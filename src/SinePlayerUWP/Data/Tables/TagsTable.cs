@@ -6,23 +6,23 @@ using SinePlayerUWP.Data.Database;
 
 namespace SinePlayerUWP.Data.Tables;
 
-internal class TagCategoryTable : ITable
+internal class TagsTable : ITable
 {
-    public static TagCategoryTable Instance { get; } = new TagCategoryTable();
+    public static TagsTable Instance { get; } = new TagsTable();
 
-    public static Int64Column ColumnId { get; } = new("id");
     public static StringColumn ColumnName { get; } = new("name");
-    public static Int64Column ColumnComicId { get; } = new("comic_id");
+    public static StringColumn ColumnTagCategory { get; } = new("tag_category");
+    public static StringColumn ColumnExt { get; } = new("ext");
 
-    private TagCategoryTable() { }
+    private TagsTable() { }
 
     public SqlDatabase GetDatabase()
     {
-        return SqliteDB.MainDatabase;
+        return SqliteDB.TagsDatabase;
     }
 
     public string GetTableName()
     {
-        return "tag_categories";
+        return "tags";
     }
 }

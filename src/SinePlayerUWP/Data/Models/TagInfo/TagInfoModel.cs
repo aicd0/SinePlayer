@@ -157,11 +157,11 @@ internal class TagInfoModel
 
     private static TagInfoModel? QueryNoLock(string tagCategory, string tag)
     {
-        SelectCommand command = SelectCommand.Create(TagInfoTable.Instance)
-            .AppendCondition(TagInfoTable.ColumnTagCategory, tagCategory)
-            .AppendCondition(TagInfoTable.ColumnName, tag)
+        SelectCommand command = SelectCommand.Create(TagsTable.Instance)
+            .AppendCondition(TagsTable.ColumnTagCategory, tagCategory)
+            .AppendCondition(TagsTable.ColumnName, tag)
             .Limit(1);
-        IReaderToken<string> extToken = command.PutQueryString(TagInfoTable.ColumnExt);
+        IReaderToken<string> extToken = command.PutQueryString(TagsTable.ColumnExt);
         using SelectCommand.IReader reader = command.Execute();
 
         bool hasRecord = false;
@@ -207,10 +207,10 @@ internal class TagInfoModel
     {
         string valueExt = model.ValueExt;
 
-        int rowsUpdated = UpdateCommand.Create(TagInfoTable.Instance)
-            .AppendCondition(TagInfoTable.ColumnTagCategory, model.TagCategory)
-            .AppendCondition(TagInfoTable.ColumnName, model.Name)
-            .AppendColumn(TagInfoTable.ColumnExt, valueExt)
+        int rowsUpdated = UpdateCommand.Create(TagsTable.Instance)
+            .AppendCondition(TagsTable.ColumnTagCategory, model.TagCategory)
+            .AppendCondition(TagsTable.ColumnName, model.Name)
+            .AppendColumn(TagsTable.ColumnExt, valueExt)
             .Execute();
 
         if (rowsUpdated == 0)
@@ -218,10 +218,10 @@ internal class TagInfoModel
             // Ensure tag category exists
             TagInfoDatabase.TagCategoryInfoGetOrCreateNoLock(model.TagCategory);
 
-            InsertCommand.Create(TagInfoTable.Instance)
-                .AppendColumn(TagInfoTable.ColumnTagCategory, model.TagCategory)
-                .AppendColumn(TagInfoTable.ColumnName, model.Name)
-                .AppendColumn(TagInfoTable.ColumnExt, valueExt)
+            InsertCommand.Create(TagsTable.Instance)
+                .AppendColumn(TagsTable.ColumnTagCategory, model.TagCategory)
+                .AppendColumn(TagsTable.ColumnName, model.Name)
+                .AppendColumn(TagsTable.ColumnExt, valueExt)
                 .Execute();
         }
     }
@@ -231,18 +231,18 @@ internal class TagInfoModel
         Key key = new(tagCategory, tag);
         _cache.TryRemove(key, out _);
 
-        DeleteCommand.Create(TagInfoTable.Instance)
-            .AppendCondition(TagInfoTable.ColumnTagCategory, tagCategory)
-            .AppendCondition(TagInfoTable.ColumnName, tag)
+        DeleteCommand.Create(TagsTable.Instance)
+            .AppendCondition(TagsTable.ColumnTagCategory, tagCategory)
+            .AppendCondition(TagsTable.ColumnName, tag)
             .Execute();
     }
 
     private static void DeleteTagCategoryCacheOnlyNoLock(string tagCategory)
     {
         List<string> tags = [];
-        SelectCommand command = SelectCommand.Create(TagInfoTable.Instance)
-            .AppendCondition(TagInfoTable.ColumnTagCategory, tagCategory);
-        IReaderToken<string> tagToken = command.PutQueryString(TagInfoTable.ColumnName);
+        SelectCommand command = SelectCommand.Create(TagsTable.Instance)
+            .AppendCondition(TagsTable.ColumnTagCategory, tagCategory);
+        IReaderToken<string> tagToken = command.PutQueryString(TagsTable.ColumnName);
         using SelectCommand.IReader reader = command.Execute();
         while (reader.Read())
         {
@@ -260,9 +260,9 @@ internal class TagInfoModel
     private static void RenameTagCategoryCacheOnlyNoLock(string oldName, string newName)
     {
         List<string> tags = [];
-        SelectCommand command = SelectCommand.Create(TagInfoTable.Instance)
-            .AppendCondition(TagInfoTable.ColumnTagCategory, oldName);
-        IReaderToken<string> tagToken = command.PutQueryString(TagInfoTable.ColumnName);
+        SelectCommand command = SelectCommand.Create(TagsTable.Instance)
+            .AppendCondition(TagsTable.ColumnTagCategory, oldName);
+        IReaderToken<string> tagToken = command.PutQueryString(TagsTable.ColumnName);
         using SelectCommand.IReader reader = command.Execute();
         while (reader.Read())
         {
@@ -297,13 +297,13 @@ internal class TagInfoModel
         HashSet<long> comicIds = [];
         await ComicHandle.Enqueue(() =>
         {
-            SelectCommand subQuery = SelectCommand.Create(TagCategoryTable.Instance)
-                .AppendCondition(TagCategoryTable.ColumnName, tagCategory);
-            subQuery.PutQueryInt64(TagCategoryTable.ColumnId);
-            SelectCommand command = SelectCommand.Create(TagTable.Instance)
-                .AppendCondition(TagTable.ColumnContent, tag)
-                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(TagTable.ColumnTagCategoryId), subQuery));
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(TagTable.ColumnComicId);
+            SelectCommand subQuery = SelectCommand.Create(MediaTagCategoryTable.Instance)
+                .AppendCondition(MediaTagCategoryTable.ColumnName, tagCategory);
+            subQuery.PutQueryInt64(MediaTagCategoryTable.ColumnId);
+            SelectCommand command = SelectCommand.Create(MediaTagTable.Instance)
+                .AppendCondition(MediaTagTable.ColumnContent, tag)
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnTagCategoryId), subQuery));
+            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagTable.ColumnComicId);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
@@ -344,11 +344,11 @@ internal class TagInfoModel
             }
 
             TagInfoDatabase.TagCategoryInfoGetOrCreateNoLock(newTagCategory);
-            UpdateCommand.Create(TagInfoTable.Instance)
-                .AppendColumn(TagInfoTable.ColumnTagCategory, newTagCategory)
-                .AppendColumn(TagInfoTable.ColumnName, newTag)
-                .AppendCondition(TagInfoTable.ColumnTagCategory, oldTagCategory)
-                .AppendCondition(TagInfoTable.ColumnName, oldTag)
+            UpdateCommand.Create(TagsTable.Instance)
+                .AppendColumn(TagsTable.ColumnTagCategory, newTagCategory)
+                .AppendColumn(TagsTable.ColumnName, newTag)
+                .AppendCondition(TagsTable.ColumnTagCategory, oldTagCategory)
+                .AppendCondition(TagsTable.ColumnName, oldTag)
                 .Execute();
             return true;
         });
@@ -356,13 +356,13 @@ internal class TagInfoModel
         List<long> comicIds = [];
         await ComicHandle.Enqueue(() =>
         {
-            SelectCommand subQuery = SelectCommand.Create(TagCategoryTable.Instance)
-                .AppendCondition(TagCategoryTable.ColumnName, oldTagCategory);
-            subQuery.PutQueryInt64(TagCategoryTable.ColumnId);
-            SelectCommand command = SelectCommand.Create(TagTable.Instance)
-                .AppendCondition(TagTable.ColumnContent, oldTag)
-                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(TagTable.ColumnTagCategoryId), subQuery));
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(TagTable.ColumnComicId);
+            SelectCommand subQuery = SelectCommand.Create(MediaTagCategoryTable.Instance)
+                .AppendCondition(MediaTagCategoryTable.ColumnName, oldTagCategory);
+            subQuery.PutQueryInt64(MediaTagCategoryTable.ColumnId);
+            SelectCommand command = SelectCommand.Create(MediaTagTable.Instance)
+                .AppendCondition(MediaTagTable.ColumnContent, oldTag)
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnTagCategoryId), subQuery));
+            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagTable.ColumnComicId);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {

@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using SinePlayerUWP.Core.Common.Lifecycle;
-using SinePlayerUWP.Core.Database.KV;
 using SinePlayerUWP.SDK.Models;
 
 namespace SinePlayerUWP.Core.Common.Utils;
@@ -89,30 +88,6 @@ public static class Extensions
     public static T GetValueOrDefault<T>(this IRegistryKey registry, string key, T defaultValue)
     {
         if (registry.TryGet(key, out T? value) && value is not null)
-        {
-            return value;
-        }
-
-        return defaultValue;
-    }
-
-    //
-    // KV
-    //
-
-    public static T? GetValue<T>(this IKVCollection collection, string key)
-    {
-        if (collection.TryGet(key, out T? value))
-        {
-            return value;
-        }
-
-        return default;
-    }
-
-    public static T GetValueOrDefault<T>(this IKVCollection collection, string key, T defaultValue)
-    {
-        if (collection.TryGet(key, out T? value) && value is not null)
         {
             return value;
         }

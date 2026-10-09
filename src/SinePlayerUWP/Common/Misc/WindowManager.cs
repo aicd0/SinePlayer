@@ -158,7 +158,7 @@ internal sealed class WindowManager
     public void RestoreWindowState()
     {
         WindowStateModel? model = null;
-        string? serialized = AppDB.AppKV.GetCollection(KVNames.KV_LIB_APP).GetValue<string>(KVNames.KV_KEY_APP_WINDOW_STATUS);
+        string? serialized = AppDB.MainRegistry.CreateKey(RegistryNames.STATE).GetValue<string>(RegistryNames.StateKey.WINDOW_STATUS);
         if (!string.IsNullOrEmpty(serialized))
         {
             try
@@ -202,7 +202,7 @@ internal sealed class WindowManager
             });
 
             string serialized = JsonSerializer.Serialize(model);
-            AppDB.AppKV.GetCollection(KVNames.KV_LIB_APP).Set(KVNames.KV_KEY_APP_WINDOW_STATUS, serialized);
+            AppDB.MainRegistry.CreateKey(RegistryNames.STATE).Set(RegistryNames.StateKey.WINDOW_STATUS, serialized);
         });
     }
 

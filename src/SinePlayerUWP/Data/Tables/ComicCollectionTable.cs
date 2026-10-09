@@ -17,7 +17,7 @@ internal class ComicCollectionTable : ITable
 
     public SqlDatabase GetDatabase()
     {
-        return SqliteDB.MainDatabase;
+        return SqliteDB.MediaDatabase;
     }
 
     public string GetTableName()

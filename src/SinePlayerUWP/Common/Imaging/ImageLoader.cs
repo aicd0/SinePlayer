@@ -31,8 +31,8 @@ internal static partial class ImageLoader
     private const string TAG = nameof(ImageLoader);
     private const int VERSION = 1;
     private const int IMAGE_META_VERSION = 2;
-    private const string IMAGES_FOLDER_NAME = "Images";
-    private const string MAIN_DATABASE_FILE_NAME = "db_main.db";
+    private const string IMAGES_FOLDER_NAME = "Thumbnails";
+    private const string MAIN_DATABASE_FILE_NAME = "Images.sqlite";
     private const long MIN_CACHE_CAPACITY = 1024 * 1024 * 1024;
     private const int CACHE_TTL_DAYS = 30;
     private const int MAX_CACHE_ROWS = 100000;
@@ -51,7 +51,7 @@ internal static partial class ImageLoader
     {
         _cacheDirectoryPath = cacheDirectoryPath;
 
-        string versionFilePath = Path.Combine(_cacheDirectoryPath, "version.txt");
+        string versionFilePath = Path.Combine(_cacheDirectoryPath, "Version.txt");
         int version = clear ? -1 : ReadVersion(versionFilePath);
         if (version != VERSION)
         {

@@ -176,7 +176,7 @@ internal class ComicFilterSQLProvider : ISQLCommandProvider
         return path1.ToLower() switch
         {
             ComicSQLProviderUtils.VAR_TAG => ComicSQLProviderUtils.CreateTagInTagCategoryCondition(path2,
-                new ComparisonCondition(ColumnOrValue.FromColumn(TagTable.ColumnContent), ColumnOrValue.FromValue(path3))),
+                new ComparisonCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnContent), ColumnOrValue.FromValue(path3))),
             _ => throw new ExpressionException($"Variable '{path1}.{path2}.{path3}' cannot be used as a condition"),
         };
     }
@@ -185,7 +185,7 @@ internal class ComicFilterSQLProvider : ISQLCommandProvider
     {
         return path1.ToLower() switch
         {
-            ComicSQLProviderUtils.VAR_TAG => ComicSQLProviderUtils.CreateTagCondition(conditionCreator(TagTable.ColumnContent)),
+            ComicSQLProviderUtils.VAR_TAG => ComicSQLProviderUtils.CreateTagCondition(conditionCreator(MediaTagTable.ColumnContent)),
             ComicSQLProviderUtils.VAR_TITLE => new OrCondition([
                 conditionCreator(ComicTable.ColumnTitle1),
                 conditionCreator(ComicTable.ColumnTitle2),
@@ -205,7 +205,7 @@ internal class ComicFilterSQLProvider : ISQLCommandProvider
     {
         return path1.ToLower() switch
         {
-            ComicSQLProviderUtils.VAR_TAG => ComicSQLProviderUtils.CreateTagInTagCategoryCondition(path2, conditionCreator(TagTable.ColumnContent)),
+            ComicSQLProviderUtils.VAR_TAG => ComicSQLProviderUtils.CreateTagInTagCategoryCondition(path2, conditionCreator(MediaTagTable.ColumnContent)),
             _ => throw new ExpressionException($"Variable '{path1}.{path2}' cannot be used here"),
         };
     }

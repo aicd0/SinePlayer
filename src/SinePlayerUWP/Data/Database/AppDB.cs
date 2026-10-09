@@ -9,7 +9,6 @@ using System.Text;
 using SinePlayerUWP.Common.Constants;
 using SinePlayerUWP.Core.Common.Storage;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Core.Database.KV;
 using SinePlayerUWP.Core.Database.Misc;
 using SinePlayerUWP.Core.Database.Registry;
 using SinePlayerUWP.SDK.Models;
@@ -18,12 +17,6 @@ namespace SinePlayerUWP.Data.Database;
 
 internal static class AppDB
 {
-    //
-    // Directories
-    //
-
-    private static string KvDirectory => Path.Combine(StorageLocation.LocalFolderPath, "kv");
-
     //
     // Host Databases
     //
@@ -34,13 +27,6 @@ internal static class AppDB
         return RegistryStore.CreateDatabase(databasePath, shared: false);
     });
     public static IRegistryDatabase MainRegistry => _mainRegistryDatabase.Value;
-
-    private static readonly Lazy<IKVDatabase> _appKvDatabase = new(() =>
-    {
-        string databasePath = Path.Combine(KvDirectory, $"app.db");
-        return KVStore.CreateDatabase(databasePath, shared: false);
-    });
-    public static IKVDatabase AppKV => _appKvDatabase.Value;
 
     //
     // Plugins Databases
@@ -79,11 +65,6 @@ internal static class AppDB
         if (_mainRegistryDatabase.IsValueCreated)
         {
             _mainRegistryDatabase.Value.Dispose();
-        }
-
-        if (_appKvDatabase.IsValueCreated)
-        {
-            _appKvDatabase.Value.Dispose();
         }
 
         foreach (IRegistryDatabase db in sPluginRegistryDatabases.Values)

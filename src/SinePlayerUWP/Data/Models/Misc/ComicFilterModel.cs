@@ -30,7 +30,7 @@ class ComicFilterModel : JsonDatabase<ComicFilterModel.JsonModel>
 
     public static readonly ComicFilterModel Instance = new();
 
-    private ComicFilterModel() : base(new SimpleConfigDatabaseLayer("filters.json")) { }
+    private ComicFilterModel() : base(new SimpleConfigDatabaseLayer("Filters.json")) { }
 
     protected override JsonModel InitializeModel(JsonModel? model)
     {

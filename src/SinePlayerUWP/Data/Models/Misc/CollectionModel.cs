@@ -113,7 +113,7 @@ internal static class CollectionModel
             }
 
             int inserted = 0;
-            SqliteDB.MainDatabase.WithTransaction(() =>
+            SqliteDB.MediaDatabase.WithTransaction(() =>
             {
                 HashSet<long> existingIds = QueryLinkedComicIdsNoLock(collectionId, ids);
                 List<long> newIds = [.. ids.Where(x => !existingIds.Contains(x))];
@@ -156,7 +156,7 @@ internal static class CollectionModel
             }
 
             int removed = 0;
-            SqliteDB.MainDatabase.WithTransaction(() =>
+            SqliteDB.MediaDatabase.WithTransaction(() =>
             {
                 foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(ids))
                 {

@@ -34,7 +34,7 @@ class FavoriteModel : JsonDatabase<FavoriteModel.JsonModel>
 
     public static readonly FavoriteModel Instance = new();
 
-    private FavoriteModel() : base(new SimpleConfigDatabaseLayer("favorites.json")) { }
+    private FavoriteModel() : base(new SimpleConfigDatabaseLayer("Favorites.json")) { }
 
     protected override JsonModel InitializeModel(JsonModel? model)
     {

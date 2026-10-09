@@ -152,10 +152,10 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
         await ComicHandle.Enqueue(() =>
         {
             {
-                var command = SelectCommand.Create(TagCategoryTable.Instance);
-                IReaderToken<long> idToken = command.PutQueryInt64(TagCategoryTable.ColumnId);
-                IReaderToken<string> nameToken = command.PutQueryString(TagCategoryTable.ColumnName);
-                IReaderToken<long> comicIdToken = command.PutQueryInt64(TagCategoryTable.ColumnComicId);
+                var command = SelectCommand.Create(MediaTagCategoryTable.Instance);
+                IReaderToken<long> idToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnId);
+                IReaderToken<string> nameToken = command.PutQueryString(MediaTagCategoryTable.ColumnName);
+                IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnComicId);
                 using SelectCommand.IReader reader = command.Execute();
                 while (reader.Read())
                 {
@@ -167,9 +167,9 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
             }
 
             {
-                var command = SelectCommand.Create(TagTable.Instance);
-                IReaderToken<string> contentToken = command.PutQueryString(TagTable.ColumnContent);
-                IReaderToken<long> categoryIdToken = command.PutQueryInt64(TagTable.ColumnTagCategoryId);
+                var command = SelectCommand.Create(MediaTagTable.Instance);
+                IReaderToken<string> contentToken = command.PutQueryString(MediaTagTable.ColumnContent);
+                IReaderToken<long> categoryIdToken = command.PutQueryInt64(MediaTagTable.ColumnTagCategoryId);
                 using SelectCommand.IReader reader = command.Execute();
                 while (reader.Read())
                 {

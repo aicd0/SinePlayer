@@ -52,7 +52,7 @@ internal class ComicSearchSQLProvider(Common.Expression.Filter.Sql.ISQLCommandPr
                 }
 
             case ComicSQLProviderUtils.VAR_TAG:
-                return ComicSQLProviderUtils.CreateTagCondition(new ComparisonCondition(ColumnOrValue.FromColumn(TagTable.ColumnContent), ColumnOrValue.FromValue(value)));
+                return ComicSQLProviderUtils.CreateTagCondition(new ComparisonCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnContent), ColumnOrValue.FromValue(value)));
 
             case ComicSQLProviderUtils.VAR_HIDDEN:
                 return value switch
@@ -63,7 +63,7 @@ internal class ComicSearchSQLProvider(Common.Expression.Filter.Sql.ISQLCommandPr
                 };
 
             default:
-                return ComicSQLProviderUtils.CreateTagInTagCategoryCondition(key, new ComparisonCondition(ColumnOrValue.FromColumn(TagTable.ColumnContent), ColumnOrValue.FromValue(value)));
+                return ComicSQLProviderUtils.CreateTagInTagCategoryCondition(key, new ComparisonCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnContent), ColumnOrValue.FromValue(value)));
         }
     }
 }

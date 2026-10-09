@@ -172,13 +172,13 @@
     <value>アンチエイリアシングフィルタ</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>マンガリーダー UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppDisplayName" xml:space="preserve">
-    <value>マンガリーダー UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppStoreName" xml:space="preserve">
-    <value>マンガリーダー UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppearanceExpander.Detail" xml:space="preserve">
     <value>表示するアプリのテーマを選択する</value>
@@ -342,7 +342,7 @@ $files</value>
     <value>説明する</value>
   </data>
   <data name="DevAppDisplayName" xml:space="preserve">
-    <value>マンガリーダー [Dev]</value>
+    <value>Sine Player UWP [Dev]</value>
   </data>
   <data name="DeveloperMode" xml:space="preserve">
     <value>開発者モード</value>

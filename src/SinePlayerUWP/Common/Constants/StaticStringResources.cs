@@ -11,10 +11,10 @@ internal static class StaticStringResources
     public const string GITHUB_PLUGINS_REPO_URL = @"https://github.com/aicd0/SinePlayerUWPPlugins";
     public const string SEND_FEEDBACK_URL = @"https://github.com/aicd0/SinePlayerUWP/issues/new/choose";
     public const string PRIVACY_POLICY_URL = @"https://github.com/aicd0/SinePlayerUWP/blob/develop/docs/PrivacyPolicy.md";
-    public const string FEEDBACK_EMAIL = "comic_reader_uwp@163.com";
+    public const string FEEDBACK_EMAIL = "sine_player_uwp@163.com";
 
     public const string LICENSE = """
-Comic Reader UWP / Comic Reader UWP SDK
+Sine Player UWP / Sine Player UWP SDK
 
 The MIT License (MIT)
 

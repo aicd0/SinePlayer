@@ -13,7 +13,7 @@ internal class SimpleConfigDatabase
 {
     private const string TAG = nameof(SimpleConfigDatabase);
 
-    private static readonly SimpleConfigDatabase sInstance = new(StorageLocation.LocalFolderPath, "configs");
+    private static readonly SimpleConfigDatabase sInstance = new(StorageLocation.LocalFolderPath, "Configs");
 
     public static SimpleConfigDatabase Instance => sInstance;
 

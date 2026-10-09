@@ -21,32 +21,32 @@ internal class ComicSQLProviderUtils
 
     public static ICondition CreateTagCondition(ICondition condition)
     {
-        var subquery = SelectCommand.Create(TagTable.Instance);
+        var subquery = SelectCommand.Create(MediaTagTable.Instance);
         subquery.AppendCondition(condition);
-        subquery.PutQueryInt64(TagTable.ColumnComicId);
+        subquery.PutQueryInt64(MediaTagTable.ColumnComicId);
         subquery.Distinct();
         return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery);
     }
 
     public static ICondition CreateTagCategoryCondition(string category)
     {
-        var subquery = SelectCommand.Create(TagCategoryTable.Instance);
-        subquery.AppendCondition(TagCategoryTable.ColumnName, category);
-        subquery.PutQueryInt64(TagCategoryTable.ColumnComicId);
+        var subquery = SelectCommand.Create(MediaTagCategoryTable.Instance);
+        subquery.AppendCondition(MediaTagCategoryTable.ColumnName, category);
+        subquery.PutQueryInt64(MediaTagCategoryTable.ColumnComicId);
         subquery.Distinct();
         return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery);
     }
 
     public static ICondition CreateTagInTagCategoryCondition(string category, ICondition condition)
     {
-        var subquery1 = SelectCommand.Create(TagCategoryTable.Instance);
-        subquery1.AppendCondition(TagCategoryTable.ColumnName, category);
-        subquery1.PutQueryInt64(TagCategoryTable.ColumnId);
+        var subquery1 = SelectCommand.Create(MediaTagCategoryTable.Instance);
+        subquery1.AppendCondition(MediaTagCategoryTable.ColumnName, category);
+        subquery1.PutQueryInt64(MediaTagCategoryTable.ColumnId);
         subquery1.Distinct();
-        var subquery2 = SelectCommand.Create(TagTable.Instance);
-        subquery2.AppendCondition(new InCondition(ColumnOrValue.FromColumn(TagTable.ColumnTagCategoryId), subquery1));
+        var subquery2 = SelectCommand.Create(MediaTagTable.Instance);
+        subquery2.AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnTagCategoryId), subquery1));
         subquery2.AppendCondition(condition);
-        subquery2.PutQueryInt64(TagTable.ColumnComicId);
+        subquery2.PutQueryInt64(MediaTagTable.ColumnComicId);
         subquery2.Distinct();
         return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery2);
     }

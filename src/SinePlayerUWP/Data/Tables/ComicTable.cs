@@ -29,7 +29,7 @@ internal class ComicTable : ITable
 
     public SqlDatabase GetDatabase()
     {
-        return SqliteDB.MainDatabase;
+        return SqliteDB.MediaDatabase;
     }
 
     public string GetTableName()

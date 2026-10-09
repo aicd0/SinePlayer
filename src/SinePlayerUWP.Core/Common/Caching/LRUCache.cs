@@ -11,7 +11,7 @@ namespace SinePlayerUWP.Core.Common.Caching;
 public partial class LRUCache(string directoryPath)
 {
     private const string TAG = nameof(LRUCache);
-    private const string DATABASE_FILE_NAME = "info.db";
+    private const string DATABASE_FILE_NAME = "Records.sqlite";
     private const int BATCH_SIZE = 1000;
 
     private readonly string _directoryPath = directoryPath;

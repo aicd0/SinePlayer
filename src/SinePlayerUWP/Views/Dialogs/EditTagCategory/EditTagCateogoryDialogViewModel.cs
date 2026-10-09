@@ -148,9 +148,9 @@ internal partial class EditTagCateogoryDialogViewModel : INotifyPropertyChanged
     {
         return await TagInfoDatabase.Enqueue(() =>
         {
-            SelectCommand command = SelectCommand.Create(TagInfoTable.Instance)
-                .AppendCondition(TagInfoTable.ColumnTagCategory, tagCategory);
-            command.PutQueryString(TagInfoTable.ColumnName);
+            SelectCommand command = SelectCommand.Create(TagsTable.Instance)
+                .AppendCondition(TagsTable.ColumnTagCategory, tagCategory);
+            command.PutQueryString(TagsTable.ColumnName);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {

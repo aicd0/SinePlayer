@@ -172,13 +172,13 @@
     <value>Anti-Aliasing-Filter</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>Comic-Leser UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppDisplayName" xml:space="preserve">
-    <value>Comic-Leser UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppStoreName" xml:space="preserve">
-    <value>Comic-Leser UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppearanceExpander.Detail" xml:space="preserve">
     <value>Wählen Sie aus, welches App-Design angezeigt werden soll</value>
@@ -342,7 +342,7 @@ $files</value>
     <value>Beschreibung</value>
   </data>
   <data name="DevAppDisplayName" xml:space="preserve">
-    <value>Comic-Leser UWP [Dev]</value>
+    <value>Sine Player UWP [Dev]</value>
   </data>
   <data name="DeveloperMode" xml:space="preserve">
     <value>Entwicklermodus</value>

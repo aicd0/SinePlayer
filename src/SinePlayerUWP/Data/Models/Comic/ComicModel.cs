@@ -466,8 +466,8 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
         return ComicHandle.Enqueue<List<string>>(() =>
         {
             HashSet<string> tags = [];
-            var command = SelectCommand.Create(TagCategoryTable.Instance);
-            IReaderToken<string> nameToken = command.PutQueryString(TagCategoryTable.ColumnName);
+            var command = SelectCommand.Create(MediaTagCategoryTable.Instance);
+            IReaderToken<string> nameToken = command.PutQueryString(MediaTagCategoryTable.ColumnName);
             command.Distinct();
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
@@ -809,15 +809,15 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
 
         await ComicHandle.Enqueue(() =>
         {
-            SqliteDB.MainDatabase.WithTransaction(() =>
+            SqliteDB.MediaDatabase.WithTransaction(() =>
             {
                 foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(ids))
                 {
-                    DeleteCommand.Create(TagTable.Instance)
-                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(TagTable.ColumnComicId), idChunk))
+                    DeleteCommand.Create(MediaTagTable.Instance)
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnComicId), idChunk))
                         .Execute();
-                    DeleteCommand.Create(TagCategoryTable.Instance)
-                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(TagCategoryTable.ColumnComicId), idChunk))
+                    DeleteCommand.Create(MediaTagCategoryTable.Instance)
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagCategoryTable.ColumnComicId), idChunk))
                         .Execute();
                     DeleteCommand.Create(ComicCollectionTable.Instance)
                         .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicCollectionTable.ColumnComicId), idChunk))
@@ -907,7 +907,7 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
     {
         return ComicHandle.Enqueue(() =>
         {
-            SqliteDB.MainDatabase.WithTransaction(action);
+            SqliteDB.MediaDatabase.WithTransaction(action);
         });
     }
 

@@ -28,11 +28,10 @@ namespace SinePlayerUWP.Common.Plugins;
 internal partial class PluginManager
 {
     private const string TAG = nameof(PluginManager);
-    private const string KEY_DISABLED_PLUGINS = "DisabledPlugins";
 
     public static readonly PluginManager Instance = new();
 
-    public static string PluginsFolderPath => Path.Combine(StorageLocation.LocalFolderPath, "plugins");
+    public static string PluginsFolderPath => Path.Combine(StorageLocation.LocalFolderPath, "Plugins");
 
     private static readonly MutableLiveData<bool> _pluginsChanged = new(false);
     public static ILiveData<bool> PluginsChanged => _pluginsChanged;
@@ -193,7 +192,7 @@ internal partial class PluginManager
     private void ReadDisabledPlugins()
     {
         _disabledPlugins.Clear();
-        string json = AppDB.AppKV.GetCollection(KVNames.KV_LIB_PLUGINS).GetValueOrDefault(KEY_DISABLED_PLUGINS, "[]");
+        string json = AppDB.MainRegistry.CreateKey(RegistryNames.PLUGINS).GetValueOrDefault(RegistryNames.PluginsKey.DISABLED_PLUGINS, "[]");
         IEnumerable<string>? disabledPlugins;
         try
         {
@@ -234,7 +233,7 @@ internal partial class PluginManager
         List<string> disabledPlugins = [.. _disabledPlugins.Keys];
         disabledPlugins.Sort();
         string json = JsonSerializer.Serialize(disabledPlugins);
-        AppDB.AppKV.GetCollection(KVNames.KV_LIB_PLUGINS).Set(KEY_DISABLED_PLUGINS, json);
+        AppDB.MainRegistry.CreateKey(RegistryNames.PLUGINS).Set(RegistryNames.PluginsKey.DISABLED_PLUGINS, json);
     }
 
     private static void NotifyPluginsChanged()

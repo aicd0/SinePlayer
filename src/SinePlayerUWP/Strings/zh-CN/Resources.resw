@@ -172,13 +172,13 @@
     <value>抗混叠滤波器</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>漫画阅读器 UWP</value>
+    <value>Sine 播放器 UWP</value>
   </data>
   <data name="AppDisplayName" xml:space="preserve">
-    <value>漫画阅读器 UWP</value>
+    <value>Sine 播放器 UWP</value>
   </data>
   <data name="AppStoreName" xml:space="preserve">
-    <value>漫画阅读器 UWP</value>
+    <value>Sine 播放器 UWP</value>
   </data>
   <data name="AppearanceExpander.Detail" xml:space="preserve">
     <value>选择要显示的应用主题</value>
@@ -342,7 +342,7 @@ $files</value>
     <value>描述</value>
   </data>
   <data name="DevAppDisplayName" xml:space="preserve">
-    <value>漫画阅读器 UWP [Dev]</value>
+    <value>Sine 播放器 UWP [Dev]</value>
   </data>
   <data name="DeveloperMode" xml:space="preserve">
     <value>开发者模式</value>

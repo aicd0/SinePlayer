@@ -44,12 +44,12 @@ internal abstract partial class ComicHandle
 
     public static Task Enqueue(Action action)
     {
-        return SqliteDB.MainDatabaseDispatcher.Submit(action);
+        return SqliteDB.MediaDatabaseDispatcher.Submit(action);
     }
 
     public static Task<T> Enqueue<T>(Func<T> func)
     {
-        return SqliteDB.MainDatabaseDispatcher.Submit(func);
+        return SqliteDB.MediaDatabaseDispatcher.Submit(func);
     }
 
     public static long InsertNoLock(ComicType type, string location)
@@ -203,11 +203,11 @@ internal abstract partial class ComicHandle
         Dictionary<long, TagTempData> tagCategories = new(comics.Count);
         foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(comics.Keys))
         {
-            SelectCommand command = SelectCommand.Create(TagCategoryTable.Instance)
-                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(TagCategoryTable.ColumnComicId), idChunk));
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(TagCategoryTable.ColumnComicId);
-            IReaderToken<long> tagCategoryIdToken = command.PutQueryInt64(TagCategoryTable.ColumnId);
-            IReaderToken<string> nameToken = command.PutQueryString(TagCategoryTable.ColumnName);
+            SelectCommand command = SelectCommand.Create(MediaTagCategoryTable.Instance)
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagCategoryTable.ColumnComicId), idChunk));
+            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnComicId);
+            IReaderToken<long> tagCategoryIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnId);
+            IReaderToken<string> nameToken = command.PutQueryString(MediaTagCategoryTable.ColumnName);
             using SelectCommand.IReader reader = command.Execute();
 
             while (reader.Read())
@@ -229,10 +229,10 @@ internal abstract partial class ComicHandle
 
         foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(tagCategories.Keys))
         {
-            SelectCommand command = SelectCommand.Create(TagTable.Instance)
-                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(TagTable.ColumnTagCategoryId), idChunk));
-            IReaderToken<long> tagCategoryIdToken = command.PutQueryInt64(TagTable.ColumnTagCategoryId);
-            IReaderToken<string> tagToken = command.PutQueryString(TagTable.ColumnContent);
+            SelectCommand command = SelectCommand.Create(MediaTagTable.Instance)
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnTagCategoryId), idChunk));
+            IReaderToken<long> tagCategoryIdToken = command.PutQueryInt64(MediaTagTable.ColumnTagCategoryId);
+            IReaderToken<string> tagToken = command.PutQueryString(MediaTagTable.ColumnContent);
             using SelectCommand.IReader reader = command.Execute();
 
             while (reader.Read())
@@ -763,23 +763,23 @@ internal abstract partial class ComicHandle
 
     private void InternalSaveTagsNoLock()
     {
-        DeleteCommand.Create(TagCategoryTable.Instance)
-            .AppendCondition(TagCategoryTable.ColumnComicId, Id)
+        DeleteCommand.Create(MediaTagCategoryTable.Instance)
+            .AppendCondition(MediaTagCategoryTable.ColumnComicId, Id)
             .Execute();
 
         foreach (KeyValuePair<string, ComicTagCategory> item in Tags)
         {
-            long tagCategoryId = InsertCommand.Create(TagCategoryTable.Instance)
-                .AppendColumn(TagCategoryTable.ColumnName, item.Key)
-                .AppendColumn(TagCategoryTable.ColumnComicId, Id)
+            long tagCategoryId = InsertCommand.Create(MediaTagCategoryTable.Instance)
+                .AppendColumn(MediaTagCategoryTable.ColumnName, item.Key)
+                .AppendColumn(MediaTagCategoryTable.ColumnComicId, Id)
                 .Execute();
 
             foreach (string tag in item.Value.Tags)
             {
-                InsertCommand.Create(TagTable.Instance)
-                    .AppendColumn(TagTable.ColumnContent, tag)
-                    .AppendColumn(TagTable.ColumnComicId, Id)
-                    .AppendColumn(TagTable.ColumnTagCategoryId, tagCategoryId)
+                InsertCommand.Create(MediaTagTable.Instance)
+                    .AppendColumn(MediaTagTable.ColumnContent, tag)
+                    .AppendColumn(MediaTagTable.ColumnComicId, Id)
+                    .AppendColumn(MediaTagTable.ColumnTagCategoryId, tagCategoryId)
                     .Execute();
             }
         }

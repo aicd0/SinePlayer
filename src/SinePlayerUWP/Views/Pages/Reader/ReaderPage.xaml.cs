@@ -110,7 +110,7 @@ internal sealed partial class ReaderPage : BasePage
         ViewModel.SetZooming((int)Math.Round(MainReaderView.Zooming * 100F));
 
         {
-            bool tipShown = AppDB.AppKV.GetCollection(KVNames.KV_LIB_TIPS).GetValueOrDefault(KVNames.KV_KEY_TIPS_READER_TIP_SHOWN, false);
+            bool tipShown = AppDB.MainRegistry.CreateKey(RegistryNames.TIPS).GetValueOrDefault(RegistryNames.TipsKey.READER_TIP_SHOWN, false);
             if (!tipShown)
             {
                 ReaderTip.IsOpen = !tipShown;
@@ -647,7 +647,7 @@ internal sealed partial class ReaderPage : BasePage
 
     private void ReaderTipCloseButton_Click(InfoBar sender, object args)
     {
-        AppDB.AppKV.GetCollection(KVNames.KV_LIB_TIPS).Set(KVNames.KV_KEY_TIPS_READER_TIP_SHOWN, true);
+        AppDB.MainRegistry.CreateKey(RegistryNames.TIPS).Set(RegistryNames.TipsKey.READER_TIP_SHOWN, true);
     }
 
     //
@@ -1303,14 +1303,16 @@ internal sealed partial class ReaderPage : BasePage
 
     private class ReaderConfigDatabase : ReaderView.IConfigurationDatabase
     {
+        private readonly Lazy<IRegistryKey> _registryKey = new(() => AppDB.MainRegistry.CreateKey(RegistryNames.READER_STATE));
+
         public string? ReadConfiguration(string key)
         {
-            return AppDB.AppKV.GetCollection(KVNames.KV_LIB_READER_STATE).GetValue<string>(key);
+            return _registryKey.Value.GetValue<string>(key);
         }
 
         public void WriteConfiguration(string key, string value)
         {
-            AppDB.AppKV.GetCollection(KVNames.KV_LIB_READER_STATE).Set(key, value);
+            _registryKey.Value.Set(key, value);
         }
     }
 }

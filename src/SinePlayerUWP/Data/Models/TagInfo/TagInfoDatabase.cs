@@ -30,7 +30,7 @@ internal static class TagInfoDatabase
 
     public static Task<T> Enqueue<T>(Func<T> op)
     {
-        return SqliteDB.TagInfoDatabaseDispatcher.Submit(op);
+        return SqliteDB.TagsDatabaseDispatcher.Submit(op);
     }
 
     public static void DispatchTagInfoUpdateEvents()

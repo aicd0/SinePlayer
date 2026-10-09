@@ -172,13 +172,13 @@
     <value>Filtre anti-aliasing</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>Lecteur de Bandes Dessinées UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppDisplayName" xml:space="preserve">
-    <value>Lecteur de Bandes Dessinées UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppStoreName" xml:space="preserve">
-    <value>Lecteur de Bandes Dessinées UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppearanceExpander.Detail" xml:space="preserve">
     <value>Sélectionnez le thème d'application à afficher</value>
@@ -342,7 +342,7 @@ $files</value>
     <value>Description</value>
   </data>
   <data name="DevAppDisplayName" xml:space="preserve">
-    <value>Lecteur de Bandes Dessinées UWP [Dev]</value>
+    <value>Sine Player UWP [Dev]</value>
   </data>
   <data name="DeveloperMode" xml:space="preserve">
     <value>Mode développeur</value>

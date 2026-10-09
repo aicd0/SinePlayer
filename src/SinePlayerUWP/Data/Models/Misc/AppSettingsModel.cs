@@ -5,15 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-using SinePlayerUWP.Common.Constants;
 using SinePlayerUWP.Common.HotKey;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.AppEnvironment;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Common.Lifecycle;
-using SinePlayerUWP.Core.Common.Utils;
 using SinePlayerUWP.Core.Database.JSON;
-using SinePlayerUWP.Data.Database;
 
 using Windows.Globalization;
 using Windows.System;
@@ -632,17 +629,12 @@ internal static class AppSettingsModel
 
     private class JsonDatabase : JsonDatabase<JsonModel>
     {
-        public JsonDatabase() : base(new SimpleConfigDatabaseLayer("settings.json")) { }
+        public JsonDatabase() : base(new SimpleConfigDatabaseLayer("Settings.json")) { }
 
         protected override JsonModel InitializeModel(JsonModel? model)
         {
             model ??= new();
             model.OpenComicDefaultBehavior ??= model.HomePageTapComicBehavior;
-            model.AutomaticallyHideCursor ??= AppDB.AppKV.GetCollection(KVNames.KV_LIB_APP).GetValueOrDefault(KVNames.KV_KEY_APP_AUTO_HIDE_CURSOR, false);
-            model.DefaultArchiveCodePage ??= (int)AppDB.AppKV.GetCollection(KVNames.KV_LIB_APP).GetValueOrDefault<long>(KVNames.KV_KEY_APP_DEFAULT_ARCHIVE_CODE_PAGE, -1);
-            model.RatingPercentageEnabled ??= AppDB.AppKV.GetCollection(KVNames.KV_LIB_APP).GetValueOrDefault(KVNames.KV_KEY_APP_RATING_PERCENTAGE_ENABLED, false);
-            model.SaveBrowsingHistory ??= AppDB.AppKV.GetCollection(KVNames.KV_LIB_APP).GetValueOrDefault(KVNames.KV_KEY_APP_SAVE_BROWSING_HISTORY, true);
-            model.TransitionAnimation ??= AppDB.AppKV.GetCollection(KVNames.KV_LIB_APP).GetValueOrDefault(KVNames.KV_KEY_APP_TRANSITION_ANIMATION, true);
             return model;
         }
     }

@@ -54,7 +54,7 @@ internal sealed partial class DevToolsPage : BasePage
         GetMainPageAbility().SetTitle("Dev tools");
         GetMainPageAbility().SetIcon(new SymbolIconSource() { Symbol = Symbol.Repair });
 
-        StartOrStopLogger(AppDB.AppKV.GetCollection(KVNames.KV_LIB_APP).GetValueOrDefault(KVNames.KV_KEY_APP_LOG_STARTED, true));
+        StartOrStopLogger(AppDB.MainRegistry.CreateKey(RegistryNames.STATE).GetValueOrDefault(RegistryNames.StateKey.LOG_STARTED, true));
         UpdateLogToggleButton();
 
         InitializeCounters();
@@ -249,7 +249,7 @@ internal sealed partial class DevToolsPage : BasePage
             return;
         }
 
-        AppDB.AppKV.GetCollection(KVNames.KV_LIB_APP).Set(KVNames.KV_KEY_APP_LOG_STARTED, started);
+        AppDB.MainRegistry.CreateKey(RegistryNames.STATE).Set(RegistryNames.StateKey.LOG_STARTED, started);
         _logStarted = started;
         if (started)
         {

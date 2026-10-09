@@ -172,13 +172,13 @@
     <value>Filtro anti-aliasing</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>Lector de Cómics UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppDisplayName" xml:space="preserve">
-    <value>Lector de Cómics UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppStoreName" xml:space="preserve">
-    <value>Lector de Cómics UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppearanceExpander.Detail" xml:space="preserve">
     <value>Seleccione qué tema de aplicación desea mostrar</value>
@@ -342,7 +342,7 @@ $files</value>
     <value>Descripción</value>
   </data>
   <data name="DevAppDisplayName" xml:space="preserve">
-    <value>Lector de Cómics [Dev]</value>
+    <value>Sine Player UWP [Dev]</value>
   </data>
   <data name="DeveloperMode" xml:space="preserve">
     <value>Modo de desarrollador</value>

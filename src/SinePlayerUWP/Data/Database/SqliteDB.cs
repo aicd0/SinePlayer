@@ -11,13 +11,13 @@ using SinePlayerUWP.Data.Tables;
 
 namespace SinePlayerUWP.Data.Database;
 
-public static class SqliteDB
+internal static class SqliteDB
 {
-    public const int DATABASE_VERSION = 8;
+    public const int VERSION = DatabaseVersionModel.SQLITE_SCHEME_VERSION;
 
     private const string TAG = nameof(SqliteDB);
 
-    private static string DatabaseFolderPath => Path.Combine(StorageLocation.LocalFolderPath, "sqlite");
+    private static string DatabaseFolderPath => Path.Combine(StorageLocation.LocalFolderPath, "Sqlite");
 
     private static bool _initialized = false;
 
@@ -25,21 +25,21 @@ public static class SqliteDB
     // Comic Database
     //
 
-    private static SqlDatabase? _mainDatabase = null;
-    public static SqlDatabase MainDatabase => _mainDatabase!;
+    private static SqlDatabase? _mediaDatabase = null;
+    public static SqlDatabase MediaDatabase => _mediaDatabase!;
 
-    private static readonly ITaskDispatcher _mainDbDispatcher = TaskDispatcher.Factory.NewQueue("MainDatabaseQueue");
-    public static ITaskDispatcher MainDatabaseDispatcher => _mainDbDispatcher;
+    private static readonly ITaskDispatcher _mediaDbDispatcher = TaskDispatcher.Factory.NewQueue("MediaDatabaseQueue");
+    public static ITaskDispatcher MediaDatabaseDispatcher => _mediaDbDispatcher;
 
     //
     // Tag Info Database
     //
 
-    private static SqlDatabase? _tagInfoDatabase = null;
-    public static SqlDatabase TagInfoDatabase => _tagInfoDatabase!;
+    private static SqlDatabase? _tagsDatabase = null;
+    public static SqlDatabase TagsDatabase => _tagsDatabase!;
 
-    private static readonly ITaskDispatcher _tabInfoDbDispatcher = TaskDispatcher.Factory.NewQueue("TagInfoDatabaseQueue");
-    public static ITaskDispatcher TagInfoDatabaseDispatcher => _tabInfoDbDispatcher;
+    private static readonly ITaskDispatcher _tagsDbDispatcher = TaskDispatcher.Factory.NewQueue("TagsDatabaseQueue");
+    public static ITaskDispatcher TagsDatabaseDispatcher => _tagsDbDispatcher;
 
     //
     // Miscellaneous Database
@@ -57,10 +57,10 @@ public static class SqliteDB
 
     public static void Dispose()
     {
-        _mainDatabase?.Dispose();
-        _mainDatabase = null;
-        _tagInfoDatabase?.Dispose();
-        _tagInfoDatabase = null;
+        _mediaDatabase?.Dispose();
+        _mediaDatabase = null;
+        _tagsDatabase?.Dispose();
+        _tagsDatabase = null;
         _miscDatabase?.Dispose();
         _miscDatabase = null;
     }
@@ -79,43 +79,17 @@ public static class SqliteDB
             Directory.CreateDirectory(databasePath);
         }
 
-        InitializeMainDatabase();
-        InitializeTagInfoDatabase();
+        InitializeMediaDatabase();
+        InitializeTagsDatabase();
         InitializeMiscDatabase();
         _initialized = true;
     }
 
     public static void UpdateDatabase(int databaseVersion)
     {
-        string comicTable = ComicTable.Instance.GetTableName();
         switch (databaseVersion)
         {
-            case -1:
-            case 0:
-            case 1:
-                goto case DATABASE_VERSION;
-            case 2:
-                ExecuteCommand(MainDatabase, $"ALTER TABLE {comicTable} DROP COLUMN image_aspect_ratios");
-                ExecuteCommand(MainDatabase, $"ALTER TABLE {comicTable} DROP COLUMN cover_file_name");
-                ExecuteCommand(MainDatabase, $"ALTER TABLE {comicTable} ADD COLUMN cover_cache_key TEXT DEFAULT ''");
-                ExecuteCommand(MainDatabase, $"ALTER TABLE {comicTable} ADD COLUMN {ComicTable.ColumnDescription.Name} TEXT DEFAULT ''");
-                goto case 3;
-            case 3:
-                ExecuteCommand(MainDatabase, $"ALTER TABLE {comicTable} ADD COLUMN {ComicTable.ColumnCompletionStatus.Name} INTEGER NOT NULL DEFAULT 0");
-                goto case 4;
-            case 4:
-                ExecuteCommand(MainDatabase, $"ALTER TABLE {comicTable} ADD COLUMN {ComicTable.ColumnExt.Name} TEXT DEFAULT ''");
-                goto case 5;
-            case 5:
-                ExecuteCommand(MainDatabase, $"ALTER TABLE {comicTable} ADD COLUMN {ComicTable.ColumnPageCount.Name} INTEGER NOT NULL DEFAULT -1");
-                goto case 6;
-            case 6:
-                ExecuteCommand(MainDatabase, $"UPDATE {comicTable} SET {ComicTable.ColumnRating.Name} = {ComicTable.ColumnRating.Name} * 20 WHERE {ComicTable.ColumnRating.Name} >= 0");
-                goto case 7;
-            case 7: // 3.3.0
-                ExecuteCommand(MainDatabase, $"ALTER TABLE {comicTable} DROP COLUMN cover_cache_key");
-                goto case DATABASE_VERSION;
-            case DATABASE_VERSION:
+            case VERSION:
                 break;
             default:
                 Logger.F(TAG, $"Unknown database version: {databaseVersion}");
@@ -123,17 +97,17 @@ public static class SqliteDB
         }
     }
 
-    private static void InitializeMainDatabase()
+    private static void InitializeMediaDatabase()
     {
-        _mainDatabase?.Dispose();
-        _mainDatabase = new SqlDatabase(Path.Combine(DatabaseFolderPath, "main.db"));
+        _mediaDatabase?.Dispose();
+        _mediaDatabase = new SqlDatabase(Path.Combine(DatabaseFolderPath, "Media.sqlite"));
 
         string comicTable = ComicTable.Instance.GetTableName();
         string comicCollectionTable = ComicCollectionTable.Instance.GetTableName();
-        string tagCategoryTable = TagCategoryTable.Instance.GetTableName();
-        string tagTable = TagTable.Instance.GetTableName();
+        string tagCategoryTable = MediaTagCategoryTable.Instance.GetTableName();
+        string tagTable = MediaTagTable.Instance.GetTableName();
 
-        ExecuteCommand(MainDatabase, "CREATE TABLE IF NOT EXISTS " + comicTable + " (" +
+        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + comicTable + " (" +
             ComicTable.ColumnId.Name + " INTEGER PRIMARY KEY AUTOINCREMENT" +
             "," + ComicTable.ColumnType.Name + " INTEGER NOT NULL" +
             "," + ComicTable.ColumnLocation.Name + " TEXT NOT NULL" +
@@ -150,48 +124,48 @@ public static class SqliteDB
             "," + ComicTable.ColumnExt.Name + " TEXT" +
             ")");
 
-        ExecuteCommand(MainDatabase, "CREATE TABLE IF NOT EXISTS " + comicCollectionTable + " (" +
+        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + comicCollectionTable + " (" +
             ComicCollectionTable.ColumnCollectionId.Name + " INTEGER NOT NULL REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
             "," + ComicCollectionTable.ColumnComicId.Name + " INTEGER NOT NULL REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
 
-        ExecuteCommand(MainDatabase, "CREATE TABLE IF NOT EXISTS " + tagCategoryTable + " (" +
-            TagCategoryTable.ColumnId.Name + " INTEGER PRIMARY KEY AUTOINCREMENT" +
-            "," + TagCategoryTable.ColumnName.Name + " TEXT" +
-            "," + TagCategoryTable.ColumnComicId.Name + " INTEGER REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
+        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + tagCategoryTable + " (" +
+            MediaTagCategoryTable.ColumnId.Name + " INTEGER PRIMARY KEY AUTOINCREMENT" +
+            "," + MediaTagCategoryTable.ColumnName.Name + " TEXT" +
+            "," + MediaTagCategoryTable.ColumnComicId.Name + " INTEGER REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
 
-        ExecuteCommand(MainDatabase, "CREATE TABLE IF NOT EXISTS " + tagTable + " (" +
-            TagTable.ColumnContent.Name + " TEXT" +
-            "," + TagTable.ColumnComicId.Name + " INTEGER NOT NULL" +
-            "," + TagTable.ColumnTagCategoryId.Name + " INTEGER REFERENCES " + tagCategoryTable + "(" + TagCategoryTable.ColumnId.Name + ") ON DELETE CASCADE" +
+        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + tagTable + " (" +
+            MediaTagTable.ColumnContent.Name + " TEXT" +
+            "," + MediaTagTable.ColumnComicId.Name + " INTEGER NOT NULL" +
+            "," + MediaTagTable.ColumnTagCategoryId.Name + " INTEGER REFERENCES " + tagCategoryTable + "(" + MediaTagCategoryTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
     }
 
-    private static void InitializeTagInfoDatabase()
+    private static void InitializeTagsDatabase()
     {
-        _tagInfoDatabase?.Dispose();
-        _tagInfoDatabase = new SqlDatabase(Path.Combine(DatabaseFolderPath, "tag_info.db"));
+        _tagsDatabase?.Dispose();
+        _tagsDatabase = new SqlDatabase(Path.Combine(DatabaseFolderPath, "Tags.sqlite"));
 
-        string tagCategoryInfoTable = TagCategoryInfoTable.Instance.GetTableName();
-        string tagInfoTable = TagInfoTable.Instance.GetTableName();
+        string tagCategoryInfoTable = TagCategoriesTable.Instance.GetTableName();
+        string tagInfoTable = TagsTable.Instance.GetTableName();
 
-        ExecuteCommand(TagInfoDatabase, "CREATE TABLE IF NOT EXISTS " + tagCategoryInfoTable + " (" +
-            TagCategoryInfoTable.ColumnName.Name + " TEXT NOT NULL PRIMARY KEY" +
-            "," + TagCategoryInfoTable.ColumnExt.Name + " TEXT" +
+        ExecuteCommand(TagsDatabase, "CREATE TABLE IF NOT EXISTS " + tagCategoryInfoTable + " (" +
+            TagCategoriesTable.ColumnName.Name + " TEXT NOT NULL PRIMARY KEY" +
+            "," + TagCategoriesTable.ColumnExt.Name + " TEXT" +
             ")");
 
-        ExecuteCommand(TagInfoDatabase, "CREATE TABLE IF NOT EXISTS " + tagInfoTable + " (" +
-            TagInfoTable.ColumnName.Name + " TEXT NOT NULL" +
-            "," + TagInfoTable.ColumnTagCategory.Name + " TEXT NOT NULL REFERENCES " + tagCategoryInfoTable + "(" + TagCategoryInfoTable.ColumnName.Name + ") ON DELETE CASCADE ON UPDATE CASCADE" +
-            "," + TagInfoTable.ColumnExt.Name + " TEXT" +
+        ExecuteCommand(TagsDatabase, "CREATE TABLE IF NOT EXISTS " + tagInfoTable + " (" +
+            TagsTable.ColumnName.Name + " TEXT NOT NULL" +
+            "," + TagsTable.ColumnTagCategory.Name + " TEXT NOT NULL REFERENCES " + tagCategoryInfoTable + "(" + TagCategoriesTable.ColumnName.Name + ") ON DELETE CASCADE ON UPDATE CASCADE" +
+            "," + TagsTable.ColumnExt.Name + " TEXT" +
             ")");
     }
 
     private static void InitializeMiscDatabase()
     {
         _miscDatabase?.Dispose();
-        _miscDatabase = new SqlDatabase(Path.Combine(DatabaseFolderPath, "misc.db"));
+        _miscDatabase = new SqlDatabase(Path.Combine(DatabaseFolderPath, "Misc.sqlite"));
 
         string comicHistoryTable = ComicHistoryTable.Instance.GetTableName();
 

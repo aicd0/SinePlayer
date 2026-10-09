@@ -172,13 +172,13 @@
     <value>앤티앨리어싱 필터</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>만화 리더 UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppDisplayName" xml:space="preserve">
-    <value>만화 리더 UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppStoreName" xml:space="preserve">
-    <value>만화 리더 UWP</value>
+    <value>Sine Player UWP</value>
   </data>
   <data name="AppearanceExpander.Detail" xml:space="preserve">
     <value>표시할 앱 테마를 선택하세요</value>
@@ -342,7 +342,7 @@ $files</value>
     <value>설명</value>
   </data>
   <data name="DevAppDisplayName" xml:space="preserve">
-    <value>만화 리더 UWP [Dev]</value>
+    <value>Sine Player UWP [Dev]</value>
   </data>
   <data name="DeveloperMode" xml:space="preserve">
     <value>개발자 모드</value>
