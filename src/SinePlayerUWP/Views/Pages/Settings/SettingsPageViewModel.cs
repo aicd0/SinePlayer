@@ -1,0 +1,233 @@
+﻿// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Globalization;
+using System.Text;
+using System.Threading.Tasks;
+
+using SinePlayerUWP.Common.Localization;
+using SinePlayerUWP.Core.Common.DebugTools;
+using SinePlayerUWP.Core.Common.Utils;
+using SinePlayerUWP.Core.Database.SqlHelpers;
+using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Misc;
+using SinePlayerUWP.Data.Tables;
+
+namespace SinePlayerUWP.Views.Pages.Settings;
+
+internal partial class SettingsPageViewModel : INotifyPropertyChanged
+{
+    private const string TAG = nameof(SettingsPageViewModel);
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public SettingsSharedViewModel Shared { get; } = new();
+
+    private List<LanguageEntry> _languages = [];
+    public List<LanguageEntry> Languages
+    {
+        get => _languages;
+        set
+        {
+            _languages = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Languages)));
+        }
+    }
+
+    private int _languageIndex = 0;
+    public int LanguageIndex
+    {
+        get => _languageIndex;
+        set
+        {
+            _languageIndex = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LanguageIndex)));
+        }
+    }
+
+    private string _statisticText = string.Empty;
+    public string StatisticText
+    {
+        get => _statisticText;
+        set
+        {
+            _statisticText = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StatisticText)));
+        }
+    }
+
+    private string _aboutText = string.Empty;
+    public string AboutText
+    {
+        get => _aboutText;
+        set
+        {
+            _aboutText = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AboutText)));
+        }
+    }
+
+    private bool _languageChanged;
+    public bool LanguageChanged
+    {
+        get => _languageChanged;
+        set
+        {
+            _languageChanged = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LanguageChanged)));
+        }
+    }
+
+    public void Initialize()
+    {
+        Shared.UpdateStarted += Update;
+    }
+
+    public void SetAppLanguage(int index)
+    {
+        if (index < 0 || index >= _languages.Count || index == _languageIndex)
+        {
+            return;
+        }
+
+        LanguageEntry selectedLanguage = _languages[index];
+        _languageIndex = index;
+        LanguageChanged = true;
+        AppSettingsModel.Language = selectedLanguage.Identifier;
+    }
+
+    public void UpdateStatistics()
+    {
+        CoroutineUtils.Run(UpdateStatisticsInternal);
+    }
+
+    //
+    // Initialization
+    //
+
+    private void Update()
+    {
+        UpdateLanguage();
+        CoroutineUtils.Run(UpdateStatisticsInternal);
+        UpdateSharedSettings();
+
+        LanguageChanged = false;
+    }
+
+    private void UpdateLanguage()
+    {
+        List<LanguageEntry> languages = [
+            new("Deutsch", "de-DE"),
+            new("Español", "es-ES"),
+            new("Français", "fr-FR"),
+            new("English", "en"),
+            new("日本語", "ja-JP"),
+            new("한국어", "ko-KR"),
+            new("Русский", "ru-RU"),
+            new("简体中文", "zh-CN"),
+            new("繁體中文", "zh-TW"),
+        ];
+        languages.Sort((x, y) => x.Identifier.CompareTo(y.Identifier));
+        LanguageEntry useSystemLanguage = new(StringResourceProvider.Instance.UseSystemLanguage, string.Empty);
+        languages.Insert(0, useSystemLanguage);
+
+        string currentLanguage = AppSettingsModel.Language;
+        int selectedIndex = -1;
+        for (int i = 0; i < languages.Count; i++)
+        {
+            if (currentLanguage == languages[i].Identifier)
+            {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        if (selectedIndex < 0)
+        {
+            selectedIndex = 0;
+        }
+
+        Languages = languages;
+        LanguageIndex = selectedIndex;
+    }
+
+    private async Task UpdateStatisticsInternal()
+    {
+        long QueryComicCount(Action<SelectCommand>? condition = null)
+        {
+            SelectCommand command = SelectCommand.Create(ComicTable.Instance)
+                .AppendCondition(ComicHandle.CreateComicOnlyCondition());
+            condition?.Invoke(command);
+            IReaderToken<long> comicCountToken = command.PutQueryCountAll();
+            using SelectCommand.IReader reader = command.Execute();
+            long result = 0;
+            if (reader.Read())
+            {
+                result = comicCountToken.GetValue();
+            }
+
+            return result;
+        }
+
+        long total = 0;
+        long hiddenCount = 0;
+        List<Tuple<CompletionStatusEnum, long>> statusCount = [];
+        await ComicHandle.Enqueue(() =>
+        {
+            total = QueryComicCount();
+            hiddenCount = QueryComicCount(c => c.AppendCondition(ComicTable.ColumnHidden, true));
+
+            foreach (CompletionStatusEnum status in CompletionStatusService.AllStatus)
+            {
+                long count = QueryComicCount(c => c.AppendCondition(ComicTable.ColumnCompletionStatus, (int)status));
+                statusCount.Add(new(status, count));
+            }
+        });
+
+        StringBuilder sb = new();
+        sb.Append(StringResourceProvider.Instance.WithColon(StringResourceProvider.Instance.TotalComics))
+            .Append(total.ToString("#,#0", CultureInfo.InvariantCulture))
+            .AppendLine()
+            .Append(StringResourceProvider.Instance.WithColon(StringResourceProvider.Instance.Hidden))
+            .Append(hiddenCount.ToString("#,#0", CultureInfo.InvariantCulture));
+
+        sb.AppendLine();
+        foreach (Tuple<CompletionStatusEnum, long> pair in statusCount)
+        {
+            CompletionStatusEnum status = pair.Item1;
+            long count = pair.Item2;
+            int percentage = (int)Math.Round(100.0 * count / Math.Max(1, total));
+            sb.AppendLine()
+                .Append(StringResourceProvider.Instance.WithColon(CompletionStatusService.EnumToString(status)))
+                .Append(count.ToString("#,#0", CultureInfo.InvariantCulture))
+                .Append(" (").Append(percentage).Append("%)");
+        }
+
+        string statisticText = sb.ToString();
+        StatisticText = statisticText;
+    }
+
+    private void UpdateSharedSettings()
+    {
+        Shared.DebugMode = DebugUtils.DebugMode;
+    }
+
+    //
+    // Types
+    //
+
+    public class BackgroundEntry(string name, AppSettingsModel.AppBackgroundEnum value)
+    {
+        public string Name { get; set; } = name;
+        public AppSettingsModel.AppBackgroundEnum Value { get; set; } = value;
+    }
+
+    public class LanguageEntry(string name, string identifier)
+    {
+        public string Name { get; set; } = name;
+        public string Identifier { get; set; } = identifier;
+    }
+}

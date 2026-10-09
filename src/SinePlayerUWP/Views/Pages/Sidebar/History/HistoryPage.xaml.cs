@@ -1,0 +1,192 @@
+// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
+
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+
+using SinePlayerUWP.Common.BaseUI;
+using SinePlayerUWP.Common.BaseUI.PageAbilities;
+using SinePlayerUWP.Common.Misc;
+using SinePlayerUWP.Core.Common.AppEnvironment;
+using SinePlayerUWP.Core.Common.Utils;
+using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Misc;
+using SinePlayerUWP.Helpers.Misc;
+using SinePlayerUWP.Helpers.Navigation;
+using SinePlayerUWP.ViewModels;
+
+namespace SinePlayerUWP.Views.Pages.Sidebar.History;
+
+internal sealed partial class HistoryPage : BasePage
+{
+    public ObservableCollection<HistoryGroupViewModel> DataSource { get; set; } = [];
+
+    public HistoryPage()
+    {
+        InitializeComponent();
+    }
+
+    protected override void OnStart(PageBundle bundle)
+    {
+        base.OnStart(bundle);
+
+        CoroutineUtils.Run(Update);
+        ObserveData();
+    }
+
+    protected override void OnResume()
+    {
+        base.OnResume();
+    }
+
+    private void ObserveData()
+    {
+        GlobalEvent.Instance.HistoryUpdated.Observe(this, _ =>
+        {
+            CoroutineUtils.Run(Update);
+        });
+    }
+
+    private async Task Update()
+    {
+        var source = new List<HistoryGroupViewModel>();
+        HistoryGroupViewModel? currentGroup = null;
+        List<ComicHistoryItemModel> historyItems = await ComicHistoryItemModel.GetAllAsync();
+        historyItems.Sort((x, y) => y.DateTime.CompareTo(x.DateTime));
+
+        List<ComicModel> comics = await ComicModel.BatchFromId(historyItems.Select(x => x.ComicId));
+        Dictionary<long, ComicModel> comicMap = new();
+        foreach (ComicModel comic in comics)
+        {
+            comicMap[comic.Id] = comic;
+        }
+
+        foreach (ComicHistoryItemModel item in historyItems)
+        {
+            DateTimeOffset localTime = item.DateTime.ToLocalTime();
+            string key = localTime.ToString("D", EnvironmentProvider.Instance.GetCurrentAppLanguageInfo());
+            if (currentGroup != null && !currentGroup.Key.Equals(key))
+            {
+                source.Add(currentGroup);
+                currentGroup = null;
+            }
+
+            currentGroup ??= new HistoryGroupViewModel(key);
+            comicMap.TryGetValue(item.ComicId, out ComicModel? comic);
+            var itemOut = new HistoryItemViewModel
+            {
+                Id = item.ComicId,
+                Comic = comic,
+                Time = localTime.ToString("t", EnvironmentProvider.Instance.GetCurrentAppLanguageInfo()),
+                Title = item.Title
+            };
+
+            currentGroup.Add(itemOut);
+        }
+
+        if (currentGroup != null)
+        {
+            source.Add(currentGroup);
+        }
+
+        DataSource.Clear();
+        foreach (HistoryGroupViewModel item in source)
+        {
+            DataSource.Add(item);
+        }
+
+        MainListView.SelectedIndex = -1;
+        TbNoHistory.Visibility = source.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async Task OpenItem(HistoryItemViewModel item, bool newTab)
+    {
+        ComicModel? comic = item.Comic ?? await ComicModel.FromId(item.Id);
+        if (comic is null)
+        {
+            DeleteItem(item);
+            return;
+        }
+
+        IEnumerable<ComicModel> playlistComics = DataSource.SelectMany(x => x).Select(x => x.Comic).OfType<ComicModel>();
+        PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(playlistComics);
+        if (newTab)
+        {
+            Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
+            GetMainPageAbility().OpenInNewTab(route);
+        }
+        else
+        {
+            Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
+            OpenComicHelper.OpenComic(PageActionHandler, route);
+        }
+
+        GetMainPageAbility().SetSidePaneOpenState(false, force: false);
+    }
+
+    private IMainPageAbility GetMainPageAbility()
+    {
+        return GetAbility<IMainPageAbility>()!;
+    }
+
+    private void DeleteItem(HistoryItemViewModel item)
+    {
+        CoroutineUtils.Run(() => ComicHistoryItemModel.RemoveAsync(item.Id, suppressEvent: true));
+        var source = (ObservableCollection<HistoryGroupViewModel>)HistorySource.Source;
+
+        for (int i = 0; i < source.Count; ++i)
+        {
+            HistoryGroupViewModel group = source[i];
+
+            for (int j = 0; j < group.Count; ++j)
+            {
+                HistoryItemViewModel item2 = group[j];
+
+                if (item2.Id == item.Id)
+                {
+                    group.RemoveAt(j);
+                    --j;
+                }
+            }
+
+            if (group.Count == 0)
+            {
+                source.RemoveAt(i);
+                --i;
+            }
+        }
+
+        TbNoHistory.Visibility = source.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // events
+    private void OnOpenInNewTabClicked(object sender, RoutedEventArgs e)
+    {
+        CoroutineUtils.Run(async () =>
+        {
+            var item = (HistoryItemViewModel)((MenuFlyoutItem)sender).DataContext;
+            await OpenItem(item, true);
+        });
+    }
+
+    private void OnDeleteItemClicked(object sender, RoutedEventArgs e)
+    {
+        var item = (HistoryItemViewModel)((MenuFlyoutItem)sender).DataContext;
+        DeleteItem(item);
+    }
+
+    private void MainListViewItemClick(object sender, ItemClickEventArgs e)
+    {
+        CoroutineUtils.Run(async () =>
+        {
+            var item = (HistoryItemViewModel)e.ClickedItem;
+            await OpenItem(item, false);
+        });
+    }
+}

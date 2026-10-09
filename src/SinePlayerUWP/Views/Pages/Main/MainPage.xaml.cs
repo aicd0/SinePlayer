@@ -1,0 +1,1677 @@
+// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json.Serialization;
+
+using Microsoft.UI;
+using Microsoft.UI.Input;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Navigation;
+
+using SinePlayerUWP.Common.Actions.Components;
+using SinePlayerUWP.Common.BaseUI;
+using SinePlayerUWP.Common.BaseUI.PageAbilities;
+using SinePlayerUWP.Common.Constants;
+using SinePlayerUWP.Common.HotKey;
+using SinePlayerUWP.Common.Misc;
+using SinePlayerUWP.Common.Utils;
+using SinePlayerUWP.Core.Common.DebugTools;
+using SinePlayerUWP.Core.Common.Lifecycle;
+using SinePlayerUWP.Core.Common.Threading;
+using SinePlayerUWP.Core.Common.Utils;
+using SinePlayerUWP.Data.Database;
+using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Misc;
+using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
+using SinePlayerUWP.Helpers.Navigation;
+using SinePlayerUWP.SDK.Models;
+using SinePlayerUWP.Views.AppWindows.Main;
+using SinePlayerUWP.Views.Pages.Home;
+using SinePlayerUWP.Views.Pages.Main.Sidebar;
+
+namespace SinePlayerUWP.Views.Pages.Main;
+
+internal sealed partial class MainPage : BasePage
+{
+    private const string TAG = nameof(MainPage);
+
+    public MainPageViewModel ViewModel { get; } = new();
+
+    //
+    // Member variables
+    //
+
+    private Grid? _tabContainerGrid;
+    private long _tabContainerGridOpacityListenerToken = 0;
+    private bool _contentPresenterLoaded = false;
+    private bool _immersiveMode = false;
+    private double _rootTabHeight = 0;
+    private double _navigationBarHeight = 0;
+
+    private readonly List<TabInfo> _tabs = [];
+    private TabInfo? _currentTab;
+
+    private readonly MainPageAbilityForSidebar _abilityForSidebar;
+
+    //
+    // Properties
+    //
+
+    public ITabInfo? CurrentTab => _currentTab;
+
+    private MainWindow? _currentWindow;
+    private MainWindow CurrentWindow => _currentWindow!;
+
+    //
+    // Constructors
+    //
+
+    public MainPage()
+    {
+        InitializeComponent();
+
+        _abilityForSidebar = new(this);
+        MainSidebarView.SetHandler(new SidebarHandler(this));
+        ContentGrid.Background = AppearanceManager.Instance.GetThemeBackground();
+    }
+
+    //
+    // Public Methods
+    //
+
+    public void Open(Route route, string targetTabId, string initiateTabId)
+    {
+        MainThreadUtils.AssertOnMainThread();
+        LoadTab(route, targetTabId: targetTabId, initiateTabId: initiateTabId);
+    }
+
+    public void CloseAllTabs()
+    {
+        MainThreadUtils.AssertOnMainThread();
+
+        while (_tabs.Count > 0)
+        {
+            CloseTabInternal(_tabs[0]);
+        }
+    }
+
+    public MainPageStateJsonModel? GetState()
+    {
+        MainThreadUtils.AssertOnMainThread();
+
+        MainPageStateJsonModel jsonModel = new()
+        {
+            SelectedIndex = RootTabView.SelectedIndex,
+            Tabs = [],
+            SidebarState = GetSidebarState(),
+        };
+
+        foreach (TabInfo item in _tabs)
+        {
+            jsonModel.Tabs.Add(new TabJsonModel
+            {
+                Id = item.Id,
+                Url = item.CurrentBundle.Url,
+            });
+        }
+
+        if (jsonModel.Tabs.Count == 0)
+        {
+            return null;
+        }
+
+        return jsonModel;
+    }
+
+    public void RestoreState(MainPageStateJsonModel? jsonModel)
+    {
+        MainThreadUtils.AssertOnMainThread();
+
+        // Restore sidebar state
+        {
+            SidebarView.SidebarStateJsonModel? sidebarState = jsonModel?.SidebarState ?? new();
+
+            SidebarSplitView.OpenPaneLength = Math.Max(360, sidebarState.Width);
+            MainSidebarView.RestoreState(sidebarState);
+
+            if (sidebarState.IsPinned && sidebarState.IsOpen)
+            {
+                SetSidebarOpenState(true, force: true);
+            }
+        }
+
+        // Restore tab state
+        if (jsonModel?.Tabs is not null)
+        {
+            for (int i = 0; i < jsonModel.Tabs.Count; i++)
+            {
+                TabJsonModel? tab = jsonModel.Tabs[i];
+                if (tab is null || string.IsNullOrEmpty(tab.Id) || string.IsNullOrEmpty(tab.Url))
+                {
+                    continue;
+                }
+
+                var route = Route.Create(tab.Url);
+                LoadTab(
+                    route,
+                    targetTabId: string.Empty,
+                    selectTab: i == jsonModel.SelectedIndex,
+                    newTabId: tab.Id,
+                    oldTabId: tab.OldTabId ?? string.Empty);
+            }
+        }
+
+        EnsureInitialTab();
+    }
+
+    //
+    // Lifecycle
+    //
+
+    protected override void OnStart(PageBundle bundle)
+    {
+        base.OnStart(bundle);
+
+        _currentWindow = App.Instance.WindowManager.GetWindow(WindowId);
+        PageActionHandler.RegisterComponent<IMainPageComponent>(new MainPageComponent(this));
+
+        CurrentWindow.SetTitleBar(MainTitleBar);
+        AppWindowTitleBar titleBar = CurrentWindow.AppWindow.TitleBar;
+        titleBar.ButtonBackgroundColor = MainTitleBar.ButtonBackground?.Color;
+        titleBar.ButtonForegroundColor = MainTitleBar.ButtonForeground?.Color;
+        titleBar.ButtonInactiveBackgroundColor = MainTitleBar.ButtonInactiveBackground?.Color;
+        titleBar.ButtonInactiveForegroundColor = MainTitleBar.ButtonInactiveForeground?.Color;
+        titleBar.ButtonHoverBackgroundColor = MainTitleBar.ButtonHoverBackground?.Color;
+        titleBar.ButtonHoverForegroundColor = MainTitleBar.ButtonHoverForeground?.Color;
+        titleBar.ButtonPressedBackgroundColor = MainTitleBar.ButtonPressedBackground?.Color;
+        titleBar.ButtonPressedForegroundColor = MainTitleBar.ButtonPressedForeground?.Color;
+
+        ViewModel.Initialize(PageActionHandler);
+        ObserveData();
+        SyncSidebarOpenState(SidebarSplitView.IsPaneOpen, initialSync: true);
+        UpdateKeyboardAccelerators();
+    }
+
+    private void ObserveData()
+    {
+        BusyStateManager.Busy.ObserveSticky(this, busy =>
+        {
+            ViewModel.IsBusy = busy;
+        });
+
+        KeyboardShortcutManager.ShortcutsChangedLiveData.Observe(this, _ => UpdateKeyboardAccelerators());
+
+        ComicModel.IsScanningLibraryLiveData.ObserveSticky(this, scanning =>
+        {
+            ViewModel.Refreshing = scanning;
+        });
+
+        GetWindowEventBus().With<double>(EventId.TitleBarOpacity).ObserveSticky(this, opacity =>
+        {
+            TopOverlayBackground.Opacity = opacity;
+            TopTile.Opacity = opacity;
+            SidebarSplitView.Opacity = opacity;
+            _tabContainerGrid?.Opacity = opacity;
+        });
+
+        GetWindowEventBus().With<string>(EventId.CloseTab).Observe(this, CloseTab);
+
+        GetMainWindowAbility().RegisterFullscreenChangedHandler(this, isFullscreen =>
+        {
+            ViewModel.IsFullscreen = isFullscreen;
+        });
+
+        _abilityForSidebar.GetLifecycleAbility().Observe(this);
+    }
+
+    //
+    // Common Input Events
+    //
+
+    private void GoBackButton_Click(object sender, RoutedEventArgs e)
+    {
+        GoBack();
+    }
+
+    private void GoForwardButton_Click(object sender, RoutedEventArgs e)
+    {
+        GoForward();
+    }
+
+    private void HomeButton_Click(object sender, RoutedEventArgs e)
+    {
+        var route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_HOME);
+        _abilityForSidebar.OpenInCurrentTab(route);
+    }
+
+    private void RefreshButton_Click(object sender, RoutedEventArgs e)
+    {
+        GetCurrentTabAbility()?.SendRefreshEvent();
+    }
+
+    private void OpenSidebarButton_Click(object sender, RoutedEventArgs e)
+    {
+        SetSidebarOpenState(!_isSidebarOpen, force: true);
+    }
+
+    private void MoreButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement element)
+        {
+            return;
+        }
+
+        List<BaseMenuFlyoutItemModel> menuItems = ViewModel.CreateMoreMenuItems();
+        if (menuItems.Count == 0)
+        {
+            return;
+        }
+
+        MenuFlyout flyout = new()
+        {
+            Placement = FlyoutPlacementMode.BottomEdgeAlignedRight,
+        };
+        foreach (BaseMenuFlyoutItemModel item in menuItems)
+        {
+            flyout.Items.Add(item.CreateMenuFlyoutItem());
+        }
+
+        flyout.ShowAt(element);
+    }
+
+    //
+    // Pointer Events
+    //
+
+    private PointerPoint? _lastPointerPoint;
+
+    private void OnPagePointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        _lastPointerPoint = e.GetCurrentPoint(sender as UIElement);
+    }
+
+    private void OnPagePointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (_lastPointerPoint == null)
+        {
+            return;
+        }
+
+        if (_lastPointerPoint.Properties.IsXButton1Pressed)
+        {
+            GoBack();
+        }
+        else if (_lastPointerPoint.Properties.IsXButton2Pressed)
+        {
+            GoForward();
+        }
+
+        _lastPointerPoint = null;
+    }
+
+    //
+    // Size Change Events
+    //
+
+    private void TabContainerGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_rootTabHeight == e.NewSize.Height)
+        {
+            return;
+        }
+
+        _rootTabHeight = e.NewSize.Height;
+        TopTile.Margin = new Thickness(0, _rootTabHeight, 0, 0);
+        DispatchTopOverlayHeightChangeEvent();
+    }
+
+    private void TopTile_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_navigationBarHeight == e.NewSize.Height)
+        {
+            return;
+        }
+
+        _navigationBarHeight = e.NewSize.Height;
+        DispatchTopOverlayHeightChangeEvent();
+    }
+
+    private void DispatchTopOverlayHeightChangeEvent()
+    {
+        GetWindowEventBus().With<double>(EventId.TopOverlayHeight).Emit(_rootTabHeight + _navigationBarHeight);
+    }
+
+    private void DispatchRightOverlayWidthChangeEvent()
+    {
+        GetWindowEventBus().With<double>(EventId.RightOverlayWidth).Emit(_isSidebarOpen && _isSidebarPinned ? _sidebarWidth : 0);
+    }
+
+    //
+    // Configurable keyboard shortcuts
+    //
+
+    private void UpdateKeyboardAccelerators()
+    {
+        void AddKeyboardAccelerators(string action, Windows.Foundation.TypedEventHandler<KeyboardAccelerator, KeyboardAcceleratorInvokedEventArgs> handler)
+        {
+            foreach (KeyboardAccelerator accelerator in KeyboardShortcutManager.CreateAccelerators(action, handler))
+            {
+                KeyboardAccelerators.Add(accelerator);
+            }
+        }
+
+        KeyboardAccelerators.Clear();
+
+        AddKeyboardAccelerators(KeyboardShortcutActions.AddNewTab, (_, _) => OpenNewTab());
+        AddKeyboardAccelerators(KeyboardShortcutActions.AddNewWindow, (_, _) => MainWindow.Open());
+        AddKeyboardAccelerators(KeyboardShortcutActions.CloseTab, (_, _) =>
+        {
+            if (RootTabView.SelectedItem is TabViewItem closingTab)
+            {
+                CloseTabByUser(closingTab);
+            }
+        });
+        AddKeyboardAccelerators(KeyboardShortcutActions.ExitApp, (_, _) => ViewModel.ExitApp());
+        AddKeyboardAccelerators(KeyboardShortcutActions.ExitFullscreen, (_, _) => GetMainWindowAbility().ExitFullscreen());
+        AddKeyboardAccelerators(KeyboardShortcutActions.JumpToNextTab, (_, _) => JumpToAdjacentTab(1));
+        AddKeyboardAccelerators(KeyboardShortcutActions.JumpToPreviousTab, (_, _) => JumpToAdjacentTab(-1));
+        AddKeyboardAccelerators(KeyboardShortcutActions.OpenDevTools, (_, _) => ViewModel.OpenDevTools());
+        AddKeyboardAccelerators(KeyboardShortcutActions.ToggleFullscreen, (_, _) =>
+        {
+            IMainWindowAbility mainWindowAbility = GetMainWindowAbility();
+            if (mainWindowAbility.IsFullscreen)
+            {
+                mainWindowAbility.ExitFullscreen();
+            }
+            else
+            {
+                mainWindowAbility.EnterFullscreen();
+            }
+        });
+    }
+
+    //
+    // Tabs Management
+    //
+
+    private void OpenNewTab()
+    {
+        var route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_HOME);
+        LoadTab(route);
+    }
+
+    private void JumpToAdjacentTab(int offset)
+    {
+        int tabCount = RootTabView.TabItems.Count;
+        if (tabCount == 0)
+        {
+            return;
+        }
+
+        int index = Math.Max(0, RootTabView.SelectedIndex);
+        RootTabView.SelectedIndex = (index + offset + tabCount) % tabCount;
+    }
+
+    private void EnsureInitialTab()
+    {
+        if (_tabs.Count == 0)
+        {
+            var route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_HOME);
+            LoadTab(route);
+        }
+    }
+
+    private bool LoadTab(
+        Route route,
+        string targetTabId = "",
+        string initiateTabId = "",
+        string newTabId = "",
+        string oldTabId = "",
+        bool selectTab = true)
+    {
+        PageNavigationBundle? bundle = AppRouter.Process(route);
+        if (bundle is null)
+        {
+            Logger.F(TAG, $"Failed to process route: {route.Url}");
+            return false;
+        }
+
+        if (!bundle.PageTrait.AllowMultiplePages)
+        {
+            foreach (TabInfo tab in _tabs)
+            {
+                if (tab.CurrentBundle.Url == bundle.Url)
+                {
+                    if (selectTab)
+                    {
+                        RootTabView.SelectedItem = tab.Item;
+                    }
+
+                    return true;
+                }
+            }
+        }
+
+        bool newTab = string.IsNullOrEmpty(targetTabId);
+        if (newTab)
+        {
+            targetTabId = AddTab(bundle, initiateTabId, newTabId);
+        }
+
+        TabInfo? tabInfo = GetTabInfo(targetTabId);
+        if (tabInfo is null)
+        {
+            Logger.F(TAG, $"Failed to find tab info for ID {targetTabId}");
+            return false;
+        }
+
+        if (newTab && !string.IsNullOrEmpty(oldTabId))
+        {
+            string oldTabRegistry = $"{RegistryNames.TAB_RESOURCES}/{oldTabId}";
+            string newTabRegistry = $"{RegistryNames.TAB_RESOURCES}/{tabInfo.Id}";
+            if (AppDB.MainRegistry.TryGetKey(oldTabRegistry, out IRegistryKey? _))
+            {
+                AppDB.MainRegistry.CopyTree(oldTabRegistry, newTabRegistry);
+            }
+        }
+
+        if (selectTab)
+        {
+            RootTabView.SelectedItem = tabInfo.Item;
+        }
+
+        if (!newTab && tabInfo.CurrentBundle.Url == bundle.Url)
+        {
+            return true;
+        }
+
+        TransferAbility(bundle.Communicator, tabInfo);
+        var frame = (Frame)tabInfo.Item.Content;
+        frame.Navigate(bundle.PageTrait.PageType, bundle);
+        return true;
+    }
+
+    private string AddTab(PageNavigationBundle bundle, string initiateTabId, string newTabId)
+    {
+        int placementIndex = -1;
+        if (!string.IsNullOrEmpty(initiateTabId))
+        {
+            for (int i = 0; i < _tabs.Count; i++)
+            {
+                TabInfo tab = _tabs[i];
+                if (tab.Id == initiateTabId)
+                {
+                    placementIndex = i + 1;
+                    break;
+                }
+            }
+        }
+
+        if (placementIndex == -1)
+        {
+            initiateTabId = string.Empty;
+            placementIndex = _tabs.Count;
+        }
+
+        string tabId = newTabId;
+        if (string.IsNullOrEmpty(tabId))
+        {
+            tabId = CreateNewTabId();
+        }
+
+        var frame = new Frame();
+        var item = new TabViewItem
+        {
+            Header = StringResource.Untitled,
+            Content = frame,
+        };
+        item.Loaded += TabItem_Loaded;
+        MainPageAbilityForTab ability = new(this, tabId);
+        TabInfo tabInfo = new()
+        {
+            Id = tabId,
+            InitiateTabId = initiateTabId,
+            Item = item,
+            Ability = ability,
+            CurrentBundle = bundle,
+        };
+        tabInfo.NavigatedHandler = (sender, e) =>
+        {
+            var newBundle = (PageNavigationBundle)e.Parameter;
+            tabInfo.Ability.ClearStates();
+            tabInfo.CurrentBundle = newBundle;
+            if (_currentTab is not null && tabInfo.Id == _currentTab.Id)
+            {
+                OnPageChanged();
+            }
+        };
+        frame.Navigated += tabInfo.NavigatedHandler;
+
+        _tabs.Insert(placementIndex, tabInfo);
+        RootTabView.TabItems.Insert(placementIndex, tabInfo.Item);
+        return tabId;
+    }
+
+    private void CloseTabByUser(TabViewItem closingTab)
+    {
+        string closingTabId = string.Empty;
+        for (int i = 0; i < _tabs.Count; ++i)
+        {
+            TabInfo tabInfo = _tabs[i];
+            if (tabInfo.Item == closingTab)
+            {
+                closingTabId = tabInfo.Id;
+                break;
+            }
+        }
+
+        if (_tabs.Count == 1)
+        {
+            switch (AppSettingsModel.CloseLastTabBehavior)
+            {
+                case AppSettingsModel.CloseLastTabBehaviorEnum.CloseWindow:
+                    break;
+                case AppSettingsModel.CloseLastTabBehaviorEnum.OpenHomePage:
+                    {
+                        var route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_HOME);
+                        LoadTab(route);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        CloseTab(closingTabId);
+    }
+
+    private void CloseTab(string tabId)
+    {
+        if (string.IsNullOrEmpty(tabId))
+        {
+            return;
+        }
+
+        TabInfo? closingTab = null;
+        for (int i = 0; i < _tabs.Count; ++i)
+        {
+            TabInfo tabInfo = _tabs[i];
+            if (tabInfo.Id == tabId)
+            {
+                closingTab = tabInfo;
+                break;
+            }
+        }
+
+        if (closingTab is null)
+        {
+            Logger.F(TAG, $"Closing tab ID {tabId} not found");
+            return;
+        }
+
+        CloseTabInternal(closingTab);
+
+        if (_tabs.Count > 0)
+        {
+            if (!string.IsNullOrEmpty(closingTab.InitiateTabId))
+            {
+                for (int i = 0; i < _tabs.Count; i++)
+                {
+                    TabInfo tab = _tabs[i];
+                    if (tab.Id == closingTab.InitiateTabId)
+                    {
+                        RootTabView.SelectedIndex = i;
+                    }
+                }
+            }
+        }
+        else
+        {
+            CurrentWindow?.Close();
+        }
+
+        App.Instance.WindowManager.ScheduleSavingWindowState();
+    }
+
+    private void CloseTabInternal(TabInfo tabInfo)
+    {
+        ((Frame)tabInfo.Item.Content).Navigated -= tabInfo.NavigatedHandler;
+        tabInfo.NavigatedHandler = null;
+        tabInfo.Ability.GetLifecycleAbility().SetCustomState("Tab", ILifecycle.State.Stopped);
+        _tabs.Remove(tabInfo);
+        RootTabView.TabItems.Remove(tabInfo.Item);
+    }
+
+    private TabInfo? GetTabInfo(string tabId)
+    {
+        foreach (TabInfo tab in _tabs)
+        {
+            if (tab.Id == tabId)
+            {
+                return tab;
+            }
+        }
+
+        return null;
+    }
+
+    //
+    // TabView
+    //
+
+    private void TabItem_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not TabViewItem item)
+        {
+            return;
+        }
+
+        // Replace the built-in close button tooltip with the current close tab shortcut.
+        Button? closeButton = item.ChildrenBreadthFirst().OfType<Button>().FirstOrDefault(button => button.Name == "CloseButton");
+        if (closeButton is not null)
+        {
+            ShortcutToolTip.Apply(
+                closeButton,
+                KeyboardShortcutActions.CloseTab,
+                KeyboardShortcutActions.Get(KeyboardShortcutActions.CloseTab)?.Name ?? "Close tab");
+        }
+
+        // Ellipsize long tab titles instead of clipping them.
+        ContentPresenter? headerPresenter = item.ChildrenBreadthFirst().OfType<ContentPresenter>().FirstOrDefault(presenter => presenter.Name == "ContentPresenter");
+        if (headerPresenter is not null)
+        {
+            if (headerPresenter.ChildrenBreadthFirst().OfType<TextBlock>().FirstOrDefault() is TextBlock headerText)
+            {
+                headerText.TextTrimming = TextTrimming.CharacterEllipsis;
+            }
+        }
+    }
+
+    private void RootGrid_DragOver(object sender, DragEventArgs e)
+    {
+        e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Move;
+    }
+
+    private void RootGrid_Drop(object sender, DragEventArgs e)
+    {
+        // Handle tab drag-drop
+        if (e.DataView.Properties.TryGetValue("windowId", out object windowIdObj) && windowIdObj is int sourceWindowId &&
+            e.DataView.Properties.TryGetValue("tabId", out object tabIdObj) && tabIdObj is string sourceTabId &&
+            e.DataView.Properties.TryGetValue("url", out object urlObj) && urlObj is string url)
+        {
+            if (sourceWindowId != WindowId)
+            {
+                App.Instance.WindowManager.GetEventBus(sourceWindowId).With<string>(EventId.CloseTab).Emit(sourceTabId);
+                LoadTab(Route.Create(url), oldTabId: sourceTabId);
+                EnsureInitialTab();
+            }
+
+            return;
+        }
+
+        // Handle file drop
+        if (e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
+        {
+            CoroutineUtils.Run(async () =>
+            {
+                IReadOnlyList<Windows.Storage.IStorageItem> items = await e.DataView.GetStorageItemsAsync();
+                foreach (Windows.Storage.IStorageItem? item in items)
+                {
+                    if (item is Windows.Storage.StorageFile file)
+                    {
+                        await App.Instance.OnCommandLine(CurrentWindow, [item.Path]);
+                    }
+                }
+            });
+
+            return;
+        }
+    }
+
+    private void TabContainerGrid_Loaded(object sender, RoutedEventArgs e)
+    {
+        _tabContainerGrid = (Grid)sender;
+
+        GetWindowEventBus().With<double>(EventId.TitleBarOpacity).Emit(_tabContainerGrid.Opacity);
+        _tabContainerGridOpacityListenerToken = _tabContainerGrid.RegisterPropertyChangedCallback(OpacityProperty, (sender, dp) =>
+        {
+            if (!IsStarted)
+            {
+                return;
+            }
+
+            GetWindowEventBus().With<double>(EventId.TitleBarOpacity).Emit(_tabContainerGrid.Opacity);
+        });
+    }
+
+    private void TabContainerGrid_Unloaded(object sender, RoutedEventArgs e)
+    {
+        _tabContainerGrid?.UnregisterPropertyChangedCallback(OpacityProperty, _tabContainerGridOpacityListenerToken);
+        _tabContainerGrid = null;
+    }
+
+    private void TabContentPresenter_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (_contentPresenterLoaded)
+        {
+            return;
+        }
+
+        _contentPresenterLoaded = true;
+        var tabContentPresenter = (ContentPresenter)sender;
+        var parent = (Grid)tabContentPresenter.Parent;
+        parent.Children.Remove(tabContentPresenter);
+        ContentGrid.Children.Add(tabContentPresenter);
+    }
+
+    private void RootTabView_Loaded(object sender, RoutedEventArgs e)
+    {
+        RootTabView.KeyboardAccelerators.Clear();
+
+        // Replace the built-in add tab button tooltip with the current open new tab shortcut.
+        Button? addButton = RootTabView.ChildrenBreadthFirst().OfType<Button>().FirstOrDefault(button => button.Name == "AddButton");
+        if (addButton is not null)
+        {
+            ShortcutToolTip.Apply(addButton, KeyboardShortcutActions.AddNewTab, StringResource.AddNewTab);
+        }
+    }
+
+    private void RootTabView_AddTabButtonClick(TabView sender, object args)
+    {
+        OpenNewTab();
+    }
+
+    private void RootTabView_TabCloseRequested(TabView sender, TabViewTabCloseRequestedEventArgs args)
+    {
+        CloseTabByUser(args.Tab);
+    }
+
+    private void RootTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.AddedItems.Count == 0)
+        {
+            return;
+        }
+
+        var newSelectedTabItem = (TabViewItem)e.AddedItems[0];
+        TabInfo? newSelectedTab = null;
+        foreach (TabInfo tabInfo in _tabs)
+        {
+            if (tabInfo.Item == newSelectedTabItem)
+            {
+                newSelectedTab = tabInfo;
+            }
+        }
+
+        Logger.Assert(newSelectedTab != null, "59496F61DEF5BD3C");
+        _currentTab = newSelectedTab;
+
+        OnPageChanged();
+    }
+
+    private void RootTabView_TabDragCompleted(TabView sender, TabViewTabDragCompletedEventArgs args)
+    {
+        // Reorder tabs to match the actual order
+        var indexMap = RootTabView.TabItems
+            .Select((value, index) => new { value, index })
+            .ToDictionary(x => x.value, x => x.index);
+        List<TabInfo> reordered = [.. _tabs
+            .OrderBy(t => indexMap.TryGetValue(t.Item, out int idx) ? idx : int.MaxValue)];
+        _tabs.Clear();
+        foreach (TabInfo tab in reordered)
+        {
+            _tabs.Add(tab);
+        }
+
+        App.Instance.WindowManager.ScheduleSavingWindowState();
+    }
+
+    private void RootTabView_TabDragStarting(TabView sender, TabViewTabDragStartingEventArgs args)
+    {
+        TabInfo? draggingTab = null;
+        foreach (TabInfo tabInfo in _tabs)
+        {
+            if (tabInfo.Item == args.Tab)
+            {
+                draggingTab = tabInfo;
+            }
+        }
+        if (draggingTab == null)
+        {
+            Logger.AssertNotReachHere("96A351AFF8B07EB6");
+            return;
+        }
+
+        args.Data.Properties.Add("windowId", WindowId);
+        args.Data.Properties.Add("tabId", draggingTab.Id);
+        args.Data.Properties.Add("url", draggingTab.CurrentBundle.Url);
+    }
+
+    private void RootTabView_TabDroppedOutside(TabView sender, TabViewTabDroppedOutsideEventArgs args)
+    {
+        TabViewItem? tab = args.Tab;
+        if (tab is null)
+        {
+            return;
+        }
+
+        TabInfo? removingTab = null;
+        foreach (TabInfo tabInfo in _tabs)
+        {
+            if (tabInfo.Item == tab)
+            {
+                removingTab = tabInfo;
+            }
+        }
+
+        if (removingTab is null)
+        {
+            Logger.AssertNotReachHere("F40D97E40039ADF7");
+            return;
+        }
+
+        if (_tabs.Count <= 1)
+        {
+            return;
+        }
+
+        _tabs.Remove(removingTab);
+        RootTabView.TabItems.Remove(removingTab.Item);
+        MainWindow.Open(removingTab.CurrentBundle.Url, oldTabId: removingTab.Id);
+    }
+
+    private void OnPageChanged()
+    {
+        TabInfo? tabInfo = _currentTab;
+        if (tabInfo is not null)
+        {
+            OnPageChangedInternal(tabInfo);
+        }
+
+        App.Instance.WindowManager.ScheduleSavingWindowState();
+    }
+
+    private void OnPageChangedInternal(TabInfo tabInfo)
+    {
+        IPageTrait pageTrait = tabInfo.CurrentBundle.PageTrait;
+        bool immersiveMode = pageTrait.IsImmersiveMode;
+        bool isHomePage = pageTrait.PageType == typeof(HomePage);
+
+        ViewModel.IsHomePage = isHomePage;
+        ViewModel.CanGoBack = ((Frame)tabInfo.Item.Content).CanGoBack;
+        ViewModel.CanGoForward = ((Frame)tabInfo.Item.Content).CanGoForward;
+
+        if (immersiveMode != _immersiveMode)
+        {
+            _immersiveMode = immersiveMode;
+            UpdateContentFramePlacement();
+            TopOverlayBackground.Background = _immersiveMode ?
+                (Brush)Application.Current.Resources["TitleBarBackground"] :
+                new SolidColorBrush(Colors.Transparent);
+        }
+
+        if (!immersiveMode)
+        {
+            SetOverlayVisibility(true, transitionAnimation: false);
+        }
+
+        tabInfo.Ability.RestoreStates();
+    }
+
+    //
+    // Overlay
+    //
+
+    private Storyboard? _overlayAnimation;
+    private bool _isOverlayVisible = true;
+    private bool _isHiddenOverlayHitTestVisible = true;
+
+    private void SetOverlayVisibility(bool isVisible, bool transitionAnimation)
+    {
+        UIElement? targetElement = _tabContainerGrid;
+        if (_currentTab is null || isVisible == _isOverlayVisible || targetElement is null)
+        {
+            return;
+        }
+
+        if (!isVisible && !_currentTab.CurrentBundle.PageTrait.IsImmersiveMode)
+        {
+            // Only hide the title bar when the current page supports immersive mode.
+            return;
+        }
+
+        _isOverlayVisible = isVisible;
+
+        UpdateOverlayHitTestVisibility();
+
+        // Start opacity animation
+        _overlayAnimation?.Stop();
+        _overlayAnimation = null;
+
+        double targetOpacity = isVisible ? 1.0 : 0.0;
+        if (transitionAnimation)
+        {
+            DoubleAnimation animation = new()
+            {
+                From = targetElement.Opacity,
+                To = targetOpacity,
+                Duration = TimeSpan.FromSeconds(0.2),
+            };
+
+            Storyboard.SetTarget(animation, targetElement);
+            Storyboard.SetTargetProperty(animation, "Opacity");
+            Storyboard storyboard = new();
+            storyboard.Children.Add(animation);
+            storyboard.Begin();
+            _overlayAnimation = storyboard;
+        }
+        else
+        {
+            targetElement.Opacity = targetOpacity;
+        }
+
+        DispatchToAllTabs(ability =>
+        {
+            ability.SendOverlayVisibilityChangedEvent(isVisible);
+        });
+    }
+
+    private void SetHiddenOverlayHitTestVisibility(bool isVisible)
+    {
+        _isHiddenOverlayHitTestVisible = isVisible;
+        UpdateOverlayHitTestVisibility();
+    }
+
+    private void UpdateOverlayHitTestVisibility()
+    {
+        bool isVisible = _isOverlayVisible || _isHiddenOverlayHitTestVisible;
+        TopTile.IsHitTestVisible = isVisible;
+        SidebarSplitView.IsHitTestVisible = isVisible;
+        _tabContainerGrid?.IsHitTestVisible = isVisible;
+    }
+
+    //
+    // Navigation
+    //
+
+    private bool GoBack()
+    {
+        Frame? contentFrame = GetCurrentContentFrame();
+        if (contentFrame is null || !contentFrame.CanGoBack)
+        {
+            return false;
+        }
+
+        contentFrame.GoBack();
+        return true;
+    }
+
+    private bool GoForward()
+    {
+        Frame? contentFrame = GetCurrentContentFrame();
+        if (contentFrame is null || !contentFrame.CanGoForward)
+        {
+            return false;
+        }
+
+        contentFrame.GoForward();
+        return true;
+    }
+
+    private void UpdateContentFramePlacement()
+    {
+        bool success = false;
+        success = success || ContentGridNormal.Children.Remove(ContentGrid);
+        success = success || ContentGridImmersive.Children.Remove(ContentGrid);
+        if (!success)
+        {
+            Logger.F(TAG, "Failed to remove ContentGrid from parent panel");
+            return;
+        }
+
+        if (_immersiveMode)
+        {
+            ContentGridImmersive.Children.Add(ContentGrid);
+        }
+        else
+        {
+            ContentGridNormal.Children.Add(ContentGrid);
+        }
+    }
+
+    private Frame? GetCurrentContentFrame()
+    {
+        TabInfo? tabInfo = _currentTab;
+        if (tabInfo is null)
+        {
+            Logger.F(TAG, "GetCurrentContentFrame: Current tab not set");
+            return null;
+        }
+
+        return (Frame)tabInfo.Item.Content;
+    }
+
+    private void SetCustomNavigationBar(UIElement? element)
+    {
+        CustomNavigationBarGrid.Children.Clear();
+
+        if (element is not null)
+        {
+            CustomNavigationBarGrid.Children.Add(element);
+        }
+    }
+
+    private void SetCustomCenteredNavigationBar(UIElement? element)
+    {
+        CustomCenteredNavigationBarGrid.Children.Clear();
+
+        if (element is not null)
+        {
+            CustomCenteredNavigationBarGrid.Children.Add(element);
+        }
+    }
+
+    //
+    // Sidebar
+    //
+
+    private double _sidebarWidth = 0;
+    private bool _isSidebarOpen = false;
+    private bool _isSidebarPinned = false;
+
+    private void SidebarSplitView_PaneOpenedOrClosed(SplitView sender, object args)
+    {
+        bool isOpen = SidebarSplitView.IsPaneOpen;
+        SyncSidebarOpenState(isOpen);
+
+        if (isOpen)
+        {
+            MainSidebarView.EnsureInitialContent();
+        }
+    }
+
+    private void MainSidebarView_PinStateChanged(SidebarView sender, bool isPinned)
+    {
+        _isSidebarPinned = isPinned;
+
+        SidebarSplitView.DisplayMode = isPinned ? SplitViewDisplayMode.Inline : SplitViewDisplayMode.Overlay;
+
+        DispatchRightOverlayWidthChangeEvent();
+    }
+
+    private void SidebarGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        double newWidth = SidebarSplitView.OpenPaneLength + SidebarSplitView.Margin.Right;
+        if (_sidebarWidth == newWidth)
+        {
+            return;
+        }
+
+        _sidebarWidth = newWidth;
+        DispatchRightOverlayWidthChangeEvent();
+        App.Instance.WindowManager.ScheduleSavingWindowState();
+    }
+
+    private void SetSidebarOpenState(bool isOpen, bool force)
+    {
+        if (isOpen == _isSidebarOpen)
+        {
+            return;
+        }
+
+        if (isOpen)
+        {
+            SidebarSplitView.IsPaneOpen = true;
+        }
+        else if (force || !MainSidebarView.IsPinned)
+        {
+            SidebarSplitView.IsPaneOpen = false;
+        }
+        else
+        {
+            return;
+        }
+
+        SyncSidebarOpenState(isOpen);
+    }
+
+    private void SyncSidebarOpenState(bool isOpen, bool initialSync = false)
+    {
+        if (!initialSync && isOpen == _isSidebarOpen)
+        {
+            return;
+        }
+
+        _isSidebarOpen = isOpen;
+
+        ViewModel.UpdateSidebarButton(isOpen);
+
+        _abilityForSidebar.GetLifecycleAbility().SetCustomState("Pane", isOpen ? ILifecycle.State.Resumed : ILifecycle.State.Started);
+
+        if (!initialSync)
+        {
+            App.Instance.WindowManager.ScheduleSavingWindowState();
+        }
+
+        DispatchRightOverlayWidthChangeEvent();
+    }
+
+    private SidebarView.SidebarStateJsonModel GetSidebarState()
+    {
+        SidebarView.SidebarStateJsonModel sidebarState = MainSidebarView.GetState();
+        sidebarState.Width = SidebarSplitView.OpenPaneLength;
+        sidebarState.IsOpen = _isSidebarOpen;
+        return sidebarState;
+    }
+
+    //
+    // Utilities
+    //
+
+    private IMainWindowAbility GetMainWindowAbility()
+    {
+        return GetAbility<IMainWindowAbility>()!;
+    }
+
+    private MainPageAbilityForTab? GetCurrentTabAbility()
+    {
+        TabInfo? tabInfo = _currentTab;
+        if (tabInfo is null)
+        {
+            Logger.F(TAG, "GetCurrentTabAbility: Current tab not set");
+            return null;
+        }
+
+        return tabInfo.Ability;
+    }
+
+    private void DispatchToAllTabs(Action<MainPageAbilityForTab> action)
+    {
+        CoroutineUtils.RunInMainThread(() =>
+        {
+            foreach (TabInfo tab in _tabs)
+            {
+                action(tab.Ability);
+            }
+        });
+    }
+
+    private static string CreateNewTabId()
+    {
+        return Guid.NewGuid().ToString();
+    }
+
+    //
+    // Page Ability
+    //
+
+    private void TransferAbility(PageCommunicator communicator)
+    {
+        communicator.RegisterAbility<ILifecycleAwareAbility>(_abilityForSidebar);
+        communicator.RegisterAbility(GetMainWindowAbility());
+        communicator.RegisterAbility<IMainPageAbility>(_abilityForSidebar);
+    }
+
+    private void TransferAbility(PageCommunicator communicator, TabInfo tabInfo)
+    {
+        tabInfo.Ability.GetLifecycleAbility().Observe(this);
+        communicator.RegisterAbility<ILifecycleAwareAbility>(tabInfo.Ability);
+        communicator.RegisterAbility(GetMainWindowAbility());
+        communicator.RegisterAbility<IMainPageAbility>(tabInfo.Ability);
+        communicator.RegisterAbility<IMainPageAbilityForTab>(tabInfo.Ability);
+    }
+
+    abstract class MainPageAbility(MainPage parent) : IMainPageAbility, ILifecycleAwareAbility
+    {
+        protected readonly WeakReference<MainPage> _parent = new(parent);
+        private readonly LifecycleAwareAbility _lifecycleAbility = new();
+        private readonly MutableLiveData<bool> _overlayVisibilityChangeLiveData = new(parent._isOverlayVisible);
+
+        public void RegisterPageLifecycleHandler(PageLifecycleEventHandler handler)
+        {
+            _lifecycleAbility.RegisterPageLifecycleHandler(handler);
+        }
+
+        public void UnregisterPageLifecycleHandler(PageLifecycleEventHandler handler)
+        {
+            _lifecycleAbility.UnregisterPageLifecycleHandler(handler);
+        }
+
+        public void RegisterOverlayVisibilityChangedHandler(ILifecycleOwner owner, IMainPageAbility.TitleBarVisibilityChangedEventHandler handler)
+        {
+            _overlayVisibilityChangeLiveData.ObserveSticky(owner, visible =>
+            {
+                handler(visible);
+            });
+        }
+
+        public void SendOverlayVisibilityChangedEvent(bool visible)
+        {
+            _overlayVisibilityChangeLiveData.Emit(visible);
+        }
+
+        public bool GetSidePaneOpenState()
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return false;
+            }
+
+            return parent._isSidebarOpen;
+        }
+
+        public void SetOverlayVisibility(bool isVisible)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            parent.SetOverlayVisibility(isVisible, transitionAnimation: true);
+        }
+
+        public void SetSidePaneOpenState(bool open, bool force)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            parent.SetSidebarOpenState(open, force: force);
+        }
+
+        public void SetSidePanePage(string tag)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            parent.MainSidebarView.SetPage(tag);
+        }
+
+        public abstract void OpenInCurrentTab(Route route);
+
+        public abstract void OpenInNewTab(Route route);
+
+        public LifecycleAwareAbility GetLifecycleAbility()
+        {
+            return _lifecycleAbility;
+        }
+    }
+
+    private class MainPageAbilityForTab : MainPageAbility, IMainPageAbilityForTab
+    {
+        private const string EVENT_REFRESH = "Refresh";
+
+        private readonly string _tabId;
+        private readonly EventBus _eventBus = new();
+        private bool _isRefreshButtonEnabled = false;
+        private WeakReference<UIElement>? _customNavigationBar;
+        private WeakReference<UIElement>? _customCenteredNavigationBar;
+        private bool _isHiddenOverlayHitTestVisible = true;
+
+        public string TabId => _tabId;
+
+        public string Url
+        {
+            get
+            {
+                TabInfo? tab = GetTab();
+                if (tab is null)
+                {
+                    return string.Empty;
+                }
+
+                return tab.CurrentBundle.Url;
+            }
+        }
+
+        public MainPageAbilityForTab(MainPage parent, string tabId) : base(parent)
+        {
+            _tabId = tabId;
+            ClearStates();
+        }
+
+        public void ClearStates()
+        {
+            _eventBus.Clear();
+
+            _isRefreshButtonEnabled = false;
+            _customNavigationBar = null;
+            _customCenteredNavigationBar = null;
+            _isHiddenOverlayHitTestVisible = true;
+        }
+
+        public void RestoreStates()
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            SetRefreshButtonAvailabilityInternal(parent);
+            SetCustomNavigationBarInternal(parent);
+            SetCustomCenteredNavigationBarInternal(parent);
+            SetHiddenOverlayHitTestVisibilityInternal(parent);
+        }
+
+        public override void OpenInCurrentTab(Route route)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            parent.LoadTab(route, targetTabId: _tabId, initiateTabId: _tabId);
+        }
+
+        public override void OpenInNewTab(Route route)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            parent.LoadTab(route, initiateTabId: _tabId);
+        }
+
+        public void RegisterRefreshHandler(ILifecycleOwner owner, IMainPageAbilityForTab.CommonEventHandler handler)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            _eventBus.With<bool>(EVENT_REFRESH).Observe(owner, _ =>
+            {
+                handler();
+            });
+
+            _isRefreshButtonEnabled = true;
+            SetRefreshButtonAvailabilityInternal(parent);
+        }
+
+        private void SetRefreshButtonAvailabilityInternal(MainPage page)
+        {
+            page.RefreshButton.IsEnabled = _isRefreshButtonEnabled;
+        }
+
+        public void SendRefreshEvent()
+        {
+            _eventBus.With<bool>(EVENT_REFRESH).Emit(true);
+        }
+
+        public void SetTitle(string title)
+        {
+            TabInfo? tab = GetTab();
+            if (tab == null)
+            {
+                return;
+            }
+
+            tab.Item.Header = title;
+        }
+
+        public void SetIcon(IconSource icon)
+        {
+            TabInfo? tab = GetTab();
+            if (tab == null)
+            {
+                return;
+            }
+
+            tab.Item.IconSource = icon;
+        }
+
+        public void SetUrl(string url)
+        {
+            TabInfo? tab = GetTab();
+            if (tab == null)
+            {
+                return;
+            }
+
+            if (tab.CurrentBundle.Url == url)
+            {
+                return;
+            }
+
+            if (!IsSameSource(tab.CurrentBundle.Url, url))
+            {
+                Logger.F(TAG, $"Cannot set url to different source: {tab.CurrentBundle.Url} -> {url}");
+                return;
+            }
+
+            tab.CurrentBundle.SetUrl(url);
+            App.Instance.WindowManager.ScheduleSavingWindowState();
+        }
+
+        public void SetCustomNavigationBar(UIElement? element)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            _customNavigationBar = element is null ? null : new WeakReference<UIElement>(element);
+            SetCustomNavigationBarInternal(parent);
+        }
+
+        private void SetCustomNavigationBarInternal(MainPage page)
+        {
+            if (_customNavigationBar is not null && _customNavigationBar.TryGetTarget(out UIElement? element))
+            {
+                page.SetCustomNavigationBar(element);
+            }
+            else
+            {
+                _customNavigationBar = null;
+                page.SetCustomNavigationBar(null);
+            }
+        }
+
+        public void SetCustomCenteredNavigationBar(UIElement? element)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            _customCenteredNavigationBar = element is null ? null : new WeakReference<UIElement>(element);
+            SetCustomCenteredNavigationBarInternal(parent);
+        }
+
+        private void SetCustomCenteredNavigationBarInternal(MainPage page)
+        {
+            if (_customCenteredNavigationBar is not null && _customCenteredNavigationBar.TryGetTarget(out UIElement? element))
+            {
+                page.SetCustomCenteredNavigationBar(element);
+            }
+            else
+            {
+                _customCenteredNavigationBar = null;
+                page.SetCustomCenteredNavigationBar(null);
+            }
+        }
+
+        public void SetHiddenOverlayHitTestVisibility(bool visible)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            _isHiddenOverlayHitTestVisible = visible;
+            SetHiddenOverlayHitTestVisibilityInternal(parent);
+        }
+
+        private void SetHiddenOverlayHitTestVisibilityInternal(MainPage page)
+        {
+            page.SetHiddenOverlayHitTestVisibility(_isHiddenOverlayHitTestVisible);
+        }
+
+        private TabInfo? GetTab()
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return null;
+            }
+
+            return parent.GetTabInfo(_tabId);
+        }
+
+        private static bool IsSameSource(string url1, string url2)
+        {
+            if (!Uri.TryCreate(url1, UriKind.Absolute, out Uri? uri1))
+            {
+                return false;
+            }
+
+            if (!Uri.TryCreate(url2, UriKind.Absolute, out Uri? uri2))
+            {
+                return false;
+            }
+
+            return string.Equals(uri1.Scheme, uri2.Scheme, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(uri1.Host, uri2.Host, StringComparison.OrdinalIgnoreCase)
+                && uri1.Port == uri2.Port;
+        }
+    }
+
+    private class MainPageAbilityForSidebar(MainPage parent) : MainPageAbility(parent)
+    {
+        public override void OpenInCurrentTab(Route route)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            TabInfo? tabInfo = parent._currentTab;
+            if (tabInfo is null)
+            {
+                return;
+            }
+
+            string currentTabId = parent._currentTab?.Id ?? string.Empty;
+            parent.LoadTab(route, targetTabId: tabInfo.Id, initiateTabId: currentTabId);
+        }
+
+        public override void OpenInNewTab(Route route)
+        {
+            if (!_parent.TryGetTarget(out MainPage? parent))
+            {
+                return;
+            }
+
+            string currentTabId = parent._currentTab?.Id ?? string.Empty;
+            parent.LoadTab(route, initiateTabId: currentTabId);
+        }
+    }
+
+    //
+    // Types
+    //
+
+    private class MainPageComponent(MainPage parent) : IMainPageComponent
+    {
+        protected readonly WeakReference<MainPage> _parent = new(parent);
+
+        public string TabId
+        {
+            get
+            {
+                if (_parent.TryGetTarget(out MainPage? parent))
+                {
+                    TabInfo? currentTab = parent._currentTab;
+                    if (currentTab is not null)
+                    {
+                        return currentTab.Id;
+                    }
+                }
+
+                return string.Empty;
+            }
+        }
+    }
+
+    private class SidebarHandler(MainPage page) : SidebarView.IHandler
+    {
+        public void TransferAbility(PageNavigationBundle bundle)
+        {
+            page.TransferAbility(bundle.Communicator);
+        }
+
+        public void OnStateChanged()
+        {
+            App.Instance.WindowManager.ScheduleSavingWindowState();
+        }
+    }
+
+    private class TabInfo : ITabInfo
+    {
+        public required string Id { init; get; }
+        public required string InitiateTabId { init; get; }
+        public required TabViewItem Item { init; get; }
+        public required MainPageAbilityForTab Ability { init; get; }
+        public required PageNavigationBundle CurrentBundle { get; set; }
+        public NavigatedEventHandler? NavigatedHandler { get; set; }
+
+        //
+        // ITabInfo Implmentation
+        //
+
+        string ITabInfo.Id => Id;
+
+        string ITabInfo.Title => Item.Header as string ?? string.Empty;
+    }
+
+    public class MainPageStateJsonModel
+    {
+        [JsonPropertyName("SelectedIndex")]
+        public int SelectedIndex { get; set; }
+
+        [JsonPropertyName("Tabs")]
+        public List<TabJsonModel?>? Tabs { get; set; }
+
+        [JsonPropertyName("SidebarState")]
+        public SidebarView.SidebarStateJsonModel? SidebarState { get; set; }
+    }
+
+    public class TabJsonModel
+    {
+        [JsonPropertyName("Id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("Url")]
+        public string? Url { get; set; }
+
+        [JsonPropertyName("OldTabId")]
+        public string? OldTabId { get; set; }
+
+        public static TabJsonModel Create()
+        {
+            return new()
+            {
+                Id = CreateNewTabId(),
+            };
+        }
+    }
+
+    public interface ITabInfo
+    {
+        string Id { get; }
+
+        string Title { get; }
+    }
+}

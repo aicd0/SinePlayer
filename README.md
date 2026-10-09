@@ -1,9 +1,9 @@
-# <img src="docs/Images/AppLogo.png" width="32"> Comic Reader UWP
-The Comic Reader UWP is a modern Windows app written in C#. The app provided basic functionality for comic reading, along with some common utilities such as file management, searching, tagging, rating, etc.
+# <img src="docs/Images/AppLogo.png" width="32"> Sine Player UWP
+The Sine Player UWP is a modern Windows app written in C#. The app provided basic functionality for comic reading, along with some common utilities such as file management, searching, tagging, rating, etc.
 
-Comic Reader UWP irregularly ships with new features and bug fixes. You can get the latest version of Comic Reader UWP in the [Microsoft Store](https://www.microsoft.com/store/apps/9NS9FG32DCP5).
+Sine Player UWP irregularly ships with new features and bug fixes. You can get the latest version of Sine Player UWP in the [Microsoft Store](https://www.microsoft.com/store/apps/9NS9FG32DCP5).
 
-![Comic Reader UWP Screenshot](docs/Images/ComicReaderUWPScreenshot.png)
+![Sine Player UWP Screenshot](docs/Images/SinePlayerUWPScreenshot.png)
 
 ## Development
 Prerequisites:
@@ -14,15 +14,15 @@ Prerequisites:
 - Install the [XAML Styler](https://marketplace.visualstudio.com/items?itemName=TeamXavalon.XAMLStyler2022) Visual Studio extension.
 - Get the code:
     ```
-    git clone git@github.com:aicd0/ComicReaderUWP.git
+    git clone git@github.com:aicd0/SinePlayerUWP.git
     ```
-- Open [ComicReaderUWP.sln](src/ComicReaderUWP.sln) in Visual Studio to build and run the Comic Reader UWP app.
+- Open [SinePlayerUWP.sln](src/SinePlayerUWP.sln) in Visual Studio to build and run the Sine Player UWP app.
 
 ## Plugins
-Comic Reader UWP can be extended with plugins (written in C#). See [Comic Reader UWP Plugins](https://github.com/aicd0/ComicReaderUWPPlugins) for more information.
+Sine Player UWP can be extended with plugins (written in C#). See [Sine Player UWP Plugins](https://github.com/aicd0/SinePlayerUWPPlugins) for more information.
 
 ## Contributing
-If Comic Reader UWP is not working properly, you can [submit an issue on GitHub](https://github.com/aicd0/ComicReaderUWP/issues/new/choose). If you know how to fix an issue, it is also encouraged to create a [pull request](https://github.com/aicd0/ComicReaderUWP/pulls) for it.
+If Sine Player UWP is not working properly, you can [submit an issue on GitHub](https://github.com/aicd0/SinePlayerUWP/issues/new/choose). If you know how to fix an issue, it is also encouraged to create a [pull request](https://github.com/aicd0/SinePlayerUWP/pulls) for it.
 
 ## License
 Licensed under the [MIT License](LICENSE.md).

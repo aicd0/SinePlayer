@@ -1,0 +1,28 @@
+﻿// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using SinePlayerUWP.Core.Database.SqlHelpers;
+using SinePlayerUWP.Data.Database;
+
+namespace SinePlayerUWP.Data.Tables;
+
+internal class TagInfoTable : ITable
+{
+    public static TagInfoTable Instance { get; } = new TagInfoTable();
+
+    public static StringColumn ColumnName { get; } = new("Name");
+    public static StringColumn ColumnTagCategory { get; } = new("TagCategory");
+    public static StringColumn ColumnExt { get; } = new("Ext");
+
+    private TagInfoTable() { }
+
+    public SqlDatabase GetDatabase()
+    {
+        return SqliteDB.TagInfoDatabase;
+    }
+
+    public string GetTableName()
+    {
+        return "TagInfo";
+    }
+}

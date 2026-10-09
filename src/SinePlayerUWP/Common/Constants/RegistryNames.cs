@@ -1,0 +1,26 @@
+﻿// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+namespace SinePlayerUWP.Common.Constants;
+
+internal static class RegistryNames
+{
+    //
+    // Main Registry
+    //
+
+    public const string GLOBAL = "/Global";
+    public const string SEARCH_HISTORY = $"{GLOBAL}/SearchHistory";
+    public const string SETTINGS = $"{GLOBAL}/Settings";
+    public const string COMIC_IMPORT_EXCLUSIONS = $"{SETTINGS}/ComicImportExclusions";
+    public const string RESOURCES = "/Resources";
+    public const string RUNTIME_RESOURCES = $"{RESOURCES}/Runtime";
+    public const string PLAYLISTS = $"{RUNTIME_RESOURCES}/Playlists";
+    public const string TAB_RESOURCES = $"{RESOURCES}/Tabs";
+
+    public static class SettingsKey
+    {
+        public const string READER_OVERLAY_PINNED = "ReaderOverlayPinned";
+        public const string SHOW_INSTALL_PLUGIN_WARNING = "ShowInstallPluginWarning";
+    }
+}

@@ -40,10 +40,10 @@ Steps to reproduce the behavior:
 <!--
 Run the following commands in Powershell and copy/paste the output.
 " - OS Build: $([Environment]::OSVersion.Version)"
-" - Architecture: $((Get-AppxPackage -Name 49915aicd.ComicReaderUWP).Architecture)"
-" - Application Version: $((Get-AppxPackage -Name 49915aicd.ComicReaderUWP).Version)"
+" - Architecture: $((Get-AppxPackage -Name 49915aicd.SinePlayerUWP).Architecture)"
+" - Application Version: $((Get-AppxPackage -Name 49915aicd.SinePlayerUWP).Version)"
 " - Region: $((Get-Culture).Name)"
-" - Dev Version Installed: $($null -ne (Get-AppxPackage -Name 49915aicd.ComicReaderUWP.Dev))"
+" - Dev Version Installed: $($null -ne (Get-AppxPackage -Name 49915aicd.SinePlayerUWP.Dev))"
 -->
 
 **Additional context**

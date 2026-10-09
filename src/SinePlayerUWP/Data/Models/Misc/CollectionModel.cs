@@ -1,0 +1,223 @@
+﻿// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+using SinePlayerUWP.Common.Misc;
+using SinePlayerUWP.Core.Common.DebugTools;
+using SinePlayerUWP.Core.Database.SqlHelpers;
+using SinePlayerUWP.Data.Database;
+using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Tables;
+
+namespace SinePlayerUWP.Data.Models.Misc;
+
+internal static class CollectionModel
+{
+    private const string TAG = nameof(CollectionModel);
+
+    //
+    // Queries
+    //
+
+    public static async Task<IReadOnlyList<long>> GetAllCollectionIds()
+    {
+        return await ComicHandle.Enqueue(() =>
+        {
+            SelectCommand command = SelectCommand.Create(ComicTable.Instance)
+                .AppendCondition(ComicTable.ColumnType, (long)ComicType.Collection);
+            IReaderToken<long> idToken = command.PutQueryInt64(ComicTable.ColumnId);
+            List<long> results = [];
+            using SelectCommand.IReader reader = command.Execute();
+            while (reader.Read())
+            {
+                results.Add(idToken.GetValue());
+            }
+            return results;
+        });
+    }
+
+    public static async Task<IReadOnlySet<long>> GetCollectionIdsContainingAll(IEnumerable<long> comicIds)
+    {
+        List<long> ids = [.. comicIds.Where(x => x >= 0).Distinct()];
+        if (ids.Count == 0)
+        {
+            return new HashSet<long>();
+        }
+
+        return await ComicHandle.Enqueue(() =>
+        {
+            HashSet<long> result = [];
+            bool hasResult = false;
+            foreach (IEnumerable<long> chunk in SqlUtils.ChunkBy(ids))
+            {
+                List<long> chunkIds = [.. chunk];
+                HashSet<long> matched = QueryCollectionIdsContainingAllNoLock(chunkIds);
+                if (!hasResult)
+                {
+                    result = matched;
+                    hasResult = true;
+                }
+                else
+                {
+                    result.IntersectWith(matched);
+                }
+
+                if (result.Count == 0)
+                {
+                    break;
+                }
+            }
+
+            return result;
+        });
+    }
+
+    public static ICondition CreateMemberCondition(long collectionId)
+    {
+        SelectCommand subquery = SelectCommand.Create(ComicCollectionTable.Instance)
+            .AppendCondition(ComicCollectionTable.ColumnCollectionId, collectionId);
+        _ = subquery.PutQueryInt64(ComicCollectionTable.ColumnComicId);
+        return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery);
+    }
+
+    //
+    // Writes
+    //
+
+    public static async Task AddComics(ComicModel collection, IEnumerable<ComicModel> comics)
+    {
+        if (collection.IsExternal || !collection.IsCollection)
+        {
+            return;
+        }
+
+        long collectionId = collection.Id;
+        List<long> ids = [.. comics
+            .Where(x => !x.IsExternal && !x.IsCollection)
+            .Select(x => x.Id)
+            .Distinct()];
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        int insertedCount = await ComicHandle.Enqueue(() =>
+        {
+            if (collection.IsExternal)
+            {
+                Logger.F(TAG, "AddComics: Cannot add comics to a collection which is not saved");
+                return 0;
+            }
+
+            int inserted = 0;
+            SqliteDB.MainDatabase.WithTransaction(() =>
+            {
+                HashSet<long> existingIds = QueryLinkedComicIdsNoLock(collectionId, ids);
+                List<long> newIds = [.. ids.Where(x => !existingIds.Contains(x))];
+                foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(newIds))
+                {
+                    foreach (long comicId in idChunk)
+                    {
+                        InsertCommand.Create(ComicCollectionTable.Instance)
+                            .AppendColumn(ComicCollectionTable.ColumnCollectionId, collectionId)
+                            .AppendColumn(ComicCollectionTable.ColumnComicId, comicId)
+                            .Execute();
+                        inserted++;
+                    }
+                }
+            });
+            return inserted;
+        });
+
+        if (insertedCount > 0)
+        {
+            DispatchUpdateEvent([collectionId]);
+        }
+    }
+
+    public static async Task RemoveComics(ComicModel collection, IEnumerable<long> comicIds)
+    {
+        long collectionId = collection.Id;
+        List<long> ids = [.. comicIds.Where(x => x >= 0).Distinct()];
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        int removedCount = await ComicHandle.Enqueue(() =>
+        {
+            if (collection.IsExternal)
+            {
+                Logger.F(TAG, "RemoveComics: Cannot remove comics from a collection which is not saved");
+                return 0;
+            }
+
+            int removed = 0;
+            SqliteDB.MainDatabase.WithTransaction(() =>
+            {
+                foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(ids))
+                {
+                    removed += DeleteCommand.Create(ComicCollectionTable.Instance)
+                        .AppendCondition(ComicCollectionTable.ColumnCollectionId, collectionId)
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicCollectionTable.ColumnComicId), idChunk))
+                        .Execute();
+                }
+            });
+            return removed;
+        });
+
+        if (removedCount > 0)
+        {
+            DispatchUpdateEvent([collectionId]);
+        }
+    }
+
+    //
+    // Private helpers
+    //
+
+    private static HashSet<long> QueryCollectionIdsContainingAllNoLock(List<long> comicIds)
+    {
+        HashSet<long> collectionIds = [];
+        SelectCommand command = SelectCommand.Create(ComicCollectionTable.Instance)
+            .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicCollectionTable.ColumnComicId), comicIds))
+            .GroupBy(ComicCollectionTable.ColumnCollectionId);
+        IReaderToken<long> collectionIdToken = command.PutQueryInt64(ComicCollectionTable.ColumnCollectionId);
+        IReaderToken<long> matchedCountToken = command.PutQueryCountDistinct(ComicCollectionTable.ColumnComicId);
+        using SelectCommand.IReader reader = command.Execute();
+        while (reader.Read())
+        {
+            if (matchedCountToken.GetValue() == comicIds.Count)
+            {
+                collectionIds.Add(collectionIdToken.GetValue());
+            }
+        }
+        return collectionIds;
+    }
+
+    private static HashSet<long> QueryLinkedComicIdsNoLock(long collectionId, List<long> comicIds)
+    {
+        HashSet<long> ids = [];
+        foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(comicIds))
+        {
+            SelectCommand command = SelectCommand.Create(ComicCollectionTable.Instance)
+                .AppendCondition(ComicCollectionTable.ColumnCollectionId, collectionId)
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicCollectionTable.ColumnComicId), idChunk));
+            IReaderToken<long> comicIdToken = command.PutQueryInt64(ComicCollectionTable.ColumnComicId);
+            using SelectCommand.IReader reader = command.Execute();
+            while (reader.Read())
+            {
+                ids.Add(comicIdToken.GetValue());
+            }
+        }
+        return ids;
+    }
+
+    private static void DispatchUpdateEvent(IEnumerable<long> collectionIds)
+    {
+        GlobalEvent.Instance.CollectionUpdated.Emit(collectionIds);
+    }
+}

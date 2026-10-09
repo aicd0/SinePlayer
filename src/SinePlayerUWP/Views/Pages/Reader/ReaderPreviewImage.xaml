@@ -1,0 +1,38 @@
+﻿<UserControl
+    x:Class="SinePlayerUWP.Views.Pages.Reader.ReaderPreviewImage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:image="using:SinePlayerUWP.Common.Imaging"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="300"
+    d:DesignWidth="400"
+    DataContextChanged="ReaderPreviewImage_DataContextChanged"
+    mc:Ignorable="d">
+
+    <Grid
+        Width="140"
+        Height="200"
+        ContextRequested="ReaderPreviewImage_ContextRequested">
+        <image:SimpleImageView ImageSource="{x:Bind ViewModel.ImageSource, Mode=OneWay}" />
+        <Grid
+            Margin="0,0,8,8"
+            Padding="5,2,5,5"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Background="White"
+            CornerRadius="5"
+            Opacity="0.9">
+            <TextBlock
+                FontWeight="Bold"
+                Foreground="Black"
+                Text="{x:Bind ViewModel.Page}" />
+        </Grid>
+        <Border
+            Margin="-4"
+            Background="Transparent"
+            BorderBrush="{ThemeResource SystemAccentColor}"
+            BorderThickness="4"
+            Visibility="{x:Bind ViewModel.Selected, Mode=OneWay}" />
+    </Grid>
+</UserControl>

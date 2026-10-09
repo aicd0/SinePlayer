@@ -1,0 +1,22 @@
+﻿// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+namespace SinePlayerUWP.Common.Constants;
+
+internal static class KVNames
+{
+    public const string KV_LIB_APP = "app";
+    public const string KV_LIB_PLUGINS = "plugins";
+    public const string KV_LIB_READER_STATE = "reader_state";
+    public const string KV_LIB_TIPS = "tips";
+
+    public const string KV_KEY_APP_AUTO_HIDE_CURSOR = "AutoHideCursor";
+    public const string KV_KEY_APP_DEFAULT_ARCHIVE_CODE_PAGE = "default_archive_code_page";
+    public const string KV_KEY_APP_RATING_PERCENTAGE_ENABLED = "RatingPercentageEnabled";
+    public const string KV_KEY_APP_SAVE_BROWSING_HISTORY = "save_browsing_history";
+    public const string KV_KEY_APP_SIDE_PANE_LAST_FILTER_PRESET = "SidePaneLastFilterPreset";
+    public const string KV_KEY_APP_TRANSITION_ANIMATION = "transition_animation";
+    public const string KV_KEY_APP_LOG_STARTED = "LogStarted";
+    public const string KV_KEY_APP_WINDOW_STATUS = "WindowStatus";
+    public const string KV_KEY_TIPS_READER_TIP_SHOWN = "ReaderTipShown";
+}
