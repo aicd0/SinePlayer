@@ -203,6 +203,7 @@ public class StringResourceProvider
     public string Pause => GetResourceString("Pause");
     public string Pin => GetResourceString("Pin");
     public string Play => GetResourceString("Play");
+    public string PlayPause => GetResourceString("PlayPause");
     public string PluginSettingsDescription => GetResourceString("PluginSettingsDescription");
     public string Plugins => GetResourceString("Plugins");
     public string PreloadPagesAfter => GetResourceString("PreloadPagesAfter");
@@ -242,6 +243,8 @@ public class StringResourceProvider
     public string Search => GetResourceString("Search");
     public string SearchResults => GetResourceString("SearchResults");
     public string SearchResultsOf => GetResourceString("SearchResultsOf");
+    public string SeekBackward => GetResourceString("SeekBackward");
+    public string SeekForward => GetResourceString("SeekForward");
     public string Select => GetResourceString("Select");
     public string SendFeedback => GetResourceString("SendFeedback");
     public string SendToWindow => GetResourceString("SendToWindow");
@@ -286,6 +289,8 @@ public class StringResourceProvider
     public string ViewType => GetResourceString("ViewType");
     public string ViewTypeLarge => GetResourceString("ViewTypeLarge");
     public string ViewTypeMedium => GetResourceString("ViewTypeMedium");
+    public string VolumeDown => GetResourceString("VolumeDown");
+    public string VolumeUp => GetResourceString("VolumeUp");
     public string Warning => GetResourceString("Warning");
     public string WindowN => GetResourceString("WindowN");
     //// SECTION MARKER - DO NOT MOVE ////

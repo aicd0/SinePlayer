@@ -15,6 +15,7 @@ using Microsoft.UI.Xaml.Input;
 using SinePlayerUWP.Common.BaseUI;
 using SinePlayerUWP.Common.BaseUI.PageAbilities;
 using SinePlayerUWP.Common.Constants;
+using SinePlayerUWP.Common.HotKey;
 using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
@@ -30,6 +31,9 @@ namespace SinePlayerUWP.Views.Pages.Player;
 
 internal sealed partial class PlayerPage : BasePage
 {
+    private const long SEEK_STEP_MS = 10000;
+    private const double VOLUME_STEP = 0.05;
+
     // Can only be accessed by UI thread
     public static IReadOnlyList<Tuple<int, string>> ActiveTabs { get; private set; } = [];
 
@@ -82,6 +86,7 @@ internal sealed partial class PlayerPage : BasePage
 
         ViewModel.Initialize(PageActionHandler);
         ObserveData();
+        UpdateKeyboardAccelerators();
 
         string playlistId = bundle.GetString(RouterConstants.ARG_PLAYLIST_ID) ?? string.Empty;
         string serializedPlayback = bundle.GetString(RouterConstants.ARG_PLAYBACK) ?? string.Empty;
@@ -296,6 +301,17 @@ internal sealed partial class PlayerPage : BasePage
             _isPointerInsideRootElement = isInside;
             UpdateOverlayState();
         });
+
+        KeyboardShortcutManager.ShortcutsChangedLiveData.Observe(this, _ => UpdateKeyboardAccelerators());
+
+        ViewModel.VolumeLiveData.Observe(this, volume =>
+        {
+            TransportBar.SetVolume(volume);
+        }, new ObserveOptions()
+        {
+            Sticky = true,
+            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
+        });
     }
 
     private async Task LoadPlaylistAsync(string playlistId, string serializedPlayback, long initialPositionMs)
@@ -443,6 +459,27 @@ internal sealed partial class PlayerPage : BasePage
             ViewModel.SetFullscreen(isFullscreen);
             TransportBar.SetFullscreen(isFullscreen);
         });
+    }
+
+    private void UpdateKeyboardAccelerators()
+    {
+        void AddKeyboardAccelerators(string action, Windows.Foundation.TypedEventHandler<KeyboardAccelerator, KeyboardAcceleratorInvokedEventArgs> handler)
+        {
+            foreach (KeyboardAccelerator accelerator in KeyboardShortcutManager.CreateAccelerators(action, handler))
+            {
+                KeyboardAccelerators.Add(accelerator);
+            }
+        }
+
+        KeyboardAccelerators.Clear();
+
+        AddKeyboardAccelerators(KeyboardShortcutActions.PlayPause, (_, _) => ViewModel.TogglePlayPause());
+        AddKeyboardAccelerators(KeyboardShortcutActions.SeekBackward, (_, _) => ViewModel.SeekBy(-SEEK_STEP_MS));
+        AddKeyboardAccelerators(KeyboardShortcutActions.SeekForward, (_, _) => ViewModel.SeekBy(SEEK_STEP_MS));
+        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeDown, (_, _) => ViewModel.AdjustVolume(-VOLUME_STEP));
+        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeUp, (_, _) => ViewModel.AdjustVolume(VOLUME_STEP));
+        AddKeyboardAccelerators(KeyboardShortcutActions.OpenNextMedia, (_, _) => ViewModel.Next());
+        AddKeyboardAccelerators(KeyboardShortcutActions.OpenPreviousMedia, (_, _) => ViewModel.Previous());
     }
 
     private void OpenMediaInfoPane()

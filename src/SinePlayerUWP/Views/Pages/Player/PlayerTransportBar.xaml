@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:base="using:SinePlayerUWP.Common.BaseUI"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:hotkey="using:SinePlayerUWP.Common.HotKey"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     d:DesignHeight="100"
     d:DesignWidth="600"
@@ -44,7 +45,8 @@
                         Click="OnPreviousClick"
                         IsEnabled="False"
                         Style="{StaticResource PlaybackControlButtonStyle}"
-                        ToolTipService.ToolTip="{x:Bind StringResource.Previous}">
+                        hotkey:ShortcutToolTip.Action="OpenPreviousMedia"
+                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Previous}">
                         <Button.Content>
                             <FontIcon FontSize="14" Glyph="&#xE892;" />
                         </Button.Content>
@@ -53,7 +55,8 @@
                         x:Name="AbbPlayPause"
                         Click="OnPlayPauseClick"
                         Style="{StaticResource PlaybackControlButtonStyle}"
-                        ToolTipService.ToolTip="{x:Bind StringResource.Play}">
+                        hotkey:ShortcutToolTip.Action="PlayPause"
+                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Play}">
                         <Button.Content>
                             <FontIcon x:Name="FiPlayPause" FontSize="14" Glyph="&#xE768;" />
                         </Button.Content>
@@ -63,7 +66,8 @@
                         Click="OnNextClick"
                         IsEnabled="False"
                         Style="{StaticResource PlaybackControlButtonStyle}"
-                        ToolTipService.ToolTip="{x:Bind StringResource.Next}">
+                        hotkey:ShortcutToolTip.Action="OpenNextMedia"
+                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Next}">
                         <Button.Content>
                             <FontIcon FontSize="14" Glyph="&#xE893;" />
                         </Button.Content>
@@ -134,7 +138,8 @@
                         x:Name="AbbFullscreen"
                         Click="OnFullscreenClick"
                         Style="{StaticResource PlaybackControlButtonStyle}"
-                        ToolTipService.ToolTip="{x:Bind StringResource.EnterFullscreen}">
+                        hotkey:ShortcutToolTip.Action="ToggleFullscreen"
+                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.EnterFullscreen}">
                         <Button.Content>
                             <FontIcon x:Name="FiFullscreen" FontSize="14" Glyph="&#xE740;" />
                         </Button.Content>

@@ -51,6 +51,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     public readonly MutableLiveData<bool> IsFavoriteLiveData = new();
     public readonly MutableLiveData<bool> IsPlayingLiveData = new();
     public readonly MutableLiveData<long> PositionLiveData = new();
+    public readonly MutableLiveData<double> VolumeLiveData = new();
 
     private bool _isFullscreen = false;
     public bool IsFullscreen
@@ -263,9 +264,39 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         _engine?.Seek(TimeSpan.FromMilliseconds(positionMs));
     }
 
+    public void SeekBy(long deltaMs)
+    {
+        IMediaEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        long positionMs = engine.Position.Ticks / TimeSpan.TicksPerMillisecond;
+        SeekTo(Math.Max(positionMs + deltaMs, 0));
+    }
+
     public void SetVolume(double volume)
     {
-        _engine?.SetVolume(volume);
+        IMediaEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        engine.SetVolume(volume);
+        VolumeLiveData.Emit(volume);
+    }
+
+    public void AdjustVolume(double delta)
+    {
+        IMediaEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        SetVolume(Math.Clamp(engine.Volume + delta, 0.0, 1.0));
     }
 
     public void SetMuted(bool isMuted)

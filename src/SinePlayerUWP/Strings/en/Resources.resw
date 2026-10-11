@@ -834,6 +834,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Play" xml:space="preserve">
     <value>Play</value>
   </data>
+  <data name="PlayPause" xml:space="preserve">
+    <value>Play / pause</value>
+  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Manage and configure plugins</value>
   </data>
@@ -983,6 +986,12 @@ Start in Safe Mode?</value>
   </data>
   <data name="SearchResultsOf" xml:space="preserve">
     <value>Results of '$keyword'</value>
+  </data>
+  <data name="SeekBackward" xml:space="preserve">
+    <value>Seek backward</value>
+  </data>
+  <data name="SeekForward" xml:space="preserve">
+    <value>Seek forward</value>
   </data>
   <data name="Select" xml:space="preserve">
     <value>Select</value>
@@ -1140,6 +1149,12 @@ $info</value>
   </data>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>Medium</value>
+  </data>
+  <data name="VolumeDown" xml:space="preserve">
+    <value>Volume down</value>
+  </data>
+  <data name="VolumeUp" xml:space="preserve">
+    <value>Volume up</value>
   </data>
   <data name="Warning" xml:space="preserve">
     <value>Warning</value>

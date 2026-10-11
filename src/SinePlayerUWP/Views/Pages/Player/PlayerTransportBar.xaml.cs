@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 
 using SinePlayerUWP.Common.BaseUI;
+using SinePlayerUWP.Common.HotKey;
 
 namespace SinePlayerUWP.Views.Pages.Player;
 
@@ -65,7 +66,7 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
     public void SetPlaying(bool isPlaying)
     {
         FiPlayPause.Glyph = isPlaying ? "\uE769" : "\uE768";
-        ToolTipService.SetToolTip(AbbPlayPause, isPlaying ? StringResource.Pause : StringResource.Play);
+        ShortcutToolTip.Apply(AbbPlayPause, KeyboardShortcutActions.PlayPause, isPlaying ? StringResource.Pause : StringResource.Play);
     }
 
     public void SetNavigation(bool isPreviousEnabled, bool isNextEnabled)
@@ -135,7 +136,7 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
     public void SetFullscreen(bool isFullscreen)
     {
         FiFullscreen.Glyph = isFullscreen ? "\uE73F" : "\uE740";
-        ToolTipService.SetToolTip(AbbFullscreen, isFullscreen ? StringResource.ExitFullscreen : StringResource.EnterFullscreen);
+        ShortcutToolTip.Apply(AbbFullscreen, KeyboardShortcutActions.ToggleFullscreen, isFullscreen ? StringResource.ExitFullscreen : StringResource.EnterFullscreen);
     }
 
     private void OnPreviousClick(object sender, RoutedEventArgs e)

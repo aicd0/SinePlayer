@@ -16,23 +16,20 @@ internal static class KeyboardShortcutActions
     public const string CloseTab = "CloseTab";
     public const string ExitApp = "ExitApp";
     public const string ExitFullscreen = "ExitFullscreen";
-    public const string GoToFirstPage = "GoToFirstPage";
-    public const string GoToLastPage = "GoToLastPage";
-    public const string GoToLeftPage = "GoToLeftPage";
-    public const string GoToNextPage = "GoToNextPage";
-    public const string GoToPreviousPage = "GoToPreviousPage";
-    public const string GoToRandomPage = "GoToRandomPage";
-    public const string GoToRightPage = "GoToRightPage";
     public const string JumpToNextTab = "JumpToNextTab";
     public const string JumpToPreviousTab = "JumpToPreviousTab";
     public const string OpenDevTools = "OpenDevTools";
     public const string OpenNextMedia = "OpenNextMedia";
     public const string OpenPreviousMedia = "OpenPreviousMedia";
-    public const string ToggleAutoScroll = "ToggleAutoScroll";
+    public const string PlayPause = "PlayPause";
+    public const string SeekBackward = "SeekBackward";
+    public const string SeekForward = "SeekForward";
     public const string ToggleFullscreen = "ToggleFullscreen";
+    public const string VolumeDown = "VolumeDown";
+    public const string VolumeUp = "VolumeUp";
 
     public const string RootScope = "";
-    public const string ReaderScope = "/Reader";
+    public const string PlayerScope = "/Player";
 
     private static readonly List<KeyboardShortcutActionEntry> sAll =
     [
@@ -41,41 +38,33 @@ internal static class KeyboardShortcutActions
         new() { Id = CloseTab, Name = StringResourceProvider.Instance.CloseTab },
         new() { Id = ExitApp, Name = StringResourceProvider.Instance.Exit },
         new() { Id = ExitFullscreen, Name = StringResourceProvider.Instance.ExitFullscreen, IsInternal = true },
-        new() { Id = GoToFirstPage, Name = StringResourceProvider.Instance.GoToFirstPage, Scope = ReaderScope },
-        new() { Id = GoToLastPage, Name = StringResourceProvider.Instance.GoToLastPage, Scope = ReaderScope },
-        new() { Id = GoToLeftPage, Name = StringResourceProvider.Instance.GoToLeftPage, Scope = ReaderScope },
-        new() { Id = GoToNextPage, Name = StringResourceProvider.Instance.GoToNextPage, Scope = ReaderScope },
-        new() { Id = GoToPreviousPage, Name = StringResourceProvider.Instance.GoToPreviousPage, Scope = ReaderScope },
-        new() { Id = GoToRandomPage, Name = StringResourceProvider.Instance.GoToRandomPage, Scope = ReaderScope },
-        new() { Id = GoToRightPage, Name = StringResourceProvider.Instance.GoToRightPage, Scope = ReaderScope },
         new() { Id = JumpToNextTab, Name = StringResourceProvider.Instance.JumpToNextTab },
         new() { Id = JumpToPreviousTab, Name = StringResourceProvider.Instance.JumpToPreviousTab },
         new() { Id = OpenDevTools, Name = "Open dev tools", IsInternal = true },
-        new() { Id = OpenNextMedia, Name = StringResourceProvider.Instance.OpenNextMedia, Scope = ReaderScope },
-        new() { Id = OpenPreviousMedia, Name = StringResourceProvider.Instance.OpenPreviousMedia, Scope = ReaderScope },
-        new() { Id = ToggleAutoScroll, Name = StringResourceProvider.Instance.ToggleAutoScroll, Scope = ReaderScope },
+        new() { Id = OpenNextMedia, Name = StringResourceProvider.Instance.OpenNextMedia, Scope = PlayerScope },
+        new() { Id = OpenPreviousMedia, Name = StringResourceProvider.Instance.OpenPreviousMedia, Scope = PlayerScope },
+        new() { Id = PlayPause, Name = StringResourceProvider.Instance.PlayPause, Scope = PlayerScope },
+        new() { Id = SeekBackward, Name = StringResourceProvider.Instance.SeekBackward, Scope = PlayerScope },
+        new() { Id = SeekForward, Name = StringResourceProvider.Instance.SeekForward, Scope = PlayerScope },
         new() { Id = ToggleFullscreen, Name = StringResourceProvider.Instance.ToggleFullscreen },
+        new() { Id = VolumeDown, Name = StringResourceProvider.Instance.VolumeDown, Scope = PlayerScope },
+        new() { Id = VolumeUp, Name = StringResourceProvider.Instance.VolumeUp, Scope = PlayerScope },
     ];
 
     private static readonly IReadOnlyList<KeyboardShortcutModel> sDefaultShortcuts =
     [
         CreateShortcut(AddNewTab, VirtualKey.T, VirtualKeyModifiers.Control),
         CreateShortcut(CloseTab, VirtualKey.W, VirtualKeyModifiers.Control),
-        CreateShortcut(GoToFirstPage, VirtualKey.Home),
-        CreateShortcut(GoToLastPage, VirtualKey.End),
-        CreateShortcut(GoToLeftPage, VirtualKey.Left),
-        CreateShortcut(GoToNextPage, VirtualKey.Down),
-        CreateShortcut(GoToNextPage, VirtualKey.PageDown),
-        CreateShortcut(GoToPreviousPage, VirtualKey.PageUp),
-        CreateShortcut(GoToPreviousPage, VirtualKey.Up),
-        CreateShortcut(GoToRandomPage, VirtualKey.R),
-        CreateShortcut(GoToRightPage, VirtualKey.Right),
         CreateShortcut(JumpToNextTab, VirtualKey.Tab, VirtualKeyModifiers.Control),
         CreateShortcut(JumpToPreviousTab, VirtualKey.Tab, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift),
         CreateShortcut(OpenNextMedia, VirtualKey.Down, VirtualKeyModifiers.Control),
         CreateShortcut(OpenPreviousMedia, VirtualKey.Up, VirtualKeyModifiers.Control),
-        CreateShortcut(ToggleAutoScroll, VirtualKey.Space),
+        CreateShortcut(PlayPause, VirtualKey.Space),
+        CreateShortcut(SeekBackward, VirtualKey.Left),
+        CreateShortcut(SeekForward, VirtualKey.Right),
         CreateShortcut(ToggleFullscreen, VirtualKey.F, VirtualKeyModifiers.Control),
+        CreateShortcut(VolumeDown, VirtualKey.Down),
+        CreateShortcut(VolumeUp, VirtualKey.Up),
     ];
     public static IReadOnlyList<KeyboardShortcutModel> DefaultShortcuts => sDefaultShortcuts;
 
