@@ -22,6 +22,7 @@ internal static class RegistryNames
 
     public static class SettingsKey
     {
+        public const string PLAYER_OVERLAY_PINNED = "PlayerOverlayPinned";
         public const string SHOW_INSTALL_PLUGIN_WARNING = "ShowInstallPluginWarning";
     }
 

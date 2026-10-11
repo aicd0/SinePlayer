@@ -24,6 +24,7 @@ namespace SinePlayerUWP.Views.Pages.Player;
 internal partial class PlayerPageViewModel : INotifyPropertyChanged
 {
     private const long POSITION_SAVE_INTERVAL = 5000;
+    private const long POSITION_UI_INTERVAL = 200;
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
 
@@ -36,6 +37,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     private IMediaEngine? _engine;
     private long _pendingStartPositionMs = -1;
     private long _lastPositionSaveTicks = 0;
+    private long _lastPositionUiTicks = 0;
 
     public PlayerPageViewModel() { }
 
@@ -47,6 +49,8 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     public readonly MutableLiveData<bool> MediaChangedLiveData = new();
     public readonly MutableLiveData<bool> IsExternalMediaLiveData = new(true);
     public readonly MutableLiveData<bool> IsFavoriteLiveData = new();
+    public readonly MutableLiveData<bool> IsPlayingLiveData = new();
+    public readonly MutableLiveData<long> PositionLiveData = new();
 
     private bool _isFullscreen = false;
     public bool IsFullscreen
@@ -174,6 +178,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     public PlaybackModel Playback { get; } = new();
     public PlayerStatusEnum PlayerStatus => PlayerStatusLiveData.Value.Status;
     public MediaModel? Media => _media;
+    public long DurationMs { get; private set; } = 0;
 
     public void Initialize(ActionHandler actionHandler)
     {
@@ -241,6 +246,31 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         {
             engine.Play();
         }
+    }
+
+    public void Next()
+    {
+        Playback.Next();
+    }
+
+    public void Previous()
+    {
+        Playback.Previous(false);
+    }
+
+    public void SeekTo(long positionMs)
+    {
+        _engine?.Seek(TimeSpan.FromMilliseconds(positionMs));
+    }
+
+    public void SetVolume(double volume)
+    {
+        _engine?.SetVolume(volume);
+    }
+
+    public void SetMuted(bool isMuted)
+    {
+        _engine?.SetMuted(isMuted);
     }
 
     public void SetIsFavorite(bool isFavorite, bool writeDatabase)
@@ -427,6 +457,8 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         UpdateFavoriteStatusInternal(media);
 
         _pendingStartPositionMs = ResolveStartPositionMs(media, args.PlaybackArgs);
+        DurationMs = 0;
+        PositionLiveData.Emit(0);
         PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
 
         IMediaEngine engine = EnsureEngine();
@@ -500,6 +532,8 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     private void Engine_StateChanged(MediaEngineStateEnum state)
     {
+        IsPlayingLiveData.Emit(state == MediaEngineStateEnum.Playing);
+
         switch (state)
         {
             case MediaEngineStateEnum.Playing:
@@ -519,6 +553,17 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     private void Engine_PositionChanged()
     {
         long now = Environment.TickCount64;
+
+        if (now - _lastPositionUiTicks >= POSITION_UI_INTERVAL)
+        {
+            _lastPositionUiTicks = now;
+            IMediaEngine? engine = _engine;
+            if (engine is not null)
+            {
+                PositionLiveData.Emit(engine.Position.Ticks / TimeSpan.TicksPerMillisecond);
+            }
+        }
+
         if (now - _lastPositionSaveTicks < POSITION_SAVE_INTERVAL)
         {
             return;
@@ -544,6 +589,8 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             CoroutineUtils.Run(async () => await media.SetDuration(durationMs));
         }
 
+        DurationMs = durationMs;
+
         long startPositionMs = _pendingStartPositionMs;
         _pendingStartPositionMs = -1;
         if (startPositionMs > 0)
@@ -551,6 +598,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             engine.Seek(TimeSpan.FromMilliseconds(startPositionMs));
         }
 
+        PositionLiveData.Emit(startPositionMs > 0 ? startPositionMs : 0);
         PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Working });
         engine.Play();
     }

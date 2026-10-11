@@ -6,13 +6,18 @@
     xmlns:base="using:SinePlayerUWP.Common.BaseUI"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:player="using:SinePlayerUWP.Views.Pages.Player"
     mc:Ignorable="d">
 
     <Grid
         x:Name="RootGrid"
-        Background="Black"
-        Tapped="RootGrid_Tapped">
-        <Grid x:Name="VideoHost" />
+        Background="Black">
+        <Grid
+            x:Name="VideoHost"
+            ContextRequested="VideoHost_ContextRequested"
+            PointerEntered="VideoHost_PointerEntered"
+            PointerExited="VideoHost_PointerExited"
+            Tapped="VideoHost_Tapped" />
         <StackPanel
             x:Name="StatusPanel"
             HorizontalAlignment="Center"
@@ -31,5 +36,8 @@
                 TextAlignment="Center"
                 TextWrapping="Wrap" />
         </StackPanel>
+        <player:PlayerTransportBar
+            x:Name="TransportBar"
+            VerticalAlignment="Bottom" />
     </Grid>
 </base:BasePage>
