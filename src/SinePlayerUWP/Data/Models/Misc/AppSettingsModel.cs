@@ -102,19 +102,6 @@ internal static class AppSettingsModel
         }
     }
 
-    public static int DefaultArchiveCodePage
-    {
-        get
-        {
-            return _db.Read(model => model.DefaultArchiveCodePage ?? -1);
-        }
-        set
-        {
-            _db.Write(model => model.DefaultArchiveCodePage = value);
-            _db.Save();
-        }
-    }
-
     public static KeepScreenOnBehaviorEnum KeepScreenOnBehavior
     {
         get
@@ -369,19 +356,6 @@ internal static class AppSettingsModel
         set
         {
             _db.Write(model => model.SaveBrowsingHistory = value);
-            _db.Save();
-        }
-    }
-
-    public static bool EnableCompressedFileCache
-    {
-        get
-        {
-            return _db.Read(model => model.EnableCompressedFileCache ?? true);
-        }
-        set
-        {
-            _db.Write(model => model.EnableCompressedFileCache = value);
             _db.Save();
         }
     }
@@ -769,14 +743,8 @@ internal static class AppSettingsModel
         [JsonPropertyName("ComicShuffleRandomSeed")]
         public int? ComicShuffleRandomSeed { get; set; }
 
-        [JsonPropertyName("DefaultArchiveCodePage")]
-        public int? DefaultArchiveCodePage { get; set; }
-
         [JsonPropertyName("DefaultReaderSettingPresetKey")]
         public string? DefaultReaderSettingPresetKey { get; set; }
-
-        [JsonPropertyName("EnableCompressedFileCache")]
-        public bool? EnableCompressedFileCache { get; set; }
 
         [JsonPropertyName("KeepScreenOnBehavior")]
         public string? KeepScreenOnBehavior { get; set; }

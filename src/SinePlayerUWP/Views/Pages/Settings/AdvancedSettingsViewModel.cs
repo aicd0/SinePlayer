@@ -6,7 +6,6 @@ using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 
-using SinePlayerUWP.Common.Archive;
 using SinePlayerUWP.Common.Imaging;
 using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Core.Common.DebugTools;
@@ -152,7 +151,6 @@ internal partial class AdvancedSettingsViewModel : INotifyPropertyChanged
     private static void ClearCacheInternal()
     {
         ImageLoader.Clear();
-        ArchiveCacheManager.Clear();
         ClearCacheDirectory(StorageLocation.LocalCacheFolderPath);
         ClearCacheDirectory(StorageLocation.TemporaryFolderPath);
     }

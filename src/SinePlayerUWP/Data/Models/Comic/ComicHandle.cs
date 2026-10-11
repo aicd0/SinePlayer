@@ -10,7 +10,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-using SinePlayerUWP.Common.Archive;
 using SinePlayerUWP.Common.ErrorHandling;
 using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Common.Utils;
@@ -298,10 +297,6 @@ internal abstract partial class ComicHandle
         {
             case ComicType.Folder:
                 return new FolderComicHandle();
-            case ComicType.Archive:
-                return new ArchiveComicHandle();
-            case ComicType.PDF:
-                return new PdfComicHandle();
             case ComicType.Collection:
                 return new CollectionComicHandle();
             default:
@@ -727,7 +722,7 @@ internal abstract partial class ComicHandle
 
     private void SetAsDefaultInfo()
     {
-        List<string> subPaths = [.. Location.Split(ArchiveManager.ARCHIVE_SEP)];
+        List<string> subPaths = [Location];
         var tags = new List<string>();
         foreach (string path in subPaths)
         {

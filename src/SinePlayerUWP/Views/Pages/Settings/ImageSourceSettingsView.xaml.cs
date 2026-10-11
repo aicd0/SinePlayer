@@ -98,9 +98,4 @@ internal sealed partial class ImageSourceSettingsView : BaseUserControl
             .Build();
         ViewModel.Shared.ActionHandler.HandleNoResult(action);
     }
-
-    private void DefaultArchiveCodePageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        ViewModel.SetDefaultArchiveCodePage(((ComboBox)sender).SelectedIndex);
-    }
 }

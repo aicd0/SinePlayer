@@ -6,8 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 
-using SinePlayerUWP.Common.Archive;
-using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.DebugTools;
 
@@ -19,9 +17,9 @@ namespace SinePlayerUWP.Data.Models.Comic;
 
 internal static class ComicScanner
 {
-    public static IEnumerable<ItemInfo> Search(string path, PathType type, int maxDepth = -1)
+    public static IEnumerable<ItemInfo> Search(string path, int maxDepth = -1)
     {
-        List<PathInfo> paths = [new PathInfo(type, path)];
+        List<PathInfo> paths = [new PathInfo(path)];
         List<PathInfo> nextPaths = [];
         int depth = 0;
         while (paths.Count > 0)
@@ -32,18 +30,9 @@ internal static class ComicScanner
                 {
                     yield return item;
 
-                    if (item.Type == ItemType.File)
+                    if (item.Type == ItemType.Folder)
                     {
-                        string filename = StringUtils.ItemNameFromPath(item.Path);
-                        string extension = StringUtils.ExtensionFromFilename(filename);
-                        if (AppInfoProvider.IsSupportedArchiveExtension(extension))
-                        {
-                            nextPaths.Add(new PathInfo(PathType.Archive, item.Path));
-                        }
-                    }
-                    else if (item.Type == ItemType.Folder && pathInfo.Type == PathType.Folder)
-                    {
-                        nextPaths.Add(new PathInfo(PathType.Folder, item.Path));
+                        nextPaths.Add(new PathInfo(item.Path));
                     }
                 }
             }
@@ -59,17 +48,11 @@ internal static class ComicScanner
         }
     }
 
-    private class PathInfo(PathType pathType, string path)
+    private class PathInfo(string path)
     {
-        public readonly PathType Type = pathType;
         public readonly string Path = path;
 
-        public readonly IStorageItemSearchContext Ctx = pathType switch
-        {
-            PathType.Folder => new FolderSearchContext(path),
-            PathType.Archive => new ArchiveSearchContext(path),
-            _ => throw new ArgumentException(null, nameof(pathType)),
-        };
+        public readonly IStorageItemSearchContext Ctx = new FolderSearchContext(path);
     }
 
     private interface IStorageItemSearchContext
@@ -207,81 +190,6 @@ internal static class ComicScanner
             lpFindFileData = findDataLocal;
             return result;
         }
-    }
-
-    private class ArchiveSearchContext(string path) : IStorageItemSearchContext
-    {
-        private const string TAG = nameof(ArchiveSearchContext);
-
-        private readonly string _path = path;
-
-        public IEnumerable<ItemInfo> Search()
-        {
-            List<string> files = [];
-            HashSet<string> folders = [];
-
-            bool success = false;
-            try
-            {
-                ArchiveManager.VisitEntries(_path, entry =>
-                {
-                    string path = entry.FullName.Replace('/', '\\');
-                    if (entry.IsDirectory)
-                    {
-                        folders.Add(path[..^1]);
-                    }
-                    else
-                    {
-                        files.Add(path);
-                        for (int i = 0; (i = path.IndexOf('\\', i)) >= 0; ++i)
-                        {
-                            folders.Add(path[..i]);
-                        }
-                    }
-
-                    return ArchiveManager.ICallbackResult.Continue;
-                });
-                success = true;
-            }
-            catch (ArchiveIOException)
-            {
-                Logger.E(TAG, $"Unable to open archive stream: {_path}");
-            }
-
-            if (!success)
-            {
-                yield return new ItemInfo
-                {
-                    Type = ItemType.NoAccessLocation,
-                    Path = _path,
-                };
-                yield break;
-            }
-
-            foreach (string file in files)
-            {
-                yield return new ItemInfo
-                {
-                    Type = ItemType.File,
-                    Path = _path + ArchiveManager.ARCHIVE_SEP + file,
-                };
-            }
-
-            foreach (string folder in folders)
-            {
-                yield return new ItemInfo
-                {
-                    Type = ItemType.Folder,
-                    Path = _path + ArchiveManager.ARCHIVE_SEP + folder,
-                };
-            }
-        }
-    }
-
-    public enum PathType
-    {
-        Folder,
-        Archive,
     }
 
     public enum ItemType

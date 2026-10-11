@@ -1,13 +1,8 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Text;
 
-using SinePlayerUWP.Common.Localization;
-using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Data.Models.Misc;
 
 namespace SinePlayerUWP.Views.Pages.Settings;
@@ -37,17 +32,6 @@ internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
         {
             _isRescanning = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRescanning)));
-        }
-    }
-
-    private List<Tuple<string, int>> _encodings = [];
-    public List<Tuple<string, int>> Encodings
-    {
-        get => _encodings;
-        set
-        {
-            _encodings = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Encodings)));
         }
     }
 
@@ -84,17 +68,6 @@ internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private int _defaultArchiveCodePageIndex = 0;
-    public int DefaultArchiveCodePageIndex
-    {
-        get => _defaultArchiveCodePageIndex;
-        set
-        {
-            _defaultArchiveCodePageIndex = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DefaultArchiveCodePageIndex)));
-        }
-    }
-
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
@@ -125,21 +98,9 @@ internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
         AppSettingsModel.UpdateModel(model);
     }
 
-    public void SetDefaultArchiveCodePage(int index)
-    {
-        if (index == _defaultArchiveCodePageIndex || index < 0 || index >= _encodings.Count)
-        {
-            return;
-        }
-
-        _defaultArchiveCodePageIndex = index;
-        AppSettingsModel.DefaultArchiveCodePage = _encodings[index].Item2;
-    }
-
     private void Update()
     {
         UpdateBasic();
-        UpdateEncodings();
     }
 
     private void UpdateBasic()
@@ -152,33 +113,5 @@ internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
         ScanOnLaunch = scanOnLaunch;
         RemoveUnreachableComics = removeUnreachableComics;
         PromptBeforeRemovingComics = promptBeforeRemovingComics;
-    }
-
-    private void UpdateEncodings()
-    {
-        IReadOnlyDictionary<int, Encoding> supportedEncodings = AppInfoProvider.SupportedEncodings;
-        var encodings = new List<Tuple<string, int>>
-        {
-            new(StringResourceProvider.Instance.Default, -1)
-        };
-        int defaultCodePage = AppSettingsModel.DefaultArchiveCodePage;
-        int selectedIndex = 0;
-        foreach (Encoding info in supportedEncodings.Values)
-        {
-            string title = info.EncodingName + " [" + info.CodePage.ToString() + "]";
-            encodings.Add(new Tuple<string, int>(title, info.CodePage));
-            if (defaultCodePage == info.CodePage)
-            {
-                selectedIndex = encodings.Count - 1;
-            }
-        }
-        if (!supportedEncodings.ContainsKey(defaultCodePage))
-        {
-            AppSettingsModel.DefaultArchiveCodePage = -1;
-            selectedIndex = 0;
-        }
-
-        Encodings = encodings;
-        DefaultArchiveCodePageIndex = selectedIndex;
     }
 }

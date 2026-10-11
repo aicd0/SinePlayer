@@ -6,7 +6,5 @@ namespace SinePlayerUWP.Data.Tables;
 internal enum ComicType : int
 {
     Folder = 1,
-    Archive = 2,
-    PDF = 3,
     Collection = 4,
 }

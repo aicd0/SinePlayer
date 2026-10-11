@@ -48,13 +48,4 @@ internal sealed partial class GeneralSettingsView : BaseUserControl
             AppSettingsModel.SaveBrowsingHistory = isChecked.Value;
         }
     }
-
-    private void EnableCompressedFileCacheCheckBox_Click(object sender, RoutedEventArgs e)
-    {
-        bool? isChecked = ((CheckBox)sender).IsChecked;
-        if (isChecked.HasValue)
-        {
-            AppSettingsModel.EnableCompressedFileCache = isChecked.Value;
-        }
-    }
 }

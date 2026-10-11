@@ -94,17 +94,6 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _enableCompressedFileCache = true;
-    public bool EnableCompressedFileCache
-    {
-        get => _enableCompressedFileCache;
-        set
-        {
-            _enableCompressedFileCache = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EnableCompressedFileCache)));
-        }
-    }
-
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
@@ -137,7 +126,6 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
     {
         UpdateCloseLastTabBehavior();
         UpdateHomePageTapComicBehavior();
-        UpdateCommonSettings();
         CoroutineUtils.Run(UpdateHistory);
     }
 
@@ -192,11 +180,6 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
 
         OpenComicDefaultBaheviors = entries;
         OpenComicDefaultBaheviorIndex = selectedIndex;
-    }
-
-    private void UpdateCommonSettings()
-    {
-        EnableCompressedFileCache = AppSettingsModel.EnableCompressedFileCache;
     }
 
     private async Task UpdateHistory()
