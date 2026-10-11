@@ -132,12 +132,12 @@ internal static class SqliteDB
         ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + tagCategoryTable + " (" +
             MediaTagCategoryTable.ColumnId.Name + " INTEGER PRIMARY KEY AUTOINCREMENT" +
             "," + MediaTagCategoryTable.ColumnName.Name + " TEXT" +
-            "," + MediaTagCategoryTable.ColumnComicId.Name + " INTEGER REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
+            "," + MediaTagCategoryTable.ColumnMediaId.Name + " INTEGER REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
 
         ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + tagTable + " (" +
             MediaTagTable.ColumnContent.Name + " TEXT" +
-            "," + MediaTagTable.ColumnComicId.Name + " INTEGER NOT NULL" +
+            "," + MediaTagTable.ColumnMediaId.Name + " INTEGER NOT NULL" +
             "," + MediaTagTable.ColumnTagCategoryId.Name + " INTEGER REFERENCES " + tagCategoryTable + "(" + MediaTagCategoryTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
     }

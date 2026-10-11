@@ -155,7 +155,7 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
                 var command = SelectCommand.Create(MediaTagCategoryTable.Instance);
                 IReaderToken<long> idToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnId);
                 IReaderToken<string> nameToken = command.PutQueryString(MediaTagCategoryTable.ColumnName);
-                IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnComicId);
+                IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnMediaId);
                 using SelectCommand.IReader reader = command.Execute();
                 while (reader.Read())
                 {

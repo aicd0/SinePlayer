@@ -814,10 +814,10 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
                 foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(ids))
                 {
                     DeleteCommand.Create(MediaTagTable.Instance)
-                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnComicId), idChunk))
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnMediaId), idChunk))
                         .Execute();
                     DeleteCommand.Create(MediaTagCategoryTable.Instance)
-                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagCategoryTable.ColumnComicId), idChunk))
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagCategoryTable.ColumnMediaId), idChunk))
                         .Execute();
                     DeleteCommand.Create(MediaCollectionTable.Instance)
                         .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnMediaId), idChunk))

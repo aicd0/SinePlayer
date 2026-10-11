@@ -23,7 +23,7 @@ internal class ComicSQLProviderUtils
     {
         var subquery = SelectCommand.Create(MediaTagTable.Instance);
         subquery.AppendCondition(condition);
-        subquery.PutQueryInt64(MediaTagTable.ColumnComicId);
+        subquery.PutQueryInt64(MediaTagTable.ColumnMediaId);
         subquery.Distinct();
         return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery);
     }
@@ -32,7 +32,7 @@ internal class ComicSQLProviderUtils
     {
         var subquery = SelectCommand.Create(MediaTagCategoryTable.Instance);
         subquery.AppendCondition(MediaTagCategoryTable.ColumnName, category);
-        subquery.PutQueryInt64(MediaTagCategoryTable.ColumnComicId);
+        subquery.PutQueryInt64(MediaTagCategoryTable.ColumnMediaId);
         subquery.Distinct();
         return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery);
     }
@@ -46,7 +46,7 @@ internal class ComicSQLProviderUtils
         var subquery2 = SelectCommand.Create(MediaTagTable.Instance);
         subquery2.AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnTagCategoryId), subquery1));
         subquery2.AppendCondition(condition);
-        subquery2.PutQueryInt64(MediaTagTable.ColumnComicId);
+        subquery2.PutQueryInt64(MediaTagTable.ColumnMediaId);
         subquery2.Distinct();
         return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery2);
     }

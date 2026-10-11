@@ -204,8 +204,8 @@ internal abstract partial class ComicHandle
         foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(comics.Keys))
         {
             SelectCommand command = SelectCommand.Create(MediaTagCategoryTable.Instance)
-                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagCategoryTable.ColumnComicId), idChunk));
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnComicId);
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagCategoryTable.ColumnMediaId), idChunk));
+            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnMediaId);
             IReaderToken<long> tagCategoryIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnId);
             IReaderToken<string> nameToken = command.PutQueryString(MediaTagCategoryTable.ColumnName);
             using SelectCommand.IReader reader = command.Execute();
@@ -764,21 +764,21 @@ internal abstract partial class ComicHandle
     private void InternalSaveTagsNoLock()
     {
         DeleteCommand.Create(MediaTagCategoryTable.Instance)
-            .AppendCondition(MediaTagCategoryTable.ColumnComicId, Id)
+            .AppendCondition(MediaTagCategoryTable.ColumnMediaId, Id)
             .Execute();
 
         foreach (KeyValuePair<string, ComicTagCategory> item in Tags)
         {
             long tagCategoryId = InsertCommand.Create(MediaTagCategoryTable.Instance)
                 .AppendColumn(MediaTagCategoryTable.ColumnName, item.Key)
-                .AppendColumn(MediaTagCategoryTable.ColumnComicId, Id)
+                .AppendColumn(MediaTagCategoryTable.ColumnMediaId, Id)
                 .Execute();
 
             foreach (string tag in item.Value.Tags)
             {
                 InsertCommand.Create(MediaTagTable.Instance)
                     .AppendColumn(MediaTagTable.ColumnContent, tag)
-                    .AppendColumn(MediaTagTable.ColumnComicId, Id)
+                    .AppendColumn(MediaTagTable.ColumnMediaId, Id)
                     .AppendColumn(MediaTagTable.ColumnTagCategoryId, tagCategoryId)
                     .Execute();
             }

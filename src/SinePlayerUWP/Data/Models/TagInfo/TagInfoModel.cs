@@ -303,7 +303,7 @@ internal class TagInfoModel
             SelectCommand command = SelectCommand.Create(MediaTagTable.Instance)
                 .AppendCondition(MediaTagTable.ColumnContent, tag)
                 .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnTagCategoryId), subQuery));
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagTable.ColumnComicId);
+            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagTable.ColumnMediaId);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
@@ -362,7 +362,7 @@ internal class TagInfoModel
             SelectCommand command = SelectCommand.Create(MediaTagTable.Instance)
                 .AppendCondition(MediaTagTable.ColumnContent, oldTag)
                 .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagTable.ColumnTagCategoryId), subQuery));
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagTable.ColumnComicId);
+            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagTable.ColumnMediaId);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
