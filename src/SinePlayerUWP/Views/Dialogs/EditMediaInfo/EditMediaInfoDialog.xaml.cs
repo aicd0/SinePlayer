@@ -144,11 +144,6 @@ internal sealed partial class EditMediaInfoDialog : BaseContentDialog
         ViewModel.SetTagIdMode(((CheckBox)sender).IsChecked == true);
     }
 
-    private void ClearReaderSettingsCheckBox_Click(object sender, RoutedEventArgs e)
-    {
-        ViewModel.SetClearReaderSettings(((CheckBox)sender).IsChecked == true);
-    }
-
     private void CoverImageField_Changed(object? sender, EventArgs e)
     {
         ViewModel.SetCoverImage(CoverImageField.PendingFilePath);

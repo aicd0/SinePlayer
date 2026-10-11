@@ -47,7 +47,6 @@ public class StringResourceProvider
     public string CheckForUpdates => GetResourceString("CheckForUpdates");
     public string ClearAllHistory => GetResourceString("ClearAllHistory");
     public string ClearCache => GetResourceString("ClearCache");
-    public string ClearReaderSettings => GetResourceString("ClearReaderSettings");
     public string CloseLastTabBehavior => GetResourceString("CloseLastTabBehavior");
     public string CloseSidebar => GetResourceString("CloseSidebar");
     public string CloseTab => GetResourceString("CloseTab");
@@ -87,7 +86,6 @@ public class StringResourceProvider
     public string Done => GetResourceString("Done");
     public string DownloadPluginsFromGitHub => GetResourceString("DownloadPluginsFromGitHub");
     public string Duration => GetResourceString("Duration");
-    public string DuringAutoScrolling => GetResourceString("DuringAutoScrolling");
     public string DuringPlayback => GetResourceString("DuringPlayback");
     public string Edit => GetResourceString("Edit");
     public string EditImportExclusionList => GetResourceString("EditImportExclusionList");
@@ -141,7 +139,6 @@ public class StringResourceProvider
     public string Help => GetResourceString("Help");
     public string Hidden => GetResourceString("Hidden");
     public string Hide => GetResourceString("Hide");
-    public string HideCursorAutomatically => GetResourceString("HideCursorAutomatically");
     public string History => GetResourceString("History");
     public string Horizontal => GetResourceString("Horizontal");
     public string Image => GetResourceString("Image");
@@ -208,8 +205,6 @@ public class StringResourceProvider
     public string PlayPause => GetResourceString("PlayPause");
     public string PluginSettingsDescription => GetResourceString("PluginSettingsDescription");
     public string Plugins => GetResourceString("Plugins");
-    public string PreloadPagesAfter => GetResourceString("PreloadPagesAfter");
-    public string PreloadPagesBefore => GetResourceString("PreloadPagesBefore");
     public string PressKeyCombination => GetResourceString("PressKeyCombination");
     public string Previous => GetResourceString("Previous");
     public string PrivacyPolicy => GetResourceString("PrivacyPolicy");
@@ -263,7 +258,6 @@ public class StringResourceProvider
     public string Sort => GetResourceString("Sort");
     public string SortingFunction => GetResourceString("SortingFunction");
     public string SpreadDetection => GetResourceString("SpreadDetection");
-    public string StartEndFromScrollingArea => GetResourceString("StartEndFromScrollingArea");
     public string Statistics => GetResourceString("Statistics");
     public string SwapLeftAndRightPages => GetResourceString("SwapLeftAndRightPages");
     public string Tag => GetResourceString("Tag");
@@ -277,7 +271,6 @@ public class StringResourceProvider
     public string ToggleAutoScroll => GetResourceString("ToggleAutoScroll");
     public string ToggleFullscreen => GetResourceString("ToggleFullscreen");
     public string TotalMedia => GetResourceString("TotalMedia");
-    public string TransitionAnimation => GetResourceString("TransitionAnimation");
     public string TwoPageMode => GetResourceString("TwoPageMode");
     public string Unfavorite => GetResourceString("Unfavorite");
     public string Ungrouped => GetResourceString("Ungrouped");

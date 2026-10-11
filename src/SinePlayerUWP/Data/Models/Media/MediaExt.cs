@@ -10,9 +10,7 @@ internal static class MediaExt
     public const string BACKGROUND_IMAGE = "BackgroundImage";
     public const string COVER_IMAGE = "CoverImage";
     public const string COVER_INDEX = "CoverIndex";
-    public const string CUSTOM_READER_SETTINGS = "CustomReaderSettings";
     public const string LINKS = "Links";
-    public const string READER_SETTING_PRESET_KEY = "ReaderSettingPresetKey";
     public const string RESOURCE_UUID = "ResourceUuid";
 
     public static int GetCoverIndex(MediaModel media)

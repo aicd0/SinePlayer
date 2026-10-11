@@ -195,14 +195,6 @@
                         Grid.Column="2"
                         Links="{x:Bind ViewModel.Links}" />
 
-                    <CheckBox
-                        Grid.Row="13"
-                        Grid.Column="0"
-                        Grid.ColumnSpan="3"
-                        Click="ClearReaderSettingsCheckBox_Click"
-                        Content="{x:Bind StringResource.ClearReaderSettings}"
-                        IsChecked="False"
-                        Visibility="{x:Bind ViewModel.IsCollectionOnlyMode, Converter={StaticResource BooleanToVisibilityNegationConverter}, Mode=OneWay}" />
                 </Grid>
 
                 <Grid x:Name="ImagesTabGrid">

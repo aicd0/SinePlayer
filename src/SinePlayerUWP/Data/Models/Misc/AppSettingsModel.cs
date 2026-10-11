@@ -50,19 +50,6 @@ internal static class AppSettingsModel
         }
     }
 
-    public static bool AutoHideCursor
-    {
-        get
-        {
-            return _db.Read(model => model.AutomaticallyHideCursor ?? false);
-        }
-        set
-        {
-            _db.Write(model => model.AutomaticallyHideCursor = value);
-            _db.Save();
-        }
-    }
-
     public static bool AutoSwitch
     {
         get
@@ -295,32 +282,6 @@ internal static class AppSettingsModel
         }
     }
 
-    public static int PreloadPagesAfter
-    {
-        get
-        {
-            return _db.Read(model => model.PreloadPagesAfter ?? 5);
-        }
-        set
-        {
-            _db.Write(model => model.PreloadPagesAfter = value);
-            _db.Save();
-        }
-    }
-
-    public static int PreloadPagesBefore
-    {
-        get
-        {
-            return _db.Read(model => model.PreloadPagesBefore ?? 5);
-        }
-        set
-        {
-            _db.Write(model => model.PreloadPagesBefore = value);
-            _db.Save();
-        }
-    }
-
     public static bool RatingPercentageEnabled
     {
         get
@@ -373,19 +334,6 @@ internal static class AppSettingsModel
         }
     }
 
-    public static bool UseScrollingAreaAsStartEnd
-    {
-        get
-        {
-            return _db.Read(model => model.UseScrollingAreaAsStartEnd ?? false);
-        }
-        set
-        {
-            _db.Write(model => model.UseScrollingAreaAsStartEnd = value);
-            _db.Save();
-        }
-    }
-
     public static bool SaveBrowsingHistory
     {
         get
@@ -395,71 +343,6 @@ internal static class AppSettingsModel
         set
         {
             _db.Write(model => model.SaveBrowsingHistory = value);
-            _db.Save();
-        }
-    }
-
-    public static bool TransitionAnimation
-    {
-        get
-        {
-            return _db.Read(model => model.TransitionAnimation ?? true);
-        }
-        set
-        {
-            _db.Write(model => model.TransitionAnimation = value);
-            _db.Save();
-        }
-    }
-
-    public static string DefaultReaderSettingPresetKey
-    {
-        get
-        {
-            return _db.Read(model => model.DefaultReaderSettingPresetKey ?? string.Empty);
-        }
-        set
-        {
-            _db.Write(model => model.DefaultReaderSettingPresetKey = value);
-            _db.Save();
-        }
-    }
-
-    public static Dictionary<string, ReaderSettingsModel> ReaderSettingPresets
-    {
-        get
-        {
-            return _db.Read(model =>
-            {
-                Dictionary<string, ReaderSettingsModel> presets = [];
-                if (model.ReaderSettingPresets is not null)
-                {
-                    foreach (KeyValuePair<string, ReaderSettingsModel.JsonModel?> kvp in model.ReaderSettingPresets)
-                    {
-                        string key = kvp.Key;
-                        ReaderSettingsModel.JsonModel? settingJsonModel = kvp.Value;
-                        if (settingJsonModel is not null)
-                        {
-                            presets[key] = ReaderSettingsModel.FromJsonModel(key, settingJsonModel);
-                        }
-                    }
-                }
-
-                return presets;
-            });
-        }
-        set
-        {
-            _db.Write(model =>
-            {
-                model.ReaderSettingPresets = [];
-                foreach (KeyValuePair<string, ReaderSettingsModel> kvp in value)
-                {
-                    string key = kvp.Key;
-                    ReaderSettingsModel setting = kvp.Value;
-                    model.ReaderSettingPresets[key] = setting.ToJsonModel();
-                }
-            });
             _db.Save();
         }
     }
@@ -770,9 +653,6 @@ internal static class AppSettingsModel
         [JsonPropertyName("AutoToggleOverlaysOnCursor")]
         public bool? AutoToggleOverlaysOnCursor { get; set; }
 
-        [JsonPropertyName("AutomaticallyHideCursor")]
-        public bool? AutomaticallyHideCursor { get; set; }
-
         [JsonPropertyName("Background")]
         public string? Background { get; set; }
 
@@ -784,9 +664,6 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("MediaShuffleRandomSeed")]
         public int? MediaShuffleRandomSeed { get; set; }
-
-        [JsonPropertyName("DefaultReaderSettingPresetKey")]
-        public string? DefaultReaderSettingPresetKey { get; set; }
 
         [JsonPropertyName("KeepScreenOnBehavior")]
         public string? KeepScreenOnBehavior { get; set; }
@@ -812,20 +689,11 @@ internal static class AppSettingsModel
         [JsonPropertyName("PlayerVolume")]
         public double? PlayerVolume { get; set; }
 
-        [JsonPropertyName("PreloadPagesAfter")]
-        public int? PreloadPagesAfter { get; set; }
-
-        [JsonPropertyName("PreloadPagesBefore")]
-        public int? PreloadPagesBefore { get; set; }
-
         [JsonPropertyName("PromptBeforeRemovingMedia")]
         public bool? PromptBeforeRemovingMedia { get; set; }
 
         [JsonPropertyName("RatingPercentageEnabled")]
         public bool? RatingPercentageEnabled { get; set; }
-
-        [JsonPropertyName("ReaderSettingPresets")]
-        public Dictionary<string, ReaderSettingsModel.JsonModel?>? ReaderSettingPresets { get; set; }
 
         [JsonPropertyName("RemoveUnreachableMedia")]
         public bool? RemoveUnreachableMedia { get; set; }
@@ -839,9 +707,6 @@ internal static class AppSettingsModel
         [JsonPropertyName("SendUsageData")]
         public bool? SendUsageData { get; set; }
 
-        [JsonPropertyName("UseScrollingAreaAsStartEnd")]
-        public bool? UseScrollingAreaAsStartEnd { get; set; }
-
         [JsonPropertyName("SaveBrowsingHistory")]
         public bool? SaveBrowsingHistory { get; set; }
 
@@ -850,9 +715,6 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("Theme")]
         public int? Theme { get; set; }
-
-        [JsonPropertyName("TransitionAnimation")]
-        public bool? TransitionAnimation { get; set; }
 
         //
         // Legacy
