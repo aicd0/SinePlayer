@@ -77,9 +77,9 @@ internal static class CollectionModel
 
     public static ICondition CreateMemberCondition(long collectionId)
     {
-        SelectCommand subquery = SelectCommand.Create(ComicCollectionTable.Instance)
-            .AppendCondition(ComicCollectionTable.ColumnCollectionId, collectionId);
-        _ = subquery.PutQueryInt64(ComicCollectionTable.ColumnComicId);
+        SelectCommand subquery = SelectCommand.Create(MediaCollectionTable.Instance)
+            .AppendCondition(MediaCollectionTable.ColumnCollectionId, collectionId);
+        _ = subquery.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
         return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery);
     }
 
@@ -121,9 +121,9 @@ internal static class CollectionModel
                 {
                     foreach (long comicId in idChunk)
                     {
-                        InsertCommand.Create(ComicCollectionTable.Instance)
-                            .AppendColumn(ComicCollectionTable.ColumnCollectionId, collectionId)
-                            .AppendColumn(ComicCollectionTable.ColumnComicId, comicId)
+                        InsertCommand.Create(MediaCollectionTable.Instance)
+                            .AppendColumn(MediaCollectionTable.ColumnCollectionId, collectionId)
+                            .AppendColumn(MediaCollectionTable.ColumnMediaId, comicId)
                             .Execute();
                         inserted++;
                     }
@@ -160,9 +160,9 @@ internal static class CollectionModel
             {
                 foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(ids))
                 {
-                    removed += DeleteCommand.Create(ComicCollectionTable.Instance)
-                        .AppendCondition(ComicCollectionTable.ColumnCollectionId, collectionId)
-                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicCollectionTable.ColumnComicId), idChunk))
+                    removed += DeleteCommand.Create(MediaCollectionTable.Instance)
+                        .AppendCondition(MediaCollectionTable.ColumnCollectionId, collectionId)
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnMediaId), idChunk))
                         .Execute();
                 }
             });
@@ -182,11 +182,11 @@ internal static class CollectionModel
     private static HashSet<long> QueryCollectionIdsContainingAllNoLock(List<long> comicIds)
     {
         HashSet<long> collectionIds = [];
-        SelectCommand command = SelectCommand.Create(ComicCollectionTable.Instance)
-            .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicCollectionTable.ColumnComicId), comicIds))
-            .GroupBy(ComicCollectionTable.ColumnCollectionId);
-        IReaderToken<long> collectionIdToken = command.PutQueryInt64(ComicCollectionTable.ColumnCollectionId);
-        IReaderToken<long> matchedCountToken = command.PutQueryCountDistinct(ComicCollectionTable.ColumnComicId);
+        SelectCommand command = SelectCommand.Create(MediaCollectionTable.Instance)
+            .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnMediaId), comicIds))
+            .GroupBy(MediaCollectionTable.ColumnCollectionId);
+        IReaderToken<long> collectionIdToken = command.PutQueryInt64(MediaCollectionTable.ColumnCollectionId);
+        IReaderToken<long> matchedCountToken = command.PutQueryCountDistinct(MediaCollectionTable.ColumnMediaId);
         using SelectCommand.IReader reader = command.Execute();
         while (reader.Read())
         {
@@ -203,10 +203,10 @@ internal static class CollectionModel
         HashSet<long> ids = [];
         foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(comicIds))
         {
-            SelectCommand command = SelectCommand.Create(ComicCollectionTable.Instance)
-                .AppendCondition(ComicCollectionTable.ColumnCollectionId, collectionId)
-                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicCollectionTable.ColumnComicId), idChunk));
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(ComicCollectionTable.ColumnComicId);
+            SelectCommand command = SelectCommand.Create(MediaCollectionTable.Instance)
+                .AppendCondition(MediaCollectionTable.ColumnCollectionId, collectionId)
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnMediaId), idChunk));
+            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {

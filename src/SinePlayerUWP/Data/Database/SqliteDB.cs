@@ -103,7 +103,7 @@ internal static class SqliteDB
         _mediaDatabase = new SqlDatabase(Path.Combine(DatabaseFolderPath, "Media.sqlite"));
 
         string comicTable = ComicTable.Instance.GetTableName();
-        string comicCollectionTable = ComicCollectionTable.Instance.GetTableName();
+        string mediaCollectionTable = MediaCollectionTable.Instance.GetTableName();
         string tagCategoryTable = MediaTagCategoryTable.Instance.GetTableName();
         string tagTable = MediaTagTable.Instance.GetTableName();
 
@@ -124,9 +124,9 @@ internal static class SqliteDB
             "," + ComicTable.ColumnExt.Name + " TEXT" +
             ")");
 
-        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + comicCollectionTable + " (" +
-            ComicCollectionTable.ColumnCollectionId.Name + " INTEGER NOT NULL REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
-            "," + ComicCollectionTable.ColumnComicId.Name + " INTEGER NOT NULL REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
+        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + mediaCollectionTable + " (" +
+            MediaCollectionTable.ColumnCollectionId.Name + " INTEGER NOT NULL REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
+            "," + MediaCollectionTable.ColumnMediaId.Name + " INTEGER NOT NULL REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
 
         ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + tagCategoryTable + " (" +

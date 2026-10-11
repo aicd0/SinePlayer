@@ -6,14 +6,14 @@ using SinePlayerUWP.Data.Database;
 
 namespace SinePlayerUWP.Data.Tables;
 
-internal class ComicCollectionTable : ITable
+internal class MediaCollectionTable : ITable
 {
-    public static ComicCollectionTable Instance { get; } = new();
+    public static MediaCollectionTable Instance { get; } = new();
 
     public static Int64Column ColumnCollectionId { get; } = new("collection_id");
-    public static Int64Column ColumnComicId { get; } = new("comic_id");
+    public static Int64Column ColumnMediaId { get; } = new("media_id");
 
-    private ComicCollectionTable() { }
+    private MediaCollectionTable() { }
 
     public SqlDatabase GetDatabase()
     {
@@ -22,6 +22,6 @@ internal class ComicCollectionTable : ITable
 
     public string GetTableName()
     {
-        return "comic_collections";
+        return "media_collections";
     }
 }

@@ -237,8 +237,8 @@ internal class ComicSearchEngine
 
     private static ICondition CreateExcludeInCollectionsCondition()
     {
-        var subquery = SelectCommand.Create(ComicCollectionTable.Instance);
-        _ = subquery.PutQueryInt64(ComicCollectionTable.ColumnComicId);
+        var subquery = SelectCommand.Create(MediaCollectionTable.Instance);
+        _ = subquery.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
         return new NotCondition(new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery));
     }
 
