@@ -4,9 +4,15 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.IO;
 using System.Threading.Tasks;
 
 using SinePlayerUWP.Common.Imaging;
+using SinePlayerUWP.Common.Misc;
+using SinePlayerUWP.Data.Models.Media;
+using SinePlayerUWP.Helpers.Imaging;
+
+using Windows.Storage.FileProperties;
 
 namespace SinePlayerUWP.Common.Storage;
 
@@ -79,10 +85,31 @@ internal sealed class MediaImageUriInterceptor : IResourceUriInterceptor
 
         public Uri Uri => _uri;
 
-        public Task<IImageSource?> ResolveImage()
+        public async Task<IImageSource?> ResolveImage()
         {
-            // Cover images will be provided by the media thumbnail provider in a later migration phase.
-            return Task.FromResult<IImageSource?>(null);
+            MediaModel? media = await MediaModel.FromId(MediaId);
+            if (media is null || media.IsCollection)
+            {
+                return null;
+            }
+
+            string? coverImage = media.GetExt(MediaExt.COVER_IMAGE);
+            if (!string.IsNullOrEmpty(coverImage) && File.Exists(coverImage))
+            {
+                return new LocalFileImageSource(coverImage, _uri.ToString());
+            }
+
+            string location = media.Location;
+            string extension = Path.GetExtension(location);
+            bool isAudioExtension = AppInfoProvider.IsSupportedAudioExtension(extension);
+            if (string.IsNullOrEmpty(location) || !File.Exists(location) ||
+                !(isAudioExtension || AppInfoProvider.IsSupportedVideoExtension(extension)))
+            {
+                return null;
+            }
+
+            ThumbnailMode thumbnailMode = isAudioExtension ? ThumbnailMode.MusicView : ThumbnailMode.VideosView;
+            return new MediaThumbnailImageSource(location, _uri.ToString(), thumbnailMode);
         }
 
         public Task Release()
