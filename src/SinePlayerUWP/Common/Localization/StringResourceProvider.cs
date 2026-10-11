@@ -27,6 +27,7 @@ public class StringResourceProvider
     public string AllMatchedResults => GetResourceString("AllMatchedResults");
     public string AllPages => GetResourceString("AllPages");
     public string Always => GetResourceString("Always");
+    public string AutoPlayNext => GetResourceString("AutoPlayNext");
     public string AntiAliasingFilter => GetResourceString("AntiAliasingFilter");
     public string AppDescription => GetResourceString("AppDescription");
     public string AppDisplayName => GetResourceString("AppDisplayName");
@@ -87,6 +88,7 @@ public class StringResourceProvider
     public string DownloadPluginsFromGitHub => GetResourceString("DownloadPluginsFromGitHub");
     public string Duration => GetResourceString("Duration");
     public string DuringAutoScrolling => GetResourceString("DuringAutoScrolling");
+    public string DuringPlayback => GetResourceString("DuringPlayback");
     public string Edit => GetResourceString("Edit");
     public string EditImportExclusionList => GetResourceString("EditImportExclusionList");
     public string EditKeyboardShortcut => GetResourceString("EditKeyboardShortcut");

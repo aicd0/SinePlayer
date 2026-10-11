@@ -11,6 +11,7 @@ using Microsoft.UI.Xaml;
 using SinePlayerUWP.Common.Actions;
 using SinePlayerUWP.Common.ErrorHandling;
 using SinePlayerUWP.Common.Localization;
+using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Common.Playback;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
@@ -38,6 +39,8 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     private long _pendingStartPositionMs = -1;
     private long _lastPositionSaveTicks = 0;
     private long _lastPositionUiTicks = 0;
+    private bool _isPageActive = false;
+    private bool _isKeepScreenOnActive = false;
 
     public PlayerPageViewModel() { }
 
@@ -52,6 +55,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     public readonly MutableLiveData<bool> IsPlayingLiveData = new();
     public readonly MutableLiveData<long> PositionLiveData = new();
     public readonly MutableLiveData<double> VolumeLiveData = new();
+    public readonly MutableLiveData<bool> MuteLiveData = new();
 
     private bool _isFullscreen = false;
     public bool IsFullscreen
@@ -200,6 +204,9 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         _isInitialized = false;
         _pendingMedia = null;
         _pendingStartPositionMs = -1;
+        SaveVolumeAndMute();
+        _isPageActive = false;
+        UpdateKeepScreenOn();
 
         IMediaEngine? engine = _engine;
         _engine = null;
@@ -229,6 +236,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     {
         _engine?.Pause();
         SaveCurrentPosition();
+        SaveVolumeAndMute();
     }
 
     public void TogglePlayPause()
@@ -301,7 +309,14 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     public void SetMuted(bool isMuted)
     {
-        _engine?.SetMuted(isMuted);
+        IMediaEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        engine.SetMuted(isMuted);
+        MuteLiveData.Emit(isMuted);
     }
 
     public void SetIsFavorite(bool isFavorite, bool writeDatabase)
@@ -552,12 +567,16 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         }
 
         IMediaEngine engine = MediaEngineService.CreateEngine();
+        engine.SetVolume(Math.Clamp(AppSettingsModel.PlayerVolume, 0.0, 1.0));
+        engine.SetMuted(AppSettingsModel.PlayerMuted);
         engine.StateChanged += Engine_StateChanged;
         engine.PositionChanged += Engine_PositionChanged;
         engine.MediaOpened += Engine_MediaOpened;
         engine.MediaEnded += Engine_MediaEnded;
         engine.ErrorOccurred += Engine_ErrorOccurred;
         _engine = engine;
+        VolumeLiveData.Emit(engine.Volume);
+        MuteLiveData.Emit(engine.IsMuted);
         return engine;
     }
 
@@ -579,6 +598,8 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             default:
                 break;
         }
+
+        UpdateKeepScreenOn();
     }
 
     private void Engine_PositionChanged()
@@ -642,7 +663,10 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             CoroutineUtils.Run(async () => await media.SetProgress(100, 0));
         }
 
-        Playback.Next();
+        if (AppSettingsModel.AutoPlayNext)
+        {
+            Playback.Next();
+        }
     }
 
     private void Engine_ErrorOccurred(string message)
@@ -658,6 +682,54 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     {
         bool isFavorite = !media.IsExternal && FavoriteModel.Instance.FromId(media.Id) != null;
         SetIsFavorite(isFavorite, false);
+    }
+
+    //
+    // Player state
+    //
+
+    public void SetPageActive(bool isPageActive)
+    {
+        _isPageActive = isPageActive;
+        UpdateKeepScreenOn();
+    }
+
+    public void RefreshKeepScreenOn()
+    {
+        UpdateKeepScreenOn();
+    }
+
+    private void SaveVolumeAndMute()
+    {
+        IMediaEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        AppSettingsModel.PlayerVolume = engine.Volume;
+        AppSettingsModel.PlayerMuted = engine.IsMuted;
+    }
+
+    private void UpdateKeepScreenOn()
+    {
+        bool shouldKeepScreenOn = _isPageActive &&
+            (AppSettingsModel.KeepScreenOnBehavior == AppSettingsModel.KeepScreenOnBehaviorEnum.Always ||
+            (AppSettingsModel.KeepScreenOnBehavior == AppSettingsModel.KeepScreenOnBehaviorEnum.DuringPlayback && IsAutoPlaying));
+        if (_isKeepScreenOnActive == shouldKeepScreenOn)
+        {
+            return;
+        }
+
+        _isKeepScreenOnActive = shouldKeepScreenOn;
+        if (shouldKeepScreenOn)
+        {
+            DisplayRequestManager.IncrememtKeepScreenOn();
+        }
+        else
+        {
+            DisplayRequestManager.DecrememtKeepScreenOn();
+        }
     }
 
     //

@@ -10,10 +10,8 @@ using SinePlayerUWP.Data.Models.Misc;
 
 namespace SinePlayerUWP.Views.Pages.Settings;
 
-internal partial class ReaderSettingsViewModel : INotifyPropertyChanged
+internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
 {
-    private const string TAG = nameof(ReaderSettingsViewModel);
-
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private SettingsSharedViewModel _shared = new();
@@ -24,17 +22,6 @@ internal partial class ReaderSettingsViewModel : INotifyPropertyChanged
         {
             _shared = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Shared)));
-        }
-    }
-
-    private bool _transitionAnimation;
-    public bool TransitionAnimation
-    {
-        get => _transitionAnimation;
-        set
-        {
-            _transitionAnimation = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TransitionAnimation)));
         }
     }
 
@@ -60,17 +47,6 @@ internal partial class ReaderSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _useScrollingAreaAsStartEnd;
-    public bool UseScrollingAreaAsStartEnd
-    {
-        get => _useScrollingAreaAsStartEnd;
-        set
-        {
-            _useScrollingAreaAsStartEnd = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UseScrollingAreaAsStartEnd)));
-        }
-    }
-
     private bool _autoToggleOverlaysOnCursor;
     public bool AutoToggleOverlaysOnCursor
     {
@@ -82,36 +58,14 @@ internal partial class ReaderSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _automaticallyHideCursor;
-    public bool AutomaticallyHideCursor
+    private bool _autoPlayNext;
+    public bool AutoPlayNext
     {
-        get => _automaticallyHideCursor;
+        get => _autoPlayNext;
         set
         {
-            _automaticallyHideCursor = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AutomaticallyHideCursor)));
-        }
-    }
-
-    private int _preloadPagesAfter;
-    public int PreloadPagesAfter
-    {
-        get => _preloadPagesAfter;
-        set
-        {
-            _preloadPagesAfter = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PreloadPagesAfter)));
-        }
-    }
-
-    private int _preloadPagesBefore;
-    public int PreloadPagesBefore
-    {
-        get => _preloadPagesBefore;
-        set
-        {
-            _preloadPagesBefore = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PreloadPagesBefore)));
+            _autoPlayNext = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AutoPlayNext)));
         }
     }
 
@@ -143,28 +97,6 @@ internal partial class ReaderSettingsViewModel : INotifyPropertyChanged
         Shared.UpdateStarted += Update;
     }
 
-    public void SetPreloadPagesAfter(int value)
-    {
-        if (value == _preloadPagesAfter)
-        {
-            return;
-        }
-
-        _preloadPagesAfter = value;
-        AppSettingsModel.PreloadPagesAfter = value;
-    }
-
-    public void SetPreloadPagesBefore(int value)
-    {
-        if (value == _preloadPagesBefore)
-        {
-            return;
-        }
-
-        _preloadPagesBefore = value;
-        AppSettingsModel.PreloadPagesBefore = value;
-    }
-
     public void SetKeepScreenOnBehavior(int index)
     {
         if (index == _keepScreenOnBehaviorIndex || index < 0 || index >= _keepScreenOnBehaviors.Count)
@@ -178,22 +110,18 @@ internal partial class ReaderSettingsViewModel : INotifyPropertyChanged
 
     private void Update()
     {
-        UpdateBasicReaderSettings();
+        UpdateBasicPlayerSettings();
         UpdateKeepScreenOnBehavior();
     }
 
-    private void UpdateBasicReaderSettings()
+    private void UpdateBasicPlayerSettings()
     {
         CoroutineUtils.RunInMainThread(() =>
         {
-            TransitionAnimation = AppSettingsModel.TransitionAnimation;
             RestoreLastReadingPosition = AppSettingsModel.RestoreLastReadingPosition;
             RestoreLastReadingPositionOnlyAppliesToReadingMedia = AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia;
-            UseScrollingAreaAsStartEnd = AppSettingsModel.UseScrollingAreaAsStartEnd;
             AutoToggleOverlaysOnCursor = AppSettingsModel.AutoToggleOverlaysOnCursor;
-            AutomaticallyHideCursor = AppSettingsModel.AutoHideCursor;
-            PreloadPagesAfter = AppSettingsModel.PreloadPagesAfter;
-            PreloadPagesBefore = AppSettingsModel.PreloadPagesBefore;
+            AutoPlayNext = AppSettingsModel.AutoPlayNext;
         });
     }
 
@@ -203,7 +131,7 @@ internal partial class ReaderSettingsViewModel : INotifyPropertyChanged
         List<KeepScreenOnBehaviorEntry> entries = [
             new(AppSettingsModel.KeepScreenOnBehaviorEnum.Never),
             new(AppSettingsModel.KeepScreenOnBehaviorEnum.Always),
-            new(AppSettingsModel.KeepScreenOnBehaviorEnum.DuringAutoScrolling),
+            new(AppSettingsModel.KeepScreenOnBehaviorEnum.DuringPlayback),
         ];
         int selectedIndex = -1;
         for (int i = 0; i < entries.Count; i++)
@@ -240,7 +168,7 @@ internal partial class ReaderSettingsViewModel : INotifyPropertyChanged
                 {
                     AppSettingsModel.KeepScreenOnBehaviorEnum.Never => StringResourceProvider.Instance.Never,
                     AppSettingsModel.KeepScreenOnBehaviorEnum.Always => StringResourceProvider.Instance.Always,
-                    AppSettingsModel.KeepScreenOnBehaviorEnum.DuringAutoScrolling => StringResourceProvider.Instance.DuringAutoScrolling,
+                    AppSettingsModel.KeepScreenOnBehaviorEnum.DuringPlayback => StringResourceProvider.Instance.DuringPlayback,
                     _ => throw new InvalidEnumArgumentException(nameof(Behavior)),
                 };
             }

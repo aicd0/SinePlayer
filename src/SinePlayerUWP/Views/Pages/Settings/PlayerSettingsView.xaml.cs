@@ -1,22 +1,19 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
 
 using SinePlayerUWP.Common.BaseUI;
 using SinePlayerUWP.Data.Models.Misc;
 
 namespace SinePlayerUWP.Views.Pages.Settings;
 
-internal sealed partial class ReaderSettingsView : BaseUserControl
+internal sealed partial class PlayerSettingsView : BaseUserControl
 {
-    public ReaderSettingsViewModel ViewModel { get; } = new();
+    public PlayerSettingsViewModel ViewModel { get; } = new();
 
-    public ReaderSettingsView()
+    public PlayerSettingsView()
     {
         InitializeComponent();
     }
@@ -24,15 +21,6 @@ internal sealed partial class ReaderSettingsView : BaseUserControl
     public void Initialize(SettingsSharedViewModel shared)
     {
         ViewModel.Initialize(shared);
-    }
-
-    private void TransitionAnimationCheckBox_Click(object sender, RoutedEventArgs e)
-    {
-        bool? isChecked = ((CheckBox)sender).IsChecked;
-        if (isChecked.HasValue)
-        {
-            AppSettingsModel.TransitionAnimation = isChecked.Value;
-        }
     }
 
     private void RestoreLastReadingPositionCheckBox_Click(object sender, RoutedEventArgs e)
@@ -53,15 +41,6 @@ internal sealed partial class ReaderSettingsView : BaseUserControl
         }
     }
 
-    private void UseScrollingAreaAsStartEndCheckBox_Click(object sender, RoutedEventArgs e)
-    {
-        bool? isChecked = ((CheckBox)sender).IsChecked;
-        if (isChecked.HasValue)
-        {
-            AppSettingsModel.UseScrollingAreaAsStartEnd = isChecked.Value;
-        }
-    }
-
     private void AutoToggleOverlaysOnCursorCheckBox_Click(object sender, RoutedEventArgs e)
     {
         bool? isChecked = ((CheckBox)sender).IsChecked;
@@ -71,25 +50,13 @@ internal sealed partial class ReaderSettingsView : BaseUserControl
         }
     }
 
-    private void HideCursorAutomaticallyCheckBox_Click(object sender, RoutedEventArgs e)
+    private void AutoPlayNextCheckBox_Click(object sender, RoutedEventArgs e)
     {
         bool? isChecked = ((CheckBox)sender).IsChecked;
         if (isChecked.HasValue)
         {
-            AppSettingsModel.AutoHideCursor = isChecked.Value;
+            AppSettingsModel.AutoPlayNext = isChecked.Value;
         }
-    }
-
-    private void PreloadPagesAfterSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-    {
-        int value = Math.Clamp((int)e.NewValue, 0, 10);
-        ViewModel.SetPreloadPagesAfter(value);
-    }
-
-    private void PreloadPagesBeforeSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-    {
-        int value = Math.Clamp((int)e.NewValue, 0, 10);
-        ViewModel.SetPreloadPagesBefore(value);
     }
 
     private void KeepScreenOnBehaviorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

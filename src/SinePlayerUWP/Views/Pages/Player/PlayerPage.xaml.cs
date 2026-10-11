@@ -113,12 +113,14 @@ internal sealed partial class PlayerPage : BasePage
         base.OnResume();
         AddToActiveTabs();
         UpdateOverlayState();
+        ViewModel.SetPageActive(true);
     }
 
     protected override void OnPause()
     {
         base.OnPause();
         ViewModel.Pause();
+        ViewModel.SetPageActive(false);
     }
 
     protected override void OnStop()
@@ -312,6 +314,17 @@ internal sealed partial class PlayerPage : BasePage
             Sticky = true,
             PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
         });
+
+        ViewModel.MuteLiveData.Observe(this, isMuted =>
+        {
+            TransportBar.SetMuted(isMuted);
+        }, new ObserveOptions()
+        {
+            Sticky = true,
+            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
+        });
+
+        AppSettingsModel.KeepScreenOnBehaviorChangedLiveData.Observe(this, _ => ViewModel.RefreshKeepScreenOn());
     }
 
     private async Task LoadPlaylistAsync(string playlistId, string serializedPlayback, long initialPositionMs)

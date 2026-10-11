@@ -168,6 +168,9 @@
   <data name="Always" xml:space="preserve">
     <value>Always</value>
   </data>
+  <data name="AutoPlayNext" xml:space="preserve">
+    <value>Play the next media automatically</value>
+  </data>
   <data name="AntiAliasingFilter" xml:space="preserve">
     <value>Anti-aliasing filter</value>
   </data>
@@ -373,6 +376,9 @@ $files</value>
   </data>
   <data name="DuringAutoScrolling" xml:space="preserve">
     <value>During auto scrolling</value>
+  </data>
+  <data name="DuringPlayback" xml:space="preserve">
+    <value>While playing</value>
   </data>
   <data name="Edit" xml:space="preserve">
     <value>Edit</value>
@@ -878,6 +884,12 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="ReaderExpander.Header" xml:space="preserve">
     <value>Reader</value>
+  </data>
+  <data name="PlayerExpander.Detail" xml:space="preserve">
+    <value>Customize the player</value>
+  </data>
+  <data name="PlayerExpander.Header" xml:space="preserve">
+    <value>Player</value>
   </data>
   <data name="ReaderSettingButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>Reader settings</value>

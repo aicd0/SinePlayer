@@ -89,6 +89,45 @@ internal static class AppSettingsModel
         }
     }
 
+    public static bool AutoPlayNext
+    {
+        get
+        {
+            return _db.Read(model => model.AutoPlayNext ?? true);
+        }
+        set
+        {
+            _db.Write(model => model.AutoPlayNext = value);
+            _db.Save();
+        }
+    }
+
+    public static bool PlayerMuted
+    {
+        get
+        {
+            return _db.Read(model => model.PlayerMuted ?? false);
+        }
+        set
+        {
+            _db.Write(model => model.PlayerMuted = value);
+            _db.Save();
+        }
+    }
+
+    public static double PlayerVolume
+    {
+        get
+        {
+            return _db.Read(model => model.PlayerVolume ?? 1.0);
+        }
+        set
+        {
+            _db.Write(model => model.PlayerVolume = value);
+            _db.Save();
+        }
+    }
+
     public static CloseLastTabBehaviorEnum CloseLastTabBehavior
     {
         get
@@ -557,7 +596,7 @@ internal static class AppSettingsModel
         {
             KeepScreenOnBehaviorEnum.Never => "Never",
             KeepScreenOnBehaviorEnum.Always => "Always",
-            KeepScreenOnBehaviorEnum.DuringAutoScrolling => "DuringAutoScrolling",
+            KeepScreenOnBehaviorEnum.DuringPlayback => "DuringPlayback",
             _ => "DuringAutoScrolling",
         };
     }
@@ -568,8 +607,8 @@ internal static class AppSettingsModel
         {
             "Never" => KeepScreenOnBehaviorEnum.Never,
             "Always" => KeepScreenOnBehaviorEnum.Always,
-            "DuringAutoScrolling" => KeepScreenOnBehaviorEnum.DuringAutoScrolling,
-            _ => KeepScreenOnBehaviorEnum.DuringAutoScrolling,
+            "DuringPlayback" => KeepScreenOnBehaviorEnum.DuringPlayback,
+            _ => KeepScreenOnBehaviorEnum.DuringPlayback,
         };
     }
 
@@ -689,7 +728,7 @@ internal static class AppSettingsModel
     {
         Never,
         Always,
-        DuringAutoScrolling,
+        DuringPlayback,
     }
 
     public enum AppearanceSetting
@@ -722,6 +761,9 @@ internal static class AppSettingsModel
 
     public class JsonModel
     {
+        [JsonPropertyName("AutoPlayNext")]
+        public bool? AutoPlayNext { get; set; }
+
         [JsonPropertyName("AutoSwitch")]
         public bool? AutoSwitch { get; set; }
 
@@ -763,6 +805,12 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("PlaybackDefaultShuffle")]
         public bool? PlaybackDefaultShuffle { get; set; }
+
+        [JsonPropertyName("PlayerMuted")]
+        public bool? PlayerMuted { get; set; }
+
+        [JsonPropertyName("PlayerVolume")]
+        public double? PlayerVolume { get; set; }
 
         [JsonPropertyName("PreloadPagesAfter")]
         public int? PreloadPagesAfter { get; set; }
