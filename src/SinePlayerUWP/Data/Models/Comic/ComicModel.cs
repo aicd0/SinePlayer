@@ -9,7 +9,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-using SinePlayerUWP.Common.Archive;
 using SinePlayerUWP.Common.ErrorHandling;
 using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Common.Misc;
@@ -89,113 +88,35 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
 
     public static async Task<ComicModel?> FromFile(string path)
     {
-        ComicHandle? comic = null;
         string extension = Path.GetExtension(path).ToLower();
-        if (AppInfoProvider.IsSupportedDocumentExtension(extension))
+        if (!AppInfoProvider.IsSupportedVideoExtension(extension) && !AppInfoProvider.IsSupportedAudioExtension(extension))
         {
-            comic = await ComicHandle.FromLocation(path);
-            if (comic is null)
-            {
-                switch (extension)
-                {
-                    case ".pdf":
-                        comic = PdfComicHandle.FromExternal(path);
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-        else if (AppInfoProvider.IsSupportedArchiveExtension(extension))
-        {
-            comic = await ComicHandle.FromLocation(path);
-            comic ??= ArchiveComicHandle.FromExternal(path);
-        }
-
-        if (comic is null)
-        {
+            Logger.E(TAG, $"Unsupported media file extension: {extension}");
             return null;
         }
 
+        ComicHandle? comic = await ComicHandle.FromLocation(path);
+        comic ??= FileComicHandle.FromExternal(path);
         return ReplaceWithExisting(comic);
     }
 
-    public static ComicModel FromFolder(string directory)
-    {
-        ComicHandle comic = FolderComicHandle.FromExternal(directory);
-        return ReplaceWithExisting(comic);
-    }
-
-    public static async Task<ComicModel?> FromExternalLocation(string location)
+    public static Task<ComicModel?> FromExternalLocation(string location)
     {
         if (File.Exists(location))
         {
             string extension = Path.GetExtension(location);
             if (!AppInfoProvider.IsSupportedExternalFileExtension(extension))
             {
-                Logger.E(TAG, $"Unsupported file extension: {extension}");
-                return null;
+                Logger.E(TAG, $"Unsupported external file extension: {extension}");
+                return Task.FromResult<ComicModel?>(null);
             }
 
-            ComicModel? comic = await FromFile(location);
-            if (comic is null)
-            {
-                Logger.E(TAG, $"Failed to create comic from file: {location}");
-                return null;
-            }
-
-            return comic;
-        }
-
-        if (Directory.Exists(location))
-        {
-            ComicModel? comic = await FromLocation(location);
-            if (comic is not null)
-            {
-                return comic;
-            }
-
-            string[] filePaths;
-            try
-            {
-                filePaths = Directory.GetFiles(location);
-            }
-            catch (Exception ex)
-            {
-                Logger.E(TAG, $"Failed to list files in directory: {location}", ex);
-                return null;
-            }
-
-            List<string> files = [];
-            foreach (string path in filePaths)
-            {
-                string extension = Path.GetExtension(path);
-                if (!AppInfoProvider.IsSupportedImageExtension(extension))
-                {
-                    continue;
-                }
-
-                files.Add(path);
-            }
-
-            if (files.Count == 0)
-            {
-                Logger.E(TAG, $"No valid image files found in directory: {location}");
-                return null;
-            }
-
-            comic = FromFolder(location);
-            if (comic is null)
-            {
-                Logger.E(TAG, $"Failed to create comic from image files in directory: {location}");
-                return null;
-            }
-
-            return comic;
+            ComicHandle comic = FileComicHandle.FromExternal(location);
+            return Task.FromResult<ComicModel?>(ReplaceWithExisting(comic));
         }
 
         Logger.E(TAG, $"Invalid location: {location}");
-        return null;
+        return Task.FromResult<ComicModel?>(null);
     }
 
     public static async Task<List<ComicModel>> BatchFromId(IEnumerable<long> ids)
@@ -558,17 +479,17 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
         });
 
         // Scan comics
-        Dictionary<string, ComicType> pendingLocations = [];
+        Dictionary<string, MediaType> pendingLocations = [];
         HashSet<string> newLocations = [];
         HashSet<string> noAccessLocations = [];
 
         async Task FlushPendingLocations()
         {
             List<UpdateItemInfo> updateQueue = [];
-            foreach (KeyValuePair<string, ComicType> pair in pendingLocations)
+            foreach (KeyValuePair<string, MediaType> pair in pendingLocations)
             {
                 string location = pair.Key;
-                ComicType type = pair.Value;
+                MediaType type = pair.Value;
 
                 if (!newLocations.Add(location))
                 {
@@ -621,7 +542,7 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
                 continue;
             }
 
-            foreach (ComicScanner.ItemInfo itemInfo in ComicScanner.Search(folderPath, ComicScanner.PathType.Folder))
+            foreach (ComicScanner.ItemInfo itemInfo in ComicScanner.Search(folderPath))
             {
                 if (_isLibraryScanPending)
                 {
@@ -644,22 +565,13 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
 
                 string filename = StringUtils.ItemNameFromPath(itemInfo.Path);
                 string extension = StringUtils.ExtensionFromFilename(filename).ToLowerInvariant();
-                if (AppInfoProvider.IsSupportedImageExtension(extension))
+                if (AppInfoProvider.IsSupportedVideoExtension(extension))
                 {
-                    string location = StringUtils.ParentLocationFromLocation(itemInfo.Path);
-                    ComicType type = ArchiveManager.IsArchivePath(itemInfo.Path) ? ComicType.Archive : ComicType.Folder;
-                    pendingLocations[location] = type;
+                    pendingLocations[itemInfo.Path] = MediaType.Video;
                 }
-                else
+                else if (AppInfoProvider.IsSupportedAudioExtension(extension))
                 {
-                    switch (extension)
-                    {
-                        case ".pdf":
-                            pendingLocations[itemInfo.Path] = ComicType.PDF;
-                            break;
-                        default:
-                            break;
-                    }
+                    pendingLocations[itemInfo.Path] = MediaType.Audio;
                 }
 
                 if (watch.LapSpan().TotalSeconds > 2)
@@ -1419,7 +1331,7 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
     private struct UpdateItemInfo
     {
         public string Location;
-        public ComicType ItemType;
+        public MediaType ItemType;
     };
 
     private sealed class QueuedTask(Func<Task> func)

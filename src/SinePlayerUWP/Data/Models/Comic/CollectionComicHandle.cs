@@ -13,6 +13,10 @@ internal partial class CollectionComicHandle : ComicHandle
 {
     private const string TAG = nameof(CollectionComicHandle);
 
+    public CollectionComicHandle() : base(MediaType.Collection)
+    {
+    }
+
     public static ComicHandle FromExternal()
     {
         return new CollectionComicHandle()
@@ -23,8 +27,6 @@ internal partial class CollectionComicHandle : ComicHandle
     }
 
     public override bool IsEditable => !IsExternal;
-
-    protected override ComicType Type => ComicType.Collection;
 
     public override IReadOnlyList<string> GetFolderViewPath()
     {

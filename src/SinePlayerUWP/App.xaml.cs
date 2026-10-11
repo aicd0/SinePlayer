@@ -322,47 +322,12 @@ public partial class App : Application
         }
 
         ComicModel? comic = await ComicModel.FromFile(targetFilePath);
-        if (comic is not null)
+        if (comic is null)
         {
-            return OpenComicHelper.GetComicRoute(comic);
+            Logger.W(nameof(GetFileActivatedRoute), $"Failed to create a media model from the file: {targetFilePath}");
+            return null;
         }
 
-        if (AppInfoProvider.IsSupportedImageExtension(targetFileExtension))
-        {
-            string? parentPath = Path.GetDirectoryName(targetFilePath);
-            if (string.IsNullOrEmpty(parentPath))
-            {
-                Logger.W(nameof(GetFileActivatedRoute), $"Failed to get parent directory of the image file: {targetFilePath}");
-                return null;
-            }
-
-            comic = await ComicModel.FromLocation(parentPath) ??
-                await ComicModel.FromExternalLocation(parentPath);
-
-            if (comic is not null)
-            {
-                double page = -1.0;
-                ErrorResult<ComicConnection> connectionErr = await comic.OpenComic();
-                if (connectionErr.IsSuccessful)
-                {
-                    using ComicConnection? connection = connectionErr.Result;
-                    int imageCount = connection.ImageCount;
-                    for (int i = 0; i < imageCount; i++)
-                    {
-                        string imagePath = connection.GetImagePath(i);
-                        if (PathUtils.IsPathEquivalent(imagePath, targetFilePath))
-                        {
-                            page = i + 1;
-                            break;
-                        }
-                    }
-                }
-
-                return OpenComicHelper.GetComicRoute(comic, page: page);
-            }
-        }
-
-        Logger.W(nameof(GetFileActivatedRoute), $"Failed to create a comic model from the file: {targetFilePath}");
-        return null;
+        return OpenComicHelper.GetComicRoute(comic);
     }
 }

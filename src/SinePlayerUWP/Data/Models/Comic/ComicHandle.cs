@@ -21,7 +21,7 @@ using SinePlayerUWP.Data.Tables;
 
 namespace SinePlayerUWP.Data.Models.Comic;
 
-internal abstract partial class ComicHandle
+internal abstract partial class ComicHandle(MediaType type)
 {
     //
     // Constants
@@ -37,7 +37,7 @@ internal abstract partial class ComicHandle
     {
         return new ComparisonCondition(
             ColumnOrValue.FromColumn(MediaTable.ColumnType),
-            ColumnOrValue.FromValue((long)ComicType.Collection),
+            ColumnOrValue.FromValue((long)MediaType.Collection),
             ComparisonCondition.TypeEnum.NotEqual);
     }
 
@@ -51,7 +51,7 @@ internal abstract partial class ComicHandle
         return SqliteDB.MediaDatabaseDispatcher.Submit(func);
     }
 
-    public static long InsertNoLock(ComicType type, string location)
+    public static long InsertNoLock(MediaType type, string location)
     {
         ComicHandle? comic = FromType(type);
         if (comic is null)
@@ -139,7 +139,7 @@ internal abstract partial class ComicHandle
             while (reader.Read())
             {
                 long id = idToken.GetValue();
-                var type = (ComicType)typeToken.GetValue();
+                var type = (MediaType)typeToken.GetValue();
                 string location = locationToken.GetValue();
                 string title1 = title1Token.GetValue();
                 string title2 = title2Token.GetValue();
@@ -291,13 +291,14 @@ internal abstract partial class ComicHandle
         return FromIdNoLock(comicId);
     }
 
-    private static ComicHandle? FromType(ComicType type)
+    private static ComicHandle? FromType(MediaType type)
     {
         switch (type)
         {
-            case ComicType.Folder:
-                return new FolderComicHandle();
-            case ComicType.Collection:
+            case MediaType.Video:
+            case MediaType.Audio:
+                return new FileComicHandle(type);
+            case MediaType.Collection:
                 return new CollectionComicHandle();
             default:
                 Logger.F(TAG, $"Unknown comic type: {type}");
@@ -327,6 +328,7 @@ internal abstract partial class ComicHandle
     //
 
     public long Id { get; set; } = -1;
+    public MediaType Type { get; } = type;
     public CompletionStatusEnum CompletionStatus { get; private set; }
     public string Location { get; protected set; } = string.Empty;
     public string Title1 { get; protected set; } = string.Empty;
@@ -344,9 +346,7 @@ internal abstract partial class ComicHandle
     public abstract bool IsEditable { get; }
     public virtual string FileSystemPath => Location;
     public bool IsExternal => Id < 0;
-    public bool IsCollection => Type == ComicType.Collection;
-
-    protected abstract ComicType Type { get; }
+    public bool IsCollection => Type == MediaType.Collection;
 
     //
     // Getters
@@ -732,11 +732,7 @@ internal abstract partial class ComicHandle
                 continue;
             }
 
-            if (Type != ComicType.Folder)
-            {
-                subTags[^1] = StringUtils.DisplayNameFromFilename(subTags[^1]);
-            }
-
+            subTags[^1] = StringUtils.DisplayNameFromFilename(subTags[^1]);
             tags.AddRange(subTags);
         }
 

@@ -25,7 +25,45 @@ internal static class AppInfoProvider
     ]);
     public static IReadOnlySet<string> SupportedImageExtensions => _supportedImageExtensions;
 
-    public static IReadOnlySet<string> SupportedExternalFileExtensions => SupportedImageExtensions;
+    private static readonly IReadOnlySet<string> _supportedVideoExtensions = new HashSet<string>(
+    [
+        ".3gp",
+        ".avi",
+        ".flv",
+        ".m2ts",
+        ".m4v",
+        ".mkv",
+        ".mov",
+        ".mp4",
+        ".mpeg",
+        ".mpg",
+        ".ts",
+        ".webm",
+        ".wmv",
+    ]);
+    public static IReadOnlySet<string> SupportedVideoExtensions => _supportedVideoExtensions;
+
+    private static readonly IReadOnlySet<string> _supportedAudioExtensions = new HashSet<string>(
+    [
+        ".aac",
+        ".flac",
+        ".m4a",
+        ".mp3",
+        ".ogg",
+        ".opus",
+        ".wav",
+        ".wma",
+    ]);
+    public static IReadOnlySet<string> SupportedAudioExtensions => _supportedAudioExtensions;
+
+    private static readonly Lazy<IReadOnlySet<string>> _supportedExternalFileExtensions = new(() =>
+    {
+        HashSet<string> results = [];
+        results.UnionWith(SupportedVideoExtensions);
+        results.UnionWith(SupportedAudioExtensions);
+        return results;
+    });
+    public static IReadOnlySet<string> SupportedExternalFileExtensions => _supportedExternalFileExtensions.Value;
 
     public static bool IsSupportedExternalFileExtension(string extension)
     {
@@ -35,5 +73,15 @@ internal static class AppInfoProvider
     public static bool IsSupportedImageExtension(string extension)
     {
         return SupportedImageExtensions.Contains(extension.ToLower());
+    }
+
+    public static bool IsSupportedVideoExtension(string extension)
+    {
+        return SupportedVideoExtensions.Contains(extension.ToLower());
+    }
+
+    public static bool IsSupportedAudioExtension(string extension)
+    {
+        return SupportedAudioExtensions.Contains(extension.ToLower());
     }
 }

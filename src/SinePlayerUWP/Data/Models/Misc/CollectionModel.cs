@@ -27,7 +27,7 @@ internal static class CollectionModel
         return await ComicHandle.Enqueue(() =>
         {
             SelectCommand command = SelectCommand.Create(MediaTable.Instance)
-                .AppendCondition(MediaTable.ColumnType, (long)ComicType.Collection);
+                .AppendCondition(MediaTable.ColumnType, (long)MediaType.Collection);
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             List<long> results = [];
             using SelectCommand.IReader reader = command.Execute();

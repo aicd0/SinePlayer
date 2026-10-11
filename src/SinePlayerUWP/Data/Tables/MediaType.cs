@@ -3,8 +3,9 @@
 
 namespace SinePlayerUWP.Data.Tables;
 
-internal enum ComicType : int
+internal enum MediaType : int
 {
-    Folder = 1,
+    Video = 1,
+    Audio = 2,
     Collection = 4,
 }
