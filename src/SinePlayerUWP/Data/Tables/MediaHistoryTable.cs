@@ -6,15 +6,15 @@ using SinePlayerUWP.Data.Database;
 
 namespace SinePlayerUWP.Data.Tables;
 
-internal class ComicHistoryTable : ITable
+internal class MediaHistoryTable : ITable
 {
-    public static ComicHistoryTable Instance { get; } = new ComicHistoryTable();
+    public static MediaHistoryTable Instance { get; } = new MediaHistoryTable();
 
-    public static Int64Column ColumnComicId { get; } = new("comic_id");
+    public static Int64Column ColumnMediaId { get; } = new("media_id");
     public static StringColumn ColumnTitle { get; } = new("title");
     public static Int64Column ColumnTime { get; } = new("time");
 
-    private ComicHistoryTable() { }
+    private MediaHistoryTable() { }
 
     public SqlDatabase GetDatabase()
     {
@@ -23,6 +23,6 @@ internal class ComicHistoryTable : ITable
 
     public string GetTableName()
     {
-        return "comic_history";
+        return "media_history";
     }
 }

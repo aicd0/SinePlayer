@@ -167,12 +167,12 @@ internal static class SqliteDB
         _miscDatabase?.Dispose();
         _miscDatabase = new SqlDatabase(Path.Combine(DatabaseFolderPath, "Misc.sqlite"));
 
-        string comicHistoryTable = ComicHistoryTable.Instance.GetTableName();
+        string mediaHistoryTable = MediaHistoryTable.Instance.GetTableName();
 
-        ExecuteCommand(MiscDatabase, "CREATE TABLE IF NOT EXISTS " + comicHistoryTable + " (" +
-            ComicHistoryTable.ColumnComicId.Name + " INTEGER PRIMARY KEY" +
-            "," + ComicHistoryTable.ColumnTitle.Name + " TEXT NOT NULL" +
-            "," + ComicHistoryTable.ColumnTime.Name + " INTEGER NOT NULL" +
+        ExecuteCommand(MiscDatabase, "CREATE TABLE IF NOT EXISTS " + mediaHistoryTable + " (" +
+            MediaHistoryTable.ColumnMediaId.Name + " INTEGER PRIMARY KEY" +
+            "," + MediaHistoryTable.ColumnTitle.Name + " TEXT NOT NULL" +
+            "," + MediaHistoryTable.ColumnTime.Name + " INTEGER NOT NULL" +
             ")");
     }
 

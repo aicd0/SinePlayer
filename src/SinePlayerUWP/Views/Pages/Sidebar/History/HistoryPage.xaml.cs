@@ -57,17 +57,17 @@ internal sealed partial class HistoryPage : BasePage
     {
         var source = new List<HistoryGroupViewModel>();
         HistoryGroupViewModel? currentGroup = null;
-        List<ComicHistoryItemModel> historyItems = await ComicHistoryItemModel.GetAllAsync();
+        List<MediaHistoryItemModel> historyItems = await MediaHistoryItemModel.GetAllAsync();
         historyItems.Sort((x, y) => y.DateTime.CompareTo(x.DateTime));
 
-        List<ComicModel> comics = await ComicModel.BatchFromId(historyItems.Select(x => x.ComicId));
+        List<ComicModel> comics = await ComicModel.BatchFromId(historyItems.Select(x => x.MediaId));
         Dictionary<long, ComicModel> comicMap = new();
         foreach (ComicModel comic in comics)
         {
             comicMap[comic.Id] = comic;
         }
 
-        foreach (ComicHistoryItemModel item in historyItems)
+        foreach (MediaHistoryItemModel item in historyItems)
         {
             DateTimeOffset localTime = item.DateTime.ToLocalTime();
             string key = localTime.ToString("D", EnvironmentProvider.Instance.GetCurrentAppLanguageInfo());
@@ -78,10 +78,10 @@ internal sealed partial class HistoryPage : BasePage
             }
 
             currentGroup ??= new HistoryGroupViewModel(key);
-            comicMap.TryGetValue(item.ComicId, out ComicModel? comic);
+            comicMap.TryGetValue(item.MediaId, out ComicModel? comic);
             var itemOut = new HistoryItemViewModel
             {
-                Id = item.ComicId,
+                Id = item.MediaId,
                 Comic = comic,
                 Time = localTime.ToString("t", EnvironmentProvider.Instance.GetCurrentAppLanguageInfo()),
                 Title = item.Title
@@ -137,7 +137,7 @@ internal sealed partial class HistoryPage : BasePage
 
     private void DeleteItem(HistoryItemViewModel item)
     {
-        CoroutineUtils.Run(() => ComicHistoryItemModel.RemoveAsync(item.Id, suppressEvent: true));
+        CoroutineUtils.Run(() => MediaHistoryItemModel.RemoveAsync(item.Id, suppressEvent: true));
         var source = (ObservableCollection<HistoryGroupViewModel>)HistorySource.Source;
 
         for (int i = 0; i < source.Count; ++i)

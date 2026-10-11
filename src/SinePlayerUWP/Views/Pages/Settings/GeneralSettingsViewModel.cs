@@ -201,7 +201,7 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
 
     private async Task UpdateHistory()
     {
-        bool hasHistory = !await ComicHistoryItemModel.IsEmptyAsync();
+        bool hasHistory = !await MediaHistoryItemModel.IsEmptyAsync();
         bool saveBrowsingHistory = AppSettingsModel.SaveBrowsingHistory;
 
         IsClearHistoryEnabled = hasHistory;

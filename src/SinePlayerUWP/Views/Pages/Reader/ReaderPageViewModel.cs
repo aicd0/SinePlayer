@@ -800,7 +800,7 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
             await comic.SetAsVisited();
             if (AppSettingsModel.SaveBrowsingHistory)
             {
-                await ComicHistoryItemModel.AddAsync(comic.Id, comic.Title1);
+                await MediaHistoryItemModel.AddAsync(comic.Id, comic.Title1);
             }
         }
 

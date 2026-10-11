@@ -36,7 +36,7 @@ internal sealed partial class GeneralSettingsView : BaseUserControl
 
     private void ClearAllHistoryButton_Click(object sender, RoutedEventArgs e)
     {
-        CoroutineUtils.Run(() => ComicHistoryItemModel.ClearAsync());
+        CoroutineUtils.Run(() => MediaHistoryItemModel.ClearAsync());
         ViewModel.IsClearHistoryEnabled = false;
     }
 

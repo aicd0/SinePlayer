@@ -12,19 +12,19 @@ using SinePlayerUWP.Data.Tables;
 
 namespace SinePlayerUWP.Data.Models.Misc;
 
-internal class ComicHistoryItemModel
+internal class MediaHistoryItemModel
 {
     //
     // Properties
     //
 
-    public long ComicId { get; private set; }
+    public long MediaId { get; private set; }
     public string Title { get; private set; }
     public DateTimeOffset DateTime { get; protected set; }
 
-    private ComicHistoryItemModel(long comicId, string title, DateTimeOffset dateTime)
+    private MediaHistoryItemModel(long mediaId, string title, DateTimeOffset dateTime)
     {
-        ComicId = comicId;
+        MediaId = mediaId;
         Title = title;
         DateTime = dateTime;
     }
@@ -33,22 +33,22 @@ internal class ComicHistoryItemModel
     // Getters
     //
 
-    public static async Task<List<ComicHistoryItemModel>> GetAllAsync()
+    public static async Task<List<MediaHistoryItemModel>> GetAllAsync()
     {
         return await Enqueue(() =>
         {
-            var command = SelectCommand.Create(ComicHistoryTable.Instance);
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(ComicHistoryTable.ColumnComicId);
-            IReaderToken<string> titleToken = command.PutQueryString(ComicHistoryTable.ColumnTitle);
-            IReaderToken<long> timeToken = command.PutQueryInt64(ComicHistoryTable.ColumnTime);
+            var command = SelectCommand.Create(MediaHistoryTable.Instance);
+            IReaderToken<long> mediaIdToken = command.PutQueryInt64(MediaHistoryTable.ColumnMediaId);
+            IReaderToken<string> titleToken = command.PutQueryString(MediaHistoryTable.ColumnTitle);
+            IReaderToken<long> timeToken = command.PutQueryInt64(MediaHistoryTable.ColumnTime);
             using SelectCommand.IReader reader = command.Execute();
-            List<ComicHistoryItemModel> items = [];
+            List<MediaHistoryItemModel> items = [];
             while (reader.Read())
             {
-                long comicId = comicIdToken.GetValue();
+                long mediaId = mediaIdToken.GetValue();
                 string title = titleToken.GetValue();
                 long time = timeToken.GetValue();
-                ComicHistoryItemModel item = new(comicId, title, DateTimeOffset.FromUnixTimeMilliseconds(time));
+                MediaHistoryItemModel item = new(mediaId, title, DateTimeOffset.FromUnixTimeMilliseconds(time));
                 items.Add(item);
             }
 
@@ -60,9 +60,9 @@ internal class ComicHistoryItemModel
     {
         return await Enqueue(() =>
         {
-            SelectCommand command = SelectCommand.Create(ComicHistoryTable.Instance)
+            SelectCommand command = SelectCommand.Create(MediaHistoryTable.Instance)
                 .Limit(1);
-            command.PutQueryInt64(ComicHistoryTable.ColumnComicId);
+            command.PutQueryInt64(MediaHistoryTable.ColumnMediaId);
             using SelectCommand.IReader reader = command.Execute();
             return !reader.Read();
         });
@@ -76,14 +76,14 @@ internal class ComicHistoryItemModel
     {
         await Enqueue(() =>
         {
-            DeleteCommand deleteCommand = DeleteCommand.Create(ComicHistoryTable.Instance)
-                .AppendCondition(ComicHistoryTable.ColumnComicId, id);
+            DeleteCommand deleteCommand = DeleteCommand.Create(MediaHistoryTable.Instance)
+                .AppendCondition(MediaHistoryTable.ColumnMediaId, id);
             deleteCommand.Execute();
 
-            InsertCommand insertCommand = InsertCommand.Create(ComicHistoryTable.Instance)
-                .AppendColumn(ComicHistoryTable.ColumnComicId, id)
-                .AppendColumn(ComicHistoryTable.ColumnTitle, title)
-                .AppendColumn(ComicHistoryTable.ColumnTime, DateTimeOffset.Now.ToUnixTimeMilliseconds());
+            InsertCommand insertCommand = InsertCommand.Create(MediaHistoryTable.Instance)
+                .AppendColumn(MediaHistoryTable.ColumnMediaId, id)
+                .AppendColumn(MediaHistoryTable.ColumnTitle, title)
+                .AppendColumn(MediaHistoryTable.ColumnTime, DateTimeOffset.Now.ToUnixTimeMilliseconds());
             insertCommand.Execute();
 
             return true;
@@ -99,8 +99,8 @@ internal class ComicHistoryItemModel
     {
         bool changed = await Enqueue(() =>
         {
-            DeleteCommand deleteCommand = DeleteCommand.Create(ComicHistoryTable.Instance)
-                .AppendCondition(ComicHistoryTable.ColumnComicId, id);
+            DeleteCommand deleteCommand = DeleteCommand.Create(MediaHistoryTable.Instance)
+                .AppendCondition(MediaHistoryTable.ColumnMediaId, id);
             int rowsAffected = deleteCommand.Execute();
             return rowsAffected > 0;
         });
@@ -115,7 +115,7 @@ internal class ComicHistoryItemModel
     {
         await Enqueue(() =>
         {
-            var deleteCommand = DeleteCommand.Create(ComicHistoryTable.Instance);
+            var deleteCommand = DeleteCommand.Create(MediaHistoryTable.Instance);
             deleteCommand.Execute();
             return true;
         });

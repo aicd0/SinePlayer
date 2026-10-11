@@ -836,8 +836,8 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
         {
             foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(ids))
             {
-                DeleteCommand.Create(ComicHistoryTable.Instance)
-                    .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicHistoryTable.ColumnComicId), idChunk))
+                DeleteCommand.Create(MediaHistoryTable.Instance)
+                    .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaHistoryTable.ColumnMediaId), idChunk))
                     .Execute();
             }
         });
