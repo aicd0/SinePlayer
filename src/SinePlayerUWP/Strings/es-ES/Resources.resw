@@ -444,7 +444,7 @@ Categoría:: Etiqueta1, Etiqueta2    - Sobrescribe “Categoría” con “Etiqu
 %rating              - Coincidir con la calificación. Por ejemplo: 100 representa 5 estrellas, -1 representa ninguna calificación.
 %completion_state    - Estado de finalización del cómic (0 - Sin leer, 1 - Leyendo, 2 - Completado).
 %progress            - Progreso de lectura, en porcentaje. Por ejemplo: 50 representa el 50%.
-%page_count          - Páginas totales.
+%duration            - Duración total.
 
 2. Operadores de variables
 

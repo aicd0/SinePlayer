@@ -317,7 +317,7 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
     {
         int comicCount = comics.Count;
         bool hasReadingComics = false;
-        int pageCount = 0;
+        long totalDuration = 0;
         int totalProgress = 0;
 
         foreach (ComicModel comic in comics)
@@ -327,10 +327,10 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
                 hasReadingComics = true;
             }
 
-            int comicPageCount = comic.PageCount;
-            if (comicPageCount >= 0)
+            long comicDurationMs = comic.DurationMs;
+            if (comicDurationMs >= 0)
             {
-                pageCount += comicPageCount;
+                totalDuration += comicDurationMs;
             }
 
             int comicProgress = comic.Progress;
@@ -340,7 +340,7 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
             }
         }
 
-        await collection.SetPageCount(pageCount);
+        await collection.SetDuration(totalDuration);
 
         int progress = comicCount > 0 ? totalProgress / comicCount : 100;
         await collection.SetProgress(progress, 0);
@@ -892,7 +892,7 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
     public bool IsEditable => _internalModel.IsEditable;
     public bool IsExternal => _internalModel.IsExternal;
     public bool IsCollection => _internalModel.IsCollection;
-    public double LastPosition => _internalModel.LastPosition;
+    public long LastPositionMs => _internalModel.LastPositionMs;
     public string Location => _internalModel.Location;
     public int Progress => _internalModel.Progress;
     public DateTimeOffset LastVisit => _internalModel.LastVisit;
@@ -902,7 +902,7 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
     public string Title2 => _internalModel.Title2;
     public string Description => _internalModel.Description;
     public CompletionStatusEnum CompletionStatus => _internalModel.CompletionStatus;
-    public int PageCount => _internalModel.PageCount;
+    public long DurationMs => _internalModel.DurationMs;
     public IReadOnlyList<string> FolderViewPath => _internalModel.GetFolderViewPath();
     public Dictionary<string, HashSet<string>> TagsCopy => _internalModel.Tags.ToDictionary(p => p.Key, p => p.Value.Tags.ToHashSet());
 
@@ -1038,14 +1038,14 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
         DispatchUpdateEvent([Id]);
     }
 
-    public async Task SetProgress(int progress, double lastPosition)
+    public async Task SetProgress(int progress, long lastPositionMs)
     {
-        if (Progress == progress && LastPosition == lastPosition)
+        if (Progress == progress && LastPositionMs == lastPositionMs)
         {
             return;
         }
 
-        await _internalModel.SetProgress(progress, lastPosition);
+        await _internalModel.SetProgress(progress, lastPositionMs);
         DispatchUpdateEvent([Id], delay: 5000);
     }
 
@@ -1065,14 +1065,14 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
         await _internalModel.SetLocation(location);
     }
 
-    private async Task SetPageCount(int pageCount)
+    private async Task SetDuration(long durationMs)
     {
-        if (PageCount == pageCount)
+        if (DurationMs == durationMs)
         {
             return;
         }
 
-        _internalModel.PageCount = pageCount;
+        _internalModel.DurationMs = durationMs;
         await ComicHandle.Enqueue(() =>
         {
             if (IsExternal)
@@ -1081,7 +1081,7 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
             }
 
             UpdateCommand.Create(MediaTable.Instance)
-                .AppendColumn(MediaTable.ColumnPageCount, _internalModel.GetColumnValue(MediaTable.ColumnPageCount))
+                .AppendColumn(MediaTable.ColumnDuration, _internalModel.GetColumnValue(MediaTable.ColumnDuration))
                 .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
@@ -1112,7 +1112,8 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
 
     string SDK.Plugins.Comic.IComicModel.Location => Location;
 
-    int SDK.Plugins.Comic.IComicModel.PageCount => PageCount;
+    // The page-based model was removed with the comic reader; the plugin SDK rework is deferred.
+    int SDK.Plugins.Comic.IComicModel.PageCount => -1;
 
     string SDK.Plugins.Comic.IComicModel.Title1 => Title1;
 

@@ -19,10 +19,10 @@ internal class MediaTable : ITable
     public static Int32Column ColumnRating { get; } = new("rating");
     public static Int32Column ColumnProgress { get; } = new("progress");
     public static DateTimeOffsetColumn ColumnLastVisit { get; } = new("last_visit");
-    public static DoubleColumn ColumnLastPosition { get; } = new("last_pos");
+    public static Int64Column ColumnLastPosition { get; } = new("last_pos_ms");
     public static StringColumn ColumnDescription { get; } = new("description");
-    public static Int32Column ColumnCompletionStatus { get; } = new("completion_state");
-    public static Int32Column ColumnPageCount { get; } = new("page_count");
+    public static Int32Column ColumnCompletionStatus { get; } = new("completion_status");
+    public static Int64Column ColumnDuration { get; } = new("duration_ms");
     public static StringColumn ColumnExt { get; } = new("ext");
 
     private MediaTable() { }

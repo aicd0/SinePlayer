@@ -128,10 +128,10 @@ internal abstract partial class ComicHandle(MediaType type)
             IReaderToken<int> ratingToken = command.PutQueryInt32(MediaTable.ColumnRating);
             IReaderToken<int> progressToken = command.PutQueryInt32(MediaTable.ColumnProgress);
             IReaderToken<DateTimeOffset> lastVisitToken = command.PutQueryDateTimeOffset(MediaTable.ColumnLastVisit);
-            IReaderToken<double> lastPositionToken = command.PutQueryDouble(MediaTable.ColumnLastPosition);
+            IReaderToken<long> lastPositionToken = command.PutQueryInt64(MediaTable.ColumnLastPosition);
             IReaderToken<string> descriptionToken = command.PutQueryString(MediaTable.ColumnDescription);
             IReaderToken<int> completionStatusToken = command.PutQueryInt32(MediaTable.ColumnCompletionStatus);
-            IReaderToken<int> pageCountToken = command.PutQueryInt32(MediaTable.ColumnPageCount);
+            IReaderToken<long> durationToken = command.PutQueryInt64(MediaTable.ColumnDuration);
             IReaderToken<string> extToken = command.PutQueryString(MediaTable.ColumnExt);
             using SelectCommand.IReader reader = command.Execute();
 
@@ -146,10 +146,10 @@ internal abstract partial class ComicHandle(MediaType type)
                 int rating = ratingToken.GetValue();
                 int progress = progressToken.GetValue();
                 DateTimeOffset lastVisit = lastVisitToken.GetValue();
-                double lastPosition = lastPositionToken.GetValue();
+                long lastPositionMs = lastPositionToken.GetValue();
                 string description = descriptionToken.GetValue();
                 CompletionStatusEnum completionStatus = ParseCompletionStatus(completionStatusToken.GetValue());
-                int pageCount = pageCountToken.GetValue();
+                long durationMs = durationToken.GetValue();
                 string extJson = extToken.GetValue();
 
                 ComicHandle? comic = FromType(type);
@@ -166,11 +166,11 @@ internal abstract partial class ComicHandle(MediaType type)
                 comic.Rating = rating;
                 comic.Progress = progress;
                 comic.LastVisit = lastVisit;
-                comic.LastPosition = lastPosition;
+                comic.LastPositionMs = lastPositionMs;
                 comic.Description = description;
                 comic._tags = new([]);
                 comic.CompletionStatus = completionStatus;
-                comic.PageCount = pageCount;
+                comic.DurationMs = durationMs;
 
                 if (!string.IsNullOrEmpty(extJson))
                 {
@@ -336,11 +336,11 @@ internal abstract partial class ComicHandle(MediaType type)
     public int Rating { get; protected set; } = -1;
     public int Progress { get; protected set; } = -1;
     public DateTimeOffset LastVisit { get; protected set; } = DateTimeOffset.MinValue;
-    public double LastPosition { get; protected set; } = 0.0;
+    public long LastPositionMs { get; protected set; } = 0;
     public string Description { get; private set; } = string.Empty;
     public IReadOnlyDictionary<string, ComicTagCategory> Tags => _tags;
     public IReadOnlyDictionary<string, SDK.Plugins.Comic.IComicTagCategory> TagsForPlugin => _tags;
-    public int PageCount { get; set; } = -1;
+    public long DurationMs { get; set; } = -1;
 
     public abstract bool IsEditable { get; }
     public virtual string FileSystemPath => Location;
@@ -552,10 +552,10 @@ internal abstract partial class ComicHandle(MediaType type)
         });
     }
 
-    public async Task SetProgress(int progress, double lastPosition)
+    public async Task SetProgress(int progress, long lastPositionMs)
     {
         Progress = Math.Clamp(progress, -1, 100);
-        LastPosition = lastPosition;
+        LastPositionMs = lastPositionMs;
 
         await Enqueue(() =>
         {
@@ -615,7 +615,7 @@ internal abstract partial class ComicHandle(MediaType type)
             MediaTable.ColumnDescription,
             MediaTable.ColumnCompletionStatus,
             MediaTable.ColumnExt,
-            MediaTable.ColumnPageCount,
+            MediaTable.ColumnDuration,
         ];
     });
 
@@ -631,11 +631,11 @@ internal abstract partial class ComicHandle(MediaType type)
         evaluators[MediaTable.ColumnRating.Name] = i => TypeAssert.AssertInt(i.Rating);
         evaluators[MediaTable.ColumnProgress.Name] = i => TypeAssert.AssertInt(i.Progress);
         evaluators[MediaTable.ColumnLastVisit.Name] = i => TypeAssert.AssertDateTimeOffset(i.LastVisit);
-        evaluators[MediaTable.ColumnLastPosition.Name] = i => TypeAssert.AssertDouble(i.LastPosition);
+        evaluators[MediaTable.ColumnLastPosition.Name] = i => TypeAssert.AssertLong(i.LastPositionMs);
         evaluators[MediaTable.ColumnDescription.Name] = i => TypeAssert.AssertString(i.Description);
         evaluators[MediaTable.ColumnCompletionStatus.Name] = i => TypeAssert.AssertInt((int)i.CompletionStatus);
         evaluators[MediaTable.ColumnExt.Name] = i => TypeAssert.AssertString(JsonSerializer.Serialize(i._ext));
-        evaluators[MediaTable.ColumnPageCount.Name] = i => TypeAssert.AssertInt(i.PageCount);
+        evaluators[MediaTable.ColumnDuration.Name] = i => TypeAssert.AssertLong(i.DurationMs);
         return evaluators;
     });
 

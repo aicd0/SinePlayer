@@ -46,20 +46,20 @@ internal partial class ComicItemViewModel : INotifyPropertyChanged
         }
     }
 
-    private string _pageCount;
-    public string PageCount
+    private string _duration;
+    public string Duration
     {
-        get => _pageCount;
+        get => _duration;
         set
         {
-            if (_pageCount == value)
+            if (_duration == value)
             {
                 return;
             }
 
-            _pageCount = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PageCount)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PageCountAndProgress)));
+            _duration = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Duration)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DurationAndProgress)));
         }
     }
 
@@ -94,27 +94,27 @@ internal partial class ComicItemViewModel : INotifyPropertyChanged
 
             _progress = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Progress)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PageCountAndProgress)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DurationAndProgress)));
         }
     }
 
-    public string PageCountAndProgress
+    public string DurationAndProgress
     {
         get
         {
-            string pageCount = PageCount;
+            string duration = Duration;
             string progress = Progress;
-            if (string.IsNullOrEmpty(pageCount))
+            if (string.IsNullOrEmpty(duration))
             {
                 return progress;
             }
             else if (string.IsNullOrEmpty(progress))
             {
-                return pageCount;
+                return duration;
             }
             else
             {
-                return $"{pageCount}  ·  {progress}";
+                return $"{duration}  ·  {progress}";
             }
         }
     }
@@ -182,7 +182,7 @@ internal partial class ComicItemViewModel : INotifyPropertyChanged
         _rating = rating >= 0 ? Math.Round(rating * 0.05F, 1, MidpointRounding.AwayFromZero).ToString("0.#") : string.Empty;
         _isFavorite = FavoriteModel.Instance.FromId(comic.Id) != null;
         _isHidden = comic.IsHidden;
-        _pageCount = comic.PageCount > 0 ? $"{comic.PageCount}P" : string.Empty;
+        _duration = FormatDuration(comic.DurationMs);
         _coverImageUri = ComicExt.GetCoverImageUri(comic);
     }
 
@@ -190,13 +190,29 @@ internal partial class ComicItemViewModel : INotifyPropertyChanged
     // Utilities
     //
 
+    private static string FormatDuration(long durationMs)
+    {
+        if (durationMs <= 0)
+        {
+            return string.Empty;
+        }
+
+        var duration = TimeSpan.FromMilliseconds(durationMs);
+        if (duration.TotalHours >= 1)
+        {
+            return $"{(int)duration.TotalHours}:{duration.Minutes:00}:{duration.Seconds:00}";
+        }
+
+        return $"{duration.Minutes}:{duration.Seconds:00}";
+    }
+
     public void Update(ComicItemViewModel item)
     {
         Title = item.Title;
         Rating = item.Rating;
         IsFavorite = item.IsFavorite;
         IsHidden = item.IsHidden;
-        PageCount = item.PageCount;
+        Duration = item.Duration;
         CoverImageUri = item.CoverImageUri;
 
         Progress = item.Progress;

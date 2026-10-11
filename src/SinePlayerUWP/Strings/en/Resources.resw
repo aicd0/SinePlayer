@@ -368,6 +368,9 @@ $files</value>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>Download plugins from GitHub</value>
   </data>
+  <data name="Duration" xml:space="preserve">
+    <value>Duration</value>
+  </data>
   <data name="DuringAutoScrolling" xml:space="preserve">
     <value>During auto scrolling</value>
   </data>
@@ -444,7 +447,7 @@ Category:: Tag1, Tag2    - Overwrite "Category" with "Tag1" and "Tag2".</value>
 %rating             - Match rating. For example: 100 represents 5 stars, -1 represents no rating.
 %completion_state   - Comic completion state (0 - Unread, 1 - Reading, 2 - Completed).
 %progress           - reading progress, in percentage. For example: 50 represents 50%.
-%page_count         - Total pages.
+%duration           - Total duration.
 
 2. Variable operators
 

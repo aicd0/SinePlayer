@@ -30,7 +30,7 @@ internal class ComicPropertyModel
     private const string PROP_TYPE_RATING = "Rating";
     private const string PROP_TYPE_COMPLETION_STATUS = "CompletionState";
     private const string PROP_TYPE_LAST_READ_TIME = "LastReadTime";
-    private const string PROP_TYPE_PAGES = "Pages";
+    private const string PROP_TYPE_DURATION = "Duration";
     private const string PROP_TYPE_PLUGIN_VIRTUAL_PROPERTY = "PluginVirtualProperty";
 
     private static readonly List<PropertyTypeEnum> _properties = [
@@ -39,7 +39,7 @@ internal class ComicPropertyModel
         PropertyTypeEnum.Rating,
         PropertyTypeEnum.CompletionStatus,
         PropertyTypeEnum.LastReadTime,
-        PropertyTypeEnum.Pages,
+        PropertyTypeEnum.Duration,
     ];
 
     private PropertyTypeEnum Type { get; init; } = PropertyTypeEnum.Title;
@@ -69,7 +69,7 @@ internal class ComicPropertyModel
                 PropertyTypeEnum.Rating => StringResourceProvider.Instance.Rating,
                 PropertyTypeEnum.CompletionStatus => StringResourceProvider.Instance.CompletionStatus,
                 PropertyTypeEnum.LastReadTime => StringResourceProvider.Instance.LastReadTime,
-                PropertyTypeEnum.Pages => StringResourceProvider.Instance.PageCount,
+                PropertyTypeEnum.Duration => StringResourceProvider.Instance.Duration,
                 _ => string.Empty,
             };
         }
@@ -218,7 +218,7 @@ internal class ComicPropertyModel
             PropertyTypeEnum.Rating => CreateSorter(x => x.Rating),
             PropertyTypeEnum.CompletionStatus => CreateSorter(x => CompletionStateToComparable(x.CompletionStatus)),
             PropertyTypeEnum.LastReadTime => CreateSorter(x => x.LastVisit.Ticks),
-            PropertyTypeEnum.Pages => CreateSorter(x => x.PageCount),
+            PropertyTypeEnum.Duration => CreateSorter(x => x.DurationMs),
             PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertySorter(),
             _ => CreateFallbackSorter(),
         };
@@ -287,30 +287,31 @@ internal class ComicPropertyModel
             return (level * 0.5F).ToString("0.#");
         }
 
-        string GetPagesGroupName(ComicModel comic)
+        string GetDurationGroupName(ComicModel comic)
         {
-            int pages = comic.PageCount;
-            if (pages <= 0)
+            double minutes = comic.DurationMs / 60000.0;
+            if (minutes <= 0)
             {
                 return StringResourceProvider.Instance.Ungrouped;
             }
 
-            if (pages < 10)
+            if (minutes < 10)
             {
-                return "<10";
+                return "<10m";
             }
 
-            if (pages < 100)
+            if (minutes < 60)
             {
-                return $"{pages / 10 * 10}";
+                return $"{(int)(minutes / 10) * 10}m";
             }
 
-            if (pages < 1000)
+            int hours = (int)(minutes / 60);
+            if (hours < 10)
             {
-                return $"{pages / 100 * 100}";
+                return $"{hours}h";
             }
 
-            return "1000+";
+            return "10h+";
         }
 
         string GetCompletionStatusGroupName(ComicModel comic)
@@ -375,7 +376,7 @@ internal class ComicPropertyModel
                 PropertyTypeEnum.Rating => CreateSorter(x => x.Items[0].Rating),
                 PropertyTypeEnum.CompletionStatus => CreateSorter(x => GetCompletionStatusGroupSortingKey(x.Items[0])),
                 PropertyTypeEnum.LastReadTime => CreateSorter(x => x.Items[0].LastVisit.Ticks),
-                PropertyTypeEnum.Pages => CreateSorter(x => x.Items[0].PageCount),
+                PropertyTypeEnum.Duration => CreateSorter(x => x.Items[0].DurationMs),
                 PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertySorter(),
                 _ => CreateFallbackSorter(),
             };
@@ -413,7 +414,7 @@ internal class ComicPropertyModel
             PropertyTypeEnum.Rating => CreateGrouper(x => [GetRatingGroupName(x)]),
             PropertyTypeEnum.CompletionStatus => CreateGrouper(x => [GetCompletionStatusGroupName(x)]),
             PropertyTypeEnum.LastReadTime => CreateGrouper(x => [GetLastReadTimeGroupName(x)]),
-            PropertyTypeEnum.Pages => CreateGrouper(x => [GetPagesGroupName(x)]),
+            PropertyTypeEnum.Duration => CreateGrouper(x => [GetDurationGroupName(x)]),
             PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertyGrouper(),
             _ => CreateFallbackGrouper(),
         };
@@ -443,7 +444,7 @@ internal class ComicPropertyModel
                 PropertyTypeEnum.Rating => comic.Rating >= 0 ? comic.Rating * 0.05 : null,
                 PropertyTypeEnum.CompletionStatus => (int)comic.CompletionStatus,
                 PropertyTypeEnum.LastReadTime => comic.LastVisit != DateTimeOffset.MinValue ? comic.LastVisit.ToUnixTimeMilliseconds() : null,
-                PropertyTypeEnum.Pages => comic.PageCount > 0 ? comic.PageCount : null,
+                PropertyTypeEnum.Duration => comic.DurationMs > 0 ? comic.DurationMs : null,
                 PropertyTypeEnum.PluginVirtualProperty => sortingPropertyPluginSorter?.AsNumber(comic),
                 _ => null,
             };
@@ -551,7 +552,7 @@ internal class ComicPropertyModel
             PropertyTypeEnum.Rating => PROP_TYPE_RATING,
             PropertyTypeEnum.CompletionStatus => PROP_TYPE_COMPLETION_STATUS,
             PropertyTypeEnum.LastReadTime => PROP_TYPE_LAST_READ_TIME,
-            PropertyTypeEnum.Pages => PROP_TYPE_PAGES,
+            PropertyTypeEnum.Duration => PROP_TYPE_DURATION,
             PropertyTypeEnum.PluginVirtualProperty => PROP_TYPE_PLUGIN_VIRTUAL_PROPERTY,
             _ => PROP_TYPE_TITLE,
         };
@@ -572,7 +573,7 @@ internal class ComicPropertyModel
             PROP_TYPE_RATING => PropertyTypeEnum.Rating,
             PROP_TYPE_COMPLETION_STATUS => PropertyTypeEnum.CompletionStatus,
             PROP_TYPE_LAST_READ_TIME => PropertyTypeEnum.LastReadTime,
-            PROP_TYPE_PAGES => PropertyTypeEnum.Pages,
+            PROP_TYPE_DURATION => PropertyTypeEnum.Duration,
             PROP_TYPE_PLUGIN_VIRTUAL_PROPERTY => PropertyTypeEnum.PluginVirtualProperty,
             _ => PropertyTypeEnum.Title,
         };
@@ -593,7 +594,7 @@ internal class ComicPropertyModel
         Tag,
         Title,
         LastReadTime,
-        Pages,
+        Duration,
         PluginVirtualProperty,
     }
 

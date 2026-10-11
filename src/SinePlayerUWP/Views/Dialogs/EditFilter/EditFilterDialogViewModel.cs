@@ -260,7 +260,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
             buttons.Add(new() { Tag = StringResourceProvider.Instance.Progress, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_PROGRESS}") });
             buttons.Add(new() { Tag = StringResourceProvider.Instance.Title1, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_TITLE1}") });
             buttons.Add(new() { Tag = StringResourceProvider.Instance.Title2, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_TITLE2}") });
-            buttons.Add(new() { Tag = StringResourceProvider.Instance.PageCount, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_PAGE_COUNT}") });
+            buttons.Add(new() { Tag = StringResourceProvider.Instance.Duration, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_DURATION}") });
             buttons.Add(new() { Tag = StringResourceProvider.Instance.Tag, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_TAG}") });
             buttons.Add(new() { Tag = StringResourceProvider.Instance.Hidden, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_HIDDEN}") });
 

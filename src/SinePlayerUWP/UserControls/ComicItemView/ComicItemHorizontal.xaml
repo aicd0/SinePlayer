@@ -100,7 +100,7 @@
                 FontSize="12"
                 FontWeight="SemiLight"
                 Opacity="0.6"
-                Text="{x:Bind Item.PageCountAndProgress, Mode=OneWay}" />
+                Text="{x:Bind Item.DurationAndProgress, Mode=OneWay}" />
         </StackPanel>
 
         <VisualStateManager.VisualStateGroups>

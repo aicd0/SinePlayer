@@ -85,6 +85,7 @@ public class StringResourceProvider
     public string Disabled => GetResourceString("Disabled");
     public string Done => GetResourceString("Done");
     public string DownloadPluginsFromGitHub => GetResourceString("DownloadPluginsFromGitHub");
+    public string Duration => GetResourceString("Duration");
     public string DuringAutoScrolling => GetResourceString("DuringAutoScrolling");
     public string Edit => GetResourceString("Edit");
     public string EditImportExclusionList => GetResourceString("EditImportExclusionList");

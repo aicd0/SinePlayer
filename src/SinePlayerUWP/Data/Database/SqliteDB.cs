@@ -117,10 +117,10 @@ internal static class SqliteDB
             "," + MediaTable.ColumnRating.Name + " INTEGER NOT NULL" +
             "," + MediaTable.ColumnProgress.Name + " INTEGER NOT NULL" +
             "," + MediaTable.ColumnLastVisit.Name + " TIMESTAMP NOT NULL" +
-            "," + MediaTable.ColumnLastPosition.Name + " REAL NOT NULL" +
+            "," + MediaTable.ColumnLastPosition.Name + " INTEGER NOT NULL" +
             "," + MediaTable.ColumnDescription.Name + " TEXT" +
             "," + MediaTable.ColumnCompletionStatus.Name + " INTEGER NOT NULL" +
-            "," + MediaTable.ColumnPageCount.Name + " INTEGER NOT NULL" +
+            "," + MediaTable.ColumnDuration.Name + " INTEGER NOT NULL" +
             "," + MediaTable.ColumnExt.Name + " TEXT" +
             ")");
 

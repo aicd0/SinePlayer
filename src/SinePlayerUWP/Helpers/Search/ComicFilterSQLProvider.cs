@@ -156,7 +156,7 @@ internal class ComicFilterSQLProvider : ISQLCommandProvider
             ComicSQLProviderUtils.VAR_TITLE1 => NotNullAndEmptyCondition(MediaTable.ColumnTitle1),
             ComicSQLProviderUtils.VAR_TITLE2 => NotNullAndEmptyCondition(MediaTable.ColumnTitle2),
             ComicSQLProviderUtils.VAR_PROGRESS => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnProgress), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThanOrEqual),
-            ComicSQLProviderUtils.VAR_PAGE_COUNT => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnPageCount), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThan),
+            ComicSQLProviderUtils.VAR_DURATION => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnDuration), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThan),
             ComicSQLProviderUtils.VAR_HIDDEN => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnHidden), ColumnOrValue.FromValue(true)),
             _ => throw new ExpressionException($"Variable '{path1}' cannot be used as a condition"),
         };
@@ -195,7 +195,7 @@ internal class ComicFilterSQLProvider : ISQLCommandProvider
             ComicSQLProviderUtils.VAR_TITLE1 => conditionCreator(MediaTable.ColumnTitle1),
             ComicSQLProviderUtils.VAR_TITLE2 => conditionCreator(MediaTable.ColumnTitle2),
             ComicSQLProviderUtils.VAR_PROGRESS => conditionCreator(MediaTable.ColumnProgress),
-            ComicSQLProviderUtils.VAR_PAGE_COUNT => conditionCreator(MediaTable.ColumnPageCount),
+            ComicSQLProviderUtils.VAR_DURATION => conditionCreator(MediaTable.ColumnDuration),
             ComicSQLProviderUtils.VAR_HIDDEN => conditionCreator(MediaTable.ColumnHidden),
             _ => throw new ExpressionException($"Variable '{path1}' cannot be used here"),
         };
