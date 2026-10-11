@@ -86,11 +86,11 @@
             </AppBarButton.Flyout>
         </AppBarButton>
 
-        <!--  Comic info  -->
+        <!--  Media info  -->
         <AppBarButton
-            Click="OnComicInfoClick"
+            Click="OnMediaInfoClick"
             Style="{StaticResource NavigationPageTopTileAppBarButton}"
-            ToolTipService.ToolTip="{x:Bind StringResource.ComicInfo}">
+            ToolTipService.ToolTip="{x:Bind StringResource.MediaInfo}">
             <AppBarButton.Content>
                 <FontIcon Glyph="&#xE946;" />
             </AppBarButton.Content>

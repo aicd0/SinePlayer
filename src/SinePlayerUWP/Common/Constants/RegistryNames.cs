@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 namespace SinePlayerUWP.Common.Constants;
@@ -12,7 +12,7 @@ internal static class RegistryNames
     public const string GLOBAL = "/Global";
     public const string SEARCH_HISTORY = $"{GLOBAL}/SearchHistory";
     public const string SETTINGS = $"{GLOBAL}/Settings";
-    public const string COMIC_IMPORT_EXCLUSIONS = $"{SETTINGS}/ComicImportExclusions";
+    public const string MEDIA_IMPORT_EXCLUSIONS = $"{SETTINGS}/MediaImportExclusions";
     public const string STATE = $"{GLOBAL}/State";
     public const string READER_STATE = $"{STATE}/Reader";
     public const string PLUGINS = $"{GLOBAL}/Plugins";

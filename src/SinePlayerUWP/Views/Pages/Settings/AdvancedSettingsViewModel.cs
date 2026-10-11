@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -106,7 +106,7 @@ internal partial class AdvancedSettingsViewModel : INotifyPropertyChanged
     public void RefreshRandomSeed()
     {
         AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.ComicShuffleRandomSeed = Random.Shared.Next();
+        model.MediaShuffleRandomSeed = Random.Shared.Next();
         AppSettingsModel.UpdateModel(model);
     }
 

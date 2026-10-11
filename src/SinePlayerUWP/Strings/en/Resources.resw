@@ -150,10 +150,10 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>Advanced</value>
   </data>
-  <data name="AllComics" xml:space="preserve">
+  <data name="AllMedia" xml:space="preserve">
     <value>All comics</value>
   </data>
-  <data name="AllComicsIn" xml:space="preserve">
+  <data name="AllMediaIn" xml:space="preserve">
     <value>All comics in $path</value>
   </data>
   <data name="AllHidden" xml:space="preserve">
@@ -264,10 +264,10 @@
   <data name="CollectionInformation" xml:space="preserve">
     <value>Collection information</value>
   </data>
-  <data name="ComicExclusionExplaination" xml:space="preserve">
+  <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Selecting "add to exclusion list" will prevent the comic from being imported again the next time the library is updated.</value>
   </data>
-  <data name="ComicInfo" xml:space="preserve">
+  <data name="MediaInfo" xml:space="preserve">
     <value>Comic information</value>
   </data>
   <data name="CompletionStatus" xml:space="preserve">
@@ -614,7 +614,7 @@ The evaluation will be performed in the following order:
   <data name="Images" xml:space="preserve">
     <value>Images</value>
   </data>
-  <data name="IncludeHiddenComics" xml:space="preserve">
+  <data name="IncludeHiddenMedia" xml:space="preserve">
     <value>Include hidden comics</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
@@ -738,7 +738,7 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Next" xml:space="preserve">
     <value>Next</value>
   </data>
-  <data name="NoComicsHint" xml:space="preserve">
+  <data name="NoMediaHint" xml:space="preserve">
     <value>Your comics appear here</value>
   </data>
   <data name="NoContent" xml:space="preserve">
@@ -774,13 +774,13 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="OK" xml:space="preserve">
     <value>OK</value>
   </data>
-  <data name="OnlyAppliesToReadingComics" xml:space="preserve">
+  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
     <value>Only applies to comics in "Reading" status</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>Open</value>
   </data>
-  <data name="OpenComicDefaultBehavior" xml:space="preserve">
+  <data name="OpenMediaDefaultBehavior" xml:space="preserve">
     <value>Default behavior when opening a comic</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
@@ -798,13 +798,13 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>Open metadata folder</value>
   </data>
-  <data name="OpenNextComic" xml:space="preserve">
+  <data name="OpenNextMedia" xml:space="preserve">
     <value>Open next comic</value>
   </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>Open plugins folder</value>
   </data>
-  <data name="OpenPreviousComic" xml:space="preserve">
+  <data name="OpenPreviousMedia" xml:space="preserve">
     <value>Open previous comic</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
@@ -861,10 +861,10 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Progress" xml:space="preserve">
     <value>Progress</value>
   </data>
-  <data name="PromptBeforeRemovingComics" xml:space="preserve">
+  <data name="PromptBeforeRemovingMedia" xml:space="preserve">
     <value>Prompt before removing comics</value>
   </data>
-  <data name="RandomComic" xml:space="preserve">
+  <data name="RandomMedia" xml:space="preserve">
     <value>Random comic</value>
   </data>
   <data name="Rating" xml:space="preserve">
@@ -1014,7 +1014,7 @@ Start in Safe Mode?</value>
   <data name="Settings" xml:space="preserve">
     <value>Settings</value>
   </data>
-  <data name="ShowHiddenComicButton.Content" xml:space="preserve">
+  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
     <value>Show hidden comics</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
@@ -1094,7 +1094,7 @@ Category2: Tag4, Tag5</value>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>Toggle fullscreen</value>
   </data>
-  <data name="TotalComics" xml:space="preserve">
+  <data name="TotalMedia" xml:space="preserve">
     <value>Total comics</value>
   </data>
   <data name="TransitionAnimation" xml:space="preserve">

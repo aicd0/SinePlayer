@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ using SinePlayerUWP.Common.Actions;
 using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Data.Models.Playback;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
@@ -22,9 +22,9 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
 {
     private ActionHandler _actionHandler = ActionHandler.Dummy;
 
-    // Comic Status
-    private ComicModel? _comic;
-    private LoadComicArgs? _pendingComic;
+    // Media Status
+    private MediaModel? _media;
+    private LoadMediaArgs? _pendingMedia;
     private bool _isLoading = false;
     private bool? _isFavorite = null;
 
@@ -35,8 +35,8 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
     public readonly MutableLiveData<string> TitleLiveData = new();
     public readonly MutableLiveData<bool> PlaybackChangeLiveData = new();
     public readonly MutableLiveData<ReaderStatusInfo> ReaderStatusLiveData = new(new() { Status = ReaderStatusEnum.Loading });
-    public readonly MutableLiveData<bool> ComicChangedLiveData = new();
-    public readonly MutableLiveData<bool> IsExternalComicLiveData = new(true);
+    public readonly MutableLiveData<bool> MediaChangedLiveData = new();
+    public readonly MutableLiveData<bool> IsExternalMediaLiveData = new(true);
     public readonly MutableLiveData<bool> IsFavoriteLiveData = new();
 
     private FlowDirection _preferredFlowDirection = FlowDirection.LeftToRight;
@@ -219,7 +219,7 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
     public PlaylistModel Playlist { get; private set; } = PlaylistModel.CreateEmpty();
     public PlaybackModel Playback { get; } = new();
     public ReaderStatusEnum ReaderStatus => ReaderStatusLiveData.Value.Status;
-    public ComicModel? Comic => _comic;
+    public MediaModel? Media => _media;
 
     public void Initialize(ActionHandler actionHandler)
     {
@@ -248,16 +248,16 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         _isFavorite = isFavorite;
         IsFavoriteLiveData.Emit(isFavorite);
 
-        ComicModel? comic = _comic;
-        if (writeDatabase && comic != null && !comic.IsExternal)
+        MediaModel? media = _media;
+        if (writeDatabase && media != null && !media.IsExternal)
         {
             if (isFavorite)
             {
-                FavoriteModel.Instance.Add(comic.Id, comic.Title1, true);
+                FavoriteModel.Instance.Add(media.Id, media.Title1, true);
             }
             else
             {
-                FavoriteModel.Instance.RemoveWithId(comic.Id, true);
+                FavoriteModel.Instance.RemoveWithId(media.Id, true);
             }
         }
     }
@@ -299,35 +299,35 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
 
     public void UpdateFavoriteStatus()
     {
-        ComicModel? comic = _comic;
-        if (comic is not null)
+        MediaModel? media = _media;
+        if (media is not null)
         {
-            UpdateFavoriteStatusInternal(comic);
+            UpdateFavoriteStatusInternal(media);
         }
     }
 
-    public void UpdateComicMetadata()
+    public void UpdateMediaMetadata()
     {
-        ComicModel? comic = _comic;
-        if (comic is null)
+        MediaModel? media = _media;
+        if (media is null)
         {
             return;
         }
 
-        BackgroundImageUri = comic.GetExt(ComicExt.BACKGROUND_IMAGE);
+        BackgroundImageUri = media.GetExt(MediaExt.BACKGROUND_IMAGE);
     }
 
-    public async Task<IReadOnlyList<BaseMenuFlyoutItemModel>> CreateComicContextMenuItems()
+    public async Task<IReadOnlyList<BaseMenuFlyoutItemModel>> CreateMediaContextMenuItems()
     {
-        ComicModel? comic = Comic;
-        if (comic is null)
+        MediaModel? media = Media;
+        if (media is null)
         {
             return [];
         }
 
-        return await MenuFlyoutItemsCreator.CreateComicMenuItems(
+        return await MenuFlyoutItemsCreator.CreateMediaMenuItems(
             _actionHandler,
-            comic,
+            media,
             playlist: Playlist.ToBuilder(),
             playback: Playback.ToBuilder());
     }
@@ -347,13 +347,13 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
                 Description = "The reading list is empty.",
             });
         }
-        else if (playlistItem.Comic != _comic || args.Reason == PlaybackStateChangeReason.Refresh)
+        else if (playlistItem.Media != _media || args.Reason == PlaybackStateChangeReason.Refresh)
         {
-            TitleLiveData.Emit(playlistItem.Comic.Title);
+            TitleLiveData.Emit(playlistItem.Media.Title);
             ReaderStatusLiveData.Emit(new() { Status = ReaderStatusEnum.Loading });
-            LoadComic(new()
+            LoadMedia(new()
             {
-                Comic = playlistItem.Comic,
+                Media = playlistItem.Media,
                 PlaybackArgs = args,
             });
         }
@@ -361,25 +361,25 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         PlaybackChangeLiveData.Emit(true);
     }
 
-    private void LoadComic(LoadComicArgs args)
+    private void LoadMedia(LoadMediaArgs args)
     {
         CoroutineUtils.Run(async () =>
         {
             if (_isLoading)
             {
-                _pendingComic = args;
+                _pendingMedia = args;
                 return;
             }
 
             _isLoading = true;
             try
             {
-                LoadComicArgs? loadingComic = args;
-                while (loadingComic != null)
+                LoadMediaArgs? loadingMedia = args;
+                while (loadingMedia != null)
                 {
-                    await LoadComicInternal(loadingComic);
-                    loadingComic = _pendingComic;
-                    _pendingComic = null;
+                    await LoadMediaInternal(loadingMedia);
+                    loadingMedia = _pendingMedia;
+                    _pendingMedia = null;
                 }
             }
             finally
@@ -387,20 +387,20 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
                 _isLoading = false;
             }
 
-            ComicChangedLiveData.Emit(true);
+            MediaChangedLiveData.Emit(true);
         });
     }
 
-    private async Task LoadComicInternal(LoadComicArgs args)
+    private async Task LoadMediaInternal(LoadMediaArgs args)
     {
-        ComicModel? comic = args.Comic;
+        MediaModel? media = args.Media;
 
         // Clear previous media
-        _comic = null;
+        _media = null;
         BackgroundImageUri = null;
 
         // Load new media
-        if (comic is null)
+        if (media is null)
         {
             ReaderStatusLiveData.Emit(new()
             {
@@ -410,24 +410,24 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
             return;
         }
 
-        _comic = comic;
-        UpdateComicMetadata();
+        _media = media;
+        UpdateMediaMetadata();
 
         // Save to history
-        if (!comic.IsExternal)
+        if (!media.IsExternal)
         {
-            await comic.SetAsVisited();
+            await media.SetAsVisited();
             if (AppSettingsModel.SaveBrowsingHistory)
             {
-                await MediaHistoryItemModel.AddAsync(comic.Id, comic.Title1);
+                await MediaHistoryItemModel.AddAsync(media.Id, media.Title1);
             }
         }
 
-        IsExternalComicLiveData.Emit(comic.IsExternal);
-        UpdateFavoriteStatusInternal(comic);
+        IsExternalMediaLiveData.Emit(media.IsExternal);
+        UpdateFavoriteStatusInternal(media);
 
         // Media playback will be provided by the media engine in a later migration phase;
-        // it will load the media file from comic.Location and resume from the stored position.
+        // it will load the media file from media.Location and resume from the stored position.
         ReaderStatusLiveData.Emit(new()
         {
             Status = ReaderStatusEnum.Error,
@@ -435,9 +435,9 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         });
     }
 
-    private void UpdateFavoriteStatusInternal(ComicModel comic)
+    private void UpdateFavoriteStatusInternal(MediaModel media)
     {
-        bool isFavorite = !comic.IsExternal && FavoriteModel.Instance.FromId(comic.Id) != null;
+        bool isFavorite = !media.IsExternal && FavoriteModel.Instance.FromId(media.Id) != null;
         SetIsFavorite(isFavorite, false);
     }
 
@@ -459,9 +459,9 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         public int Progress { get; init; } = -1;
     }
 
-    private class LoadComicArgs
+    private class LoadMediaArgs
     {
-        public required ComicModel? Comic { get; init; }
+        public required MediaModel? Media { get; init; }
         public required PlaybackStateChangedEventArgs PlaybackArgs { get; init; }
     }
 }

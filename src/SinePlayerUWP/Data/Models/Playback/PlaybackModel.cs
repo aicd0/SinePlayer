@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -236,7 +236,7 @@ internal class PlaybackModel
             {
                 Span<byte> buffer = stackalloc byte[sizeof(int) + sizeof(long)];
                 BinaryPrimitives.WriteInt32LittleEndian(buffer, _randomSeed);
-                BinaryPrimitives.WriteInt64LittleEndian(buffer[sizeof(int)..], x.Comic.Id);
+                BinaryPrimitives.WriteInt64LittleEndian(buffer[sizeof(int)..], x.Media.Id);
                 return HashUtils.GetXxHash64Int(buffer);
             })];
             for (int i = 0; i < _items.Count; i++)

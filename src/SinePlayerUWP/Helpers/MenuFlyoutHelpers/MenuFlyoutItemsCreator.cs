@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -22,28 +22,28 @@ using SinePlayerUWP.Common.Plugins;
 using SinePlayerUWP.Common.Storage;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Data.Models.Playback;
 using SinePlayerUWP.Data.Models.TagInfo;
 using SinePlayerUWP.Helpers.Misc;
 using SinePlayerUWP.Helpers.Navigation;
 using SinePlayerUWP.Helpers.Search;
-using SinePlayerUWP.Views.Dialogs.EditComicInfo;
+using SinePlayerUWP.Views.Dialogs.EditMediaInfo;
 
 namespace SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 
 internal static class MenuFlyoutItemsCreator
 {
-    public const string CUSTOM_ACTION_SOURCE_COMIC_ITEM_MENU = "ComicItemMenu";
+    public const string CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU = "MediaItemMenu";
     public const string CUSTOM_ACTION_NAME_SELECT = "Select";
 
-    public static async Task<List<BaseMenuFlyoutItemModel>> CreateComicMenuItems(
+    public static async Task<List<BaseMenuFlyoutItemModel>> CreateMediaMenuItems(
         ActionHandler actionHandler,
-        ComicModel primaryItem,
+        MediaModel primaryItem,
         PlaylistModel.Builder? playlist = null,
         PlaybackModel.Builder? playback = null,
-        IEnumerable<ComicModel>? selectedItems = null,
+        IEnumerable<MediaModel>? selectedItems = null,
         bool canOpenWithDefault = false,
         bool canEdit = true,
         bool canSelect = false)
@@ -56,7 +56,7 @@ internal static class MenuFlyoutItemsCreator
         {
             if (selectedItems.Any(i => i.Id == primaryItem.Id))
             {
-                playlist = new PlaylistModel.Builder().AddComics(selectedItems);
+                playlist = new PlaylistModel.Builder().AddMedia(selectedItems);
                 canOpenWithDefault = true;
             }
             else
@@ -65,10 +65,10 @@ internal static class MenuFlyoutItemsCreator
             }
         }
 
-        List<ComicModel> inLibraryItems = [.. selectedItems.Where(x => !x.IsExternal)];
-        List<ComicModel> inLibraryComics = [.. inLibraryItems.Where(x => !x.IsCollection)];
+        List<MediaModel> inLibraryItems = [.. selectedItems.Where(x => !x.IsExternal)];
+        List<MediaModel> inLibraryMedia = [.. inLibraryItems.Where(x => !x.IsCollection)];
 
-        Route primaryComicRoute = OpenComicHelper.GetComicRoute(
+        Route primaryMediaRoute = OpenMediaHelper.GetMediaRoute(
             primaryItem,
             playlist: playlist,
             playback: playback);
@@ -83,7 +83,7 @@ internal static class MenuFlyoutItemsCreator
                 Icon = new FontIconSource() { Glyph = "\uE8B9" },
                 Click = () =>
                 {
-                    OpenComicHelper.OpenComic(actionHandler, primaryComicRoute);
+                    OpenMediaHelper.OpenMedia(actionHandler, primaryMediaRoute);
                 },
             });
         }
@@ -95,7 +95,7 @@ internal static class MenuFlyoutItemsCreator
             Click = () =>
             {
                 ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
-                    .AddParameter(OpenTabProvider.PARAM_URL, primaryComicRoute.Url)
+                    .AddParameter(OpenTabProvider.PARAM_URL, primaryMediaRoute.Url)
                     .AddParameter(OpenTabProvider.PARAM_TAB_ID, string.Empty)
                     .Build();
                 actionHandler.HandleNoResult(actionModel);
@@ -106,7 +106,7 @@ internal static class MenuFlyoutItemsCreator
         {
             Text = StringResourceProvider.Instance.SendToWindow,
             Icon = new FontIconSource() { Glyph = "\uE78B" },
-            Items = CreateSendToWindowMenuItems(actionHandler, primaryComicRoute),
+            Items = CreateSendToWindowMenuItems(actionHandler, primaryMediaRoute),
         });
 
         if (!primaryItem.IsCollection)
@@ -134,14 +134,14 @@ internal static class MenuFlyoutItemsCreator
         {
             Text = StringResourceProvider.Instance.Links,
             Icon = new FontIconSource() { Glyph = "\uE71B" },
-            Items = await CreateComicLinkMenuItems(primaryItem, actionHandler),
+            Items = await CreateMediaLinkMenuItems(primaryItem, actionHandler),
         });
 
         items.Add(new SubItemMenuFlyoutItemModel()
         {
             Text = StringResourceProvider.Instance.Tags,
             Icon = new FontIconSource() { Glyph = "\uE8EC" },
-            Items = CreateComicTagMenuItems(primaryItem, actionHandler),
+            Items = CreateMediaTagMenuItems(primaryItem, actionHandler),
         });
 
         if (canEdit && inLibraryItems.Count > 0)
@@ -178,13 +178,13 @@ internal static class MenuFlyoutItemsCreator
                 });
             }
 
-            if (inLibraryComics.Count > 0)
+            if (inLibraryMedia.Count > 0)
             {
                 items.Add(new SubItemMenuFlyoutItemModel()
                 {
                     Text = StringResourceProvider.Instance.AddToCollection,
                     Icon = new FontIconSource() { Glyph = "\uF5ED" },
-                    Items = await CreateAddToCollectionMenuItems(actionHandler, inLibraryComics),
+                    Items = await CreateAddToCollectionMenuItems(actionHandler, inLibraryMedia),
                 });
             }
 
@@ -233,8 +233,8 @@ internal static class MenuFlyoutItemsCreator
                 Click = () =>
                 {
                     string idList = string.Join(',', inLibraryItems.Select(x => x.Id.ToString()));
-                    ActionModel actionModel = ActionModel.Builder.Create(EditComicProvider.NAME)
-                        .AddParameter(EditComicProvider.PARAM_COMIC_ID, idList)
+                    ActionModel actionModel = ActionModel.Builder.Create(EditMediaProvider.NAME)
+                        .AddParameter(EditMediaProvider.PARAM_MEDIA_ID, idList)
                         .Build();
                     actionHandler.HandleNoResult(actionModel);
                 },
@@ -253,8 +253,8 @@ internal static class MenuFlyoutItemsCreator
                 Click = () =>
                 {
                     string idList = string.Join(',', inLibraryItems.Select(x => x.Id.ToString()));
-                    ActionModel actionModel = ActionModel.Builder.Create(RemoveComicProvider.NAME)
-                        .AddParameter(RemoveComicProvider.PARAM_COMIC_ID, idList)
+                    ActionModel actionModel = ActionModel.Builder.Create(RemoveMediaProvider.NAME)
+                        .AddParameter(RemoveMediaProvider.PARAM_MEDIA_ID, idList)
                         .Build();
                     actionHandler.HandleNoResult(actionModel);
                 },
@@ -264,7 +264,7 @@ internal static class MenuFlyoutItemsCreator
         {
             var windowContext = PluginWindowContext.From(actionHandler);
             var pluginItems = PluginManager.Instance.GetActivePlugins()
-                .SelectMany(ctx => ctx.GetComicMenuItems(windowContext, primaryItem, selectedItems))
+                .SelectMany(ctx => ctx.GetMediaMenuItems(windowContext, primaryItem, selectedItems))
                 .ToImmutableList();
             if (pluginItems.Count > 0)
             {
@@ -322,7 +322,7 @@ internal static class MenuFlyoutItemsCreator
             Click = () =>
             {
                 ActionModel actionModel = ActionModel.Builder.Create(CustomActionProvider.NAME)
-                    .AddParameter(CustomActionProvider.PARAM_SOURCE, CUSTOM_ACTION_SOURCE_COMIC_ITEM_MENU)
+                    .AddParameter(CustomActionProvider.PARAM_SOURCE, CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU)
                     .AddParameter(CustomActionProvider.PARAM_NAME, CUSTOM_ACTION_NAME_SELECT)
                     .Build();
                 actionHandler.HandleNoResult(actionModel);
@@ -330,26 +330,26 @@ internal static class MenuFlyoutItemsCreator
         };
     }
 
-    public static async Task<List<BaseMenuFlyoutItemModel>> CreateComicGroupMenuItems(
+    public static async Task<List<BaseMenuFlyoutItemModel>> CreateMediaGroupMenuItems(
         ActionHandler actionHandler,
-        IReadOnlyList<ComicModel> comics,
+        IReadOnlyList<MediaModel> mediaItems,
         Action expandAllHandler,
         Action collapseAllHandler,
         IList<BaseMenuFlyoutItemModel>? customItems = null)
     {
         List<BaseMenuFlyoutItemModel> result = [];
 
-        ComicModel? randomComic = comics.Count > 0 ? comics[Random.Shared.Next(comics.Count)] : null;
-        if (randomComic is not null)
+        MediaModel? randomMedia = mediaItems.Count > 0 ? mediaItems[Random.Shared.Next(mediaItems.Count)] : null;
+        if (randomMedia is not null)
         {
-            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(comics);
+            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(mediaItems);
             result.Add(new SubItemMenuFlyoutItemModel()
             {
-                Text = StringResourceProvider.Instance.RandomComic,
+                Text = StringResourceProvider.Instance.RandomMedia,
                 Icon = new FontIconSource() { Glyph = "\uE8B1" },
-                Items = await CreateComicMenuItems(
+                Items = await CreateMediaMenuItems(
                     actionHandler,
-                    randomComic,
+                    randomMedia,
                     playlist: playlist,
                     canOpenWithDefault: true),
             });
@@ -383,20 +383,20 @@ internal static class MenuFlyoutItemsCreator
         return result;
     }
 
-    public static List<BaseMenuFlyoutItemModel> CreateCompletionStatusMenuItems(IEnumerable<ComicModel> selectedComics)
+    public static List<BaseMenuFlyoutItemModel> CreateCompletionStatusMenuItems(IEnumerable<MediaModel> selectedMedia)
     {
-        List<ComicModel> comics = [.. selectedComics];
+        List<MediaModel> mediaItems = [.. selectedMedia];
 
         CompletionStatusEnum? oldStatus = null;
-        foreach (ComicModel comic in comics)
+        foreach (MediaModel media in mediaItems)
         {
             if (!oldStatus.HasValue)
             {
-                oldStatus = comic.CompletionStatus;
+                oldStatus = media.CompletionStatus;
                 continue;
             }
 
-            if (oldStatus.Value != comic.CompletionStatus)
+            if (oldStatus.Value != media.CompletionStatus)
             {
                 oldStatus = null;
                 break;
@@ -416,7 +416,7 @@ internal static class MenuFlyoutItemsCreator
                 {
                     CoroutineUtils.Run(() => BusyStateManager.WithBusyState(async () =>
                     {
-                        await Task.WhenAll(selectedComics.Select(x => x.SetCompletionStatus(status)));
+                        await Task.WhenAll(selectedMedia.Select(x => x.SetCompletionStatus(status)));
                     }));
                 },
             });
@@ -425,7 +425,7 @@ internal static class MenuFlyoutItemsCreator
         return items;
     }
 
-    private static async Task<IEnumerable<BaseMenuFlyoutItemModel>> CreateAddToCollectionMenuItems(ActionHandler actionHandler, IReadOnlyList<ComicModel> selectedComics)
+    private static async Task<IEnumerable<BaseMenuFlyoutItemModel>> CreateAddToCollectionMenuItems(ActionHandler actionHandler, IReadOnlyList<MediaModel> selectedMedia)
     {
         int windowId = -1;
         if (actionHandler.TryGetComponent(out IMainWindowComponent? mainWindowCom))
@@ -433,16 +433,16 @@ internal static class MenuFlyoutItemsCreator
             windowId = mainWindowCom.WindowId;
         }
 
-        List<ComicModel> comics = [.. selectedComics.Where(x => !x.IsExternal && !x.IsCollection)];
+        List<MediaModel> mediaItems = [.. selectedMedia.Where(x => !x.IsExternal && !x.IsCollection)];
 
         List<BaseMenuFlyoutItemModel> items = [];
 
         IReadOnlyList<long> collectionIds = await CollectionModel.GetAllCollectionIds();
         if (collectionIds.Count > 0)
         {
-            List<ComicModel> collections = await ComicModel.BatchFromId(collectionIds);
-            IReadOnlySet<long> linkedCollectionIds = await CollectionModel.GetCollectionIdsContainingAll(comics.Select(x => x.Id));
-            foreach (ComicModel collection in collections)
+            List<MediaModel> collections = await MediaModel.BatchFromId(collectionIds);
+            IReadOnlySet<long> linkedCollectionIds = await CollectionModel.GetCollectionIdsContainingAll(mediaItems.Select(x => x.Id));
+            foreach (MediaModel collection in collections)
             {
                 bool isLinked = linkedCollectionIds.Contains(collection.Id);
 
@@ -456,11 +456,11 @@ internal static class MenuFlyoutItemsCreator
                         {
                             if (isLinked)
                             {
-                                await CollectionModel.RemoveComics(collection, comics.Select(x => x.Id));
+                                await CollectionModel.RemoveMedia(collection, mediaItems.Select(x => x.Id));
                             }
                             else
                             {
-                                await CollectionModel.AddComics(collection, comics);
+                                await CollectionModel.AddMedia(collection, mediaItems);
                             }
                         }));
                     },
@@ -477,9 +477,9 @@ internal static class MenuFlyoutItemsCreator
             {
                 CoroutineUtils.Run(async () =>
                 {
-                    var collection = ComicModel.CreateCollection();
+                    var collection = MediaModel.CreateCollection();
                     await collection.SetTitle1(StringResourceProvider.Instance.NewCollection);
-                    var dialog = new EditComicInfoDialog([collection]);
+                    var dialog = new EditMediaInfoDialog([collection]);
                     await dialog.ShowAsync(windowId);
                     if (collection.IsExternal)
                     {
@@ -488,16 +488,16 @@ internal static class MenuFlyoutItemsCreator
 
                     await BusyStateManager.WithBusyState(async () =>
                     {
-                        await CollectionModel.AddComics(collection, comics);
+                        await CollectionModel.AddMedia(collection, mediaItems);
 
                         // Set default cover
-                        string? coverImage = ComicExt.GetCoverImageUri(collection);
-                        if (string.IsNullOrEmpty(coverImage) && comics.Count > 0)
+                        string? coverImage = MediaExt.GetCoverImageUri(collection);
+                        if (string.IsNullOrEmpty(coverImage) && mediaItems.Count > 0)
                         {
-                            ComicModel comic = comics[0];
-                            int coverIndex = ComicExt.GetCoverIndex(comic);
-                            collection.SetExt(ComicExt.COVER_INDEX, coverIndex.ToString(CultureInfo.InvariantCulture));
-                            collection.SetExt(ComicExt.COVER_IMAGE, ResourceUri.CreateComicImage(comic.Id, coverIndex).ToString());
+                            MediaModel media = mediaItems[0];
+                            int coverIndex = MediaExt.GetCoverIndex(media);
+                            collection.SetExt(MediaExt.COVER_INDEX, coverIndex.ToString(CultureInfo.InvariantCulture));
+                            collection.SetExt(MediaExt.COVER_IMAGE, ResourceUri.CreateMediaImage(media.Id, coverIndex).ToString());
                             await collection.FlushExt();
                         }
                     });
@@ -564,11 +564,11 @@ internal static class MenuFlyoutItemsCreator
         return items;
     }
 
-    private static async Task<List<BaseMenuFlyoutItemModel>> CreateComicLinkMenuItems(ComicModel comic, ActionHandler actionHandler)
+    private static async Task<List<BaseMenuFlyoutItemModel>> CreateMediaLinkMenuItems(MediaModel media, ActionHandler actionHandler)
     {
         Dictionary<string, TagLinkModel.LinkModel> linkMap = [];
 
-        foreach (KeyValuePair<string, ComicTagCategory> tagItem in comic.Tags)
+        foreach (KeyValuePair<string, MediaTagCategory> tagItem in media.Tags)
         {
             string tagCategory = tagItem.Key;
             TagCategoryInfoModel? tagCategoryInfo = await TagCategoryInfoModel.Get(tagCategory);
@@ -598,7 +598,7 @@ internal static class MenuFlyoutItemsCreator
         }
 
         {
-            string? linkJson = comic.GetExt(ComicExt.LINKS);
+            string? linkJson = media.GetExt(MediaExt.LINKS);
             var linkModel = TagLinkModel.Parse(linkJson);
             foreach (TagLinkModel.LinkModel item in linkModel.Links)
             {
@@ -651,10 +651,10 @@ internal static class MenuFlyoutItemsCreator
         return items;
     }
 
-    private static List<BaseMenuFlyoutItemModel> CreateComicTagMenuItems(ComicModel comic, ActionHandler actionHandler)
+    private static List<BaseMenuFlyoutItemModel> CreateMediaTagMenuItems(MediaModel media, ActionHandler actionHandler)
     {
         List<BaseMenuFlyoutItemModel> items = [];
-        var tags = comic.Tags
+        var tags = media.Tags
             .SelectMany(item => item.Value.Tags.Select(tag => (Category: item.Key, Tag: tag)))
             .OrderBy(t => t.Category)
             .ThenBy(t => t.Tag)
@@ -669,7 +669,7 @@ internal static class MenuFlyoutItemsCreator
                     Text = name,
                     Click = () =>
                     {
-                        string expression = $"%{ComicSQLProviderUtils.VAR_TAG}.\"{ExpressionUtils.EscapeString(category)}\"=\"{ExpressionUtils.EscapeString(tag)}\"";
+                        string expression = $"%{MediaSQLProviderUtils.VAR_TAG}.\"{ExpressionUtils.EscapeString(category)}\"=\"{ExpressionUtils.EscapeString(tag)}\"";
                         Route route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_SEARCH)
                             .WithParam(RouterConstants.ARG_KEYWORD, $"exp:\"{ExpressionUtils.EscapeString(expression)}\"");
                         ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)

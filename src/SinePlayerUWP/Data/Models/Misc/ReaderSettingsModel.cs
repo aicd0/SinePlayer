@@ -10,7 +10,7 @@ using System.Text.Json.Serialization;
 using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 
 namespace SinePlayerUWP.Data.Models.Misc;
 
@@ -69,7 +69,7 @@ internal class ReaderSettingsModel
         };
     }
 
-    public static ReaderSettingsModel LoadFromComic(ComicModel comic)
+    public static ReaderSettingsModel LoadFromMedia(MediaModel media)
     {
         string defaultPresetKey = AppSettingsModel.DefaultReaderSettingPresetKey;
         if (string.IsNullOrEmpty(defaultPresetKey))
@@ -77,7 +77,7 @@ internal class ReaderSettingsModel
             defaultPresetKey = PRESET_KEY_DEFAULT;
         }
 
-        string? presetKey = comic.GetExt(ComicExt.READER_SETTING_PRESET_KEY);
+        string? presetKey = media.GetExt(MediaExt.READER_SETTING_PRESET_KEY);
         if (string.IsNullOrEmpty(presetKey))
         {
             presetKey = defaultPresetKey;
@@ -113,7 +113,7 @@ internal class ReaderSettingsModel
         }
 
         JsonModel? jsonModel = null;
-        string? customSettingsJson = comic.GetExt(ComicExt.CUSTOM_READER_SETTINGS);
+        string? customSettingsJson = media.GetExt(MediaExt.CUSTOM_READER_SETTINGS);
         if (!string.IsNullOrEmpty(customSettingsJson))
         {
             try
@@ -248,7 +248,7 @@ internal class ReaderSettingsModel
         };
     }
 
-    public void SaveToComic(ComicModel comic)
+    public void SaveToMedia(MediaModel media)
     {
         JsonModel? jsonModel = ToJsonModel();
 
@@ -260,9 +260,9 @@ internal class ReaderSettingsModel
         }
 
         string customSettingsJson = JsonSerializer.Serialize(jsonModel);
-        comic.SetExt(ComicExt.READER_SETTING_PRESET_KEY, PresetKey);
-        comic.SetExt(ComicExt.CUSTOM_READER_SETTINGS, customSettingsJson);
-        CoroutineUtils.Run(comic.FlushExt);
+        media.SetExt(MediaExt.READER_SETTING_PRESET_KEY, PresetKey);
+        media.SetExt(MediaExt.CUSTOM_READER_SETTINGS, customSettingsJson);
+        CoroutineUtils.Run(media.FlushExt);
     }
 
     public static T? NullOutMatchingFields<T>(T? first, T? second) where T : class

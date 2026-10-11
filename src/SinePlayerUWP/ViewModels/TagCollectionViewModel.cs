@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System.Collections.Generic;
@@ -16,7 +16,7 @@ using SinePlayerUWP.Common.Expression;
 using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Core.Common.Algorithm;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Navigation;
 using SinePlayerUWP.Helpers.Search;
@@ -55,9 +55,9 @@ internal partial class TagCollectionViewModel(string name) : BaseViewModel, INot
     // Construction
     //
 
-    public static void Update(ObservableCollection<TagCollectionViewModel> target, ComicModel? comic, ActionHandler actionHandler)
+    public static void Update(ObservableCollection<TagCollectionViewModel> target, MediaModel? media, ActionHandler actionHandler)
     {
-        List<TagCollectionViewModel> newCollection = Create(comic, actionHandler);
+        List<TagCollectionViewModel> newCollection = Create(media, actionHandler);
         DiffUtils.UpdateCollection(target, newCollection, (x, y) => x.Name == y.Name, (x, y) =>
         {
             DiffUtils.UpdateCollection(x.Tags, y.Tags, (a, b) => a.Tag == b.Tag, (a, b) =>
@@ -68,15 +68,15 @@ internal partial class TagCollectionViewModel(string name) : BaseViewModel, INot
         });
     }
 
-    private static List<TagCollectionViewModel> Create(ComicModel? comic, ActionHandler actionHandler)
+    private static List<TagCollectionViewModel> Create(MediaModel? media, ActionHandler actionHandler)
     {
         List<TagCollectionViewModel> newCollection = [];
-        if (comic is null)
+        if (media is null)
         {
             return newCollection;
         }
 
-        foreach (KeyValuePair<string, ComicTagCategory> tagItem in comic.Tags)
+        foreach (KeyValuePair<string, MediaTagCategory> tagItem in media.Tags)
         {
             string tagCategory = tagItem.Key;
             List<TagViewModel> tagModels = [];
@@ -87,7 +87,7 @@ internal partial class TagCollectionViewModel(string name) : BaseViewModel, INot
                 {
                     Tag = tagName,
                     OnClicked = () => OpenTagSearch(actionHandler, tagCategory, tagName),
-                    OnRequestContextFlyoutAsync = () => CreateTagContextMenuItems(comic, actionHandler, tagCategory, tagName),
+                    OnRequestContextFlyoutAsync = () => CreateTagContextMenuItems(media, actionHandler, tagCategory, tagName),
                 };
                 tagModels.Add(tagModel);
             }
@@ -108,7 +108,7 @@ internal partial class TagCollectionViewModel(string name) : BaseViewModel, INot
 
     private static void OpenTagSearch(ActionHandler actionHandler, string tagCategory, string tag)
     {
-        string expression = $"%{ComicSQLProviderUtils.VAR_TAG}.\"{ExpressionUtils.EscapeString(tagCategory)}\"=\"{ExpressionUtils.EscapeString(tag)}\"";
+        string expression = $"%{MediaSQLProviderUtils.VAR_TAG}.\"{ExpressionUtils.EscapeString(tagCategory)}\"=\"{ExpressionUtils.EscapeString(tag)}\"";
         Route route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_SEARCH)
             .WithParam(RouterConstants.ARG_KEYWORD, $"exp:\"{ExpressionUtils.EscapeString(expression)}\"");
         ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
@@ -118,7 +118,7 @@ internal partial class TagCollectionViewModel(string name) : BaseViewModel, INot
         actionHandler.HandleNoResult(actionModel);
     }
 
-    private static async Task<List<BaseMenuFlyoutItemModel>> CreateTagContextMenuItems(ComicModel comic, ActionHandler actionHandler, string tagCategory, string tag)
+    private static async Task<List<BaseMenuFlyoutItemModel>> CreateTagContextMenuItems(MediaModel media, ActionHandler actionHandler, string tagCategory, string tag)
     {
         List<BaseMenuFlyoutItemModel> items = [];
 
@@ -153,12 +153,12 @@ internal partial class TagCollectionViewModel(string name) : BaseViewModel, INot
             {
                 CoroutineUtils.Run(async () =>
                 {
-                    Dictionary<string, HashSet<string>> tags = comic.TagsCopy;
+                    Dictionary<string, HashSet<string>> tags = media.TagsCopy;
                     if (tags.TryGetValue(tagCategory, out HashSet<string>? tagSet))
                     {
                         if (tagSet.Remove(tag))
                         {
-                            await comic.SetTags(tags);
+                            await media.SetTags(tags);
                         }
                     }
                 });

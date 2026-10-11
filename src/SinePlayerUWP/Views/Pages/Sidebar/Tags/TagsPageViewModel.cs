@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -18,7 +18,7 @@ using SinePlayerUWP.Core.Common.Algorithm;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
 using SinePlayerUWP.Core.Database.SqlHelpers;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Data.Models.TagInfo;
 using SinePlayerUWP.Data.Tables;
@@ -149,20 +149,20 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
     private async Task<List<SimpleTreeViewNodeModel>> GenerateNodeTree()
     {
         Dictionary<long, TagCateogryEntry> tagCategoryMapper = [];
-        await ComicHandle.Enqueue(() =>
+        await MediaHandle.Enqueue(() =>
         {
             {
                 var command = SelectCommand.Create(MediaTagCategoryTable.Instance);
                 IReaderToken<long> idToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnId);
                 IReaderToken<string> nameToken = command.PutQueryString(MediaTagCategoryTable.ColumnName);
-                IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnMediaId);
+                IReaderToken<long> mediaIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnMediaId);
                 using SelectCommand.IReader reader = command.Execute();
                 while (reader.Read())
                 {
                     long id = idToken.GetValue();
                     string name = nameToken.GetValue();
-                    long comicId = comicIdToken.GetValue();
-                    tagCategoryMapper[id] = new(name, comicId);
+                    long mediaId = mediaIdToken.GetValue();
+                    tagCategoryMapper[id] = new(name, mediaId);
                 }
             }
 
@@ -203,28 +203,28 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
             return tagModel;
         }
 
-        HashSet<long> requestingComicIds = [];
+        HashSet<long> requestingMediaIds = [];
         foreach (TagCateogryEntry tagCategoryModel in tagCategoryMapper.Values)
         {
             foreach (string tag in tagCategoryModel.Tags)
             {
                 TagEntry tagModel = PutTag(tagCategoryModel.Name, tag);
-                tagModel.ComicIds.Add(tagCategoryModel.ComicId);
-                requestingComicIds.Add(tagCategoryModel.ComicId);
+                tagModel.MediaIds.Add(tagCategoryModel.MediaId);
+                requestingMediaIds.Add(tagCategoryModel.MediaId);
             }
         }
 
-        Dictionary<long, ComicModel> comicMap = [];
+        Dictionary<long, MediaModel> mediaMap = [];
         {
-            List<ComicModel> requestedComics = await ComicModel.BatchFromId(requestingComicIds);
-            foreach (ComicModel comic in requestedComics)
+            List<MediaModel> requestedMedia = await MediaModel.BatchFromId(requestingMediaIds);
+            foreach (MediaModel media in requestedMedia)
             {
-                if (comic.IsHidden)
+                if (media.IsHidden)
                 {
                     continue;
                 }
 
-                comicMap[comic.Id] = comic;
+                mediaMap[media.Id] = media;
             }
         }
 
@@ -234,29 +234,29 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
             return keywords.Length == 0 || StringUtils.FastMatch(keywords, text.ToLowerInvariant()) > 0;
         }
 
-        SimpleTreeViewNodeModel ComicToNode(ComicModel comic, PlaylistModel.Builder playlist)
+        SimpleTreeViewNodeModel MediaToNode(MediaModel media, PlaylistModel.Builder playlist)
         {
             return new()
             {
-                DataContext = comic,
+                DataContext = media,
                 Glyph = "\uE8B9",
-                Title = comic.Title,
+                Title = media.Title,
                 CanExpand = false,
                 Clicked = item =>
                 {
-                    Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
-                    OpenComicHelper.OpenComic(_actionHandler, route);
+                    Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                    OpenMediaHelper.OpenMedia(_actionHandler, route);
                 },
                 RequestContextMenuItemsAsync = (primary, selection) =>
                 {
-                    IEnumerable<ComicModel>? selectedComics = !_selectionMode ? null : selection
-                        .Where(x => x.DataContext is ComicModel)
-                        .Select(x => (ComicModel)x.DataContext!);
-                    return MenuFlyoutItemsCreator.CreateComicMenuItems(
+                    IEnumerable<MediaModel>? selectedMedia = !_selectionMode ? null : selection
+                        .Where(x => x.DataContext is MediaModel)
+                        .Select(x => (MediaModel)x.DataContext!);
+                    return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                         _actionHandler,
-                        comic,
+                        media,
                         playlist: playlist,
-                        selectedItems: selectedComics,
+                        selectedItems: selectedMedia,
                         canSelect: !SelectionMode);
                 },
             };
@@ -298,14 +298,14 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
                     RequestContextMenuItemsAsync = CreateTagMenuItems,
                 };
 
-                IEnumerable<ComicModel> sortedComics = tagEntry.ComicIds
-                    .Where(comicMap.ContainsKey)
-                    .Select(x => comicMap[x])
+                IEnumerable<MediaModel> sortedMedia = tagEntry.MediaIds
+                    .Where(mediaMap.ContainsKey)
+                    .Select(x => mediaMap[x])
                     .Where(x => tagMatched || MatchSearchText(x.Title))
                     .OrderBy(x => StringUtils.SmartFileNameKeySelector(x.Title), StringUtils.SmartFileNameComparer);
-                PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(sortedComics);
-                IEnumerable<SimpleTreeViewNodeModel> tagChildren = sortedComics
-                    .Select(x => ComicToNode(x, playlist));
+                PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sortedMedia);
+                IEnumerable<SimpleTreeViewNodeModel> tagChildren = sortedMedia
+                    .Select(x => MediaToNode(x, playlist));
 
                 foreach (SimpleTreeViewNodeModel child in tagChildren)
                 {
@@ -370,9 +370,9 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
             },
         });
 
-        List<ComicModel> comics = [.. primary.CollectDataContext<ComicModel>()];
-        return await MenuFlyoutItemsCreator.CreateComicGroupMenuItems(
-            _actionHandler, comics,
+        List<MediaModel> mediaItems = [.. primary.CollectDataContext<MediaModel>()];
+        return await MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
+            _actionHandler, mediaItems,
             primary.ExpandAll, primary.CollapseAll, customItems: items);
     }
 
@@ -421,22 +421,22 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
             },
         });
 
-        List<ComicModel> comics = [.. primary.CollectDataContext<ComicModel>()];
-        return await MenuFlyoutItemsCreator.CreateComicGroupMenuItems(
-            _actionHandler, comics,
+        List<MediaModel> mediaItems = [.. primary.CollectDataContext<MediaModel>()];
+        return await MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
+            _actionHandler, mediaItems,
             primary.ExpandAll, primary.CollapseAll, customItems: items);
     }
 
-    private class TagCateogryEntry(string name, long comicId)
+    private class TagCateogryEntry(string name, long mediaId)
     {
         public string Name { get; } = name;
-        public long ComicId { get; } = comicId;
+        public long MediaId { get; } = mediaId;
         public HashSet<string> Tags { get; } = [];
     }
 
     private class TagEntry
     {
-        public HashSet<long> ComicIds { get; } = [];
+        public HashSet<long> MediaIds { get; } = [];
     }
 
     private class TagCateogryModel(string name)

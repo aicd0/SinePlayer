@@ -150,10 +150,10 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>高度な</value>
   </data>
-  <data name="AllComics" xml:space="preserve">
+  <data name="AllMedia" xml:space="preserve">
     <value>すべてのコミック</value>
   </data>
-  <data name="AllComicsIn" xml:space="preserve">
+  <data name="AllMediaIn" xml:space="preserve">
     <value>$path内のすべてのコミック</value>
   </data>
   <data name="AllHidden" xml:space="preserve">
@@ -264,10 +264,10 @@
   <data name="CollectionInformation" xml:space="preserve">
     <value>コレクション情報</value>
   </data>
-  <data name="ComicExclusionExplaination" xml:space="preserve">
+  <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>「除外リストに追加」を選択すると、次回ライブラリを更新したときにこのコミックが再度インポートされなくなります。</value>
   </data>
-  <data name="ComicInfo" xml:space="preserve">
+  <data name="MediaInfo" xml:space="preserve">
     <value>コミック情報</value>
   </data>
   <data name="CompletionStatus" xml:space="preserve">
@@ -609,7 +609,7 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="Images" xml:space="preserve">
     <value>画像</value>
   </data>
-  <data name="IncludeHiddenComics" xml:space="preserve">
+  <data name="IncludeHiddenMedia" xml:space="preserve">
     <value>非表示の漫画を含める</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
@@ -733,7 +733,7 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="Next" xml:space="preserve">
     <value>次へ</value>
   </data>
-  <data name="NoComicsHint" xml:space="preserve">
+  <data name="NoMediaHint" xml:space="preserve">
     <value>あなたのコミックはここに表示されます</value>
   </data>
   <data name="NoContent" xml:space="preserve">
@@ -769,13 +769,13 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="OK" xml:space="preserve">
     <value>わかりました</value>
   </data>
-  <data name="OnlyAppliesToReadingComics" xml:space="preserve">
+  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
     <value>「閲覧中」ステータスのマンガにのみ適用</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>開く</value>
   </data>
-  <data name="OpenComicDefaultBehavior" xml:space="preserve">
+  <data name="OpenMediaDefaultBehavior" xml:space="preserve">
     <value>コミックを開いたときのデフォルトの動作</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
@@ -793,13 +793,13 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>メタデータフォルダを開く</value>
   </data>
-  <data name="OpenNextComic" xml:space="preserve">
+  <data name="OpenNextMedia" xml:space="preserve">
     <value>次のコミックを開く</value>
   </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>プラグインフォルダーを開く</value>
   </data>
-  <data name="OpenPreviousComic" xml:space="preserve">
+  <data name="OpenPreviousMedia" xml:space="preserve">
     <value>前のコミックを開く</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
@@ -856,10 +856,10 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="Progress" xml:space="preserve">
     <value>スケジュール</value>
   </data>
-  <data name="PromptBeforeRemovingComics" xml:space="preserve">
+  <data name="PromptBeforeRemovingMedia" xml:space="preserve">
     <value>マンガを削除する前に確認</value>
   </data>
-  <data name="RandomComic" xml:space="preserve">
+  <data name="RandomMedia" xml:space="preserve">
     <value>ランダムコミック</value>
   </data>
   <data name="Rating" xml:space="preserve">
@@ -1009,7 +1009,7 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>設定</value>
   </data>
-  <data name="ShowHiddenComicButton.Content" xml:space="preserve">
+  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
     <value>非表示のコミックを見る</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
@@ -1089,7 +1089,7 @@ $plugins</value>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>フルスクリーンの切り替え</value>
   </data>
-  <data name="TotalComics" xml:space="preserve">
+  <data name="TotalMedia" xml:space="preserve">
     <value>漫画総数</value>
   </data>
   <data name="TransitionAnimation" xml:space="preserve">

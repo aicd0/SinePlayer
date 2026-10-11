@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using Microsoft.UI.Xaml;
@@ -10,7 +10,7 @@ using SinePlayerUWP.Common.BaseUI;
 using SinePlayerUWP.Common.ErrorHandling;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.Navigation;
 using SinePlayerUWP.Helpers.Search;
@@ -31,7 +31,7 @@ internal sealed partial class ImageSourceSettingsView : BaseUserControl
     {
         ViewModel.Initialize(shared);
 
-        ComicModel.IsScanningLibraryLiveData.ObserveSticky(owner, isScanning =>
+        MediaModel.IsScanningLibraryLiveData.ObserveSticky(owner, isScanning =>
         {
             ViewModel.IsRescanning = isScanning;
         });
@@ -60,38 +60,38 @@ internal sealed partial class ImageSourceSettingsView : BaseUserControl
         bool? isChecked = ((CheckBox)sender).IsChecked;
         if (isChecked.HasValue)
         {
-            ViewModel.SetRemoveUnreachableComics(isChecked.Value);
+            ViewModel.SetRemoveUnreachableMedia(isChecked.Value);
         }
     }
 
-    private void PromptBeforeRemovingComicsCheckBox_Click(object sender, RoutedEventArgs e)
+    private void PromptBeforeRemovingMediaCheckBox_Click(object sender, RoutedEventArgs e)
     {
         bool? isChecked = ((CheckBox)sender).IsChecked;
         if (isChecked.HasValue)
         {
-            ViewModel.SetPromptBeforeRemovingComics(isChecked.Value);
+            ViewModel.SetPromptBeforeRemovingMedia(isChecked.Value);
         }
     }
 
     private void OnRescanFilesClicked(object sender, RoutedEventArgs e)
     {
-        ComicModel.RescanLibrary("OnRescanFilesClicked");
+        MediaModel.RescanLibrary("OnRescanFilesClicked");
     }
 
     private void EditImportExclusionListButton_Click(object sender, RoutedEventArgs e)
     {
         CoroutineUtils.Run(async () =>
         {
-            ErrorResult err = await ComicImportExclusionModel.Instance.EditWithNotepad();
+            ErrorResult err = await MediaImportExclusionModel.Instance.EditWithNotepad();
             err.DisplayErrorMessage(ViewModel.Shared.ActionHandler);
         });
 
     }
 
-    private void ShowHiddenComicButton_Click(object sender, RoutedEventArgs e)
+    private void ShowHiddenMediaButton_Click(object sender, RoutedEventArgs e)
     {
         Route route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_SEARCH)
-            .WithParam(RouterConstants.ARG_KEYWORD, $"{ComicSQLProviderUtils.VAR_HIDDEN}:1");
+            .WithParam(RouterConstants.ARG_KEYWORD, $"{MediaSQLProviderUtils.VAR_HIDDEN}:1");
         ActionModel action = ActionModel.Builder.Create(OpenTabProvider.NAME)
             .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
             .AddParameter(OpenTabProvider.PARAM_TAB_ID, string.Empty)

@@ -64,7 +64,7 @@ internal sealed partial class SettingsPage : BasePage
 
     private void ObserveData()
     {
-        GlobalEvent.Instance.ComicUpdated.Observe(this, _ =>
+        GlobalEvent.Instance.MediaUpdated.Observe(this, _ =>
         {
             ViewModel.UpdateStatistics();
         });

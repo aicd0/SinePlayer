@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -17,7 +17,7 @@ using SinePlayerUWP.Core.Common.AppEnvironment;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Database.SqlHelpers;
 using SinePlayerUWP.Data.Database;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Tables;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Navigation;
@@ -94,14 +94,14 @@ internal partial class PluginContext : IPluginContext
         }
     }
 
-    public void DispatchComicEditedEvent(IComicModel comic)
+    public void DispatchMediaEditedEvent(IComicModel media)
     {
         if (!IsActive)
         {
             return;
         }
 
-        SafeAction(() => _comicEditedEventHandler?.Invoke(comic));
+        SafeAction(() => _mediaEditedEventHandler?.Invoke(media));
     }
 
     public IReadOnlyList<BaseMenuFlyoutItemModel> GetMainPageMoreMenuItems(IWindowContext windowContext)
@@ -120,14 +120,14 @@ internal partial class PluginContext : IPluginContext
         return [.. SafeAction(() => creator.CreateMenuItems(windowContext), []).Select(CreateHostMenuFlyoutItem)];
     }
 
-    public IReadOnlyList<BaseMenuFlyoutItemModel> GetComicMenuItems(IWindowContext windowContext, IComicModel primary, IEnumerable<IComicModel> selection)
+    public IReadOnlyList<BaseMenuFlyoutItemModel> GetMediaMenuItems(IWindowContext windowContext, IComicModel primary, IEnumerable<IComicModel> selection)
     {
         if (!IsActive)
         {
             return [];
         }
 
-        IComicMenuItemCreator? creator = _comicMenuItemCreator;
+        IComicMenuItemCreator? creator = _mediaMenuItemCreator;
         if (creator is null)
         {
             return [];
@@ -136,14 +136,14 @@ internal partial class PluginContext : IPluginContext
         return [.. SafeAction(() => creator.CreateMenuItems(windowContext, primary, selection), []).Select(CreateHostMenuFlyoutItem)];
     }
 
-    public IEnumerable<IVirtualProperty<IComicModel>> GetAllComicVirtualProperties()
+    public IEnumerable<IVirtualProperty<IComicModel>> GetAllMediaVirtualProperties()
     {
         if (!IsActive)
         {
             return [];
         }
 
-        return [.. _comicVirtualProperties.Values];
+        return [.. _mediaVirtualProperties.Values];
     }
 
     public IReadOnlyList<ISidebarPageProvider> GetAllSidebarPageProviders()
@@ -156,33 +156,33 @@ internal partial class PluginContext : IPluginContext
         return [.. _sidebarPageProviders];
     }
 
-    public void SetReadingComic(PluginWindowContext windowContext, IComicModel? comic)
+    public void SetReadingComic(PluginWindowContext windowContext, IComicModel? media)
     {
         if (!IsActive)
         {
             return;
         }
 
-        windowContext.SetReadingComic(comic, SafeAction);
+        windowContext.SetReadingComic(media, SafeAction);
     }
 
     //
     // IPluginContext Implementation
     //
 
-    private event ComicEditedEventHandler? _comicEditedEventHandler;
+    private event ComicEditedEventHandler? _mediaEditedEventHandler;
 
-    private readonly Dictionary<string, IVirtualProperty<IComicModel>> _comicVirtualProperties = [];
+    private readonly Dictionary<string, IVirtualProperty<IComicModel>> _mediaVirtualProperties = [];
     private readonly List<ISidebarPageProvider> _sidebarPageProviders = [];
     private readonly Lazy<ILogger> _logger;
     private readonly Lazy<IRegistryDatabase> _registryDatabase;
-    private IComicMenuItemCreator? _comicMenuItemCreator = null;
+    private IComicMenuItemCreator? _mediaMenuItemCreator = null;
     private ICommonMenuItemCreator? _mainPageMoreMenuItemCreator = null;
 
     event ComicEditedEventHandler? IPluginContext.ComicEdited
     {
-        add => _comicEditedEventHandler += value;
-        remove => _comicEditedEventHandler -= value;
+        add => _mediaEditedEventHandler += value;
+        remove => _mediaEditedEventHandler -= value;
     }
 
     CultureInfo IPluginContext.CurrentCulture => EnvironmentProvider.Instance.GetCurrentAppLanguageInfo();
@@ -195,8 +195,8 @@ internal partial class PluginContext : IPluginContext
 
     IComicMenuItemCreator? IPluginContext.ComicMenuItemCreator
     {
-        get => _comicMenuItemCreator;
-        set => _comicMenuItemCreator = value;
+        get => _mediaMenuItemCreator;
+        set => _mediaMenuItemCreator = value;
     }
 
     ICommonMenuItemCreator? IPluginContext.MainPageMoreMenuItemCreator
@@ -222,19 +222,19 @@ internal partial class PluginContext : IPluginContext
 
     async Task<IComicModel?> IPluginContext.GetComic(long id)
     {
-        return await ComicModel.FromId(id);
+        return await MediaModel.FromId(id);
     }
 
     async Task<IEnumerable<long>> IPluginContext.SearchComics(string filterExpression)
     {
         ICondition? filterCondition = ParseFilterExpression(filterExpression) ?? throw new InvalidExpressionException();
         List<long> ids = [];
-        await ComicHandle.Enqueue(() =>
+        await MediaHandle.Enqueue(() =>
         {
             var command = SelectCommand.Create(MediaTable.Instance);
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             command.AppendCondition(filterCondition);
-            command.AppendCondition(ComicHandle.CreateComicOnlyCondition());
+            command.AppendCondition(MediaHandle.CreateMediaOnlyCondition());
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
@@ -259,13 +259,13 @@ internal partial class PluginContext : IPluginContext
         string name = property.Name;
         if (string.IsNullOrEmpty(name) || !VirtualPropertyNameRegex().IsMatch(name))
         {
-            Logger.F(TAG, $"({Name}) RegisterComicVirtualProperty: Invalid name '{name}'");
+            Logger.F(TAG, $"({Name}) RegisterMediaVirtualProperty: Invalid name '{name}'");
             return;
         }
 
-        if (!_comicVirtualProperties.TryAdd(name, property))
+        if (!_mediaVirtualProperties.TryAdd(name, property))
         {
-            Logger.F(TAG, $"({Name}) RegisterComicVirtualProperty: Property '{name}' already registered");
+            Logger.F(TAG, $"({Name}) RegisterMediaVirtualProperty: Property '{name}' already registered");
         }
     }
 
@@ -362,7 +362,7 @@ internal partial class PluginContext : IPluginContext
         ICondition condition;
         try
         {
-            condition = Common.Expression.Filter.Sql.SQLGenerator.CreateQuery(token, new ComicFilterSQLProvider());
+            condition = Common.Expression.Filter.Sql.SQLGenerator.CreateQuery(token, new MediaFilterSQLProvider());
         }
         catch (Exception ex)
         {

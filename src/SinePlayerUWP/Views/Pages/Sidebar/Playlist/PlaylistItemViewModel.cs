@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 
 namespace SinePlayerUWP.Views.Pages.Sidebar.Playlist;
@@ -18,7 +18,7 @@ internal partial class PlaylistItemViewModel : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public ComicModel? Comic { get; set; }
+    public MediaModel? Media { get; set; }
 
     private string _title = string.Empty;
     public string Title

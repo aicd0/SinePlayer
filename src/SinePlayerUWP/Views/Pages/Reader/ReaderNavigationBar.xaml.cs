@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using Microsoft.UI.Xaml;
@@ -8,7 +8,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using SinePlayerUWP.Common.BaseUI;
 using SinePlayerUWP.Common.BaseUI.PageAbilities;
 using SinePlayerUWP.Common.Localization;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 
 namespace SinePlayerUWP.Views.Pages.Reader;
@@ -53,9 +53,9 @@ internal sealed partial class ReaderNavigationBar : BaseUserControl
         FavoriteChanged?.Invoke(isFavorite);
     }
 
-    public void SetExternalComic(bool isExternalComic)
+    public void SetExternalMedia(bool isExternalMedia)
     {
-        AbbAddToFavorite.IsEnabled = !isExternalComic;
+        AbbAddToFavorite.IsEnabled = !isExternalMedia;
     }
 
     public void SetGridViewMode(bool enabled)
@@ -63,9 +63,9 @@ internal sealed partial class ReaderNavigationBar : BaseUserControl
         AbtbPreviewButton.IsChecked = enabled;
     }
 
-    public void SetReaderSettings(ComicModel comic)
+    public void SetReaderSettings(MediaModel media)
     {
-        MainReaderSettingPanel.SetComic(comic);
+        MainReaderSettingPanel.SetMedia(media);
     }
 
     private void OnAddToFavoritesClick(object sender, RoutedEventArgs e)
@@ -73,7 +73,7 @@ internal sealed partial class ReaderNavigationBar : BaseUserControl
         SetFavorite(!_isFavorite);
     }
 
-    private void OnComicInfoClick(object sender, RoutedEventArgs e)
+    private void OnMediaInfoClick(object sender, RoutedEventArgs e)
     {
         InfoPaneExpanded?.Invoke();
     }

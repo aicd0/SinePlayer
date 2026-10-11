@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -14,7 +14,7 @@ using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.Algorithm;
 using SinePlayerUWP.Core.Common.Threading;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Misc;
@@ -43,34 +43,34 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _noComicsVisible = false;
-    public bool NoComicsVisible
+    private bool _noMediaVisible = false;
+    public bool NoMediaVisible
     {
-        get => _noComicsVisible;
+        get => _noMediaVisible;
         set
         {
-            if (_noComicsVisible != value)
+            if (_noMediaVisible != value)
             {
-                _noComicsVisible = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NoComicsVisible)));
+                _noMediaVisible = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NoMediaVisible)));
             }
         }
     }
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
     private readonly ITaskDispatcher _sharedDispatcher = TaskDispatcher.Factory.NewQueue("FilterPresetsPageQueue");
-    private readonly ComicSearchEngine _searchEngine = new();
+    private readonly MediaSearchEngine _searchEngine = new();
     private int _searchSubmitted = 0;
 
     public void Initialize(ActionHandler actionHandler)
     {
         _actionHandler = actionHandler;
-        _searchEngine.SetResultCallback(OnComicSearchResult);
+        _searchEngine.SetResultCallback(OnMediaSearchResult);
     }
 
-    public void UpdateComics()
+    public void UpdateMedia()
     {
-        ScheduleUpdateComics();
+        ScheduleUpdateMedia();
     }
 
     public void SetSearchText(string searchText)
@@ -95,12 +95,12 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
         });
     }
 
-    private void ScheduleUpdateComics()
+    private void ScheduleUpdateMedia()
     {
         _searchEngine.Update();
     }
 
-    private void OnComicSearchResult(IReadOnlyList<ComicModel> items)
+    private void OnMediaSearchResult(IReadOnlyList<MediaModel> items)
     {
         CoroutineUtils.Run(async () =>
         {
@@ -119,18 +119,18 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
             CoroutineUtils.RunInMainThread(() =>
             {
                 DiffUtils.UpdateCollection(DataSource, dataSource, (x, y) => x.Title == y.Title, UpdateItem);
-                NoComicsVisible = DataSource.Count == 0;
+                NoMediaVisible = DataSource.Count == 0;
             });
         });
     }
 
-    private async Task<List<SimpleTreeViewNodeModel>> GenerateNodeTree(IReadOnlyList<ComicModel> comics)
+    private async Task<List<SimpleTreeViewNodeModel>> GenerateNodeTree(IReadOnlyList<MediaModel> mediaItems)
     {
         FolderNode rootNode = new() { Name = string.Empty };
-        foreach (ComicModel comic in comics)
+        foreach (MediaModel media in mediaItems)
         {
             FolderNode currentNode = rootNode;
-            IReadOnlyList<string> folders = comic.FolderViewPath;
+            IReadOnlyList<string> folders = media.FolderViewPath;
             foreach (string folder in folders)
             {
                 if (!currentNode.Folders.TryGetValue(folder, out FolderNode? folderNode))
@@ -142,32 +142,32 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
                 currentNode = folderNode;
             }
 
-            currentNode.Comics.Add(comic);
+            currentNode.Media.Add(media);
         }
 
-        SimpleTreeViewNodeModel ComicToNode(ComicModel comic, PlaylistModel.Builder playlist)
+        SimpleTreeViewNodeModel MediaToNode(MediaModel media, PlaylistModel.Builder playlist)
         {
             return new()
             {
-                DataContext = comic,
+                DataContext = media,
                 Glyph = "\uE8B9",
-                Title = comic.Title,
+                Title = media.Title,
                 CanExpand = false,
                 Clicked = item =>
                 {
-                    Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
-                    OpenComicHelper.OpenComic(_actionHandler, route);
+                    Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                    OpenMediaHelper.OpenMedia(_actionHandler, route);
                 },
                 RequestContextMenuItemsAsync = (primary, selection) =>
                 {
-                    IEnumerable<ComicModel>? selectedComics = !_selectionMode ? null : selection
-                        .Where(x => x.DataContext is ComicModel)
-                        .Select(x => (ComicModel)x.DataContext!);
-                    return MenuFlyoutItemsCreator.CreateComicMenuItems(
+                    IEnumerable<MediaModel>? selectedMedia = !_selectionMode ? null : selection
+                        .Where(x => x.DataContext is MediaModel)
+                        .Select(x => (MediaModel)x.DataContext!);
+                    return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                         _actionHandler,
-                        comic,
+                        media,
                         playlist: playlist,
-                        selectedItems: selectedComics,
+                        selectedItems: selectedMedia,
                         canSelect: !SelectionMode);
                 },
             };
@@ -200,12 +200,12 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
                 nodes.Add(item);
             }
 
-            IEnumerable<ComicModel> sortedComics = folderNode.Comics
+            IEnumerable<MediaModel> sortedMedia = folderNode.Media
                 .OrderBy(x => StringUtils.SmartFileNameKeySelector(x.Title), StringUtils.SmartFileNameComparer);
-            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(sortedComics);
-            foreach (ComicModel comic in sortedComics)
+            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sortedMedia);
+            foreach (MediaModel media in sortedMedia)
             {
-                nodes.Add(ComicToNode(comic, playlist));
+                nodes.Add(MediaToNode(media, playlist));
             }
 
             if (nodes.Count == 1 && nodes[0].CanExpand)
@@ -221,16 +221,16 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
 
     private async Task<List<BaseMenuFlyoutItemModel>> CreateFolderMenuItems(SimpleTreeViewNodeModel primary, IEnumerable<SimpleTreeViewNodeModel> selection)
     {
-        List<ComicModel> comics = [.. primary.CollectDataContext<ComicModel>()];
-        return await MenuFlyoutItemsCreator.CreateComicGroupMenuItems(
-            _actionHandler, comics,
+        List<MediaModel> mediaItems = [.. primary.CollectDataContext<MediaModel>()];
+        return await MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
+            _actionHandler, mediaItems,
             primary.ExpandAll, primary.CollapseAll);
     }
 
     private class FolderNode
     {
         public required string Name { get; init; }
-        public List<ComicModel> Comics { get; } = [];
+        public List<MediaModel> Media { get; } = [];
         public Dictionary<string, FolderNode> Folders { get; } = [];
     }
 }

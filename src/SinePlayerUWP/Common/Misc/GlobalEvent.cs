@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -24,8 +24,8 @@ internal class GlobalEvent
         1000,
         delay: 100,
         mergeFunc: static (a, b) => [.. a.Union(b)]);
-    public MutableLiveDataWithDelay<IEnumerable<long>> ComicUpdated = new(
-        EventBus.Default.With("ComicUpdated", () => new MutableLiveData<IEnumerable<long>>() { Lossless = true }),
+    public MutableLiveDataWithDelay<IEnumerable<long>> MediaUpdated = new(
+        EventBus.Default.With("MediaUpdated", () => new MutableLiveData<IEnumerable<long>>() { Lossless = true }),
         1000,
         delay: 100,
         mergeFunc: static (a, b) => [.. a.Union(b)]);

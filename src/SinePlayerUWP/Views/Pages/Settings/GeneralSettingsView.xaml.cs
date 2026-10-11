@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using Microsoft.UI.Xaml;
@@ -29,9 +29,9 @@ internal sealed partial class GeneralSettingsView : BaseUserControl
         ViewModel.SetCloseLastTabBehavior(((ComboBox)sender).SelectedIndex);
     }
 
-    private void OpenComicDefaultBehaviorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void OpenMediaDefaultBehaviorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        ViewModel.SetOpenComicDefaultBehavior(((ComboBox)sender).SelectedIndex);
+        ViewModel.SetOpenMediaDefaultBehavior(((ComboBox)sender).SelectedIndex);
     }
 
     private void ClearAllHistoryButton_Click(object sender, RoutedEventArgs e)

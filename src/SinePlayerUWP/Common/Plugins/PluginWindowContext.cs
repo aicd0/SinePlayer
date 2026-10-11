@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -48,32 +48,32 @@ internal sealed class PluginWindowContext(int windowId) : IWindowContext
     // Public API
     //
 
-    public void SetReadingComic(IComicModel? comic, Func<Action?, bool> executor)
+    public void SetReadingComic(IComicModel? media, Func<Action?, bool> executor)
     {
-        if (comic == _readingComic)
+        if (media == _readingMedia)
         {
             return;
         }
 
-        _readingComic = comic;
-        executor(() => _readingComicChanged?.Invoke(comic));
+        _readingMedia = media;
+        executor(() => _readingMediaChanged?.Invoke(media));
     }
 
     //
     // IWindowContext Implementation
     //
 
-    private event ReadingComicChangedEventHandler? _readingComicChanged;
+    private event ReadingComicChangedEventHandler? _readingMediaChanged;
 
-    private IComicModel? _readingComic;
+    private IComicModel? _readingMedia;
 
     event ReadingComicChangedEventHandler? IWindowContext.ReadingComicChanged
     {
-        add { _readingComicChanged += value; }
-        remove { _readingComicChanged -= value; }
+        add { _readingMediaChanged += value; }
+        remove { _readingMediaChanged -= value; }
     }
 
-    public IComicModel? ReadingComic => _readingComic;
+    public IComicModel? ReadingComic => _readingMedia;
 
     Task<DialogResult> IWindowContext.EnqueueDialog(DialogOptions options)
     {

@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 
 using SinePlayerUWP.Common.Localization;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 
 namespace SinePlayerUWP.Views.Dialogs.EditReaderSettingPreset;
@@ -81,13 +81,13 @@ internal partial class EditReaderSettingPresetDialogViewModel : INotifyPropertyC
         }
     }
 
-    private ComicModel? _comic = null;
+    private MediaModel? _media = null;
     private ReaderSettingsModel _presetModel = ReaderSettingsModel.FromDefault();
 
-    public void Initialize(ComicModel comic)
+    public void Initialize(MediaModel media)
     {
-        _comic = comic;
-        _presetModel = ReaderSettingsModel.LoadFromComic(comic);
+        _media = media;
+        _presetModel = ReaderSettingsModel.LoadFromMedia(media);
 
         Title = StringResourceProvider.Instance.EditPreset;
         Name = _presetModel.PresetName;
@@ -106,10 +106,10 @@ internal partial class EditReaderSettingPresetDialogViewModel : INotifyPropertyC
         presets.Remove(_presetModel.PresetKey);
         AppSettingsModel.ReaderSettingPresets = presets;
 
-        if (_comic is not null)
+        if (_media is not null)
         {
-            _comic.SetExt(ComicExt.READER_SETTING_PRESET_KEY, null);
-            _comic.SetExt(ComicExt.CUSTOM_READER_SETTINGS, null);
+            _media.SetExt(MediaExt.READER_SETTING_PRESET_KEY, null);
+            _media.SetExt(MediaExt.CUSTOM_READER_SETTINGS, null);
         }
     }
 
@@ -131,9 +131,9 @@ internal partial class EditReaderSettingPresetDialogViewModel : INotifyPropertyC
             AppSettingsModel.DefaultReaderSettingPresetKey = _presetModel.PresetKey;
         }
 
-        if (_comic is not null)
+        if (_media is not null)
         {
-            _presetModel.SaveToComic(_comic);
+            _presetModel.SaveToMedia(_media);
         }
     }
 
@@ -156,9 +156,9 @@ internal partial class EditReaderSettingPresetDialogViewModel : INotifyPropertyC
             AppSettingsModel.DefaultReaderSettingPresetKey = _presetModel.PresetKey;
         }
 
-        if (_comic is not null)
+        if (_media is not null)
         {
-            _presetModel.SaveToComic(_comic);
+            _presetModel.SaveToMedia(_media);
         }
     }
 

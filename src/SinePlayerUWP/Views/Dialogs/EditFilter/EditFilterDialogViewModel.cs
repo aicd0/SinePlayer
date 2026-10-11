@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System.Collections.Generic;
@@ -13,7 +13,7 @@ using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
 using SinePlayerUWP.Core.Database.SqlHelpers;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Data.Tables;
 using SinePlayerUWP.Helpers.Search;
@@ -32,8 +32,8 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
     public MutableLiveData<bool> SaveAsNewEnableLiveData = new();
     public MutableLiveData<ExpressionTokenInfo> AppendToExpressionLiveData = new();
 
-    private ComicFilterModel.ExternalModel? _filterModel;
-    private ComicFilterModel.ExternalFilterModel? _filter;
+    private MediaFilterModel.ExternalModel? _filterModel;
+    private MediaFilterModel.ExternalFilterModel? _filter;
     private string? _name;
     private string? _expression;
     private bool _isNameValid = false;
@@ -51,14 +51,14 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _includeHiddenComics = false;
-    public bool IncludeHiddenComics
+    private bool _includeHiddenMedia = false;
+    public bool IncludeHiddenMedia
     {
-        get => _includeHiddenComics;
+        get => _includeHiddenMedia;
         set
         {
-            _includeHiddenComics = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IncludeHiddenComics)));
+            _includeHiddenMedia = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IncludeHiddenMedia)));
         }
     }
 
@@ -84,7 +84,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         }
     }
 
-    public void Initialize(ComicFilterModel.ExternalFilterModel filter)
+    public void Initialize(MediaFilterModel.ExternalFilterModel filter)
     {
         CoroutineUtils.Run(() => InitializeAsync(filter));
     }
@@ -112,7 +112,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
 
         _expression = expression;
 
-        ComicFilterModel.ExternalFilterModel? filter = _filter;
+        MediaFilterModel.ExternalFilterModel? filter = _filter;
         if (filter == null)
         {
             return;
@@ -122,20 +122,20 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         UpdateSQLQuery();
     }
 
-    public void SetIncludeHiddenComics(bool includeHiddenComics)
+    public void SetIncludeHiddenMedia(bool includeHiddenMedia)
     {
-        ComicFilterModel.ExternalFilterModel? filter = _filter;
+        MediaFilterModel.ExternalFilterModel? filter = _filter;
         if (filter is null)
         {
             return;
         }
 
-        filter.IncludeHiddenComics = includeHiddenComics;
+        filter.IncludeHiddenMedia = includeHiddenMedia;
     }
 
     public void SetSaveViewSettings(bool save)
     {
-        ComicFilterModel.ExternalFilterModel? filter = _filter;
+        MediaFilterModel.ExternalFilterModel? filter = _filter;
         if (filter is null)
         {
             return;
@@ -146,7 +146,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
 
     public void SetSaveSortingAndGroupingSettings(bool save)
     {
-        ComicFilterModel.ExternalFilterModel? filter = _filter;
+        MediaFilterModel.ExternalFilterModel? filter = _filter;
         if (filter is null)
         {
             return;
@@ -157,7 +157,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
 
     public void Save()
     {
-        ComicFilterModel.ExternalFilterModel? filter = _filter;
+        MediaFilterModel.ExternalFilterModel? filter = _filter;
         if (filter is null)
         {
             return;
@@ -168,19 +168,19 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         filter.Modified = false;
         OverwriteFilter(filter);
 
-        ComicFilterModel.ExternalModel? model = _filterModel;
+        MediaFilterModel.ExternalModel? model = _filterModel;
         if (model is null)
         {
             return;
         }
 
         model.LastFilter = filter.Clone();
-        ComicFilterModel.Instance.UpdateModel(model);
+        MediaFilterModel.Instance.UpdateModel(model);
     }
 
     public void SaveAsNew()
     {
-        ComicFilterModel.ExternalFilterModel? filter = _filter;
+        MediaFilterModel.ExternalFilterModel? filter = _filter;
         if (filter is null)
         {
             return;
@@ -191,19 +191,19 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         filter.Modified = false;
         OverwriteFilter(filter);
 
-        ComicFilterModel.ExternalModel? model = _filterModel;
+        MediaFilterModel.ExternalModel? model = _filterModel;
         if (model is null)
         {
             return;
         }
 
         model.LastFilter = filter.Clone();
-        ComicFilterModel.Instance.UpdateModel(model);
+        MediaFilterModel.Instance.UpdateModel(model);
     }
 
     public void Delete()
     {
-        ComicFilterModel.ExternalFilterModel? filter = _filter;
+        MediaFilterModel.ExternalFilterModel? filter = _filter;
         if (filter is null)
         {
             return;
@@ -211,17 +211,17 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
 
         RemoveFilter(filter.Name);
 
-        ComicFilterModel.ExternalModel? model = _filterModel;
+        MediaFilterModel.ExternalModel? model = _filterModel;
         if (model is null)
         {
             return;
         }
 
         model.LastFilter = null;
-        ComicFilterModel.Instance.UpdateModel(model);
+        MediaFilterModel.Instance.UpdateModel(model);
     }
 
-    private async Task InitializeAsync(ComicFilterModel.ExternalFilterModel filter)
+    private async Task InitializeAsync(MediaFilterModel.ExternalFilterModel filter)
     {
         {
             void OnClickButton(string text, int cursorPosition = -1)
@@ -245,39 +245,39 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
             buttons.Add(new() { Tag = ">=", OnClicked = () => OnClickButton(">= ") });
             buttons.Add(new() { Tag = "<=", OnClicked = () => OnClickButton("<= ") });
             buttons.Add(new() { Tag = StringResourceProvider.Instance.ExpressionIn, OnClicked = () => OnClickButton("in ()", -2) });
-            buttons.Add(new() { Tag = StringResourceProvider.Instance.Title, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_TITLE}") });
-            buttons.Add(new() { Tag = StringResourceProvider.Instance.Rating, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_RATING}") });
+            buttons.Add(new() { Tag = StringResourceProvider.Instance.Title, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_TITLE}") });
+            buttons.Add(new() { Tag = StringResourceProvider.Instance.Rating, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_RATING}") });
 
             foreach (CompletionStatusEnum status in CompletionStatusService.AllStatus)
             {
                 buttons.Add(new()
                 {
                     Tag = CompletionStatusService.EnumToString(status),
-                    OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_COMPLETION_STATUS} = {(int)status}")
+                    OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_COMPLETION_STATUS} = {(int)status}")
                 });
             }
 
-            buttons.Add(new() { Tag = StringResourceProvider.Instance.Progress, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_PROGRESS}") });
-            buttons.Add(new() { Tag = StringResourceProvider.Instance.Title1, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_TITLE1}") });
-            buttons.Add(new() { Tag = StringResourceProvider.Instance.Title2, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_TITLE2}") });
-            buttons.Add(new() { Tag = StringResourceProvider.Instance.Duration, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_DURATION}") });
-            buttons.Add(new() { Tag = StringResourceProvider.Instance.Tag, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_TAG}") });
-            buttons.Add(new() { Tag = StringResourceProvider.Instance.Hidden, OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_HIDDEN}") });
+            buttons.Add(new() { Tag = StringResourceProvider.Instance.Progress, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_PROGRESS}") });
+            buttons.Add(new() { Tag = StringResourceProvider.Instance.Title1, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_TITLE1}") });
+            buttons.Add(new() { Tag = StringResourceProvider.Instance.Title2, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_TITLE2}") });
+            buttons.Add(new() { Tag = StringResourceProvider.Instance.Duration, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_DURATION}") });
+            buttons.Add(new() { Tag = StringResourceProvider.Instance.Tag, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_TAG}") });
+            buttons.Add(new() { Tag = StringResourceProvider.Instance.Hidden, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_HIDDEN}") });
 
-            List<string> tagCategories = await ComicModel.GetAllTagCategories();
+            List<string> tagCategories = await MediaModel.GetAllTagCategories();
             foreach (string category in tagCategories)
             {
                 buttons.Add(new()
                 {
                     Tag = $"{StringResourceProvider.Instance.Tag}.{category}",
-                    OnClicked = () => OnClickButton($"%{ComicSQLProviderUtils.VAR_TAG}.\"{ExpressionUtils.EscapeString(category)}\""),
+                    OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_TAG}.\"{ExpressionUtils.EscapeString(category)}\""),
                 });
             }
 
             ExpressionButtons = buttons;
         }
 
-        ComicFilterModel.ExternalModel? filterModel = ComicFilterModel.Instance.GetModel();
+        MediaFilterModel.ExternalModel? filterModel = MediaFilterModel.Instance.GetModel();
         _filterModel = filterModel;
         _filter = filter;
         if (filter is not null)
@@ -286,7 +286,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
             NameLiveData.Emit(filter.Name);
             UpdateExpression(filter.Expression);
             ExpressionLiveData.Emit(filter.Expression);
-            IncludeHiddenComics = filter.IncludeHiddenComics;
+            IncludeHiddenMedia = filter.IncludeHiddenMedia;
             SaveViewSettings = filter.SaveViewSettings;
             SaveSortingAndGroupingSettings = filter.SaveSortingAndGroupingSettings;
         }
@@ -294,7 +294,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
 
     private void UpdateSQLQuery()
     {
-        ComicFilterModel.ExternalFilterModel? filter = _filter;
+        MediaFilterModel.ExternalFilterModel? filter = _filter;
         if (filter is null)
         {
             return;
@@ -322,7 +322,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         ICondition condition;
         try
         {
-            condition = SQLGenerator.CreateQuery(token, new ComicFilterSQLProvider());
+            condition = SQLGenerator.CreateQuery(token, new MediaFilterSQLProvider());
         }
         catch (ExpressionException e)
         {
@@ -347,9 +347,9 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         SaveAsNewEnableLiveData.Emit(isInputValid && !_isNameExists);
     }
 
-    private ComicFilterModel.ExternalFilterModel? FindFilter(string name)
+    private MediaFilterModel.ExternalFilterModel? FindFilter(string name)
     {
-        ComicFilterModel.ExternalModel? filterModel = _filterModel;
+        MediaFilterModel.ExternalModel? filterModel = _filterModel;
         if (filterModel is null)
         {
             return null;
@@ -358,9 +358,9 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         return filterModel.Filters.Find(x => x.Name == name);
     }
 
-    private void OverwriteFilter(ComicFilterModel.ExternalFilterModel filter)
+    private void OverwriteFilter(MediaFilterModel.ExternalFilterModel filter)
     {
-        ComicFilterModel.ExternalModel? filterModel = _filterModel;
+        MediaFilterModel.ExternalModel? filterModel = _filterModel;
         if (filterModel is null)
         {
             return;
@@ -372,13 +372,13 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
 
     private void RemoveFilter(string name)
     {
-        ComicFilterModel.ExternalModel? filterModel = _filterModel;
+        MediaFilterModel.ExternalModel? filterModel = _filterModel;
         if (filterModel is null)
         {
             return;
         }
 
-        ComicFilterModel.ExternalFilterModel? oldFilter = filterModel.Filters.Find(x => x.Name == name);
+        MediaFilterModel.ExternalFilterModel? oldFilter = filterModel.Filters.Find(x => x.Name == name);
         if (oldFilter is not null)
         {
             filterModel.Filters.Remove(oldFilter);

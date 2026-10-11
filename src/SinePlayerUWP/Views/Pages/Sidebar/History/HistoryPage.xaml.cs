@@ -15,7 +15,7 @@ using SinePlayerUWP.Common.BaseUI.PageAbilities;
 using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Core.Common.AppEnvironment;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.Misc;
 using SinePlayerUWP.Helpers.Navigation;
@@ -60,11 +60,11 @@ internal sealed partial class HistoryPage : BasePage
         List<MediaHistoryItemModel> historyItems = await MediaHistoryItemModel.GetAllAsync();
         historyItems.Sort((x, y) => y.DateTime.CompareTo(x.DateTime));
 
-        List<ComicModel> comics = await ComicModel.BatchFromId(historyItems.Select(x => x.MediaId));
-        Dictionary<long, ComicModel> comicMap = new();
-        foreach (ComicModel comic in comics)
+        List<MediaModel> mediaItems = await MediaModel.BatchFromId(historyItems.Select(x => x.MediaId));
+        Dictionary<long, MediaModel> mediaMap = new();
+        foreach (MediaModel media in mediaItems)
         {
-            comicMap[comic.Id] = comic;
+            mediaMap[media.Id] = media;
         }
 
         foreach (MediaHistoryItemModel item in historyItems)
@@ -78,11 +78,11 @@ internal sealed partial class HistoryPage : BasePage
             }
 
             currentGroup ??= new HistoryGroupViewModel(key);
-            comicMap.TryGetValue(item.MediaId, out ComicModel? comic);
+            mediaMap.TryGetValue(item.MediaId, out MediaModel? media);
             var itemOut = new HistoryItemViewModel
             {
                 Id = item.MediaId,
-                Comic = comic,
+                Media = media,
                 Time = localTime.ToString("t", EnvironmentProvider.Instance.GetCurrentAppLanguageInfo()),
                 Title = item.Title
             };
@@ -107,24 +107,24 @@ internal sealed partial class HistoryPage : BasePage
 
     private async Task OpenItem(HistoryItemViewModel item, bool newTab)
     {
-        ComicModel? comic = item.Comic ?? await ComicModel.FromId(item.Id);
-        if (comic is null)
+        MediaModel? media = item.Media ?? await MediaModel.FromId(item.Id);
+        if (media is null)
         {
             DeleteItem(item);
             return;
         }
 
-        IEnumerable<ComicModel> playlistComics = DataSource.SelectMany(x => x).Select(x => x.Comic).OfType<ComicModel>();
-        PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(playlistComics);
+        IEnumerable<MediaModel> playlistMedia = DataSource.SelectMany(x => x).Select(x => x.Media).OfType<MediaModel>();
+        PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(playlistMedia);
         if (newTab)
         {
-            Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
+            Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
             GetMainPageAbility().OpenInNewTab(route);
         }
         else
         {
-            Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
-            OpenComicHelper.OpenComic(PageActionHandler, route);
+            Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+            OpenMediaHelper.OpenMedia(PageActionHandler, route);
         }
 
         GetMainPageAbility().SetSidePaneOpenState(false, force: false);

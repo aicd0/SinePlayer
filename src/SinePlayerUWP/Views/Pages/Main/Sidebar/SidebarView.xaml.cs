@@ -22,7 +22,7 @@ internal sealed partial class SidebarView : BaseUserControl
     public const string ITEM_FOLDERS = "Folders";
     public const string ITEM_FILTER_PRESETS = "FilterPresets";
     public const string ITEM_PLAYLIST = "Playlist";
-    public const string ITEM_COMIC_INFO = "ComicInfo";
+    public const string ITEM_MEDIA_INFO = "MediaInfo";
 
     public delegate void PinStateChangedEventHandler(SidebarView sender, bool pinned);
     public event PinStateChangedEventHandler? PinStateChanged;
@@ -47,9 +47,9 @@ internal sealed partial class SidebarView : BaseUserControl
         [
             new()
             {
-                Tag = ITEM_COMIC_INFO,
-                Name = StringResource.ComicInfo,
-                PageRoute = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_SIDE_PANE_COMIC_INFO),
+                Tag = ITEM_MEDIA_INFO,
+                Name = StringResource.MediaInfo,
+                PageRoute = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_SIDE_PANE_MEDIA_INFO),
                 Icon = new FontIconSource() { Glyph = "\uE946" },
             },
             new()

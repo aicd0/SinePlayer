@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -10,7 +10,7 @@ using SinePlayerUWP.Common.Actions;
 using SinePlayerUWP.Core.Common.Algorithm;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Data.Models.Playback;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
@@ -21,16 +21,16 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    private bool _noComicsVisible = false;
-    public bool NoComicsVisible
+    private bool _noMediaVisible = false;
+    public bool NoMediaVisible
     {
-        get => _noComicsVisible;
+        get => _noMediaVisible;
         set
         {
-            if (_noComicsVisible != value)
+            if (_noMediaVisible != value)
             {
-                _noComicsVisible = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NoComicsVisible)));
+                _noMediaVisible = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NoMediaVisible)));
             }
         }
     }
@@ -87,7 +87,7 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
         _playback.Cursor = index;
     }
 
-    public void UpdateComics()
+    public void UpdateMedia()
     {
         UpdatePlaylist();
     }
@@ -110,14 +110,14 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
         {
             newPlaylist.Add(new()
             {
-                Comic = playlistItem.Comic,
-                Title = playlistItem.Comic.Title,
-                Progress = GetProgressText(playlistItem.Comic),
+                Media = playlistItem.Media,
+                Title = playlistItem.Media.Title,
+                Progress = GetProgressText(playlistItem.Media),
                 RequestContextMenuItemsAsync = item =>
                 {
-                    return MenuFlyoutItemsCreator.CreateComicMenuItems(
+                    return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                         _actionHandler,
-                        playlistItem.Comic,
+                        playlistItem.Media,
                         playlist: playlist,
                         playback: _playback.ToBuilder());
                 },
@@ -126,13 +126,13 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
 
         CoroutineUtils.RunInMainThread(() =>
         {
-            DiffUtils.UpdateCollection(DataSource, newPlaylist, (a, b) => a.Comic == b.Comic, (a, b) =>
+            DiffUtils.UpdateCollection(DataSource, newPlaylist, (a, b) => a.Media == b.Media, (a, b) =>
             {
                 a.Title = b.Title;
                 a.Progress = b.Progress;
                 a.RequestContextMenuItemsAsync = b.RequestContextMenuItemsAsync;
             });
-            NoComicsVisible = DataSource.Count == 0;
+            NoMediaVisible = DataSource.Count == 0;
         });
     }
 
@@ -149,9 +149,9 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
         });
     }
 
-    private static string GetProgressText(ComicModel comic)
+    private static string GetProgressText(MediaModel media)
     {
-        CompletionStatusEnum status = comic.CompletionStatus;
+        CompletionStatusEnum status = media.CompletionStatus;
 
         if (CompletionStatusService.CanTransitToReadingAutomatically(status))
         {
@@ -160,7 +160,7 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
 
         return status switch
         {
-            CompletionStatusEnum.Reading => Math.Clamp(comic.Progress, 0, 100).ToString() + "%",
+            CompletionStatusEnum.Reading => Math.Clamp(media.Progress, 0, 100).ToString() + "%",
             _ => CompletionStatusService.EnumToString(status),
         };
     }

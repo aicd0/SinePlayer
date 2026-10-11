@@ -150,10 +150,10 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>Fortschrittlich</value>
   </data>
-  <data name="AllComics" xml:space="preserve">
+  <data name="AllMedia" xml:space="preserve">
     <value>Alle Comics</value>
   </data>
-  <data name="AllComicsIn" xml:space="preserve">
+  <data name="AllMediaIn" xml:space="preserve">
     <value>Alle Comics in $path</value>
   </data>
   <data name="AllHidden" xml:space="preserve">
@@ -264,10 +264,10 @@
   <data name="CollectionInformation" xml:space="preserve">
     <value>Sammlungsinformationen</value>
   </data>
-  <data name="ComicExclusionExplaination" xml:space="preserve">
+  <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Mit der Option „zur Ausschlussliste hinzufügen“ wird verhindert, dass der Comic beim nächsten Aktualisieren der Bibliothek erneut importiert wird.</value>
   </data>
-  <data name="ComicInfo" xml:space="preserve">
+  <data name="MediaInfo" xml:space="preserve">
     <value>Comic-Informationen</value>
   </data>
   <data name="CompletionStatus" xml:space="preserve">
@@ -609,7 +609,7 @@ Die Auswertung erfolgt in der folgenden Reihenfolge:
   <data name="Images" xml:space="preserve">
     <value>Bilder</value>
   </data>
-  <data name="IncludeHiddenComics" xml:space="preserve">
+  <data name="IncludeHiddenMedia" xml:space="preserve">
     <value>Versteckte Comics einschließen</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
@@ -733,7 +733,7 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Next" xml:space="preserve">
     <value>Weiter</value>
   </data>
-  <data name="NoComicsHint" xml:space="preserve">
+  <data name="NoMediaHint" xml:space="preserve">
     <value>Deine Comics werden hier angezeigt</value>
   </data>
   <data name="NoContent" xml:space="preserve">
@@ -769,13 +769,13 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OK" xml:space="preserve">
     <value>OK</value>
   </data>
-  <data name="OnlyAppliesToReadingComics" xml:space="preserve">
+  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
     <value>Gilt nur für Comics mit dem Status „Wird gelesen“</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>Öffnen</value>
   </data>
-  <data name="OpenComicDefaultBehavior" xml:space="preserve">
+  <data name="OpenMediaDefaultBehavior" xml:space="preserve">
     <value>Standardverhalten beim Öffnen eines Comics</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
@@ -793,13 +793,13 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>Metadatenordner öffnen</value>
   </data>
-  <data name="OpenNextComic" xml:space="preserve">
+  <data name="OpenNextMedia" xml:space="preserve">
     <value>Nächsten Comic öffnen</value>
   </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>Plugin-Ordner öffnen</value>
   </data>
-  <data name="OpenPreviousComic" xml:space="preserve">
+  <data name="OpenPreviousMedia" xml:space="preserve">
     <value>Vorherigen Comic öffnen</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
@@ -856,10 +856,10 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Progress" xml:space="preserve">
     <value>Fortschritt</value>
   </data>
-  <data name="PromptBeforeRemovingComics" xml:space="preserve">
+  <data name="PromptBeforeRemovingMedia" xml:space="preserve">
     <value>Vor dem Entfernen von Comics bestätigen</value>
   </data>
-  <data name="RandomComic" xml:space="preserve">
+  <data name="RandomMedia" xml:space="preserve">
     <value>Zufälliger comic</value>
   </data>
   <data name="Rating" xml:space="preserve">
@@ -1009,7 +1009,7 @@ Im abgesicherten Modus starten?</value>
   <data name="Settings" xml:space="preserve">
     <value>Einstellungen</value>
   </data>
-  <data name="ShowHiddenComicButton.Content" xml:space="preserve">
+  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
     <value>Versteckte Comics anzeigen</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
@@ -1089,7 +1089,7 @@ Kategorie 2: Tag 4, Tag 5</value>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>Vollbild umschalten</value>
   </data>
-  <data name="TotalComics" xml:space="preserve">
+  <data name="TotalMedia" xml:space="preserve">
     <value>Comics insgesamt</value>
   </data>
   <data name="TransitionAnimation" xml:space="preserve">

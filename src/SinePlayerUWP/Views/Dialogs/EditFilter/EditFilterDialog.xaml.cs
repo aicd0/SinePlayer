@@ -18,7 +18,7 @@ internal sealed partial class EditFilterDialog : BaseContentDialog
 
     public bool HasMadeChanges { get; private set; } = false;
 
-    public EditFilterDialog(ComicFilterModel.ExternalFilterModel filter)
+    public EditFilterDialog(MediaFilterModel.ExternalFilterModel filter)
     {
         InitializeComponent();
 
@@ -136,10 +136,10 @@ internal sealed partial class EditFilterDialog : BaseContentDialog
         ViewModel.UpdateExpression(ExpressionTextBox.Text ?? "");
     }
 
-    private void IncludeHiddenComicsCheckBox_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void IncludeHiddenMediaCheckBox_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         bool isChecked = ((CheckBox)sender).IsChecked ?? false;
-        ViewModel.SetIncludeHiddenComics(isChecked);
+        ViewModel.SetIncludeHiddenMedia(isChecked);
     }
 
     private void SaveViewSettingsCheckBox_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)

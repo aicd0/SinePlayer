@@ -4,7 +4,7 @@
 using Microsoft.UI.Xaml.Controls;
 
 using SinePlayerUWP.Common.BaseUI;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 
 namespace SinePlayerUWP.Views.Dialogs.EditReaderSettingPreset;
 
@@ -12,11 +12,11 @@ internal sealed partial class EditReaderSettingPresetDialog : BaseContentDialog
 {
     public EditReaderSettingPresetDialogViewModel ViewModel = new();
 
-    public EditReaderSettingPresetDialog(ComicModel comic)
+    public EditReaderSettingPresetDialog(MediaModel media)
     {
         InitializeComponent();
 
-        ViewModel.Initialize(comic);
+        ViewModel.Initialize(media);
     }
 
     //

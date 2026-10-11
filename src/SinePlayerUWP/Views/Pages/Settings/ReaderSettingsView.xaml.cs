@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -44,12 +44,12 @@ internal sealed partial class ReaderSettingsView : BaseUserControl
         }
     }
 
-    private void RestoreLastReadingPositionOnlyAppliesToReadingComicsCheckBox_Click(object sender, RoutedEventArgs e)
+    private void RestoreLastReadingPositionOnlyAppliesToReadingMediaCheckBox_Click(object sender, RoutedEventArgs e)
     {
         bool? isChecked = ((CheckBox)sender).IsChecked;
         if (isChecked.HasValue)
         {
-            AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingComics = isChecked.Value;
+            AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia = isChecked.Value;
         }
     }
 

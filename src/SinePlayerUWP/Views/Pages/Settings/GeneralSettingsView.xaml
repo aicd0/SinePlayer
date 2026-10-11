@@ -52,15 +52,15 @@
                 Grid.Row="2"
                 Grid.Column="0"
                 VerticalAlignment="Center"
-                Text="{x:Bind StringResource.OpenComicDefaultBehavior}"
+                Text="{x:Bind StringResource.OpenMediaDefaultBehavior}"
                 TextWrapping="Wrap" />
             <ComboBox
                 Grid.Row="2"
                 Grid.Column="2"
                 DisplayMemberPath="Name"
-                ItemsSource="{x:Bind ViewModel.OpenComicDefaultBaheviors, Mode=OneWay}"
-                SelectedIndex="{x:Bind ViewModel.OpenComicDefaultBaheviorIndex, Mode=OneWay}"
-                SelectionChanged="OpenComicDefaultBehaviorComboBox_SelectionChanged" />
+                ItemsSource="{x:Bind ViewModel.OpenMediaDefaultBaheviors, Mode=OneWay}"
+                SelectedIndex="{x:Bind ViewModel.OpenMediaDefaultBaheviorIndex, Mode=OneWay}"
+                SelectionChanged="OpenMediaDefaultBehaviorComboBox_SelectionChanged" />
         </Grid>
         <CheckBox
             Click="SaveBrowsingHistoryCheckBox_Click"

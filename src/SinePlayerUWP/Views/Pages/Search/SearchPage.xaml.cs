@@ -43,7 +43,7 @@ internal sealed partial class SearchPage : BasePage
         base.OnStart(bundle);
 
         PageActionHandler.RegisterProvider(new CustomActionProvider(new CustomActionHandler(ViewModel)));
-        ItemsView.Initialize(ViewModel.ComicSelection, PageActionHandler);
+        ItemsView.Initialize(ViewModel.MediaSelection, PageActionHandler);
         ViewTypeSelector.ViewTypeChanged += ViewModel.SelectViewType;
 
         _keyword = bundle.GetString(RouterConstants.ARG_KEYWORD, "");
@@ -82,7 +82,7 @@ internal sealed partial class SearchPage : BasePage
 
     private void ObserveData()
     {
-        GlobalEvent.Instance.ComicUpdated.Observe(this, _ =>
+        GlobalEvent.Instance.MediaUpdated.Observe(this, _ =>
         {
             ViewModel.Refresh();
         });
@@ -207,11 +207,11 @@ internal sealed partial class SearchPage : BasePage
             bool handled = true;
             switch (source)
             {
-                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_COMIC_ITEM_MENU:
+                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
                     switch (name)
                     {
                         case MenuFlyoutItemsCreator.CUSTOM_ACTION_NAME_SELECT:
-                            viewModel.ComicSelection.SetSelectMode(!viewModel.ComicSelection.IsSelectMode);
+                            viewModel.MediaSelection.SetSelectMode(!viewModel.MediaSelection.IsSelectMode);
                             break;
                         default:
                             handled = false;

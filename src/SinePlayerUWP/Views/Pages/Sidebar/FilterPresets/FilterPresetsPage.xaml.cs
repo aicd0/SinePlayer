@@ -12,7 +12,7 @@ using SinePlayerUWP.Common.BaseUI;
 using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 
 namespace SinePlayerUWP.Views.Pages.Sidebar.FilterPresets;
@@ -36,19 +36,19 @@ internal sealed partial class FilterPresetsPage : BasePage
 
         ObserveData();
         ViewModel.Initialize(PageActionHandler);
-        ViewModel.UpdateComics();
+        ViewModel.UpdateMedia();
     }
 
     private void ObserveData()
     {
-        GlobalEvent.Instance.ComicUpdated.Observe(this, _ =>
+        GlobalEvent.Instance.MediaUpdated.Observe(this, _ =>
         {
-            ViewModel.UpdateComics();
+            ViewModel.UpdateMedia();
         });
 
         GlobalEvent.Instance.FilterUpdated.Observe(this, _ =>
         {
-            ViewModel.UpdateComics();
+            ViewModel.UpdateMedia();
         });
 
         ViewModel.FilterPresetDropDownLiveData.ObserveSticky(this, model =>
@@ -91,8 +91,8 @@ internal sealed partial class FilterPresetsPage : BasePage
             return;
         }
 
-        List<ComicModel> snapshot = ViewModel.GetComicSnapshot();
-        List<BaseMenuFlyoutItemModel> menuItems = await MenuFlyoutItemsCreator.CreateComicGroupMenuItems(
+        List<MediaModel> snapshot = ViewModel.GetMediaSnapshot();
+        List<BaseMenuFlyoutItemModel> menuItems = await MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
             PageActionHandler, snapshot, ViewModel.ExpandAllGroups, ViewModel.CollapseAllGroups);
         if (menuItems.Count == 0)
         {
@@ -122,7 +122,7 @@ internal sealed partial class FilterPresetsPage : BasePage
             bool handled = true;
             switch (source)
             {
-                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_COMIC_ITEM_MENU:
+                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
                     switch (name)
                     {
                         case MenuFlyoutItemsCreator.CUSTOM_ACTION_NAME_SELECT:

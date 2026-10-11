@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -12,11 +12,11 @@ using SinePlayerUWP.Views.Pages.DevTools;
 using SinePlayerUWP.Views.Pages.Home;
 using SinePlayerUWP.Views.Pages.Main;
 using SinePlayerUWP.Views.Pages.Search;
-using SinePlayerUWP.Views.Pages.Sidebar.ComicInfo;
 using SinePlayerUWP.Views.Pages.Sidebar.Favorite;
 using SinePlayerUWP.Views.Pages.Sidebar.FilterPresets;
 using SinePlayerUWP.Views.Pages.Sidebar.Folders;
 using SinePlayerUWP.Views.Pages.Sidebar.History;
+using SinePlayerUWP.Views.Pages.Sidebar.MediaInfo;
 using SinePlayerUWP.Views.Pages.Sidebar.Playlist;
 using SinePlayerUWP.Views.Pages.Sidebar.Tags;
 
@@ -38,7 +38,7 @@ internal class OpenPageInterceptor : IRouterInterceptor
         { RouterConstants.HOST_SIDE_PANE_FOLDERS, new DefaultPageTrait(typeof(FoldersPage)) },
         { RouterConstants.HOST_SIDE_PANE_FILTER_PRESETS, new DefaultPageTrait(typeof(FilterPresetsPage)) },
         { RouterConstants.HOST_SIDE_PANE_PLAYLIST, new DefaultPageTrait(typeof(PlaylistPage)) },
-        { RouterConstants.HOST_SIDE_PANE_COMIC_INFO, new DefaultPageTrait(typeof(ComicInfoPage)) },
+        { RouterConstants.HOST_SIDE_PANE_MEDIA_INFO, new DefaultPageTrait(typeof(MediaInfoPage)) },
         { RouterConstants.HOST_DEV_TOOLS, new DefaultPageTrait(typeof(DevToolsPage)) },
     };
 

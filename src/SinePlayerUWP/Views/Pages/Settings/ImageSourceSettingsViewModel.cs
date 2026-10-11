@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System.ComponentModel;
@@ -46,25 +46,25 @@ internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _removeUnreachableComics = true;
-    public bool RemoveUnreachableComics
+    private bool _removeUnreachableMedia = true;
+    public bool RemoveUnreachableMedia
     {
-        get => _removeUnreachableComics;
+        get => _removeUnreachableMedia;
         set
         {
-            _removeUnreachableComics = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RemoveUnreachableComics)));
+            _removeUnreachableMedia = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RemoveUnreachableMedia)));
         }
     }
 
-    private bool _promptBeforeRemovingComics = true;
-    public bool PromptBeforeRemovingComics
+    private bool _promptBeforeRemovingMedia = true;
+    public bool PromptBeforeRemovingMedia
     {
-        get => _promptBeforeRemovingComics;
+        get => _promptBeforeRemovingMedia;
         set
         {
-            _promptBeforeRemovingComics = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PromptBeforeRemovingComics)));
+            _promptBeforeRemovingMedia = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PromptBeforeRemovingMedia)));
         }
     }
 
@@ -82,19 +82,19 @@ internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
         AppSettingsModel.UpdateModel(model);
     }
 
-    public void SetRemoveUnreachableComics(bool removeUnreachableComics)
+    public void SetRemoveUnreachableMedia(bool removeUnreachableMedia)
     {
-        _removeUnreachableComics = removeUnreachableComics;
+        _removeUnreachableMedia = removeUnreachableMedia;
         AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.RemoveUnreachableComics = removeUnreachableComics;
+        model.RemoveUnreachableMedia = removeUnreachableMedia;
         AppSettingsModel.UpdateModel(model);
     }
 
-    public void SetPromptBeforeRemovingComics(bool promptBeforeRemovingComics)
+    public void SetPromptBeforeRemovingMedia(bool promptBeforeRemovingMedia)
     {
-        _promptBeforeRemovingComics = promptBeforeRemovingComics;
+        _promptBeforeRemovingMedia = promptBeforeRemovingMedia;
         AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.PromptBeforeRemovingComics = promptBeforeRemovingComics;
+        model.PromptBeforeRemovingMedia = promptBeforeRemovingMedia;
         AppSettingsModel.UpdateModel(model);
     }
 
@@ -107,11 +107,11 @@ internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
     {
         AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
         bool scanOnLaunch = model.ScanOnLaunch;
-        bool removeUnreachableComics = model.RemoveUnreachableComics;
-        bool promptBeforeRemovingComics = model.PromptBeforeRemovingComics;
+        bool removeUnreachableMedia = model.RemoveUnreachableMedia;
+        bool promptBeforeRemovingMedia = model.PromptBeforeRemovingMedia;
 
         ScanOnLaunch = scanOnLaunch;
-        RemoveUnreachableComics = removeUnreachableComics;
-        PromptBeforeRemovingComics = promptBeforeRemovingComics;
+        RemoveUnreachableMedia = removeUnreachableMedia;
+        PromptBeforeRemovingMedia = promptBeforeRemovingMedia;
     }
 }

@@ -5,7 +5,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -319,7 +318,7 @@ internal sealed partial class DevToolsPage : BasePage
         GlobalEvent events = GlobalEvent.Instance;
         _counters.Add(new EventCounter("Logs", () => Interlocked.Read(ref _receivedLogCount)));
         ObserveEventCounter("CollectionUpdated", events.CollectionUpdated);
-        ObserveEventCounter("ComicUpdated", events.ComicUpdated);
+        ObserveEventCounter("MediaUpdated", events.MediaUpdated);
         ObserveEventCounter("FilterUpdated", events.FilterUpdated);
         ObserveEventCounter("FavoriteUpdated", events.FavoriteUpdated);
         ObserveEventCounter("HistoryUpdated", events.HistoryUpdated);

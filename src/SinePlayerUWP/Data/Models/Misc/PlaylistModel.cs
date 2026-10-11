@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 using SinePlayerUWP.Core.Common.DebugTools;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 
 namespace SinePlayerUWP.Data.Models.Misc;
 
@@ -45,7 +45,7 @@ internal class PlaylistModel
 
     private static async Task<PlaylistModel> CreateFromBuilder(IEnumerable<PlaylistItemJsonModel> builder)
     {
-        List<long> comicIds = [];
+        List<long> mediaIds = [];
         foreach (PlaylistItemJsonModel jsonItem in builder)
         {
             if (!jsonItem.IsExternal.HasValue)
@@ -55,20 +55,20 @@ internal class PlaylistModel
 
             if (!jsonItem.IsExternal.Value)
             {
-                if (!jsonItem.ComicId.HasValue)
+                if (!jsonItem.MediaId.HasValue)
                 {
                     continue;
                 }
 
-                comicIds.Add(jsonItem.ComicId.Value);
+                mediaIds.Add(jsonItem.MediaId.Value);
             }
         }
 
-        List<ComicModel> libraryComics = await ComicModel.BatchFromId(comicIds);
-        var comicIdMap = new Dictionary<long, ComicModel>();
-        foreach (ComicModel comic in libraryComics)
+        List<MediaModel> libraryMedia = await MediaModel.BatchFromId(mediaIds);
+        var mediaIdMap = new Dictionary<long, MediaModel>();
+        foreach (MediaModel media in libraryMedia)
         {
-            comicIdMap[comic.Id] = comic;
+            mediaIdMap[media.Id] = media;
         }
 
         List<PlaylistItem> items = [];
@@ -79,22 +79,22 @@ internal class PlaylistModel
                 continue;
             }
 
-            ComicModel? comic = null;
+            MediaModel? media = null;
             if (jsonItem.IsExternal.Value)
             {
-                comic = await ComicModel.FromExternalLocation(jsonItem.Location ?? string.Empty);
+                media = await MediaModel.FromExternalLocation(jsonItem.Location ?? string.Empty);
             }
-            else if (jsonItem.ComicId.HasValue)
+            else if (jsonItem.MediaId.HasValue)
             {
-                comicIdMap.TryGetValue(jsonItem.ComicId.Value, out comic);
+                mediaIdMap.TryGetValue(jsonItem.MediaId.Value, out media);
             }
 
-            if (comic is not null && !comic.IsCollection)
+            if (media is not null && !media.IsCollection)
             {
                 string id = string.IsNullOrEmpty(jsonItem.Id) ? Guid.NewGuid().ToString() : jsonItem.Id;
                 items.Add(new()
                 {
-                    Comic = comic,
+                    Media = media,
                     Id = id,
                 });
             }
@@ -123,9 +123,9 @@ internal class PlaylistModel
             .Select(x => new PlaylistItemJsonModel()
             {
                 Id = x.Id,
-                IsExternal = x.Comic.IsExternal,
-                ComicId = x.Comic.Id,
-                Location = x.Comic.Location,
+                IsExternal = x.Media.IsExternal,
+                MediaId = x.Media.Id,
+                Location = x.Media.Location,
             });
         return JsonSerializer.Serialize(new List<PlaylistItemJsonModel>(jsonItems));
     }
@@ -133,7 +133,7 @@ internal class PlaylistModel
     public class PlaylistItem
     {
         public required string Id { get; init; }
-        public required ComicModel Comic { get; init; }
+        public required MediaModel Media { get; init; }
     }
 
     private class PlaylistItemJsonModel
@@ -144,8 +144,8 @@ internal class PlaylistModel
         [JsonPropertyName("IsExternal")]
         public bool? IsExternal { get; set; }
 
-        [JsonPropertyName("ComicId")]
-        public long? ComicId { get; set; }
+        [JsonPropertyName("MediaId")]
+        public long? MediaId { get; set; }
 
         [JsonPropertyName("Location")]
         public string? Location { get; set; }
@@ -153,76 +153,76 @@ internal class PlaylistModel
 
     public class Builder
     {
-        private readonly List<PlaylistItemJsonModel> _comics = [];
+        private readonly List<PlaylistItemJsonModel> _mediaItems = [];
 
         public Builder AddItems(IEnumerable<PlaylistItem> items)
         {
             foreach (PlaylistItem item in items)
             {
-                if (item.Comic.IsCollection)
+                if (item.Media.IsCollection)
                 {
                     continue;
                 }
 
-                _comics.Add(new PlaylistItemJsonModel()
+                _mediaItems.Add(new PlaylistItemJsonModel()
                 {
                     Id = item.Id,
-                    IsExternal = item.Comic.IsExternal,
-                    Location = item.Comic.Location,
-                    ComicId = item.Comic.Id
+                    IsExternal = item.Media.IsExternal,
+                    Location = item.Media.Location,
+                    MediaId = item.Media.Id
                 });
             }
 
             return this;
         }
 
-        public Builder AddComics(IEnumerable<ComicModel> comics)
+        public Builder AddMedia(IEnumerable<MediaModel> mediaItems)
         {
-            foreach (ComicModel comic in comics)
+            foreach (MediaModel media in mediaItems)
             {
-                AddComic(comic);
+                AddMedia(media);
             }
 
             return this;
         }
 
-        public string EnsureComic(ComicModel comic)
+        public string EnsureMedia(MediaModel media)
         {
-            string? itemId = IdOf(comic);
+            string? itemId = IdOf(media);
             if (string.IsNullOrEmpty(itemId))
             {
                 var item = new PlaylistItemJsonModel()
                 {
-                    IsExternal = comic.IsExternal,
-                    Location = comic.Location,
-                    ComicId = comic.Id
+                    IsExternal = media.IsExternal,
+                    Location = media.Location,
+                    MediaId = media.Id
                 };
                 itemId = EnsureId(item);
-                _comics.Insert(0, item);
+                _mediaItems.Insert(0, item);
             }
 
             return itemId;
         }
 
-        public Builder AddComic(ComicModel comic)
+        public Builder AddMedia(MediaModel media)
         {
-            if (comic.IsCollection)
+            if (media.IsCollection)
             {
                 return this;
             }
 
-            _comics.Add(new PlaylistItemJsonModel()
+            _mediaItems.Add(new PlaylistItemJsonModel()
             {
-                IsExternal = comic.IsExternal,
-                Location = comic.Location,
-                ComicId = comic.Id
+                IsExternal = media.IsExternal,
+                Location = media.Location,
+                MediaId = media.Id
             });
             return this;
         }
 
-        public Builder AddComicLocation(string location)
+        public Builder AddMediaLocation(string location)
         {
-            _comics.Add(new PlaylistItemJsonModel()
+            _mediaItems.Add(new PlaylistItemJsonModel()
             {
                 IsExternal = true,
                 Location = location,
@@ -230,25 +230,25 @@ internal class PlaylistModel
             return this;
         }
 
-        private string? IdOf(ComicModel comic)
+        private string? IdOf(MediaModel media)
         {
-            foreach (PlaylistItemJsonModel item in _comics)
+            foreach (PlaylistItemJsonModel item in _mediaItems)
             {
-                if (comic.IsExternal != item.IsExternal)
+                if (media.IsExternal != item.IsExternal)
                 {
                     continue;
                 }
 
-                if (comic.IsExternal)
+                if (media.IsExternal)
                 {
-                    if (comic.Location != item.Location)
+                    if (media.Location != item.Location)
                     {
                         continue;
                     }
                 }
                 else
                 {
-                    if (comic.Id != item.ComicId)
+                    if (media.Id != item.MediaId)
                     {
                         continue;
                     }
@@ -262,7 +262,7 @@ internal class PlaylistModel
 
         public string ToSerializedString()
         {
-            return JsonSerializer.Serialize(_comics);
+            return JsonSerializer.Serialize(_mediaItems);
         }
 
         private static string EnsureId(PlaylistItemJsonModel item)

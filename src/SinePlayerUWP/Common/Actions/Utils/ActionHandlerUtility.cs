@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using SinePlayerUWP.Common.Actions.Providers;
@@ -15,8 +15,8 @@ internal class ActionHandlerUtility
     {
         handler.RegisterProvider(new MessageDialogProvider());
         handler.RegisterProvider(new OpenTabProvider());
-        handler.RegisterProvider(new EditComicProvider());
-        handler.RegisterProvider(new RemoveComicProvider());
+        handler.RegisterProvider(new EditMediaProvider());
+        handler.RegisterProvider(new RemoveMediaProvider());
         handler.RegisterProvider(new FullscreenServiceProvider());
     }
 }

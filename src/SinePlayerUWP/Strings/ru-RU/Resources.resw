@@ -150,10 +150,10 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>Передовой</value>
   </data>
-  <data name="AllComics" xml:space="preserve">
+  <data name="AllMedia" xml:space="preserve">
     <value>Все комиксы</value>
   </data>
-  <data name="AllComicsIn" xml:space="preserve">
+  <data name="AllMediaIn" xml:space="preserve">
     <value>Все комиксы в $path</value>
   </data>
   <data name="AllHidden" xml:space="preserve">
@@ -264,10 +264,10 @@
   <data name="CollectionInformation" xml:space="preserve">
     <value>Информация о коллекции</value>
   </data>
-  <data name="ComicExclusionExplaination" xml:space="preserve">
+  <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Выбор пункта «добавить в список исключений» не позволит повторно импортировать комикс при следующем обновлении библиотеки.</value>
   </data>
-  <data name="ComicInfo" xml:space="preserve">
+  <data name="MediaInfo" xml:space="preserve">
     <value>Информация о комиксах</value>
   </data>
   <data name="CompletionStatus" xml:space="preserve">
@@ -610,7 +610,7 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Images" xml:space="preserve">
     <value>Картинки</value>
   </data>
-  <data name="IncludeHiddenComics" xml:space="preserve">
+  <data name="IncludeHiddenMedia" xml:space="preserve">
     <value>Включать скрытые комиксы</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
@@ -734,7 +734,7 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Next" xml:space="preserve">
     <value>Следующий</value>
   </data>
-  <data name="NoComicsHint" xml:space="preserve">
+  <data name="NoMediaHint" xml:space="preserve">
     <value>Ваши комиксы появятся здесь</value>
   </data>
   <data name="NoContent" xml:space="preserve">
@@ -770,13 +770,13 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="OK" xml:space="preserve">
     <value>ХОРОШО</value>
   </data>
-  <data name="OnlyAppliesToReadingComics" xml:space="preserve">
+  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
     <value>Применяется только к комиксам со статусом «Читается»</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>Открыть</value>
   </data>
-  <data name="OpenComicDefaultBehavior" xml:space="preserve">
+  <data name="OpenMediaDefaultBehavior" xml:space="preserve">
     <value>Поведение по умолчанию при открытии комикса</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
@@ -794,13 +794,13 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>Открыть папку метаданных</value>
   </data>
-  <data name="OpenNextComic" xml:space="preserve">
+  <data name="OpenNextMedia" xml:space="preserve">
     <value>Открыть следующий комикс</value>
   </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>Открыть папку плагинов</value>
   </data>
-  <data name="OpenPreviousComic" xml:space="preserve">
+  <data name="OpenPreviousMedia" xml:space="preserve">
     <value>Открыть предыдущий комикс</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
@@ -857,10 +857,10 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Progress" xml:space="preserve">
     <value>Прогресс</value>
   </data>
-  <data name="PromptBeforeRemovingComics" xml:space="preserve">
+  <data name="PromptBeforeRemovingMedia" xml:space="preserve">
     <value>Запрашивать подтверждение перед удалением комиксов</value>
   </data>
-  <data name="RandomComic" xml:space="preserve">
+  <data name="RandomMedia" xml:space="preserve">
     <value>Случайный комикс</value>
   </data>
   <data name="Rating" xml:space="preserve">
@@ -1010,7 +1010,7 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>Настройки</value>
   </data>
-  <data name="ShowHiddenComicButton.Content" xml:space="preserve">
+  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
     <value>Показать скрытые комиксы</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
@@ -1090,7 +1090,7 @@ $plugins</value>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>Переключить полноэкранный режим</value>
   </data>
-  <data name="TotalComics" xml:space="preserve">
+  <data name="TotalMedia" xml:space="preserve">
     <value>Всего комиксов</value>
   </data>
   <data name="TransitionAnimation" xml:space="preserve">

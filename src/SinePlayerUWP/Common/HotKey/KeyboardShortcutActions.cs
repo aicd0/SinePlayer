@@ -26,8 +26,8 @@ internal static class KeyboardShortcutActions
     public const string JumpToNextTab = "JumpToNextTab";
     public const string JumpToPreviousTab = "JumpToPreviousTab";
     public const string OpenDevTools = "OpenDevTools";
-    public const string OpenNextComic = "OpenNextComic";
-    public const string OpenPreviousComic = "OpenPreviousComic";
+    public const string OpenNextMedia = "OpenNextMedia";
+    public const string OpenPreviousMedia = "OpenPreviousMedia";
     public const string ToggleAutoScroll = "ToggleAutoScroll";
     public const string ToggleFullscreen = "ToggleFullscreen";
 
@@ -51,8 +51,8 @@ internal static class KeyboardShortcutActions
         new() { Id = JumpToNextTab, Name = StringResourceProvider.Instance.JumpToNextTab },
         new() { Id = JumpToPreviousTab, Name = StringResourceProvider.Instance.JumpToPreviousTab },
         new() { Id = OpenDevTools, Name = "Open dev tools", IsInternal = true },
-        new() { Id = OpenNextComic, Name = StringResourceProvider.Instance.OpenNextComic, Scope = ReaderScope },
-        new() { Id = OpenPreviousComic, Name = StringResourceProvider.Instance.OpenPreviousComic, Scope = ReaderScope },
+        new() { Id = OpenNextMedia, Name = StringResourceProvider.Instance.OpenNextMedia, Scope = ReaderScope },
+        new() { Id = OpenPreviousMedia, Name = StringResourceProvider.Instance.OpenPreviousMedia, Scope = ReaderScope },
         new() { Id = ToggleAutoScroll, Name = StringResourceProvider.Instance.ToggleAutoScroll, Scope = ReaderScope },
         new() { Id = ToggleFullscreen, Name = StringResourceProvider.Instance.ToggleFullscreen },
     ];
@@ -72,8 +72,8 @@ internal static class KeyboardShortcutActions
         CreateShortcut(GoToRightPage, VirtualKey.Right),
         CreateShortcut(JumpToNextTab, VirtualKey.Tab, VirtualKeyModifiers.Control),
         CreateShortcut(JumpToPreviousTab, VirtualKey.Tab, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift),
-        CreateShortcut(OpenNextComic, VirtualKey.Down, VirtualKeyModifiers.Control),
-        CreateShortcut(OpenPreviousComic, VirtualKey.Up, VirtualKeyModifiers.Control),
+        CreateShortcut(OpenNextMedia, VirtualKey.Down, VirtualKeyModifiers.Control),
+        CreateShortcut(OpenPreviousMedia, VirtualKey.Up, VirtualKeyModifiers.Control),
         CreateShortcut(ToggleAutoScroll, VirtualKey.Space),
         CreateShortcut(ToggleFullscreen, VirtualKey.F, VirtualKeyModifiers.Control),
     ];

@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -12,7 +12,7 @@ using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Common.Utils;
 using SinePlayerUWP.Core.Database.SqlHelpers;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Data.Tables;
 
@@ -156,17 +156,17 @@ internal partial class SettingsPageViewModel : INotifyPropertyChanged
 
     private async Task UpdateStatisticsInternal()
     {
-        long QueryComicCount(Action<SelectCommand>? condition = null)
+        long QueryMediaCount(Action<SelectCommand>? condition = null)
         {
             SelectCommand command = SelectCommand.Create(MediaTable.Instance)
-                .AppendCondition(ComicHandle.CreateComicOnlyCondition());
+                .AppendCondition(MediaHandle.CreateMediaOnlyCondition());
             condition?.Invoke(command);
-            IReaderToken<long> comicCountToken = command.PutQueryCountAll();
+            IReaderToken<long> mediaCountToken = command.PutQueryCountAll();
             using SelectCommand.IReader reader = command.Execute();
             long result = 0;
             if (reader.Read())
             {
-                result = comicCountToken.GetValue();
+                result = mediaCountToken.GetValue();
             }
 
             return result;
@@ -175,20 +175,20 @@ internal partial class SettingsPageViewModel : INotifyPropertyChanged
         long total = 0;
         long hiddenCount = 0;
         List<Tuple<CompletionStatusEnum, long>> statusCount = [];
-        await ComicHandle.Enqueue(() =>
+        await MediaHandle.Enqueue(() =>
         {
-            total = QueryComicCount();
-            hiddenCount = QueryComicCount(c => c.AppendCondition(MediaTable.ColumnHidden, true));
+            total = QueryMediaCount();
+            hiddenCount = QueryMediaCount(c => c.AppendCondition(MediaTable.ColumnHidden, true));
 
             foreach (CompletionStatusEnum status in CompletionStatusService.AllStatus)
             {
-                long count = QueryComicCount(c => c.AppendCondition(MediaTable.ColumnCompletionStatus, (int)status));
+                long count = QueryMediaCount(c => c.AppendCondition(MediaTable.ColumnCompletionStatus, (int)status));
                 statusCount.Add(new(status, count));
             }
         });
 
         StringBuilder sb = new();
-        sb.Append(StringResourceProvider.Instance.WithColon(StringResourceProvider.Instance.TotalComics))
+        sb.Append(StringResourceProvider.Instance.WithColon(StringResourceProvider.Instance.TotalMedia))
             .Append(total.ToString("#,#0", CultureInfo.InvariantCulture))
             .AppendLine()
             .Append(StringResourceProvider.Instance.WithColon(StringResourceProvider.Instance.Hidden))

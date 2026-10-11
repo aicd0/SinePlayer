@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 namespace SinePlayerUWP.Helpers.Navigation;
@@ -20,7 +20,7 @@ internal static class RouterConstants
     public const string HOST_SIDE_PANE_TAGS = "side_pane_tags";
     public const string HOST_SIDE_PANE_FILTER_PRESETS = "side_pane_filter_presets";
     public const string HOST_SIDE_PANE_PLAYLIST = "side_pane_playlist";
-    public const string HOST_SIDE_PANE_COMIC_INFO = "side_pane_comic_info";
+    public const string HOST_SIDE_PANE_MEDIA_INFO = "side_pane_media_info";
     public const string HOST_DEV_TOOLS = "dev_tools";
 
     public const string ARG_FILTER_JSON = "filter_json";

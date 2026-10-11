@@ -14,7 +14,7 @@ using SinePlayerUWP.Common.Constants;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
 using SinePlayerUWP.Data.Database;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Views.Dialogs.EditReaderSettingPreset;
@@ -32,8 +32,8 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
     public bool ActionInProgress { get; private set; } = false;
 
     private IMainWindowAbility? _windowAbility;
-    private ComicModel? _comic;
-    private ReaderSettingsModel _comicSettings = ReaderSettingsModel.FromDefault();
+    private MediaModel? _media;
+    private ReaderSettingsModel _mediaSettings = ReaderSettingsModel.FromDefault();
     private ReaderSettingsModel? _presetSettings;
     private bool _updatingUI = false;
 
@@ -54,14 +54,14 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
         _windowAbility = windowAbility;
     }
 
-    public void SetComic(ComicModel comic)
+    public void SetMedia(MediaModel media)
     {
-        if (_comic == comic)
+        if (_media == media)
         {
             return;
         }
 
-        _comic = comic;
+        _media = media;
         LoadSettings();
         UpdateUI();
         DispatchDataChangeEvent();
@@ -110,108 +110,108 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
 
     private void TwoPageModeToggleSwitch_Toggled(object sender, RoutedEventArgs e)
     {
-        PageLayoutSettings pageLayoutSettings = _comicSettings.IsVertical ? _comicSettings.VerticalPageLayout : _comicSettings.HorizontalPageLayout;
+        PageLayoutSettings pageLayoutSettings = _mediaSettings.IsVertical ? _mediaSettings.VerticalPageLayout : _mediaSettings.HorizontalPageLayout;
         pageLayoutSettings.TwoPageMode = ((ToggleSwitch)sender).IsOn;
         NotifySettingsChanged();
     }
 
     private void CoverPageCountSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        PageLayoutSettings pageLayoutSettings = _comicSettings.IsVertical ? _comicSettings.VerticalPageLayout : _comicSettings.HorizontalPageLayout;
+        PageLayoutSettings pageLayoutSettings = _mediaSettings.IsVertical ? _mediaSettings.VerticalPageLayout : _mediaSettings.HorizontalPageLayout;
         pageLayoutSettings.CoverPageCount = Math.Clamp((int)e.NewValue, 0, 2);
         NotifySettingsChanged();
     }
 
     private void SwapLeftAndRightPagesToggleSwitch_Toggled(object sender, RoutedEventArgs e)
     {
-        PageLayoutSettings pageLayoutSettings = _comicSettings.IsVertical ? _comicSettings.VerticalPageLayout : _comicSettings.HorizontalPageLayout;
+        PageLayoutSettings pageLayoutSettings = _mediaSettings.IsVertical ? _mediaSettings.VerticalPageLayout : _mediaSettings.HorizontalPageLayout;
         pageLayoutSettings.SwapLeftAndRightPages = ((ToggleSwitch)sender).IsOn;
         NotifySettingsChanged();
     }
 
     private void SpreadDetectionToggleSwitch_Toggled(object sender, RoutedEventArgs e)
     {
-        PageLayoutSettings pageLayoutSettings = _comicSettings.IsVertical ? _comicSettings.VerticalPageLayout : _comicSettings.HorizontalPageLayout;
+        PageLayoutSettings pageLayoutSettings = _mediaSettings.IsVertical ? _mediaSettings.VerticalPageLayout : _mediaSettings.HorizontalPageLayout;
         pageLayoutSettings.SpreadDetection = ((ToggleSwitch)sender).IsOn;
         NotifySettingsChanged();
     }
 
     private void AbbOrientation_Click(object sender, RoutedEventArgs e)
     {
-        _comicSettings.IsVertical = !_comicSettings.IsVertical;
+        _mediaSettings.IsVertical = !_mediaSettings.IsVertical;
         NotifySettingsChanged();
     }
 
     private void AbbFlowDirection_Click(object sender, RoutedEventArgs e)
     {
-        _comicSettings.IsLeftToRight = !_comicSettings.IsLeftToRight;
+        _mediaSettings.IsLeftToRight = !_mediaSettings.IsLeftToRight;
         NotifySettingsChanged();
     }
 
     private void AbbContinuous_Click(object sender, RoutedEventArgs e)
     {
-        _comicSettings.IsContinuous = !_comicSettings.IsContinuous;
+        _mediaSettings.IsContinuous = !_mediaSettings.IsContinuous;
         NotifySettingsChanged();
     }
 
     private void PageSpacingSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        _comicSettings.PageSpacing = Math.Clamp((int)e.NewValue, 0, 200);
+        _mediaSettings.PageSpacing = Math.Clamp((int)e.NewValue, 0, 200);
         NotifySettingsChanged();
     }
 
     private void AutoScrollingSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        _comicSettings.AutoScrollSpeed = Math.Clamp((int)e.NewValue, 0, 100);
+        _mediaSettings.AutoScrollSpeed = Math.Clamp((int)e.NewValue, 0, 100);
         NotifySettingsChanged();
     }
 
     private void OriginalSizeToggleSwitch_Toggled(object sender, RoutedEventArgs e)
     {
-        _comicSettings.OriginalSize = OriginalSizeToggleSwitch.IsOn;
+        _mediaSettings.OriginalSize = OriginalSizeToggleSwitch.IsOn;
         NotifySettingsChanged();
     }
 
     private void FlipImageToggleSwitch_Toggled(object sender, RoutedEventArgs e)
     {
-        _comicSettings.ImageFlip = FlipImageToggleSwitch.IsOn;
+        _mediaSettings.ImageFlip = FlipImageToggleSwitch.IsOn;
         NotifySettingsChanged();
     }
 
     private void AntiAliasingFilterSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        _comicSettings.AntiAliasingFilterPercentage = Math.Clamp((int)e.NewValue, 0, 200);
+        _mediaSettings.AntiAliasingFilterPercentage = Math.Clamp((int)e.NewValue, 0, 200);
         NotifySettingsChanged();
     }
 
     private void BrightnessSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        _comicSettings.BrightnessPercentage = Math.Clamp((int)e.NewValue, 0, 100);
+        _mediaSettings.BrightnessPercentage = Math.Clamp((int)e.NewValue, 0, 100);
         NotifySettingsChanged();
     }
 
     private void ContrastSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        _comicSettings.ContrastPercentage = Math.Clamp((int)e.NewValue, 0, 100);
+        _mediaSettings.ContrastPercentage = Math.Clamp((int)e.NewValue, 0, 100);
         NotifySettingsChanged();
     }
 
     private void SaturationSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        _comicSettings.SaturationPercentage = Math.Clamp((int)e.NewValue, 0, 100);
+        _mediaSettings.SaturationPercentage = Math.Clamp((int)e.NewValue, 0, 100);
         NotifySettingsChanged();
     }
 
     private void InvertImageToggleSwitch_Toggled(object sender, RoutedEventArgs e)
     {
-        _comicSettings.ImageInvert = InvertImageToggleSwitch.IsOn;
+        _mediaSettings.ImageInvert = InvertImageToggleSwitch.IsOn;
         NotifySettingsChanged();
     }
 
     private async void EditPresetButton_Click(object sender, RoutedEventArgs e)
     {
         IMainWindowAbility? windowAbility = _windowAbility;
-        if (_comic is null || windowAbility is null)
+        if (_media is null || windowAbility is null)
         {
             return;
         }
@@ -219,7 +219,7 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
         ActionInProgress = true;
         try
         {
-            var dialog = new EditReaderSettingPresetDialog(_comic);
+            var dialog = new EditReaderSettingPresetDialog(_media);
             await dialog.ShowAsync(windowAbility.WindowId);
         }
         finally
@@ -235,21 +235,21 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
     private void ResetButton_Click(object sender, RoutedEventArgs e)
     {
         var newSettings = ReaderSettingsModel.FromDefault();
-        newSettings.PresetKey = _comicSettings.PresetKey;
-        newSettings.PresetName = _comicSettings.PresetName;
-        _comicSettings = newSettings;
+        newSettings.PresetKey = _mediaSettings.PresetKey;
+        newSettings.PresetName = _mediaSettings.PresetName;
+        _mediaSettings = newSettings;
         NotifySettingsChanged();
     }
 
     private void LoadSettings()
     {
-        if (_comic is null)
+        if (_media is null)
         {
             return;
         }
 
-        _comicSettings = ReaderSettingsModel.LoadFromComic(_comic);
-        _presetSettings = ReaderSettingsModel.LoadFromPreset(_comicSettings.PresetKey);
+        _mediaSettings = ReaderSettingsModel.LoadFromMedia(_media);
+        _presetSettings = ReaderSettingsModel.LoadFromPreset(_mediaSettings.PresetKey);
     }
 
     private void NotifySettingsChanged()
@@ -259,12 +259,12 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
 
     private void SaveSettings()
     {
-        if (_updatingUI || _comic is null)
+        if (_updatingUI || _media is null)
         {
             return;
         }
 
-        _comicSettings.SaveToComic(_comic);
+        _mediaSettings.SaveToMedia(_media);
     }
 
     private void UpdateUI()
@@ -292,10 +292,10 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
             return modified ? name + " *" : name;
         }
 
-        ReaderSettingsModel comicSettings = _comicSettings;
-        PageLayoutSettings comicLayoutSettings = comicSettings.IsVertical ? comicSettings.VerticalPageLayout : comicSettings.HorizontalPageLayout;
-        ReaderSettingsModel presetSettings = _presetSettings ?? comicSettings;
-        PageLayoutSettings presetLayoutSettings = comicSettings.IsVertical ? presetSettings.VerticalPageLayout : presetSettings.HorizontalPageLayout;
+        ReaderSettingsModel mediaSettings = _mediaSettings;
+        PageLayoutSettings mediaLayoutSettings = mediaSettings.IsVertical ? mediaSettings.VerticalPageLayout : mediaSettings.HorizontalPageLayout;
+        ReaderSettingsModel presetSettings = _presetSettings ?? mediaSettings;
+        PageLayoutSettings presetLayoutSettings = mediaSettings.IsVertical ? presetSettings.VerticalPageLayout : presetSettings.HorizontalPageLayout;
 
         bool settingsModified = false;
 
@@ -303,83 +303,83 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
             bool tabModified = false;
 
             {
-                bool modified = comicLayoutSettings.TwoPageMode != presetLayoutSettings.TwoPageMode;
+                bool modified = mediaLayoutSettings.TwoPageMode != presetLayoutSettings.TwoPageMode;
                 tabModified = tabModified || modified;
-                TwoPageModeToggleSwitch.IsOn = comicLayoutSettings.TwoPageMode;
+                TwoPageModeToggleSwitch.IsOn = mediaLayoutSettings.TwoPageMode;
                 ViewModel.TwoPageModeLabel = GetLabel(StringResource.TwoPageMode, modified);
             }
 
             {
-                bool modified = comicLayoutSettings.CoverPageCount != presetLayoutSettings.CoverPageCount;
+                bool modified = mediaLayoutSettings.CoverPageCount != presetLayoutSettings.CoverPageCount;
                 tabModified = tabModified || modified;
-                CoverPageCountSlider.Value = Math.Clamp(comicLayoutSettings.CoverPageCount, 0, 2);
+                CoverPageCountSlider.Value = Math.Clamp(mediaLayoutSettings.CoverPageCount, 0, 2);
                 CoverPageCountSlider.DefaultValue = presetLayoutSettings.CoverPageCount;
-                CoverPageCountSlider.Visibility = comicLayoutSettings.TwoPageMode ? Visibility.Visible : Visibility.Collapsed;
+                CoverPageCountSlider.Visibility = mediaLayoutSettings.TwoPageMode ? Visibility.Visible : Visibility.Collapsed;
                 ViewModel.CoverPageCountLabel = GetLabel(StringResource.CoverPageCount, modified);
             }
 
             {
-                bool modified = comicLayoutSettings.SwapLeftAndRightPages != presetLayoutSettings.SwapLeftAndRightPages;
+                bool modified = mediaLayoutSettings.SwapLeftAndRightPages != presetLayoutSettings.SwapLeftAndRightPages;
                 tabModified = tabModified || modified;
-                SwapLeftAndRightPagesToggleSwitch.IsOn = comicLayoutSettings.SwapLeftAndRightPages;
-                SwapLeftAndRightPagesGrid.Visibility = comicLayoutSettings.TwoPageMode ? Visibility.Visible : Visibility.Collapsed;
+                SwapLeftAndRightPagesToggleSwitch.IsOn = mediaLayoutSettings.SwapLeftAndRightPages;
+                SwapLeftAndRightPagesGrid.Visibility = mediaLayoutSettings.TwoPageMode ? Visibility.Visible : Visibility.Collapsed;
                 ViewModel.SwapLeftAndRightPagesLabel = GetLabel(StringResource.SwapLeftAndRightPages, modified);
             }
 
             {
-                bool modified = comicLayoutSettings.SpreadDetection != presetLayoutSettings.SpreadDetection;
+                bool modified = mediaLayoutSettings.SpreadDetection != presetLayoutSettings.SpreadDetection;
                 tabModified = tabModified || modified;
-                SpreadDetectionToggleSwitch.IsOn = comicLayoutSettings.SpreadDetection;
+                SpreadDetectionToggleSwitch.IsOn = mediaLayoutSettings.SpreadDetection;
                 ViewModel.SpreadDetectionLabel = GetLabel(StringResource.SpreadDetection, modified);
             }
 
             {
-                bool modified = comicSettings.IsVertical != presetSettings.IsVertical;
+                bool modified = mediaSettings.IsVertical != presetSettings.IsVertical;
                 tabModified = tabModified || modified;
                 AbbOrientation.Label = GetLabel(
-                    comicSettings.IsVertical ? StringResource.Vertical : StringResource.Horizontal,
+                    mediaSettings.IsVertical ? StringResource.Vertical : StringResource.Horizontal,
                     modified);
-                AbbOrientation.Content = new FontIcon() { Glyph = comicSettings.IsVertical ? "\uE7C3" : "\uEF6B" };
+                AbbOrientation.Content = new FontIcon() { Glyph = mediaSettings.IsVertical ? "\uE7C3" : "\uEF6B" };
             }
 
             {
-                bool modified = comicSettings.IsLeftToRight != presetSettings.IsLeftToRight;
+                bool modified = mediaSettings.IsLeftToRight != presetSettings.IsLeftToRight;
                 tabModified = tabModified || modified;
                 AbbFlowDirection.Label = GetLabel(
-                    comicSettings.IsLeftToRight ? StringResource.LeftToRight : StringResource.RightToLeft,
+                    mediaSettings.IsLeftToRight ? StringResource.LeftToRight : StringResource.RightToLeft,
                     modified);
-                AbbFlowDirection.Content = new FontIcon() { Glyph = comicSettings.IsLeftToRight ? "\uEBE7" : "\uEC52" };
+                AbbFlowDirection.Content = new FontIcon() { Glyph = mediaSettings.IsLeftToRight ? "\uEBE7" : "\uEC52" };
             }
 
             {
-                bool modified = comicSettings.IsContinuous != presetSettings.IsContinuous;
+                bool modified = mediaSettings.IsContinuous != presetSettings.IsContinuous;
                 tabModified = tabModified || modified;
                 AbbContinuous.Label = GetLabel(
-                    comicSettings.IsContinuous ? StringResource.Continuous : StringResource.Separate,
+                    mediaSettings.IsContinuous ? StringResource.Continuous : StringResource.Separate,
                     modified);
-                AbbContinuous.Content = new FontIcon() { Glyph = comicSettings.IsContinuous ? "\uE785" : "\uE72E" };
+                AbbContinuous.Content = new FontIcon() { Glyph = mediaSettings.IsContinuous ? "\uE785" : "\uE72E" };
             }
 
             {
-                bool modified = comicSettings.PageSpacing != presetSettings.PageSpacing;
+                bool modified = mediaSettings.PageSpacing != presetSettings.PageSpacing;
                 tabModified = tabModified || modified;
-                PageSpacingSlider.Value = Math.Clamp(comicSettings.PageSpacing, 0, 200);
+                PageSpacingSlider.Value = Math.Clamp(mediaSettings.PageSpacing, 0, 200);
                 PageSpacingSlider.DefaultValue = presetSettings.PageSpacing;
                 ViewModel.PageSpacingLabel = GetLabel(StringResource.PageSpacing, modified);
             }
 
             {
-                bool modified = comicSettings.AutoScrollSpeed != presetSettings.AutoScrollSpeed;
+                bool modified = mediaSettings.AutoScrollSpeed != presetSettings.AutoScrollSpeed;
                 tabModified = tabModified || modified;
-                AutoScrollingSlider.Value = Math.Clamp(comicSettings.AutoScrollSpeed, 0, 100);
+                AutoScrollingSlider.Value = Math.Clamp(mediaSettings.AutoScrollSpeed, 0, 100);
                 AutoScrollingSlider.DefaultValue = presetSettings.AutoScrollSpeed;
                 ViewModel.AutoScrollingLabel = GetLabel(StringResource.AutoScrolling, modified);
             }
 
             {
-                bool modified = comicSettings.OriginalSize != presetSettings.OriginalSize;
+                bool modified = mediaSettings.OriginalSize != presetSettings.OriginalSize;
                 tabModified = tabModified || modified;
-                OriginalSizeToggleSwitch.IsOn = comicSettings.OriginalSize;
+                OriginalSizeToggleSwitch.IsOn = mediaSettings.OriginalSize;
                 ViewModel.OriginalSizeLabel = GetLabel(StringResource.MaintainRelativeSize, modified);
             }
 
@@ -391,55 +391,55 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
             bool tabModified = false;
 
             {
-                bool modified = comicSettings.ImageRotation != presetSettings.ImageRotation;
+                bool modified = mediaSettings.ImageRotation != presetSettings.ImageRotation;
                 tabModified = tabModified || modified;
-                UpdateImageRotation(comicSettings);
+                UpdateImageRotation(mediaSettings);
                 ViewModel.RotationLabel = GetLabel(StringResource.Rotation, modified);
             }
 
             {
-                bool modified = comicSettings.ImageFlip != presetSettings.ImageFlip;
+                bool modified = mediaSettings.ImageFlip != presetSettings.ImageFlip;
                 tabModified = tabModified || modified;
-                FlipImageToggleSwitch.IsOn = comicSettings.ImageFlip;
+                FlipImageToggleSwitch.IsOn = mediaSettings.ImageFlip;
                 ViewModel.FlipImageLabel = GetLabel(StringResource.FlipImage, modified);
             }
 
             {
-                bool modified = comicSettings.AntiAliasingFilterPercentage != presetSettings.AntiAliasingFilterPercentage;
+                bool modified = mediaSettings.AntiAliasingFilterPercentage != presetSettings.AntiAliasingFilterPercentage;
                 tabModified = tabModified || modified;
-                AntiAliasingFilterSlider.Value = Math.Clamp(comicSettings.AntiAliasingFilterPercentage, 0, 200);
+                AntiAliasingFilterSlider.Value = Math.Clamp(mediaSettings.AntiAliasingFilterPercentage, 0, 200);
                 AntiAliasingFilterSlider.DefaultValue = presetSettings.AntiAliasingFilterPercentage;
                 ViewModel.AntiAliasingFilterLabel = GetLabel(StringResource.AntiAliasingFilter, modified);
             }
 
             {
-                bool modified = comicSettings.BrightnessPercentage != presetSettings.BrightnessPercentage;
+                bool modified = mediaSettings.BrightnessPercentage != presetSettings.BrightnessPercentage;
                 tabModified = tabModified || modified;
-                BrightnessSlider.Value = Math.Clamp(comicSettings.BrightnessPercentage, 0, 100);
+                BrightnessSlider.Value = Math.Clamp(mediaSettings.BrightnessPercentage, 0, 100);
                 BrightnessSlider.DefaultValue = presetSettings.BrightnessPercentage;
                 ViewModel.BrightnessLabel = GetLabel(StringResource.ImageBrightness, modified);
             }
 
             {
-                bool modified = comicSettings.ContrastPercentage != presetSettings.ContrastPercentage;
+                bool modified = mediaSettings.ContrastPercentage != presetSettings.ContrastPercentage;
                 tabModified = tabModified || modified;
-                ContrastSlider.Value = Math.Clamp(comicSettings.ContrastPercentage, 0, 100);
+                ContrastSlider.Value = Math.Clamp(mediaSettings.ContrastPercentage, 0, 100);
                 ContrastSlider.DefaultValue = presetSettings.ContrastPercentage;
                 ViewModel.ContrastLabel = GetLabel(StringResource.ImageContrast, modified);
             }
 
             {
-                bool modified = comicSettings.SaturationPercentage != presetSettings.SaturationPercentage;
+                bool modified = mediaSettings.SaturationPercentage != presetSettings.SaturationPercentage;
                 tabModified = tabModified || modified;
-                SaturationSlider.Value = Math.Clamp(comicSettings.SaturationPercentage, 0, 100);
+                SaturationSlider.Value = Math.Clamp(mediaSettings.SaturationPercentage, 0, 100);
                 SaturationSlider.DefaultValue = presetSettings.SaturationPercentage;
                 ViewModel.SaturationLabel = GetLabel(StringResource.ImageSaturation, modified);
             }
 
             {
-                bool modified = comicSettings.ImageInvert != presetSettings.ImageInvert;
+                bool modified = mediaSettings.ImageInvert != presetSettings.ImageInvert;
                 tabModified = tabModified || modified;
-                InvertImageToggleSwitch.IsOn = comicSettings.ImageInvert;
+                InvertImageToggleSwitch.IsOn = mediaSettings.ImageInvert;
                 ViewModel.InvertImageLabel = GetLabel(StringResource.InvertImage, modified);
             }
 
@@ -447,14 +447,14 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
             ViewModel.ImageProcessingTabTitle = GetLabel(StringResource.Image, tabModified);
         }
 
-        PresetDropDownButton.Flyout = CreatePresetContextMenu(comicSettings);
+        PresetDropDownButton.Flyout = CreatePresetContextMenu(mediaSettings);
         PresetDropDownButton.Content = GetLabel(
-            comicSettings.PresetKey == ReaderSettingsModel.PRESET_KEY_CUSTOM ?
-                StringResource.Custom : comicSettings.PresetName,
+            mediaSettings.PresetKey == ReaderSettingsModel.PRESET_KEY_CUSTOM ?
+                StringResource.Custom : mediaSettings.PresetName,
             settingsModified);
     }
 
-    private void UpdateImageRotation(ReaderSettingsModel comicSettings)
+    private void UpdateImageRotation(ReaderSettingsModel mediaSettings)
     {
         List<Tuple<string, ImageRotationEnum>> rotations =
         [
@@ -471,12 +471,12 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
             items.Add(new ToggleMenuFlyoutItemModel()
             {
                 Text = rotation.Item1,
-                IsChecked = comicSettings.ImageRotation == rotationValue,
+                IsChecked = mediaSettings.ImageRotation == rotationValue,
                 Click = () =>
                 {
-                    if (comicSettings.ImageRotation != rotationValue)
+                    if (mediaSettings.ImageRotation != rotationValue)
                     {
-                        comicSettings.ImageRotation = rotationValue;
+                        mediaSettings.ImageRotation = rotationValue;
                         SaveSettings();
                         DispatchDataChangeEvent();
                     }
@@ -493,10 +493,10 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
         }
 
         RotationDropDownButton.Flyout = flyout;
-        RotationDropDownButton.Content = rotations.Find(r => r.Item2 == comicSettings.ImageRotation)?.Item1 ?? StringResource.None;
+        RotationDropDownButton.Content = rotations.Find(r => r.Item2 == mediaSettings.ImageRotation)?.Item1 ?? StringResource.None;
     }
 
-    private MenuFlyout CreatePresetContextMenu(ReaderSettingsModel comicSettings)
+    private MenuFlyout CreatePresetContextMenu(ReaderSettingsModel mediaSettings)
     {
         List<Tuple<string, string>> presets = [];
         foreach (KeyValuePair<string, ReaderSettingsModel> kvp in AppSettingsModel.ReaderSettingPresets)
@@ -519,28 +519,28 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
             items.Add(new ToggleMenuFlyoutItemModel()
             {
                 Text = preset.Item1,
-                IsChecked = comicSettings.PresetKey == presetKey,
+                IsChecked = mediaSettings.PresetKey == presetKey,
                 Click = () =>
                 {
                     var newSettings = ReaderSettingsModel.LoadFromPreset(presetKey);
                     if (newSettings is not null)
                     {
                         _presetSettings = newSettings;
-                        _comicSettings = newSettings.Clone();
+                        _mediaSettings = newSettings.Clone();
                         SaveSettings();
                         DispatchDataChangeEvent();
                     }
                     else if (presetKey == ReaderSettingsModel.PRESET_KEY_CUSTOM)
                     {
                         _presetSettings = null;
-                        _comicSettings.PresetKey = presetKey;
+                        _mediaSettings.PresetKey = presetKey;
                         SaveSettings();
                     }
                     else
                     {
                         newSettings = ReaderSettingsModel.FromDefault();
                         _presetSettings = newSettings;
-                        _comicSettings = newSettings.Clone();
+                        _mediaSettings = newSettings.Clone();
                         SaveSettings();
                         DispatchDataChangeEvent();
                     }
@@ -566,6 +566,6 @@ internal sealed partial class ReaderSettingsPanel : BaseUserControl
             return;
         }
 
-        DataChanged?.Invoke(_comicSettings);
+        DataChanged?.Invoke(_mediaSettings);
     }
 }

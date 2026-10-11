@@ -150,10 +150,10 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>進階</value>
   </data>
-  <data name="AllComics" xml:space="preserve">
+  <data name="AllMedia" xml:space="preserve">
     <value>所有漫畫</value>
   </data>
-  <data name="AllComicsIn" xml:space="preserve">
+  <data name="AllMediaIn" xml:space="preserve">
     <value>所有位於 $path 的漫畫</value>
   </data>
   <data name="AllHidden" xml:space="preserve">
@@ -264,10 +264,10 @@
   <data name="CollectionInformation" xml:space="preserve">
     <value>合集資訊</value>
   </data>
-  <data name="ComicExclusionExplaination" xml:space="preserve">
+  <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>選擇「加入排除清單」後，下次更新媒體庫時將不會再次匯入此漫畫。</value>
   </data>
-  <data name="ComicInfo" xml:space="preserve">
+  <data name="MediaInfo" xml:space="preserve">
     <value>漫畫資訊</value>
   </data>
   <data name="CompletionStatus" xml:space="preserve">
@@ -607,7 +607,7 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="Images" xml:space="preserve">
     <value>圖片</value>
   </data>
-  <data name="IncludeHiddenComics" xml:space="preserve">
+  <data name="IncludeHiddenMedia" xml:space="preserve">
     <value>包含隱藏漫畫</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
@@ -731,7 +731,7 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="Next" xml:space="preserve">
     <value>下一個</value>
   </data>
-  <data name="NoComicsHint" xml:space="preserve">
+  <data name="NoMediaHint" xml:space="preserve">
     <value>你的漫畫會顯示在這裡</value>
   </data>
   <data name="NoContent" xml:space="preserve">
@@ -767,13 +767,13 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="OK" xml:space="preserve">
     <value>好的</value>
   </data>
-  <data name="OnlyAppliesToReadingComics" xml:space="preserve">
+  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
     <value>僅對「閱讀中」狀態的漫畫生效</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>打開</value>
   </data>
-  <data name="OpenComicDefaultBehavior" xml:space="preserve">
+  <data name="OpenMediaDefaultBehavior" xml:space="preserve">
     <value>開啟漫畫時的預設行為</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
@@ -791,13 +791,13 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>開啟中繼資料資料夾</value>
   </data>
-  <data name="OpenNextComic" xml:space="preserve">
+  <data name="OpenNextMedia" xml:space="preserve">
     <value>開啟下一部漫畫</value>
   </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>打開外掛資料夾</value>
   </data>
-  <data name="OpenPreviousComic" xml:space="preserve">
+  <data name="OpenPreviousMedia" xml:space="preserve">
     <value>開啟上一部漫畫</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
@@ -854,10 +854,10 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="Progress" xml:space="preserve">
     <value>進度</value>
   </data>
-  <data name="PromptBeforeRemovingComics" xml:space="preserve">
+  <data name="PromptBeforeRemovingMedia" xml:space="preserve">
     <value>移除漫畫前提示</value>
   </data>
-  <data name="RandomComic" xml:space="preserve">
+  <data name="RandomMedia" xml:space="preserve">
     <value>隨機漫畫</value>
   </data>
   <data name="Rating" xml:space="preserve">
@@ -1007,7 +1007,7 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>設定</value>
   </data>
-  <data name="ShowHiddenComicButton.Content" xml:space="preserve">
+  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
     <value>顯示隱藏的漫畫</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
@@ -1087,7 +1087,7 @@ $plugins</value>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>切換全螢幕</value>
   </data>
-  <data name="TotalComics" xml:space="preserve">
+  <data name="TotalMedia" xml:space="preserve">
     <value>漫畫總數</value>
   </data>
   <data name="TransitionAnimation" xml:space="preserve">

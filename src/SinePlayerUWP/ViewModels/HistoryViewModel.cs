@@ -1,21 +1,21 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System.Collections.ObjectModel;
 
 using SinePlayerUWP.Common.BaseUI;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 
 namespace SinePlayerUWP.ViewModels;
 
 internal class HistoryItemViewModel : BaseViewModel
 {
-    public ComicModel? Comic { get; set; }
+    public MediaModel? Media { get; set; }
     public long Id { get; set; }
     public string Time { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
 
-    public string ItemGlyph => Comic is null ? "\uE9CE" : (Comic.IsCollection ? "\uF5ED" : "\uE8B9");
+    public string ItemGlyph => Media is null ? "\uE9CE" : (Media.IsCollection ? "\uF5ED" : "\uE8B9");
 }
 
 internal class HistoryGroupViewModel : ObservableCollection<HistoryItemViewModel>

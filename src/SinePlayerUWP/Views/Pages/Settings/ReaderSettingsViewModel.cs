@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System.Collections.Generic;
@@ -49,14 +49,14 @@ internal partial class ReaderSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _restoreLastReadingPositionOnlyAppliesToReadingComics;
-    public bool RestoreLastReadingPositionOnlyAppliesToReadingComics
+    private bool _restoreLastReadingPositionOnlyAppliesToReadingMedia;
+    public bool RestoreLastReadingPositionOnlyAppliesToReadingMedia
     {
-        get => _restoreLastReadingPositionOnlyAppliesToReadingComics;
+        get => _restoreLastReadingPositionOnlyAppliesToReadingMedia;
         set
         {
-            _restoreLastReadingPositionOnlyAppliesToReadingComics = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RestoreLastReadingPositionOnlyAppliesToReadingComics)));
+            _restoreLastReadingPositionOnlyAppliesToReadingMedia = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RestoreLastReadingPositionOnlyAppliesToReadingMedia)));
         }
     }
 
@@ -188,7 +188,7 @@ internal partial class ReaderSettingsViewModel : INotifyPropertyChanged
         {
             TransitionAnimation = AppSettingsModel.TransitionAnimation;
             RestoreLastReadingPosition = AppSettingsModel.RestoreLastReadingPosition;
-            RestoreLastReadingPositionOnlyAppliesToReadingComics = AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingComics;
+            RestoreLastReadingPositionOnlyAppliesToReadingMedia = AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia;
             UseScrollingAreaAsStartEnd = AppSettingsModel.UseScrollingAreaAsStartEnd;
             AutoToggleOverlaysOnCursor = AppSettingsModel.AutoToggleOverlaysOnCursor;
             AutomaticallyHideCursor = AppSettingsModel.AutoHideCursor;
