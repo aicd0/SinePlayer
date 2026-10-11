@@ -47,6 +47,13 @@
                 VerticalAlignment="Center"
                 ImageUri="{x:Bind Item.CoverImageUri, Mode=OneWay}"
                 Stretch="UniformToFill" />
+            <FontIcon
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                FontSize="32"
+                Foreground="{ThemeResource ForegroundGrey2}"
+                Glyph="{x:Bind Item.CoverPlaceholderGlyph, Mode=OneWay}"
+                Visibility="{x:Bind Item.IsCoverImageVisible, Converter={StaticResource BooleanToVisibilityNegationConverter}, Mode=OneWay}" />
         </Grid>
 
         <StackPanel

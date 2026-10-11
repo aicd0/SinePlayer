@@ -51,6 +51,13 @@
                         CornerRadius="5">
                         <image:SimpleImageView x:Name="ImageHolder" ImageUri="{x:Bind Item.CoverImageUri, Mode=OneWay}" />
                     </Border>
+                    <FontIcon
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        FontSize="48"
+                        Foreground="{ThemeResource ForegroundGrey2}"
+                        Glyph="{x:Bind Item.CoverPlaceholderGlyph, Mode=OneWay}"
+                        Visibility="{x:Bind Item.IsCoverImageVisible, Converter={StaticResource BooleanToVisibilityNegationConverter}, Mode=OneWay}" />
                 </Grid>
             </Grid>
 

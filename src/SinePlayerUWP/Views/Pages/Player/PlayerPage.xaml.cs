@@ -585,7 +585,7 @@ internal sealed partial class PlayerPage : BasePage
                     }
 
                     long currentTick = GetTick();
-                    if (currentTick <= _hideOverlayDeadline)
+                    if (currentTick < _hideOverlayDeadline)
                     {
                         PostHideTask((int)(_hideOverlayDeadline - currentTick));
                         return;

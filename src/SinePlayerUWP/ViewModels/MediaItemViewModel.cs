@@ -4,12 +4,14 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 
 using SinePlayerUWP.Common.Localization;
+using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
@@ -29,6 +31,21 @@ internal partial class MediaItemViewModel : INotifyPropertyChanged
     public bool IsCollection => Media.IsCollection;
     public bool IsRatingVisible => !string.IsNullOrEmpty(Rating);
     public int TitleMaxLines => IsCollection && IsRatingVisible ? 2 : 3;
+
+    public bool IsCoverImageVisible => !string.IsNullOrEmpty(_coverImageUri);
+
+    public string CoverPlaceholderGlyph
+    {
+        get
+        {
+            if (IsCollection)
+            {
+                return "\uF5ED";
+            }
+
+            return AppInfoProvider.IsSupportedAudioExtension(Path.GetExtension(Media.Location)) ? "\uE8D6" : "\uE714";
+        }
+    }
 
     private string _title;
     public string Title
@@ -164,6 +181,7 @@ internal partial class MediaItemViewModel : INotifyPropertyChanged
 
             _coverImageUri = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CoverImageUri)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCoverImageVisible)));
         }
     }
 

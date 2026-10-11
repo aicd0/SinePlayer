@@ -5,7 +5,7 @@ namespace SinePlayerUWP.Helpers.Navigation;
 
 internal static class RouterConstants
 {
-    public const string SCHEME_APP_NO_PREFIX = "comicreader";
+    public const string SCHEME_APP_NO_PREFIX = "app";
     public const string SCHEME_APP = SCHEME_APP_NO_PREFIX + "://";
 
     public const string HOST_MAIN = "main";
