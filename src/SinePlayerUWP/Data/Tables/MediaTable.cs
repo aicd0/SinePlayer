@@ -6,9 +6,9 @@ using SinePlayerUWP.Data.Database;
 
 namespace SinePlayerUWP.Data.Tables;
 
-internal class ComicTable : ITable
+internal class MediaTable : ITable
 {
-    public static ComicTable Instance { get; } = new ComicTable();
+    public static MediaTable Instance { get; } = new MediaTable();
 
     public static Int64Column ColumnId { get; } = new("id");
     public static Int64Column ColumnType { get; } = new("type");
@@ -25,7 +25,7 @@ internal class ComicTable : ITable
     public static Int32Column ColumnPageCount { get; } = new("page_count");
     public static StringColumn ColumnExt { get; } = new("ext");
 
-    private ComicTable() { }
+    private MediaTable() { }
 
     public SqlDatabase GetDatabase()
     {
@@ -34,6 +34,6 @@ internal class ComicTable : ITable
 
     public string GetTableName()
     {
-        return "comics";
+        return "media";
     }
 }

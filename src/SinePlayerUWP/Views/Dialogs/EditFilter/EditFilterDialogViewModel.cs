@@ -330,8 +330,8 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
             return;
         }
 
-        var command = SelectCommand.Create(ComicTable.Instance);
-        command.PutQueryInt64(ComicTable.ColumnId);
+        var command = SelectCommand.Create(MediaTable.Instance);
+        command.PutQueryInt64(MediaTable.ColumnId);
         command.AppendCondition(condition);
 
         _isExpressionValid = true;

@@ -162,10 +162,10 @@ internal class ComicSearchEngine
         var matches = new List<Match>();
         await ComicHandle.Enqueue(() =>
         {
-            var command = SelectCommand.Create(ComicTable.Instance);
-            IReaderToken<long> idToken = command.PutQueryInt64(ComicTable.ColumnId);
-            IReaderToken<string> title1Token = command.PutQueryString(ComicTable.ColumnTitle1);
-            IReaderToken<string> title2Token = command.PutQueryString(ComicTable.ColumnTitle2);
+            var command = SelectCommand.Create(MediaTable.Instance);
+            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
+            IReaderToken<string> title1Token = command.PutQueryString(MediaTable.ColumnTitle1);
+            IReaderToken<string> title2Token = command.PutQueryString(MediaTable.ColumnTitle2);
 
             if (searchCondition is not null)
             {
@@ -239,7 +239,7 @@ internal class ComicSearchEngine
     {
         var subquery = SelectCommand.Create(MediaCollectionTable.Instance);
         _ = subquery.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
-        return new NotCondition(new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery));
+        return new NotCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), subquery));
     }
 
     private class Match

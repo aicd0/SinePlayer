@@ -37,7 +37,7 @@ internal abstract partial class ComicHandle
     public static ICondition CreateComicOnlyCondition()
     {
         return new ComparisonCondition(
-            ColumnOrValue.FromColumn(ComicTable.ColumnType),
+            ColumnOrValue.FromColumn(MediaTable.ColumnType),
             ColumnOrValue.FromValue((long)ComicType.Collection),
             ComparisonCondition.TypeEnum.NotEqual);
     }
@@ -119,22 +119,22 @@ internal abstract partial class ComicHandle
         Dictionary<long, ComicHandle> comics = new(ids.Count());
         foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(ids))
         {
-            SelectCommand command = SelectCommand.Create(ComicTable.Instance)
-                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), idChunk));
-            IReaderToken<long> idToken = command.PutQueryInt64(ComicTable.ColumnId);
-            IReaderToken<long> typeToken = command.PutQueryInt64(ComicTable.ColumnType);
-            IReaderToken<string> locationToken = command.PutQueryString(ComicTable.ColumnLocation);
-            IReaderToken<string> title1Token = command.PutQueryString(ComicTable.ColumnTitle1);
-            IReaderToken<string> title2Token = command.PutQueryString(ComicTable.ColumnTitle2);
-            IReaderToken<bool> hiddenToken = command.PutQueryBoolean(ComicTable.ColumnHidden);
-            IReaderToken<int> ratingToken = command.PutQueryInt32(ComicTable.ColumnRating);
-            IReaderToken<int> progressToken = command.PutQueryInt32(ComicTable.ColumnProgress);
-            IReaderToken<DateTimeOffset> lastVisitToken = command.PutQueryDateTimeOffset(ComicTable.ColumnLastVisit);
-            IReaderToken<double> lastPositionToken = command.PutQueryDouble(ComicTable.ColumnLastPosition);
-            IReaderToken<string> descriptionToken = command.PutQueryString(ComicTable.ColumnDescription);
-            IReaderToken<int> completionStatusToken = command.PutQueryInt32(ComicTable.ColumnCompletionStatus);
-            IReaderToken<int> pageCountToken = command.PutQueryInt32(ComicTable.ColumnPageCount);
-            IReaderToken<string> extToken = command.PutQueryString(ComicTable.ColumnExt);
+            SelectCommand command = SelectCommand.Create(MediaTable.Instance)
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), idChunk));
+            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
+            IReaderToken<long> typeToken = command.PutQueryInt64(MediaTable.ColumnType);
+            IReaderToken<string> locationToken = command.PutQueryString(MediaTable.ColumnLocation);
+            IReaderToken<string> title1Token = command.PutQueryString(MediaTable.ColumnTitle1);
+            IReaderToken<string> title2Token = command.PutQueryString(MediaTable.ColumnTitle2);
+            IReaderToken<bool> hiddenToken = command.PutQueryBoolean(MediaTable.ColumnHidden);
+            IReaderToken<int> ratingToken = command.PutQueryInt32(MediaTable.ColumnRating);
+            IReaderToken<int> progressToken = command.PutQueryInt32(MediaTable.ColumnProgress);
+            IReaderToken<DateTimeOffset> lastVisitToken = command.PutQueryDateTimeOffset(MediaTable.ColumnLastVisit);
+            IReaderToken<double> lastPositionToken = command.PutQueryDouble(MediaTable.ColumnLastPosition);
+            IReaderToken<string> descriptionToken = command.PutQueryString(MediaTable.ColumnDescription);
+            IReaderToken<int> completionStatusToken = command.PutQueryInt32(MediaTable.ColumnCompletionStatus);
+            IReaderToken<int> pageCountToken = command.PutQueryInt32(MediaTable.ColumnPageCount);
+            IReaderToken<string> extToken = command.PutQueryString(MediaTable.ColumnExt);
             using SelectCommand.IReader reader = command.Execute();
 
             while (reader.Read())
@@ -276,11 +276,11 @@ internal abstract partial class ComicHandle
 
     private static ComicHandle? FromLocationNoLock(string location)
     {
-        SelectCommand command = SelectCommand.Create(ComicTable.Instance)
-            .AppendCondition(ComicTable.ColumnLocation, location)
+        SelectCommand command = SelectCommand.Create(MediaTable.Instance)
+            .AppendCondition(MediaTable.ColumnLocation, location)
             .AppendCondition(CreateComicOnlyCondition())
             .Limit(1);
-        IReaderToken<long> comicIdToken = command.PutQueryInt64(ComicTable.ColumnId);
+        IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTable.ColumnId);
         using SelectCommand.IReader reader = command.Execute();
 
         if (!reader.Read())
@@ -380,13 +380,13 @@ internal abstract partial class ComicHandle
             }
             else
             {
-                var command = UpdateCommand.Create(ComicTable.Instance);
+                var command = UpdateCommand.Create(MediaTable.Instance);
                 foreach (IColumnTypeless column in _allNonIdColumns.Value)
                 {
                     command.AppendColumn(column, GetColumnValue(column));
                 }
 
-                command.AppendCondition(ComicTable.ColumnId, Id).Execute();
+                command.AppendCondition(MediaTable.ColumnId, Id).Execute();
             }
         });
     }
@@ -412,9 +412,9 @@ internal abstract partial class ComicHandle
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnExt, GetColumnValue(ComicTable.ColumnExt))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnExt, GetColumnValue(MediaTable.ColumnExt))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
     }
@@ -429,9 +429,9 @@ internal abstract partial class ComicHandle
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnTitle1, GetColumnValue(ComicTable.ColumnTitle1))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnTitle1, GetColumnValue(MediaTable.ColumnTitle1))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
     }
@@ -446,9 +446,9 @@ internal abstract partial class ComicHandle
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnTitle2, GetColumnValue(ComicTable.ColumnTitle2))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnTitle2, GetColumnValue(MediaTable.ColumnTitle2))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
     }
@@ -463,9 +463,9 @@ internal abstract partial class ComicHandle
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnDescription, GetColumnValue(ComicTable.ColumnDescription))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnDescription, GetColumnValue(MediaTable.ColumnDescription))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
     }
@@ -533,9 +533,9 @@ internal abstract partial class ComicHandle
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnLocation, GetColumnValue(ComicTable.ColumnLocation))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnLocation, GetColumnValue(MediaTable.ColumnLocation))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
     }
@@ -551,9 +551,9 @@ internal abstract partial class ComicHandle
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnRating, GetColumnValue(ComicTable.ColumnRating))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnRating, GetColumnValue(MediaTable.ColumnRating))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
     }
@@ -570,10 +570,10 @@ internal abstract partial class ComicHandle
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnProgress, GetColumnValue(ComicTable.ColumnProgress))
-                .AppendColumn(ComicTable.ColumnLastPosition, GetColumnValue(ComicTable.ColumnLastPosition))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnProgress, GetColumnValue(MediaTable.ColumnProgress))
+                .AppendColumn(MediaTable.ColumnLastPosition, GetColumnValue(MediaTable.ColumnLastPosition))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
     }
@@ -611,39 +611,39 @@ internal abstract partial class ComicHandle
     private static readonly Lazy<IReadOnlyList<IColumnTypeless>> _allNonIdColumns = new(() =>
     {
         return [
-            ComicTable.ColumnType,
-            ComicTable.ColumnLocation,
-            ComicTable.ColumnTitle1,
-            ComicTable.ColumnTitle2,
-            ComicTable.ColumnHidden,
-            ComicTable.ColumnRating,
-            ComicTable.ColumnProgress,
-            ComicTable.ColumnLastVisit,
-            ComicTable.ColumnLastPosition,
-            ComicTable.ColumnDescription,
-            ComicTable.ColumnCompletionStatus,
-            ComicTable.ColumnExt,
-            ComicTable.ColumnPageCount,
+            MediaTable.ColumnType,
+            MediaTable.ColumnLocation,
+            MediaTable.ColumnTitle1,
+            MediaTable.ColumnTitle2,
+            MediaTable.ColumnHidden,
+            MediaTable.ColumnRating,
+            MediaTable.ColumnProgress,
+            MediaTable.ColumnLastVisit,
+            MediaTable.ColumnLastPosition,
+            MediaTable.ColumnDescription,
+            MediaTable.ColumnCompletionStatus,
+            MediaTable.ColumnExt,
+            MediaTable.ColumnPageCount,
         ];
     });
 
     private static readonly Lazy<IReadOnlyDictionary<string, Func<ComicHandle, object>>> _columnValueEvaluator = new(() =>
     {
         Dictionary<string, Func<ComicHandle, object>> evaluators = [];
-        evaluators[ComicTable.ColumnId.Name] = i => TypeAssert.AssertLong(i.Id);
-        evaluators[ComicTable.ColumnType.Name] = i => TypeAssert.AssertLong((long)i.Type);
-        evaluators[ComicTable.ColumnLocation.Name] = i => TypeAssert.AssertString(i.Location);
-        evaluators[ComicTable.ColumnTitle1.Name] = i => TypeAssert.AssertString(i.Title1);
-        evaluators[ComicTable.ColumnTitle2.Name] = i => TypeAssert.AssertString(i.Title2);
-        evaluators[ComicTable.ColumnHidden.Name] = i => TypeAssert.AssertBoolean(i.IsHidden);
-        evaluators[ComicTable.ColumnRating.Name] = i => TypeAssert.AssertInt(i.Rating);
-        evaluators[ComicTable.ColumnProgress.Name] = i => TypeAssert.AssertInt(i.Progress);
-        evaluators[ComicTable.ColumnLastVisit.Name] = i => TypeAssert.AssertDateTimeOffset(i.LastVisit);
-        evaluators[ComicTable.ColumnLastPosition.Name] = i => TypeAssert.AssertDouble(i.LastPosition);
-        evaluators[ComicTable.ColumnDescription.Name] = i => TypeAssert.AssertString(i.Description);
-        evaluators[ComicTable.ColumnCompletionStatus.Name] = i => TypeAssert.AssertInt((int)i.CompletionStatus);
-        evaluators[ComicTable.ColumnExt.Name] = i => TypeAssert.AssertString(JsonSerializer.Serialize(i._ext));
-        evaluators[ComicTable.ColumnPageCount.Name] = i => TypeAssert.AssertInt(i.PageCount);
+        evaluators[MediaTable.ColumnId.Name] = i => TypeAssert.AssertLong(i.Id);
+        evaluators[MediaTable.ColumnType.Name] = i => TypeAssert.AssertLong((long)i.Type);
+        evaluators[MediaTable.ColumnLocation.Name] = i => TypeAssert.AssertString(i.Location);
+        evaluators[MediaTable.ColumnTitle1.Name] = i => TypeAssert.AssertString(i.Title1);
+        evaluators[MediaTable.ColumnTitle2.Name] = i => TypeAssert.AssertString(i.Title2);
+        evaluators[MediaTable.ColumnHidden.Name] = i => TypeAssert.AssertBoolean(i.IsHidden);
+        evaluators[MediaTable.ColumnRating.Name] = i => TypeAssert.AssertInt(i.Rating);
+        evaluators[MediaTable.ColumnProgress.Name] = i => TypeAssert.AssertInt(i.Progress);
+        evaluators[MediaTable.ColumnLastVisit.Name] = i => TypeAssert.AssertDateTimeOffset(i.LastVisit);
+        evaluators[MediaTable.ColumnLastPosition.Name] = i => TypeAssert.AssertDouble(i.LastPosition);
+        evaluators[MediaTable.ColumnDescription.Name] = i => TypeAssert.AssertString(i.Description);
+        evaluators[MediaTable.ColumnCompletionStatus.Name] = i => TypeAssert.AssertInt((int)i.CompletionStatus);
+        evaluators[MediaTable.ColumnExt.Name] = i => TypeAssert.AssertString(JsonSerializer.Serialize(i._ext));
+        evaluators[MediaTable.ColumnPageCount.Name] = i => TypeAssert.AssertInt(i.PageCount);
         return evaluators;
     });
 
@@ -655,7 +655,7 @@ internal abstract partial class ComicHandle
 
     private void InsertNewNoLock()
     {
-        var command = InsertCommand.Create(ComicTable.Instance);
+        var command = InsertCommand.Create(MediaTable.Instance);
         foreach (IColumnTypeless column in _allNonIdColumns.Value)
         {
             command.AppendColumn(column, GetColumnValue(column));
@@ -680,9 +680,9 @@ internal abstract partial class ComicHandle
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnHidden, GetColumnValue(ComicTable.ColumnHidden))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnHidden, GetColumnValue(MediaTable.ColumnHidden))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
     }
@@ -698,9 +698,9 @@ internal abstract partial class ComicHandle
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnCompletionStatus, GetColumnValue(ComicTable.ColumnCompletionStatus))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnCompletionStatus, GetColumnValue(MediaTable.ColumnCompletionStatus))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
     }
@@ -717,10 +717,10 @@ internal abstract partial class ComicHandle
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnProgress, GetColumnValue(ComicTable.ColumnProgress))
-                .AppendColumn(ComicTable.ColumnLastVisit, GetColumnValue(ComicTable.ColumnLastVisit))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnProgress, GetColumnValue(MediaTable.ColumnProgress))
+                .AppendColumn(MediaTable.ColumnLastVisit, GetColumnValue(MediaTable.ColumnLastVisit))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         }));
     }

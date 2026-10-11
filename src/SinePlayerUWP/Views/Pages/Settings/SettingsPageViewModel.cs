@@ -158,7 +158,7 @@ internal partial class SettingsPageViewModel : INotifyPropertyChanged
     {
         long QueryComicCount(Action<SelectCommand>? condition = null)
         {
-            SelectCommand command = SelectCommand.Create(ComicTable.Instance)
+            SelectCommand command = SelectCommand.Create(MediaTable.Instance)
                 .AppendCondition(ComicHandle.CreateComicOnlyCondition());
             condition?.Invoke(command);
             IReaderToken<long> comicCountToken = command.PutQueryCountAll();
@@ -178,11 +178,11 @@ internal partial class SettingsPageViewModel : INotifyPropertyChanged
         await ComicHandle.Enqueue(() =>
         {
             total = QueryComicCount();
-            hiddenCount = QueryComicCount(c => c.AppendCondition(ComicTable.ColumnHidden, true));
+            hiddenCount = QueryComicCount(c => c.AppendCondition(MediaTable.ColumnHidden, true));
 
             foreach (CompletionStatusEnum status in CompletionStatusService.AllStatus)
             {
-                long count = QueryComicCount(c => c.AppendCondition(ComicTable.ColumnCompletionStatus, (int)status));
+                long count = QueryComicCount(c => c.AppendCondition(MediaTable.ColumnCompletionStatus, (int)status));
                 statusCount.Add(new(status, count));
             }
         });

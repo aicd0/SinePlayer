@@ -547,9 +547,9 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
         HashSet<string> oldLocations = [];
         await ComicHandle.Enqueue(() =>
         {
-            SelectCommand command = SelectCommand.Create(ComicTable.Instance)
+            SelectCommand command = SelectCommand.Create(MediaTable.Instance)
                 .AppendCondition(ComicHandle.CreateComicOnlyCondition());
-            IReaderToken<string> locationToken = command.PutQueryString(ComicTable.ColumnLocation);
+            IReaderToken<string> locationToken = command.PutQueryString(MediaTable.ColumnLocation);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
@@ -723,10 +723,10 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
                         foreach (string location in locationRemoved)
                         {
                             List<long> comicIds = [];
-                            SelectCommand command = SelectCommand.Create(ComicTable.Instance)
-                                .AppendCondition(ComicTable.ColumnLocation, location)
+                            SelectCommand command = SelectCommand.Create(MediaTable.Instance)
+                                .AppendCondition(MediaTable.ColumnLocation, location)
                                 .AppendCondition(ComicHandle.CreateComicOnlyCondition());
-                            IReaderToken<long> idToken = command.PutQueryInt64(ComicTable.ColumnId);
+                            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
                             using SelectCommand.IReader reader = command.Execute();
                             while (reader.Read())
                             {
@@ -825,8 +825,8 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
                     DeleteCommand.Create(MediaCollectionTable.Instance)
                         .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnCollectionId), idChunk))
                         .Execute();
-                    DeleteCommand.Create(ComicTable.Instance)
-                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), idChunk))
+                    DeleteCommand.Create(MediaTable.Instance)
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), idChunk))
                         .Execute();
                 }
             });
@@ -1168,9 +1168,9 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
                 return;
             }
 
-            UpdateCommand.Create(ComicTable.Instance)
-                .AppendColumn(ComicTable.ColumnPageCount, _internalModel.GetColumnValue(ComicTable.ColumnPageCount))
-                .AppendCondition(ComicTable.ColumnId, Id)
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnPageCount, _internalModel.GetColumnValue(MediaTable.ColumnPageCount))
+                .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
 

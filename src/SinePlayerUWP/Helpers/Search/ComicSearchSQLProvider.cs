@@ -19,7 +19,7 @@ internal class ComicSearchSQLProvider(Common.Expression.Filter.Sql.ISQLCommandPr
 
     public ICondition CreateNotHiddenCondition()
     {
-        return new ComparisonCondition(ColumnOrValue.FromColumn(ComicTable.ColumnHidden), ColumnOrValue.FromValue(false));
+        return new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnHidden), ColumnOrValue.FromValue(false));
     }
 
     public ICondition CreateFilterCondition(string key, string value)
@@ -57,8 +57,8 @@ internal class ComicSearchSQLProvider(Common.Expression.Filter.Sql.ISQLCommandPr
             case ComicSQLProviderUtils.VAR_HIDDEN:
                 return value switch
                 {
-                    "0" => new ComparisonCondition(ColumnOrValue.FromColumn(ComicTable.ColumnHidden), ColumnOrValue.FromValue(false)),
-                    "1" => new ComparisonCondition(ColumnOrValue.FromColumn(ComicTable.ColumnHidden), ColumnOrValue.FromValue(true)),
+                    "0" => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnHidden), ColumnOrValue.FromValue(false)),
+                    "1" => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnHidden), ColumnOrValue.FromValue(true)),
                     _ => new BooleanCondition(false),
                 };
 

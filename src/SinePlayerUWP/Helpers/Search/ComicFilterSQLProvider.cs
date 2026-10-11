@@ -149,15 +149,15 @@ internal class ComicFilterSQLProvider : ISQLCommandProvider
         {
             ComicSQLProviderUtils.VAR_TAG => ComicSQLProviderUtils.CreateTagCondition(new BooleanCondition(true)),
             ComicSQLProviderUtils.VAR_TITLE => new OrCondition([
-                NotNullAndEmptyCondition(ComicTable.ColumnTitle1),
-                NotNullAndEmptyCondition(ComicTable.ColumnTitle2),
+                NotNullAndEmptyCondition(MediaTable.ColumnTitle1),
+                NotNullAndEmptyCondition(MediaTable.ColumnTitle2),
             ]),
-            ComicSQLProviderUtils.VAR_RATING => new ComparisonCondition(ColumnOrValue.FromColumn(ComicTable.ColumnRating), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThanOrEqual),
-            ComicSQLProviderUtils.VAR_TITLE1 => NotNullAndEmptyCondition(ComicTable.ColumnTitle1),
-            ComicSQLProviderUtils.VAR_TITLE2 => NotNullAndEmptyCondition(ComicTable.ColumnTitle2),
-            ComicSQLProviderUtils.VAR_PROGRESS => new ComparisonCondition(ColumnOrValue.FromColumn(ComicTable.ColumnProgress), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThanOrEqual),
-            ComicSQLProviderUtils.VAR_PAGE_COUNT => new ComparisonCondition(ColumnOrValue.FromColumn(ComicTable.ColumnPageCount), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThan),
-            ComicSQLProviderUtils.VAR_HIDDEN => new ComparisonCondition(ColumnOrValue.FromColumn(ComicTable.ColumnHidden), ColumnOrValue.FromValue(true)),
+            ComicSQLProviderUtils.VAR_RATING => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnRating), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThanOrEqual),
+            ComicSQLProviderUtils.VAR_TITLE1 => NotNullAndEmptyCondition(MediaTable.ColumnTitle1),
+            ComicSQLProviderUtils.VAR_TITLE2 => NotNullAndEmptyCondition(MediaTable.ColumnTitle2),
+            ComicSQLProviderUtils.VAR_PROGRESS => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnProgress), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThanOrEqual),
+            ComicSQLProviderUtils.VAR_PAGE_COUNT => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnPageCount), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThan),
+            ComicSQLProviderUtils.VAR_HIDDEN => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnHidden), ColumnOrValue.FromValue(true)),
             _ => throw new ExpressionException($"Variable '{path1}' cannot be used as a condition"),
         };
     }
@@ -187,16 +187,16 @@ internal class ComicFilterSQLProvider : ISQLCommandProvider
         {
             ComicSQLProviderUtils.VAR_TAG => ComicSQLProviderUtils.CreateTagCondition(conditionCreator(MediaTagTable.ColumnContent)),
             ComicSQLProviderUtils.VAR_TITLE => new OrCondition([
-                conditionCreator(ComicTable.ColumnTitle1),
-                conditionCreator(ComicTable.ColumnTitle2),
+                conditionCreator(MediaTable.ColumnTitle1),
+                conditionCreator(MediaTable.ColumnTitle2),
             ]),
-            ComicSQLProviderUtils.VAR_RATING => conditionCreator(ComicTable.ColumnRating),
-            ComicSQLProviderUtils.VAR_COMPLETION_STATUS => conditionCreator(ComicTable.ColumnCompletionStatus),
-            ComicSQLProviderUtils.VAR_TITLE1 => conditionCreator(ComicTable.ColumnTitle1),
-            ComicSQLProviderUtils.VAR_TITLE2 => conditionCreator(ComicTable.ColumnTitle2),
-            ComicSQLProviderUtils.VAR_PROGRESS => conditionCreator(ComicTable.ColumnProgress),
-            ComicSQLProviderUtils.VAR_PAGE_COUNT => conditionCreator(ComicTable.ColumnPageCount),
-            ComicSQLProviderUtils.VAR_HIDDEN => conditionCreator(ComicTable.ColumnHidden),
+            ComicSQLProviderUtils.VAR_RATING => conditionCreator(MediaTable.ColumnRating),
+            ComicSQLProviderUtils.VAR_COMPLETION_STATUS => conditionCreator(MediaTable.ColumnCompletionStatus),
+            ComicSQLProviderUtils.VAR_TITLE1 => conditionCreator(MediaTable.ColumnTitle1),
+            ComicSQLProviderUtils.VAR_TITLE2 => conditionCreator(MediaTable.ColumnTitle2),
+            ComicSQLProviderUtils.VAR_PROGRESS => conditionCreator(MediaTable.ColumnProgress),
+            ComicSQLProviderUtils.VAR_PAGE_COUNT => conditionCreator(MediaTable.ColumnPageCount),
+            ComicSQLProviderUtils.VAR_HIDDEN => conditionCreator(MediaTable.ColumnHidden),
             _ => throw new ExpressionException($"Variable '{path1}' cannot be used here"),
         };
     }

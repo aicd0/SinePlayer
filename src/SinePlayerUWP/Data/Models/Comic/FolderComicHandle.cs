@@ -70,10 +70,10 @@ internal partial class FolderComicHandle : ComicHandle
             List<long> affectingComicIds = [];
             await Enqueue(() =>
             {
-                SelectCommand command = SelectCommand.Create(ComicTable.Instance)
-                    .AppendCondition(new LikeCondition(ComicTable.ColumnLocation, sourceDir + "%"))
+                SelectCommand command = SelectCommand.Create(MediaTable.Instance)
+                    .AppendCondition(new LikeCondition(MediaTable.ColumnLocation, sourceDir + "%"))
                     .AppendCondition(CreateComicOnlyCondition());
-                IReaderToken<long> comicIdToken = command.PutQueryInt64(ComicTable.ColumnId);
+                IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTable.ColumnId);
                 using SelectCommand.IReader reader = command.Execute();
                 while (reader.Read())
                 {

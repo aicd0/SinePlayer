@@ -22,7 +22,7 @@ internal static class SqliteDB
     private static bool _initialized = false;
 
     //
-    // Comic Database
+    // Media Database
     //
 
     private static SqlDatabase? _mediaDatabase = null;
@@ -102,37 +102,37 @@ internal static class SqliteDB
         _mediaDatabase?.Dispose();
         _mediaDatabase = new SqlDatabase(Path.Combine(DatabaseFolderPath, "Media.sqlite"));
 
-        string comicTable = ComicTable.Instance.GetTableName();
+        string mediaTable = MediaTable.Instance.GetTableName();
         string mediaCollectionTable = MediaCollectionTable.Instance.GetTableName();
         string tagCategoryTable = MediaTagCategoryTable.Instance.GetTableName();
         string tagTable = MediaTagTable.Instance.GetTableName();
 
-        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + comicTable + " (" +
-            ComicTable.ColumnId.Name + " INTEGER PRIMARY KEY AUTOINCREMENT" +
-            "," + ComicTable.ColumnType.Name + " INTEGER NOT NULL" +
-            "," + ComicTable.ColumnLocation.Name + " TEXT NOT NULL" +
-            "," + ComicTable.ColumnTitle1.Name + " TEXT" +
-            "," + ComicTable.ColumnTitle2.Name + " TEXT" +
-            "," + ComicTable.ColumnHidden.Name + " BOOLEAN NOT NULL" +
-            "," + ComicTable.ColumnRating.Name + " INTEGER NOT NULL" +
-            "," + ComicTable.ColumnProgress.Name + " INTEGER NOT NULL" +
-            "," + ComicTable.ColumnLastVisit.Name + " TIMESTAMP NOT NULL" +
-            "," + ComicTable.ColumnLastPosition.Name + " REAL NOT NULL" +
-            "," + ComicTable.ColumnDescription.Name + " TEXT" +
-            "," + ComicTable.ColumnCompletionStatus.Name + " INTEGER NOT NULL" +
-            "," + ComicTable.ColumnPageCount.Name + " INTEGER NOT NULL" +
-            "," + ComicTable.ColumnExt.Name + " TEXT" +
+        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + mediaTable + " (" +
+            MediaTable.ColumnId.Name + " INTEGER PRIMARY KEY AUTOINCREMENT" +
+            "," + MediaTable.ColumnType.Name + " INTEGER NOT NULL" +
+            "," + MediaTable.ColumnLocation.Name + " TEXT NOT NULL" +
+            "," + MediaTable.ColumnTitle1.Name + " TEXT" +
+            "," + MediaTable.ColumnTitle2.Name + " TEXT" +
+            "," + MediaTable.ColumnHidden.Name + " BOOLEAN NOT NULL" +
+            "," + MediaTable.ColumnRating.Name + " INTEGER NOT NULL" +
+            "," + MediaTable.ColumnProgress.Name + " INTEGER NOT NULL" +
+            "," + MediaTable.ColumnLastVisit.Name + " TIMESTAMP NOT NULL" +
+            "," + MediaTable.ColumnLastPosition.Name + " REAL NOT NULL" +
+            "," + MediaTable.ColumnDescription.Name + " TEXT" +
+            "," + MediaTable.ColumnCompletionStatus.Name + " INTEGER NOT NULL" +
+            "," + MediaTable.ColumnPageCount.Name + " INTEGER NOT NULL" +
+            "," + MediaTable.ColumnExt.Name + " TEXT" +
             ")");
 
         ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + mediaCollectionTable + " (" +
-            MediaCollectionTable.ColumnCollectionId.Name + " INTEGER NOT NULL REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
-            "," + MediaCollectionTable.ColumnMediaId.Name + " INTEGER NOT NULL REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
+            MediaCollectionTable.ColumnCollectionId.Name + " INTEGER NOT NULL REFERENCES " + mediaTable + "(" + MediaTable.ColumnId.Name + ") ON DELETE CASCADE" +
+            "," + MediaCollectionTable.ColumnMediaId.Name + " INTEGER NOT NULL REFERENCES " + mediaTable + "(" + MediaTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
 
         ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + tagCategoryTable + " (" +
             MediaTagCategoryTable.ColumnId.Name + " INTEGER PRIMARY KEY AUTOINCREMENT" +
             "," + MediaTagCategoryTable.ColumnName.Name + " TEXT" +
-            "," + MediaTagCategoryTable.ColumnMediaId.Name + " INTEGER REFERENCES " + comicTable + "(" + ComicTable.ColumnId.Name + ") ON DELETE CASCADE" +
+            "," + MediaTagCategoryTable.ColumnMediaId.Name + " INTEGER REFERENCES " + mediaTable + "(" + MediaTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
 
         ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + tagTable + " (" +

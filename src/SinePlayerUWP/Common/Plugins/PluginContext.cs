@@ -231,8 +231,8 @@ internal partial class PluginContext : IPluginContext
         List<long> ids = [];
         await ComicHandle.Enqueue(() =>
         {
-            var command = SelectCommand.Create(ComicTable.Instance);
-            IReaderToken<long> idToken = command.PutQueryInt64(ComicTable.ColumnId);
+            var command = SelectCommand.Create(MediaTable.Instance);
+            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             command.AppendCondition(filterCondition);
             command.AppendCondition(ComicHandle.CreateComicOnlyCondition());
             using SelectCommand.IReader reader = command.Execute();

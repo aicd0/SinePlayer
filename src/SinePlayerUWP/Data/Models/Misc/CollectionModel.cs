@@ -26,9 +26,9 @@ internal static class CollectionModel
     {
         return await ComicHandle.Enqueue(() =>
         {
-            SelectCommand command = SelectCommand.Create(ComicTable.Instance)
-                .AppendCondition(ComicTable.ColumnType, (long)ComicType.Collection);
-            IReaderToken<long> idToken = command.PutQueryInt64(ComicTable.ColumnId);
+            SelectCommand command = SelectCommand.Create(MediaTable.Instance)
+                .AppendCondition(MediaTable.ColumnType, (long)ComicType.Collection);
+            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             List<long> results = [];
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
@@ -80,7 +80,7 @@ internal static class CollectionModel
         SelectCommand subquery = SelectCommand.Create(MediaCollectionTable.Instance)
             .AppendCondition(MediaCollectionTable.ColumnCollectionId, collectionId);
         _ = subquery.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
-        return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery);
+        return new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), subquery);
     }
 
     //

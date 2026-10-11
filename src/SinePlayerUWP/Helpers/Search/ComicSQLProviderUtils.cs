@@ -25,7 +25,7 @@ internal class ComicSQLProviderUtils
         subquery.AppendCondition(condition);
         subquery.PutQueryInt64(MediaTagTable.ColumnMediaId);
         subquery.Distinct();
-        return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery);
+        return new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), subquery);
     }
 
     public static ICondition CreateTagCategoryCondition(string category)
@@ -34,7 +34,7 @@ internal class ComicSQLProviderUtils
         subquery.AppendCondition(MediaTagCategoryTable.ColumnName, category);
         subquery.PutQueryInt64(MediaTagCategoryTable.ColumnMediaId);
         subquery.Distinct();
-        return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery);
+        return new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), subquery);
     }
 
     public static ICondition CreateTagInTagCategoryCondition(string category, ICondition condition)
@@ -48,6 +48,6 @@ internal class ComicSQLProviderUtils
         subquery2.AppendCondition(condition);
         subquery2.PutQueryInt64(MediaTagTable.ColumnMediaId);
         subquery2.Distinct();
-        return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery2);
+        return new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), subquery2);
     }
 }
