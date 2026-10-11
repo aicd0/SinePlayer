@@ -14,7 +14,7 @@ using SinePlayerUWP.Data.Models.Comic;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Data.Models.Playback;
 using SinePlayerUWP.Helpers.Navigation;
-using SinePlayerUWP.Views.Pages.Reader;
+using SinePlayerUWP.Views.Pages.Player;
 
 namespace SinePlayerUWP.Helpers.Misc;
 
@@ -43,7 +43,7 @@ internal static class OpenComicHelper
         string playlistId = Guid.NewGuid().ToString();
         AppDB.MainRegistry.CreateKey(RegistryNames.PLAYLISTS).Set(playlistId, playlist.ToSerializedString());
 
-        Route route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_READER)
+        Route route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_PLAYER)
             .WithParam(RouterConstants.ARG_PLAYLIST_ID, playlistId)
             .WithParam(RouterConstants.ARG_PLAYBACK, playback.ToSerializedString());
 
@@ -79,14 +79,14 @@ internal static class OpenComicHelper
                 break;
             case AppSettingsModel.OpenComicBehaviorEnum.OpenInLastActiveReaderTab:
                 {
-                    IReadOnlyList<Tuple<int, string>> activeReaderTabs = ReaderPage.ActiveTabs;
-                    if (activeReaderTabs.Count == 0)
+                    IReadOnlyList<Tuple<int, string>> activePlayerTabs = PlayerPage.ActiveTabs;
+                    if (activePlayerTabs.Count == 0)
                     {
                         goto case AppSettingsModel.OpenComicBehaviorEnum.OpenInNewTab;
                     }
 
-                    int windowId = activeReaderTabs[activeReaderTabs.Count - 1].Item1;
-                    string tabId = activeReaderTabs[activeReaderTabs.Count - 1].Item2;
+                    int windowId = activePlayerTabs[activePlayerTabs.Count - 1].Item1;
+                    string tabId = activePlayerTabs[activePlayerTabs.Count - 1].Item2;
                     ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
                         .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
                         .AddParameter(OpenTabProvider.PARAM_WINDOW_ID, windowId.ToString())

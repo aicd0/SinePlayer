@@ -10,7 +10,7 @@ namespace SinePlayerUWP.Views.Pages.Sidebar.ComicInfo;
 
 internal class ComicChangedEventArgs
 {
-    public required ComicModel? Comic;
-    public required PlaylistModel Playlist;
-    public required IReadOnlyList<string> ImageDescriptions;
+    public required ComicModel? Comic { get; init; }
+    public required PlaylistModel Playlist { get; init; }
+    public required IReadOnlyList<string> ImageDescriptions { get; init; }
 }

@@ -75,7 +75,7 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
 
     public readonly MutableLiveData<string> TitleLiveData = new();
     public readonly MutableLiveData<bool> PlaybackChangeLiveData = new();
-    public readonly MutableLiveData<ReaderPage.ReaderStatusInfo> ReaderStatusLiveData = new(new() { Status = ReaderPage.ReaderStatusEnum.Loading });
+    public readonly MutableLiveData<ReaderStatusInfo> ReaderStatusLiveData = new(new() { Status = ReaderStatusEnum.Loading });
     public readonly MutableLiveData<bool> ComicChangedLiveData = new();
     public readonly MutableLiveData<bool> IsExternalComicLiveData = new(true);
     public readonly MutableLiveData<bool> IsFavoriteLiveData = new();
@@ -260,7 +260,7 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
 
     public PlaylistModel Playlist { get; private set; } = PlaylistModel.CreateEmpty();
     public PlaybackModel Playback { get; } = new();
-    public ReaderPage.ReaderStatusEnum ReaderStatus => ReaderStatusLiveData.Value.Status;
+    public ReaderStatusEnum ReaderStatus => ReaderStatusLiveData.Value.Status;
     public ComicModel? Comic => _comic;
     public ObservableCollection<ReaderPreviewImageViewModel> PreviewDataSource { get; set; } = [];
     public IEnumerable<ReaderPreviewImageViewModel> SelectedPreviews => _selectedPreviewImages;
@@ -707,14 +707,14 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
             TitleLiveData.Emit(StringResourceProvider.Instance.Error);
             ReaderStatusLiveData.Emit(new()
             {
-                Status = ReaderPage.ReaderStatusEnum.Error,
+                Status = ReaderStatusEnum.Error,
                 Description = "The reading list is empty.",
             });
         }
         else if (playlistItem.Comic != _comic || args.Reason == PlaybackStateChangeReason.Refresh)
         {
             TitleLiveData.Emit(playlistItem.Comic.Title);
-            ReaderStatusLiveData.Emit(new() { Status = ReaderPage.ReaderStatusEnum.Loading });
+            ReaderStatusLiveData.Emit(new() { Status = ReaderStatusEnum.Loading });
             LoadComic(new()
             {
                 Comic = playlistItem.Comic,
@@ -784,7 +784,7 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         {
             ReaderStatusLiveData.Emit(new()
             {
-                Status = ReaderPage.ReaderStatusEnum.Error,
+                Status = ReaderStatusEnum.Error,
                 Description = "No comic is selected.",
             });
             return;
@@ -813,7 +813,7 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         {
             ReaderStatusLiveData.Emit(new()
             {
-                Status = ReaderPage.ReaderStatusEnum.Error,
+                Status = ReaderStatusEnum.Error,
                 Description = connectionErr.DetailedErrorMessage,
             });
             return;
@@ -821,14 +821,14 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
 
         ComicConnection connection = connectionErr.Result;
         _comicConnection = connection;
-        ReaderStatusLiveData.Emit(new() { Status = ReaderPage.ReaderStatusEnum.Loading });
+        ReaderStatusLiveData.Emit(new() { Status = ReaderStatusEnum.Loading });
 
         int imageCount = connection.ImageCount;
         if (imageCount == 0)
         {
             ReaderStatusLiveData.Emit(new()
             {
-                Status = ReaderPage.ReaderStatusEnum.Error,
+                Status = ReaderStatusEnum.Error,
                 Description = "No images found.",
             });
             return;
@@ -908,6 +908,20 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
     //
     // Types
     //
+
+    public enum ReaderStatusEnum
+    {
+        Loading,
+        Error,
+        Working,
+    }
+
+    public class ReaderStatusInfo
+    {
+        public required ReaderStatusEnum Status { get; init; }
+        public string Description { get; init; } = string.Empty;
+        public int Progress { get; init; } = -1;
+    }
 
     public class ReaderLoadingInfo(IEnumerable<IImageSource> images, double initialPage)
     {

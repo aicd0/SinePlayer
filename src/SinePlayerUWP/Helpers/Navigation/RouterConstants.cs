@@ -9,7 +9,7 @@ internal static class RouterConstants
     public const string SCHEME_APP = SCHEME_APP_NO_PREFIX + "://";
 
     public const string HOST_MAIN = "main";
-    public const string HOST_READER = "reader";
+    public const string HOST_PLAYER = "player";
     public const string HOST_HOME = "home";
     public const string HOST_SEARCH = "search";
     public const string HOST_COLLECTION = "collection";

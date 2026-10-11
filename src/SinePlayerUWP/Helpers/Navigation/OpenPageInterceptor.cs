@@ -27,7 +27,7 @@ internal class OpenPageInterceptor : IRouterInterceptor
     private readonly Dictionary<string, IPageTrait> _internalHosts = new()
     {
         { RouterConstants.HOST_MAIN, new DefaultPageTrait(typeof(MainPage)) },
-        { RouterConstants.HOST_READER, ReaderPageTrait.Instance },
+        { RouterConstants.HOST_PLAYER, PlayerPageTrait.Instance },
         { RouterConstants.HOST_HOME, new DefaultPageTrait(typeof(HomePage)) },
         { RouterConstants.HOST_SEARCH, new DefaultPageTrait(typeof(SearchPage)) },
         { RouterConstants.HOST_COLLECTION, new DefaultPageTrait(typeof(CollectionPage)) },
