@@ -7,9 +7,6 @@ using System.Globalization;
 using System.Threading.Tasks;
 
 using SinePlayerUWP.Common.Imaging;
-using SinePlayerUWP.Data.Models.Comic;
-
-using SinePlayerUWP.Helpers.Imaging;
 
 namespace SinePlayerUWP.Common.Storage;
 
@@ -82,15 +79,10 @@ internal sealed class ComicImageUriInterceptor : IResourceUriInterceptor
 
         public Uri Uri => _uri;
 
-        public async Task<IImageSource?> ResolveImage()
+        public Task<IImageSource?> ResolveImage()
         {
-            ComicModel? comic = await ComicModel.FromId(ComicId);
-            if (comic is null)
-            {
-                return null;
-            }
-
-            return new ComicImageSource(comic, Index, _uri.ToString());
+            // Cover images will be provided by the media thumbnail provider in a later migration phase.
+            return Task.FromResult<IImageSource?>(null);
         }
 
         public Task Release()

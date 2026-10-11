@@ -10,7 +10,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-using SinePlayerUWP.Common.ErrorHandling;
 using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.DebugTools;
@@ -596,8 +595,6 @@ internal abstract partial class ComicHandle(MediaType type)
     //
 
     public abstract IReadOnlyList<string> GetFolderViewPath();
-
-    public abstract Task<ErrorResult<BaseComicConnection>> OpenComicConnection();
 
     //
     // DB Helpers

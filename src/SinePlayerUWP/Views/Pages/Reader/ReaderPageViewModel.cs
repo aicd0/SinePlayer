@@ -1,72 +1,31 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Globalization;
-using System.IO;
-using System.Text;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 
 using SinePlayerUWP.Common.Actions;
-using SinePlayerUWP.Common.Actions.Components;
-using SinePlayerUWP.Common.Constants;
-using SinePlayerUWP.Common.ErrorHandling;
-using SinePlayerUWP.Common.Imaging;
 using SinePlayerUWP.Common.Localization;
-using SinePlayerUWP.Common.Storage;
-using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
 using SinePlayerUWP.Data.Models.Comic;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Data.Models.Playback;
-using SinePlayerUWP.Helpers.Imaging;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
-using SinePlayerUWP.SDK.Models;
 
 namespace SinePlayerUWP.Views.Pages.Reader;
 
 internal partial class ReaderPageViewModel : INotifyPropertyChanged
 {
-    private static string FormatDpi(double dpiX, double dpiY)
-    {
-        if (dpiX == dpiY)
-        {
-            return $"{dpiX:0.##} dpi";
-        }
-        else
-        {
-            return $"{dpiX:0.##} x {dpiY:0.##} dpi";
-        }
-    }
-
-    private static string FormatBytes(long byteCount)
-    {
-        string[] units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
-        if (byteCount < 1024)
-        {
-            return $"{byteCount} B";
-        }
-
-        int unitIndex = (int)Math.Floor(Math.Log(byteCount, 1024));
-        double adjustedSize = byteCount / Math.Pow(1024, unitIndex);
-        return $"{adjustedSize:0.#} {units[unitIndex]}";
-    }
-
     private ActionHandler _actionHandler = ActionHandler.Dummy;
 
     // Comic Status
     private ComicModel? _comic;
     private LoadComicArgs? _pendingComic;
     private bool _isLoading = false;
-    private ComicConnection? _comicConnection;
-    private readonly List<ReaderPreviewImageViewModel> _selectedPreviewImages = [];
     private bool? _isFavorite = null;
 
     public ReaderPageViewModel() { }
@@ -79,7 +38,6 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
     public readonly MutableLiveData<bool> ComicChangedLiveData = new();
     public readonly MutableLiveData<bool> IsExternalComicLiveData = new(true);
     public readonly MutableLiveData<bool> IsFavoriteLiveData = new();
-    public readonly MutableLiveData<ReaderLoadingInfo> ReaderLoadingInfoLiveData = new();
 
     private FlowDirection _preferredFlowDirection = FlowDirection.LeftToRight;
     public FlowDirection PreferredFlowDirection
@@ -262,8 +220,6 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
     public PlaybackModel Playback { get; } = new();
     public ReaderStatusEnum ReaderStatus => ReaderStatusLiveData.Value.Status;
     public ComicModel? Comic => _comic;
-    public ObservableCollection<ReaderPreviewImageViewModel> PreviewDataSource { get; set; } = [];
-    public IEnumerable<ReaderPreviewImageViewModel> SelectedPreviews => _selectedPreviewImages;
 
     public void Initialize(ActionHandler actionHandler)
     {
@@ -274,75 +230,12 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
     public void Destory()
     {
         Playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
-        CloseComicConnection();
     }
 
     public void LoadPlaylist(PlaylistModel playlist, string? serializedPlayback, double initialPage)
     {
         Playlist = playlist;
         Playback.LoadState(playlist, serializedPlayback, initialPage);
-    }
-
-    public async Task<IReadOnlyList<string>> GetImageDescriptions(IEnumerable<int> pageIndices)
-    {
-        ComicModel? comic = _comic;
-        ComicConnection? comicConnection = _comicConnection;
-        if (comic is null || comicConnection is null)
-        {
-            return [];
-        }
-
-        int imageCount = comicConnection.ImageCount;
-        List<int> pageIndicesList = [.. pageIndices];
-        pageIndicesList.RemoveAll(i => i < 0 || i >= imageCount);
-        if (pageIndicesList.Count == 0)
-        {
-            return [];
-        }
-
-        pageIndicesList.Sort();
-
-        List<string> imageDescriptions = [];
-        foreach (int pageIndex in pageIndicesList)
-        {
-            string imageName = comicConnection.GetImageName(pageIndex);
-            var imageSource = new ComicImageSource(comic, pageIndex, comicConnection);
-            ImageMeta? imageMeta = await ImageLoader.LoadImageMeta(imageSource, new()
-            {
-                Priority = ImageLoadingPriority.READER_IMAGE,
-            });
-
-            if (imageMeta is null)
-            {
-                continue;
-            }
-
-            StringBuilder imageDescriptionSb = new();
-            if (string.IsNullOrEmpty(imageName))
-            {
-                imageName = StringResourceProvider.Instance.PageN.Replace("$page", (pageIndex + 1).ToString());
-            }
-
-            imageDescriptionSb.Append(imageName).Append('\n');
-            imageDescriptionSb.Append(imageMeta.Format);
-            imageDescriptionSb.Append(' ').Append(imageMeta.Width).Append(" x ").Append(imageMeta.Height);
-            imageDescriptionSb.Append(' ').Append(FormatBytes(imageMeta.Size));
-
-            if (imageMeta.DpiX > 0 && imageMeta.DpiY > 0)
-            {
-                imageDescriptionSb.Append(' ').Append(FormatDpi(imageMeta.DpiX, imageMeta.DpiY));
-            }
-
-            imageDescriptionSb.Append(' ').Append(imageMeta.BitsPerPixel).Append(" bits");
-            imageDescriptions.Add(imageDescriptionSb.ToString());
-        }
-
-        if (imageDescriptions.Count == 0)
-        {
-            return [];
-        }
-
-        return imageDescriptions;
     }
 
     public void SetIsFavorite(bool isFavorite, bool writeDatabase)
@@ -366,42 +259,6 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
             {
                 FavoriteModel.Instance.RemoveWithId(comic.Id, true);
             }
-        }
-    }
-
-    public void SetPageIndices(IReadOnlySet<int> pageIndices)
-    {
-        for (int i = _selectedPreviewImages.Count - 1; i >= 0; --i)
-        {
-            ReaderPreviewImageViewModel previewImage = _selectedPreviewImages[i];
-            if (!pageIndices.Contains(previewImage.Page - 1))
-            {
-                previewImage.Selected = false;
-                _selectedPreviewImages.RemoveAt(i);
-            }
-        }
-
-        foreach (int index in pageIndices)
-        {
-            if (index < 0 || index >= PreviewDataSource.Count)
-            {
-                continue;
-            }
-
-            ReaderPreviewImageViewModel previewImage = PreviewDataSource[index];
-            if (_selectedPreviewImages.Contains(previewImage))
-            {
-                continue;
-            }
-
-            int position = _selectedPreviewImages.Count;
-            while (position > 0 && _selectedPreviewImages[position - 1].Page > previewImage.Page)
-            {
-                --position;
-            }
-
-            _selectedPreviewImages.Insert(position, previewImage);
-            previewImage.Selected = true;
         }
     }
 
@@ -460,227 +317,6 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         BackgroundImageUri = comic.GetExt(ComicExt.BACKGROUND_IMAGE);
     }
 
-    public async Task<IReadOnlyList<BaseMenuFlyoutItemModel>> CreateImageContextMenuItems(int index, IImageSource imageSource)
-    {
-        ComicModel? comic = Comic;
-        if (comic is null)
-        {
-            return [];
-        }
-
-        using IImageConnection? imageConnection = await imageSource.Open();
-        if (imageConnection is null)
-        {
-            return [];
-        }
-
-        string imagePath = imageConnection.Path;
-
-        List<BaseMenuFlyoutItemModel> items = [];
-
-        items.Add(new SimpleMenuFlyoutItemModel()
-        {
-            Text = StringResourceProvider.Instance.Copy,
-            Icon = new FontIconSource() { Glyph = "\uE8C8" },
-            Click = () =>
-            {
-                CoroutineUtils.Run(async () =>
-                {
-                    ErrorResult err = await ErrorLogger.Run($"{nameof(CreateImageContextMenuItems)}#Copy", async err =>
-                    {
-                        using IImageConnection? connection = await imageSource.Open();
-                        if (connection is null)
-                        {
-                            return err.Error("Failed to open image connection.");
-                        }
-
-                        using Stream? stream = await connection.OpenImageStream();
-                        if (stream is null)
-                        {
-                            return err.Error("Failed to open image stream.");
-                        }
-
-                        ErrorResult innerErr = await ClipboardUtils.SetImage(stream);
-                        if (!innerErr.IsSuccessful)
-                        {
-                            return err.Error(innerErr);
-                        }
-
-                        return err.Success();
-                    });
-
-                    err.DisplayErrorMessage(_actionHandler);
-                });
-            },
-        });
-
-        items.Add(new SimpleMenuFlyoutItemModel()
-        {
-            Text = StringResourceProvider.Instance.ShowInFileExplorer,
-            Icon = new FontIconSource() { Glyph = "\uE838" },
-            IsEnabled = !string.IsNullOrEmpty(imagePath),
-            Click = () =>
-            {
-                CoroutineUtils.Run(async () =>
-                {
-                    ErrorResult err = await ThirdPartyLauncher.ShowInFileExplorer(imagePath);
-                    err.DisplayErrorMessage(_actionHandler);
-                });
-            }
-        });
-
-        if (!comic.IsExternal)
-        {
-            int coverIndex = ComicExt.GetCoverIndex(comic);
-            items.Add(new SimpleMenuFlyoutItemModel()
-            {
-                Text = StringResourceProvider.Instance.SetAsCover,
-                Icon = new FontIconSource() { Glyph = "\uE82D" },
-                IsEnabled = coverIndex != index,
-                Click = () =>
-                {
-                    CoroutineUtils.Run(async () =>
-                    {
-                        string? oldCoverImage = comic.GetExt(ComicExt.COVER_IMAGE);
-                        comic.SetExt(ComicExt.COVER_INDEX, index.ToString(CultureInfo.InvariantCulture));
-                        comic.SetExt(ComicExt.COVER_IMAGE, ResourceUri.CreateComicImage(comic.Id, index).ToString());
-                        await comic.FlushExt();
-
-                        if (ResourceUri.TryParse(oldCoverImage, out ResourceUri? parsedOldCoverImage))
-                        {
-                            await parsedOldCoverImage.Release();
-                        }
-                    });
-                },
-            });
-        }
-
-        {
-            List<BaseMenuFlyoutItemModel> fileOperationItems = [];
-
-            fileOperationItems.Add(new SimpleMenuFlyoutItemModel()
-            {
-                Text = StringResourceProvider.Instance.Copy,
-                Click = () =>
-                {
-                    CoroutineUtils.Run(async () =>
-                    {
-                        ErrorResult err = await ErrorLogger.Run($"{nameof(CreateImageContextMenuItems)}#CopyFile", async err =>
-                        {
-                            if (!string.IsNullOrEmpty(imagePath))
-                            {
-                                ErrorResult innerErr = await ClipboardUtils.SetFile(imagePath);
-                                if (!innerErr.IsSuccessful)
-                                {
-                                    return err.Error(innerErr);
-                                }
-
-                                return err.Success();
-                            }
-
-                            ImageMeta? meta = await ImageLoader.LoadImageMeta(imageSource, new());
-                            string extension = meta?.Format.ToLowerInvariant() switch
-                            {
-                                "jpeg" or "jpg" => ".jpg",
-                                "png" => ".png",
-                                "bmp" => ".bmp",
-                                "gif" => ".gif",
-                                "tiff" => ".tiff",
-                                "heif" or "heic" => ".heic",
-                                "webp" => ".webp",
-                                _ => string.Empty,
-                            };
-
-                            using IImageConnection? connection = await imageSource.Open();
-                            if (connection is null)
-                            {
-                                return err.Error("Failed to open image connection.");
-                            }
-
-                            using Stream? stream = await connection.OpenImageStream();
-                            if (stream is null)
-                            {
-                                return err.Error("Failed to open image stream.");
-                            }
-
-                            ErrorResult streamErr = await ClipboardUtils.SetFile(stream, $"{index + 1}{extension}");
-                            if (!streamErr.IsSuccessful)
-                            {
-                                return err.Error(streamErr);
-                            }
-
-                            return err.Success();
-                        });
-
-                        err.DisplayErrorMessage(_actionHandler);
-                    });
-                },
-            });
-
-            fileOperationItems.Add(new SimpleMenuFlyoutItemModel()
-            {
-                Text = StringResourceProvider.Instance.Delete,
-                IsEnabled = !string.IsNullOrEmpty(imagePath),
-                Click = () =>
-                {
-                    CoroutineUtils.Run(async () =>
-                    {
-                        string promptContent = StringResourceProvider.Instance.DeleteFilesPrompt
-                            .Replace("$files", imagePath);
-                        DialogOptions options = new DialogOptions.Builder()
-                            .SetTitle(StringResourceProvider.Instance.Warning)
-                            .SetContent(promptContent)
-                            .SetPrimaryButtonText(StringResourceProvider.Instance.Delete)
-                            .SetCloseButtonText(StringResourceProvider.Instance.Cancel)
-                            .Build();
-
-                        int windowId = -1;
-                        if (_actionHandler.TryGetComponent(out IMainWindowComponent? mainWindowCom))
-                        {
-                            windowId = mainWindowCom.WindowId;
-                        }
-
-                        DialogResult result = await DialogUtils.EnqueueDialogAsync(windowId, options);
-                        if (result != DialogResult.Primary)
-                        {
-                            return;
-                        }
-
-                        ErrorResult err = ErrorLogger.Run($"{nameof(CreateImageContextMenuItems)}#DeleteFile", err =>
-                        {
-                            try
-                            {
-                                File.Delete(imagePath);
-                            }
-                            catch (Exception ex)
-                            {
-                                return err.Error(ex);
-                            }
-
-                            return err.Success();
-                        });
-
-                        err.DisplayErrorMessage(_actionHandler);
-
-                        if (err.IsSuccessful)
-                        {
-                            Playback.Refresh();
-                        }
-                    });
-                },
-            });
-
-            items.Add(new SubItemMenuFlyoutItemModel()
-            {
-                Text = StringResourceProvider.Instance.FileOperations,
-                Icon = new FontIconSource() { Glyph = "\uE91B" },
-                Items = fileOperationItems,
-            });
-        }
-
-        return items;
-    }
-
     public async Task<IReadOnlyList<BaseMenuFlyoutItemModel>> CreateComicContextMenuItems()
     {
         ComicModel? comic = Comic;
@@ -725,12 +361,6 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         PlaybackChangeLiveData.Emit(true);
     }
 
-    private void CloseComicConnection()
-    {
-        _comicConnection?.Dispose();
-        _comicConnection = null;
-    }
-
     private void LoadComic(LoadComicArgs args)
     {
         CoroutineUtils.Run(async () =>
@@ -765,33 +395,22 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
     {
         ComicModel? comic = args.Comic;
 
-        // Close and clear previous comic
-        CloseComicConnection();
+        // Clear previous media
         _comic = null;
         BackgroundImageUri = null;
 
-        // Clear preview images
-        foreach (ReaderPreviewImageViewModel previewImage in _selectedPreviewImages)
-        {
-            previewImage.Selected = false;
-        }
-
-        _selectedPreviewImages.Clear();
-        PreviewDataSource.Clear();
-
-        // Load new comic
+        // Load new media
         if (comic is null)
         {
             ReaderStatusLiveData.Emit(new()
             {
                 Status = ReaderStatusEnum.Error,
-                Description = "No comic is selected.",
+                Description = "No media is selected.",
             });
             return;
         }
 
         _comic = comic;
-        CompletionStatusEnum completionStatus = comic.CompletionStatus;
         UpdateComicMetadata();
 
         // Save to history
@@ -807,96 +426,13 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         IsExternalComicLiveData.Emit(comic.IsExternal);
         UpdateFavoriteStatusInternal(comic);
 
-        // Open new comic
-        ErrorResult<ComicConnection> connectionErr = await comic.OpenComic();
-        if (!connectionErr.IsSuccessful)
+        // Media playback will be provided by the media engine in a later migration phase;
+        // it will load the media file from comic.Location and resume from the stored position.
+        ReaderStatusLiveData.Emit(new()
         {
-            ReaderStatusLiveData.Emit(new()
-            {
-                Status = ReaderStatusEnum.Error,
-                Description = connectionErr.DetailedErrorMessage,
-            });
-            return;
-        }
-
-        ComicConnection connection = connectionErr.Result;
-        _comicConnection = connection;
-        ReaderStatusLiveData.Emit(new() { Status = ReaderStatusEnum.Loading });
-
-        int imageCount = connection.ImageCount;
-        if (imageCount == 0)
-        {
-            ReaderStatusLiveData.Emit(new()
-            {
-                Status = ReaderStatusEnum.Error,
-                Description = "No images found.",
-            });
-            return;
-        }
-
-        List<IImageSource> images = new(imageCount);
-        for (int i = 0; i < imageCount; ++i)
-        {
-            images.Add(new ComicImageSource(comic, i, connection));
-        }
-
-        // Load preview images
-        for (int i = 0; i < images.Count; ++i)
-        {
-            int index = i;
-            IImageSource imageSource = images[i];
-            PreviewDataSource.Add(new()
-            {
-                ImageSource = imageSource,
-                Page = i + 1,
-                RequestContextMenu = async () => await CreateImageContextMenuItems(index, imageSource),
-            });
-        }
-
-        // Load reader images
-        double overrideInitialPage = args.PlaybackArgs.InitialPage;
-        bool useScrollingAreaStartEnd = AppSettingsModel.UseScrollingAreaAsStartEnd;
-        double startPage = useScrollingAreaStartEnd ? 0.5 : 1.0;
-        double endPage = useScrollingAreaStartEnd ? images.Count + 0.5 : images.Count;
-
-        double initialPage;
-        if (double.IsFinite(overrideInitialPage) && overrideInitialPage >= 0.0)
-        {
-            initialPage = Math.Clamp(overrideInitialPage, startPage, endPage);
-        }
-        else
-        {
-            switch (args.PlaybackArgs.Reason)
-            {
-                case PlaybackStateChangeReason.Next:
-                case PlaybackStateChangeReason.Previous:
-                    initialPage = startPage;
-                    break;
-
-                case PlaybackStateChangeReason.PreviousByOverScroll:
-                    initialPage = endPage;
-                    break;
-
-                default:
-                    {
-                        bool restorePosition =
-                            AppSettingsModel.RestoreLastReadingPosition &&
-                            !(AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingComics && completionStatus != CompletionStatusEnum.Reading);
-                        if (restorePosition)
-                        {
-                            double lastPosition = comic.LastPosition;
-                            initialPage = lastPosition > 0 ? lastPosition : startPage;
-                        }
-                        else
-                        {
-                            initialPage = startPage;
-                        }
-                    }
-                    break;
-            }
-        }
-
-        ReaderLoadingInfoLiveData.Emit(new(images, initialPage));
+            Status = ReaderStatusEnum.Error,
+            Description = "Media playback is not implemented yet.",
+        });
     }
 
     private void UpdateFavoriteStatusInternal(ComicModel comic)
@@ -921,12 +457,6 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         public required ReaderStatusEnum Status { get; init; }
         public string Description { get; init; } = string.Empty;
         public int Progress { get; init; } = -1;
-    }
-
-    public class ReaderLoadingInfo(IEnumerable<IImageSource> images, double initialPage)
-    {
-        public readonly IEnumerable<IImageSource> Images = images;
-        public readonly double InitialPage = initialPage;
     }
 
     private class LoadComicArgs

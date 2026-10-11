@@ -1090,66 +1090,6 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
     }
 
     //
-    // Comic Connection
-    //
-
-    public async Task<ErrorResult<ComicConnection>> OpenComic()
-    {
-        var err = ErrorLogger<ComicConnection>.Create(TAG);
-
-        ErrorResult<BaseComicConnection> connectionErr = await _internalModel.OpenComicConnection();
-        if (!connectionErr.IsSuccessful)
-        {
-            return err.Error(connectionErr);
-        }
-
-        BaseComicConnection connection = connectionErr.Result;
-
-        ErrorResult innerErr = await InitializeConnection(connection);
-        if (!innerErr.IsSuccessful)
-        {
-            connection.Dispose();
-            return err.Error(innerErr);
-        }
-
-        return err.Success(new ComicConnection(connection));
-    }
-
-    private async Task<ErrorResult> InitializeConnection(BaseComicConnection connection)
-    {
-        var err = ErrorLogger.Create(TAG);
-
-        bool needFlushExt = false;
-
-        // Refresh page count
-        int pageCount = connection.ImageCount;
-        if (pageCount <= 0)
-        {
-            return err.Error($"No images found at '{Location}'.", isFatal: true);
-        }
-
-        await SetPageCount(pageCount);
-
-        // Refresh cover index
-        string? coverIndexString = GetExt(ComicExt.COVER_INDEX);
-        if (coverIndexString is not null)
-        {
-            if (!int.TryParse(coverIndexString, out int coverIndex) || coverIndex < 0 || coverIndex >= pageCount)
-            {
-                SetExt(ComicExt.COVER_INDEX, null);
-                needFlushExt = true;
-            }
-        }
-
-        if (needFlushExt)
-        {
-            await FlushExt();
-        }
-
-        return err.Success();
-    }
-
-    //
     // Helpers
     //
 
@@ -1269,15 +1209,10 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
         DispatchUpdateEvent([Id]);
     }
 
-    async Task<SDK.Plugins.Comic.IComicConnection?> SDK.Plugins.Comic.IComicModel.Open()
+    Task<SDK.Plugins.Comic.IComicConnection?> SDK.Plugins.Comic.IComicModel.Open()
     {
-        ErrorResult<ComicConnection> connectionErr = await OpenComic();
-        if (!connectionErr.IsSuccessful)
-        {
-            return null;
-        }
-
-        return new PluginComicConnection(connectionErr.Result);
+        // Media playback will be provided by the media engine in a later migration phase.
+        return Task.FromResult<SDK.Plugins.Comic.IComicConnection?>(null);
     }
 
     async Task<bool> SDK.Plugins.Comic.IComicModel.MoveToLocation(string location)
@@ -1297,31 +1232,6 @@ internal sealed partial class ComicModel : IEquatable<ComicModel>, SDK.Plugins.C
         }
 
         return success;
-    }
-
-    private sealed partial class PluginComicConnection(IComicConnection connection) : SDK.Plugins.Comic.IComicConnection
-    {
-        public int ImageCount => connection.ImageCount;
-
-        public void Dispose()
-        {
-            connection.Dispose();
-        }
-
-        public string GetImageName(int index)
-        {
-            return connection.GetImageName(index);
-        }
-
-        public string GetImageSignature(int index)
-        {
-            return connection.GetImageSignature(index);
-        }
-
-        public Task<Stream?> OpenImageStream(int index)
-        {
-            return connection.OpenImageStream(index);
-        }
     }
 
     //

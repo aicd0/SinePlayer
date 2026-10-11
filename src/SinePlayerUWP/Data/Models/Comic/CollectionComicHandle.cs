@@ -2,17 +2,13 @@
 // Licensed under the MIT License.
 
 using System.Collections.Generic;
-using System.Threading.Tasks;
 
-using SinePlayerUWP.Common.ErrorHandling;
 using SinePlayerUWP.Data.Tables;
 
 namespace SinePlayerUWP.Data.Models.Comic;
 
 internal partial class CollectionComicHandle : ComicHandle
 {
-    private const string TAG = nameof(CollectionComicHandle);
-
     public CollectionComicHandle() : base(MediaType.Collection)
     {
     }
@@ -31,11 +27,5 @@ internal partial class CollectionComicHandle : ComicHandle
     public override IReadOnlyList<string> GetFolderViewPath()
     {
         return [];
-    }
-
-    public override Task<ErrorResult<BaseComicConnection>> OpenComicConnection()
-    {
-        var err = ErrorLogger<BaseComicConnection>.Create(TAG);
-        return Task.FromResult(err.Error("A collection has no content to open."));
     }
 }

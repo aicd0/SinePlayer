@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
-using SinePlayerUWP.Common.ErrorHandling;
 using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.DebugTools;
@@ -17,8 +16,6 @@ namespace SinePlayerUWP.Data.Models.Comic;
 
 internal partial class FileComicHandle(MediaType type) : ComicHandle(type)
 {
-    private const string TAG = nameof(FileComicHandle);
-
     public static ComicHandle FromExternal(string filePath)
     {
         MediaType type = AppInfoProvider.IsSupportedAudioExtension(Path.GetExtension(filePath))
@@ -92,12 +89,5 @@ internal partial class FileComicHandle(MediaType type) : ComicHandle(type)
             await SetLocation(targetPath);
             return true;
         });
-    }
-
-    public override Task<ErrorResult<BaseComicConnection>> OpenComicConnection()
-    {
-        // Media playback will be provided by the media engine, see the media player migration plan.
-        var err = ErrorLogger<BaseComicConnection>.Create(TAG);
-        return Task.FromResult(err.Error("Media playback is not implemented yet."));
     }
 }
