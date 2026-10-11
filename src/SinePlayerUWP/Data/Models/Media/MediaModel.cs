@@ -1065,7 +1065,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.C
         await _internalModel.SetLocation(location);
     }
 
-    private async Task SetDuration(long durationMs)
+    public async Task SetDuration(long durationMs)
     {
         if (DurationMs == durationMs)
         {

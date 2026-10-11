@@ -24,7 +24,7 @@ internal static class OpenMediaHelper
 
     public static Route GetMediaRoute(
         MediaModel media,
-        double page = -1.0,
+        long positionMs = -1,
         PlaylistModel.Builder? playlist = null,
         PlaybackModel.Builder? playback = null)
     {
@@ -47,9 +47,9 @@ internal static class OpenMediaHelper
             .WithParam(RouterConstants.ARG_PLAYLIST_ID, playlistId)
             .WithParam(RouterConstants.ARG_PLAYBACK, playback.ToSerializedString());
 
-        if (double.IsFinite(page) && page >= 0.0)
+        if (positionMs >= 0)
         {
-            route = route.WithParam(RouterConstants.ARG_PAGE, page.ToString(CultureInfo.InvariantCulture));
+            route = route.WithParam(RouterConstants.ARG_POSITION, positionMs.ToString(CultureInfo.InvariantCulture));
         }
 
         return route;

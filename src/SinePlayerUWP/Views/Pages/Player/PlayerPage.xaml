@@ -8,23 +8,28 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <!--  Temporary placeholder until the video & audio player is implemented  -->
-    <Grid>
+    <Grid
+        x:Name="RootGrid"
+        Background="Black"
+        Tapped="RootGrid_Tapped">
+        <Grid x:Name="VideoHost" />
         <StackPanel
+            x:Name="StatusPanel"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
-            Spacing="16">
-            <FontIcon
-                HorizontalAlignment="Center"
-                FontSize="48"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Glyph="&#xE768;" />
+            Spacing="12">
+            <ProgressRing
+                x:Name="BusyRing"
+                Width="36"
+                Height="36"
+                IsActive="True"
+                Foreground="White" />
             <TextBlock
-                HorizontalAlignment="Center"
-                MaxWidth="360"
-                Style="{StaticResource BodyTextBlockStyle}"
-                Text="Media playback is not available yet."
-                TextAlignment="Center" />
+                x:Name="StatusText"
+                MaxWidth="480"
+                Foreground="White"
+                TextAlignment="Center"
+                TextWrapping="Wrap" />
         </StackPanel>
     </Grid>
 </base:BasePage>

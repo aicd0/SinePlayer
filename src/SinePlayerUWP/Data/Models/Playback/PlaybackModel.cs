@@ -29,7 +29,7 @@ internal class PlaybackModel
     private int _cursor = 0;
     private int _randomSeed = Random.Shared.Next();
     private string? _firstId;
-    private double _initialPage = -1.0;
+    private long _initialPositionMs = -1;
 
     public IReadOnlyList<PlaylistModel.PlaylistItem> Items => _items;
     public bool CanGoNext => _isRepeat || _cursor < _items.Count - 1;
@@ -114,10 +114,10 @@ internal class PlaybackModel
         };
     }
 
-    public void LoadState(PlaylistModel playlist, string? serializedPlayback, double initialPage)
+    public void LoadState(PlaylistModel playlist, string? serializedPlayback, long initialPositionMs)
     {
         _playlist = playlist;
-        _initialPage = initialPage;
+        _initialPositionMs = initialPositionMs;
 
         if (!string.IsNullOrEmpty(serializedPlayback) && FromSerializedString(serializedPlayback))
         {
@@ -278,13 +278,13 @@ internal class PlaybackModel
 
     private void DispatchPlaybackStatusChange(PlaybackStateChangeReason reason)
     {
-        double initialPage = _initialPage;
-        _initialPage = -1.0;
+        long initialPositionMs = _initialPositionMs;
+        _initialPositionMs = -1;
 
         PlaybackStateChanged?.Invoke(new()
         {
             Reason = reason,
-            InitialPage = initialPage,
+            InitialPositionMs = initialPositionMs,
         });
     }
 

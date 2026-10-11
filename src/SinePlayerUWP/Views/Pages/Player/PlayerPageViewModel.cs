@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading.Tasks;
@@ -8,7 +9,9 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 
 using SinePlayerUWP.Common.Actions;
+using SinePlayerUWP.Common.ErrorHandling;
 using SinePlayerUWP.Common.Localization;
+using SinePlayerUWP.Common.Playback;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
 using SinePlayerUWP.Data.Models.Media;
@@ -16,39 +19,34 @@ using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Data.Models.Playback;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 
-namespace SinePlayerUWP.Views.Pages.Reader;
+namespace SinePlayerUWP.Views.Pages.Player;
 
-internal partial class ReaderPageViewModel : INotifyPropertyChanged
+internal partial class PlayerPageViewModel : INotifyPropertyChanged
 {
+    private const long POSITION_SAVE_INTERVAL = 5000;
+
     private ActionHandler _actionHandler = ActionHandler.Dummy;
 
-    // Media Status
+    // Media status
     private MediaModel? _media;
     private LoadMediaArgs? _pendingMedia;
     private bool _isLoading = false;
     private bool? _isFavorite = null;
+    private bool _isInitialized = false;
+    private IMediaEngine? _engine;
+    private long _pendingStartPositionMs = -1;
+    private long _lastPositionSaveTicks = 0;
 
-    public ReaderPageViewModel() { }
+    public PlayerPageViewModel() { }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public readonly MutableLiveData<string> TitleLiveData = new();
     public readonly MutableLiveData<bool> PlaybackChangeLiveData = new();
-    public readonly MutableLiveData<ReaderStatusInfo> ReaderStatusLiveData = new(new() { Status = ReaderStatusEnum.Loading });
+    public readonly MutableLiveData<PlayerStatusInfo> PlayerStatusLiveData = new(new() { Status = PlayerStatusEnum.Loading });
     public readonly MutableLiveData<bool> MediaChangedLiveData = new();
     public readonly MutableLiveData<bool> IsExternalMediaLiveData = new(true);
     public readonly MutableLiveData<bool> IsFavoriteLiveData = new();
-
-    private FlowDirection _preferredFlowDirection = FlowDirection.LeftToRight;
-    public FlowDirection PreferredFlowDirection
-    {
-        get => _preferredFlowDirection;
-        set
-        {
-            _preferredFlowDirection = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PreferredFlowDirection)));
-        }
-    }
 
     private bool _isFullscreen = false;
     public bool IsFullscreen
@@ -116,50 +114,6 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private string _zooming = string.Empty;
-    public string Zooming
-    {
-        get => _zooming;
-        set
-        {
-            _zooming = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Zooming)));
-        }
-    }
-
-    private string _primaryPageIndicatorText = string.Empty;
-    public string PrimaryPageIndicatorText
-    {
-        get => _primaryPageIndicatorText;
-        set
-        {
-            _primaryPageIndicatorText = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PrimaryPageIndicatorText)));
-        }
-    }
-
-    private string _secondaryPageIndicatorText = string.Empty;
-    public string SecondaryPageIndicatorText
-    {
-        get => _secondaryPageIndicatorText;
-        set
-        {
-            _secondaryPageIndicatorText = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondaryPageIndicatorText)));
-        }
-    }
-
-    private bool _isAutoPlayEnabled = false;
-    public bool IsAutoPlayEnabled
-    {
-        get => _isAutoPlayEnabled;
-        set
-        {
-            _isAutoPlayEnabled = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAutoPlayEnabled)));
-        }
-    }
-
     private bool _isAutoPlaying = false;
     public bool IsAutoPlaying
     {
@@ -218,24 +172,75 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
 
     public PlaylistModel Playlist { get; private set; } = PlaylistModel.CreateEmpty();
     public PlaybackModel Playback { get; } = new();
-    public ReaderStatusEnum ReaderStatus => ReaderStatusLiveData.Value.Status;
+    public PlayerStatusEnum PlayerStatus => PlayerStatusLiveData.Value.Status;
     public MediaModel? Media => _media;
 
     public void Initialize(ActionHandler actionHandler)
     {
         _actionHandler = actionHandler;
+        if (_isInitialized)
+        {
+            return;
+        }
+
+        _isInitialized = true;
         Playback.PlaybackStateChanged += Playback_PlaybackStateChanged;
     }
 
     public void Destory()
     {
+        SaveCurrentPosition();
         Playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
+        _isInitialized = false;
+        _pendingMedia = null;
+        _pendingStartPositionMs = -1;
+
+        IMediaEngine? engine = _engine;
+        _engine = null;
+        if (engine is not null)
+        {
+            engine.StateChanged -= Engine_StateChanged;
+            engine.PositionChanged -= Engine_PositionChanged;
+            engine.MediaOpened -= Engine_MediaOpened;
+            engine.MediaEnded -= Engine_MediaEnded;
+            engine.ErrorOccurred -= Engine_ErrorOccurred;
+            engine.Dispose();
+        }
     }
 
-    public void LoadPlaylist(PlaylistModel playlist, string? serializedPlayback, double initialPage)
+    public void LoadPlaylist(PlaylistModel playlist, string? serializedPlayback, long initialPositionMs)
     {
         Playlist = playlist;
-        Playback.LoadState(playlist, serializedPlayback, initialPage);
+        Playback.LoadState(playlist, serializedPlayback, initialPositionMs);
+    }
+
+    public UIElement GetVideoSurface()
+    {
+        return EnsureEngine().CreateVideoSurface();
+    }
+
+    public void Pause()
+    {
+        _engine?.Pause();
+        SaveCurrentPosition();
+    }
+
+    public void TogglePlayPause()
+    {
+        IMediaEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        if (engine.State == MediaEngineStateEnum.Playing)
+        {
+            engine.Pause();
+        }
+        else
+        {
+            engine.Play();
+        }
     }
 
     public void SetIsFavorite(bool isFavorite, bool writeDatabase)
@@ -292,11 +297,6 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         }
     }
 
-    public void SetZooming(int zooming)
-    {
-        Zooming = $"{zooming}%";
-    }
-
     public void UpdateFavoriteStatus()
     {
         MediaModel? media = _media;
@@ -341,16 +341,16 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         if (playlistItem is null)
         {
             TitleLiveData.Emit(StringResourceProvider.Instance.Error);
-            ReaderStatusLiveData.Emit(new()
+            PlayerStatusLiveData.Emit(new()
             {
-                Status = ReaderStatusEnum.Error,
-                Description = "The reading list is empty.",
+                Status = PlayerStatusEnum.Error,
+                Description = "The playlist is empty.",
             });
         }
         else if (playlistItem.Media != _media || args.Reason == PlaybackStateChangeReason.Refresh)
         {
             TitleLiveData.Emit(playlistItem.Media.Title);
-            ReaderStatusLiveData.Emit(new() { Status = ReaderStatusEnum.Loading });
+            PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
             LoadMedia(new()
             {
                 Media = playlistItem.Media,
@@ -393,18 +393,18 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
 
     private async Task LoadMediaInternal(LoadMediaArgs args)
     {
-        MediaModel? media = args.Media;
+        // Save the position of the previous media
+        SaveCurrentPosition();
 
-        // Clear previous media
+        MediaModel? media = args.Media;
         _media = null;
         BackgroundImageUri = null;
 
-        // Load new media
         if (media is null)
         {
-            ReaderStatusLiveData.Emit(new()
+            PlayerStatusLiveData.Emit(new()
             {
-                Status = ReaderStatusEnum.Error,
+                Status = PlayerStatusEnum.Error,
                 Description = "No media is selected.",
             });
             return;
@@ -426,12 +426,152 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
         IsExternalMediaLiveData.Emit(media.IsExternal);
         UpdateFavoriteStatusInternal(media);
 
-        // Media playback will be provided by the media engine in a later migration phase;
-        // it will load the media file from media.Location and resume from the stored position.
-        ReaderStatusLiveData.Emit(new()
+        _pendingStartPositionMs = ResolveStartPositionMs(media, args.PlaybackArgs);
+        PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
+
+        IMediaEngine engine = EnsureEngine();
+        ErrorResult err = await engine.LoadAsync(media.Location);
+        if (!err.IsSuccessful)
         {
-            Status = ReaderStatusEnum.Error,
-            Description = "Media playback is not implemented yet.",
+            PlayerStatusLiveData.Emit(new()
+            {
+                Status = PlayerStatusEnum.Error,
+                Description = err.DetailedErrorMessage,
+            });
+        }
+    }
+
+    private void SaveCurrentPosition()
+    {
+        MediaModel? media = _media;
+        IMediaEngine? engine = _engine;
+        if (media is null || engine is null || media.IsExternal)
+        {
+            return;
+        }
+
+        long positionMs = engine.Position.Ticks / TimeSpan.TicksPerMillisecond;
+        long durationMs = engine.Duration.Ticks / TimeSpan.TicksPerMillisecond;
+        int progress = durationMs > 0 ? (int)Math.Clamp(positionMs * 100 / durationMs, 0, 100) : -1;
+        CoroutineUtils.Run(async () => await media.SetProgress(progress, positionMs));
+    }
+
+    private static long ResolveStartPositionMs(MediaModel media, PlaybackStateChangedEventArgs args)
+    {
+        long overridePositionMs = args.InitialPositionMs;
+        if (overridePositionMs >= 0)
+        {
+            return overridePositionMs;
+        }
+
+        switch (args.Reason)
+        {
+            case PlaybackStateChangeReason.Next:
+            case PlaybackStateChangeReason.Previous:
+            case PlaybackStateChangeReason.PreviousByOverScroll:
+                return 0;
+
+            default:
+                {
+                    bool restorePosition =
+                        AppSettingsModel.RestoreLastReadingPosition &&
+                        !(AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia && media.CompletionStatus != CompletionStatusEnum.Reading);
+                    return restorePosition ? media.LastPositionMs : 0;
+                }
+        }
+    }
+
+    private IMediaEngine EnsureEngine()
+    {
+        if (_engine is not null)
+        {
+            return _engine;
+        }
+
+        IMediaEngine engine = MediaEngineService.CreateEngine();
+        engine.StateChanged += Engine_StateChanged;
+        engine.PositionChanged += Engine_PositionChanged;
+        engine.MediaOpened += Engine_MediaOpened;
+        engine.MediaEnded += Engine_MediaEnded;
+        engine.ErrorOccurred += Engine_ErrorOccurred;
+        _engine = engine;
+        return engine;
+    }
+
+    private void Engine_StateChanged(MediaEngineStateEnum state)
+    {
+        switch (state)
+        {
+            case MediaEngineStateEnum.Playing:
+                IsAutoPlaying = true;
+                break;
+            case MediaEngineStateEnum.None:
+            case MediaEngineStateEnum.Paused:
+            case MediaEngineStateEnum.Ended:
+            case MediaEngineStateEnum.Error:
+                IsAutoPlaying = false;
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void Engine_PositionChanged()
+    {
+        long now = Environment.TickCount64;
+        if (now - _lastPositionSaveTicks < POSITION_SAVE_INTERVAL)
+        {
+            return;
+        }
+
+        _lastPositionSaveTicks = now;
+        SaveCurrentPosition();
+    }
+
+    private void Engine_MediaOpened()
+    {
+        MediaModel? media = _media;
+        IMediaEngine? engine = _engine;
+        if (media is null || engine is null)
+        {
+            return;
+        }
+
+        // Persist the duration probed by the engine when it is still unknown
+        long durationMs = engine.Duration.Ticks / TimeSpan.TicksPerMillisecond;
+        if (durationMs > 0 && media.DurationMs <= 0 && !media.IsExternal)
+        {
+            CoroutineUtils.Run(async () => await media.SetDuration(durationMs));
+        }
+
+        long startPositionMs = _pendingStartPositionMs;
+        _pendingStartPositionMs = -1;
+        if (startPositionMs > 0)
+        {
+            engine.Seek(TimeSpan.FromMilliseconds(startPositionMs));
+        }
+
+        PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Working });
+        engine.Play();
+    }
+
+    private void Engine_MediaEnded()
+    {
+        MediaModel? media = _media;
+        if (media is not null && !media.IsExternal)
+        {
+            CoroutineUtils.Run(async () => await media.SetProgress(100, 0));
+        }
+
+        Playback.Next();
+    }
+
+    private void Engine_ErrorOccurred(string message)
+    {
+        PlayerStatusLiveData.Emit(new()
+        {
+            Status = PlayerStatusEnum.Error,
+            Description = message,
         });
     }
 
@@ -445,16 +585,16 @@ internal partial class ReaderPageViewModel : INotifyPropertyChanged
     // Types
     //
 
-    public enum ReaderStatusEnum
+    public enum PlayerStatusEnum
     {
         Loading,
         Error,
         Working,
     }
 
-    public class ReaderStatusInfo
+    public class PlayerStatusInfo
     {
-        public required ReaderStatusEnum Status { get; init; }
+        public required PlayerStatusEnum Status { get; init; }
         public string Description { get; init; } = string.Empty;
         public int Progress { get; init; } = -1;
     }
