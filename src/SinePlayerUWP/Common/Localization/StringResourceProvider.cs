@@ -92,7 +92,6 @@ public class StringResourceProvider
     public string EditKeyboardShortcut => GetResourceString("EditKeyboardShortcut");
     public string EditPreset => GetResourceString("EditPreset");
     public string Enable => GetResourceString("Enable");
-    public string EnableCompressedFileCache => GetResourceString("EnableCompressedFileCache");
     public string Enabled => GetResourceString("Enabled");
     public string EnterFullscreen => GetResourceString("EnterFullscreen");
     public string EnterNewTags => GetResourceString("EnterNewTags");
@@ -200,8 +199,6 @@ public class StringResourceProvider
     public string OpenSidebar => GetResourceString("OpenSidebar");
     public string OpenUserDataFolder => GetResourceString("OpenUserDataFolder");
     public string OverwriteExistingEntries => GetResourceString("OverwriteExistingEntries");
-    public string PageCount => GetResourceString("PageCount");
-    public string PageN => GetResourceString("PageN");
     public string PageSpacing => GetResourceString("PageSpacing");
     public string Pause => GetResourceString("Pause");
     public string Pin => GetResourceString("Pin");
@@ -218,9 +215,6 @@ public class StringResourceProvider
     public string PromptBeforeRemovingMedia => GetResourceString("PromptBeforeRemovingMedia");
     public string RandomMedia => GetResourceString("RandomMedia");
     public string Rating => GetResourceString("Rating");
-    public string ReaderStatusError => GetResourceString("ReaderStatusError");
-    public string ReaderStatusLoading => GetResourceString("ReaderStatusLoading");
-    public string ReaderTipContent => GetResourceString("ReaderTipContent");
     public string ReadingList => GetResourceString("ReadingList");
     public string ReadingListEmpty => GetResourceString("ReadingListEmpty");
     public string Refresh => GetResourceString("Refresh");

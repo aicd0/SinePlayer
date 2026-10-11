@@ -103,7 +103,7 @@ public static class DebugUtils
             sb.Append("Caller stack trace:\n");
             sb.Append(new System.Diagnostics.StackTrace(true).ToString());
             string text = sb.ToString();
-            NativeMethods.MessageBoxW(nint.Zero, text, "Comic Reader UWP", 0x00000010);
+            NativeMethods.MessageBoxW(nint.Zero, text, "Sine Player UWP", 0x00000010);
         }
 
         Logger.E(TAG, message, ex);

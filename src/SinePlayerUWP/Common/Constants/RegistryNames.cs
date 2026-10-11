@@ -14,9 +14,7 @@ internal static class RegistryNames
     public const string SETTINGS = $"{GLOBAL}/Settings";
     public const string MEDIA_IMPORT_EXCLUSIONS = $"{SETTINGS}/MediaImportExclusions";
     public const string STATE = $"{GLOBAL}/State";
-    public const string READER_STATE = $"{STATE}/Reader";
     public const string PLUGINS = $"{GLOBAL}/Plugins";
-    public const string TIPS = $"{GLOBAL}/Tips";
     public const string RESOURCES = "/Resources";
     public const string RUNTIME_RESOURCES = $"{RESOURCES}/Runtime";
     public const string PLAYLISTS = $"{RUNTIME_RESOURCES}/Playlists";
@@ -24,7 +22,6 @@ internal static class RegistryNames
 
     public static class SettingsKey
     {
-        public const string READER_OVERLAY_PINNED = "ReaderOverlayPinned";
         public const string SHOW_INSTALL_PLUGIN_WARNING = "ShowInstallPluginWarning";
     }
 
@@ -38,10 +35,5 @@ internal static class RegistryNames
     public static class PluginsKey
     {
         public const string DISABLED_PLUGINS = "DisabledPlugins";
-    }
-
-    public static class TipsKey
-    {
-        public const string READER_TIP_SHOWN = "ReaderTipShown";
     }
 }

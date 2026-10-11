@@ -70,11 +70,6 @@ internal static class AppInfoProvider
         return SupportedExternalFileExtensions.Contains(extension.ToLower());
     }
 
-    public static bool IsSupportedImageExtension(string extension)
-    {
-        return SupportedImageExtensions.Contains(extension.ToLower());
-    }
-
     public static bool IsSupportedVideoExtension(string extension)
     {
         return SupportedVideoExtensions.Contains(extension.ToLower());

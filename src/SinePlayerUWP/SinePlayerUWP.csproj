@@ -85,7 +85,7 @@
 		<Version>1.0.0.0</Version>
 		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 		<ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
-		<AssemblyTitle>Comic Reader UWP</AssemblyTitle>
+		<AssemblyTitle>Sine Player UWP</AssemblyTitle>
 	</PropertyGroup>
 
 	<ItemGroup Condition="'$(IsPackaged)' == 'true'">
