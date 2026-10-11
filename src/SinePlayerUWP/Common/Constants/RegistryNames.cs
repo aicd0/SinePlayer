@@ -20,17 +20,13 @@ internal static class RegistryNames
     public const string PLAYLISTS = $"{RUNTIME_RESOURCES}/Playlists";
     public const string TAB_RESOURCES = $"{RESOURCES}/Tabs";
 
-    public static class SettingsKey
-    {
-        public const string PLAYER_OVERLAY_PINNED = "PlayerOverlayPinned";
-        public const string SHOW_INSTALL_PLUGIN_WARNING = "ShowInstallPluginWarning";
-    }
-
     public static class StateKey
     {
-        public const string WINDOW_STATUS = "WindowStatus";
         public const string LOG_STARTED = "LogStarted";
+        public const string PLAYER_OVERLAY_PINNED = "PlayerOverlayPinned";
         public const string SIDE_PANE_LAST_FILTER_PRESET = "SidePaneLastFilterPreset";
+        public const string SHOW_INSTALL_PLUGIN_WARNING = "ShowInstallPluginWarning";
+        public const string WINDOW_STATUS = "WindowStatus";
     }
 
     public static class PluginsKey

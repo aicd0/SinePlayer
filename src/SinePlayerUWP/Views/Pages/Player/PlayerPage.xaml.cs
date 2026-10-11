@@ -78,7 +78,7 @@ internal sealed partial class PlayerPage : BasePage
         SetupFullscreenHandler();
 
         {
-            bool pinned = AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).GetValueOrDefault(RegistryNames.SettingsKey.PLAYER_OVERLAY_PINNED, false);
+            bool pinned = AppDB.MainRegistry.CreateKey(RegistryNames.STATE).GetValueOrDefault(RegistryNames.StateKey.PLAYER_OVERLAY_PINNED, false);
             ViewModel.SetPinned(pinned);
             TransportBar.SetPinned(pinned);
             UpdatePinRelatedUI();
@@ -397,7 +397,7 @@ internal sealed partial class PlayerPage : BasePage
         ViewModel.SetPinned(!ViewModel.IsPinned);
         TransportBar.SetPinned(ViewModel.IsPinned);
         UpdatePinRelatedUI();
-        AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).Set(RegistryNames.SettingsKey.PLAYER_OVERLAY_PINNED, ViewModel.IsPinned);
+        AppDB.MainRegistry.CreateKey(RegistryNames.STATE).Set(RegistryNames.StateKey.PLAYER_OVERLAY_PINNED, ViewModel.IsPinned);
     }
 
     private void OpenPlaylistPane()
