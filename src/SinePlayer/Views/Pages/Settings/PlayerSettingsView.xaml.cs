@@ -32,15 +32,6 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
-    private void RestoreLastReadingPositionOnlyAppliesToReadingMediaCheckBox_Click(object sender, RoutedEventArgs e)
-    {
-        bool? isChecked = ((CheckBox)sender).IsChecked;
-        if (isChecked.HasValue)
-        {
-            AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia = isChecked.Value;
-        }
-    }
-
     private void AutoToggleOverlaysOnCursorCheckBox_Click(object sender, RoutedEventArgs e)
     {
         bool? isChecked = ((CheckBox)sender).IsChecked;

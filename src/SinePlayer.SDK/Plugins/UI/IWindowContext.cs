@@ -8,7 +8,7 @@ using SinePlayer.SDK.Plugins.Media;
 
 namespace SinePlayer.SDK.Plugins.UI;
 
-public delegate void ForegroundMediaChangedEventHandler(IMediaModel? comic);
+public delegate void ForegroundMediaChangedEventHandler(IMediaModel? media);
 
 public interface IWindowContext
 {

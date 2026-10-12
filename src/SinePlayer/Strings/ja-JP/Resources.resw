@@ -424,49 +424,49 @@ $files</value>
     <value>または</value>
   </data>
   <data name="ExpressionReference" xml:space="preserve">
-    <value>式リファレンス
+    <value>式のリファレンス
 
 1. 変数
 
-%tag              - コミック内のすべてのタグに一致します。
-%title            - タイトル1またはタイトル2に一致します。
-%title1           - タイトル1に一致します。
-%title2           - タイトル2に一致します。
-%rating           - 評価に一致します。例：100は星5つ、-1は評価なしを表します。
-%completion_state - コミックの完了状態（0 - 未読、1 - 読んでいる、2 - 完了）。
-%progress         - 読書の進捗状況（パーセンテージ）。例：50は50%を表します。
-%duration         - 合計再生時間。
+%tag                 - タグ。
+%title               - タイトル1またはタイトル2。
+%title1              - タイトル1。
+%title2              - タイトル2。
+%rating              - 評価。例：100は星5つ、-1は評価なしを表します。
+%completion_status   - 完了状態。
+%progress            - 進捗率。例：50は50%を表します。
+%duration            - 合計時間。
 
 2. 変数演算子
 
-=                 - 等しい。例：%title = "This is a title"
-&gt;                 - より大きい。例：%rating &gt; 3
-&gt;=                - 以上。
-&lt;                 - より小さい。
-&lt;=                - 以下。
-... IN (...)      - 包含。例：
-                    %rating in (3, 4, 5) - 評価が3、4、5のコミックにマッチします。
-                    %tag.language in (languageA, languageB) - 「language」タグカテゴリに「languageA」または「languageB」が含まれるコミックにマッチします。
-                    (authorA, authorB) in %tag.authors - 「authors」タグカテゴリに「authorA」と「authorB」の両方が含まれるコミックにマッチします。
-                    apple in %tag - 「apple」タグを含むコミックにマッチします。
+=                    - 等しい。例：%title = "タイトル"
+&gt;                    - より大きい。例：%rating &gt; 3
+&gt;=                   - 以上。
+&lt;                    - より小さい。
+&lt;=                   - 以下。
+... IN (...)         - ～に含まれる。例：
+                       %rating in (3, 4, 5) - 評価が3、4、5の項目に一致します。
+                       %tag.language in (A, B) - "language"タグカテゴリに"A"または"B"が含まれる項目に一致します。
+                       (A, B) in %tag.artists - "artists"タグカテゴリに"A"と"B"の両方が含まれる項目に一致します。
+                       "apple" in %tag - "apple"タグを含む項目に一致します。
 
 3. 論理演算子
 
-AND               - 論理積。例：%tag.fruit = apple AND %title = "I have an apple"
-OR                - 論理和。例：%title1 = "Apple is OK" OR %title2 = "Orange is also OK"
-NOT               - 論理否定。例: NOT %tag = "hide this"
+AND                  - 論理積（AND）。例：%tag.artists = A AND %title = "タイトル"
+OR                   - 論理和（OR）。例：%title1 = "タイトル1" OR %title2 = "タイトル2"
+NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
 
 4. 括弧
 
-デフォルトでは、演算子は左から右に評価されます。(...) を使用すると、含まれる式の優先順位が上がります。例:
+デフォルトでは、演算子は左から右の順に評価されます。(...)を使うと、括弧内の式が優先して評価されます。例：
 
-%tag.author = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
+    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
 
-評価は以下の順序で実行されます:
+次の順序で評価されます。
 
-1. NOT %tag.lang = langB  ==&gt;  結果1
-2. %tag.language = langA OR 結果1  ==&gt;  結果2
-3. %tag.author = abc AND 結果2  ==&gt;  結果3</value>
+    1. NOT %tag.lang = langB  ==&gt;  結果1
+    2. %tag.language = langA OR 結果1  ==&gt;  結果2
+    3. %tag.artists = abc AND 結果2  ==&gt;  結果3</value>
   </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>条件式</value>
@@ -650,7 +650,7 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
     <value>リンク</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>「除外リストに追加」を選択すると、次回ライブラリを更新したときにこのコミックが再度インポートされなくなります。</value>
+    <value>「除外リストに追加」を選択すると、次回ライブラリを更新したときに、これらのメディアファイルは再インポートされません。</value>
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>メディア情報</value>
@@ -738,9 +738,6 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   </data>
   <data name="OK" xml:space="preserve">
     <value>わかりました</value>
-  </data>
-  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
-    <value>「閲覧中」ステータスのマンガにのみ適用</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>開く</value>
@@ -871,8 +868,8 @@ $items</value>
     <value>以下のプラグインは削除されます：
 $plugins</value>
   </data>
-  <data name="RemoveUnreachableCheckBox.Content" xml:space="preserve">
-    <value>アクセスできないコミックを自動的に削除</value>
+  <data name="RemoveUnreachableItems" xml:space="preserve">
+    <value>アクセスできない項目を自動的に削除</value>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>リピート</value>
@@ -971,8 +968,8 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>設定</value>
   </data>
-  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
-    <value>非表示のコミックを見る</value>
+  <data name="ShowHiddenItems" xml:space="preserve">
+    <value>非表示の項目を表示</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>エクスプローラーで表示</value>

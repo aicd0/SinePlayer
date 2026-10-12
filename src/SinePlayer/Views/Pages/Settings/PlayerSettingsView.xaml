@@ -23,12 +23,6 @@
             Content="{x:Bind StringResource.RestoreLastReadingPosition}"
             IsChecked="{x:Bind ViewModel.RestoreLastReadingPosition, Mode=TwoWay}" />
         <CheckBox
-            Margin="16,0,0,0"
-            Click="RestoreLastReadingPositionOnlyAppliesToReadingMediaCheckBox_Click"
-            Content="{x:Bind StringResource.OnlyAppliesToReadingMedia}"
-            IsChecked="{x:Bind ViewModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia, Mode=TwoWay}"
-            IsEnabled="{x:Bind ViewModel.RestoreLastReadingPosition, Mode=OneWay}" />
-        <CheckBox
             Click="AutoToggleOverlaysOnCursorCheckBox_Click"
             Content="{x:Bind StringResource.AutoToggleOverlaysOnCursor}"
             IsChecked="{x:Bind ViewModel.AutoToggleOverlaysOnCursor, Mode=TwoWay}" />

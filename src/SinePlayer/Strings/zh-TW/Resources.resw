@@ -169,13 +169,13 @@
     <value>抗混疊濾波器</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>Sine 播放器 UWP</value>
+    <value>Sine 播放器</value>
   </data>
   <data name="AppDisplayName" xml:space="preserve">
-    <value>Sine 播放器 UWP</value>
+    <value>Sine 播放器</value>
   </data>
   <data name="AppStoreName" xml:space="preserve">
-    <value>Sine 播放器 UWP</value>
+    <value>Sine 播放器</value>
   </data>
   <data name="AppearanceExpander.Detail" xml:space="preserve">
     <value>選擇要顯示的應用程式主題</value>
@@ -331,7 +331,7 @@
     <value>描述</value>
   </data>
   <data name="DevAppDisplayName" xml:space="preserve">
-    <value>Sine 播放器 UWP [Dev]</value>
+    <value>Sine 播放器 [Dev]</value>
   </data>
   <data name="DeveloperMode" xml:space="preserve">
     <value>開發者模式</value>
@@ -422,49 +422,49 @@
     <value>或</value>
   </data>
   <data name="ExpressionReference" xml:space="preserve">
-    <value>表達式參考
+    <value>運算式參考
 
 1. 變數
 
-%tag                - 匹配漫畫中的所有標籤。
-%title              - 匹配標題 1 或標題 2。
-%title1             - 匹配標題 1。
-%title2             - 匹配標題 2。
-%rating             - 匹配評分。例如：100 代表 5 顆星，-1 代表無評分。
-%completion_state   - 漫畫完成狀態（0 - 未讀，1 - 正在閱讀，2 - 已完成）。
-%progress           - 閱讀進度，以百分比表示。例如：50 代表 50%。
-%duration           - 總時長。
+%tag                 - 標籤。
+%title               - 標題 1 或標題 2。
+%title1              - 標題 1。
+%title2              - 標題 2。
+%rating              - 評分。例如，100 代表 5 顆星，-1 代表沒有評分。
+%completion_status   - 完成狀態。
+%progress            - 進度百分比。例如，50 代表 50%。
+%duration            - 總時長。
 
-2. 變數運算符
+2. 變數運算子
 
-=                   - 等於。例如：%title = "This is a title"
-&gt;                   - 大於。例如：%rating &gt; 3
-&gt;=                  - 大於等於。
-&lt;                   - 小於。
-&lt;=                  - 小於等於。
-... IN (...)        - 包含於。例如：
-                      %rating in (3, 4, 5) - 配對評分在 3、4 和 5 之間的漫畫。
-                      %tag.language in (languageA, languageB) - 符合「language」標籤類別包含「languageA」或「languageB」的漫畫。
-                      (authorA, authorB) in %tag.authors - 匹配「authors」標籤類別同時包含「authorA」和「authorB」的漫畫。
-                      apple in %tag - 匹配包含標籤「apple」的漫畫。
+=                    - 等於。例如：%title = "標題內容"
+&gt;                    - 大於。例如：%rating &gt; 3
+&gt;=                   - 大於或等於。
+&lt;                    - 小於。
+&lt;=                   - 小於或等於。
+... IN (...)         - 屬於指定集合。例如：
+                       %rating in (3, 4, 5) - 符合評分為 3、4 或 5 的項目。
+                       %tag.language in (A, B) - 符合 "language" 標籤類別中包含 "A" 或 "B" 的項目。
+                       (A, B) in %tag.artists - 符合 "artists" 標籤類別中同時包含 "A" 和 "B" 的項目。
+                       "apple" in %tag - 符合包含 "apple" 標籤的項目。
 
-3. 邏輯運算符
+3. 邏輯運算子
 
-AND                 - 邏輯與。例如：%tag.fruit = apple AND %title = "我有一個蘋果"
-OR                  - 邏輯或。例如：%title1 = "蘋果還可以" OR %title2 = "橘子也可以"
-NOT                 - 邏輯非。例如：NOT %tag = "hide this"
+AND                  - 邏輯 AND（且）。例如：%tag.artists = A AND %title = "標題內容"
+OR                   - 邏輯 OR（或）。例如：%title1 = "標題 1" OR %title2 = "標題 2"
+NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
 
 4. 括號
 
-預設情況下，運算子將從左到右進行求值。使用 (...) 可提高所包含表達式的優先權。例如：
+預設情況下，運算子會由左至右依序計算。使用 (...) 可提高括號內運算式的優先順序。例如：
 
-%tag.author = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
+    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
 
-求值將以以下順序進行：
+計算順序如下：
 
-1. NOT %tag.lang = langB  ==&gt;  結果 1
-2. %tag.language = langA OR 結果 1  ==&gt;  結果 2
-3. %tag.author = abc AND 結果 2  ==&gt;  結果 3</value>
+    1. NOT %tag.lang = langB  ==&gt;  結果1
+    2. %tag.language = langA OR 結果1  ==&gt;  結果2
+    3. %tag.artists = abc AND 結果2  ==&gt;  結果3</value>
   </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>表達式</value>
@@ -648,7 +648,7 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
     <value>連結</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>選擇「加入排除清單」後，下次更新媒體庫時將不會再次匯入此漫畫。</value>
+    <value>選擇「加入排除清單」後，下次更新媒體庫時將不會再次匯入這些媒體檔案。</value>
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>媒體資訊</value>
@@ -736,9 +736,6 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   </data>
   <data name="OK" xml:space="preserve">
     <value>好的</value>
-  </data>
-  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
-    <value>僅對「閱讀中」狀態的漫畫生效</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>打開</value>
@@ -869,8 +866,8 @@ $items</value>
     <value>以下外掛程式將被移除：
 $plugins</value>
   </data>
-  <data name="RemoveUnreachableCheckBox.Content" xml:space="preserve">
-    <value>自動移除不可存取的漫畫</value>
+  <data name="RemoveUnreachableItems" xml:space="preserve">
+    <value>自動移除無法存取的項目</value>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>循環播放</value>
@@ -969,8 +966,8 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>設定</value>
   </data>
-  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
-    <value>顯示隱藏的漫畫</value>
+  <data name="ShowHiddenItems" xml:space="preserve">
+    <value>顯示隱藏項目</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>在檔案總管中顯示</value>

@@ -428,46 +428,45 @@ $files</value>
 
 1. Переменные
 
-%tag                     - Соответствует всем тегам в комиксе.
-%title                   - Соответствует заголовку 1 или заголовку 2.
-%title1                  - Соответствует заголовку 1.
-%title2                  - Соответствует заголовку 2.
-%rating                  - Соответствует рейтингу. Например: 100 представляет 5 звезды, -1 представляет отсутствие рейтинга.
-%completion_state        - Состояние завершения комикса (0 - не прочитано, 1 - читается, 2 - завершено).
-%progress                - прогресс чтения в процентах. Например: 50 представляет 50%.
-%duration                - Общая длительность.
+%tag                 - Теги.
+%title               - Название 1 или название 2.
+%title1              - Название 1.
+%title2              - Название 2.
+%rating              - Рейтинг. Например, 100 означает 5 звёзд, а -1 — отсутствие рейтинга.
+%completion_status   - Статус завершения.
+%progress            - Прогресс в процентах. Например, 50 означает 50 %.
+%duration            - Общая продолжительность.
 
 2. Операторы переменных
 
-=                        - Равно. Например: %title = "Это заголовок"
-&gt;                        - Больше. Например: %rating &gt; 3
-&gt;=                       - Больше или равно.
-&lt;                        - Меньше.
-&lt;=                       - Меньше или равно.
-... IN (...)             - Содержится в. Например:
-                           %rating in (3, 4, 5) - Сопоставить комиксы, рейтинги которых находятся в пределах 3, 4 и 5.
-                           %tag.language in (languageA, languageB) - Сопоставить комиксы, категория тега «язык» которых содержит «языкА» или «языкБ».
-                           (authorA, authorB) in %tag.authors - Сопоставить комиксы, категория тега «авторы» которых содержит как «авторА», так и «авторБ».
-                           apple in %tag - Сопоставить комиксы, содержащие тег «яблоко».
+=                    - Равно. Например: %title = "Название"
+&gt;                    - Больше. Например: %rating &gt; 3
+&gt;=                   - Больше или равно.
+&lt;                    - Меньше.
+&lt;=                   - Меньше или равно.
+... IN (...)         - Содержится в. Например:
+                       %rating in (3, 4, 5) - Соответствует элементам с рейтингом 3, 4 или 5.
+                       %tag.language in (A, B) - Соответствует элементам, у которых категория тегов "language" содержит "A" или "B".
+                       (A, B) in %tag.artists - Соответствует элементам, у которых категория тегов "artists" содержит и "A", и "B".
+                       "apple" in %tag - Соответствует элементам с тегом "apple".
 
 3. Логические операторы
 
-AND                      - Логическое и. Например: %tag.fruit = apple AND %title = "У меня есть яблоко"
-OR                       - Логическое или. Например: %title1 = "Яблоко - это нормально" OR %title2 = "Апельсин - это тоже нормально"
-NOT                      - Логическое не. Например: NOT %tag = "скрыть это"
+AND                  - Логическое И. Например: %tag.artists = A AND %title = "Название"
+OR                   - Логическое ИЛИ. Например: %title1 = "Название 1" OR %title2 = "Название 2"
+NOT                  - Логическое НЕ. Например: NOT %tag = "SomeTag"
 
 4. Скобки
 
-По умолчанию операторы будут оцениваться слева направо. Используйте (...), чтобы повысить
-приоритет включенного выражения. Например:
+По умолчанию операторы вычисляются слева направо. Используйте (...) для повышения приоритета выражения в скобках. Например:
 
-%tag.author = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
+    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
 
-Оценка будет выполняться в следующем порядке:
+Вычисление выполняется в следующем порядке:
 
-1. NOT %tag.lang = langB  ==&gt;  Результат1
-2. %tag.language = langA OR Результат1  ==&gt;  Результат2
-3. %tag.author = abc AND Результат2  ==&gt;  Результат3</value>
+    1. NOT %tag.lang = langB  ==&gt;  Результат1
+    2. %tag.language = langA OR Результат1  ==&gt;  Результат2
+    3. %tag.artists = abc AND Результат2  ==&gt;  Результат3</value>
   </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>Выражение</value>
@@ -651,7 +650,7 @@ NOT                      - Логическое не. Например: NOT %tag
     <value>Ссылки</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>Выбор пункта «добавить в список исключений» не позволит повторно импортировать комикс при следующем обновлении библиотеки.</value>
+    <value>Если выбрать «добавить в список исключений», эти медиафайлы не будут импортированы повторно при следующем обновлении библиотеки.</value>
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>Информация о медиафайле</value>
@@ -739,9 +738,6 @@ NOT                      - Логическое не. Например: NOT %tag
   </data>
   <data name="OK" xml:space="preserve">
     <value>ХОРОШО</value>
-  </data>
-  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
-    <value>Применяется только к комиксам со статусом «Читается»</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>Открыть</value>
@@ -872,8 +868,8 @@ $items</value>
     <value>Следующие плагины будут удалены:
 $plugins</value>
   </data>
-  <data name="RemoveUnreachableCheckBox.Content" xml:space="preserve">
-    <value>Автоматически удалять недоступные комиксы</value>
+  <data name="RemoveUnreachableItems" xml:space="preserve">
+    <value>Автоматически удалять недоступные элементы</value>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>Повтор</value>
@@ -972,8 +968,8 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>Настройки</value>
   </data>
-  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
-    <value>Показать скрытые комиксы</value>
+  <data name="ShowHiddenItems" xml:space="preserve">
+    <value>Показывать скрытые элементы</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>Показать в проводнике</value>

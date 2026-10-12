@@ -428,45 +428,45 @@ Catégorie :: Tag1, Tag2    - Remplacez « Catégorie » par « Tag1 » et « Ta
 
 1. Variables
 
-%tag                  - Correspond à tous les tags d'une BD.
-%title                - Correspond au titre 1 ou 2.
-%title1               - Correspond au titre 1.
-%title2               - Correspond au titre 2.
-%rating               - Correspond à la note. Par exemple : 100 représente 5 étoiles, -1 représente aucune note.
-%completion_state     - État d'achèvement de la BD (0 - Non lu, 1 - Lu, 2 - Terminé).
-%progress             - Progression de la lecture, en pourcentage. Par exemple : 50 représente 50 %.
-%duration             - Durée totale.
+%tag                 - Balises.
+%title               - Titre 1 ou Titre 2.
+%title1              - Titre 1.
+%title2              - Titre 2.
+%rating              - Note. Par exemple, 100 représente 5 étoiles et -1 signifie qu'aucune note n'est disponible.
+%completion_status   - État d'achèvement.
+%progress            - Progression en pourcentage. Par exemple, 50 représente 50 %.
+%duration            - Durée totale.
 
-2. Opérateurs de variables
+2. Opérateurs sur les variables
 
-=                     - Égal. Par exemple : %title = "Ceci est un titre"
-&gt;                     - Supérieur à. Par exemple : %rating &gt; 3
-&gt;=                    - Supérieur ou égal à.
-&lt;                     - Inférieur à.
-&lt;=                    - Inférieur ou égal à.
-... IN (...)          - Contenu par. Par exemple :
-                        %rating in (3, 4, 5) - Correspond aux bandes dessinées dont les notes sont comprises entre 3, 4 et 5.
-                        %tag.language in (languageA, languageB) - Correspond aux bandes dessinées dont la catégorie de balise « language » contient « languageA » ou « languageB ».
-                        (authorA, authorB) in %tag.authors - Correspond aux bandes dessinées dont la catégorie de balise « authors » contient à la fois « authorA » et « authorB ».
-                        apple in %tag - Correspond aux bandes dessinées contenant la balise « apple ».
+=                    - Égal à. Exemple : %title = "Voici le titre"
+&gt;                    - Supérieur à. Exemple : %rating &gt; 3
+&gt;=                   - Supérieur ou égal à.
+&lt;                    - Inférieur à.
+&lt;=                   - Inférieur ou égal à.
+... IN (...)         - Appartient à. Exemple :
+                       %rating in (3, 4, 5) - Correspond aux éléments dont la note est 3, 4 ou 5.
+                       %tag.language in (A, B) - Correspond aux éléments dont la catégorie de balises "language" contient "A" ou "B".
+                       (A, B) in %tag.artists - Correspond aux éléments dont la catégorie de balises "artists" contient à la fois "A" et "B".
+                       "apple" in %tag - Correspond aux éléments qui contiennent la balise "apple".
 
 3. Opérateurs logiques
 
-AND                   - Et logique. Par exemple : %tag.fruit = apple and %title = "J'ai une pomme"
-OR                    - Ou logique. Par exemple : %title1 = "Apple is OK" or %title2 = "Orange is OK also"
-NOT                   - Non logique. Par exemple : NOT %tag = "hide this"
+AND                  - ET logique. Exemple : %tag.artists = A AND %title = "Voici le titre"
+OR                   - OU logique. Exemple : %title1 = "Voici le titre 1" OR %title2 = "Voici le titre 2"
+NOT                  - NON logique. Exemple : NOT %tag = "SomeTag"
 
 4. Parenthèses
 
-Par défaut, les opérateurs sont évalués de gauche à droite. Utilisez (...) pour augmenter la priorité de l'expression incluse. Par exemple :
+Par défaut, les opérateurs sont évalués de gauche à droite. Utilisez (...) pour donner la priorité à l'expression entre parenthèses. Exemple :
 
-%tag.author = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
+    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
 
-L'évaluation sera effectuée dans l'ordre suivant :
+L'évaluation s'effectuera dans l'ordre suivant :
 
-1. NOT %tag.lang = langB  ==&gt;  Résultat1
-2. %tag.language = langA OR Result1  ==&gt;  Résultat2
-3. %tag.author = abc AND Result2  ==&gt;  Résultat3</value>
+    1. NOT %tag.lang = langB  ==&gt;  Résultat1
+    2. %tag.language = langA OR Résultat1  ==&gt;  Résultat2
+    3. %tag.artists = abc AND Résultat2  ==&gt;  Résultat3</value>
   </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>Expression</value>
@@ -650,7 +650,7 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
     <value>Links</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>Sélectionner « ajouter à la liste d’exclusion » empêchera la réimportation de la BD lors de la prochaine mise à jour de la bibliothèque.</value>
+    <value>En sélectionnant « ajouter à la liste d’exclusion », ces fichiers multimédias ne seront pas importés à nouveau lors de la prochaine mise à jour de la bibliothèque.</value>
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>Informations sur le média</value>
@@ -738,9 +738,6 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="OK" xml:space="preserve">
     <value>D'ACCORD</value>
-  </data>
-  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
-    <value>S’applique uniquement aux bandes dessinées avec le statut « En lecture »</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>Ouvrir</value>
@@ -871,8 +868,8 @@ $items</value>
     <value>Les extensions suivantes seront supprimées :
 $plugins</value>
   </data>
-  <data name="RemoveUnreachableCheckBox.Content" xml:space="preserve">
-    <value>Supprimer automatiquement les bandes dessinées inaccessibles</value>
+  <data name="RemoveUnreachableItems" xml:space="preserve">
+    <value>Supprimer automatiquement les éléments inaccessibles</value>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>Répéter</value>
@@ -971,8 +968,8 @@ Démarrer en mode sans échec ?</value>
   <data name="Settings" xml:space="preserve">
     <value>Paramètres</value>
   </data>
-  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
-    <value>Afficher les bandes dessinées cachées</value>
+  <data name="ShowHiddenItems" xml:space="preserve">
+    <value>Afficher les éléments masqués</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>Afficher dans l’Explorateur de fichiers</value>

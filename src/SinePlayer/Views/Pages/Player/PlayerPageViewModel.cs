@@ -551,9 +551,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
             default:
                 {
-                    bool restorePosition =
-                        AppSettingsModel.RestoreLastReadingPosition &&
-                        !(AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia && media.CompletionStatus != CompletionStatusEnum.Ongoing);
+                    bool restorePosition = AppSettingsModel.RestoreLastReadingPosition;
                     return restorePosition ? media.LastPositionMs : 0;
                 }
         }

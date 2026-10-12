@@ -36,17 +36,6 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _restoreLastReadingPositionOnlyAppliesToReadingMedia;
-    public bool RestoreLastReadingPositionOnlyAppliesToReadingMedia
-    {
-        get => _restoreLastReadingPositionOnlyAppliesToReadingMedia;
-        set
-        {
-            _restoreLastReadingPositionOnlyAppliesToReadingMedia = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RestoreLastReadingPositionOnlyAppliesToReadingMedia)));
-        }
-    }
-
     private bool _autoToggleOverlaysOnCursor;
     public bool AutoToggleOverlaysOnCursor
     {
@@ -119,7 +108,6 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         CoroutineUtils.RunInMainThread(() =>
         {
             RestoreLastReadingPosition = AppSettingsModel.RestoreLastReadingPosition;
-            RestoreLastReadingPositionOnlyAppliesToReadingMedia = AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia;
             AutoToggleOverlaysOnCursor = AppSettingsModel.AutoToggleOverlaysOnCursor;
             AutoPlayNext = AppSettingsModel.AutoPlayNext;
         });

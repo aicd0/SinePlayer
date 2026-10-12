@@ -169,13 +169,13 @@
     <value>抗混叠滤波器</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>Sine 播放器 UWP</value>
+    <value>Sine 播放器</value>
   </data>
   <data name="AppDisplayName" xml:space="preserve">
-    <value>Sine 播放器 UWP</value>
+    <value>Sine 播放器</value>
   </data>
   <data name="AppStoreName" xml:space="preserve">
-    <value>Sine 播放器 UWP</value>
+    <value>Sine 播放器</value>
   </data>
   <data name="AppearanceExpander.Detail" xml:space="preserve">
     <value>选择要显示的应用主题</value>
@@ -333,7 +333,7 @@ $files</value>
     <value>描述</value>
   </data>
   <data name="DevAppDisplayName" xml:space="preserve">
-    <value>Sine 播放器 UWP [Dev]</value>
+    <value>Sine 播放器 [Dev]</value>
   </data>
   <data name="DeveloperMode" xml:space="preserve">
     <value>开发者模式</value>
@@ -428,45 +428,45 @@ $files</value>
 
 1. 变量
 
-%tag              - 匹配漫画中的所有标签。
-%title            - 匹配标题 1 或标题 2。
-%title1           - 匹配标题 1。
-%title2           - 匹配标题 2。
-%rating           - 匹配评分。例如：100 代表 5 星，-1 代表无评分。
-%completion_state - 漫画完成状态（0 - 未读，1 - 正在阅读，2 - 已完成）。
-%progress         - 阅读进度，以百分比表示。例如：50 代表 50%。
-%duration         - 总时长。
+%tag                 - 标签。
+%title               - 标题 1 或标题 2。
+%title1              - 标题 1。
+%title2              - 标题 2。
+%rating              - 评分。例如，100 表示 5 星，-1 表示无评分。
+%completion_status   - 完成状态。
+%progress            - 进度百分比。例如，50 表示 50%。
+%duration            - 总时长。
 
 2. 变量运算符
 
-=                 - 等于。例如：%title = "This is a title"
-&gt;                 - 大于。例如：%rating &gt; 3
-&gt;=                - 大于等于。
-&lt;                 - 小于。
-&lt;=                - 小于等于。
-... IN (...)      - 包含于。例如：
-                    %rating in (3, 4, 5) - 匹配评分在 3、4 和 5 之间的漫画。
-                    %tag.language in (languageA, languageB) - 匹配“language”标签类别包含“languageA”或“languageB”的漫画。
-                    (authorA, authorB) in %tag.authors - 匹配“authors”标签类别同时包含“authorA”和“authorB”的漫画。
-                    apple in %tag - 匹配包含标签“apple”的漫画。
+=                    - 等于。例如：%title = "标题内容"
+&gt;                    - 大于。例如：%rating &gt; 3
+&gt;=                   - 大于或等于。
+&lt;                    - 小于。
+&lt;=                   - 小于或等于。
+... IN (...)         - 属于指定集合。例如：
+                       %rating in (3, 4, 5) - 匹配评分为 3、4 或 5 的项目。
+                       %tag.language in (A, B) - 匹配 "language" 标签类别中包含 "A" 或 "B" 的项目。
+                       (A, B) in %tag.artists - 匹配 "artists" 标签类别中同时包含 "A" 和 "B" 的项目。
+                       "apple" in %tag - 匹配包含 "apple" 标签的项目。
 
 3. 逻辑运算符
 
-AND               - 逻辑与。例如：%tag.fruit = apple AND %title = "我有一个苹果"
-OR                - 逻辑或。例如：%title1 = "苹果还可以" OR %title2 = "橙子也可以"
-NOT               - 逻辑非。例如：NOT %tag = "hide this"
+AND                  - 逻辑与。例如：%tag.artists = A AND %title = "标题内容"
+OR                   - 逻辑或。例如：%title1 = "标题 1" OR %title2 = "标题 2"
+NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
 
 4. 括号
 
-默认情况下，运算符将从左到右进行求值。使用 (...) 可提高所包含表达式的优先级。例如：
+默认情况下，运算符按照从左到右的顺序进行计算。使用 (...) 可以提高括号内表达式的优先级。例如：
 
-%tag.author = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
+    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
 
-求值将按以下顺序进行：
+计算顺序如下：
 
-1. NOT %tag.lang = langB  ==&gt;  结果 1
-2. %tag.language = langA OR 结果 1  ==&gt;  结果 2
-3. %tag.author = abc AND 结果 2  ==&gt;  结果 3</value>
+    1. NOT %tag.lang = langB  ==&gt;  结果1
+    2. %tag.language = langA OR 结果1  ==&gt;  结果2
+    3. %tag.artists = abc AND 结果2  ==&gt;  结果3</value>
   </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>表达式</value>
@@ -650,7 +650,7 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
     <value>链接</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>选择“添加到排除列表”后，下次更新媒体库时将不会再次导入此漫画。</value>
+    <value>选择“添加到排除列表”后，下次更新媒体库时将不会再次导入这些媒体文件。</value>
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>媒体信息</value>
@@ -738,9 +738,6 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   </data>
   <data name="OK" xml:space="preserve">
     <value>好的</value>
-  </data>
-  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
-    <value>仅对“阅读中”状态的漫画生效</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>打开</value>
@@ -871,8 +868,8 @@ $items</value>
     <value>以下插件将被移除：
 $plugins</value>
   </data>
-  <data name="RemoveUnreachableCheckBox.Content" xml:space="preserve">
-    <value>自动移除不可访问的漫画</value>
+  <data name="RemoveUnreachableItems" xml:space="preserve">
+    <value>自动移除无法访问的项目</value>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>循环播放</value>
@@ -971,8 +968,8 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>设置</value>
   </data>
-  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
-    <value>查看隐藏漫画</value>
+  <data name="ShowHiddenItems" xml:space="preserve">
+    <value>显示隐藏项目</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>在文件资源管理器中显示</value>

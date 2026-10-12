@@ -13,7 +13,7 @@ using SinePlayer.SDK.Plugins.UI.Menu;
 
 namespace SinePlayer.SDK.Plugins;
 
-public delegate void MediaEditedEventHandler(IMediaModel comic);
+public delegate void MediaEditedEventHandler(IMediaModel media);
 
 public interface IPluginContext
 {
