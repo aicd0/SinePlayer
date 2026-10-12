@@ -6,18 +6,18 @@ using System.Globalization;
 using Microsoft.UI.Xaml.Controls;
 
 using SinePlayerUWP.SDK.Models;
-using SinePlayerUWP.SDK.Plugins.Comic;
+using SinePlayerUWP.SDK.Plugins.Media;
 using SinePlayerUWP.SDK.Plugins.Property;
 using SinePlayerUWP.SDK.Plugins.UI;
 using SinePlayerUWP.SDK.Plugins.UI.Menu;
 
 namespace SinePlayerUWP.SDK.Plugins;
 
-public delegate void ComicEditedEventHandler(IComicModel comic);
+public delegate void MediaEditedEventHandler(IMediaModel comic);
 
 public interface IPluginContext
 {
-    event ComicEditedEventHandler? ComicEdited;
+    event MediaEditedEventHandler? MediaEdited;
 
     CultureInfo CurrentCulture { get; }
 
@@ -27,7 +27,7 @@ public interface IPluginContext
 
     IRegistryDatabase RegistryDatabase { get; }
 
-    IComicMenuItemCreator? ComicMenuItemCreator { get; set; }
+    IMediaMenuItemCreator? MediaMenuItemCreator { get; set; }
 
     ICommonMenuItemCreator? MainPageMoreMenuItemCreator { get; set; }
 
@@ -37,13 +37,13 @@ public interface IPluginContext
 
     Task<DialogResult> EnqueueDialog(ContentDialog dialog);
 
-    Task<IComicModel?> GetComic(long id);
+    Task<IMediaModel?> GetMedia(long id);
 
-    Task<IEnumerable<long>> SearchComics(string filterExpression);
+    Task<IEnumerable<long>> SearchMedia(string filterExpression);
 
     void RegisterPage(string host, Type pageType);
 
-    void RegisterComicVirtualProperty(IVirtualProperty<IComicModel> property);
+    void RegisterMediaVirtualProperty(IVirtualProperty<IMediaModel> property);
 
     void RegisterSidebarPage(ISidebarPageProvider provider);
 }

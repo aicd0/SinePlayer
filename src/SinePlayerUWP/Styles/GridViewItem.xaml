@@ -531,7 +531,7 @@
         </Setter>
     </Style>
 
-    <Style x:Key="VerticalComicItemContainerStyle" TargetType="GridViewItem">
+    <Style x:Key="VerticalMediaItemContainerStyle" TargetType="GridViewItem">
         <Setter Property="Margin" Value="6" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="cw:Effects.Shadow">

@@ -15,25 +15,25 @@ namespace SinePlayerUWP.UserControls.Misc;
 
 internal sealed partial class ViewTypeSelector : BaseUserControl
 {
-    public delegate void ViewTypeChangedEventHandler(ComicFilterModel.ViewTypeEnum viewType);
+    public delegate void ViewTypeChangedEventHandler(MediaFilterModel.ViewTypeEnum viewType);
     public event ViewTypeChangedEventHandler? ViewTypeChanged;
 
-    private static readonly List<ComicFilterModel.ViewTypeEnum> _viewTypes = [
-        ComicFilterModel.ViewTypeEnum.Large,
-        ComicFilterModel.ViewTypeEnum.Medium,
+    private static readonly List<MediaFilterModel.ViewTypeEnum> _viewTypes = [
+        MediaFilterModel.ViewTypeEnum.Large,
+        MediaFilterModel.ViewTypeEnum.Medium,
     ];
 
-    public ComicFilterModel.ViewTypeEnum SelectedViewType
+    public MediaFilterModel.ViewTypeEnum SelectedViewType
     {
-        get => (ComicFilterModel.ViewTypeEnum)GetValue(SelectedViewTypeProperty);
+        get => (MediaFilterModel.ViewTypeEnum)GetValue(SelectedViewTypeProperty);
         set => SetValue(SelectedViewTypeProperty, value);
     }
 
     public static readonly DependencyProperty SelectedViewTypeProperty = DependencyProperty.Register(
         nameof(SelectedViewType),
-        typeof(ComicFilterModel.ViewTypeEnum),
+        typeof(MediaFilterModel.ViewTypeEnum),
         typeof(ViewTypeSelector),
-        new PropertyMetadata(ComicFilterModel.ViewTypeEnum.Medium));
+        new PropertyMetadata(MediaFilterModel.ViewTypeEnum.Medium));
 
     public ViewTypeSelector()
     {
@@ -50,25 +50,25 @@ internal sealed partial class ViewTypeSelector : BaseUserControl
     private void RebuildItems(MenuFlyout flyout)
     {
         flyout.Items.Clear();
-        foreach (ComicFilterModel.ViewTypeEnum viewType in _viewTypes)
+        foreach (MediaFilterModel.ViewTypeEnum viewType in _viewTypes)
         {
             var item = new ToggleMenuFlyoutItem
             {
                 Text = ViewTypeToDisplayName(viewType),
                 IsChecked = viewType == SelectedViewType,
             };
-            ComicFilterModel.ViewTypeEnum selected = viewType;
+            MediaFilterModel.ViewTypeEnum selected = viewType;
             item.Click += (sender, args) => ViewTypeChanged?.Invoke(selected);
             flyout.Items.Add(item);
         }
     }
 
-    private static string ViewTypeToDisplayName(ComicFilterModel.ViewTypeEnum viewType)
+    private static string ViewTypeToDisplayName(MediaFilterModel.ViewTypeEnum viewType)
     {
         return viewType switch
         {
-            ComicFilterModel.ViewTypeEnum.Large => StringResourceProvider.Instance.ViewTypeLarge,
-            ComicFilterModel.ViewTypeEnum.Medium => StringResourceProvider.Instance.ViewTypeMedium,
+            MediaFilterModel.ViewTypeEnum.Large => StringResourceProvider.Instance.ViewTypeLarge,
+            MediaFilterModel.ViewTypeEnum.Medium => StringResourceProvider.Instance.ViewTypeMedium,
             _ => "Unknown"
         };
     }

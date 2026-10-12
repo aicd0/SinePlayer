@@ -150,14 +150,11 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>Fortschrittlich</value>
   </data>
-  <data name="AllComics" xml:space="preserve">
-    <value>Alle Comics</value>
-  </data>
-  <data name="AllComicsIn" xml:space="preserve">
-    <value>Alle Comics in $path</value>
-  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>Alle versteckten Elemente</value>
+  </data>
+  <data name="AllItems" xml:space="preserve">
+    <value>Alle Elemente</value>
   </data>
   <data name="AllMatchedResults" xml:space="preserve">
     <value>Alle übereinstimmenden Ergebnisse</value>
@@ -197,6 +194,9 @@
   </data>
   <data name="Auto" xml:space="preserve">
     <value>Auto</value>
+  </data>
+  <data name="AutoPlayNext" xml:space="preserve">
+    <value>Nächstes Element automatisch abspielen</value>
   </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>Automatisches scrollen</value>
@@ -240,9 +240,6 @@
   <data name="ClearCache" xml:space="preserve">
     <value>Cache leeren</value>
   </data>
-  <data name="ClearReaderSettings" xml:space="preserve">
-    <value>Leseeinstellungen löschen</value>
-  </data>
   <data name="CloseLastTabBehavior" xml:space="preserve">
     <value>Verhalten beim Schließen des letzten Tabs</value>
   </data>
@@ -264,12 +261,6 @@
   <data name="CollectionInformation" xml:space="preserve">
     <value>Sammlungsinformationen</value>
   </data>
-  <data name="ComicExclusionExplaination" xml:space="preserve">
-    <value>Mit der Option „zur Ausschlussliste hinzufügen“ wird verhindert, dass der Comic beim nächsten Aktualisieren der Bibliothek erneut importiert wird.</value>
-  </data>
-  <data name="ComicInfo" xml:space="preserve">
-    <value>Comic-Informationen</value>
-  </data>
   <data name="CompletionStatus" xml:space="preserve">
     <value>Abschlussstatus</value>
   </data>
@@ -279,17 +270,17 @@
   <data name="CompletionStatusCompleted" xml:space="preserve">
     <value>Abgeschlossen</value>
   </data>
+  <data name="CompletionStatusNotStarted" xml:space="preserve">
+    <value>Nicht begonnen</value>
+  </data>
   <data name="CompletionStatusOnHold" xml:space="preserve">
     <value>Pausiert</value>
   </data>
-  <data name="CompletionStatusPlanToRead" xml:space="preserve">
-    <value>Lesen geplant</value>
+  <data name="CompletionStatusOngoing" xml:space="preserve">
+    <value>Laufend</value>
   </data>
-  <data name="CompletionStatusReading" xml:space="preserve">
-    <value>Lese gerade</value>
-  </data>
-  <data name="CompletionStatusUnread" xml:space="preserve">
-    <value>Ungelesen</value>
+  <data name="CompletionStatusPlanned" xml:space="preserve">
+    <value>Geplant</value>
   </data>
   <data name="Continuous" xml:space="preserve">
     <value>Kontinuierlich</value>
@@ -368,8 +359,8 @@ $files</value>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>Plugins von GitHub herunterladen</value>
   </data>
-  <data name="DuringAutoScrolling" xml:space="preserve">
-    <value>Beim automatischen Scrollen</value>
+  <data name="Duration" xml:space="preserve">
+    <value>Dauer</value>
   </data>
   <data name="Edit" xml:space="preserve">
     <value>Bearbeiten</value>
@@ -444,7 +435,7 @@ Kategorie:: Tag1, Tag2    - Überschreibe „Kategorie“ mit „Tag1“ und „
 %rating                   - Bewertung abgleichen. Beispiel: 100 steht für 5 Sterne, -1 für keine Bewertung.
 %completion_state         - Status der Comic-Vervollständigung (0 - Ungelesen, 1 - Lesen, 2 - Abgeschlossen).
 %progress                 - Lesefortschritt in Prozent. Beispiel: 50 steht für 50 %.
-%page_count               - Seitenanzahl.
+%duration                 - Gesamtdauer.
 
 2. Variablenoperatoren
 
@@ -543,27 +534,6 @@ Die Auswertung erfolgt in der folgenden Reihenfolge:
   <data name="GoForward" xml:space="preserve">
     <value>Weiter</value>
   </data>
-  <data name="GoToFirstPage" xml:space="preserve">
-    <value>Zur ersten Seite</value>
-  </data>
-  <data name="GoToLastPage" xml:space="preserve">
-    <value>Zur letzten Seite gehen</value>
-  </data>
-  <data name="GoToLeftPage" xml:space="preserve">
-    <value>Zur linken Seite</value>
-  </data>
-  <data name="GoToNextPage" xml:space="preserve">
-    <value>Zur nächsten Seite</value>
-  </data>
-  <data name="GoToPreviousPage" xml:space="preserve">
-    <value>Zur vorherigen Seite</value>
-  </data>
-  <data name="GoToRandomPage" xml:space="preserve">
-    <value>Gehen Sie zu einer zufälligen Seite</value>
-  </data>
-  <data name="GoToRightPage" xml:space="preserve">
-    <value>Zur rechten Seite</value>
-  </data>
   <data name="Group" xml:space="preserve">
     <value>Gruppierung</value>
   </data>
@@ -609,8 +579,8 @@ Die Auswertung erfolgt in der folgenden Reihenfolge:
   <data name="Images" xml:space="preserve">
     <value>Bilder</value>
   </data>
-  <data name="IncludeHiddenComics" xml:space="preserve">
-    <value>Versteckte Comics einschließen</value>
+  <data name="IncludeHiddenItems" xml:space="preserve">
+    <value>Versteckte Elemente einschließen</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>Plugin installieren</value>
@@ -652,11 +622,8 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="LanguageExpander.Header" xml:space="preserve">
     <value>Sprache</value>
   </data>
-  <data name="LastReadTime" xml:space="preserve">
-    <value>Letzte Lesezeit</value>
-  </data>
-  <data name="LeftToRight" xml:space="preserve">
-    <value>Von links nach rechts</value>
+  <data name="LastVisitTime" xml:space="preserve">
+    <value>Zuletzt aufgerufen</value>
   </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>Keine Ergebnisse mit den aktuellen Filtereinstellungen. Versuchen Sie es mit </value>
@@ -682,8 +649,11 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Links" xml:space="preserve">
     <value>Links</value>
   </data>
-  <data name="MaintainRelativeSize" xml:space="preserve">
-    <value>Relative Größe beibehalten</value>
+  <data name="MediaExclusionExplaination" xml:space="preserve">
+    <value>Mit der Option „zur Ausschlussliste hinzufügen“ wird verhindert, dass der Comic beim nächsten Aktualisieren der Bibliothek erneut importiert wird.</value>
+  </data>
+  <data name="MediaInfo" xml:space="preserve">
+    <value>Medieninformationen</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Neuen Ordner erstellen</value>
@@ -733,9 +703,6 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Next" xml:space="preserve">
     <value>Weiter</value>
   </data>
-  <data name="NoComicsHint" xml:space="preserve">
-    <value>Deine Comics werden hier angezeigt</value>
-  </data>
   <data name="NoContent" xml:space="preserve">
     <value>Keine Inhalte verfügbar</value>
   </data>
@@ -747,6 +714,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   </data>
   <data name="NoKeyboardShortcuts" xml:space="preserve">
     <value>Keine Tastenkürzel</value>
+  </data>
+  <data name="NoMediaHint" xml:space="preserve">
+    <value>Deine Medien werden hier angezeigt</value>
   </data>
   <data name="NoPluginsInstalled" xml:space="preserve">
     <value>Keine Plugins installiert</value>
@@ -769,14 +739,11 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OK" xml:space="preserve">
     <value>OK</value>
   </data>
-  <data name="OnlyAppliesToReadingComics" xml:space="preserve">
+  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
     <value>Gilt nur für Comics mit dem Status „Wird gelesen“</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>Öffnen</value>
-  </data>
-  <data name="OpenComicDefaultBehavior" xml:space="preserve">
-    <value>Standardverhalten beim Öffnen eines Comics</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Startseite öffnen</value>
@@ -790,17 +757,20 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OpenInNewTab" xml:space="preserve">
     <value>In neuem Tab öffnen</value>
   </data>
+  <data name="OpenItemDefaultBehavior" xml:space="preserve">
+    <value>Standardverhalten beim Öffnen eines Elements</value>
+  </data>
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>Metadatenordner öffnen</value>
   </data>
-  <data name="OpenNextComic" xml:space="preserve">
-    <value>Nächsten Comic öffnen</value>
+  <data name="OpenNextItem" xml:space="preserve">
+    <value>Nächstes Element öffnen</value>
   </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>Plugin-Ordner öffnen</value>
   </data>
-  <data name="OpenPreviousComic" xml:space="preserve">
-    <value>Vorherigen Comic öffnen</value>
+  <data name="OpenPreviousItem" xml:space="preserve">
+    <value>Vorheriges Element öffnen</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>Seitenleiste öffnen</value>
@@ -811,15 +781,6 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Dieser Vorgang überschreibt vorhandene Einträge.</value>
   </data>
-  <data name="PageCount" xml:space="preserve">
-    <value>Seiten</value>
-  </data>
-  <data name="PageN" xml:space="preserve">
-    <value>Seite $page</value>
-  </data>
-  <data name="PageSpacing" xml:space="preserve">
-    <value>Seitenabstand</value>
-  </data>
   <data name="Pause" xml:space="preserve">
     <value>Pause</value>
   </data>
@@ -829,17 +790,35 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Play" xml:space="preserve">
     <value>Abspielen</value>
   </data>
+  <data name="PlayPause" xml:space="preserve">
+    <value>Wiedergabe / Pause</value>
+  </data>
+  <data name="PlayerExpander.Detail" xml:space="preserve">
+    <value>Allgemeine Player-Einstellungen</value>
+  </data>
+  <data name="PlayerExpander.Header" xml:space="preserve">
+    <value>Player</value>
+  </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>Player-Einstellungen</value>
+  </data>
+  <data name="PlayerStatusError" xml:space="preserve">
+    <value>Beim Laden ist ein Fehler aufgetreten</value>
+  </data>
+  <data name="PlayerStatusLoading" xml:space="preserve">
+    <value>Der Player wird geladen</value>
+  </data>
+  <data name="Playlist" xml:space="preserve">
+    <value>Wiedergabeliste</value>
+  </data>
+  <data name="PlaylistEmpty" xml:space="preserve">
+    <value>Deine Wiedergabeliste wird hier angezeigt</value>
+  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Plugins verwalten und konfigurieren</value>
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>Plugins</value>
-  </data>
-  <data name="PreloadPagesAfter" xml:space="preserve">
-    <value>Seiten vorladen (nach der aktuellen Seite)</value>
-  </data>
-  <data name="PreloadPagesBefore" xml:space="preserve">
-    <value>Seiten vorladen (vor der aktuellen Seite)</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>Tastenkombination drücken</value>
@@ -856,40 +835,14 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Progress" xml:space="preserve">
     <value>Fortschritt</value>
   </data>
-  <data name="PromptBeforeRemovingComics" xml:space="preserve">
-    <value>Vor dem Entfernen von Comics bestätigen</value>
+  <data name="PromptBeforeRemovingItems" xml:space="preserve">
+    <value>Vor dem Entfernen von Elementen nachfragen</value>
   </data>
-  <data name="RandomComic" xml:space="preserve">
-    <value>Zufälliger comic</value>
+  <data name="Random" xml:space="preserve">
+    <value>Zufallswiedergabe</value>
   </data>
   <data name="Rating" xml:space="preserve">
     <value>Punktzahl</value>
-  </data>
-  <data name="ReaderExpander.Detail" xml:space="preserve">
-    <value>Passen Sie den Reader an</value>
-  </data>
-  <data name="ReaderExpander.Header" xml:space="preserve">
-    <value>Leser</value>
-  </data>
-  <data name="ReaderSettingButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Reader-Einstellungen</value>
-  </data>
-  <data name="ReaderStatusError" xml:space="preserve">
-    <value>Beim Laden ist ein Fehler aufgetreten</value>
-  </data>
-  <data name="ReaderStatusLoading" xml:space="preserve">
-    <value>Der Reader wird geladen</value>
-  </data>
-  <data name="ReaderTipContent" xml:space="preserve">
-    <value>1. Doppeltippen, um die Seite an die Breite oder Höhe anzupassen.
-2. Setzen Sie „Automatisches Scrollen“ auf einen Wert größer als 0, um automatisches Scrollen und das Scrollen mit der mittleren Maustaste zu aktivieren.
-3. Ziehen Sie die Seite, um die Scrollgeschwindigkeit anzupassen.</value>
-  </data>
-  <data name="ReadingList" xml:space="preserve">
-    <value>Leseliste</value>
-  </data>
-  <data name="ReadingListEmpty" xml:space="preserve">
-    <value>Deine Leseliste wird hier angezeigt</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>Aktualisieren</value>
@@ -936,6 +889,9 @@ $plugins</value>
   <data name="ResetAllSettingsMessage" xml:space="preserve">
     <value>Alle einstellungen werden auf den standardzustand zurückgesetzt. Ihre benutzerdaten bleiben erhalten.</value>
   </data>
+  <data name="ResetPlayerSettings" xml:space="preserve">
+    <value>Player-Einstellungen zurücksetzen</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Wiederherstellen</value>
   </data>
@@ -979,6 +935,12 @@ Im abgesicherten Modus starten?</value>
   <data name="SearchResultsOf" xml:space="preserve">
     <value>Ergebnisse von „$keyword“</value>
   </data>
+  <data name="SeekBackward" xml:space="preserve">
+    <value>Zurückspulen</value>
+  </data>
+  <data name="SeekForward" xml:space="preserve">
+    <value>Vorspulen</value>
+  </data>
   <data name="Select" xml:space="preserve">
     <value>Wählen</value>
   </data>
@@ -1009,7 +971,7 @@ Im abgesicherten Modus starten?</value>
   <data name="Settings" xml:space="preserve">
     <value>Einstellungen</value>
   </data>
-  <data name="ShowHiddenComicButton.Content" xml:space="preserve">
+  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
     <value>Versteckte Comics anzeigen</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
@@ -1030,17 +992,8 @@ Im abgesicherten Modus starten?</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>Sortierfunktion</value>
   </data>
-  <data name="SpreadDetection" xml:space="preserve">
-    <value>Doppelseiten-Erkennung</value>
-  </data>
-  <data name="StartEndFromScrollingArea" xml:space="preserve">
-    <value>Start-/Endpunkt des Scrollbereichs als Leseanfang/-ende verwenden</value>
-  </data>
   <data name="Statistics" xml:space="preserve">
     <value>Statistiken</value>
-  </data>
-  <data name="SwapLeftAndRightPages" xml:space="preserve">
-    <value>Seiten links/rechts tauschen</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>Etikett</value>
@@ -1083,17 +1036,11 @@ Kategorie 2: Tag 4, Tag 5</value>
   <data name="Title2" xml:space="preserve">
     <value>Titel 2</value>
   </data>
-  <data name="ToggleAutoScroll" xml:space="preserve">
-    <value>Automatisches Scrollen umschalten</value>
-  </data>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>Vollbild umschalten</value>
   </data>
-  <data name="TotalComics" xml:space="preserve">
-    <value>Comics insgesamt</value>
-  </data>
-  <data name="TransitionAnimation" xml:space="preserve">
-    <value>Animation zum Umblättern</value>
+  <data name="TotalMedia" xml:space="preserve">
+    <value>Medien insgesamt</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Doppelseitenmodus</value>
@@ -1136,11 +1083,20 @@ $info</value>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>Medium</value>
   </data>
+  <data name="VolumeDown" xml:space="preserve">
+    <value>Lautstärke verringern</value>
+  </data>
+  <data name="VolumeUp" xml:space="preserve">
+    <value>Lautstärke erhöhen</value>
+  </data>
   <data name="Warning" xml:space="preserve">
     <value>Warnung</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>Im Moment beobachten wir diese Ordner:</value>
+  </data>
+  <data name="WhilePlayingVideos" xml:space="preserve">
+    <value>Bei der Videowiedergabe</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>Fenster $n</value>

@@ -25,5 +25,6 @@ internal static class DatabaseUpgradeManager
 
     public static void UpgradeDatabaseAfterInitialization()
     {
+        SqliteDB.UpgradeDatabase(DatabaseVersionModel.SqliteSchemeVersion);
     }
 }

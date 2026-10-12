@@ -10,7 +10,7 @@ using Microsoft.UI.Xaml.Input;
 using SinePlayerUWP.Common.BaseUI;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.ViewModels;
 
@@ -36,7 +36,7 @@ public sealed partial class ChooseLocationsDialog : BaseContentDialog
             IsAddNew = true
         });
 
-        foreach (string folder in AppSettingsModel.GetModel().ComicFolders)
+        foreach (string folder in AppSettingsModel.GetModel().MediaFolders)
         {
             FolderItemDataSource.Add(new FolderItemViewModel
             {
@@ -48,7 +48,7 @@ public sealed partial class ChooseLocationsDialog : BaseContentDialog
 
     private void ContentDialogPrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
-        ComicModel.RescanLibrary("ContentDialogPrimaryButtonClick");
+        MediaModel.RescanLibrary("ContentDialogPrimaryButtonClick");
     }
 
     private void ListViewLoaded(object sender, RoutedEventArgs e)
@@ -72,7 +72,7 @@ public sealed partial class ChooseLocationsDialog : BaseContentDialog
                 {
                     return;
                 }
-                AppSettingsModel.AddComicFolder(folder.Path);
+                AppSettingsModel.AddMediaFolder(folder.Path);
                 Update();
             }
             finally
@@ -92,7 +92,7 @@ public sealed partial class ChooseLocationsDialog : BaseContentDialog
         try
         {
             var item = (FolderItemViewModel)((Grid)sender).DataContext;
-            AppSettingsModel.RemoveComicFolder(item.Folder);
+            AppSettingsModel.RemoveMediaFolder(item.Folder);
             Update();
         }
         finally

@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System.Collections.Generic;
@@ -9,13 +9,13 @@ using SinePlayerUWP.Common.Actions;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Threading;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Misc;
 using SinePlayerUWP.Helpers.Navigation;
 using SinePlayerUWP.Helpers.Search;
-using SinePlayerUWP.UserControls.ComicSelection;
+using SinePlayerUWP.UserControls.MediaSelection;
 using SinePlayerUWP.ViewModels;
 
 namespace SinePlayerUWP.Views.Pages.Search;
@@ -46,8 +46,8 @@ internal partial class SearchPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private ComicFilterModel.ViewTypeEnum _viewType = ComicFilterModel.ViewTypeEnum.Medium;
-    public ComicFilterModel.ViewTypeEnum ViewType
+    private MediaFilterModel.ViewTypeEnum _viewType = MediaFilterModel.ViewTypeEnum.Medium;
+    public MediaFilterModel.ViewTypeEnum ViewType
     {
         get => _viewType;
         set
@@ -95,20 +95,20 @@ internal partial class SearchPageViewModel : INotifyPropertyChanged
         }
     }
 
-    public readonly MutableLiveData<IReadOnlyList<ComicItemViewModel>> ResultsLiveData = new();
+    public readonly MutableLiveData<IReadOnlyList<MediaItemViewModel>> ResultsLiveData = new();
 
-    public ComicSelectionViewModel ComicSelection { get; }
+    public MediaSelectionViewModel MediaSelection { get; }
     public bool IsLoading;
     public bool IsResultEmpty => SearchResults.Count == 0;
-    public List<ComicItemViewModel> SearchResults { get; private set; } = [];
+    public List<MediaItemViewModel> SearchResults { get; private set; } = [];
 
     private readonly ITaskDispatcher _sharedDispatcher = TaskDispatcher.DefaultQueue;
     private ActionHandler _actionHandler = ActionHandler.Dummy;
-    private readonly ComicSearchEngine _searchEngine = new();
+    private readonly MediaSearchEngine _searchEngine = new();
 
     public SearchPageViewModel()
     {
-        ComicSelection = new(() => SearchResults.Count);
+        MediaSelection = new(() => SearchResults.Count);
     }
 
     public void Initialize(ActionHandler actionHandler, string searchText)
@@ -116,17 +116,17 @@ internal partial class SearchPageViewModel : INotifyPropertyChanged
         _actionHandler = actionHandler;
         _searchEngine.SetResultCallback(OnSearchResult);
 
-        ViewType = ComicFilterModel.Instance.LastViewType;
+        ViewType = MediaFilterModel.Instance.LastViewType;
 
         IsLoading = true;
         UpdateUI();
-        ComicSelection.SetSelectMode(false);
+        MediaSelection.SetSelectMode(false);
 
         _searchEngine.SearchText = searchText;
         Refresh();
     }
 
-    public void SelectViewType(ComicFilterModel.ViewTypeEnum viewType)
+    public void SelectViewType(MediaFilterModel.ViewTypeEnum viewType)
     {
         if (ViewType == viewType)
         {
@@ -134,7 +134,7 @@ internal partial class SearchPageViewModel : INotifyPropertyChanged
         }
 
         ViewType = viewType;
-        ComicFilterModel.Instance.LastViewType = viewType;
+        MediaFilterModel.Instance.LastViewType = viewType;
     }
 
     public void Refresh()
@@ -149,33 +149,33 @@ internal partial class SearchPageViewModel : INotifyPropertyChanged
         IsNoResultTextVisible = !IsLoading && IsResultEmpty;
     }
 
-    private void OnSearchResult(IReadOnlyList<ComicModel> comics)
+    private void OnSearchResult(IReadOnlyList<MediaModel> mediaItems)
     {
         _sharedDispatcher.Submit(() =>
         {
-            IEnumerable<ComicModel> sortedComics = comics.OrderBy(x => x.Title);
-            List<ComicItemViewModel> newItems = [];
-            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(sortedComics);
-            foreach (ComicModel comic in sortedComics)
+            IEnumerable<MediaModel> sortedMedia = mediaItems.OrderBy(x => x.Title);
+            List<MediaItemViewModel> newItems = [];
+            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sortedMedia);
+            foreach (MediaModel media in sortedMedia)
             {
-                ComicItemViewModel item = new(comic)
+                MediaItemViewModel item = new(media)
                 {
                     OnClick = model =>
                     {
-                        if (ComicSelection.IsSelectMode)
+                        if (MediaSelection.IsSelectMode)
                         {
                             return;
                         }
 
-                        Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
-                        OpenComicHelper.OpenComic(_actionHandler, route);
+                        Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                        OpenMediaHelper.OpenMedia(_actionHandler, route);
                     },
                     OnRequestContextFlyoutAsync = model =>
                     {
-                        IEnumerable<ComicModel>? selection = ComicSelection.IsSelectMode ? ComicSelection.GetSelectedComics() : null;
-                        return MenuFlyoutItemsCreator.CreateComicMenuItems(
+                        IEnumerable<MediaModel>? selection = MediaSelection.IsSelectMode ? MediaSelection.GetSelectedMedia() : null;
+                        return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                             _actionHandler,
-                            comic,
+                            media,
                             playlist: playlist,
                             selectedItems: selection,
                             canSelect: true);

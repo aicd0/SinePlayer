@@ -17,7 +17,7 @@ using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Navigation;
@@ -37,7 +37,7 @@ internal sealed partial class HomePage : BasePage
 
     private readonly SearchNavigationBar _searchNavigationBar;
 
-    private ComicFilterModel.ViewTypeEnum? _viewType = null;
+    private MediaFilterModel.ViewTypeEnum? _viewType = null;
     private Storyboard? _headerTextBlockAnimation = null;
     private double _lastGridViewVerticalOffset = 0.0;
 
@@ -56,7 +56,7 @@ internal sealed partial class HomePage : BasePage
         base.OnStart(bundle);
 
         PageActionHandler.RegisterProvider(new CustomActionProvider(new CustomActionHandler(ViewModel)));
-        ItemsView.Initialize(ViewModel.ComicSelection, PageActionHandler);
+        ItemsView.Initialize(ViewModel.MediaSelection, PageActionHandler);
         ViewTypeSelector.ViewTypeChanged += ViewModel.SelectViewType;
 
         GetMainPageAbility().SetTitle(StringResourceProvider.Instance.NewTab);
@@ -70,7 +70,7 @@ internal sealed partial class HomePage : BasePage
 
     private void ObserveData()
     {
-        GlobalEvent.Instance.ComicUpdated.Observe(this, _ =>
+        GlobalEvent.Instance.MediaUpdated.Observe(this, _ =>
         {
             ViewModel.Refresh(filters: true, library: true);
         });
@@ -87,7 +87,7 @@ internal sealed partial class HomePage : BasePage
 
         GetMainPageAbility().RegisterRefreshHandler(this, () =>
         {
-            ComicModel.RescanLibrary("HomePage#RefreshPage");
+            MediaModel.RescanLibrary("HomePage#RefreshPage");
         });
 
         ViewModel.UrlLiveData.ObserveSticky(this, url =>
@@ -101,11 +101,11 @@ internal sealed partial class HomePage : BasePage
         {
             if (grouped)
             {
-                ItemsView.SetGroupedItems(ViewModel.GroupedComicItems);
+                ItemsView.SetGroupedItems(ViewModel.GroupedMediaItems);
             }
             else
             {
-                ItemsView.SetItems(ViewModel.UngroupedComicItems);
+                ItemsView.SetItems(ViewModel.UngroupedMediaItems);
             }
         });
 
@@ -174,7 +174,7 @@ internal sealed partial class HomePage : BasePage
         _lastGridViewVerticalOffset = verticalOffset;
     }
 
-    private void ItemsView_GroupCollapseRequested(ComicGroupViewModel group)
+    private void ItemsView_GroupCollapseRequested(MediaGroupViewModel group)
     {
         ViewModel.CollapseOrExpandGroup(group);
     }
@@ -258,7 +258,7 @@ internal sealed partial class HomePage : BasePage
     }
 
     //
-    // Comic Item
+    // Media Item
     //
 
     private void EditFilterButton_Click(object sender, RoutedEventArgs e)
@@ -284,8 +284,8 @@ internal sealed partial class HomePage : BasePage
                 return;
             }
 
-            AppSettingsModel.AddComicFolder(folder.Path);
-            ComicModel.RescanLibrary("HomePage#AddNewFolder");
+            AppSettingsModel.AddMediaFolder(folder.Path);
+            MediaModel.RescanLibrary("HomePage#AddNewFolder");
         });
     }
 
@@ -296,7 +296,7 @@ internal sealed partial class HomePage : BasePage
 
     private void RefreshHyperlink_Click(Microsoft.UI.Xaml.Documents.Hyperlink sender, Microsoft.UI.Xaml.Documents.HyperlinkClickEventArgs args)
     {
-        ComicModel.RescanLibrary("RefreshPage");
+        MediaModel.RescanLibrary("RefreshPage");
     }
 
     //
@@ -312,8 +312,8 @@ internal sealed partial class HomePage : BasePage
                 return;
             }
 
-            IReadOnlyList<ComicModel> snapshot = ViewModel.GetComics();
-            List<BaseMenuFlyoutItemModel> menuItems = await MenuFlyoutItemsCreator.CreateComicGroupMenuItems(
+            IReadOnlyList<MediaModel> snapshot = ViewModel.GetMedia();
+            List<BaseMenuFlyoutItemModel> menuItems = await MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
                 PageActionHandler, snapshot, ViewModel.ExpandAllGroups, ViewModel.CollapseAllGroups);
             if (menuItems.Count == 0)
             {
@@ -342,11 +342,11 @@ internal sealed partial class HomePage : BasePage
             bool handled = true;
             switch (source)
             {
-                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_COMIC_ITEM_MENU:
+                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
                     switch (name)
                     {
                         case MenuFlyoutItemsCreator.CUSTOM_ACTION_NAME_SELECT:
-                            viewModel.ComicSelection.SetSelectMode(!viewModel.ComicSelection.IsSelectMode);
+                            viewModel.MediaSelection.SetSelectMode(!viewModel.MediaSelection.IsSelectMode);
                             break;
                         default:
                             handled = false;

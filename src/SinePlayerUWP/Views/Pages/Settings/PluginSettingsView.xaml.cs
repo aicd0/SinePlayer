@@ -97,7 +97,7 @@ internal sealed partial class PluginSettingsView : BaseUserControl
                 return;
             }
 
-            if (AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).GetValueOrDefault(RegistryNames.SettingsKey.SHOW_INSTALL_PLUGIN_WARNING, true))
+            if (AppDB.MainRegistry.CreateKey(RegistryNames.STATE).GetValueOrDefault(RegistryNames.StateKey.SHOW_INSTALL_PLUGIN_WARNING, true))
             {
                 DialogOptions options = new DialogOptions.Builder()
                     .SetTitle(StringResourceProvider.Instance.Warning)
@@ -111,7 +111,7 @@ internal sealed partial class PluginSettingsView : BaseUserControl
                     return;
                 }
 
-                AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).Set(RegistryNames.SettingsKey.SHOW_INSTALL_PLUGIN_WARNING, false);
+                AppDB.MainRegistry.CreateKey(RegistryNames.STATE).Set(RegistryNames.StateKey.SHOW_INSTALL_PLUGIN_WARNING, false);
             }
 
             string pluginsFolderPath = PluginManager.PluginsFolderPath;

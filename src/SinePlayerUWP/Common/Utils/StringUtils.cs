@@ -229,23 +229,6 @@ class StringUtils
         return path[(i + 1)..];
     }
 
-    public static string ParentLocationFromLocation(string location)
-    {
-        int i = location.LastIndexOf('\\');
-        if (i == -1)
-        {
-            return "";
-        }
-
-        if (i > 0 && location[i - 1] == '\\')
-        {
-            i--;
-        }
-
-        return location[..i];
-
-    }
-
     public static string ExtensionFromFilename(string filename)
     {
         int i = filename.LastIndexOf('.');

@@ -150,14 +150,11 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>高度な</value>
   </data>
-  <data name="AllComics" xml:space="preserve">
-    <value>すべてのコミック</value>
-  </data>
-  <data name="AllComicsIn" xml:space="preserve">
-    <value>$path内のすべてのコミック</value>
-  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>すべての非表示アイテム</value>
+  </data>
+  <data name="AllItems" xml:space="preserve">
+    <value>すべての項目</value>
   </data>
   <data name="AllMatchedResults" xml:space="preserve">
     <value>一致したすべての結果</value>
@@ -197,6 +194,9 @@
   </data>
   <data name="Auto" xml:space="preserve">
     <value>自動</value>
+  </data>
+  <data name="AutoPlayNext" xml:space="preserve">
+    <value>次の項目を自動再生</value>
   </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>自動スクロール</value>
@@ -240,9 +240,6 @@
   <data name="ClearCache" xml:space="preserve">
     <value>キャッシュをクリアする</value>
   </data>
-  <data name="ClearReaderSettings" xml:space="preserve">
-    <value>リーダー設定をクリア</value>
-  </data>
   <data name="CloseLastTabBehavior" xml:space="preserve">
     <value>最後のタブを閉じたときの動作</value>
   </data>
@@ -264,12 +261,6 @@
   <data name="CollectionInformation" xml:space="preserve">
     <value>コレクション情報</value>
   </data>
-  <data name="ComicExclusionExplaination" xml:space="preserve">
-    <value>「除外リストに追加」を選択すると、次回ライブラリを更新したときにこのコミックが再度インポートされなくなります。</value>
-  </data>
-  <data name="ComicInfo" xml:space="preserve">
-    <value>コミック情報</value>
-  </data>
   <data name="CompletionStatus" xml:space="preserve">
     <value>完了ステータス</value>
   </data>
@@ -279,17 +270,17 @@
   <data name="CompletionStatusCompleted" xml:space="preserve">
     <value>完了</value>
   </data>
+  <data name="CompletionStatusNotStarted" xml:space="preserve">
+    <value>未開始</value>
+  </data>
   <data name="CompletionStatusOnHold" xml:space="preserve">
     <value>保留中</value>
   </data>
-  <data name="CompletionStatusPlanToRead" xml:space="preserve">
-    <value>読む予定</value>
+  <data name="CompletionStatusOngoing" xml:space="preserve">
+    <value>進行中</value>
   </data>
-  <data name="CompletionStatusReading" xml:space="preserve">
-    <value>読書中</value>
-  </data>
-  <data name="CompletionStatusUnread" xml:space="preserve">
-    <value>未読</value>
+  <data name="CompletionStatusPlanned" xml:space="preserve">
+    <value>予定</value>
   </data>
   <data name="Continuous" xml:space="preserve">
     <value>連続</value>
@@ -368,8 +359,8 @@ $files</value>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>GitHubからプラグインをダウンロード</value>
   </data>
-  <data name="DuringAutoScrolling" xml:space="preserve">
-    <value>自動スクロール中</value>
+  <data name="Duration" xml:space="preserve">
+    <value>再生時間</value>
   </data>
   <data name="Edit" xml:space="preserve">
     <value>編集</value>
@@ -444,7 +435,7 @@ $files</value>
 %rating           - 評価に一致します。例：100は星5つ、-1は評価なしを表します。
 %completion_state - コミックの完了状態（0 - 未読、1 - 読んでいる、2 - 完了）。
 %progress         - 読書の進捗状況（パーセンテージ）。例：50は50%を表します。
-%page_count       - 総ページ数。
+%duration         - 合計再生時間。
 
 2. 変数演算子
 
@@ -543,27 +534,6 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="GoForward" xml:space="preserve">
     <value>前進する</value>
   </data>
-  <data name="GoToFirstPage" xml:space="preserve">
-    <value>最初のページへジャンプ</value>
-  </data>
-  <data name="GoToLastPage" xml:space="preserve">
-    <value>最後のページへジャンプ</value>
-  </data>
-  <data name="GoToLeftPage" xml:space="preserve">
-    <value>左のページに移動</value>
-  </data>
-  <data name="GoToNextPage" xml:space="preserve">
-    <value>次のページへ進む</value>
-  </data>
-  <data name="GoToPreviousPage" xml:space="preserve">
-    <value>前のページへジャンプ</value>
-  </data>
-  <data name="GoToRandomPage" xml:space="preserve">
-    <value>ランダムなページにジャンプ</value>
-  </data>
-  <data name="GoToRightPage" xml:space="preserve">
-    <value>右のページに移動</value>
-  </data>
   <data name="Group" xml:space="preserve">
     <value>グループ化</value>
   </data>
@@ -609,8 +579,8 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="Images" xml:space="preserve">
     <value>画像</value>
   </data>
-  <data name="IncludeHiddenComics" xml:space="preserve">
-    <value>非表示の漫画を含める</value>
+  <data name="IncludeHiddenItems" xml:space="preserve">
+    <value>非表示の項目を含める</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>プラグインをインストール</value>
@@ -652,11 +622,8 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="LanguageExpander.Header" xml:space="preserve">
     <value>言語</value>
   </data>
-  <data name="LastReadTime" xml:space="preserve">
-    <value>最終閲覧時間</value>
-  </data>
-  <data name="LeftToRight" xml:space="preserve">
-    <value>左から右へ</value>
+  <data name="LastVisitTime" xml:space="preserve">
+    <value>前回のアクセス日時</value>
   </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>現在のフィルタ条件では結果が見つかりません。</value>
@@ -682,8 +649,11 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="Links" xml:space="preserve">
     <value>リンク</value>
   </data>
-  <data name="MaintainRelativeSize" xml:space="preserve">
-    <value>相対的なサイズを維持する</value>
+  <data name="MediaExclusionExplaination" xml:space="preserve">
+    <value>「除外リストに追加」を選択すると、次回ライブラリを更新したときにこのコミックが再度インポートされなくなります。</value>
+  </data>
+  <data name="MediaInfo" xml:space="preserve">
+    <value>メディア情報</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>新しいフォルダを作成する</value>
@@ -733,9 +703,6 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="Next" xml:space="preserve">
     <value>次へ</value>
   </data>
-  <data name="NoComicsHint" xml:space="preserve">
-    <value>あなたのコミックはここに表示されます</value>
-  </data>
   <data name="NoContent" xml:space="preserve">
     <value>表示できるコンテンツがありません</value>
   </data>
@@ -747,6 +714,9 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   </data>
   <data name="NoKeyboardShortcuts" xml:space="preserve">
     <value>キーボードショートカットはありません</value>
+  </data>
+  <data name="NoMediaHint" xml:space="preserve">
+    <value>メディアがここに表示されます</value>
   </data>
   <data name="NoPluginsInstalled" xml:space="preserve">
     <value>プラグインがインストールされていません</value>
@@ -769,14 +739,11 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="OK" xml:space="preserve">
     <value>わかりました</value>
   </data>
-  <data name="OnlyAppliesToReadingComics" xml:space="preserve">
+  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
     <value>「閲覧中」ステータスのマンガにのみ適用</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>開く</value>
-  </data>
-  <data name="OpenComicDefaultBehavior" xml:space="preserve">
-    <value>コミックを開いたときのデフォルトの動作</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>ホームページを開く</value>
@@ -790,17 +757,20 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="OpenInNewTab" xml:space="preserve">
     <value>新しいタブで開く</value>
   </data>
+  <data name="OpenItemDefaultBehavior" xml:space="preserve">
+    <value>項目を開くときの既定の動作</value>
+  </data>
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>メタデータフォルダを開く</value>
   </data>
-  <data name="OpenNextComic" xml:space="preserve">
-    <value>次のコミックを開く</value>
+  <data name="OpenNextItem" xml:space="preserve">
+    <value>次の項目を開く</value>
   </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>プラグインフォルダーを開く</value>
   </data>
-  <data name="OpenPreviousComic" xml:space="preserve">
-    <value>前のコミックを開く</value>
+  <data name="OpenPreviousItem" xml:space="preserve">
+    <value>前の項目を開く</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>サイドバーを開く</value>
@@ -811,15 +781,6 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>この操作により既存のエントリが上書きされます。</value>
   </data>
-  <data name="PageCount" xml:space="preserve">
-    <value>ページ数</value>
-  </data>
-  <data name="PageN" xml:space="preserve">
-    <value>$pageページ目</value>
-  </data>
-  <data name="PageSpacing" xml:space="preserve">
-    <value>ページ間隔</value>
-  </data>
   <data name="Pause" xml:space="preserve">
     <value>一時停止</value>
   </data>
@@ -829,17 +790,35 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="Play" xml:space="preserve">
     <value>再生</value>
   </data>
+  <data name="PlayPause" xml:space="preserve">
+    <value>再生 / 一時停止</value>
+  </data>
+  <data name="PlayerExpander.Detail" xml:space="preserve">
+    <value>プレーヤーの全般設定</value>
+  </data>
+  <data name="PlayerExpander.Header" xml:space="preserve">
+    <value>プレーヤー</value>
+  </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>プレーヤーの設定</value>
+  </data>
+  <data name="PlayerStatusError" xml:space="preserve">
+    <value>読み込みエラー</value>
+  </data>
+  <data name="PlayerStatusLoading" xml:space="preserve">
+    <value>プレーヤーを読み込み中</value>
+  </data>
+  <data name="Playlist" xml:space="preserve">
+    <value>プレイリスト</value>
+  </data>
+  <data name="PlaylistEmpty" xml:space="preserve">
+    <value>プレイリストがここに表示されます</value>
+  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>プラグインの管理と設定</value>
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>プラグイン</value>
-  </data>
-  <data name="PreloadPagesAfter" xml:space="preserve">
-    <value>ページを先読み（現在のページより後）</value>
-  </data>
-  <data name="PreloadPagesBefore" xml:space="preserve">
-    <value>ページを先読み（現在のページより前）</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>キーの組み合わせを押してください</value>
@@ -856,40 +835,14 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="Progress" xml:space="preserve">
     <value>スケジュール</value>
   </data>
-  <data name="PromptBeforeRemovingComics" xml:space="preserve">
-    <value>マンガを削除する前に確認</value>
+  <data name="PromptBeforeRemovingItems" xml:space="preserve">
+    <value>項目を削除する前に確認する</value>
   </data>
-  <data name="RandomComic" xml:space="preserve">
-    <value>ランダムコミック</value>
+  <data name="Random" xml:space="preserve">
+    <value>シャッフル</value>
   </data>
   <data name="Rating" xml:space="preserve">
     <value>スコア</value>
-  </data>
-  <data name="ReaderExpander.Detail" xml:space="preserve">
-    <value>カスタムリーダー</value>
-  </data>
-  <data name="ReaderExpander.Header" xml:space="preserve">
-    <value>リーダー</value>
-  </data>
-  <data name="ReaderSettingButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>リーダー設定</value>
-  </data>
-  <data name="ReaderStatusError" xml:space="preserve">
-    <value>読み込みエラー</value>
-  </data>
-  <data name="ReaderStatusLoading" xml:space="preserve">
-    <value>リーダー読み込み中</value>
-  </data>
-  <data name="ReaderTipContent" xml:space="preserve">
-    <value>1. ダブルタップして、ページを幅または高さに合わせます。
-2. 「自動スクロール」を 0 より大きい値に設定すると、自動スクロールとマウスの中ボタンが有効になります。
-3. ページをドラッグして、自動スクロールの速度を調整します。</value>
-  </data>
-  <data name="ReadingList" xml:space="preserve">
-    <value>読書リスト</value>
-  </data>
-  <data name="ReadingListEmpty" xml:space="preserve">
-    <value>あなたの読書リストがここに表示されます</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>リフレッシュ</value>
@@ -907,7 +860,7 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
     <value>お気に入りから削除</value>
   </data>
   <data name="RemoveItemsConfirmation" xml:space="preserve">
-    <value>以下の$count件のアイテムがライブラリから完全に削除されます：
+    <value>次の$count個の項目がライブラリから完全に削除されます：
 
 $items</value>
   </data>
@@ -935,6 +888,9 @@ $plugins</value>
   </data>
   <data name="ResetAllSettingsMessage" xml:space="preserve">
     <value>すべての設定は既定の状態に戻ります。ユーザーデータは保持されます。</value>
+  </data>
+  <data name="ResetPlayerSettings" xml:space="preserve">
+    <value>プレーヤーの設定をリセット</value>
   </data>
   <data name="Restore" xml:space="preserve">
     <value>復元</value>
@@ -979,6 +935,12 @@ $plugins</value>
   <data name="SearchResultsOf" xml:space="preserve">
     <value>「$keyword」の検索結果</value>
   </data>
+  <data name="SeekBackward" xml:space="preserve">
+    <value>巻き戻し</value>
+  </data>
+  <data name="SeekForward" xml:space="preserve">
+    <value>早送り</value>
+  </data>
   <data name="Select" xml:space="preserve">
     <value>選ぶ</value>
   </data>
@@ -1009,7 +971,7 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>設定</value>
   </data>
-  <data name="ShowHiddenComicButton.Content" xml:space="preserve">
+  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
     <value>非表示のコミックを見る</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
@@ -1030,17 +992,8 @@ $plugins</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>ソート機能</value>
   </data>
-  <data name="SpreadDetection" xml:space="preserve">
-    <value>見開き検出</value>
-  </data>
-  <data name="StartEndFromScrollingArea" xml:space="preserve">
-    <value>スクロール範囲の開始位置／終了位置を読書の開始位置／終了位置として使用する</value>
-  </data>
   <data name="Statistics" xml:space="preserve">
     <value>統計</value>
-  </data>
-  <data name="SwapLeftAndRightPages" xml:space="preserve">
-    <value>左右ページを入れ替え</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>ラベル</value>
@@ -1083,17 +1036,11 @@ $plugins</value>
   <data name="Title2" xml:space="preserve">
     <value>タイトル 2</value>
   </data>
-  <data name="ToggleAutoScroll" xml:space="preserve">
-    <value>自動スクロール切替</value>
-  </data>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>フルスクリーンの切り替え</value>
   </data>
-  <data name="TotalComics" xml:space="preserve">
-    <value>漫画総数</value>
-  </data>
-  <data name="TransitionAnimation" xml:space="preserve">
-    <value>ページめくりアニメーション</value>
+  <data name="TotalMedia" xml:space="preserve">
+    <value>メディアの合計数</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>見開きモード</value>
@@ -1136,11 +1083,20 @@ $info</value>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>中くらい</value>
   </data>
+  <data name="VolumeDown" xml:space="preserve">
+    <value>音量を下げる</value>
+  </data>
+  <data name="VolumeUp" xml:space="preserve">
+    <value>音量を上げる</value>
+  </data>
   <data name="Warning" xml:space="preserve">
     <value>警告</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>現在、リポジトリには次のフォルダーが含まれています。</value>
+  </data>
+  <data name="WhilePlayingVideos" xml:space="preserve">
+    <value>動画の再生中</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>ウィンドウ $n</value>

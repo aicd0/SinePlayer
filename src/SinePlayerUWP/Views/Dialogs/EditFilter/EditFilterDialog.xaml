@@ -1,4 +1,4 @@
-﻿<base:BaseContentDialog
+<base:BaseContentDialog
     x:Class="SinePlayerUWP.Views.Dialogs.EditFilter.EditFilterDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -94,9 +94,9 @@
         </Grid>
         <CheckBox
             Margin="0,16,0,0"
-            Click="IncludeHiddenComicsCheckBox_Click"
-            Content="{x:Bind StringResource.IncludeHiddenComics}"
-            IsChecked="{x:Bind ViewModel.IncludeHiddenComics, Mode=TwoWay}" />
+            Click="IncludeHiddenItemsCheckBox_Click"
+            Content="{x:Bind StringResource.IncludeHiddenItems}"
+            IsChecked="{x:Bind ViewModel.IncludeHiddenItems, Mode=TwoWay}" />
         <CheckBox
             Click="SaveViewSettingsCheckBox_Click"
             Content="{x:Bind StringResource.SaveViewSettings}"

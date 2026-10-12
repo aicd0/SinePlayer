@@ -1,13 +1,8 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Text;
 
-using SinePlayerUWP.Common.Localization;
-using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Data.Models.Misc;
 
 namespace SinePlayerUWP.Views.Pages.Settings;
@@ -40,17 +35,6 @@ internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private List<Tuple<string, int>> _encodings = [];
-    public List<Tuple<string, int>> Encodings
-    {
-        get => _encodings;
-        set
-        {
-            _encodings = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Encodings)));
-        }
-    }
-
     private bool _scanOnLaunch = true;
     public bool ScanOnLaunch
     {
@@ -62,36 +46,25 @@ internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _removeUnreachableComics = true;
-    public bool RemoveUnreachableComics
+    private bool _removeUnreachableMedia = true;
+    public bool RemoveUnreachableMedia
     {
-        get => _removeUnreachableComics;
+        get => _removeUnreachableMedia;
         set
         {
-            _removeUnreachableComics = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RemoveUnreachableComics)));
+            _removeUnreachableMedia = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RemoveUnreachableMedia)));
         }
     }
 
-    private bool _promptBeforeRemovingComics = true;
-    public bool PromptBeforeRemovingComics
+    private bool _promptBeforeRemovingMedia = true;
+    public bool PromptBeforeRemovingMedia
     {
-        get => _promptBeforeRemovingComics;
+        get => _promptBeforeRemovingMedia;
         set
         {
-            _promptBeforeRemovingComics = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PromptBeforeRemovingComics)));
-        }
-    }
-
-    private int _defaultArchiveCodePageIndex = 0;
-    public int DefaultArchiveCodePageIndex
-    {
-        get => _defaultArchiveCodePageIndex;
-        set
-        {
-            _defaultArchiveCodePageIndex = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DefaultArchiveCodePageIndex)));
+            _promptBeforeRemovingMedia = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PromptBeforeRemovingMedia)));
         }
     }
 
@@ -109,76 +82,36 @@ internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
         AppSettingsModel.UpdateModel(model);
     }
 
-    public void SetRemoveUnreachableComics(bool removeUnreachableComics)
+    public void SetRemoveUnreachableMedia(bool removeUnreachableMedia)
     {
-        _removeUnreachableComics = removeUnreachableComics;
+        _removeUnreachableMedia = removeUnreachableMedia;
         AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.RemoveUnreachableComics = removeUnreachableComics;
+        model.RemoveUnreachableMedia = removeUnreachableMedia;
         AppSettingsModel.UpdateModel(model);
     }
 
-    public void SetPromptBeforeRemovingComics(bool promptBeforeRemovingComics)
+    public void SetPromptBeforeRemovingMedia(bool promptBeforeRemovingMedia)
     {
-        _promptBeforeRemovingComics = promptBeforeRemovingComics;
+        _promptBeforeRemovingMedia = promptBeforeRemovingMedia;
         AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.PromptBeforeRemovingComics = promptBeforeRemovingComics;
+        model.PromptBeforeRemovingMedia = promptBeforeRemovingMedia;
         AppSettingsModel.UpdateModel(model);
-    }
-
-    public void SetDefaultArchiveCodePage(int index)
-    {
-        if (index == _defaultArchiveCodePageIndex || index < 0 || index >= _encodings.Count)
-        {
-            return;
-        }
-
-        _defaultArchiveCodePageIndex = index;
-        AppSettingsModel.DefaultArchiveCodePage = _encodings[index].Item2;
     }
 
     private void Update()
     {
         UpdateBasic();
-        UpdateEncodings();
     }
 
     private void UpdateBasic()
     {
         AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
         bool scanOnLaunch = model.ScanOnLaunch;
-        bool removeUnreachableComics = model.RemoveUnreachableComics;
-        bool promptBeforeRemovingComics = model.PromptBeforeRemovingComics;
+        bool removeUnreachableMedia = model.RemoveUnreachableMedia;
+        bool promptBeforeRemovingMedia = model.PromptBeforeRemovingMedia;
 
         ScanOnLaunch = scanOnLaunch;
-        RemoveUnreachableComics = removeUnreachableComics;
-        PromptBeforeRemovingComics = promptBeforeRemovingComics;
-    }
-
-    private void UpdateEncodings()
-    {
-        IReadOnlyDictionary<int, Encoding> supportedEncodings = AppInfoProvider.SupportedEncodings;
-        var encodings = new List<Tuple<string, int>>
-        {
-            new(StringResourceProvider.Instance.Default, -1)
-        };
-        int defaultCodePage = AppSettingsModel.DefaultArchiveCodePage;
-        int selectedIndex = 0;
-        foreach (Encoding info in supportedEncodings.Values)
-        {
-            string title = info.EncodingName + " [" + info.CodePage.ToString() + "]";
-            encodings.Add(new Tuple<string, int>(title, info.CodePage));
-            if (defaultCodePage == info.CodePage)
-            {
-                selectedIndex = encodings.Count - 1;
-            }
-        }
-        if (!supportedEncodings.ContainsKey(defaultCodePage))
-        {
-            AppSettingsModel.DefaultArchiveCodePage = -1;
-            selectedIndex = 0;
-        }
-
-        Encodings = encodings;
-        DefaultArchiveCodePageIndex = selectedIndex;
+        RemoveUnreachableMedia = removeUnreachableMedia;
+        PromptBeforeRemovingMedia = promptBeforeRemovingMedia;
     }
 }

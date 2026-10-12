@@ -150,14 +150,11 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>高级</value>
   </data>
-  <data name="AllComics" xml:space="preserve">
-    <value>所有漫画</value>
-  </data>
-  <data name="AllComicsIn" xml:space="preserve">
-    <value>所有位于 $path 的漫画</value>
-  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>所有隐藏项</value>
+  </data>
+  <data name="AllItems" xml:space="preserve">
+    <value>所有项目</value>
   </data>
   <data name="AllMatchedResults" xml:space="preserve">
     <value>所有匹配项</value>
@@ -197,6 +194,9 @@
   </data>
   <data name="Auto" xml:space="preserve">
     <value>自动</value>
+  </data>
+  <data name="AutoPlayNext" xml:space="preserve">
+    <value>自动播放下一项</value>
   </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>自动滚动</value>
@@ -240,9 +240,6 @@
   <data name="ClearCache" xml:space="preserve">
     <value>清空缓存</value>
   </data>
-  <data name="ClearReaderSettings" xml:space="preserve">
-    <value>清除阅读器设置</value>
-  </data>
   <data name="CloseLastTabBehavior" xml:space="preserve">
     <value>关闭最后一个标签页时的行为</value>
   </data>
@@ -264,32 +261,26 @@
   <data name="CollectionInformation" xml:space="preserve">
     <value>合集信息</value>
   </data>
-  <data name="ComicExclusionExplaination" xml:space="preserve">
-    <value>选择“添加到排除列表”后，下次更新媒体库时将不会再次导入此漫画。</value>
-  </data>
-  <data name="ComicInfo" xml:space="preserve">
-    <value>漫画信息</value>
-  </data>
   <data name="CompletionStatus" xml:space="preserve">
     <value>完成状态</value>
   </data>
   <data name="CompletionStatusAbandoned" xml:space="preserve">
-    <value>弃读</value>
+    <value>已弃坑</value>
   </data>
   <data name="CompletionStatusCompleted" xml:space="preserve">
     <value>已完成</value>
   </data>
+  <data name="CompletionStatusNotStarted" xml:space="preserve">
+    <value>未开始</value>
+  </data>
   <data name="CompletionStatusOnHold" xml:space="preserve">
-    <value>搁置</value>
+    <value>搁置中</value>
   </data>
-  <data name="CompletionStatusPlanToRead" xml:space="preserve">
-    <value>计划阅读</value>
+  <data name="CompletionStatusOngoing" xml:space="preserve">
+    <value>进行中</value>
   </data>
-  <data name="CompletionStatusReading" xml:space="preserve">
-    <value>阅读中</value>
-  </data>
-  <data name="CompletionStatusUnread" xml:space="preserve">
-    <value>未读</value>
+  <data name="CompletionStatusPlanned" xml:space="preserve">
+    <value>计划中</value>
   </data>
   <data name="Continuous" xml:space="preserve">
     <value>连续</value>
@@ -368,8 +359,8 @@ $files</value>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>从 GitHub 下载插件</value>
   </data>
-  <data name="DuringAutoScrolling" xml:space="preserve">
-    <value>自动滚动时</value>
+  <data name="Duration" xml:space="preserve">
+    <value>时长</value>
   </data>
   <data name="Edit" xml:space="preserve">
     <value>编辑</value>
@@ -444,7 +435,7 @@ $files</value>
 %rating           - 匹配评分。例如：100 代表 5 星，-1 代表无评分。
 %completion_state - 漫画完成状态（0 - 未读，1 - 正在阅读，2 - 已完成）。
 %progress         - 阅读进度，以百分比表示。例如：50 代表 50%。
-%page_count       - 总页数。
+%duration         - 总时长。
 
 2. 变量运算符
 
@@ -543,27 +534,6 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   <data name="GoForward" xml:space="preserve">
     <value>前进</value>
   </data>
-  <data name="GoToFirstPage" xml:space="preserve">
-    <value>跳转到第一页</value>
-  </data>
-  <data name="GoToLastPage" xml:space="preserve">
-    <value>跳转到最后一页</value>
-  </data>
-  <data name="GoToLeftPage" xml:space="preserve">
-    <value>跳转到左侧页面</value>
-  </data>
-  <data name="GoToNextPage" xml:space="preserve">
-    <value>跳转到下一页</value>
-  </data>
-  <data name="GoToPreviousPage" xml:space="preserve">
-    <value>跳转到上一页</value>
-  </data>
-  <data name="GoToRandomPage" xml:space="preserve">
-    <value>跳转到随机页面</value>
-  </data>
-  <data name="GoToRightPage" xml:space="preserve">
-    <value>跳转到右侧页面</value>
-  </data>
   <data name="Group" xml:space="preserve">
     <value>分组</value>
   </data>
@@ -609,8 +579,8 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   <data name="Images" xml:space="preserve">
     <value>图片</value>
   </data>
-  <data name="IncludeHiddenComics" xml:space="preserve">
-    <value>包含隐藏漫画</value>
+  <data name="IncludeHiddenItems" xml:space="preserve">
+    <value>包含隐藏项目</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>安装插件</value>
@@ -652,11 +622,8 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   <data name="LanguageExpander.Header" xml:space="preserve">
     <value>语言</value>
   </data>
-  <data name="LastReadTime" xml:space="preserve">
-    <value>上次阅读时间</value>
-  </data>
-  <data name="LeftToRight" xml:space="preserve">
-    <value>自左向右</value>
+  <data name="LastVisitTime" xml:space="preserve">
+    <value>上次访问时间</value>
   </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>当前筛选条件下没有找到结果，尝试</value>
@@ -682,8 +649,11 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   <data name="Links" xml:space="preserve">
     <value>链接</value>
   </data>
-  <data name="MaintainRelativeSize" xml:space="preserve">
-    <value>保持相对大小</value>
+  <data name="MediaExclusionExplaination" xml:space="preserve">
+    <value>选择“添加到排除列表”后，下次更新媒体库时将不会再次导入此漫画。</value>
+  </data>
+  <data name="MediaInfo" xml:space="preserve">
+    <value>媒体信息</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>新建文件夹</value>
@@ -733,9 +703,6 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   <data name="Next" xml:space="preserve">
     <value>下一个</value>
   </data>
-  <data name="NoComicsHint" xml:space="preserve">
-    <value>你的漫画会显示在这里</value>
-  </data>
   <data name="NoContent" xml:space="preserve">
     <value>暂无可显示内容</value>
   </data>
@@ -747,6 +714,9 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   </data>
   <data name="NoKeyboardShortcuts" xml:space="preserve">
     <value>没有键盘快捷键</value>
+  </data>
+  <data name="NoMediaHint" xml:space="preserve">
+    <value>你的媒体将显示在这里</value>
   </data>
   <data name="NoPluginsInstalled" xml:space="preserve">
     <value>未安装插件</value>
@@ -769,14 +739,11 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   <data name="OK" xml:space="preserve">
     <value>好的</value>
   </data>
-  <data name="OnlyAppliesToReadingComics" xml:space="preserve">
+  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
     <value>仅对“阅读中”状态的漫画生效</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>打开</value>
-  </data>
-  <data name="OpenComicDefaultBehavior" xml:space="preserve">
-    <value>打开漫画时的默认行为</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>打开主页</value>
@@ -790,17 +757,20 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   <data name="OpenInNewTab" xml:space="preserve">
     <value>在新标签页中打开</value>
   </data>
+  <data name="OpenItemDefaultBehavior" xml:space="preserve">
+    <value>打开项目时的默认行为</value>
+  </data>
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>打开元数据文件夹</value>
   </data>
-  <data name="OpenNextComic" xml:space="preserve">
-    <value>打开下一部漫画</value>
+  <data name="OpenNextItem" xml:space="preserve">
+    <value>打开下一项</value>
   </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>打开插件文件夹</value>
   </data>
-  <data name="OpenPreviousComic" xml:space="preserve">
-    <value>打开上一部漫画</value>
+  <data name="OpenPreviousItem" xml:space="preserve">
+    <value>打开上一项</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>打开侧边栏</value>
@@ -811,15 +781,6 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>此操作将覆盖现有条目。</value>
   </data>
-  <data name="PageCount" xml:space="preserve">
-    <value>页数</value>
-  </data>
-  <data name="PageN" xml:space="preserve">
-    <value>第$page页</value>
-  </data>
-  <data name="PageSpacing" xml:space="preserve">
-    <value>页面间距</value>
-  </data>
   <data name="Pause" xml:space="preserve">
     <value>暂停</value>
   </data>
@@ -829,17 +790,35 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   <data name="Play" xml:space="preserve">
     <value>播放</value>
   </data>
+  <data name="PlayPause" xml:space="preserve">
+    <value>播放 / 暂停</value>
+  </data>
+  <data name="PlayerExpander.Detail" xml:space="preserve">
+    <value>播放器全局设置</value>
+  </data>
+  <data name="PlayerExpander.Header" xml:space="preserve">
+    <value>播放器</value>
+  </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>播放器设置</value>
+  </data>
+  <data name="PlayerStatusError" xml:space="preserve">
+    <value>加载时发生错误</value>
+  </data>
+  <data name="PlayerStatusLoading" xml:space="preserve">
+    <value>播放器正在加载</value>
+  </data>
+  <data name="Playlist" xml:space="preserve">
+    <value>播放列表</value>
+  </data>
+  <data name="PlaylistEmpty" xml:space="preserve">
+    <value>你的播放列表将显示在这里</value>
+  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>管理和配置插件</value>
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>插件</value>
-  </data>
-  <data name="PreloadPagesAfter" xml:space="preserve">
-    <value>预加载页数（当前页之后）</value>
-  </data>
-  <data name="PreloadPagesBefore" xml:space="preserve">
-    <value>预加载页数（当前页之前）</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>按下组合键</value>
@@ -856,40 +835,14 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
   <data name="Progress" xml:space="preserve">
     <value>进度</value>
   </data>
-  <data name="PromptBeforeRemovingComics" xml:space="preserve">
-    <value>移除漫画前提示</value>
+  <data name="PromptBeforeRemovingItems" xml:space="preserve">
+    <value>移除项目前进行确认</value>
   </data>
-  <data name="RandomComic" xml:space="preserve">
-    <value>随机漫画</value>
+  <data name="Random" xml:space="preserve">
+    <value>随机播放</value>
   </data>
   <data name="Rating" xml:space="preserve">
     <value>评分</value>
-  </data>
-  <data name="ReaderExpander.Detail" xml:space="preserve">
-    <value>自定义阅读器</value>
-  </data>
-  <data name="ReaderExpander.Header" xml:space="preserve">
-    <value>阅读器</value>
-  </data>
-  <data name="ReaderSettingButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>阅读器设置</value>
-  </data>
-  <data name="ReaderStatusError" xml:space="preserve">
-    <value>加载时发生错误</value>
-  </data>
-  <data name="ReaderStatusLoading" xml:space="preserve">
-    <value>阅读器加载中</value>
-  </data>
-  <data name="ReaderTipContent" xml:space="preserve">
-    <value>1. 双击以适应页面宽度或高度。
-2. 将“自动滚动”设置为大于 0 的值，以启用自动滚动和鼠标中键功能。
-3. 拖动页面以调整自动滚动速度。</value>
-  </data>
-  <data name="ReadingList" xml:space="preserve">
-    <value>阅读列表</value>
-  </data>
-  <data name="ReadingListEmpty" xml:space="preserve">
-    <value>你的阅读列表将显示在这里</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>刷新</value>
@@ -907,7 +860,7 @@ NOT               - 逻辑非。例如：NOT %tag = "hide this"
     <value>取消收藏</value>
   </data>
   <data name="RemoveItemsConfirmation" xml:space="preserve">
-    <value>以下 $count 个项目将从你的书库中永久删除：
+    <value>以下 $count 个项目将从你的媒体库中永久删除：
 
 $items</value>
   </data>
@@ -935,6 +888,9 @@ $plugins</value>
   </data>
   <data name="ResetAllSettingsMessage" xml:space="preserve">
     <value>所有设置将恢复为默认状态。您的用户数据将被保留。</value>
+  </data>
+  <data name="ResetPlayerSettings" xml:space="preserve">
+    <value>重置播放器设置</value>
   </data>
   <data name="Restore" xml:space="preserve">
     <value>恢复</value>
@@ -979,6 +935,12 @@ $plugins</value>
   <data name="SearchResultsOf" xml:space="preserve">
     <value>'$keyword' 的搜索结果</value>
   </data>
+  <data name="SeekBackward" xml:space="preserve">
+    <value>后退</value>
+  </data>
+  <data name="SeekForward" xml:space="preserve">
+    <value>前进</value>
+  </data>
   <data name="Select" xml:space="preserve">
     <value>选择</value>
   </data>
@@ -1009,7 +971,7 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>设置</value>
   </data>
-  <data name="ShowHiddenComicButton.Content" xml:space="preserve">
+  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
     <value>查看隐藏漫画</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
@@ -1030,17 +992,8 @@ $plugins</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>排序函数</value>
   </data>
-  <data name="SpreadDetection" xml:space="preserve">
-    <value>跨页检测</value>
-  </data>
-  <data name="StartEndFromScrollingArea" xml:space="preserve">
-    <value>使用滚动区域的起始/结束位置作为阅读起始/结束位置</value>
-  </data>
   <data name="Statistics" xml:space="preserve">
     <value>统计信息</value>
-  </data>
-  <data name="SwapLeftAndRightPages" xml:space="preserve">
-    <value>左右页对调</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>标签</value>
@@ -1083,17 +1036,11 @@ $plugins</value>
   <data name="Title2" xml:space="preserve">
     <value>标题 2</value>
   </data>
-  <data name="ToggleAutoScroll" xml:space="preserve">
-    <value>切换自动滚动</value>
-  </data>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>切换全屏</value>
   </data>
-  <data name="TotalComics" xml:space="preserve">
-    <value>漫画总数</value>
-  </data>
-  <data name="TransitionAnimation" xml:space="preserve">
-    <value>翻页动画</value>
+  <data name="TotalMedia" xml:space="preserve">
+    <value>媒体总数</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>双页模式</value>
@@ -1136,11 +1083,20 @@ $info</value>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>适中</value>
   </data>
+  <data name="VolumeDown" xml:space="preserve">
+    <value>降低音量</value>
+  </data>
+  <data name="VolumeUp" xml:space="preserve">
+    <value>提高音量</value>
+  </data>
   <data name="Warning" xml:space="preserve">
     <value>警告</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>目前，您的仓库包含如下文件夹：</value>
+  </data>
+  <data name="WhilePlayingVideos" xml:space="preserve">
+    <value>播放视频时</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>窗口 $n</value>

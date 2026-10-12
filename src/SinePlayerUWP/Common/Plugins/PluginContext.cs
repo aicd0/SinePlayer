@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -17,15 +17,15 @@ using SinePlayerUWP.Core.Common.AppEnvironment;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Database.SqlHelpers;
 using SinePlayerUWP.Data.Database;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Tables;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Navigation;
 using SinePlayerUWP.Helpers.Search;
 using SinePlayerUWP.SDK.Models;
 using SinePlayerUWP.SDK.Plugins;
-using SinePlayerUWP.SDK.Plugins.Comic;
 using SinePlayerUWP.SDK.Plugins.Common;
+using SinePlayerUWP.SDK.Plugins.Media;
 using SinePlayerUWP.SDK.Plugins.Property;
 using SinePlayerUWP.SDK.Plugins.UI;
 using SinePlayerUWP.SDK.Plugins.UI.Menu;
@@ -94,14 +94,14 @@ internal partial class PluginContext : IPluginContext
         }
     }
 
-    public void DispatchComicEditedEvent(IComicModel comic)
+    public void DispatchMediaEditedEvent(IMediaModel media)
     {
         if (!IsActive)
         {
             return;
         }
 
-        SafeAction(() => _comicEditedEventHandler?.Invoke(comic));
+        SafeAction(() => _mediaEditedEventHandler?.Invoke(media));
     }
 
     public IReadOnlyList<BaseMenuFlyoutItemModel> GetMainPageMoreMenuItems(IWindowContext windowContext)
@@ -120,14 +120,14 @@ internal partial class PluginContext : IPluginContext
         return [.. SafeAction(() => creator.CreateMenuItems(windowContext), []).Select(CreateHostMenuFlyoutItem)];
     }
 
-    public IReadOnlyList<BaseMenuFlyoutItemModel> GetComicMenuItems(IWindowContext windowContext, IComicModel primary, IEnumerable<IComicModel> selection)
+    public IReadOnlyList<BaseMenuFlyoutItemModel> GetMediaMenuItems(IWindowContext windowContext, IMediaModel primary, IEnumerable<IMediaModel> selection)
     {
         if (!IsActive)
         {
             return [];
         }
 
-        IComicMenuItemCreator? creator = _comicMenuItemCreator;
+        IMediaMenuItemCreator? creator = _mediaMenuItemCreator;
         if (creator is null)
         {
             return [];
@@ -136,14 +136,14 @@ internal partial class PluginContext : IPluginContext
         return [.. SafeAction(() => creator.CreateMenuItems(windowContext, primary, selection), []).Select(CreateHostMenuFlyoutItem)];
     }
 
-    public IEnumerable<IVirtualProperty<IComicModel>> GetAllComicVirtualProperties()
+    public IEnumerable<IVirtualProperty<IMediaModel>> GetAllMediaVirtualProperties()
     {
         if (!IsActive)
         {
             return [];
         }
 
-        return [.. _comicVirtualProperties.Values];
+        return [.. _mediaVirtualProperties.Values];
     }
 
     public IReadOnlyList<ISidebarPageProvider> GetAllSidebarPageProviders()
@@ -156,33 +156,33 @@ internal partial class PluginContext : IPluginContext
         return [.. _sidebarPageProviders];
     }
 
-    public void SetReadingComic(PluginWindowContext windowContext, IComicModel? comic)
+    public void SetForegroundMedia(PluginWindowContext windowContext, IMediaModel? media)
     {
         if (!IsActive)
         {
             return;
         }
 
-        windowContext.SetReadingComic(comic, SafeAction);
+        windowContext.SetForegroundMedia(media, SafeAction);
     }
 
     //
     // IPluginContext Implementation
     //
 
-    private event ComicEditedEventHandler? _comicEditedEventHandler;
+    private event MediaEditedEventHandler? _mediaEditedEventHandler;
 
-    private readonly Dictionary<string, IVirtualProperty<IComicModel>> _comicVirtualProperties = [];
+    private readonly Dictionary<string, IVirtualProperty<IMediaModel>> _mediaVirtualProperties = [];
     private readonly List<ISidebarPageProvider> _sidebarPageProviders = [];
     private readonly Lazy<ILogger> _logger;
     private readonly Lazy<IRegistryDatabase> _registryDatabase;
-    private IComicMenuItemCreator? _comicMenuItemCreator = null;
+    private IMediaMenuItemCreator? _mediaMenuItemCreator = null;
     private ICommonMenuItemCreator? _mainPageMoreMenuItemCreator = null;
 
-    event ComicEditedEventHandler? IPluginContext.ComicEdited
+    event MediaEditedEventHandler? IPluginContext.MediaEdited
     {
-        add => _comicEditedEventHandler += value;
-        remove => _comicEditedEventHandler -= value;
+        add => _mediaEditedEventHandler += value;
+        remove => _mediaEditedEventHandler -= value;
     }
 
     CultureInfo IPluginContext.CurrentCulture => EnvironmentProvider.Instance.GetCurrentAppLanguageInfo();
@@ -193,10 +193,10 @@ internal partial class PluginContext : IPluginContext
 
     IRegistryDatabase IPluginContext.RegistryDatabase => _registryDatabase.Value;
 
-    IComicMenuItemCreator? IPluginContext.ComicMenuItemCreator
+    IMediaMenuItemCreator? IPluginContext.MediaMenuItemCreator
     {
-        get => _comicMenuItemCreator;
-        set => _comicMenuItemCreator = value;
+        get => _mediaMenuItemCreator;
+        set => _mediaMenuItemCreator = value;
     }
 
     ICommonMenuItemCreator? IPluginContext.MainPageMoreMenuItemCreator
@@ -220,21 +220,21 @@ internal partial class PluginContext : IPluginContext
         return DialogUtils.EnqueueDialogAsync(dialog);
     }
 
-    async Task<IComicModel?> IPluginContext.GetComic(long id)
+    async Task<IMediaModel?> IPluginContext.GetMedia(long id)
     {
-        return await ComicModel.FromId(id);
+        return await MediaModel.FromId(id);
     }
 
-    async Task<IEnumerable<long>> IPluginContext.SearchComics(string filterExpression)
+    async Task<IEnumerable<long>> IPluginContext.SearchMedia(string filterExpression)
     {
         ICondition? filterCondition = ParseFilterExpression(filterExpression) ?? throw new InvalidExpressionException();
         List<long> ids = [];
-        await ComicHandle.Enqueue(() =>
+        await MediaHandle.Enqueue(() =>
         {
-            var command = SelectCommand.Create(ComicTable.Instance);
-            IReaderToken<long> idToken = command.PutQueryInt64(ComicTable.ColumnId);
+            var command = SelectCommand.Create(MediaTable.Instance);
+            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             command.AppendCondition(filterCondition);
-            command.AppendCondition(ComicHandle.CreateComicOnlyCondition());
+            command.AppendCondition(MediaHandle.CreateMediaOnlyCondition());
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
@@ -252,20 +252,20 @@ internal partial class PluginContext : IPluginContext
         AppRouter.RegisterPage(host, pageType);
     }
 
-    void IPluginContext.RegisterComicVirtualProperty(IVirtualProperty<IComicModel> property)
+    void IPluginContext.RegisterMediaVirtualProperty(IVirtualProperty<IMediaModel> property)
     {
         ArgumentNullException.ThrowIfNull(property, nameof(property));
 
         string name = property.Name;
         if (string.IsNullOrEmpty(name) || !VirtualPropertyNameRegex().IsMatch(name))
         {
-            Logger.F(TAG, $"({Name}) RegisterComicVirtualProperty: Invalid name '{name}'");
+            Logger.F(TAG, $"({Name}) RegisterMediaVirtualProperty: Invalid name '{name}'");
             return;
         }
 
-        if (!_comicVirtualProperties.TryAdd(name, property))
+        if (!_mediaVirtualProperties.TryAdd(name, property))
         {
-            Logger.F(TAG, $"({Name}) RegisterComicVirtualProperty: Property '{name}' already registered");
+            Logger.F(TAG, $"({Name}) RegisterMediaVirtualProperty: Property '{name}' already registered");
         }
     }
 
@@ -362,7 +362,7 @@ internal partial class PluginContext : IPluginContext
         ICondition condition;
         try
         {
-            condition = Common.Expression.Filter.Sql.SQLGenerator.CreateQuery(token, new ComicFilterSQLProvider());
+            condition = Common.Expression.Filter.Sql.SQLGenerator.CreateQuery(token, new MediaFilterSQLProvider());
         }
         catch (Exception ex)
         {

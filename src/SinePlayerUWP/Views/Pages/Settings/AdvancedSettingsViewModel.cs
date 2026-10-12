@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -6,7 +6,6 @@ using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 
-using SinePlayerUWP.Common.Archive;
 using SinePlayerUWP.Common.Imaging;
 using SinePlayerUWP.Common.Localization;
 using SinePlayerUWP.Core.Common.DebugTools;
@@ -107,7 +106,7 @@ internal partial class AdvancedSettingsViewModel : INotifyPropertyChanged
     public void RefreshRandomSeed()
     {
         AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.ComicShuffleRandomSeed = Random.Shared.Next();
+        model.MediaShuffleRandomSeed = Random.Shared.Next();
         AppSettingsModel.UpdateModel(model);
     }
 
@@ -152,7 +151,6 @@ internal partial class AdvancedSettingsViewModel : INotifyPropertyChanged
     private static void ClearCacheInternal()
     {
         ImageLoader.Clear();
-        ArchiveCacheManager.Clear();
         ClearCacheDirectory(StorageLocation.LocalCacheFolderPath);
         ClearCacheDirectory(StorageLocation.TemporaryFolderPath);
     }

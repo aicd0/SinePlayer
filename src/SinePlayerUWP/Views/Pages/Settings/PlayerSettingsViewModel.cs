@@ -1,0 +1,177 @@
+// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using System.Collections.Generic;
+using System.ComponentModel;
+
+using SinePlayerUWP.Common.Localization;
+using SinePlayerUWP.Core.Common.Utils;
+using SinePlayerUWP.Data.Models.Misc;
+
+namespace SinePlayerUWP.Views.Pages.Settings;
+
+internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private SettingsSharedViewModel _shared = new();
+    public SettingsSharedViewModel Shared
+    {
+        get => _shared;
+        private set
+        {
+            _shared = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Shared)));
+        }
+    }
+
+    private bool _restoreLastReadingPosition;
+    public bool RestoreLastReadingPosition
+    {
+        get => _restoreLastReadingPosition;
+        set
+        {
+            _restoreLastReadingPosition = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RestoreLastReadingPosition)));
+        }
+    }
+
+    private bool _restoreLastReadingPositionOnlyAppliesToReadingMedia;
+    public bool RestoreLastReadingPositionOnlyAppliesToReadingMedia
+    {
+        get => _restoreLastReadingPositionOnlyAppliesToReadingMedia;
+        set
+        {
+            _restoreLastReadingPositionOnlyAppliesToReadingMedia = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RestoreLastReadingPositionOnlyAppliesToReadingMedia)));
+        }
+    }
+
+    private bool _autoToggleOverlaysOnCursor;
+    public bool AutoToggleOverlaysOnCursor
+    {
+        get => _autoToggleOverlaysOnCursor;
+        set
+        {
+            _autoToggleOverlaysOnCursor = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AutoToggleOverlaysOnCursor)));
+        }
+    }
+
+    private bool _autoPlayNext;
+    public bool AutoPlayNext
+    {
+        get => _autoPlayNext;
+        set
+        {
+            _autoPlayNext = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AutoPlayNext)));
+        }
+    }
+
+    private List<KeepScreenOnBehaviorEntry> _keepScreenOnBehaviors = [];
+    public List<KeepScreenOnBehaviorEntry> KeepScreenOnBehaviors
+    {
+        get => _keepScreenOnBehaviors;
+        set
+        {
+            _keepScreenOnBehaviors = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(KeepScreenOnBehaviors)));
+        }
+    }
+
+    private int _keepScreenOnBehaviorIndex;
+    public int KeepScreenOnBehaviorIndex
+    {
+        get => _keepScreenOnBehaviorIndex;
+        set
+        {
+            _keepScreenOnBehaviorIndex = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(KeepScreenOnBehaviorIndex)));
+        }
+    }
+
+    public void Initialize(SettingsSharedViewModel shared)
+    {
+        Shared = shared;
+        Shared.UpdateStarted += Update;
+    }
+
+    public void SetKeepScreenOnBehavior(int index)
+    {
+        if (index == _keepScreenOnBehaviorIndex || index < 0 || index >= _keepScreenOnBehaviors.Count)
+        {
+            return;
+        }
+
+        _keepScreenOnBehaviorIndex = index;
+        AppSettingsModel.KeepScreenOnBehavior = _keepScreenOnBehaviors[index].Behavior;
+    }
+
+    private void Update()
+    {
+        UpdateBasicPlayerSettings();
+        UpdateKeepScreenOnBehavior();
+    }
+
+    private void UpdateBasicPlayerSettings()
+    {
+        CoroutineUtils.RunInMainThread(() =>
+        {
+            RestoreLastReadingPosition = AppSettingsModel.RestoreLastReadingPosition;
+            RestoreLastReadingPositionOnlyAppliesToReadingMedia = AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia;
+            AutoToggleOverlaysOnCursor = AppSettingsModel.AutoToggleOverlaysOnCursor;
+            AutoPlayNext = AppSettingsModel.AutoPlayNext;
+        });
+    }
+
+    private void UpdateKeepScreenOnBehavior()
+    {
+        AppSettingsModel.KeepScreenOnBehaviorEnum behavior = AppSettingsModel.KeepScreenOnBehavior;
+        List<KeepScreenOnBehaviorEntry> entries = [
+            new(AppSettingsModel.KeepScreenOnBehaviorEnum.Never),
+            new(AppSettingsModel.KeepScreenOnBehaviorEnum.Always),
+            new(AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos),
+        ];
+        int selectedIndex = -1;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            if (behavior == entries[i].Behavior)
+            {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        if (selectedIndex < 0)
+        {
+            selectedIndex = 0;
+        }
+
+        KeepScreenOnBehaviors = entries;
+        KeepScreenOnBehaviorIndex = selectedIndex;
+    }
+
+    //
+    // Types
+    //
+
+    public class KeepScreenOnBehaviorEntry(AppSettingsModel.KeepScreenOnBehaviorEnum behavior)
+    {
+        public AppSettingsModel.KeepScreenOnBehaviorEnum Behavior => behavior;
+
+        public string Name
+        {
+            get
+            {
+                return behavior switch
+                {
+                    AppSettingsModel.KeepScreenOnBehaviorEnum.Never => StringResourceProvider.Instance.Never,
+                    AppSettingsModel.KeepScreenOnBehaviorEnum.Always => StringResourceProvider.Instance.Always,
+                    AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos => StringResourceProvider.Instance.WhilePlayingVideos,
+                    _ => throw new InvalidEnumArgumentException(nameof(Behavior)),
+                };
+            }
+        }
+    }
+}

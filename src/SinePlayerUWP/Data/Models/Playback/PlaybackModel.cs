@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -29,7 +29,7 @@ internal class PlaybackModel
     private int _cursor = 0;
     private int _randomSeed = Random.Shared.Next();
     private string? _firstId;
-    private double _initialPage = -1.0;
+    private long _initialPositionMs = -1;
 
     public IReadOnlyList<PlaylistModel.PlaylistItem> Items => _items;
     public bool CanGoNext => _isRepeat || _cursor < _items.Count - 1;
@@ -114,10 +114,10 @@ internal class PlaybackModel
         };
     }
 
-    public void LoadState(PlaylistModel playlist, string? serializedPlayback, double initialPage)
+    public void LoadState(PlaylistModel playlist, string? serializedPlayback, long initialPositionMs)
     {
         _playlist = playlist;
-        _initialPage = initialPage;
+        _initialPositionMs = initialPositionMs;
 
         if (!string.IsNullOrEmpty(serializedPlayback) && FromSerializedString(serializedPlayback))
         {
@@ -236,7 +236,7 @@ internal class PlaybackModel
             {
                 Span<byte> buffer = stackalloc byte[sizeof(int) + sizeof(long)];
                 BinaryPrimitives.WriteInt32LittleEndian(buffer, _randomSeed);
-                BinaryPrimitives.WriteInt64LittleEndian(buffer[sizeof(int)..], x.Comic.Id);
+                BinaryPrimitives.WriteInt64LittleEndian(buffer[sizeof(int)..], x.Media.Id);
                 return HashUtils.GetXxHash64Int(buffer);
             })];
             for (int i = 0; i < _items.Count; i++)
@@ -278,13 +278,13 @@ internal class PlaybackModel
 
     private void DispatchPlaybackStatusChange(PlaybackStateChangeReason reason)
     {
-        double initialPage = _initialPage;
-        _initialPage = -1.0;
+        long initialPositionMs = _initialPositionMs;
+        _initialPositionMs = -1;
 
         PlaybackStateChanged?.Invoke(new()
         {
             Reason = reason,
-            InitialPage = initialPage,
+            InitialPositionMs = initialPositionMs,
         });
     }
 

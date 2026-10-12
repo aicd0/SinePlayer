@@ -11,7 +11,7 @@ internal class MediaTagTable : ITable
     public static MediaTagTable Instance { get; } = new MediaTagTable();
 
     public static StringColumn ColumnContent { get; } = new("content");
-    public static Int64Column ColumnComicId { get; } = new("comic_id");
+    public static Int64Column ColumnMediaId { get; } = new("media_id");
     public static Int64Column ColumnTagCategoryId { get; } = new("tag_category_id");
 
     private MediaTagTable() { }

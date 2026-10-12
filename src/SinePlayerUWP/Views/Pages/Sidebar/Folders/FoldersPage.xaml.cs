@@ -34,14 +34,14 @@ internal sealed partial class FoldersPage : BasePage
 
         ObserveData();
         ViewModel.Initialize(PageActionHandler);
-        ViewModel.UpdateComics();
+        ViewModel.UpdateMedia();
     }
 
     private void ObserveData()
     {
-        GlobalEvent.Instance.ComicUpdated.Observe(this, _ =>
+        GlobalEvent.Instance.MediaUpdated.Observe(this, _ =>
         {
-            ViewModel.UpdateComics();
+            ViewModel.UpdateMedia();
         });
     }
 
@@ -75,7 +75,7 @@ internal sealed partial class FoldersPage : BasePage
             bool handled = true;
             switch (source)
             {
-                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_COMIC_ITEM_MENU:
+                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
                     switch (name)
                     {
                         case MenuFlyoutItemsCreator.CUSTOM_ACTION_NAME_SELECT:

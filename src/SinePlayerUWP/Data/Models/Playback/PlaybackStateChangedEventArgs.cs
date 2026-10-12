@@ -6,5 +6,5 @@ namespace SinePlayerUWP.Data.Models.Playback;
 internal class PlaybackStateChangedEventArgs
 {
     public required PlaybackStateChangeReason Reason { get; init; }
-    public required double InitialPage { get; init; }
+    public required long InitialPositionMs { get; init; }
 }

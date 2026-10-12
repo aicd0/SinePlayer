@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -50,19 +50,6 @@ internal static class AppSettingsModel
         }
     }
 
-    public static bool AutoHideCursor
-    {
-        get
-        {
-            return _db.Read(model => model.AutomaticallyHideCursor ?? false);
-        }
-        set
-        {
-            _db.Write(model => model.AutomaticallyHideCursor = value);
-            _db.Save();
-        }
-    }
-
     public static bool AutoSwitch
     {
         get
@@ -89,6 +76,45 @@ internal static class AppSettingsModel
         }
     }
 
+    public static bool AutoPlayNext
+    {
+        get
+        {
+            return _db.Read(model => model.AutoPlayNext ?? true);
+        }
+        set
+        {
+            _db.Write(model => model.AutoPlayNext = value);
+            _db.Save();
+        }
+    }
+
+    public static bool PlayerMuted
+    {
+        get
+        {
+            return _db.Read(model => model.PlayerMuted ?? false);
+        }
+        set
+        {
+            _db.Write(model => model.PlayerMuted = value);
+            _db.Save();
+        }
+    }
+
+    public static double PlayerVolume
+    {
+        get
+        {
+            return _db.Read(model => model.PlayerVolume ?? 1.0);
+        }
+        set
+        {
+            _db.Write(model => model.PlayerVolume = value);
+            _db.Save();
+        }
+    }
+
     public static CloseLastTabBehaviorEnum CloseLastTabBehavior
     {
         get
@@ -98,19 +124,6 @@ internal static class AppSettingsModel
         set
         {
             _db.Write(model => model.CloseLastTabBehavior = ConvertCloseLastTabBehaviorToJson(value));
-            _db.Save();
-        }
-    }
-
-    public static int DefaultArchiveCodePage
-    {
-        get
-        {
-            return _db.Read(model => model.DefaultArchiveCodePage ?? -1);
-        }
-        set
-        {
-            _db.Write(model => model.DefaultArchiveCodePage = value);
             _db.Save();
         }
     }
@@ -230,15 +243,15 @@ internal static class AppSettingsModel
         }
     }
 
-    public static OpenComicBehaviorEnum OpenComicDefaultBehavior
+    public static OpenMediaBehaviorEnum OpenMediaDefaultBehavior
     {
         get
         {
-            return _db.Read(model => ConvertOpenComicDefaultBehaviorFromJson(model.OpenComicDefaultBehavior));
+            return _db.Read(model => ConvertOpenMediaDefaultBehaviorFromJson(model.OpenMediaDefaultBehavior));
         }
         set
         {
-            _db.Write(model => model.OpenComicDefaultBehavior = ConvertOpenComicDefaultBehaviorToJson(value));
+            _db.Write(model => model.OpenMediaDefaultBehavior = ConvertOpenMediaDefaultBehaviorToJson(value));
             _db.Save();
         }
     }
@@ -269,28 +282,54 @@ internal static class AppSettingsModel
         }
     }
 
-    public static int PreloadPagesAfter
+    public static string DefaultPlayerSettingPresetKey
     {
         get
         {
-            return _db.Read(model => model.PreloadPagesAfter ?? 5);
+            return _db.Read(model => model.DefaultPlayerSettingPresetKey ?? string.Empty);
         }
         set
         {
-            _db.Write(model => model.PreloadPagesAfter = value);
+            _db.Write(model => model.DefaultPlayerSettingPresetKey = value);
             _db.Save();
         }
     }
 
-    public static int PreloadPagesBefore
+    public static Dictionary<string, PlayerSettingsModel> PlayerSettingPresets
     {
         get
         {
-            return _db.Read(model => model.PreloadPagesBefore ?? 5);
+            return _db.Read(model =>
+            {
+                Dictionary<string, PlayerSettingsModel> presets = [];
+                if (model.PlayerSettingPresets is not null)
+                {
+                    foreach (KeyValuePair<string, PlayerSettingsModel.JsonModel?> kvp in model.PlayerSettingPresets)
+                    {
+                        string key = kvp.Key;
+                        PlayerSettingsModel.JsonModel? settingJsonModel = kvp.Value;
+                        if (settingJsonModel is not null)
+                        {
+                            presets[key] = PlayerSettingsModel.FromJsonModel(key, settingJsonModel);
+                        }
+                    }
+                }
+
+                return presets;
+            });
         }
         set
         {
-            _db.Write(model => model.PreloadPagesBefore = value);
+            _db.Write(model =>
+            {
+                model.PlayerSettingPresets = [];
+                foreach (KeyValuePair<string, PlayerSettingsModel> kvp in value)
+                {
+                    string key = kvp.Key;
+                    PlayerSettingsModel setting = kvp.Value;
+                    model.PlayerSettingPresets[key] = setting.ToJsonModel();
+                }
+            });
             _db.Save();
         }
     }
@@ -321,15 +360,15 @@ internal static class AppSettingsModel
         }
     }
 
-    public static bool RestoreLastReadingPositionOnlyAppliesToReadingComics
+    public static bool RestoreLastReadingPositionOnlyAppliesToReadingMedia
     {
         get
         {
-            return _db.Read(model => model.RestoreLastReadingPositionOnlyAppliesToReadingComics ?? false);
+            return _db.Read(model => model.RestoreLastReadingPositionOnlyAppliesToReadingMedia ?? false);
         }
         set
         {
-            _db.Write(model => model.RestoreLastReadingPositionOnlyAppliesToReadingComics = value);
+            _db.Write(model => model.RestoreLastReadingPositionOnlyAppliesToReadingMedia = value);
             _db.Save();
         }
     }
@@ -347,19 +386,6 @@ internal static class AppSettingsModel
         }
     }
 
-    public static bool UseScrollingAreaAsStartEnd
-    {
-        get
-        {
-            return _db.Read(model => model.UseScrollingAreaAsStartEnd ?? false);
-        }
-        set
-        {
-            _db.Write(model => model.UseScrollingAreaAsStartEnd = value);
-            _db.Save();
-        }
-    }
-
     public static bool SaveBrowsingHistory
     {
         get
@@ -369,84 +395,6 @@ internal static class AppSettingsModel
         set
         {
             _db.Write(model => model.SaveBrowsingHistory = value);
-            _db.Save();
-        }
-    }
-
-    public static bool EnableCompressedFileCache
-    {
-        get
-        {
-            return _db.Read(model => model.EnableCompressedFileCache ?? true);
-        }
-        set
-        {
-            _db.Write(model => model.EnableCompressedFileCache = value);
-            _db.Save();
-        }
-    }
-
-    public static bool TransitionAnimation
-    {
-        get
-        {
-            return _db.Read(model => model.TransitionAnimation ?? true);
-        }
-        set
-        {
-            _db.Write(model => model.TransitionAnimation = value);
-            _db.Save();
-        }
-    }
-
-    public static string DefaultReaderSettingPresetKey
-    {
-        get
-        {
-            return _db.Read(model => model.DefaultReaderSettingPresetKey ?? string.Empty);
-        }
-        set
-        {
-            _db.Write(model => model.DefaultReaderSettingPresetKey = value);
-            _db.Save();
-        }
-    }
-
-    public static Dictionary<string, ReaderSettingsModel> ReaderSettingPresets
-    {
-        get
-        {
-            return _db.Read(model =>
-            {
-                Dictionary<string, ReaderSettingsModel> presets = [];
-                if (model.ReaderSettingPresets is not null)
-                {
-                    foreach (KeyValuePair<string, ReaderSettingsModel.JsonModel?> kvp in model.ReaderSettingPresets)
-                    {
-                        string key = kvp.Key;
-                        ReaderSettingsModel.JsonModel? settingJsonModel = kvp.Value;
-                        if (settingJsonModel is not null)
-                        {
-                            presets[key] = ReaderSettingsModel.FromJsonModel(key, settingJsonModel);
-                        }
-                    }
-                }
-
-                return presets;
-            });
-        }
-        set
-        {
-            _db.Write(model =>
-            {
-                model.ReaderSettingPresets = [];
-                foreach (KeyValuePair<string, ReaderSettingsModel> kvp in value)
-                {
-                    string key = kvp.Key;
-                    ReaderSettingsModel setting = kvp.Value;
-                    model.ReaderSettingPresets[key] = setting.ToJsonModel();
-                }
-            });
             _db.Save();
         }
     }
@@ -469,7 +417,7 @@ internal static class AppSettingsModel
         JsonModel newModel = new();
         _db.Read(model =>
         {
-            newModel.ComicFolders = model.ComicFolders;
+            newModel.MediaFolders = model.MediaFolders;
         });
 
         _db.Write(newModel);
@@ -485,17 +433,17 @@ internal static class AppSettingsModel
         _db.Save();
     }
 
-    public static void AddComicFolder(string folderPath)
+    public static void AddMediaFolder(string folderPath)
     {
         bool updated = _db.Write(m =>
         {
-            m.ComicFolders ??= [];
-            for (int i = m.ComicFolders.Count - 1; i >= 0; i--)
+            m.MediaFolders ??= [];
+            for (int i = m.MediaFolders.Count - 1; i >= 0; i--)
             {
-                string? oldPath = m.ComicFolders[i];
+                string? oldPath = m.MediaFolders[i];
                 if (string.IsNullOrEmpty(oldPath))
                 {
-                    m.ComicFolders.RemoveAt(i);
+                    m.MediaFolders.RemoveAt(i);
                     continue;
                 }
                 if (StringUtils.FolderContain(oldPath, folderPath))
@@ -504,10 +452,10 @@ internal static class AppSettingsModel
                 }
                 if (StringUtils.FolderContain(folderPath, oldPath))
                 {
-                    m.ComicFolders.RemoveAt(i);
+                    m.MediaFolders.RemoveAt(i);
                 }
             }
-            m.ComicFolders.Add(folderPath);
+            m.MediaFolders.Add(folderPath);
             return true;
         });
 
@@ -517,12 +465,12 @@ internal static class AppSettingsModel
         }
     }
 
-    public static void RemoveComicFolder(string folderPath)
+    public static void RemoveMediaFolder(string folderPath)
     {
         bool updated = _db.Write(m =>
         {
-            m.ComicFolders ??= [];
-            return m.ComicFolders.Remove(folderPath);
+            m.MediaFolders ??= [];
+            return m.MediaFolders.Remove(folderPath);
         });
 
         if (updated)
@@ -555,25 +503,25 @@ internal static class AppSettingsModel
         };
     }
 
-    private static string ConvertOpenComicDefaultBehaviorToJson(OpenComicBehaviorEnum behavior)
+    private static string ConvertOpenMediaDefaultBehaviorToJson(OpenMediaBehaviorEnum behavior)
     {
         return behavior switch
         {
-            OpenComicBehaviorEnum.OpenInCurrentTab => "OpenInCurrentTab",
-            OpenComicBehaviorEnum.OpenInNewTab => "OpenInNewTab",
-            OpenComicBehaviorEnum.OpenInLastActiveReaderTab => "OpenInLastActiveReaderTab",
+            OpenMediaBehaviorEnum.OpenInCurrentTab => "OpenInCurrentTab",
+            OpenMediaBehaviorEnum.OpenInNewTab => "OpenInNewTab",
+            OpenMediaBehaviorEnum.OpenInLastActiveReaderTab => "OpenInLastActiveReaderTab",
             _ => "OpenInCurrentTab",
         };
     }
 
-    private static OpenComicBehaviorEnum ConvertOpenComicDefaultBehaviorFromJson(string? behavior)
+    private static OpenMediaBehaviorEnum ConvertOpenMediaDefaultBehaviorFromJson(string? behavior)
     {
         return behavior switch
         {
-            "OpenInCurrentTab" => OpenComicBehaviorEnum.OpenInCurrentTab,
-            "OpenInNewTab" => OpenComicBehaviorEnum.OpenInNewTab,
-            "OpenInLastActiveReaderTab" => OpenComicBehaviorEnum.OpenInLastActiveReaderTab,
-            _ => OpenComicBehaviorEnum.OpenInCurrentTab,
+            "OpenInCurrentTab" => OpenMediaBehaviorEnum.OpenInCurrentTab,
+            "OpenInNewTab" => OpenMediaBehaviorEnum.OpenInNewTab,
+            "OpenInLastActiveReaderTab" => OpenMediaBehaviorEnum.OpenInLastActiveReaderTab,
+            _ => OpenMediaBehaviorEnum.OpenInCurrentTab,
         };
     }
 
@@ -583,7 +531,7 @@ internal static class AppSettingsModel
         {
             KeepScreenOnBehaviorEnum.Never => "Never",
             KeepScreenOnBehaviorEnum.Always => "Always",
-            KeepScreenOnBehaviorEnum.DuringAutoScrolling => "DuringAutoScrolling",
+            KeepScreenOnBehaviorEnum.WhilePlayingVideos => "DuringPlayback",
             _ => "DuringAutoScrolling",
         };
     }
@@ -594,8 +542,8 @@ internal static class AppSettingsModel
         {
             "Never" => KeepScreenOnBehaviorEnum.Never,
             "Always" => KeepScreenOnBehaviorEnum.Always,
-            "DuringAutoScrolling" => KeepScreenOnBehaviorEnum.DuringAutoScrolling,
-            _ => KeepScreenOnBehaviorEnum.DuringAutoScrolling,
+            "DuringPlayback" => KeepScreenOnBehaviorEnum.WhilePlayingVideos,
+            _ => KeepScreenOnBehaviorEnum.WhilePlayingVideos,
         };
     }
 
@@ -634,39 +582,39 @@ internal static class AppSettingsModel
         protected override JsonModel InitializeModel(JsonModel? model)
         {
             model ??= new();
-            model.OpenComicDefaultBehavior ??= model.HomePageTapComicBehavior;
+            model.OpenMediaDefaultBehavior ??= model.HomePageTapMediaBehavior;
             return model;
         }
     }
 
     public class ExternalModel
     {
-        public List<string> ComicFolders { get; set; } = [];
+        public List<string> MediaFolders { get; set; } = [];
         public bool ScanOnLaunch { get; set; }
-        public bool RemoveUnreachableComics { get; set; }
-        public bool PromptBeforeRemovingComics { get; set; }
+        public bool RemoveUnreachableMedia { get; set; }
+        public bool PromptBeforeRemovingMedia { get; set; }
         public AppearanceSetting Theme { get; set; } = AppearanceSetting.UseSystemSetting;
-        public int ComicShuffleRandomSeed { get; set; }
+        public int MediaShuffleRandomSeed { get; set; }
 
         public static ExternalModel From(JsonModel model)
         {
             ExternalModel externalModel = new()
             {
                 ScanOnLaunch = model.ScanOnLaunch ?? true,
-                RemoveUnreachableComics = model.RemoveUnreachableComics ?? true,
-                PromptBeforeRemovingComics = model.PromptBeforeRemovingComics ?? true,
-                ComicShuffleRandomSeed = model.ComicShuffleRandomSeed ?? 0,
+                RemoveUnreachableMedia = model.RemoveUnreachableMedia ?? true,
+                PromptBeforeRemovingMedia = model.PromptBeforeRemovingMedia ?? true,
+                MediaShuffleRandomSeed = model.MediaShuffleRandomSeed ?? 0,
             };
 
-            if (model.ComicFolders is not null)
+            if (model.MediaFolders is not null)
             {
-                foreach (string? folder in model.ComicFolders)
+                foreach (string? folder in model.MediaFolders)
                 {
                     if (string.IsNullOrEmpty(folder))
                     {
                         continue;
                     }
-                    externalModel.ComicFolders.Add(folder);
+                    externalModel.MediaFolders.Add(folder);
                 }
             }
 
@@ -689,12 +637,12 @@ internal static class AppSettingsModel
 
         public void To(JsonModel model)
         {
-            model.ComicFolders = [.. ComicFolders];
+            model.MediaFolders = [.. MediaFolders];
             model.ScanOnLaunch = ScanOnLaunch;
-            model.RemoveUnreachableComics = RemoveUnreachableComics;
-            model.PromptBeforeRemovingComics = PromptBeforeRemovingComics;
+            model.RemoveUnreachableMedia = RemoveUnreachableMedia;
+            model.PromptBeforeRemovingMedia = PromptBeforeRemovingMedia;
             model.Theme = (int)Theme;
-            model.ComicShuffleRandomSeed = ComicShuffleRandomSeed;
+            model.MediaShuffleRandomSeed = MediaShuffleRandomSeed;
         }
     }
 
@@ -704,7 +652,7 @@ internal static class AppSettingsModel
         OpenHomePage,
     }
 
-    public enum OpenComicBehaviorEnum
+    public enum OpenMediaBehaviorEnum
     {
         OpenInCurrentTab,
         OpenInNewTab,
@@ -715,7 +663,7 @@ internal static class AppSettingsModel
     {
         Never,
         Always,
-        DuringAutoScrolling,
+        WhilePlayingVideos,
     }
 
     public enum AppearanceSetting
@@ -748,14 +696,14 @@ internal static class AppSettingsModel
 
     public class JsonModel
     {
+        [JsonPropertyName("AutoPlayNext")]
+        public bool? AutoPlayNext { get; set; }
+
         [JsonPropertyName("AutoSwitch")]
         public bool? AutoSwitch { get; set; }
 
         [JsonPropertyName("AutoToggleOverlaysOnCursor")]
         public bool? AutoToggleOverlaysOnCursor { get; set; }
-
-        [JsonPropertyName("AutomaticallyHideCursor")]
-        public bool? AutomaticallyHideCursor { get; set; }
 
         [JsonPropertyName("Background")]
         public string? Background { get; set; }
@@ -763,20 +711,11 @@ internal static class AppSettingsModel
         [JsonPropertyName("CloseLastTabBehavior")]
         public string? CloseLastTabBehavior { get; set; }
 
-        [JsonPropertyName("ComicFolders")]
-        public List<string?>? ComicFolders { get; set; }
+        [JsonPropertyName("MediaFolders")]
+        public List<string?>? MediaFolders { get; set; }
 
-        [JsonPropertyName("ComicShuffleRandomSeed")]
-        public int? ComicShuffleRandomSeed { get; set; }
-
-        [JsonPropertyName("DefaultArchiveCodePage")]
-        public int? DefaultArchiveCodePage { get; set; }
-
-        [JsonPropertyName("DefaultReaderSettingPresetKey")]
-        public string? DefaultReaderSettingPresetKey { get; set; }
-
-        [JsonPropertyName("EnableCompressedFileCache")]
-        public bool? EnableCompressedFileCache { get; set; }
+        [JsonPropertyName("MediaShuffleRandomSeed")]
+        public int? MediaShuffleRandomSeed { get; set; }
 
         [JsonPropertyName("KeepScreenOnBehavior")]
         public string? KeepScreenOnBehavior { get; set; }
@@ -784,8 +723,8 @@ internal static class AppSettingsModel
         [JsonPropertyName("KeyboardShortcuts")]
         public List<KeyboardShortcutJsonModel?>? KeyboardShortcuts { get; set; }
 
-        [JsonPropertyName("OpenComicDefaultBehavior")]
-        public string? OpenComicDefaultBehavior { get; set; }
+        [JsonPropertyName("OpenMediaDefaultBehavior")]
+        public string? OpenMediaDefaultBehavior { get; set; }
 
         [JsonPropertyName("Language")]
         public string? Language { get; set; }
@@ -796,35 +735,35 @@ internal static class AppSettingsModel
         [JsonPropertyName("PlaybackDefaultShuffle")]
         public bool? PlaybackDefaultShuffle { get; set; }
 
-        [JsonPropertyName("PreloadPagesAfter")]
-        public int? PreloadPagesAfter { get; set; }
+        [JsonPropertyName("DefaultPlayerSettingPresetKey")]
+        public string? DefaultPlayerSettingPresetKey { get; set; }
 
-        [JsonPropertyName("PreloadPagesBefore")]
-        public int? PreloadPagesBefore { get; set; }
+        [JsonPropertyName("PlayerSettingPresets")]
+        public Dictionary<string, PlayerSettingsModel.JsonModel?>? PlayerSettingPresets { get; set; }
 
-        [JsonPropertyName("PromptBeforeRemovingComics")]
-        public bool? PromptBeforeRemovingComics { get; set; }
+        [JsonPropertyName("PlayerMuted")]
+        public bool? PlayerMuted { get; set; }
+
+        [JsonPropertyName("PlayerVolume")]
+        public double? PlayerVolume { get; set; }
+
+        [JsonPropertyName("PromptBeforeRemovingMedia")]
+        public bool? PromptBeforeRemovingMedia { get; set; }
 
         [JsonPropertyName("RatingPercentageEnabled")]
         public bool? RatingPercentageEnabled { get; set; }
 
-        [JsonPropertyName("ReaderSettingPresets")]
-        public Dictionary<string, ReaderSettingsModel.JsonModel?>? ReaderSettingPresets { get; set; }
-
-        [JsonPropertyName("RemoveUnreachableComics")]
-        public bool? RemoveUnreachableComics { get; set; }
+        [JsonPropertyName("RemoveUnreachableMedia")]
+        public bool? RemoveUnreachableMedia { get; set; }
 
         [JsonPropertyName("RestoreLastReadingPosition")]
         public bool? RestoreLastReadingPosition { get; set; }
 
-        [JsonPropertyName("RestoreLastReadingPositionOnlyAppliesToReadingComics")]
-        public bool? RestoreLastReadingPositionOnlyAppliesToReadingComics { get; set; }
+        [JsonPropertyName("RestoreLastReadingPositionOnlyAppliesToReadingMedia")]
+        public bool? RestoreLastReadingPositionOnlyAppliesToReadingMedia { get; set; }
 
         [JsonPropertyName("SendUsageData")]
         public bool? SendUsageData { get; set; }
-
-        [JsonPropertyName("UseScrollingAreaAsStartEnd")]
-        public bool? UseScrollingAreaAsStartEnd { get; set; }
 
         [JsonPropertyName("SaveBrowsingHistory")]
         public bool? SaveBrowsingHistory { get; set; }
@@ -835,14 +774,11 @@ internal static class AppSettingsModel
         [JsonPropertyName("Theme")]
         public int? Theme { get; set; }
 
-        [JsonPropertyName("TransitionAnimation")]
-        public bool? TransitionAnimation { get; set; }
-
         //
         // Legacy
         //
 
-        [JsonPropertyName("HomePageTapComicBehavior")]
-        public string? HomePageTapComicBehavior { get; set; }
+        [JsonPropertyName("HomePageTapMediaBehavior")]
+        public string? HomePageTapMediaBehavior { get; set; }
     }
 }

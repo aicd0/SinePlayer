@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System.Collections.Generic;
@@ -9,7 +9,7 @@ using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Database.SqlHelpers;
 using SinePlayerUWP.Data.Database;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Tables;
 
 namespace SinePlayerUWP.Data.Models.Misc;
@@ -24,11 +24,11 @@ internal static class CollectionModel
 
     public static async Task<IReadOnlyList<long>> GetAllCollectionIds()
     {
-        return await ComicHandle.Enqueue(() =>
+        return await MediaHandle.Enqueue(() =>
         {
-            SelectCommand command = SelectCommand.Create(ComicTable.Instance)
-                .AppendCondition(ComicTable.ColumnType, (long)ComicType.Collection);
-            IReaderToken<long> idToken = command.PutQueryInt64(ComicTable.ColumnId);
+            SelectCommand command = SelectCommand.Create(MediaTable.Instance)
+                .AppendCondition(MediaTable.ColumnType, (long)MediaType.Collection);
+            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             List<long> results = [];
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
@@ -39,15 +39,15 @@ internal static class CollectionModel
         });
     }
 
-    public static async Task<IReadOnlySet<long>> GetCollectionIdsContainingAll(IEnumerable<long> comicIds)
+    public static async Task<IReadOnlySet<long>> GetCollectionIdsContainingAll(IEnumerable<long> mediaIds)
     {
-        List<long> ids = [.. comicIds.Where(x => x >= 0).Distinct()];
+        List<long> ids = [.. mediaIds.Where(x => x >= 0).Distinct()];
         if (ids.Count == 0)
         {
             return new HashSet<long>();
         }
 
-        return await ComicHandle.Enqueue(() =>
+        return await MediaHandle.Enqueue(() =>
         {
             HashSet<long> result = [];
             bool hasResult = false;
@@ -77,17 +77,17 @@ internal static class CollectionModel
 
     public static ICondition CreateMemberCondition(long collectionId)
     {
-        SelectCommand subquery = SelectCommand.Create(ComicCollectionTable.Instance)
-            .AppendCondition(ComicCollectionTable.ColumnCollectionId, collectionId);
-        _ = subquery.PutQueryInt64(ComicCollectionTable.ColumnComicId);
-        return new InCondition(ColumnOrValue.FromColumn(ComicTable.ColumnId), subquery);
+        SelectCommand subquery = SelectCommand.Create(MediaCollectionTable.Instance)
+            .AppendCondition(MediaCollectionTable.ColumnCollectionId, collectionId);
+        _ = subquery.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
+        return new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), subquery);
     }
 
     //
     // Writes
     //
 
-    public static async Task AddComics(ComicModel collection, IEnumerable<ComicModel> comics)
+    public static async Task AddMedia(MediaModel collection, IEnumerable<MediaModel> mediaItems)
     {
         if (collection.IsExternal || !collection.IsCollection)
         {
@@ -95,7 +95,7 @@ internal static class CollectionModel
         }
 
         long collectionId = collection.Id;
-        List<long> ids = [.. comics
+        List<long> ids = [.. mediaItems
             .Where(x => !x.IsExternal && !x.IsCollection)
             .Select(x => x.Id)
             .Distinct()];
@@ -104,26 +104,26 @@ internal static class CollectionModel
             return;
         }
 
-        int insertedCount = await ComicHandle.Enqueue(() =>
+        int insertedCount = await MediaHandle.Enqueue(() =>
         {
             if (collection.IsExternal)
             {
-                Logger.F(TAG, "AddComics: Cannot add comics to a collection which is not saved");
+                Logger.F(TAG, "AddMedia: Cannot add mediaItems to a collection which is not saved");
                 return 0;
             }
 
             int inserted = 0;
             SqliteDB.MediaDatabase.WithTransaction(() =>
             {
-                HashSet<long> existingIds = QueryLinkedComicIdsNoLock(collectionId, ids);
+                HashSet<long> existingIds = QueryLinkedMediaIdsNoLock(collectionId, ids);
                 List<long> newIds = [.. ids.Where(x => !existingIds.Contains(x))];
                 foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(newIds))
                 {
-                    foreach (long comicId in idChunk)
+                    foreach (long mediaId in idChunk)
                     {
-                        InsertCommand.Create(ComicCollectionTable.Instance)
-                            .AppendColumn(ComicCollectionTable.ColumnCollectionId, collectionId)
-                            .AppendColumn(ComicCollectionTable.ColumnComicId, comicId)
+                        InsertCommand.Create(MediaCollectionTable.Instance)
+                            .AppendColumn(MediaCollectionTable.ColumnCollectionId, collectionId)
+                            .AppendColumn(MediaCollectionTable.ColumnMediaId, mediaId)
                             .Execute();
                         inserted++;
                     }
@@ -138,20 +138,20 @@ internal static class CollectionModel
         }
     }
 
-    public static async Task RemoveComics(ComicModel collection, IEnumerable<long> comicIds)
+    public static async Task RemoveMedia(MediaModel collection, IEnumerable<long> mediaIds)
     {
         long collectionId = collection.Id;
-        List<long> ids = [.. comicIds.Where(x => x >= 0).Distinct()];
+        List<long> ids = [.. mediaIds.Where(x => x >= 0).Distinct()];
         if (ids.Count == 0)
         {
             return;
         }
 
-        int removedCount = await ComicHandle.Enqueue(() =>
+        int removedCount = await MediaHandle.Enqueue(() =>
         {
             if (collection.IsExternal)
             {
-                Logger.F(TAG, "RemoveComics: Cannot remove comics from a collection which is not saved");
+                Logger.F(TAG, "RemoveMedia: Cannot remove mediaItems from a collection which is not saved");
                 return 0;
             }
 
@@ -160,9 +160,9 @@ internal static class CollectionModel
             {
                 foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(ids))
                 {
-                    removed += DeleteCommand.Create(ComicCollectionTable.Instance)
-                        .AppendCondition(ComicCollectionTable.ColumnCollectionId, collectionId)
-                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicCollectionTable.ColumnComicId), idChunk))
+                    removed += DeleteCommand.Create(MediaCollectionTable.Instance)
+                        .AppendCondition(MediaCollectionTable.ColumnCollectionId, collectionId)
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnMediaId), idChunk))
                         .Execute();
                 }
             });
@@ -179,18 +179,18 @@ internal static class CollectionModel
     // Private helpers
     //
 
-    private static HashSet<long> QueryCollectionIdsContainingAllNoLock(List<long> comicIds)
+    private static HashSet<long> QueryCollectionIdsContainingAllNoLock(List<long> mediaIds)
     {
         HashSet<long> collectionIds = [];
-        SelectCommand command = SelectCommand.Create(ComicCollectionTable.Instance)
-            .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicCollectionTable.ColumnComicId), comicIds))
-            .GroupBy(ComicCollectionTable.ColumnCollectionId);
-        IReaderToken<long> collectionIdToken = command.PutQueryInt64(ComicCollectionTable.ColumnCollectionId);
-        IReaderToken<long> matchedCountToken = command.PutQueryCountDistinct(ComicCollectionTable.ColumnComicId);
+        SelectCommand command = SelectCommand.Create(MediaCollectionTable.Instance)
+            .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnMediaId), mediaIds))
+            .GroupBy(MediaCollectionTable.ColumnCollectionId);
+        IReaderToken<long> collectionIdToken = command.PutQueryInt64(MediaCollectionTable.ColumnCollectionId);
+        IReaderToken<long> matchedCountToken = command.PutQueryCountDistinct(MediaCollectionTable.ColumnMediaId);
         using SelectCommand.IReader reader = command.Execute();
         while (reader.Read())
         {
-            if (matchedCountToken.GetValue() == comicIds.Count)
+            if (matchedCountToken.GetValue() == mediaIds.Count)
             {
                 collectionIds.Add(collectionIdToken.GetValue());
             }
@@ -198,19 +198,19 @@ internal static class CollectionModel
         return collectionIds;
     }
 
-    private static HashSet<long> QueryLinkedComicIdsNoLock(long collectionId, List<long> comicIds)
+    private static HashSet<long> QueryLinkedMediaIdsNoLock(long collectionId, List<long> mediaIds)
     {
         HashSet<long> ids = [];
-        foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(comicIds))
+        foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(mediaIds))
         {
-            SelectCommand command = SelectCommand.Create(ComicCollectionTable.Instance)
-                .AppendCondition(ComicCollectionTable.ColumnCollectionId, collectionId)
-                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(ComicCollectionTable.ColumnComicId), idChunk));
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(ComicCollectionTable.ColumnComicId);
+            SelectCommand command = SelectCommand.Create(MediaCollectionTable.Instance)
+                .AppendCondition(MediaCollectionTable.ColumnCollectionId, collectionId)
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnMediaId), idChunk));
+            IReaderToken<long> mediaIdToken = command.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
-                ids.Add(comicIdToken.GetValue());
+                ids.Add(mediaIdToken.GetValue());
             }
         }
         return ids;
