@@ -886,6 +886,9 @@ $plugins</value>
   <data name="ResetAllSettingsMessage" xml:space="preserve">
     <value>所有设置将恢复为默认状态。您的用户数据将被保留。</value>
   </data>
+  <data name="ResetPlayerSettings" xml:space="preserve">
+    <value>重置播放器设置</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>恢复</value>
   </data>

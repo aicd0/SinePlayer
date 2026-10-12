@@ -195,6 +195,14 @@
                         Grid.Column="2"
                         Links="{x:Bind ViewModel.Links}" />
 
+                    <CheckBox
+                        Grid.Row="13"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="3"
+                        Click="ResetPlayerSettingsCheckBox_Click"
+                        Content="{x:Bind StringResource.ResetPlayerSettings}"
+                        IsChecked="False"
+                        Visibility="{x:Bind ViewModel.IsCollectionOnlyMode, Converter={StaticResource BooleanToVisibilityNegationConverter}, Mode=OneWay}" />
                 </Grid>
 
                 <Grid x:Name="ImagesTabGrid">

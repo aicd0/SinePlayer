@@ -886,6 +886,9 @@ $plugins</value>
   <data name="ResetAllSettingsMessage" xml:space="preserve">
     <value>Alle einstellungen werden auf den standardzustand zurückgesetzt. Ihre benutzerdaten bleiben erhalten.</value>
   </data>
+  <data name="ResetPlayerSettings" xml:space="preserve">
+    <value>Player-Einstellungen zurücksetzen</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Wiederherstellen</value>
   </data>

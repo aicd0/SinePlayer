@@ -171,6 +171,7 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
     private string _tags = string.Empty;
     private bool _tagDiffMode = true;
     private bool _tagIdMode = false;
+    private bool _resetPlayerSettings = false;
     private bool _title1Changed = false;
     private bool _title2Changed = false;
     private bool _descriptionChanged = false;
@@ -317,6 +318,12 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
                 if (_backgroundImageChanged)
                 {
                     await ApplyImageChange(media, MediaExt.BACKGROUND_IMAGE, _backgroundImagePendingFilePath);
+                    needFlushExt = true;
+                }
+
+                if (_resetPlayerSettings)
+                {
+                    // TODO
                     needFlushExt = true;
                 }
 
@@ -482,6 +489,11 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
 
         _tagIdMode = tagIdMode;
         InitializeTags(tagIdMode);
+    }
+
+    public void SetResetPlayerSettings(bool resetPlayerSettings)
+    {
+        _resetPlayerSettings = resetPlayerSettings;
     }
 
     public void SetCoverImage(string? pendingFilePath)
