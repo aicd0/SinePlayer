@@ -170,7 +170,7 @@ internal partial class PluginContext : IPluginContext
     // IPluginContext Implementation
     //
 
-    private event ComicEditedEventHandler? _mediaEditedEventHandler;
+    private event MediaEditedEventHandler? _mediaEditedEventHandler;
 
     private readonly Dictionary<string, IVirtualProperty<IMediaModel>> _mediaVirtualProperties = [];
     private readonly List<ISidebarPageProvider> _sidebarPageProviders = [];
@@ -179,7 +179,7 @@ internal partial class PluginContext : IPluginContext
     private IMediaMenuItemCreator? _mediaMenuItemCreator = null;
     private ICommonMenuItemCreator? _mainPageMoreMenuItemCreator = null;
 
-    event ComicEditedEventHandler? IPluginContext.ComicEdited
+    event MediaEditedEventHandler? IPluginContext.MediaEdited
     {
         add => _mediaEditedEventHandler += value;
         remove => _mediaEditedEventHandler -= value;
@@ -193,7 +193,7 @@ internal partial class PluginContext : IPluginContext
 
     IRegistryDatabase IPluginContext.RegistryDatabase => _registryDatabase.Value;
 
-    IMediaMenuItemCreator? IPluginContext.ComicMenuItemCreator
+    IMediaMenuItemCreator? IPluginContext.MediaMenuItemCreator
     {
         get => _mediaMenuItemCreator;
         set => _mediaMenuItemCreator = value;
@@ -220,12 +220,12 @@ internal partial class PluginContext : IPluginContext
         return DialogUtils.EnqueueDialogAsync(dialog);
     }
 
-    async Task<IMediaModel?> IPluginContext.GetComic(long id)
+    async Task<IMediaModel?> IPluginContext.GetMedia(long id)
     {
         return await MediaModel.FromId(id);
     }
 
-    async Task<IEnumerable<long>> IPluginContext.SearchComics(string filterExpression)
+    async Task<IEnumerable<long>> IPluginContext.SearchMedia(string filterExpression)
     {
         ICondition? filterCondition = ParseFilterExpression(filterExpression) ?? throw new InvalidExpressionException();
         List<long> ids = [];
@@ -252,7 +252,7 @@ internal partial class PluginContext : IPluginContext
         AppRouter.RegisterPage(host, pageType);
     }
 
-    void IPluginContext.RegisterComicVirtualProperty(IVirtualProperty<IMediaModel> property)
+    void IPluginContext.RegisterMediaVirtualProperty(IVirtualProperty<IMediaModel> property)
     {
         ArgumentNullException.ThrowIfNull(property, nameof(property));
 
