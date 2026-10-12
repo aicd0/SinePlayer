@@ -55,7 +55,7 @@ internal sealed partial class SidebarView : BaseUserControl
             new()
             {
                 Tag = ITEM_PLAYLIST,
-                Name = StringResource.ReadingList,
+                Name = StringResource.Playlist,
                 PageRoute = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_SIDE_PANE_PLAYLIST),
                 Icon = new FontIconSource() { Glyph = "\uE7BC" },
             },

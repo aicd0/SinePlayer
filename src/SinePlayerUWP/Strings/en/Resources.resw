@@ -150,14 +150,11 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>Advanced</value>
   </data>
-  <data name="AllMedia" xml:space="preserve">
-    <value>All comics</value>
-  </data>
-  <data name="AllMediaIn" xml:space="preserve">
-    <value>All comics in $path</value>
-  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>All hidden items</value>
+  </data>
+  <data name="AllItems" xml:space="preserve">
+    <value>All items</value>
   </data>
   <data name="AllMatchedResults" xml:space="preserve">
     <value>All matched results</value>
@@ -167,9 +164,6 @@
   </data>
   <data name="Always" xml:space="preserve">
     <value>Always</value>
-  </data>
-  <data name="AutoPlayNext" xml:space="preserve">
-    <value>Play the next media automatically</value>
   </data>
   <data name="AntiAliasingFilter" xml:space="preserve">
     <value>Anti-aliasing filter</value>
@@ -200,6 +194,9 @@
   </data>
   <data name="Auto" xml:space="preserve">
     <value>Auto</value>
+  </data>
+  <data name="AutoPlayNext" xml:space="preserve">
+    <value>Play the next item automatically</value>
   </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>Auto scrolling</value>
@@ -243,9 +240,6 @@
   <data name="ClearCache" xml:space="preserve">
     <value>Clear cache</value>
   </data>
-  <data name="ClearReaderSettings" xml:space="preserve">
-    <value>Clear reader settings</value>
-  </data>
   <data name="CloseLastTabBehavior" xml:space="preserve">
     <value>Behavior when closing the last tab</value>
   </data>
@@ -266,12 +260,6 @@
   </data>
   <data name="CollectionInformation" xml:space="preserve">
     <value>Collection information</value>
-  </data>
-  <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>Selecting "add to exclusion list" will prevent the comic from being imported again the next time the library is updated.</value>
-  </data>
-  <data name="MediaInfo" xml:space="preserve">
-    <value>Comic information</value>
   </data>
   <data name="CompletionStatus" xml:space="preserve">
     <value>Completion status</value>
@@ -696,6 +684,12 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="MaintainRelativeSize" xml:space="preserve">
     <value>Maintain relative size</value>
   </data>
+  <data name="MediaExclusionExplaination" xml:space="preserve">
+    <value>Selecting "add to exclusion list" will prevent the comic from being imported again the next time the library is updated.</value>
+  </data>
+  <data name="MediaInfo" xml:space="preserve">
+    <value>Media information</value>
+  </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Create new folder</value>
   </data>
@@ -744,9 +738,6 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Next" xml:space="preserve">
     <value>Next</value>
   </data>
-  <data name="NoMediaHint" xml:space="preserve">
-    <value>Your comics appear here</value>
-  </data>
   <data name="NoContent" xml:space="preserve">
     <value>No content to display</value>
   </data>
@@ -758,6 +749,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="NoKeyboardShortcuts" xml:space="preserve">
     <value>No keyboard shortcuts</value>
+  </data>
+  <data name="NoMediaHint" xml:space="preserve">
+    <value>Your media appear here</value>
   </data>
   <data name="NoPluginsInstalled" xml:space="preserve">
     <value>No plugins installed</value>
@@ -786,9 +780,6 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Open" xml:space="preserve">
     <value>Open</value>
   </data>
-  <data name="OpenMediaDefaultBehavior" xml:space="preserve">
-    <value>Default behavior when opening a comic</value>
-  </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Open home page</value>
   </data>
@@ -801,17 +792,20 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="OpenInNewTab" xml:space="preserve">
     <value>Open in new tab</value>
   </data>
+  <data name="OpenItemDefaultBehavior" xml:space="preserve">
+    <value>Default behavior when opening an item</value>
+  </data>
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>Open metadata folder</value>
   </data>
-  <data name="OpenNextMedia" xml:space="preserve">
-    <value>Open next comic</value>
+  <data name="OpenNextItem" xml:space="preserve">
+    <value>Open next item</value>
   </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>Open plugins folder</value>
   </data>
-  <data name="OpenPreviousMedia" xml:space="preserve">
-    <value>Open previous comic</value>
+  <data name="OpenPreviousItem" xml:space="preserve">
+    <value>Open previous item</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>Open sidebar</value>
@@ -821,15 +815,6 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>This operation will overwrite existing entries.</value>
-  </data>
-  <data name="PageCount" xml:space="preserve">
-    <value>Pages</value>
-  </data>
-  <data name="PageN" xml:space="preserve">
-    <value>Page $page</value>
-  </data>
-  <data name="PageSpacing" xml:space="preserve">
-    <value>Page spacing</value>
   </data>
   <data name="Pause" xml:space="preserve">
     <value>Pause</value>
@@ -841,19 +826,31 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
     <value>Play</value>
   </data>
   <data name="PlayPause" xml:space="preserve">
-    <value>Play / pause</value>
+    <value>Play / Pause</value>
+  </data>
+  <data name="PlayerExpander.Detail" xml:space="preserve">
+    <value>Customize the player</value>
+  </data>
+  <data name="PlayerExpander.Header" xml:space="preserve">
+    <value>Player</value>
+  </data>
+  <data name="PlayerStatusError" xml:space="preserve">
+    <value>An error occured while loading</value>
+  </data>
+  <data name="PlayerStatusLoading" xml:space="preserve">
+    <value>The player is loading</value>
+  </data>
+  <data name="Playlist" xml:space="preserve">
+    <value>Playlist</value>
+  </data>
+  <data name="PlaylistEmpty" xml:space="preserve">
+    <value>Your playlist appears here</value>
   </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Manage and configure plugins</value>
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>Plugins</value>
-  </data>
-  <data name="PreloadPagesAfter" xml:space="preserve">
-    <value>Preload pages (after current page)</value>
-  </data>
-  <data name="PreloadPagesBefore" xml:space="preserve">
-    <value>Preload pages (before current page)</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>Press a key combination</value>
@@ -870,46 +867,14 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Progress" xml:space="preserve">
     <value>Progress</value>
   </data>
-  <data name="PromptBeforeRemovingMedia" xml:space="preserve">
-    <value>Prompt before removing comics</value>
+  <data name="PromptBeforeRemovingItems" xml:space="preserve">
+    <value>Prompt before removing items</value>
   </data>
-  <data name="RandomMedia" xml:space="preserve">
-    <value>Random comic</value>
+  <data name="Random" xml:space="preserve">
+    <value>Random</value>
   </data>
   <data name="Rating" xml:space="preserve">
     <value>Rating</value>
-  </data>
-  <data name="ReaderExpander.Detail" xml:space="preserve">
-    <value>Customize the reader</value>
-  </data>
-  <data name="ReaderExpander.Header" xml:space="preserve">
-    <value>Reader</value>
-  </data>
-  <data name="PlayerExpander.Detail" xml:space="preserve">
-    <value>Customize the player</value>
-  </data>
-  <data name="PlayerExpander.Header" xml:space="preserve">
-    <value>Player</value>
-  </data>
-  <data name="ReaderSettingButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Reader settings</value>
-  </data>
-  <data name="ReaderStatusError" xml:space="preserve">
-    <value>An error occured while loading</value>
-  </data>
-  <data name="ReaderStatusLoading" xml:space="preserve">
-    <value>The reader is loading</value>
-  </data>
-  <data name="ReaderTipContent" xml:space="preserve">
-    <value>1. Double-tap to fit the page to the width or height.
-2. Set “Auto scrolling” to a value greater than 0 to enable auto scrolling and middle mouse button scrolling.
-3. Drag the page to adjust the auto scrolling speed.</value>
-  </data>
-  <data name="ReadingList" xml:space="preserve">
-    <value>Reading list</value>
-  </data>
-  <data name="ReadingListEmpty" xml:space="preserve">
-    <value>Your reading list appears here</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>Refresh</value>
@@ -1056,17 +1021,8 @@ Start in Safe Mode?</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>Sorting function</value>
   </data>
-  <data name="SpreadDetection" xml:space="preserve">
-    <value>Spread detection</value>
-  </data>
-  <data name="StartEndFromScrollingArea" xml:space="preserve">
-    <value>Use the start/end of the scrolling area as the reading start/end position</value>
-  </data>
   <data name="Statistics" xml:space="preserve">
     <value>Statistics</value>
-  </data>
-  <data name="SwapLeftAndRightPages" xml:space="preserve">
-    <value>Swap left &amp; right pages</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>Tag</value>
@@ -1109,17 +1065,11 @@ Category2: Tag4, Tag5</value>
   <data name="Title2" xml:space="preserve">
     <value>Title 2</value>
   </data>
-  <data name="ToggleAutoScroll" xml:space="preserve">
-    <value>Toggle auto scrolling</value>
-  </data>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>Toggle fullscreen</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
-    <value>Total comics</value>
-  </data>
-  <data name="TransitionAnimation" xml:space="preserve">
-    <value>Transition animation</value>
+    <value>Total media</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Two-page mode</value>

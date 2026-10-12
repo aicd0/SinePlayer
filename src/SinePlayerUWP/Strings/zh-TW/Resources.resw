@@ -150,12 +150,6 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>進階</value>
   </data>
-  <data name="AllMedia" xml:space="preserve">
-    <value>所有漫畫</value>
-  </data>
-  <data name="AllMediaIn" xml:space="preserve">
-    <value>所有位於 $path 的漫畫</value>
-  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>所有隱藏項</value>
   </data>
@@ -240,9 +234,6 @@
   <data name="ClearCache" xml:space="preserve">
     <value>清空快取</value>
   </data>
-  <data name="ClearReaderSettings" xml:space="preserve">
-    <value>清除閱讀器設定</value>
-  </data>
   <data name="CloseLastTabBehavior" xml:space="preserve">
     <value>關閉最後一個分頁時的行為</value>
   </data>
@@ -263,12 +254,6 @@
   </data>
   <data name="CollectionInformation" xml:space="preserve">
     <value>合集資訊</value>
-  </data>
-  <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>選擇「加入排除清單」後，下次更新媒體庫時將不會再次匯入此漫畫。</value>
-  </data>
-  <data name="MediaInfo" xml:space="preserve">
-    <value>漫畫資訊</value>
   </data>
   <data name="CompletionStatus" xml:space="preserve">
     <value>完成狀態</value>
@@ -683,6 +668,9 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="MaintainRelativeSize" xml:space="preserve">
     <value>保持相對大小</value>
   </data>
+  <data name="MediaExclusionExplaination" xml:space="preserve">
+    <value>選擇「加入排除清單」後，下次更新媒體庫時將不會再次匯入此漫畫。</value>
+  </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>新建資料夾</value>
   </data>
@@ -731,9 +719,6 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="Next" xml:space="preserve">
     <value>下一個</value>
   </data>
-  <data name="NoMediaHint" xml:space="preserve">
-    <value>你的漫畫會顯示在這裡</value>
-  </data>
   <data name="NoContent" xml:space="preserve">
     <value>暫無可顯示內容</value>
   </data>
@@ -773,9 +758,6 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="Open" xml:space="preserve">
     <value>打開</value>
   </data>
-  <data name="OpenMediaDefaultBehavior" xml:space="preserve">
-    <value>開啟漫畫時的預設行為</value>
-  </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>開啟首頁</value>
   </data>
@@ -791,14 +773,8 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>開啟中繼資料資料夾</value>
   </data>
-  <data name="OpenNextMedia" xml:space="preserve">
-    <value>開啟下一部漫畫</value>
-  </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>打開外掛資料夾</value>
-  </data>
-  <data name="OpenPreviousMedia" xml:space="preserve">
-    <value>開啟上一部漫畫</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>打開側邊欄</value>
@@ -809,15 +785,6 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>此操作將覆蓋現有條目。</value>
   </data>
-  <data name="PageCount" xml:space="preserve">
-    <value>頁數</value>
-  </data>
-  <data name="PageN" xml:space="preserve">
-    <value>第$page頁</value>
-  </data>
-  <data name="PageSpacing" xml:space="preserve">
-    <value>頁面間距</value>
-  </data>
   <data name="Pause" xml:space="preserve">
     <value>暫停</value>
   </data>
@@ -827,17 +794,14 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="Play" xml:space="preserve">
     <value>播放</value>
   </data>
+  <data name="PlayerStatusError" xml:space="preserve">
+    <value>載入時發生錯誤</value>
+  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>管理與設定外掛程式</value>
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>外掛程式</value>
-  </data>
-  <data name="PreloadPagesAfter" xml:space="preserve">
-    <value>預載入頁數（目前頁之後）</value>
-  </data>
-  <data name="PreloadPagesBefore" xml:space="preserve">
-    <value>預載入頁數（目前頁之前）</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>按下組合鍵</value>
@@ -854,40 +818,8 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="Progress" xml:space="preserve">
     <value>進度</value>
   </data>
-  <data name="PromptBeforeRemovingMedia" xml:space="preserve">
-    <value>移除漫畫前提示</value>
-  </data>
-  <data name="RandomMedia" xml:space="preserve">
-    <value>隨機漫畫</value>
-  </data>
   <data name="Rating" xml:space="preserve">
     <value>評分</value>
-  </data>
-  <data name="ReaderExpander.Detail" xml:space="preserve">
-    <value>自訂閱讀器</value>
-  </data>
-  <data name="ReaderExpander.Header" xml:space="preserve">
-    <value>閱讀器</value>
-  </data>
-  <data name="ReaderSettingButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>閱讀器設定</value>
-  </data>
-  <data name="ReaderStatusError" xml:space="preserve">
-    <value>載入時發生錯誤</value>
-  </data>
-  <data name="ReaderStatusLoading" xml:space="preserve">
-    <value>閱讀器載入中</value>
-  </data>
-  <data name="ReaderTipContent" xml:space="preserve">
-    <value>1. 雙擊以適應頁面寬度或高度。
-2. 將「自動滾動」設定為大於 0 的值，以啟用自動滾動和滑鼠中鍵功能。
-3. 拖動頁面以調整自動滾動速度。</value>
-  </data>
-  <data name="ReadingList" xml:space="preserve">
-    <value>閱讀清單</value>
-  </data>
-  <data name="ReadingListEmpty" xml:space="preserve">
-    <value>你的閱讀清單將顯示在這裡</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>重新整理</value>
@@ -903,11 +835,6 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   </data>
   <data name="RemoveFromFavorites" xml:space="preserve">
     <value>取消收藏</value>
-  </data>
-  <data name="RemoveItemsConfirmation" xml:space="preserve">
-    <value>以下 $count 個項目將從你的書庫中永久刪除：
-
-$items</value>
   </data>
   <data name="RemoveLocationButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>從清單中移除目前資料夾</value>
@@ -1028,17 +955,8 @@ $plugins</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>排序函數</value>
   </data>
-  <data name="SpreadDetection" xml:space="preserve">
-    <value>跨頁偵測</value>
-  </data>
-  <data name="StartEndFromScrollingArea" xml:space="preserve">
-    <value>使用捲動區域的起始/結束位置作為閱讀起始/結束位置</value>
-  </data>
   <data name="Statistics" xml:space="preserve">
     <value>統計資訊</value>
-  </data>
-  <data name="SwapLeftAndRightPages" xml:space="preserve">
-    <value>左右頁對調</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>標籤</value>
@@ -1081,17 +999,8 @@ $plugins</value>
   <data name="Title2" xml:space="preserve">
     <value>標題 2</value>
   </data>
-  <data name="ToggleAutoScroll" xml:space="preserve">
-    <value>切換自動捲動</value>
-  </data>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>切換全螢幕</value>
-  </data>
-  <data name="TotalMedia" xml:space="preserve">
-    <value>漫畫總數</value>
-  </data>
-  <data name="TransitionAnimation" xml:space="preserve">
-    <value>翻頁動畫</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>雙頁模式</value>

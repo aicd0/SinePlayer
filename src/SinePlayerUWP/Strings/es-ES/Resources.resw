@@ -150,12 +150,6 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>Avanzado</value>
   </data>
-  <data name="AllMedia" xml:space="preserve">
-    <value>Todos los cómics</value>
-  </data>
-  <data name="AllMediaIn" xml:space="preserve">
-    <value>Todos los cómics en $path</value>
-  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>Todos los elementos ocultos</value>
   </data>
@@ -240,9 +234,6 @@
   <data name="ClearCache" xml:space="preserve">
     <value>Borrar caché</value>
   </data>
-  <data name="ClearReaderSettings" xml:space="preserve">
-    <value>Borrar ajustes de lectura</value>
-  </data>
   <data name="CloseLastTabBehavior" xml:space="preserve">
     <value>Comportamiento al cerrar la última pestaña</value>
   </data>
@@ -263,12 +254,6 @@
   </data>
   <data name="CollectionInformation" xml:space="preserve">
     <value>Información de la colección</value>
-  </data>
-  <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>Seleccionar "añadir a la lista de exclusión" evitará que el cómic se vuelva a importar la próxima vez que se actualice la biblioteca.</value>
-  </data>
-  <data name="MediaInfo" xml:space="preserve">
-    <value>Información del cómic</value>
   </data>
   <data name="CompletionStatus" xml:space="preserve">
     <value>Estado de finalización</value>
@@ -685,6 +670,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="MaintainRelativeSize" xml:space="preserve">
     <value>Mantener el tamaño relativo</value>
   </data>
+  <data name="MediaExclusionExplaination" xml:space="preserve">
+    <value>Seleccionar "añadir a la lista de exclusión" evitará que el cómic se vuelva a importar la próxima vez que se actualice la biblioteca.</value>
+  </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Crear nueva carpeta</value>
   </data>
@@ -733,9 +721,6 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="Next" xml:space="preserve">
     <value>Siguiente</value>
   </data>
-  <data name="NoMediaHint" xml:space="preserve">
-    <value>Tus cómics aparecerán aquí</value>
-  </data>
   <data name="NoContent" xml:space="preserve">
     <value>No hay contenido para mostrar</value>
   </data>
@@ -775,9 +760,6 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="Open" xml:space="preserve">
     <value>Abrir</value>
   </data>
-  <data name="OpenMediaDefaultBehavior" xml:space="preserve">
-    <value>Comportamiento predeterminado al abrir un cómic</value>
-  </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Abrir página de inicio</value>
   </data>
@@ -793,14 +775,8 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>Abrir carpeta de metadatos</value>
   </data>
-  <data name="OpenNextMedia" xml:space="preserve">
-    <value>Abrir el siguiente cómic</value>
-  </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>Abrir carpeta de plugins</value>
-  </data>
-  <data name="OpenPreviousMedia" xml:space="preserve">
-    <value>Abrir el cómic anterior</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>Abrir la barra lateral</value>
@@ -811,15 +787,6 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Esta operación sobrescribirá las entradas existentes.</value>
   </data>
-  <data name="PageCount" xml:space="preserve">
-    <value>Páginas</value>
-  </data>
-  <data name="PageN" xml:space="preserve">
-    <value>Página $page</value>
-  </data>
-  <data name="PageSpacing" xml:space="preserve">
-    <value>Espaciado</value>
-  </data>
   <data name="Pause" xml:space="preserve">
     <value>Pausa</value>
   </data>
@@ -829,17 +796,14 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="Play" xml:space="preserve">
     <value>Reproducir</value>
   </data>
+  <data name="PlayerStatusError" xml:space="preserve">
+    <value>Se produjo un error durante la carga</value>
+  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Administrar y configurar complementos</value>
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>Complementos</value>
-  </data>
-  <data name="PreloadPagesAfter" xml:space="preserve">
-    <value>Precargar páginas (después de la página actual)</value>
-  </data>
-  <data name="PreloadPagesBefore" xml:space="preserve">
-    <value>Precargar páginas (antes de la página actual)</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>Pulsar una combinación de teclas</value>
@@ -856,40 +820,8 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="Progress" xml:space="preserve">
     <value>Progreso</value>
   </data>
-  <data name="PromptBeforeRemovingMedia" xml:space="preserve">
-    <value>Confirmar antes de eliminar cómics</value>
-  </data>
-  <data name="RandomMedia" xml:space="preserve">
-    <value>Cómic aleatorio</value>
-  </data>
   <data name="Rating" xml:space="preserve">
     <value>Puntaje</value>
-  </data>
-  <data name="ReaderExpander.Detail" xml:space="preserve">
-    <value>Personalizar el lector</value>
-  </data>
-  <data name="ReaderExpander.Header" xml:space="preserve">
-    <value>Lector</value>
-  </data>
-  <data name="ReaderSettingButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Configuración del lector</value>
-  </data>
-  <data name="ReaderStatusError" xml:space="preserve">
-    <value>Se produjo un error durante la carga</value>
-  </data>
-  <data name="ReaderStatusLoading" xml:space="preserve">
-    <value>El lector esta cargando</value>
-  </data>
-  <data name="ReaderTipContent" xml:space="preserve">
-    <value>1. Toca dos veces para ajustar la página al ancho o a la altura.
-2. Establece “Desplazamiento automático” en un valor mayor que 0 para activar el desplazamiento automático y el botón central del ratón.
-3. Arrastra la página para ajustar la velocidad de desplazamiento automático.</value>
-  </data>
-  <data name="ReadingList" xml:space="preserve">
-    <value>Lista de lectura</value>
-  </data>
-  <data name="ReadingListEmpty" xml:space="preserve">
-    <value>Tu lista de lectura aparecerá aquí</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>Refrescar</value>
@@ -905,11 +837,6 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="RemoveFromFavorites" xml:space="preserve">
     <value>Eliminar de favoritos</value>
-  </data>
-  <data name="RemoveItemsConfirmation" xml:space="preserve">
-    <value>Los siguientes $count elemento(s) se eliminarán permanentemente de tu biblioteca:
-
-$items</value>
   </data>
   <data name="RemoveLocationButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>Eliminar esta carpeta de la lista</value>
@@ -1030,17 +957,8 @@ $plugins</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>Función de clasificación</value>
   </data>
-  <data name="SpreadDetection" xml:space="preserve">
-    <value>Detección de páginas dobles</value>
-  </data>
-  <data name="StartEndFromScrollingArea" xml:space="preserve">
-    <value>Usar el inicio/fin del área de desplazamiento como inicio/fin de lectura</value>
-  </data>
   <data name="Statistics" xml:space="preserve">
     <value>Estadística</value>
-  </data>
-  <data name="SwapLeftAndRightPages" xml:space="preserve">
-    <value>Intercambiar páginas izquierda/derecha</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>Etiqueta</value>
@@ -1083,17 +1001,8 @@ Categoría 2: Etiqueta 4, Etiqueta 5</value>
   <data name="Title2" xml:space="preserve">
     <value>Título 2</value>
   </data>
-  <data name="ToggleAutoScroll" xml:space="preserve">
-    <value>Alternar desplazamiento automático</value>
-  </data>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>Alternar pantalla completa</value>
-  </data>
-  <data name="TotalMedia" xml:space="preserve">
-    <value>Total de cómics</value>
-  </data>
-  <data name="TransitionAnimation" xml:space="preserve">
-    <value>Animación de transición</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Modo de doble página</value>

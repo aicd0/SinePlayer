@@ -150,12 +150,6 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>Передовой</value>
   </data>
-  <data name="AllMedia" xml:space="preserve">
-    <value>Все комиксы</value>
-  </data>
-  <data name="AllMediaIn" xml:space="preserve">
-    <value>Все комиксы в $path</value>
-  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>Все скрытые элементы</value>
   </data>
@@ -240,9 +234,6 @@
   <data name="ClearCache" xml:space="preserve">
     <value>Очистить кэш</value>
   </data>
-  <data name="ClearReaderSettings" xml:space="preserve">
-    <value>Сбросить настройки чтения</value>
-  </data>
   <data name="CloseLastTabBehavior" xml:space="preserve">
     <value>Поведение при закрытии последней вкладки</value>
   </data>
@@ -263,12 +254,6 @@
   </data>
   <data name="CollectionInformation" xml:space="preserve">
     <value>Информация о коллекции</value>
-  </data>
-  <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>Выбор пункта «добавить в список исключений» не позволит повторно импортировать комикс при следующем обновлении библиотеки.</value>
-  </data>
-  <data name="MediaInfo" xml:space="preserve">
-    <value>Информация о комиксах</value>
   </data>
   <data name="CompletionStatus" xml:space="preserve">
     <value>Состояние завершения</value>
@@ -686,6 +671,9 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="MaintainRelativeSize" xml:space="preserve">
     <value>Сохранять относительный размер</value>
   </data>
+  <data name="MediaExclusionExplaination" xml:space="preserve">
+    <value>Выбор пункта «добавить в список исключений» не позволит повторно импортировать комикс при следующем обновлении библиотеки.</value>
+  </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Создать новую папку</value>
   </data>
@@ -734,9 +722,6 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Next" xml:space="preserve">
     <value>Следующий</value>
   </data>
-  <data name="NoMediaHint" xml:space="preserve">
-    <value>Ваши комиксы появятся здесь</value>
-  </data>
   <data name="NoContent" xml:space="preserve">
     <value>Нет содержимого для отображения</value>
   </data>
@@ -776,9 +761,6 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Open" xml:space="preserve">
     <value>Открыть</value>
   </data>
-  <data name="OpenMediaDefaultBehavior" xml:space="preserve">
-    <value>Поведение по умолчанию при открытии комикса</value>
-  </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Открыть главную страницу</value>
   </data>
@@ -794,14 +776,8 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>Открыть папку метаданных</value>
   </data>
-  <data name="OpenNextMedia" xml:space="preserve">
-    <value>Открыть следующий комикс</value>
-  </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>Открыть папку плагинов</value>
-  </data>
-  <data name="OpenPreviousMedia" xml:space="preserve">
-    <value>Открыть предыдущий комикс</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>Открыть боковую панель</value>
@@ -812,15 +788,6 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Эта операция перезапишет существующие записи.</value>
   </data>
-  <data name="PageCount" xml:space="preserve">
-    <value>Страницы</value>
-  </data>
-  <data name="PageN" xml:space="preserve">
-    <value>Страница $page</value>
-  </data>
-  <data name="PageSpacing" xml:space="preserve">
-    <value>интервал</value>
-  </data>
   <data name="Pause" xml:space="preserve">
     <value>Пауза</value>
   </data>
@@ -830,17 +797,14 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Play" xml:space="preserve">
     <value>Воспроизвести</value>
   </data>
+  <data name="PlayerStatusError" xml:space="preserve">
+    <value>Произошла ошибка при загрузке</value>
+  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Управление и настройка плагинов</value>
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>Плагины</value>
-  </data>
-  <data name="PreloadPagesAfter" xml:space="preserve">
-    <value>Предзагрузка страниц (после текущей страницы)</value>
-  </data>
-  <data name="PreloadPagesBefore" xml:space="preserve">
-    <value>Предзагрузка страниц (до текущей страницы)</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>Нажмите сочетание клавиш</value>
@@ -857,40 +821,8 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Progress" xml:space="preserve">
     <value>Прогресс</value>
   </data>
-  <data name="PromptBeforeRemovingMedia" xml:space="preserve">
-    <value>Запрашивать подтверждение перед удалением комиксов</value>
-  </data>
-  <data name="RandomMedia" xml:space="preserve">
-    <value>Случайный комикс</value>
-  </data>
   <data name="Rating" xml:space="preserve">
     <value>Рейтинг</value>
-  </data>
-  <data name="ReaderExpander.Detail" xml:space="preserve">
-    <value>Настройте считыватель</value>
-  </data>
-  <data name="ReaderExpander.Header" xml:space="preserve">
-    <value>Читатель</value>
-  </data>
-  <data name="ReaderSettingButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Настройки ридера</value>
-  </data>
-  <data name="ReaderStatusError" xml:space="preserve">
-    <value>Произошла ошибка при загрузке</value>
-  </data>
-  <data name="ReaderStatusLoading" xml:space="preserve">
-    <value>Читатель загружается</value>
-  </data>
-  <data name="ReaderTipContent" xml:space="preserve">
-    <value>1. Дважды нажмите, чтобы подогнать страницу по ширине или высоте.
-2. Установите значение «Автопрокрутка» больше 0, чтобы включить автопрокрутку и прокрутку средней кнопкой мыши.
-3. Перетащите страницу, чтобы изменить скорость автопрокрутки.</value>
-  </data>
-  <data name="ReadingList" xml:space="preserve">
-    <value>Список чтения</value>
-  </data>
-  <data name="ReadingListEmpty" xml:space="preserve">
-    <value>Ваш список чтения появится здесь</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>Обновить</value>
@@ -906,11 +838,6 @@ NOT                      - Логическое не. Например: NOT %tag
   </data>
   <data name="RemoveFromFavorites" xml:space="preserve">
     <value>Удалить из избранного</value>
-  </data>
-  <data name="RemoveItemsConfirmation" xml:space="preserve">
-    <value>Следующие $count элемент(ов) будут безвозвратно удалены из вашей библиотеки:
-
-$items</value>
   </data>
   <data name="RemoveLocationButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>Удалить эту папку из списка</value>
@@ -1031,17 +958,8 @@ $plugins</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>Функция сортировки</value>
   </data>
-  <data name="SpreadDetection" xml:space="preserve">
-    <value>Определение разворотов</value>
-  </data>
-  <data name="StartEndFromScrollingArea" xml:space="preserve">
-    <value>Использовать начало/конец области прокрутки как начало/конец чтения</value>
-  </data>
   <data name="Statistics" xml:space="preserve">
     <value>Статистика</value>
-  </data>
-  <data name="SwapLeftAndRightPages" xml:space="preserve">
-    <value>Поменять страницы местами</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>Ярлык</value>
@@ -1084,17 +1002,8 @@ $plugins</value>
   <data name="Title2" xml:space="preserve">
     <value>Заголовок 2</value>
   </data>
-  <data name="ToggleAutoScroll" xml:space="preserve">
-    <value>Переключить автопрокрутку</value>
-  </data>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>Переключить полноэкранный режим</value>
-  </data>
-  <data name="TotalMedia" xml:space="preserve">
-    <value>Всего комиксов</value>
-  </data>
-  <data name="TransitionAnimation" xml:space="preserve">
-    <value>Анимация перелистывания страниц</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Режим разворота</value>

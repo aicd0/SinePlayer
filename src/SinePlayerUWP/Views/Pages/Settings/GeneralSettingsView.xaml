@@ -52,7 +52,7 @@
                 Grid.Row="2"
                 Grid.Column="0"
                 VerticalAlignment="Center"
-                Text="{x:Bind StringResource.OpenMediaDefaultBehavior}"
+                Text="{x:Bind StringResource.OpenItemDefaultBehavior}"
                 TextWrapping="Wrap" />
             <ComboBox
                 Grid.Row="2"

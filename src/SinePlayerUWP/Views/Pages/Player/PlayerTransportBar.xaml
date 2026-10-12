@@ -42,32 +42,35 @@
                     Spacing="4">
                     <Button
                         x:Name="AbbPrevious"
+                        hotkey:ShortcutToolTip.Action="OpenPreviousMedia"
+                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Previous}"
                         Click="OnPreviousClick"
                         IsEnabled="False"
-                        Style="{StaticResource PlaybackControlButtonStyle}"
-                        hotkey:ShortcutToolTip.Action="OpenPreviousMedia"
-                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Previous}">
+                        Style="{StaticResource PlaybackControlButtonStyle}">
                         <Button.Content>
                             <FontIcon FontSize="14" Glyph="&#xE892;" />
                         </Button.Content>
                     </Button>
                     <Button
                         x:Name="AbbPlayPause"
-                        Click="OnPlayPauseClick"
-                        Style="{StaticResource PlaybackControlButtonStyle}"
                         hotkey:ShortcutToolTip.Action="PlayPause"
-                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Play}">
+                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Play}"
+                        Click="OnPlayPauseClick"
+                        Style="{StaticResource PlaybackControlButtonStyle}">
                         <Button.Content>
-                            <FontIcon x:Name="FiPlayPause" FontSize="14" Glyph="&#xE768;" />
+                            <FontIcon
+                                x:Name="FiPlayPause"
+                                FontSize="14"
+                                Glyph="&#xE768;" />
                         </Button.Content>
                     </Button>
                     <Button
                         x:Name="AbbNext"
+                        hotkey:ShortcutToolTip.Action="OpenNextMedia"
+                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Next}"
                         Click="OnNextClick"
                         IsEnabled="False"
-                        Style="{StaticResource PlaybackControlButtonStyle}"
-                        hotkey:ShortcutToolTip.Action="OpenNextMedia"
-                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Next}">
+                        Style="{StaticResource PlaybackControlButtonStyle}">
                         <Button.Content>
                             <FontIcon FontSize="14" Glyph="&#xE893;" />
                         </Button.Content>
@@ -76,7 +79,7 @@
                         x:Name="AbbPlaylist"
                         Click="OnPlaylistClick"
                         Style="{StaticResource PlaybackControlButtonStyle}"
-                        ToolTipService.ToolTip="{x:Bind StringResource.ReadingList}">
+                        ToolTipService.ToolTip="{x:Bind StringResource.Playlist}">
                         <Button.Content>
                             <FontIcon FontSize="16" Glyph="&#xE7BC;" />
                         </Button.Content>
@@ -100,7 +103,10 @@
                         Click="OnMuteClick"
                         Style="{StaticResource PlaybackControlButtonStyle}">
                         <Button.Content>
-                            <FontIcon x:Name="FiMute" FontSize="14" Glyph="&#xE767;" />
+                            <FontIcon
+                                x:Name="FiMute"
+                                FontSize="14"
+                                Glyph="&#xE767;" />
                         </Button.Content>
                     </Button>
                     <Slider
@@ -110,8 +116,8 @@
                         IsThumbToolTipEnabled="False"
                         Maximum="1"
                         StepFrequency="0.01"
-                        Value="1"
-                        ValueChanged="OnVolumeValueChanged" />
+                        ValueChanged="OnVolumeValueChanged"
+                        Value="1" />
                     <TextBlock
                         x:Name="TbPosition"
                         Margin="0,0,2,2"
@@ -131,17 +137,23 @@
                         Style="{StaticResource PlaybackControlButtonStyle}"
                         ToolTipService.ToolTip="{x:Bind StringResource.Pin}">
                         <Button.Content>
-                            <FontIcon x:Name="FiPin" FontSize="14" Glyph="&#xE718;" />
+                            <FontIcon
+                                x:Name="FiPin"
+                                FontSize="14"
+                                Glyph="&#xE718;" />
                         </Button.Content>
                     </Button>
                     <Button
                         x:Name="AbbFullscreen"
-                        Click="OnFullscreenClick"
-                        Style="{StaticResource PlaybackControlButtonStyle}"
                         hotkey:ShortcutToolTip.Action="ToggleFullscreen"
-                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.EnterFullscreen}">
+                        hotkey:ShortcutToolTip.Text="{x:Bind StringResource.EnterFullscreen}"
+                        Click="OnFullscreenClick"
+                        Style="{StaticResource PlaybackControlButtonStyle}">
                         <Button.Content>
-                            <FontIcon x:Name="FiFullscreen" FontSize="14" Glyph="&#xE740;" />
+                            <FontIcon
+                                x:Name="FiFullscreen"
+                                FontSize="14"
+                                Glyph="&#xE740;" />
                         </Button.Content>
                     </Button>
                 </StackPanel>

@@ -345,7 +345,7 @@ internal static class MenuFlyoutItemsCreator
             PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(mediaItems);
             result.Add(new SubItemMenuFlyoutItemModel()
             {
-                Text = StringResourceProvider.Instance.RandomMedia,
+                Text = StringResourceProvider.Instance.Random,
                 Icon = new FontIconSource() { Glyph = "\uE8B1" },
                 Items = await CreateMediaMenuItems(
                     actionHandler,

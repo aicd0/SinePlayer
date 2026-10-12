@@ -491,8 +491,8 @@ internal sealed partial class PlayerPage : BasePage
         AddKeyboardAccelerators(KeyboardShortcutActions.SeekForward, (_, _) => ViewModel.SeekBy(SEEK_STEP_MS));
         AddKeyboardAccelerators(KeyboardShortcutActions.VolumeDown, (_, _) => ViewModel.AdjustVolume(-VOLUME_STEP));
         AddKeyboardAccelerators(KeyboardShortcutActions.VolumeUp, (_, _) => ViewModel.AdjustVolume(VOLUME_STEP));
-        AddKeyboardAccelerators(KeyboardShortcutActions.OpenNextMedia, (_, _) => ViewModel.Next());
-        AddKeyboardAccelerators(KeyboardShortcutActions.OpenPreviousMedia, (_, _) => ViewModel.Previous());
+        AddKeyboardAccelerators(KeyboardShortcutActions.OpenNextItem, (_, _) => ViewModel.Next());
+        AddKeyboardAccelerators(KeyboardShortcutActions.OpenPreviousItem, (_, _) => ViewModel.Previous());
     }
 
     private void OpenMediaInfoPane()

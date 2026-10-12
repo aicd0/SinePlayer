@@ -19,8 +19,8 @@ internal static class KeyboardShortcutActions
     public const string JumpToNextTab = "JumpToNextTab";
     public const string JumpToPreviousTab = "JumpToPreviousTab";
     public const string OpenDevTools = "OpenDevTools";
-    public const string OpenNextMedia = "OpenNextMedia";
-    public const string OpenPreviousMedia = "OpenPreviousMedia";
+    public const string OpenNextItem = "OpenNextItem";
+    public const string OpenPreviousItem = "OpenPreviousItem";
     public const string PlayPause = "PlayPause";
     public const string SeekBackward = "SeekBackward";
     public const string SeekForward = "SeekForward";
@@ -41,8 +41,8 @@ internal static class KeyboardShortcutActions
         new() { Id = JumpToNextTab, Name = StringResourceProvider.Instance.JumpToNextTab },
         new() { Id = JumpToPreviousTab, Name = StringResourceProvider.Instance.JumpToPreviousTab },
         new() { Id = OpenDevTools, Name = "Open dev tools", IsInternal = true },
-        new() { Id = OpenNextMedia, Name = StringResourceProvider.Instance.OpenNextMedia, Scope = PlayerScope },
-        new() { Id = OpenPreviousMedia, Name = StringResourceProvider.Instance.OpenPreviousMedia, Scope = PlayerScope },
+        new() { Id = OpenNextItem, Name = StringResourceProvider.Instance.OpenNextItem, Scope = PlayerScope },
+        new() { Id = OpenPreviousItem, Name = StringResourceProvider.Instance.OpenPreviousItem, Scope = PlayerScope },
         new() { Id = PlayPause, Name = StringResourceProvider.Instance.PlayPause, Scope = PlayerScope },
         new() { Id = SeekBackward, Name = StringResourceProvider.Instance.SeekBackward, Scope = PlayerScope },
         new() { Id = SeekForward, Name = StringResourceProvider.Instance.SeekForward, Scope = PlayerScope },
@@ -57,8 +57,8 @@ internal static class KeyboardShortcutActions
         CreateShortcut(CloseTab, VirtualKey.W, VirtualKeyModifiers.Control),
         CreateShortcut(JumpToNextTab, VirtualKey.Tab, VirtualKeyModifiers.Control),
         CreateShortcut(JumpToPreviousTab, VirtualKey.Tab, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift),
-        CreateShortcut(OpenNextMedia, VirtualKey.Down, VirtualKeyModifiers.Control),
-        CreateShortcut(OpenPreviousMedia, VirtualKey.Up, VirtualKeyModifiers.Control),
+        CreateShortcut(OpenNextItem, VirtualKey.Down, VirtualKeyModifiers.Control),
+        CreateShortcut(OpenPreviousItem, VirtualKey.Up, VirtualKeyModifiers.Control),
         CreateShortcut(PlayPause, VirtualKey.Space),
         CreateShortcut(SeekBackward, VirtualKey.Left),
         CreateShortcut(SeekForward, VirtualKey.Right),

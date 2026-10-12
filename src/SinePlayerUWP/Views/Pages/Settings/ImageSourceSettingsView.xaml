@@ -50,7 +50,7 @@
             IsChecked="{x:Bind ViewModel.RemoveUnreachableMedia, Mode=OneWay}" />
         <CheckBox
             Click="PromptBeforeRemovingMediaCheckBox_Click"
-            Content="{x:Bind StringResource.PromptBeforeRemovingMedia}"
+            Content="{x:Bind StringResource.PromptBeforeRemovingItems}"
             IsChecked="{x:Bind ViewModel.PromptBeforeRemovingMedia, Mode=OneWay}" />
         <Button
             x:Uid="ShowHiddenMediaButton"
