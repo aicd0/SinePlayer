@@ -3,7 +3,7 @@
 
 namespace SinePlayerUWP.Data.Models.Media;
 
-public enum CompletionStatusEnum
+internal enum CompletionStatusEnum
 {
     Unread = 0,
     Reading = 1,
