@@ -800,6 +800,9 @@ NOT                  - 논리 not. 예: NOT %tag = "hide this"
   <data name="PlayerExpander.Header" xml:space="preserve">
     <value>플레이어</value>
   </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>플레이어 설정</value>
+  </data>
   <data name="PlayerStatusError" xml:space="preserve">
     <value>로딩 중 오류가 발생했습니다.</value>
   </data>

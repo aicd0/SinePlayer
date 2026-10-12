@@ -797,6 +797,9 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="PlayerExpander.Header" xml:space="preserve">
     <value>播放器</value>
   </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>播放器設定</value>
+  </data>
   <data name="PlayerStatusError" xml:space="preserve">
     <value>載入時發生錯誤</value>
   </data>

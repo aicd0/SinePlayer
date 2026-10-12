@@ -799,6 +799,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="PlayerExpander.Header" xml:space="preserve">
     <value>Player</value>
   </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>Player-Einstellungen</value>
+  </data>
   <data name="PlayerStatusError" xml:space="preserve">
     <value>Beim Laden ist ein Fehler aufgetreten</value>
   </data>

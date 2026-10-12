@@ -801,6 +801,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="PlayerExpander.Header" xml:space="preserve">
     <value>Player</value>
   </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>Player settings</value>
+  </data>
   <data name="PlayerStatusError" xml:space="preserve">
     <value>An error occured while loading</value>
   </data>

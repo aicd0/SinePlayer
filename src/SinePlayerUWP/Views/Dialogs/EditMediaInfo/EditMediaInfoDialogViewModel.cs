@@ -323,7 +323,8 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
 
                 if (_resetPlayerSettings)
                 {
-                    // TODO
+                    media.SetExt(MediaExt.PLAYER_SETTING_PRESET_KEY, null);
+                    media.SetExt(MediaExt.CUSTOM_PLAYER_SETTINGS, null);
                     needFlushExt = true;
                 }
 

@@ -193,6 +193,7 @@ public class StringResourceProvider
     public string Pin => GetResourceString("Pin");
     public string Play => GetResourceString("Play");
     public string PlayPause => GetResourceString("PlayPause");
+    public string PlayerSettings => GetResourceString("PlayerSettings");
     public string PlayerStatusError => GetResourceString("PlayerStatusError");
     public string PlayerStatusLoading => GetResourceString("PlayerStatusLoading");
     public string Playlist => GetResourceString("Playlist");

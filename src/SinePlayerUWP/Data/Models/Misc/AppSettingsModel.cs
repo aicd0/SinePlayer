@@ -282,6 +282,58 @@ internal static class AppSettingsModel
         }
     }
 
+    public static string DefaultPlayerSettingPresetKey
+    {
+        get
+        {
+            return _db.Read(model => model.DefaultPlayerSettingPresetKey ?? string.Empty);
+        }
+        set
+        {
+            _db.Write(model => model.DefaultPlayerSettingPresetKey = value);
+            _db.Save();
+        }
+    }
+
+    public static Dictionary<string, PlayerSettingsModel> PlayerSettingPresets
+    {
+        get
+        {
+            return _db.Read(model =>
+            {
+                Dictionary<string, PlayerSettingsModel> presets = [];
+                if (model.PlayerSettingPresets is not null)
+                {
+                    foreach (KeyValuePair<string, PlayerSettingsModel.JsonModel?> kvp in model.PlayerSettingPresets)
+                    {
+                        string key = kvp.Key;
+                        PlayerSettingsModel.JsonModel? settingJsonModel = kvp.Value;
+                        if (settingJsonModel is not null)
+                        {
+                            presets[key] = PlayerSettingsModel.FromJsonModel(key, settingJsonModel);
+                        }
+                    }
+                }
+
+                return presets;
+            });
+        }
+        set
+        {
+            _db.Write(model =>
+            {
+                model.PlayerSettingPresets = [];
+                foreach (KeyValuePair<string, PlayerSettingsModel> kvp in value)
+                {
+                    string key = kvp.Key;
+                    PlayerSettingsModel setting = kvp.Value;
+                    model.PlayerSettingPresets[key] = setting.ToJsonModel();
+                }
+            });
+            _db.Save();
+        }
+    }
+
     public static bool RatingPercentageEnabled
     {
         get
@@ -682,6 +734,12 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("PlaybackDefaultShuffle")]
         public bool? PlaybackDefaultShuffle { get; set; }
+
+        [JsonPropertyName("DefaultPlayerSettingPresetKey")]
+        public string? DefaultPlayerSettingPresetKey { get; set; }
+
+        [JsonPropertyName("PlayerSettingPresets")]
+        public Dictionary<string, PlayerSettingsModel.JsonModel?>? PlayerSettingPresets { get; set; }
 
         [JsonPropertyName("PlayerMuted")]
         public bool? PlayerMuted { get; set; }

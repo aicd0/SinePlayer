@@ -800,6 +800,9 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="PlayerExpander.Header" xml:space="preserve">
     <value>Проигрыватель</value>
   </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>Настройки плеера</value>
+  </data>
   <data name="PlayerStatusError" xml:space="preserve">
     <value>Произошла ошибка при загрузке</value>
   </data>

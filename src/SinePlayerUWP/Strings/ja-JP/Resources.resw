@@ -799,6 +799,9 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="PlayerExpander.Header" xml:space="preserve">
     <value>プレーヤー</value>
   </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>プレーヤーの設定</value>
+  </data>
   <data name="PlayerStatusError" xml:space="preserve">
     <value>読み込みエラー</value>
   </data>

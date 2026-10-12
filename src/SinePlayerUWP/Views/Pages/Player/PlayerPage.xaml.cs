@@ -233,6 +233,11 @@ internal sealed partial class PlayerPage : BasePage
 
         ViewModel.MediaChangedLiveData.Observe(this, _ =>
         {
+            if (ViewModel.Media is not null)
+            {
+                _navigationBar?.SetPlayerSettings(ViewModel.Media);
+            }
+
             GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaInfoChanged).Emit(new()
             {
                 Media = ViewModel.Media,
@@ -356,6 +361,7 @@ internal sealed partial class PlayerPage : BasePage
     private void SetupNavigationBar()
     {
         var bar = new PlayerNavigationBar();
+        bar.Initialize(GetMainWindowAbility());
         bar.FavoriteChanged += isFavorite => ViewModel.SetIsFavorite(isFavorite, true);
         bar.InfoPaneExpanded += OpenMediaInfoPane;
         GetMainPageAbility().SetCustomCenteredNavigationBar(bar);

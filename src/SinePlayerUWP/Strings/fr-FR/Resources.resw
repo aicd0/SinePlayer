@@ -799,6 +799,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="PlayerExpander.Header" xml:space="preserve">
     <value>Lecteur</value>
   </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>Paramètres du lecteur</value>
+  </data>
   <data name="PlayerStatusError" xml:space="preserve">
     <value>Une erreur s'est produite lors du chargement</value>
   </data>
