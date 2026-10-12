@@ -310,7 +310,6 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
 
                 if (_coverImageChanged)
                 {
-                    media.SetExt(MediaExt.COVER_INDEX, null);
                     await ApplyImageChange(media, MediaExt.COVER_IMAGE, _coverImagePendingFilePath);
                     needFlushExt = true;
                 }

@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -495,9 +494,7 @@ internal static class MenuFlyoutItemsCreator
                         if (string.IsNullOrEmpty(coverImage) && mediaItems.Count > 0)
                         {
                             MediaModel media = mediaItems[0];
-                            int coverIndex = MediaExt.GetCoverIndex(media);
-                            collection.SetExt(MediaExt.COVER_INDEX, coverIndex.ToString(CultureInfo.InvariantCulture));
-                            collection.SetExt(MediaExt.COVER_IMAGE, ResourceUri.CreateMediaImage(media.Id, coverIndex).ToString());
+                            collection.SetExt(MediaExt.COVER_IMAGE, ResourceUri.CreateMediaThumbnail(media.Id).ToString());
                             await collection.FlushExt();
                         }
                     });

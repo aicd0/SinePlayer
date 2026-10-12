@@ -18,7 +18,7 @@ internal sealed class ResourceUri
     private static readonly IResourceUriInterceptor[] sInterceptors =
     [
         new ResourceFileUriInterceptor(),
-        new MediaImageUriInterceptor(),
+        new MediaThumbnailUriInterceptor(),
     ];
 
     public static ResourceUri CreateResourceFile(string resourceId, string fileName)
@@ -26,9 +26,9 @@ internal sealed class ResourceUri
         return new(new ResourceFileUriInterceptor.Handler(resourceId, fileName));
     }
 
-    public static ResourceUri CreateMediaImage(long mediaId, int index)
+    public static ResourceUri CreateMediaThumbnail(long mediaId)
     {
-        return new(new MediaImageUriInterceptor.Handler(mediaId, index));
+        return new(new MediaThumbnailUriInterceptor.Handler(mediaId));
     }
 
     private readonly IResourceUriHandler _handler;

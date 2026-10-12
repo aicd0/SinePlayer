@@ -16,11 +16,10 @@ using Windows.Storage.FileProperties;
 
 namespace SinePlayerUWP.Common.Storage;
 
-internal sealed class MediaImageUriInterceptor : IResourceUriInterceptor
+internal sealed class MediaThumbnailUriInterceptor : IResourceUriInterceptor
 {
-    private const string HOST = "MediaImage";
+    private const string HOST = "MediaThumbnail";
     private const string QUERY_MEDIA_ID = "id";
-    private const string QUERY_INDEX = "index";
 
     public bool TryParse(Uri uri, [NotNullWhen(true)] out IResourceUriHandler? handler)
     {
@@ -31,7 +30,6 @@ internal sealed class MediaImageUriInterceptor : IResourceUriInterceptor
         }
 
         string mediaIdRaw = string.Empty;
-        string indexRaw = string.Empty;
         foreach (string item in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
         {
             int equalsIndex = item.IndexOf('=');
@@ -46,10 +44,6 @@ internal sealed class MediaImageUriInterceptor : IResourceUriInterceptor
             {
                 mediaIdRaw = itemValue;
             }
-            else if (key.Equals(QUERY_INDEX, StringComparison.OrdinalIgnoreCase))
-            {
-                indexRaw = itemValue;
-            }
         }
 
         if (!long.TryParse(mediaIdRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out long mediaId))
@@ -57,12 +51,7 @@ internal sealed class MediaImageUriInterceptor : IResourceUriInterceptor
             return false;
         }
 
-        if (!int.TryParse(indexRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int index) || index < 0)
-        {
-            return false;
-        }
-
-        handler = new Handler(mediaId, index);
+        handler = new Handler(mediaId);
         return true;
     }
 
@@ -70,18 +59,14 @@ internal sealed class MediaImageUriInterceptor : IResourceUriInterceptor
     {
         private readonly Uri _uri;
 
-        public Handler(long mediaId, int index)
+        public Handler(long mediaId)
         {
             MediaId = mediaId;
-            Index = index;
             string idText = mediaId.ToString(CultureInfo.InvariantCulture);
-            string indexText = index.ToString(CultureInfo.InvariantCulture);
-            _uri = new Uri($"{ResourceUri.SCHEME}{HOST}?{QUERY_MEDIA_ID}={idText}&{QUERY_INDEX}={indexText}");
+            _uri = new Uri($"{ResourceUri.SCHEME}{HOST}?{QUERY_MEDIA_ID}={idText}");
         }
 
         public long MediaId { get; }
-
-        public int Index { get; }
 
         public Uri Uri => _uri;
 
