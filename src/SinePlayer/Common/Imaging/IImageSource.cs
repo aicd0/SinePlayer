@@ -1,0 +1,17 @@
+﻿// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using System.Threading.Tasks;
+
+namespace SinePlayer.Common.Imaging;
+
+internal interface IImageSource
+{
+    string Uri { get; }
+
+    ImageLoaderSchedulerGroup PreferredSchedulerGroup { get; }
+
+    bool IsCacheValidationEnabled { get; }
+
+    Task<IImageConnection?> Open();
+}

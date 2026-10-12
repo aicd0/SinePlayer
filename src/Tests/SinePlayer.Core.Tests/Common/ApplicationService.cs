@@ -1,0 +1,59 @@
+﻿// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using SinePlayer.Core.Common.ServiceManagement.Services;
+
+namespace SinePlayer.Core.Tests.Common;
+
+internal class ApplicationService : IApplicationService
+{
+    private const string DIR_USER = "user";
+
+    private static string GetDeploymentPath()
+    {
+        return AppContext.BaseDirectory;
+    }
+
+    private readonly Lazy<string> _localFolderPath = new(() =>
+    {
+        return Path.Combine(GetDeploymentPath(), DIR_USER, "local");
+    });
+
+    private readonly Lazy<string> _localCacheFolderPath = new(() =>
+    {
+        return Path.Combine(GetDeploymentPath(), DIR_USER, "local_cache");
+    });
+
+    private readonly Lazy<string> _temporaryFolderPath = new(() =>
+    {
+        return Path.Combine(GetDeploymentPath(), DIR_USER, "temporary");
+    });
+
+    public bool PortableBuild => true;
+
+    public bool SafeMode => false;
+
+    public bool Launching => false;
+
+    public bool Exiting => false;
+
+    public string GetLocalFolderPath()
+    {
+        return _localFolderPath.Value;
+    }
+
+    public string GetLocalCacheFolderPath()
+    {
+        return _localCacheFolderPath.Value;
+    }
+
+    public string GetTemporaryFolderPath()
+    {
+        return _temporaryFolderPath.Value;
+    }
+
+    public string GetEnvironmentDebugInfo()
+    {
+        return string.Empty;
+    }
+}

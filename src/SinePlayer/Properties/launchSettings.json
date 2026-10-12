@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "SinePlayer (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": false,
+      "nativeDebugging": false
+    },
+    "SinePlayer (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

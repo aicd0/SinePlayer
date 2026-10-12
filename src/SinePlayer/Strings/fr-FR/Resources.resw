@@ -1,0 +1,1104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="About" xml:space="preserve">
+    <value>À propos</value>
+  </data>
+  <data name="AboutCopyright" xml:space="preserve">
+    <value>© 2026 $author. Tous droits réservés.</value>
+  </data>
+  <data name="Action" xml:space="preserve">
+    <value>Action</value>
+  </data>
+  <data name="Add" xml:space="preserve">
+    <value>Ajouter</value>
+  </data>
+  <data name="AddFolder" xml:space="preserve">
+    <value>Ajouter un dossier</value>
+  </data>
+  <data name="AddKeyboardShortcut" xml:space="preserve">
+    <value>Ajouter un raccourci</value>
+  </data>
+  <data name="AddNewTab" xml:space="preserve">
+    <value>Ajouter un nouvel onglet</value>
+  </data>
+  <data name="AddToCollection" xml:space="preserve">
+    <value>Ajouter à la collection</value>
+  </data>
+  <data name="AddToFavorites" xml:space="preserve">
+    <value>Ajouter aux favoris</value>
+  </data>
+  <data name="AdvancedExpander.Detail" xml:space="preserve">
+    <value>Paramètres inhabituels</value>
+  </data>
+  <data name="AdvancedExpander.Header" xml:space="preserve">
+    <value>Avancé</value>
+  </data>
+  <data name="AllHidden" xml:space="preserve">
+    <value>Tous les objets cachés</value>
+  </data>
+  <data name="AllItems" xml:space="preserve">
+    <value>Tous les éléments</value>
+  </data>
+  <data name="AllMatchedResults" xml:space="preserve">
+    <value>Tous les résultats correspondants</value>
+  </data>
+  <data name="AllPages" xml:space="preserve">
+    <value>Toutes les pages</value>
+  </data>
+  <data name="Always" xml:space="preserve">
+    <value>Toujours</value>
+  </data>
+  <data name="AntiAliasingFilter" xml:space="preserve">
+    <value>Filtre anti-aliasing</value>
+  </data>
+  <data name="AppDescription" xml:space="preserve">
+    <value>Sine Player</value>
+  </data>
+  <data name="AppDisplayName" xml:space="preserve">
+    <value>Sine Player</value>
+  </data>
+  <data name="AppStoreName" xml:space="preserve">
+    <value>Sine Player</value>
+  </data>
+  <data name="AppearanceExpander.Detail" xml:space="preserve">
+    <value>Sélectionnez le thème d'application à afficher</value>
+  </data>
+  <data name="AppearanceExpander.Header" xml:space="preserve">
+    <value>Apparence</value>
+  </data>
+  <data name="ApplyOnNextLaunch" xml:space="preserve">
+    <value>Vous verrez votre changement la prochaine fois que vous démarrerez l'application</value>
+  </data>
+  <data name="ArchiveEncoding.Text" xml:space="preserve">
+    <value>Codage de fichiers compressés</value>
+  </data>
+  <data name="Ascending" xml:space="preserve">
+    <value>Ascendant</value>
+  </data>
+  <data name="Auto" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="AutoPlayNext" xml:space="preserve">
+    <value>Lire automatiquement l’élément suivant</value>
+  </data>
+  <data name="AutoScrolling" xml:space="preserve">
+    <value>Défilement automatique</value>
+  </data>
+  <data name="AutoSwitch" xml:space="preserve">
+    <value>Changement automatique</value>
+  </data>
+  <data name="AutoToggleOverlaysOnCursor" xml:space="preserve">
+    <value>Afficher ou masquer automatiquement les superpositions non épinglées selon la position du curseur</value>
+  </data>
+  <data name="Background" xml:space="preserve">
+    <value>Arrière-plan</value>
+  </data>
+  <data name="BackgroundAcrylic" xml:space="preserve">
+    <value>Acrylique</value>
+  </data>
+  <data name="BackgroundImage" xml:space="preserve">
+    <value>Image d’arrière-plan</value>
+  </data>
+  <data name="Calculating" xml:space="preserve">
+    <value>Calculateur...</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="Category" xml:space="preserve">
+    <value>Catégorie</value>
+  </data>
+  <data name="CheckForUpdates" xml:space="preserve">
+    <value>Rechercher des mises à jour</value>
+  </data>
+  <data name="ChooseLocationButton.Content" xml:space="preserve">
+    <value>Choisir où nous recherchons des images</value>
+  </data>
+  <data name="ChooseLocationDialog.Title" xml:space="preserve">
+    <value>Créez vos collections à partir de vos fichiers locaux</value>
+  </data>
+  <data name="ClearAllHistory" xml:space="preserve">
+    <value>Effacer l’historique</value>
+  </data>
+  <data name="ClearCache" xml:space="preserve">
+    <value>Vider le cache</value>
+  </data>
+  <data name="CloseLastTabBehavior" xml:space="preserve">
+    <value>Comportement lors de la fermeture du dernier onglet</value>
+  </data>
+  <data name="CloseSidebar" xml:space="preserve">
+    <value>Fermer la barre latérale</value>
+  </data>
+  <data name="CloseTab" xml:space="preserve">
+    <value>Fermer l’onglet</value>
+  </data>
+  <data name="CloseWindow" xml:space="preserve">
+    <value>Fermer la fenêtre</value>
+  </data>
+  <data name="CollapseAll" xml:space="preserve">
+    <value>Réduire tout</value>
+  </data>
+  <data name="Collection" xml:space="preserve">
+    <value>Collection</value>
+  </data>
+  <data name="CollectionInformation" xml:space="preserve">
+    <value>Informations sur la collection</value>
+  </data>
+  <data name="CompletionStatus" xml:space="preserve">
+    <value>État d'achèvement</value>
+  </data>
+  <data name="CompletionStatusAbandoned" xml:space="preserve">
+    <value>Abandonné</value>
+  </data>
+  <data name="CompletionStatusCompleted" xml:space="preserve">
+    <value>Terminé</value>
+  </data>
+  <data name="CompletionStatusNotStarted" xml:space="preserve">
+    <value>Pas commencé</value>
+  </data>
+  <data name="CompletionStatusOnHold" xml:space="preserve">
+    <value>En pause</value>
+  </data>
+  <data name="CompletionStatusOngoing" xml:space="preserve">
+    <value>En cours</value>
+  </data>
+  <data name="CompletionStatusPlanned" xml:space="preserve">
+    <value>Prévu</value>
+  </data>
+  <data name="Continuous" xml:space="preserve">
+    <value>Continu</value>
+  </data>
+  <data name="ContributionRunAfterLink" xml:space="preserve">
+    <value> pour savoir comment contribuer à cette application.</value>
+  </data>
+  <data name="ContributionRunBeforeLink" xml:space="preserve">
+    <value>$appname est un projet open source. Consultez </value>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>Copie</value>
+  </data>
+  <data name="CoverImage" xml:space="preserve">
+    <value>Image de couverture</value>
+  </data>
+  <data name="CoverPageCount" xml:space="preserve">
+    <value>Nombre de pages de couverture</value>
+  </data>
+  <data name="Custom" xml:space="preserve">
+    <value>Personnalisé</value>
+  </data>
+  <data name="DebugInformation.Text" xml:space="preserve">
+    <value>Informations de débogage</value>
+  </data>
+  <data name="DebugMode.Text" xml:space="preserve">
+    <value>Mode débogage</value>
+  </data>
+  <data name="DebugModeWarning" xml:space="preserve">
+    <value>L'activation du mode débogage peut rendre l'application instable, continuer ?</value>
+  </data>
+  <data name="Default" xml:space="preserve">
+    <value>Défaut</value>
+  </data>
+  <data name="DefaultTags" xml:space="preserve">
+    <value>Balises par défaut</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Supprimer</value>
+  </data>
+  <data name="DeleteFilesPrompt" xml:space="preserve">
+    <value>Les fichiers et dossiers suivants seront définitivement supprimés :
+
+$files</value>
+  </data>
+  <data name="Descending" xml:space="preserve">
+    <value>Descendant</value>
+  </data>
+  <data name="Description" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="DevAppDisplayName" xml:space="preserve">
+    <value>Sine Player [Dev]</value>
+  </data>
+  <data name="DeveloperMode" xml:space="preserve">
+    <value>Mode développeur</value>
+  </data>
+  <data name="DeveloperTools" xml:space="preserve">
+    <value>Outils de développement</value>
+  </data>
+  <data name="DiffMode" xml:space="preserve">
+    <value>Mode différentiel</value>
+  </data>
+  <data name="Disable" xml:space="preserve">
+    <value>Désactiver</value>
+  </data>
+  <data name="Disabled" xml:space="preserve">
+    <value>Désactivé</value>
+  </data>
+  <data name="Disclaimer.Text" xml:space="preserve">
+    <value>Clause de non-responsabilité</value>
+  </data>
+  <data name="Done" xml:space="preserve">
+    <value>Fait</value>
+  </data>
+  <data name="DownloadPluginsFromGitHub" xml:space="preserve">
+    <value>Télécharger des extensions depuis GitHub</value>
+  </data>
+  <data name="Duration" xml:space="preserve">
+    <value>Durée</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Modifier</value>
+  </data>
+  <data name="EditImportExclusionList" xml:space="preserve">
+    <value>Modifier la liste d’exclusion à l’importation</value>
+  </data>
+  <data name="EditKeyboardShortcut" xml:space="preserve">
+    <value>Modifier le raccourci</value>
+  </data>
+  <data name="EditPreset" xml:space="preserve">
+    <value>Modifier le préréglage</value>
+  </data>
+  <data name="Enable" xml:space="preserve">
+    <value>Activer</value>
+  </data>
+  <data name="EnableCompressedFileCache" xml:space="preserve">
+    <value>Activer le cache des fichiers compressés</value>
+  </data>
+  <data name="Enabled" xml:space="preserve">
+    <value>Activé</value>
+  </data>
+  <data name="EnterFullscreen" xml:space="preserve">
+    <value>Entrer en plein écran</value>
+  </data>
+  <data name="EnterNewTags" xml:space="preserve">
+    <value>Saisir de nouvelles étiquettes</value>
+  </data>
+  <data name="EnterNewTagsHint" xml:space="preserve">
+    <value>Catégorie : Tag1, Tag2     - Ajoutez « Tag1 » et « Tag2 » à « Catégorie ».
+Catégorie :: Tag1, Tag2    - Remplacez « Catégorie » par « Tag1 » et « Tag2 ».</value>
+  </data>
+  <data name="Error" xml:space="preserve">
+    <value>Erreur</value>
+  </data>
+  <data name="ErrorCommonDescription" xml:space="preserve">
+    <value>L'opération a échoué pour la raison suivante :</value>
+  </data>
+  <data name="Exit" xml:space="preserve">
+    <value>Quitter</value>
+  </data>
+  <data name="ExitFullscreen" xml:space="preserve">
+    <value>Quitter le plein écran</value>
+  </data>
+  <data name="ExpandAll" xml:space="preserve">
+    <value>Développer tout</value>
+  </data>
+  <data name="ExpressionAnd" xml:space="preserve">
+    <value>Et</value>
+  </data>
+  <data name="ExpressionIn" xml:space="preserve">
+    <value>Contenu par</value>
+  </data>
+  <data name="ExpressionInvalid" xml:space="preserve">
+    <value>L'expression n'est pas valide ($reason)</value>
+  </data>
+  <data name="ExpressionNot" xml:space="preserve">
+    <value>Pas</value>
+  </data>
+  <data name="ExpressionOr" xml:space="preserve">
+    <value>Ou</value>
+  </data>
+  <data name="ExpressionReference" xml:space="preserve">
+    <value>Référence des expressions
+
+1. Variables
+
+%tag                  - Correspond à tous les tags d'une BD.
+%title                - Correspond au titre 1 ou 2.
+%title1               - Correspond au titre 1.
+%title2               - Correspond au titre 2.
+%rating               - Correspond à la note. Par exemple : 100 représente 5 étoiles, -1 représente aucune note.
+%completion_state     - État d'achèvement de la BD (0 - Non lu, 1 - Lu, 2 - Terminé).
+%progress             - Progression de la lecture, en pourcentage. Par exemple : 50 représente 50 %.
+%duration             - Durée totale.
+
+2. Opérateurs de variables
+
+=                     - Égal. Par exemple : %title = "Ceci est un titre"
+&gt;                     - Supérieur à. Par exemple : %rating &gt; 3
+&gt;=                    - Supérieur ou égal à.
+&lt;                     - Inférieur à.
+&lt;=                    - Inférieur ou égal à.
+... IN (...)          - Contenu par. Par exemple :
+                        %rating in (3, 4, 5) - Correspond aux bandes dessinées dont les notes sont comprises entre 3, 4 et 5.
+                        %tag.language in (languageA, languageB) - Correspond aux bandes dessinées dont la catégorie de balise « language » contient « languageA » ou « languageB ».
+                        (authorA, authorB) in %tag.authors - Correspond aux bandes dessinées dont la catégorie de balise « authors » contient à la fois « authorA » et « authorB ».
+                        apple in %tag - Correspond aux bandes dessinées contenant la balise « apple ».
+
+3. Opérateurs logiques
+
+AND                   - Et logique. Par exemple : %tag.fruit = apple and %title = "J'ai une pomme"
+OR                    - Ou logique. Par exemple : %title1 = "Apple is OK" or %title2 = "Orange is OK also"
+NOT                   - Non logique. Par exemple : NOT %tag = "hide this"
+
+4. Parenthèses
+
+Par défaut, les opérateurs sont évalués de gauche à droite. Utilisez (...) pour augmenter la priorité de l'expression incluse. Par exemple :
+
+%tag.author = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
+
+L'évaluation sera effectuée dans l'ordre suivant :
+
+1. NOT %tag.lang = langB  ==&gt;  Résultat1
+2. %tag.language = langA OR Result1  ==&gt;  Résultat2
+3. %tag.author = abc AND Result2  ==&gt;  Résultat3</value>
+  </data>
+  <data name="ExpressionTextBlock.Text" xml:space="preserve">
+    <value>Expression</value>
+  </data>
+  <data name="ExpressionValid" xml:space="preserve">
+    <value>Requête SQL : $query</value>
+  </data>
+  <data name="Favorite" xml:space="preserve">
+    <value>Collecter</value>
+  </data>
+  <data name="Favorites" xml:space="preserve">
+    <value>Favoris</value>
+  </data>
+  <data name="Feedback" xml:space="preserve">
+    <value>Retour</value>
+  </data>
+  <data name="FeedbackIntroduction" xml:space="preserve">
+    <value>Utilisez le bouton ci-dessous pour nous envoyer des suggestions ou signaler un bug sur GitHub.</value>
+  </data>
+  <data name="FileOperations" xml:space="preserve">
+    <value>Opérations sur les fichiers</value>
+  </data>
+  <data name="FilterPresets" xml:space="preserve">
+    <value>Préréglages de filtre</value>
+  </data>
+  <data name="FilterSettings" xml:space="preserve">
+    <value>Paramètres de filtre</value>
+  </data>
+  <data name="FilteredBy" xml:space="preserve">
+    <value>$count filtre(s) appliqué(s)</value>
+  </data>
+  <data name="FinishPercentage" xml:space="preserve">
+    <value>$percentage% Terminé</value>
+  </data>
+  <data name="FlipImage" xml:space="preserve">
+    <value>Retourner</value>
+  </data>
+  <data name="Folders" xml:space="preserve">
+    <value>Dossiers</value>
+  </data>
+  <data name="FunctionAverage" xml:space="preserve">
+    <value>Moyenne</value>
+  </data>
+  <data name="FunctionItemCount" xml:space="preserve">
+    <value>Nombre d'articles</value>
+  </data>
+  <data name="FunctionMax" xml:space="preserve">
+    <value>Maximum</value>
+  </data>
+  <data name="FunctionMin" xml:space="preserve">
+    <value>Minimum</value>
+  </data>
+  <data name="FunctionSum" xml:space="preserve">
+    <value>Somme</value>
+  </data>
+  <data name="General" xml:space="preserve">
+    <value>Général</value>
+  </data>
+  <data name="GeneralSettingsDescription" xml:space="preserve">
+    <value>Modifier le comportement par défaut de l’application</value>
+  </data>
+  <data name="GoBack" xml:space="preserve">
+    <value>Retour</value>
+  </data>
+  <data name="GoForward" xml:space="preserve">
+    <value>Aller de l'avant</value>
+  </data>
+  <data name="Group" xml:space="preserve">
+    <value>Regroupement</value>
+  </data>
+  <data name="Help" xml:space="preserve">
+    <value>Aide</value>
+  </data>
+  <data name="Hidden" xml:space="preserve">
+    <value>Masqué</value>
+  </data>
+  <data name="Hide" xml:space="preserve">
+    <value>Cacher</value>
+  </data>
+  <data name="HideCursorAutomatically" xml:space="preserve">
+    <value>Masquer le curseur automatiquement (expérimental)</value>
+  </data>
+  <data name="History" xml:space="preserve">
+    <value>Histoire</value>
+  </data>
+  <data name="HomeButton.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Maison</value>
+  </data>
+  <data name="Horizontal" xml:space="preserve">
+    <value>Horizontal</value>
+  </data>
+  <data name="Image" xml:space="preserve">
+    <value>Image</value>
+  </data>
+  <data name="ImageBrightness" xml:space="preserve">
+    <value>Luminosité</value>
+  </data>
+  <data name="ImageContrast" xml:space="preserve">
+    <value>Contraste</value>
+  </data>
+  <data name="ImageLocationExpander.Detail" xml:space="preserve">
+    <value>Choisir où nous recherchons des images</value>
+  </data>
+  <data name="ImageLocationExpander.Header" xml:space="preserve">
+    <value>Images sur cet appareil</value>
+  </data>
+  <data name="ImageSaturation" xml:space="preserve">
+    <value>Saturation</value>
+  </data>
+  <data name="Images" xml:space="preserve">
+    <value>Images</value>
+  </data>
+  <data name="IncludeHiddenItems" xml:space="preserve">
+    <value>Inclure les éléments masqués</value>
+  </data>
+  <data name="InstallPlugin" xml:space="preserve">
+    <value>Installer le module</value>
+  </data>
+  <data name="InstallPluginWarning" xml:space="preserve">
+    <value>L’installation d’un module complémentaire tiers non vérifié peut présenter un risque pour votre ordinateur. Continuez uniquement si vous faites entièrement confiance à l’éditeur.
+En cliquant sur « Continuer », vous confirmez que vous comprenez les risques et souhaitez poursuivre l’installation. Ce message ne s’affichera plus.</value>
+  </data>
+  <data name="InvertImage" xml:space="preserve">
+    <value>Inverser</value>
+  </data>
+  <data name="JumpToNextTab" xml:space="preserve">
+    <value>Passer à l’onglet suivant</value>
+  </data>
+  <data name="JumpToPreviousTab" xml:space="preserve">
+    <value>Passer à l’onglet précédent</value>
+  </data>
+  <data name="KeepScreenOn" xml:space="preserve">
+    <value>Garder l’écran allumé</value>
+  </data>
+  <data name="KeyboardKeys" xml:space="preserve">
+    <value>Touches</value>
+  </data>
+  <data name="KeyboardShortcutInUse" xml:space="preserve">
+    <value>Ce raccourci est déjà utilisé.</value>
+  </data>
+  <data name="KeyboardShortcutReserved" xml:space="preserve">
+    <value>Ce raccourci est réservé.</value>
+  </data>
+  <data name="KeyboardShortcutsExpander.Detail" xml:space="preserve">
+    <value>Configurer tous les raccourcis clavier</value>
+  </data>
+  <data name="KeyboardShortcutsExpander.Header" xml:space="preserve">
+    <value>Raccourcis clavier</value>
+  </data>
+  <data name="LanguageExpander.Detail" xml:space="preserve">
+    <value>Sélectionnez la langue d'affichage de l'application</value>
+  </data>
+  <data name="LanguageExpander.Header" xml:space="preserve">
+    <value>Langue</value>
+  </data>
+  <data name="LastVisitTime" xml:space="preserve">
+    <value>Dernière visite</value>
+  </data>
+  <data name="LibraryEmptyPart1.Text" xml:space="preserve">
+    <value>Aucun résultat avec les paramètres de filtre actuels. Essayez </value>
+  </data>
+  <data name="LibraryEmptyPart2.Text" xml:space="preserve">
+    <value>ou</value>
+  </data>
+  <data name="LibraryEmptyPart3.Text" xml:space="preserve">
+    <value>.</value>
+  </data>
+  <data name="LibraryHeader.Text" xml:space="preserve">
+    <value>Bibliothèque</value>
+  </data>
+  <data name="License" xml:space="preserve">
+    <value>Licence</value>
+  </data>
+  <data name="LinkErrorContent" xml:space="preserve">
+    <value>« $link » ne semble pas être un lien Web valide.</value>
+  </data>
+  <data name="LinkErrorTitle" xml:space="preserve">
+    <value>Impossible d'ouvrir le lien</value>
+  </data>
+  <data name="Links" xml:space="preserve">
+    <value>Links</value>
+  </data>
+  <data name="MediaExclusionExplaination" xml:space="preserve">
+    <value>Sélectionner « ajouter à la liste d’exclusion » empêchera la réimportation de la BD lors de la prochaine mise à jour de la bibliothèque.</value>
+  </data>
+  <data name="MediaInfo" xml:space="preserve">
+    <value>Informations sur le média</value>
+  </data>
+  <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
+    <value>Créer un nouveau dossier</value>
+  </data>
+  <data name="MenuFlyoutRemoveFromList.Text" xml:space="preserve">
+    <value>Supprimer de la liste</value>
+  </data>
+  <data name="MenuFlyoutRename.Text" xml:space="preserve">
+    <value>Rebaptiser</value>
+  </data>
+  <data name="MenuFlyoutSortByName.Text" xml:space="preserve">
+    <value>Trier par nom</value>
+  </data>
+  <data name="MergeSingleItemGroups" xml:space="preserve">
+    <value>Fusionner les groupes seuls</value>
+  </data>
+  <data name="Miscellaneous" xml:space="preserve">
+    <value>Divers</value>
+  </data>
+  <data name="More" xml:space="preserve">
+    <value>Plus</value>
+  </data>
+  <data name="NItems" xml:space="preserve">
+    <value>$n élément(s)</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>nom</value>
+  </data>
+  <data name="Never" xml:space="preserve">
+    <value>Jamais</value>
+  </data>
+  <data name="New" xml:space="preserve">
+    <value>Nouveau</value>
+  </data>
+  <data name="NewCollection" xml:space="preserve">
+    <value>Nouvelle collection</value>
+  </data>
+  <data name="NewFolder" xml:space="preserve">
+    <value>Nouveau dossier</value>
+  </data>
+  <data name="NewTab" xml:space="preserve">
+    <value>Nouvel onglet</value>
+  </data>
+  <data name="NewWindow" xml:space="preserve">
+    <value>Nouvelle fenêtre</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Suivant</value>
+  </data>
+  <data name="NoContent" xml:space="preserve">
+    <value>Aucun contenu à afficher</value>
+  </data>
+  <data name="NoFavorite.Text" xml:space="preserve">
+    <value>Vos favoris apparaîtront ici</value>
+  </data>
+  <data name="NoHistory.Text" xml:space="preserve">
+    <value>Votre historique de navigation sera affiché ici</value>
+  </data>
+  <data name="NoKeyboardShortcuts" xml:space="preserve">
+    <value>Aucun raccourci clavier</value>
+  </data>
+  <data name="NoMediaHint" xml:space="preserve">
+    <value>Vos médias apparaîtront ici</value>
+  </data>
+  <data name="NoPluginsInstalled" xml:space="preserve">
+    <value>Aucun plugin installé</value>
+  </data>
+  <data name="NoRating" xml:space="preserve">
+    <value>Aucune note</value>
+  </data>
+  <data name="NoResults" xml:space="preserve">
+    <value>Aucun résultat pour « $keyword »</value>
+  </data>
+  <data name="NoResultsDetail.Text" xml:space="preserve">
+    <value>Essayez de rechercher avec différents mots-clés</value>
+  </data>
+  <data name="NoTagsHint" xml:space="preserve">
+    <value>Vos tags apparaîtront ici</value>
+  </data>
+  <data name="None" xml:space="preserve">
+    <value>Aucun</value>
+  </data>
+  <data name="OK" xml:space="preserve">
+    <value>D'ACCORD</value>
+  </data>
+  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
+    <value>S’applique uniquement aux bandes dessinées avec le statut « En lecture »</value>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>Ouvrir</value>
+  </data>
+  <data name="OpenHomePage" xml:space="preserve">
+    <value>Ouvrir la page d’accueil</value>
+  </data>
+  <data name="OpenInCurrentTab" xml:space="preserve">
+    <value>Ouvrir dans l’onglet actuel</value>
+  </data>
+  <data name="OpenInLastActiveReaderTab" xml:space="preserve">
+    <value>Ouvrir dans le dernier onglet de lecture actif</value>
+  </data>
+  <data name="OpenInNewTab" xml:space="preserve">
+    <value>Ouvrir dans un nouvel onglet</value>
+  </data>
+  <data name="OpenItemDefaultBehavior" xml:space="preserve">
+    <value>Comportement par défaut à l’ouverture d’un élément</value>
+  </data>
+  <data name="OpenMetadataFolder" xml:space="preserve">
+    <value>Ouvrir le dossier des métadonnées</value>
+  </data>
+  <data name="OpenNextItem" xml:space="preserve">
+    <value>Ouvrir l’élément suivant</value>
+  </data>
+  <data name="OpenPluginsFolder" xml:space="preserve">
+    <value>Ouvrir le dossier des plugins</value>
+  </data>
+  <data name="OpenPreviousItem" xml:space="preserve">
+    <value>Ouvrir l’élément précédent</value>
+  </data>
+  <data name="OpenSidebar" xml:space="preserve">
+    <value>Ouvrir la barre latérale</value>
+  </data>
+  <data name="OpenUserDataFolder" xml:space="preserve">
+    <value>Ouvrir le dossier de données utilisateur</value>
+  </data>
+  <data name="OverwriteExistingEntries" xml:space="preserve">
+    <value>Cette opération écrasera les entrées existantes.</value>
+  </data>
+  <data name="Pause" xml:space="preserve">
+    <value>Pause</value>
+  </data>
+  <data name="Pin" xml:space="preserve">
+    <value>Épingler</value>
+  </data>
+  <data name="Play" xml:space="preserve">
+    <value>Lire</value>
+  </data>
+  <data name="PlayPause" xml:space="preserve">
+    <value>Lecture / Pause</value>
+  </data>
+  <data name="PlayerExpander.Detail" xml:space="preserve">
+    <value>Paramètres généraux du lecteur</value>
+  </data>
+  <data name="PlayerExpander.Header" xml:space="preserve">
+    <value>Lecteur</value>
+  </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>Paramètres du lecteur</value>
+  </data>
+  <data name="PlayerStatusError" xml:space="preserve">
+    <value>Une erreur s'est produite lors du chargement</value>
+  </data>
+  <data name="PlayerStatusLoading" xml:space="preserve">
+    <value>Chargement du lecteur</value>
+  </data>
+  <data name="Playlist" xml:space="preserve">
+    <value>Liste de lecture</value>
+  </data>
+  <data name="PlaylistEmpty" xml:space="preserve">
+    <value>Votre liste de lecture apparaîtra ici</value>
+  </data>
+  <data name="PluginSettingsDescription" xml:space="preserve">
+    <value>Gérer et configurer les extensions</value>
+  </data>
+  <data name="Plugins" xml:space="preserve">
+    <value>Extensions</value>
+  </data>
+  <data name="PressKeyCombination" xml:space="preserve">
+    <value>Appuyez sur une combinaison de touches</value>
+  </data>
+  <data name="Previous" xml:space="preserve">
+    <value>Précédent</value>
+  </data>
+  <data name="PrivacyPolicy" xml:space="preserve">
+    <value>politique de confidentialité</value>
+  </data>
+  <data name="Proceed" xml:space="preserve">
+    <value>Procéder</value>
+  </data>
+  <data name="Progress" xml:space="preserve">
+    <value>Progrès</value>
+  </data>
+  <data name="PromptBeforeRemovingItems" xml:space="preserve">
+    <value>Demander confirmation avant de supprimer des éléments</value>
+  </data>
+  <data name="Random" xml:space="preserve">
+    <value>Aléatoire</value>
+  </data>
+  <data name="Rating" xml:space="preserve">
+    <value>score</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>Rafraîchir</value>
+  </data>
+  <data name="RefreshRandomSeed" xml:space="preserve">
+    <value>Actualiser la graine aléatoire</value>
+  </data>
+  <data name="Remove" xml:space="preserve">
+    <value>Retirer</value>
+  </data>
+  <data name="RemoveAndExclude" xml:space="preserve">
+    <value>Retirer (ajouter à la liste d’exclusion)</value>
+  </data>
+  <data name="RemoveFromFavorites" xml:space="preserve">
+    <value>Supprimer des favoris</value>
+  </data>
+  <data name="RemoveItemsConfirmation" xml:space="preserve">
+    <value>Le(s) $count élément(s) suivant(s) seront définitivement supprimé(s) de votre bibliothèque :
+
+$items</value>
+  </data>
+  <data name="RemoveLocationButton.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Supprimer ce dossier de la liste</value>
+  </data>
+  <data name="RemovePluginsConfirmation" xml:space="preserve">
+    <value>Les extensions suivantes seront supprimées :
+$plugins</value>
+  </data>
+  <data name="RemoveUnreachableCheckBox.Content" xml:space="preserve">
+    <value>Supprimer automatiquement les bandes dessinées inaccessibles</value>
+  </data>
+  <data name="Repeat" xml:space="preserve">
+    <value>Répéter</value>
+  </data>
+  <data name="RescanFilesButton.Content" xml:space="preserve">
+    <value>Réanalyser les fichiers</value>
+  </data>
+  <data name="Reset" xml:space="preserve">
+    <value>Réinitialiser</value>
+  </data>
+  <data name="ResetAllSettings" xml:space="preserve">
+    <value>Réinitialiser tous les réglages</value>
+  </data>
+  <data name="ResetAllSettingsMessage" xml:space="preserve">
+    <value>Tous les réglages seront restaurés à leur état par défaut. Vos données utilisateur seront conservées.</value>
+  </data>
+  <data name="ResetPlayerSettings" xml:space="preserve">
+    <value>Réinitialiser les paramètres du lecteur</value>
+  </data>
+  <data name="Restore" xml:space="preserve">
+    <value>Restaurer</value>
+  </data>
+  <data name="RestoreLastReadingPosition" xml:space="preserve">
+    <value>Restaurer la dernière position de lecture</value>
+  </data>
+  <data name="RightToLeft" xml:space="preserve">
+    <value>De droite à gauche</value>
+  </data>
+  <data name="Rotation" xml:space="preserve">
+    <value>Rotation</value>
+  </data>
+  <data name="SafeModeMessage" xml:space="preserve">
+    <value>L’application ne s’est pas fermée correctement la dernière fois.
+Démarrer en mode sans échec ?</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Sauvegarder</value>
+  </data>
+  <data name="SaveAsDefaultConfig" xml:space="preserve">
+    <value>Enregistrer comme configuration par défaut</value>
+  </data>
+  <data name="SaveBrowsingHistory" xml:space="preserve">
+    <value>Enregistrer l'historique de navigation</value>
+  </data>
+  <data name="SaveSortingAndGroupingSettings" xml:space="preserve">
+    <value>Enregistrer les paramètres de tri et de regroupement</value>
+  </data>
+  <data name="SaveViewSettings" xml:space="preserve">
+    <value>Enregistrer les paramètres d’affichage</value>
+  </data>
+  <data name="ScanOnLaunch" xml:space="preserve">
+    <value>Analyser au démarrage</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Rechercher</value>
+  </data>
+  <data name="SearchResults" xml:space="preserve">
+    <value>Résultats de la recherche</value>
+  </data>
+  <data name="SearchResultsOf" xml:space="preserve">
+    <value>Résultats de « $keyword »</value>
+  </data>
+  <data name="SeekBackward" xml:space="preserve">
+    <value>Reculer</value>
+  </data>
+  <data name="SeekForward" xml:space="preserve">
+    <value>Avancer</value>
+  </data>
+  <data name="Select" xml:space="preserve">
+    <value>Sélectionner</value>
+  </data>
+  <data name="SelectAllAppBarButton.Label" xml:space="preserve">
+    <value>Tout sélectionner</value>
+  </data>
+  <data name="SendFeedback" xml:space="preserve">
+    <value>Envoyer des commentaires</value>
+  </data>
+  <data name="SendToWindow" xml:space="preserve">
+    <value>Envoyer vers la fenêtre</value>
+  </data>
+  <data name="SendUsageData" xml:space="preserve">
+    <value>Envoyer les données d’utilisation</value>
+  </data>
+  <data name="Separate" xml:space="preserve">
+    <value>Séparé</value>
+  </data>
+  <data name="SetAsCover" xml:space="preserve">
+    <value>Définir comme couverture</value>
+  </data>
+  <data name="SetAsDefault" xml:space="preserve">
+    <value>Définir par défaut</value>
+  </data>
+  <data name="SetCompletionState" xml:space="preserve">
+    <value>Définir l'état d'achèvement</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>Paramètres</value>
+  </data>
+  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
+    <value>Afficher les bandes dessinées cachées</value>
+  </data>
+  <data name="ShowInFileExplorer" xml:space="preserve">
+    <value>Afficher dans l’Explorateur de fichiers</value>
+  </data>
+  <data name="ShowTagId" xml:space="preserve">
+    <value>Afficher l'ID de la balise</value>
+  </data>
+  <data name="Shuffle" xml:space="preserve">
+    <value>Aléatoire</value>
+  </data>
+  <data name="ShuffleStable" xml:space="preserve">
+    <value>Aléatoire (stable)</value>
+  </data>
+  <data name="Sort" xml:space="preserve">
+    <value>Tri</value>
+  </data>
+  <data name="SortingFunction" xml:space="preserve">
+    <value>Fonction de tri</value>
+  </data>
+  <data name="Statistics" xml:space="preserve">
+    <value>Statistiques</value>
+  </data>
+  <data name="Tag" xml:space="preserve">
+    <value>Étiquette</value>
+  </data>
+  <data name="TagIntroduction.Message" xml:space="preserve">
+    <value>Utiliser correctement les étiquettes peut faciliter l'organisation de votre bibliothèque. Par exemple :
+Catégorie 1 : Étiquette 1, Étiquette 2, Étiquette 3
+Catégorie 2 : Étiquette 4, Étiquette 5</value>
+  </data>
+  <data name="TagLinkTip" xml:space="preserve">
+    <value>Variables spéciales :
+
+{%tag}          - Remplacé par le nom de la balise échappée
+{%tag_category} - Remplacé par la catégorie de la balise échappée</value>
+  </data>
+  <data name="Tags" xml:space="preserve">
+    <value>Étiquette</value>
+  </data>
+  <data name="TextWithColon" xml:space="preserve">
+    <value>$text : </value>
+  </data>
+  <data name="ThemeDark.Content" xml:space="preserve">
+    <value>Sombre</value>
+  </data>
+  <data name="ThemeLight.Content" xml:space="preserve">
+    <value>Couleur de la lumière</value>
+  </data>
+  <data name="ThemeUseSystemSetting.Content" xml:space="preserve">
+    <value>Suivre les paramètres du système</value>
+  </data>
+  <data name="Tip" xml:space="preserve">
+    <value>Conseil</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Titre</value>
+  </data>
+  <data name="Title1" xml:space="preserve">
+    <value>Titre 1</value>
+  </data>
+  <data name="Title2" xml:space="preserve">
+    <value>Titre 2</value>
+  </data>
+  <data name="ToggleFullscreen" xml:space="preserve">
+    <value>Activer le plein écran</value>
+  </data>
+  <data name="TotalMedia" xml:space="preserve">
+    <value>Nombre total de médias</value>
+  </data>
+  <data name="TwoPageMode" xml:space="preserve">
+    <value>Mode double page</value>
+  </data>
+  <data name="Unfavorite" xml:space="preserve">
+    <value>Défavori</value>
+  </data>
+  <data name="Ungrouped" xml:space="preserve">
+    <value>Pas de regroupement</value>
+  </data>
+  <data name="UnhandledExceptionContent" xml:space="preserve">
+    <value>Pour aider nos développeurs à analyser le problème, veuillez également fournir les informations suivantes :
+
+$info</value>
+  </data>
+  <data name="UnhandledExceptionTitle" xml:space="preserve">
+    <value>Cette application a peut-être planté</value>
+  </data>
+  <data name="Unhide" xml:space="preserve">
+    <value>Afficher</value>
+  </data>
+  <data name="Unpin" xml:space="preserve">
+    <value>Détacher</value>
+  </data>
+  <data name="Untitled" xml:space="preserve">
+    <value>Anonyme</value>
+  </data>
+  <data name="UseSystemLanguage" xml:space="preserve">
+    <value>Utiliser la langue du système</value>
+  </data>
+  <data name="Vertical" xml:space="preserve">
+    <value>Verticale</value>
+  </data>
+  <data name="ViewType" xml:space="preserve">
+    <value>Voir</value>
+  </data>
+  <data name="ViewTypeLarge" xml:space="preserve">
+    <value>Grand</value>
+  </data>
+  <data name="ViewTypeMedium" xml:space="preserve">
+    <value>Moyen</value>
+  </data>
+  <data name="VolumeDown" xml:space="preserve">
+    <value>Baisser le volume</value>
+  </data>
+  <data name="VolumeUp" xml:space="preserve">
+    <value>Augmenter le volume</value>
+  </data>
+  <data name="Warning" xml:space="preserve">
+    <value>Avertissement</value>
+  </data>
+  <data name="WatchingFolders.Text" xml:space="preserve">
+    <value>En ce moment, nous surveillons ces dossiers :</value>
+  </data>
+  <data name="WhilePlayingVideos" xml:space="preserve">
+    <value>Pendant la lecture de vidéos</value>
+  </data>
+  <data name="WindowN" xml:space="preserve">
+    <value>Fenêtre $n</value>
+  </data>
+</root>

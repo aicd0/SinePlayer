@@ -1,9 +1,9 @@
-# <img src="docs/Images/AppLogo.png" width="32"> Sine Player UWP
-The Sine Player UWP is a modern Windows app written in C#. The app provided basic functionality for comic reading, along with some common utilities such as file management, searching, tagging, rating, etc.
+# <img src="docs/Images/AppLogo.png" width="32"> Sine Player
+The Sine Player is a modern Windows app written in C#. The app provided basic functionality for comic reading, along with some common utilities such as file management, searching, tagging, rating, etc.
 
-Sine Player UWP irregularly ships with new features and bug fixes. You can get the latest version of Sine Player UWP in the [Microsoft Store](https://www.microsoft.com/store/apps/9NS9FG32DCP5).
+Sine Player irregularly ships with new features and bug fixes. You can get the latest version of Sine Player in the [Microsoft Store](https://www.microsoft.com/store/apps/9NS9FG32DCP5).
 
-![Sine Player UWP Screenshot](docs/Images/SinePlayerUWPScreenshot.png)
+![Sine Player Screenshot](docs/Images/SinePlayerScreenshot.png)
 
 ## Development
 Prerequisites:
@@ -14,15 +14,15 @@ Prerequisites:
 - Install the [XAML Styler](https://marketplace.visualstudio.com/items?itemName=TeamXavalon.XAMLStyler2022) Visual Studio extension.
 - Get the code:
     ```
-    git clone git@github.com:aicd0/SinePlayerUWP.git
+    git clone git@github.com:aicd0/SinePlayer.git
     ```
-- Open [SinePlayerUWP.sln](src/SinePlayerUWP.sln) in Visual Studio to build and run the Sine Player UWP app.
+- Open [SinePlayer.sln](src/SinePlayer.sln) in Visual Studio to build and run the Sine Player app.
 
 ## Plugins
-Sine Player UWP can be extended with plugins (written in C#). See [Sine Player UWP Plugins](https://github.com/aicd0/SinePlayerUWPPlugins) for more information.
+Sine Player can be extended with plugins (written in C#). See [Sine Player Plugins](https://github.com/aicd0/SinePlayerPlugins) for more information.
 
 ## Contributing
-If Sine Player UWP is not working properly, you can [submit an issue on GitHub](https://github.com/aicd0/SinePlayerUWP/issues/new/choose). If you know how to fix an issue, it is also encouraged to create a [pull request](https://github.com/aicd0/SinePlayerUWP/pulls) for it.
+If Sine Player is not working properly, you can [submit an issue on GitHub](https://github.com/aicd0/SinePlayer/issues/new/choose). If you know how to fix an issue, it is also encouraged to create a [pull request](https://github.com/aicd0/SinePlayer/pulls) for it.
 
 ## License
 Licensed under the [MIT License](LICENSE.md).
