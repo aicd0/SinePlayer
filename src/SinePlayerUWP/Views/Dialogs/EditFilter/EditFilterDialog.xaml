@@ -94,9 +94,9 @@
         </Grid>
         <CheckBox
             Margin="0,16,0,0"
-            Click="IncludeHiddenMediaCheckBox_Click"
-            Content="{x:Bind StringResource.IncludeHiddenMedia}"
-            IsChecked="{x:Bind ViewModel.IncludeHiddenMedia, Mode=TwoWay}" />
+            Click="IncludeHiddenItemsCheckBox_Click"
+            Content="{x:Bind StringResource.IncludeHiddenItems}"
+            IsChecked="{x:Bind ViewModel.IncludeHiddenItems, Mode=TwoWay}" />
         <CheckBox
             Click="SaveViewSettingsCheckBox_Click"
             Content="{x:Bind StringResource.SaveViewSettings}"

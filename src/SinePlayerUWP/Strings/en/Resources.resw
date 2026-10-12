@@ -270,17 +270,17 @@
   <data name="CompletionStatusCompleted" xml:space="preserve">
     <value>Completed</value>
   </data>
+  <data name="CompletionStatusNotStarted" xml:space="preserve">
+    <value>Not Started</value>
+  </data>
   <data name="CompletionStatusOnHold" xml:space="preserve">
-    <value>On hold</value>
+    <value>On Hold</value>
   </data>
-  <data name="CompletionStatusPlanToRead" xml:space="preserve">
-    <value>Plan to read</value>
+  <data name="CompletionStatusOngoing" xml:space="preserve">
+    <value>Ongoing</value>
   </data>
-  <data name="CompletionStatusReading" xml:space="preserve">
-    <value>Reading</value>
-  </data>
-  <data name="CompletionStatusUnread" xml:space="preserve">
-    <value>Unread</value>
+  <data name="CompletionStatusPlanned" xml:space="preserve">
+    <value>Planned</value>
   </data>
   <data name="Continuous" xml:space="preserve">
     <value>Continuous</value>
@@ -536,27 +536,6 @@ The evaluation will be performed in the following order:
   <data name="GoForward" xml:space="preserve">
     <value>Go forward</value>
   </data>
-  <data name="GoToFirstPage" xml:space="preserve">
-    <value>Go to first page</value>
-  </data>
-  <data name="GoToLastPage" xml:space="preserve">
-    <value>Go to last page</value>
-  </data>
-  <data name="GoToLeftPage" xml:space="preserve">
-    <value>Go to left page</value>
-  </data>
-  <data name="GoToNextPage" xml:space="preserve">
-    <value>Go to next page</value>
-  </data>
-  <data name="GoToPreviousPage" xml:space="preserve">
-    <value>Go to previous page</value>
-  </data>
-  <data name="GoToRandomPage" xml:space="preserve">
-    <value>Go to a random page</value>
-  </data>
-  <data name="GoToRightPage" xml:space="preserve">
-    <value>Go to right page</value>
-  </data>
   <data name="Group" xml:space="preserve">
     <value>Group</value>
   </data>
@@ -602,8 +581,8 @@ The evaluation will be performed in the following order:
   <data name="Images" xml:space="preserve">
     <value>Images</value>
   </data>
-  <data name="IncludeHiddenMedia" xml:space="preserve">
-    <value>Include hidden comics</value>
+  <data name="IncludeHiddenItems" xml:space="preserve">
+    <value>Include hidden items</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>Install plugin</value>
@@ -671,9 +650,6 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="Links" xml:space="preserve">
     <value>Links</value>
-  </data>
-  <data name="MaintainRelativeSize" xml:space="preserve">
-    <value>Maintain relative size</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Selecting "add to exclusion list" will prevent the comic from being imported again the next time the library is updated.</value>

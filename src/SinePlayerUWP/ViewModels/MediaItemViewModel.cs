@@ -242,7 +242,7 @@ internal partial class MediaItemViewModel : INotifyPropertyChanged
     {
         switch (Media.CompletionStatus)
         {
-            case CompletionStatusEnum.Reading:
+            case CompletionStatusEnum.Ongoing:
                 if (compat)
                 {
                     Progress = Math.Clamp(Media.Progress, 0, 100).ToString() + "%";

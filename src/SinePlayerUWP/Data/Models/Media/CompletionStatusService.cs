@@ -13,9 +13,9 @@ internal static class CompletionStatusService
     public static readonly IReadOnlyList<CompletionStatusEnum> AllStatus = [
         CompletionStatusEnum.Abandoned,
         CompletionStatusEnum.OnHold,
-        CompletionStatusEnum.Unread,
-        CompletionStatusEnum.PlanToRead,
-        CompletionStatusEnum.Reading,
+        CompletionStatusEnum.NotStarted,
+        CompletionStatusEnum.Planned,
+        CompletionStatusEnum.Ongoing,
         CompletionStatusEnum.Completed,
     ];
 
@@ -25,9 +25,9 @@ internal static class CompletionStatusService
         {
             CompletionStatusEnum.Abandoned => 1,
             CompletionStatusEnum.OnHold => 2,
-            CompletionStatusEnum.Unread => 3,
-            CompletionStatusEnum.PlanToRead => 4,
-            CompletionStatusEnum.Reading => 5,
+            CompletionStatusEnum.NotStarted => 3,
+            CompletionStatusEnum.Planned => 4,
+            CompletionStatusEnum.Ongoing => 5,
             CompletionStatusEnum.Completed => 6,
             _ => 0,
         };
@@ -37,11 +37,11 @@ internal static class CompletionStatusService
     {
         return status switch
         {
-            CompletionStatusEnum.Unread => StringResourceProvider.Instance.CompletionStatusUnread,
-            CompletionStatusEnum.Reading => StringResourceProvider.Instance.CompletionStatusReading,
+            CompletionStatusEnum.NotStarted => StringResourceProvider.Instance.CompletionStatusNotStarted,
+            CompletionStatusEnum.Ongoing => StringResourceProvider.Instance.CompletionStatusOngoing,
             CompletionStatusEnum.Completed => StringResourceProvider.Instance.CompletionStatusCompleted,
             CompletionStatusEnum.Abandoned => StringResourceProvider.Instance.CompletionStatusAbandoned,
-            CompletionStatusEnum.PlanToRead => StringResourceProvider.Instance.CompletionStatusPlanToRead,
+            CompletionStatusEnum.Planned => StringResourceProvider.Instance.CompletionStatusPlanned,
             CompletionStatusEnum.OnHold => StringResourceProvider.Instance.CompletionStatusOnHold,
             _ => fallback is null ? throw new ArgumentException($"Unknwon completion status '{status}'.") : fallback,
         };
@@ -51,11 +51,11 @@ internal static class CompletionStatusService
     {
         return status switch
         {
-            CompletionStatusEnum.Unread => SDK.Plugins.Media.CompletionStatusEnum.Unread,
-            CompletionStatusEnum.Reading => SDK.Plugins.Media.CompletionStatusEnum.Reading,
+            CompletionStatusEnum.NotStarted => SDK.Plugins.Media.CompletionStatusEnum.NotStarted,
+            CompletionStatusEnum.Ongoing => SDK.Plugins.Media.CompletionStatusEnum.Ongoing,
             CompletionStatusEnum.Completed => SDK.Plugins.Media.CompletionStatusEnum.Completed,
             CompletionStatusEnum.Abandoned => SDK.Plugins.Media.CompletionStatusEnum.Abandoned,
-            CompletionStatusEnum.PlanToRead => SDK.Plugins.Media.CompletionStatusEnum.PlanToRead,
+            CompletionStatusEnum.Planned => SDK.Plugins.Media.CompletionStatusEnum.Planned,
             CompletionStatusEnum.OnHold => SDK.Plugins.Media.CompletionStatusEnum.OnHold,
             _ => throw new ArgumentException($"Unknwon completion status '{status}'."),
         };
@@ -65,25 +65,25 @@ internal static class CompletionStatusService
     {
         return status switch
         {
-            SDK.Plugins.Media.CompletionStatusEnum.Unread => CompletionStatusEnum.Unread,
-            SDK.Plugins.Media.CompletionStatusEnum.Reading => CompletionStatusEnum.Reading,
+            SDK.Plugins.Media.CompletionStatusEnum.NotStarted => CompletionStatusEnum.NotStarted,
+            SDK.Plugins.Media.CompletionStatusEnum.Ongoing => CompletionStatusEnum.Ongoing,
             SDK.Plugins.Media.CompletionStatusEnum.Completed => CompletionStatusEnum.Completed,
             SDK.Plugins.Media.CompletionStatusEnum.Abandoned => CompletionStatusEnum.Abandoned,
-            SDK.Plugins.Media.CompletionStatusEnum.PlanToRead => CompletionStatusEnum.PlanToRead,
+            SDK.Plugins.Media.CompletionStatusEnum.Planned => CompletionStatusEnum.Planned,
             SDK.Plugins.Media.CompletionStatusEnum.OnHold => CompletionStatusEnum.OnHold,
             _ => throw new ArgumentException($"Unknwon completion status '{status}'."),
         };
     }
 
-    public static bool CanTransitToReadingAutomatically(CompletionStatusEnum status)
+    public static bool CanTransitToOngoingAutomatically(CompletionStatusEnum status)
     {
         return status switch
         {
-            CompletionStatusEnum.Unread => true,
-            CompletionStatusEnum.Reading => false,
+            CompletionStatusEnum.NotStarted => true,
+            CompletionStatusEnum.Ongoing => false,
             CompletionStatusEnum.Completed => false,
             CompletionStatusEnum.Abandoned => false,
-            CompletionStatusEnum.PlanToRead => true,
+            CompletionStatusEnum.Planned => true,
             CompletionStatusEnum.OnHold => false,
             _ => false,
         };

@@ -270,17 +270,17 @@
   <data name="CompletionStatusCompleted" xml:space="preserve">
     <value>完了</value>
   </data>
+  <data name="CompletionStatusNotStarted" xml:space="preserve">
+    <value>未開始</value>
+  </data>
   <data name="CompletionStatusOnHold" xml:space="preserve">
     <value>保留中</value>
   </data>
-  <data name="CompletionStatusPlanToRead" xml:space="preserve">
-    <value>読む予定</value>
+  <data name="CompletionStatusOngoing" xml:space="preserve">
+    <value>進行中</value>
   </data>
-  <data name="CompletionStatusReading" xml:space="preserve">
-    <value>読書中</value>
-  </data>
-  <data name="CompletionStatusUnread" xml:space="preserve">
-    <value>未読</value>
+  <data name="CompletionStatusPlanned" xml:space="preserve">
+    <value>予定</value>
   </data>
   <data name="Continuous" xml:space="preserve">
     <value>連続</value>
@@ -534,27 +534,6 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="GoForward" xml:space="preserve">
     <value>前進する</value>
   </data>
-  <data name="GoToFirstPage" xml:space="preserve">
-    <value>最初のページへジャンプ</value>
-  </data>
-  <data name="GoToLastPage" xml:space="preserve">
-    <value>最後のページへジャンプ</value>
-  </data>
-  <data name="GoToLeftPage" xml:space="preserve">
-    <value>左のページに移動</value>
-  </data>
-  <data name="GoToNextPage" xml:space="preserve">
-    <value>次のページへ進む</value>
-  </data>
-  <data name="GoToPreviousPage" xml:space="preserve">
-    <value>前のページへジャンプ</value>
-  </data>
-  <data name="GoToRandomPage" xml:space="preserve">
-    <value>ランダムなページにジャンプ</value>
-  </data>
-  <data name="GoToRightPage" xml:space="preserve">
-    <value>右のページに移動</value>
-  </data>
   <data name="Group" xml:space="preserve">
     <value>グループ化</value>
   </data>
@@ -600,8 +579,8 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   <data name="Images" xml:space="preserve">
     <value>画像</value>
   </data>
-  <data name="IncludeHiddenMedia" xml:space="preserve">
-    <value>非表示の漫画を含める</value>
+  <data name="IncludeHiddenItems" xml:space="preserve">
+    <value>非表示の項目を含める</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>プラグインをインストール</value>
@@ -669,9 +648,6 @@ NOT               - 論理否定。例: NOT %tag = "hide this"
   </data>
   <data name="Links" xml:space="preserve">
     <value>リンク</value>
-  </data>
-  <data name="MaintainRelativeSize" xml:space="preserve">
-    <value>相対的なサイズを維持する</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>「除外リストに追加」を選択すると、次回ライブラリを更新したときにこのコミックが再度インポートされなくなります。</value>

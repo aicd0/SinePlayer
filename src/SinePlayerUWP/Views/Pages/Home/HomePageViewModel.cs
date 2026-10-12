@@ -511,14 +511,14 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
         }
 
         // Update mediaItems
-        if (_searchEngine.Expression == filter.Expression && _searchEngine.IncludeHidden == filter.IncludeHiddenMedia)
+        if (_searchEngine.Expression == filter.Expression && _searchEngine.IncludeHidden == filter.IncludeHiddenItems)
         {
             ScheduleDisplayMedia();
         }
         else
         {
             _searchEngine.Expression = filter.Expression;
-            _searchEngine.IncludeHidden = filter.IncludeHiddenMedia;
+            _searchEngine.IncludeHidden = filter.IncludeHiddenItems;
             ScheduleUpdateMedia();
         }
     }

@@ -56,10 +56,10 @@ public class StringResourceProvider
     public string CompletionStatus => GetResourceString("CompletionStatus");
     public string CompletionStatusAbandoned => GetResourceString("CompletionStatusAbandoned");
     public string CompletionStatusCompleted => GetResourceString("CompletionStatusCompleted");
+    public string CompletionStatusNotStarted => GetResourceString("CompletionStatusNotStarted");
     public string CompletionStatusOnHold => GetResourceString("CompletionStatusOnHold");
-    public string CompletionStatusPlanToRead => GetResourceString("CompletionStatusPlanToRead");
-    public string CompletionStatusReading => GetResourceString("CompletionStatusReading");
-    public string CompletionStatusUnread => GetResourceString("CompletionStatusUnread");
+    public string CompletionStatusOngoing => GetResourceString("CompletionStatusOngoing");
+    public string CompletionStatusPlanned => GetResourceString("CompletionStatusPlanned");
     public string Continuous => GetResourceString("Continuous");
     public string ContributionRunAfterLink => GetResourceString("ContributionRunAfterLink");
     public string ContributionRunBeforeLink => GetResourceString("ContributionRunBeforeLink");
@@ -125,13 +125,6 @@ public class StringResourceProvider
     public string GeneralSettingsDescription => GetResourceString("GeneralSettingsDescription");
     public string GoBack => GetResourceString("GoBack");
     public string GoForward => GetResourceString("GoForward");
-    public string GoToFirstPage => GetResourceString("GoToFirstPage");
-    public string GoToLastPage => GetResourceString("GoToLastPage");
-    public string GoToLeftPage => GetResourceString("GoToLeftPage");
-    public string GoToNextPage => GetResourceString("GoToNextPage");
-    public string GoToPreviousPage => GetResourceString("GoToPreviousPage");
-    public string GoToRandomPage => GetResourceString("GoToRandomPage");
-    public string GoToRightPage => GetResourceString("GoToRightPage");
     public string Group => GetResourceString("Group");
     public string Help => GetResourceString("Help");
     public string Hidden => GetResourceString("Hidden");
@@ -144,7 +137,7 @@ public class StringResourceProvider
     public string ImageContrast => GetResourceString("ImageContrast");
     public string ImageSaturation => GetResourceString("ImageSaturation");
     public string Images => GetResourceString("Images");
-    public string IncludeHiddenMedia => GetResourceString("IncludeHiddenMedia");
+    public string IncludeHiddenItems => GetResourceString("IncludeHiddenItems");
     public string InstallPlugin => GetResourceString("InstallPlugin");
     public string InstallPluginWarning => GetResourceString("InstallPluginWarning");
     public string InvertImage => GetResourceString("InvertImage");
@@ -159,7 +152,6 @@ public class StringResourceProvider
     public string LinkErrorContent => GetResourceString("LinkErrorContent");
     public string LinkErrorTitle => GetResourceString("LinkErrorTitle");
     public string Links => GetResourceString("Links");
-    public string MaintainRelativeSize => GetResourceString("MaintainRelativeSize");
     public string MediaExclusionExplaination => GetResourceString("MediaExclusionExplaination");
     public string MediaInfo => GetResourceString("MediaInfo");
     public string MergeSingleItemGroups => GetResourceString("MergeSingleItemGroups");

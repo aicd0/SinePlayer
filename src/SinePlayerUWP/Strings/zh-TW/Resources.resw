@@ -265,22 +265,22 @@
     <value>完成狀態</value>
   </data>
   <data name="CompletionStatusAbandoned" xml:space="preserve">
-    <value>棄讀</value>
+    <value>已棄坑</value>
   </data>
   <data name="CompletionStatusCompleted" xml:space="preserve">
     <value>已完成</value>
   </data>
+  <data name="CompletionStatusNotStarted" xml:space="preserve">
+    <value>未開始</value>
+  </data>
   <data name="CompletionStatusOnHold" xml:space="preserve">
-    <value>擱置</value>
+    <value>擱置中</value>
   </data>
-  <data name="CompletionStatusPlanToRead" xml:space="preserve">
-    <value>計畫閱讀</value>
+  <data name="CompletionStatusOngoing" xml:space="preserve">
+    <value>進行中</value>
   </data>
-  <data name="CompletionStatusReading" xml:space="preserve">
-    <value>閱讀中</value>
-  </data>
-  <data name="CompletionStatusUnread" xml:space="preserve">
-    <value>未讀</value>
+  <data name="CompletionStatusPlanned" xml:space="preserve">
+    <value>計劃中</value>
   </data>
   <data name="Continuous" xml:space="preserve">
     <value>連續</value>
@@ -532,27 +532,6 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="GoForward" xml:space="preserve">
     <value>前進</value>
   </data>
-  <data name="GoToFirstPage" xml:space="preserve">
-    <value>跳到第一頁</value>
-  </data>
-  <data name="GoToLastPage" xml:space="preserve">
-    <value>跳到最後一頁</value>
-  </data>
-  <data name="GoToLeftPage" xml:space="preserve">
-    <value>跳到左侧页面</value>
-  </data>
-  <data name="GoToNextPage" xml:space="preserve">
-    <value>跳到下一頁</value>
-  </data>
-  <data name="GoToPreviousPage" xml:space="preserve">
-    <value>跳到上一頁</value>
-  </data>
-  <data name="GoToRandomPage" xml:space="preserve">
-    <value>跳到隨機頁面</value>
-  </data>
-  <data name="GoToRightPage" xml:space="preserve">
-    <value>跳到右侧页面</value>
-  </data>
   <data name="Group" xml:space="preserve">
     <value>分組</value>
   </data>
@@ -598,8 +577,8 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="Images" xml:space="preserve">
     <value>圖片</value>
   </data>
-  <data name="IncludeHiddenMedia" xml:space="preserve">
-    <value>包含隱藏漫畫</value>
+  <data name="IncludeHiddenItems" xml:space="preserve">
+    <value>包含隱藏項目</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>安裝外掛程式</value>
@@ -667,9 +646,6 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   </data>
   <data name="Links" xml:space="preserve">
     <value>連結</value>
-  </data>
-  <data name="MaintainRelativeSize" xml:space="preserve">
-    <value>保持相對大小</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>選擇「加入排除清單」後，下次更新媒體庫時將不會再次匯入此漫畫。</value>

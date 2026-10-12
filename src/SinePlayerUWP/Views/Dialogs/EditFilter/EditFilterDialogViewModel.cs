@@ -51,14 +51,14 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _includeHiddenMedia = false;
-    public bool IncludeHiddenMedia
+    private bool _includeHiddenItems = false;
+    public bool IncludeHiddenItems
     {
-        get => _includeHiddenMedia;
+        get => _includeHiddenItems;
         set
         {
-            _includeHiddenMedia = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IncludeHiddenMedia)));
+            _includeHiddenItems = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IncludeHiddenItems)));
         }
     }
 
@@ -122,7 +122,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         UpdateSQLQuery();
     }
 
-    public void SetIncludeHiddenMedia(bool includeHiddenMedia)
+    public void SetIncludeHiddenItems(bool includeHiddenItems)
     {
         MediaFilterModel.ExternalFilterModel? filter = _filter;
         if (filter is null)
@@ -130,7 +130,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
             return;
         }
 
-        filter.IncludeHiddenMedia = includeHiddenMedia;
+        filter.IncludeHiddenItems = includeHiddenItems;
     }
 
     public void SetSaveViewSettings(bool save)
@@ -286,7 +286,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
             NameLiveData.Emit(filter.Name);
             UpdateExpression(filter.Expression);
             ExpressionLiveData.Emit(filter.Expression);
-            IncludeHiddenMedia = filter.IncludeHiddenMedia;
+            IncludeHiddenItems = filter.IncludeHiddenItems;
             SaveViewSettings = filter.SaveViewSettings;
             SaveSortingAndGroupingSettings = filter.SaveSortingAndGroupingSettings;
         }

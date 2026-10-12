@@ -5,10 +5,10 @@ namespace SinePlayerUWP.SDK.Plugins.Media;
 
 public enum CompletionStatusEnum
 {
-    Unread = 0,
-    Reading = 1,
+    NotStarted = 0,
+    Ongoing = 1,
     Completed = 2,
     Abandoned = 3,
-    PlanToRead = 4,
+    Planned = 4,
     OnHold = 5,
 }

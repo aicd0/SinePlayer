@@ -322,7 +322,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
         foreach (MediaModel media in mediaItems)
         {
-            if (media.CompletionStatus == CompletionStatusEnum.Reading)
+            if (media.CompletionStatus == CompletionStatusEnum.Ongoing)
             {
                 hasReadingMedia = true;
             }
@@ -345,9 +345,9 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         int progress = mediaCount > 0 ? totalProgress / mediaCount : 100;
         await collection.SetProgress(progress, 0);
 
-        if (hasReadingMedia && CompletionStatusService.CanTransitToReadingAutomatically(collection.CompletionStatus))
+        if (hasReadingMedia && CompletionStatusService.CanTransitToOngoingAutomatically(collection.CompletionStatus))
         {
-            await collection.SetCompletionStatus(CompletionStatusEnum.Reading);
+            await collection.SetCompletionStatus(CompletionStatusEnum.Ongoing);
         }
     }
 
@@ -1002,11 +1002,11 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
         switch (status)
         {
-            case CompletionStatusEnum.Unread:
+            case CompletionStatusEnum.NotStarted:
                 updated = true;
                 await _internalModel.SetProgress(-1, 0);
                 break;
-            case CompletionStatusEnum.Reading:
+            case CompletionStatusEnum.Ongoing:
                 updated = true;
                 _internalModel.SetAsVisited();
                 break;
@@ -1030,9 +1030,9 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     {
         _internalModel.SetAsVisited();
 
-        if (CompletionStatusService.CanTransitToReadingAutomatically(CompletionStatus))
+        if (CompletionStatusService.CanTransitToOngoingAutomatically(CompletionStatus))
         {
-            await _internalModel.SaveCompletionStatus(CompletionStatusEnum.Reading);
+            await _internalModel.SaveCompletionStatus(CompletionStatusEnum.Ongoing);
         }
 
         DispatchUpdateEvent([Id]);

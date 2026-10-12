@@ -205,7 +205,7 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
         FilterPresetDropDownLiveData.Emit(filterPresetDropdown);
 
         _searchEngine.Expression = selectedFilter.Expression;
-        _searchEngine.IncludeHidden = selectedFilter.IncludeHiddenMedia;
+        _searchEngine.IncludeHidden = selectedFilter.IncludeHiddenItems;
         _searchEngine.Update();
     }
 

@@ -312,7 +312,7 @@ internal abstract partial class MediaHandle(MediaType type)
             return (CompletionStatusEnum)value;
         }
 
-        return CompletionStatusEnum.Unread;
+        return CompletionStatusEnum.NotStarted;
     }
 
     //

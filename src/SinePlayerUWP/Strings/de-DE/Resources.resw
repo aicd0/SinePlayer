@@ -270,17 +270,17 @@
   <data name="CompletionStatusCompleted" xml:space="preserve">
     <value>Abgeschlossen</value>
   </data>
+  <data name="CompletionStatusNotStarted" xml:space="preserve">
+    <value>Nicht begonnen</value>
+  </data>
   <data name="CompletionStatusOnHold" xml:space="preserve">
     <value>Pausiert</value>
   </data>
-  <data name="CompletionStatusPlanToRead" xml:space="preserve">
-    <value>Lesen geplant</value>
+  <data name="CompletionStatusOngoing" xml:space="preserve">
+    <value>Laufend</value>
   </data>
-  <data name="CompletionStatusReading" xml:space="preserve">
-    <value>Lese gerade</value>
-  </data>
-  <data name="CompletionStatusUnread" xml:space="preserve">
-    <value>Ungelesen</value>
+  <data name="CompletionStatusPlanned" xml:space="preserve">
+    <value>Geplant</value>
   </data>
   <data name="Continuous" xml:space="preserve">
     <value>Kontinuierlich</value>
@@ -534,27 +534,6 @@ Die Auswertung erfolgt in der folgenden Reihenfolge:
   <data name="GoForward" xml:space="preserve">
     <value>Weiter</value>
   </data>
-  <data name="GoToFirstPage" xml:space="preserve">
-    <value>Zur ersten Seite</value>
-  </data>
-  <data name="GoToLastPage" xml:space="preserve">
-    <value>Zur letzten Seite gehen</value>
-  </data>
-  <data name="GoToLeftPage" xml:space="preserve">
-    <value>Zur linken Seite</value>
-  </data>
-  <data name="GoToNextPage" xml:space="preserve">
-    <value>Zur nächsten Seite</value>
-  </data>
-  <data name="GoToPreviousPage" xml:space="preserve">
-    <value>Zur vorherigen Seite</value>
-  </data>
-  <data name="GoToRandomPage" xml:space="preserve">
-    <value>Gehen Sie zu einer zufälligen Seite</value>
-  </data>
-  <data name="GoToRightPage" xml:space="preserve">
-    <value>Zur rechten Seite</value>
-  </data>
   <data name="Group" xml:space="preserve">
     <value>Gruppierung</value>
   </data>
@@ -600,8 +579,8 @@ Die Auswertung erfolgt in der folgenden Reihenfolge:
   <data name="Images" xml:space="preserve">
     <value>Bilder</value>
   </data>
-  <data name="IncludeHiddenMedia" xml:space="preserve">
-    <value>Versteckte Comics einschließen</value>
+  <data name="IncludeHiddenItems" xml:space="preserve">
+    <value>Versteckte Elemente einschließen</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>Plugin installieren</value>
@@ -669,9 +648,6 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   </data>
   <data name="Links" xml:space="preserve">
     <value>Links</value>
-  </data>
-  <data name="MaintainRelativeSize" xml:space="preserve">
-    <value>Relative Größe beibehalten</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Mit der Option „zur Ausschlussliste hinzufügen“ wird verhindert, dass der Comic beim nächsten Aktualisieren der Bibliothek erneut importiert wird.</value>

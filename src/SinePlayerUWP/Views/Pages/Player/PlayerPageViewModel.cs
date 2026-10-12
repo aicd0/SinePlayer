@@ -553,7 +553,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
                 {
                     bool restorePosition =
                         AppSettingsModel.RestoreLastReadingPosition &&
-                        !(AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia && media.CompletionStatus != CompletionStatusEnum.Reading);
+                        !(AppSettingsModel.RestoreLastReadingPositionOnlyAppliesToReadingMedia && media.CompletionStatus != CompletionStatusEnum.Ongoing);
                     return restorePosition ? media.LastPositionMs : 0;
                 }
         }

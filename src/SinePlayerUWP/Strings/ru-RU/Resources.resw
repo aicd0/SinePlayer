@@ -270,17 +270,17 @@
   <data name="CompletionStatusCompleted" xml:space="preserve">
     <value>Завершено</value>
   </data>
+  <data name="CompletionStatusNotStarted" xml:space="preserve">
+    <value>Не начато</value>
+  </data>
   <data name="CompletionStatusOnHold" xml:space="preserve">
-    <value>Отложено</value>
+    <value>Приостановлено</value>
   </data>
-  <data name="CompletionStatusPlanToRead" xml:space="preserve">
-    <value>Запланировано к чтению</value>
+  <data name="CompletionStatusOngoing" xml:space="preserve">
+    <value>В процессе</value>
   </data>
-  <data name="CompletionStatusReading" xml:space="preserve">
-    <value>Читаю</value>
-  </data>
-  <data name="CompletionStatusUnread" xml:space="preserve">
-    <value>Не прочитано</value>
+  <data name="CompletionStatusPlanned" xml:space="preserve">
+    <value>Запланировано</value>
   </data>
   <data name="Continuous" xml:space="preserve">
     <value>Непрерывный</value>
@@ -535,27 +535,6 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="GoForward" xml:space="preserve">
     <value>Идти вперед</value>
   </data>
-  <data name="GoToFirstPage" xml:space="preserve">
-    <value>Перейти на первую страницу</value>
-  </data>
-  <data name="GoToLastPage" xml:space="preserve">
-    <value>Перейти на последнюю страницу</value>
-  </data>
-  <data name="GoToLeftPage" xml:space="preserve">
-    <value>Перейти на левую страницу</value>
-  </data>
-  <data name="GoToNextPage" xml:space="preserve">
-    <value>Перейти на следующую страницу</value>
-  </data>
-  <data name="GoToPreviousPage" xml:space="preserve">
-    <value>Перейти на предыдущую страницу</value>
-  </data>
-  <data name="GoToRandomPage" xml:space="preserve">
-    <value>Перейти на случайную страницу</value>
-  </data>
-  <data name="GoToRightPage" xml:space="preserve">
-    <value>Перейти на правую страницу</value>
-  </data>
   <data name="Group" xml:space="preserve">
     <value>Группировка</value>
   </data>
@@ -601,8 +580,8 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Images" xml:space="preserve">
     <value>Картинки</value>
   </data>
-  <data name="IncludeHiddenMedia" xml:space="preserve">
-    <value>Включать скрытые комиксы</value>
+  <data name="IncludeHiddenItems" xml:space="preserve">
+    <value>Включить скрытые элементы</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>Установить плагин</value>
@@ -670,9 +649,6 @@ NOT                      - Логическое не. Например: NOT %tag
   </data>
   <data name="Links" xml:space="preserve">
     <value>Ссылки</value>
-  </data>
-  <data name="MaintainRelativeSize" xml:space="preserve">
-    <value>Сохранять относительный размер</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Выбор пункта «добавить в список исключений» не позволит повторно импортировать комикс при следующем обновлении библиотеки.</value>

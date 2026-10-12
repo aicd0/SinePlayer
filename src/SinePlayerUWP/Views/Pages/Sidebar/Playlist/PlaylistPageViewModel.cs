@@ -153,14 +153,14 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
     {
         CompletionStatusEnum status = media.CompletionStatus;
 
-        if (CompletionStatusService.CanTransitToReadingAutomatically(status))
+        if (CompletionStatusService.CanTransitToOngoingAutomatically(status))
         {
             return string.Empty;
         }
 
         return status switch
         {
-            CompletionStatusEnum.Reading => Math.Clamp(media.Progress, 0, 100).ToString() + "%",
+            CompletionStatusEnum.Ongoing => Math.Clamp(media.Progress, 0, 100).ToString() + "%",
             _ => CompletionStatusService.EnumToString(status),
         };
     }
