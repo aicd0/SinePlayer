@@ -157,6 +157,7 @@ public class StringResourceProvider
     public string MergeSingleItemGroups => GetResourceString("MergeSingleItemGroups");
     public string Miscellaneous => GetResourceString("Miscellaneous");
     public string More => GetResourceString("More");
+    public string Mute => GetResourceString("Mute");
     public string NItems => GetResourceString("NItems");
     public string Name => GetResourceString("Name");
     public string Never => GetResourceString("Never");
@@ -192,11 +193,11 @@ public class StringResourceProvider
     public string Pin => GetResourceString("Pin");
     public string Play => GetResourceString("Play");
     public string PlayPause => GetResourceString("PlayPause");
+    public string PlayQueue => GetResourceString("PlayQueue");
+    public string PlayQueueEmpty => GetResourceString("PlayQueueEmpty");
     public string PlayerSettings => GetResourceString("PlayerSettings");
     public string PlayerStatusError => GetResourceString("PlayerStatusError");
     public string PlayerStatusLoading => GetResourceString("PlayerStatusLoading");
-    public string Playlist => GetResourceString("Playlist");
-    public string PlaylistEmpty => GetResourceString("PlaylistEmpty");
     public string PluginSettingsDescription => GetResourceString("PluginSettingsDescription");
     public string Plugins => GetResourceString("Plugins");
     public string PressKeyCombination => GetResourceString("PressKeyCombination");
@@ -215,7 +216,9 @@ public class StringResourceProvider
     public string RemoveItemsConfirmation => GetResourceString("RemoveItemsConfirmation");
     public string RemovePluginsConfirmation => GetResourceString("RemovePluginsConfirmation");
     public string RemoveUnreachableItems => GetResourceString("RemoveUnreachableItems");
-    public string Repeat => GetResourceString("Repeat");
+    public string RepeatAll => GetResourceString("RepeatAll");
+    public string RepeatOff => GetResourceString("RepeatOff");
+    public string RepeatOne => GetResourceString("RepeatOne");
     public string Reset => GetResourceString("Reset");
     public string ResetAllSettings => GetResourceString("ResetAllSettings");
     public string ResetAllSettingsMessage => GetResourceString("ResetAllSettingsMessage");
@@ -269,6 +272,7 @@ public class StringResourceProvider
     public string UnhandledExceptionContent => GetResourceString("UnhandledExceptionContent");
     public string UnhandledExceptionTitle => GetResourceString("UnhandledExceptionTitle");
     public string Unhide => GetResourceString("Unhide");
+    public string Unmute => GetResourceString("Unmute");
     public string Unpin => GetResourceString("Unpin");
     public string Untitled => GetResourceString("Untitled");
     public string UseSystemLanguage => GetResourceString("UseSystemLanguage");
@@ -276,6 +280,7 @@ public class StringResourceProvider
     public string ViewType => GetResourceString("ViewType");
     public string ViewTypeLarge => GetResourceString("ViewTypeLarge");
     public string ViewTypeMedium => GetResourceString("ViewTypeMedium");
+    public string Volume => GetResourceString("Volume");
     public string VolumeDown => GetResourceString("VolumeDown");
     public string VolumeUp => GetResourceString("VolumeUp");
     public string Warning => GetResourceString("Warning");

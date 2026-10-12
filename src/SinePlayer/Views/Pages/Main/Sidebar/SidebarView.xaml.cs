@@ -21,7 +21,7 @@ internal sealed partial class SidebarView : BaseUserControl
     public const string ITEM_TAGS = "Tags";
     public const string ITEM_FOLDERS = "Folders";
     public const string ITEM_FILTER_PRESETS = "FilterPresets";
-    public const string ITEM_PLAYLIST = "Playlist";
+    public const string ITEM_PLAY_QUEUE = "PlayQueue";
     public const string ITEM_MEDIA_INFO = "MediaInfo";
 
     public delegate void PinStateChangedEventHandler(SidebarView sender, bool pinned);
@@ -54,10 +54,10 @@ internal sealed partial class SidebarView : BaseUserControl
             },
             new()
             {
-                Tag = ITEM_PLAYLIST,
-                Name = StringResource.Playlist,
-                PageRoute = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_SIDE_PANE_PLAYLIST),
-                Icon = new FontIconSource() { Glyph = "\uE7BC" },
+                Tag = ITEM_PLAY_QUEUE,
+                Name = StringResource.PlayQueue,
+                PageRoute = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_SIDE_PANE_PLAY_QUEUE),
+                Icon = new FontIconSource() { Glyph = "\uE8FD" },
             },
             new()
             {

@@ -888,6 +888,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     //
 
     public long Id => _internalModel.Id;
+    public MediaType Type => _internalModel.Type;
     public bool IsHidden => _internalModel.IsHidden;
     public bool IsEditable => _internalModel.IsEditable;
     public bool IsExternal => _internalModel.IsExternal;

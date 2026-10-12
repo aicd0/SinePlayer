@@ -19,7 +19,7 @@ internal static class RouterConstants
     public const string HOST_SIDE_PANE_FOLDERS = "side_pane_folders";
     public const string HOST_SIDE_PANE_TAGS = "side_pane_tags";
     public const string HOST_SIDE_PANE_FILTER_PRESETS = "side_pane_filter_presets";
-    public const string HOST_SIDE_PANE_PLAYLIST = "side_pane_playlist";
+    public const string HOST_SIDE_PANE_PLAY_QUEUE = "side_pane_play_queue";
     public const string HOST_SIDE_PANE_MEDIA_INFO = "side_pane_media_info";
     public const string HOST_DEV_TOOLS = "dev_tools";
 
@@ -27,6 +27,6 @@ internal static class RouterConstants
     public const string ARG_ID = "id";
     public const string ARG_KEYWORD = "keyword";
     public const string ARG_PLAYBACK = "playback";
-    public const string ARG_PLAYLIST_ID = "playlist_id";
+    public const string ARG_PLAY_QUEUE_ID = "play_queue_id";
     public const string ARG_POSITION = "position";
 }

@@ -4,17 +4,16 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.IO;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 
 using SinePlayer.Common.Localization;
-using SinePlayer.Common.Misc;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
+using SinePlayer.Helpers.Misc;
 
 namespace SinePlayer.ViewModels;
 
@@ -43,7 +42,7 @@ internal partial class MediaItemViewModel : INotifyPropertyChanged
                 return "\uF5ED";
             }
 
-            return AppInfoProvider.IsSupportedAudioExtension(Path.GetExtension(Media.Location)) ? "\uE8D6" : "\uE714";
+            return MediaGlyphHelper.GetMediaGlyph(Media);
         }
     }
 

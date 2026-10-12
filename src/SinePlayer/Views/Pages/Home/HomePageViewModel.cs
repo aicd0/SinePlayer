@@ -527,7 +527,7 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
     {
         Logger.I(TAG, "DisplayMediaNoLock");
 
-        MediaItemViewModel MediaToViewModel(MediaModel media, PlaylistModel.Builder playlist)
+        MediaItemViewModel MediaToViewModel(MediaModel media, PlayQueueModel.Builder playQueue)
         {
             var item = new MediaItemViewModel(media)
             {
@@ -538,7 +538,7 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
                         return;
                     }
 
-                    Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                    Route route = OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
                     OpenMediaHelper.OpenMedia(_actionHandler, route);
                 },
                 OnRequestContextFlyoutAsync = model =>
@@ -547,7 +547,7 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
                     return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                         _actionHandler,
                         media,
-                        playlist: playlist,
+                        playQueue: playQueue,
                         selectedItems: selectedMedia,
                         canSelect: true);
                 },
@@ -578,13 +578,13 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
                     filter.GroupSortingFunction,
                     filter.GroupSortingProperty,
                     filter.MergeSingleItemGroups);
-                var playlist = new PlaylistModel.Builder();
+                var playQueue = new PlayQueueModel.Builder();
                 groupedMedia = [];
                 foreach (MediaPropertyModel.GroupItem<MediaModel> group in groups)
                 {
                     List<MediaModel> sorted = SortMediaByProerty(group.Items, sortBy, filter.MediaOrderMethod);
-                    playlist.AddMedia(sorted);
-                    List<MediaItemViewModel> items = [.. sorted.Select(x => MediaToViewModel(x, playlist))];
+                    playQueue.AddMedia(sorted);
+                    List<MediaItemViewModel> items = [.. sorted.Select(x => MediaToViewModel(x, playQueue))];
                     var groupViewModel = new MediaGroupViewModel(group.Name, items, filter.CollapsedGroups.Contains(group.Name))
                     {
                         Description = group.Description,
@@ -595,8 +595,8 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
             else
             {
                 List<MediaModel> sortedMedia = SortMediaByProerty(mediaItems, sortBy, filter.MediaOrderMethod);
-                PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sortedMedia);
-                ungroupedMedia = [.. sortedMedia.Select(x => MediaToViewModel(x, playlist))];
+                PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(sortedMedia);
+                ungroupedMedia = [.. sortedMedia.Select(x => MediaToViewModel(x, playQueue))];
             }
         }
 

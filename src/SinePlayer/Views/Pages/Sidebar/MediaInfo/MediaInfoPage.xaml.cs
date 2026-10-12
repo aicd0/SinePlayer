@@ -77,7 +77,7 @@ internal sealed partial class MediaInfoPage : BasePage
         {
             ViewModel.SetMedia(args.Media);
             ViewModel.SetImageDescriptions(args.ImageDescriptions);
-            ViewModel.Playlist = args.Playlist;
+            ViewModel.PlayQueue = args.PlayQueue;
         });
 
         GetWindowEventBus().With<PlaybackModel>(EventId.PlaybackChanged).ObserveSticky(this, playback =>
@@ -145,7 +145,7 @@ internal sealed partial class MediaInfoPage : BasePage
             List<BaseMenuFlyoutItemModel> menuItems = await MenuFlyoutItemsCreator.CreateMediaMenuItems(
                 PageActionHandler,
                 media,
-                playlist: ViewModel.Playlist.ToBuilder(),
+                playQueue: ViewModel.PlayQueue.ToBuilder(),
                 playback: ViewModel.Playback?.ToBuilder());
             if (menuItems.Count == 0)
             {

@@ -234,17 +234,17 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
             return keywords.Length == 0 || StringUtils.FastMatch(keywords, text.ToLowerInvariant()) > 0;
         }
 
-        SimpleTreeViewNodeModel MediaToNode(MediaModel media, PlaylistModel.Builder playlist)
+        SimpleTreeViewNodeModel MediaToNode(MediaModel media, PlayQueueModel.Builder playQueue)
         {
             return new()
             {
                 DataContext = media,
-                Glyph = "\uE8B9",
+                Glyph = MediaGlyphHelper.GetMediaGlyph(media),
                 Title = media.Title,
                 CanExpand = false,
                 Clicked = item =>
                 {
-                    Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                    Route route = OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
                     OpenMediaHelper.OpenMedia(_actionHandler, route);
                 },
                 RequestContextMenuItemsAsync = (primary, selection) =>
@@ -255,7 +255,7 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
                     return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                         _actionHandler,
                         media,
-                        playlist: playlist,
+                        playQueue: playQueue,
                         selectedItems: selectedMedia,
                         canSelect: !SelectionMode);
                 },
@@ -303,9 +303,9 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
                     .Select(x => mediaMap[x])
                     .Where(x => tagMatched || MatchSearchText(x.Title))
                     .OrderBy(x => StringUtils.SmartFileNameKeySelector(x.Title), StringUtils.SmartFileNameComparer);
-                PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sortedMedia);
+                PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(sortedMedia);
                 IEnumerable<SimpleTreeViewNodeModel> tagChildren = sortedMedia
-                    .Select(x => MediaToNode(x, playlist));
+                    .Select(x => MediaToNode(x, playQueue));
 
                 foreach (SimpleTreeViewNodeModel child in tagChildren)
                 {

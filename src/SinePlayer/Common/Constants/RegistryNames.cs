@@ -17,7 +17,7 @@ internal static class RegistryNames
     public const string PLUGINS = $"{GLOBAL}/Plugins";
     public const string RESOURCES = "/Resources";
     public const string RUNTIME_RESOURCES = $"{RESOURCES}/Runtime";
-    public const string PLAYLISTS = $"{RUNTIME_RESOURCES}/Playlists";
+    public const string PLAY_QUEUES = $"{RUNTIME_RESOURCES}/PlayQueues";
     public const string TAB_RESOURCES = $"{RESOURCES}/Tabs";
 
     public static class StateKey

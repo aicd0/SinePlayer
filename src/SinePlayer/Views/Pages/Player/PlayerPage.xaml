@@ -9,15 +9,16 @@
     xmlns:player="using:SinePlayer.Views.Pages.Player"
     mc:Ignorable="d">
 
-    <Grid
-        x:Name="RootGrid"
-        Background="Black">
+    <Grid x:Name="RootGrid" Background="Black">
         <Grid
             x:Name="VideoHost"
             ContextRequested="VideoHost_ContextRequested"
+            PointerCanceled="VideoHost_PointerCanceled"
             PointerEntered="VideoHost_PointerEntered"
             PointerExited="VideoHost_PointerExited"
-            Tapped="VideoHost_Tapped" />
+            PointerMoved="VideoHost_PointerMoved"
+            PointerPressed="VideoHost_PointerPressed"
+            PointerReleased="VideoHost_PointerReleased" />
         <StackPanel
             x:Name="StatusPanel"
             HorizontalAlignment="Center"
@@ -27,8 +28,7 @@
                 x:Name="BusyRing"
                 Width="36"
                 Height="36"
-                IsActive="True"
-                Foreground="White" />
+                IsActive="True" />
             <TextBlock
                 x:Name="StatusText"
                 MaxWidth="480"
@@ -36,8 +36,6 @@
                 TextAlignment="Center"
                 TextWrapping="Wrap" />
         </StackPanel>
-        <player:PlayerTransportBar
-            x:Name="TransportBar"
-            VerticalAlignment="Bottom" />
+        <player:PlayerTransportBar x:Name="TransportBar" VerticalAlignment="Bottom" />
     </Grid>
 </base:BasePage>

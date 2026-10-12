@@ -17,7 +17,7 @@ using SinePlayer.Views.Pages.Sidebar.FilterPresets;
 using SinePlayer.Views.Pages.Sidebar.Folders;
 using SinePlayer.Views.Pages.Sidebar.History;
 using SinePlayer.Views.Pages.Sidebar.MediaInfo;
-using SinePlayer.Views.Pages.Sidebar.Playlist;
+using SinePlayer.Views.Pages.Sidebar.PlayQueue;
 using SinePlayer.Views.Pages.Sidebar.Tags;
 
 namespace SinePlayer.Helpers.Navigation;
@@ -37,7 +37,7 @@ internal class OpenPageInterceptor : IRouterInterceptor
         { RouterConstants.HOST_SIDE_PANE_TAGS, new DefaultPageTrait(typeof(TagsPage)) },
         { RouterConstants.HOST_SIDE_PANE_FOLDERS, new DefaultPageTrait(typeof(FoldersPage)) },
         { RouterConstants.HOST_SIDE_PANE_FILTER_PRESETS, new DefaultPageTrait(typeof(FilterPresetsPage)) },
-        { RouterConstants.HOST_SIDE_PANE_PLAYLIST, new DefaultPageTrait(typeof(PlaylistPage)) },
+        { RouterConstants.HOST_SIDE_PANE_PLAY_QUEUE, new DefaultPageTrait(typeof(PlayQueuePage)) },
         { RouterConstants.HOST_SIDE_PANE_MEDIA_INFO, new DefaultPageTrait(typeof(MediaInfoPage)) },
         { RouterConstants.HOST_DEV_TOOLS, new DefaultPageTrait(typeof(DevToolsPage)) },
     };

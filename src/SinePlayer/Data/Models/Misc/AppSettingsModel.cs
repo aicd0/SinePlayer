@@ -11,6 +11,7 @@ using SinePlayer.Core.Common.AppEnvironment;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Database.JSON;
+using SinePlayer.Data.Models.Playback;
 
 using Windows.Globalization;
 using Windows.System;
@@ -256,15 +257,15 @@ internal static class AppSettingsModel
         }
     }
 
-    public static bool PlaybackDefaultRepeat
+    public static RepeatMode PlaybackDefaultRepeatMode
     {
         get
         {
-            return _db.Read(model => model.PlaybackDefaultRepeat ?? false);
+            return _db.Read(model => ConvertRepeatModeFromJson(model.PlaybackDefaultRepeatMode));
         }
         set
         {
-            _db.Write(model => model.PlaybackDefaultRepeat = value);
+            _db.Write(model => model.PlaybackDefaultRepeatMode = ConvertRepeatModeToJson(value));
             _db.Save();
         }
     }
@@ -534,6 +535,26 @@ internal static class AppSettingsModel
         };
     }
 
+    private static string ConvertRepeatModeToJson(RepeatMode repeatMode)
+    {
+        return repeatMode switch
+        {
+            RepeatMode.All => "All",
+            RepeatMode.One => "One",
+            _ => "Off",
+        };
+    }
+
+    private static RepeatMode ConvertRepeatModeFromJson(string? repeatMode)
+    {
+        return repeatMode switch
+        {
+            "All" => RepeatMode.All,
+            "One" => RepeatMode.One,
+            _ => RepeatMode.Off,
+        };
+    }
+
     private static string ConvertAppBackgroundToJson(AppBackgroundEnum background)
     {
         return background switch
@@ -716,8 +737,8 @@ internal static class AppSettingsModel
         [JsonPropertyName("Language")]
         public string? Language { get; set; }
 
-        [JsonPropertyName("PlaybackDefaultRepeat")]
-        public bool? PlaybackDefaultRepeat { get; set; }
+        [JsonPropertyName("PlaybackDefaultRepeatMode")]
+        public string? PlaybackDefaultRepeatMode { get; set; }
 
         [JsonPropertyName("PlaybackDefaultShuffle")]
         public bool? PlaybackDefaultShuffle { get; set; }

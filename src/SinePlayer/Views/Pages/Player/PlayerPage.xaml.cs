@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Threading.Tasks;
 
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -20,9 +21,11 @@ using SinePlayer.Common.Localization;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Database;
+using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
+using SinePlayer.Helpers.Misc;
 using SinePlayer.Helpers.Navigation;
 using SinePlayer.SDK.Models;
 using SinePlayer.Views.Pages.Main.Sidebar;
@@ -32,28 +35,17 @@ namespace SinePlayer.Views.Pages.Player;
 
 internal sealed partial class PlayerPage : BasePage
 {
-    private const long SEEK_STEP_MS = 10000;
-    private const double VOLUME_STEP = 0.05;
+    private const long SEEK_STEP_MS = 5000;
+    private const int VOLUME_STEP = 5;
+    private const int SINGLE_TAP_DELAY_MS = 100;
+    private const int HIDE_OVERLAY_DELAY_MS = 0;
 
     // Can only be accessed by UI thread
     public static IReadOnlyList<Tuple<int, string>> ActiveTabs { get; private set; } = [];
 
     private readonly PlayerPageViewModel ViewModel = new();
 
-    private string _loadedKey = string.Empty;
     private PlayerNavigationBar? _navigationBar = null;
-    private bool _isFullscreenHandlerRegistered = false;
-
-    // Overlay
-    private bool _shouldOverlayVisible = false;
-    private bool _isPointerInsideRootElement = true;
-    private bool _isPointerInsideVideo = false;
-    private double _topOverlayHeight = 0.0;
-    private double _rightOverlayWidth = 0.0;
-    private double _bottomGridHeight = 0.0;
-    private bool _isOverlayVisible = false;
-    private bool _isOverlayHold = false;
-    private long _hideOverlayDeadline = -1;
 
     //
     // Constructor
@@ -62,6 +54,8 @@ internal sealed partial class PlayerPage : BasePage
     public PlayerPage()
     {
         InitializeComponent();
+
+        _gestureRecognizer.Tapped += GestureRecognizer_Tapped;
     }
 
     //
@@ -72,24 +66,16 @@ internal sealed partial class PlayerPage : BasePage
     {
         base.OnStart(bundle);
         AddToActiveTabs();
-        GetMainPageAbility().SetIcon(new SymbolIconSource { Symbol = Symbol.Play });
 
-        SetupNavigationBar();
-        SetupTransportBar();
-        SetupFullscreenHandler();
-
-        {
-            bool pinned = AppDB.MainRegistry.CreateKey(RegistryNames.STATE).GetValueOrDefault(RegistryNames.StateKey.PLAYER_OVERLAY_PINNED, false);
-            ViewModel.SetPinned(pinned);
-            TransportBar.SetPinned(pinned);
-            UpdatePinRelatedUI();
-        }
+        InitializeNavigationBar();
+        InitializeTransportBar();
+        InitializePinState();
 
         ViewModel.Initialize(PageActionHandler);
         ObserveData();
         UpdateKeyboardAccelerators();
 
-        string playlistId = bundle.GetString(RouterConstants.ARG_PLAYLIST_ID) ?? string.Empty;
+        string playQueueId = bundle.GetString(RouterConstants.ARG_PLAY_QUEUE_ID) ?? string.Empty;
         string serializedPlayback = bundle.GetString(RouterConstants.ARG_PLAYBACK) ?? string.Empty;
         long initialPositionMs = -1;
         string? positionString = bundle.GetString(RouterConstants.ARG_POSITION);
@@ -98,15 +84,14 @@ internal sealed partial class PlayerPage : BasePage
             long.TryParse(positionString, CultureInfo.InvariantCulture, out initialPositionMs);
         }
 
-        string loadKey = $"{playlistId}|{serializedPlayback}|{initialPositionMs}";
-        if (loadKey != _loadedKey)
-        {
-            _loadedKey = loadKey;
-            CoroutineUtils.Run(async () => await LoadPlaylistAsync(playlistId, serializedPlayback, initialPositionMs));
-        }
-
         VideoHost.Children.Clear();
         VideoHost.Children.Add(ViewModel.GetVideoSurface());
+
+        CoroutineUtils.Run(async () =>
+        {
+            PlayQueueModel playQueue = await GetPlayQueue(playQueueId);
+            ViewModel.LoadPlayQueue(playQueue, serializedPlayback, initialPositionMs);
+        });
     }
 
     protected override void OnResume()
@@ -128,128 +113,50 @@ internal sealed partial class PlayerPage : BasePage
     {
         base.OnStop();
         ViewModel.Destory();
-        _loadedKey = string.Empty;
         _navigationBar = null;
         GetMainPageAbility().SetCustomCenteredNavigationBar(null);
         RemoveFromActiveTabs();
     }
 
-    //
-    // Load
-    //
+    private void InitializeNavigationBar()
+    {
+        var bar = new PlayerNavigationBar();
+        bar.Initialize(GetMainWindowAbility());
+        bar.FavoriteChanged += isFavorite => ViewModel.SetIsFavorite(isFavorite, true);
+        bar.InfoPaneExpanded += OpenMediaInfoPane;
+        GetMainPageAbility().SetCustomCenteredNavigationBar(bar);
+        _navigationBar = bar;
+    }
+
+    private void InitializeTransportBar()
+    {
+        TransportBar.PlayPauseRequested += ViewModel.TogglePlayPause;
+        TransportBar.PreviousRequested += ViewModel.Previous;
+        TransportBar.NextRequested += ViewModel.Next;
+        TransportBar.PlayQueueRequested += OpenPlayQueuePane;
+        TransportBar.RepeatRequested += ViewModel.CycleRepeatMode;
+        TransportBar.ShuffleRequested += ViewModel.ToggleShuffle;
+        TransportBar.SeekRequested += ViewModel.SeekTo;
+        TransportBar.VolumeChanged += ViewModel.SetVolume;
+        TransportBar.MuteChanged += ViewModel.SetMuted;
+        TransportBar.PinRequested += TogglePin;
+        TransportBar.FullscreenRequested += ToggleFullscreen;
+        TransportBar.SizeChanged += TransportBar_SizeChanged;
+    }
+
+    private void InitializePinState()
+    {
+        bool pinned = AppDB.MainRegistry.CreateKey(RegistryNames.STATE).GetValueOrDefault(RegistryNames.StateKey.PLAYER_OVERLAY_PINNED, false);
+        ViewModel.SetPinned(pinned);
+        TransportBar.SetPinned(pinned);
+        UpdatePinRelatedUI();
+    }
 
     private void ObserveData()
     {
-        ViewModel.TitleLiveData.Observe(this, title =>
-        {
-            GetMainPageAbility().SetTitle(title);
-        }, new ObserveOptions()
-        {
-            Sticky = true,
-            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
-        });
+        AppSettingsModel.KeepScreenOnBehaviorChangedLiveData.Observe(this, _ => ViewModel.RefreshKeepScreenOn());
 
-        ViewModel.PlayerStatusLiveData.Observe(this, status =>
-        {
-            switch (status.Status)
-            {
-                case PlayerPageViewModel.PlayerStatusEnum.Working:
-                    BusyRing.IsActive = false;
-                    StatusPanel.Visibility = Visibility.Collapsed;
-                    StatusText.Text = string.Empty;
-                    break;
-                case PlayerPageViewModel.PlayerStatusEnum.Loading:
-                    BusyRing.IsActive = true;
-                    StatusPanel.Visibility = Visibility.Visible;
-                    StatusText.Text = status.Description;
-                    break;
-                case PlayerPageViewModel.PlayerStatusEnum.Error:
-                    BusyRing.IsActive = false;
-                    StatusPanel.Visibility = Visibility.Visible;
-                    StatusText.Text = status.Description;
-                    break;
-                default:
-                    break;
-            }
-
-            if (status.Status == PlayerPageViewModel.PlayerStatusEnum.Error)
-            {
-                ShowOverlay();
-            }
-        }, new ObserveOptions()
-        {
-            Sticky = true,
-            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
-        });
-
-        ViewModel.IsPlayingLiveData.Observe(this, isPlaying =>
-        {
-            TransportBar.SetPlaying(isPlaying);
-            if (!isPlaying)
-            {
-                ShowOverlay();
-            }
-        }, new ObserveOptions()
-        {
-            Sticky = true,
-            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
-        });
-
-        ViewModel.PositionLiveData.Observe(this, positionMs =>
-        {
-            TransportBar.SetPosition(positionMs, ViewModel.DurationMs);
-        }, new ObserveOptions()
-        {
-            Sticky = true,
-            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
-        });
-
-        ViewModel.IsFavoriteLiveData.Observe(this, isFavorite =>
-        {
-            _navigationBar?.SetFavorite(isFavorite);
-        }, new ObserveOptions()
-        {
-            Sticky = true,
-            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
-        });
-
-        ViewModel.IsExternalMediaLiveData.Observe(this, isExternal =>
-        {
-            _navigationBar?.SetExternalMedia(isExternal);
-        }, new ObserveOptions()
-        {
-            Sticky = true,
-            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
-        });
-
-        ViewModel.PlaybackChangeLiveData.Observe(this, _ =>
-        {
-            TransportBar.SetNavigation(ViewModel.IsPlaybackPreviousEnabled, ViewModel.IsPlaybackNextEnabled);
-            GetWindowEventBus().With<PlaybackModel>(EventId.PlaybackChanged).Emit(ViewModel.Playback);
-        }, new ObserveOptions()
-        {
-            Sticky = true,
-            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
-        });
-
-        ViewModel.MediaChangedLiveData.Observe(this, _ =>
-        {
-            if (ViewModel.Media is not null)
-            {
-                _navigationBar?.SetPlayerSettings(ViewModel.Media);
-            }
-
-            GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaInfoChanged).Emit(new()
-            {
-                Media = ViewModel.Media,
-                Playlist = ViewModel.Playlist,
-                ImageDescriptions = [],
-            });
-        }, new ObserveOptions()
-        {
-            Sticky = true,
-            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
-        });
+        KeyboardShortcutManager.ShortcutsChangedLiveData.Observe(this, _ => UpdateKeyboardAccelerators());
 
         GetWindowEventBus().With<double>(EventId.TopOverlayHeight).ObserveSticky(this, h =>
         {
@@ -292,6 +199,18 @@ internal sealed partial class PlayerPage : BasePage
             GetMainPageAbility().SetHiddenOverlayHitTestVisibility(autoToggleOverlaysOnCursor);
         });
 
+        GetMainWindowAbility().RegisterFullscreenChangedHandler(this, isFullscreen =>
+        {
+            ViewModel.SetFullscreen(isFullscreen);
+            TransportBar.SetFullscreen(isFullscreen);
+        });
+
+        GetMainWindowAbility().RegisterPointerInsideRootElementChangedHandler(this, isInside =>
+        {
+            _isPointerInsideRootElement = isInside;
+            UpdateOverlayState();
+        });
+
         GetMainPageAbility().RegisterOverlayVisibilityChangedHandler(this, visible =>
         {
             if (visible)
@@ -304,108 +223,160 @@ internal sealed partial class PlayerPage : BasePage
             }
         });
 
-        GetMainWindowAbility().RegisterPointerInsideRootElementChangedHandler(this, isInside =>
+        ViewModel.PlaybackChangeLiveData.Observe(this, _ =>
         {
-            _isPointerInsideRootElement = isInside;
-            UpdateOverlayState();
-        });
+            TransportBar.SetNavigation(ViewModel.IsPlaybackPreviousEnabled, ViewModel.IsPlaybackNextEnabled);
+            TransportBar.SetRepeatMode(ViewModel.Playback.RepeatMode);
+            TransportBar.SetShuffle(ViewModel.Playback.IsShuffle);
+            GetWindowEventBus().With<PlaybackModel>(EventId.PlaybackChanged).Emit(ViewModel.Playback);
 
-        KeyboardShortcutManager.ShortcutsChangedLiveData.Observe(this, _ => UpdateKeyboardAccelerators());
-
-        ViewModel.VolumeLiveData.Observe(this, volume =>
-        {
-            TransportBar.SetVolume(volume);
-        }, new ObserveOptions()
-        {
-            Sticky = true,
-            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
-        });
-
-        ViewModel.MuteLiveData.Observe(this, isMuted =>
-        {
-            TransportBar.SetMuted(isMuted);
-        }, new ObserveOptions()
-        {
-            Sticky = true,
-            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
-        });
-
-        AppSettingsModel.KeepScreenOnBehaviorChangedLiveData.Observe(this, _ => ViewModel.RefreshKeepScreenOn());
-    }
-
-    private async Task LoadPlaylistAsync(string playlistId, string serializedPlayback, long initialPositionMs)
-    {
-        PlaylistModel playlist = await GetPlaylist(playlistId);
-        ViewModel.LoadPlaylist(playlist, serializedPlayback, initialPositionMs);
-    }
-
-    private async Task<PlaylistModel> GetPlaylist(string playlistId)
-    {
-        string playlistsRegistry = $"{RegistryNames.TAB_RESOURCES}/{GetMainPageAbility().TabId}/Playlists";
-
-        PlaylistModel? playlist = null;
-        if (!string.IsNullOrEmpty(playlistId))
-        {
-            if (AppDB.MainRegistry.TryGetKey(RegistryNames.PLAYLISTS, out IRegistryKey? key))
+            MediaModel? media = ViewModel.Media;
+            if (media is null)
             {
-                if (key.TryGet(playlistId, out string? serializedPlaylist))
+                GetMainPageAbility().SetTitle(string.Empty);
+                GetMainPageAbility().SetIcon(new SymbolIconSource { Symbol = Symbol.Play });
+            }
+            else
+            {
+                GetMainPageAbility().SetTitle(media.Title);
+                GetMainPageAbility().SetIcon(new FontIconSource { Glyph = MediaGlyphHelper.GetMediaGlyph(media) });
+                _navigationBar?.SetPlayerSettings(media);
+            }
+
+            GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaInfoChanged).Emit(new()
+            {
+                Media = media,
+                PlayQueue = ViewModel.PlayQueue,
+                ImageDescriptions = [],
+            });
+        }, new ObserveOptions()
+        {
+            PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
+        });
+
+        ViewModel.PlayerStatusLiveData.Observe(this, status =>
+        {
+            switch (status.Status)
+            {
+                case PlayerPageViewModel.PlayerStatusEnum.Working:
+                    BusyRing.IsActive = false;
+                    StatusPanel.Visibility = Visibility.Collapsed;
+                    StatusText.Text = string.Empty;
+                    break;
+                case PlayerPageViewModel.PlayerStatusEnum.Loading:
+                    BusyRing.IsActive = true;
+                    StatusPanel.Visibility = Visibility.Visible;
+                    StatusText.Text = status.Description;
+                    break;
+                case PlayerPageViewModel.PlayerStatusEnum.Error:
+                    BusyRing.IsActive = false;
+                    StatusPanel.Visibility = Visibility.Visible;
+                    StatusText.Text = status.Description;
+                    break;
+                default:
+                    break;
+            }
+
+            if (status.Status == PlayerPageViewModel.PlayerStatusEnum.Error)
+            {
+                ShowOverlay();
+            }
+        });
+
+        ViewModel.IsPlayingLiveData.Observe(this, TransportBar.SetPlaying);
+
+        ViewModel.PositionLiveData.Observe(this, positionMs =>
+        {
+            TransportBar.SetPosition(positionMs, ViewModel.DurationMs);
+        });
+
+        ViewModel.IsFavoriteLiveData.Observe(this, isFavorite =>
+        {
+            _navigationBar?.SetFavorite(isFavorite);
+        });
+
+        ViewModel.IsExternalMediaLiveData.Observe(this, isExternal =>
+        {
+            _navigationBar?.SetExternalMedia(isExternal);
+        });
+
+        ViewModel.VolumeLiveData.Observe(this, TransportBar.SetVolume);
+
+        ViewModel.MuteLiveData.Observe(this, TransportBar.SetMuted);
+    }
+
+    private async Task<PlayQueueModel> GetPlayQueue(string playQueueId)
+    {
+        string playQueuesRegistry = $"{RegistryNames.TAB_RESOURCES}/{GetMainPageAbility().TabId}/PlayQueues";
+
+        PlayQueueModel? playQueue = null;
+        if (!string.IsNullOrEmpty(playQueueId))
+        {
+            if (AppDB.MainRegistry.TryGetKey(RegistryNames.PLAY_QUEUES, out IRegistryKey? key))
+            {
+                if (key.TryGet(playQueueId, out string? serializedPlayQueue))
                 {
-                    playlist = await PlaylistModel.CreateFromSerializedString(serializedPlaylist);
+                    playQueue = await PlayQueueModel.CreateFromSerializedString(serializedPlayQueue);
                 }
             }
 
-            if (playlist is null && AppDB.MainRegistry.TryGetKey(playlistsRegistry, out key))
+            if (playQueue is null && AppDB.MainRegistry.TryGetKey(playQueuesRegistry, out key))
             {
-                if (key.TryGet(playlistId, out string? serializedPlaylist))
+                if (key.TryGet(playQueueId, out string? serializedPlayQueue))
                 {
-                    playlist = await PlaylistModel.CreateFromSerializedString(serializedPlaylist);
-                    if (playlist is not null)
+                    playQueue = await PlayQueueModel.CreateFromSerializedString(serializedPlayQueue);
+                    if (playQueue is not null)
                     {
-                        return playlist;
+                        return playQueue;
                     }
                 }
             }
         }
         else
         {
-            playlistId = Guid.NewGuid().ToString();
+            playQueueId = Guid.NewGuid().ToString();
             Route route = Route.Create(GetMainPageAbility().Url)
-                .WithParam(RouterConstants.ARG_PLAYLIST_ID, playlistId);
+                .WithParam(RouterConstants.ARG_PLAY_QUEUE_ID, playQueueId);
             GetMainPageAbility().SetUrl(route.Url);
         }
 
-        playlist ??= PlaylistModel.CreateEmpty();
-        AppDB.MainRegistry.CreateKey(playlistsRegistry).Set(playlistId, playlist.ToSerializedString());
-        return playlist;
+        playQueue ??= PlayQueueModel.CreateEmpty();
+        AppDB.MainRegistry.CreateKey(playQueuesRegistry).Set(playQueueId, playQueue.ToSerializedString());
+        return playQueue;
     }
 
     //
-    // Setup
+    // Events
     //
 
-    private void SetupNavigationBar()
+    private void VideoHost_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
     {
-        var bar = new PlayerNavigationBar();
-        bar.Initialize(GetMainWindowAbility());
-        bar.FavoriteChanged += isFavorite => ViewModel.SetIsFavorite(isFavorite, true);
-        bar.InfoPaneExpanded += OpenMediaInfoPane;
-        GetMainPageAbility().SetCustomCenteredNavigationBar(bar);
-        _navigationBar = bar;
-    }
+        if (sender is not FrameworkElement fe)
+        {
+            return;
+        }
 
-    private void SetupTransportBar()
-    {
-        TransportBar.PlayPauseRequested += ViewModel.TogglePlayPause;
-        TransportBar.PreviousRequested += ViewModel.Previous;
-        TransportBar.NextRequested += ViewModel.Next;
-        TransportBar.PlaylistRequested += OpenPlaylistPane;
-        TransportBar.MoreRequested += ShowPlaybackMoreMenu;
-        TransportBar.SeekRequested += ViewModel.SeekTo;
-        TransportBar.VolumeChanged += ViewModel.SetVolume;
-        TransportBar.MuteChanged += ViewModel.SetMuted;
-        TransportBar.PinRequested += TogglePin;
-        TransportBar.FullscreenRequested += ToggleFullscreen;
-        TransportBar.SizeChanged += TransportBar_SizeChanged;
+        args.Handled = true;
+
+        CoroutineUtils.Run(async () =>
+        {
+            IReadOnlyList<BaseMenuFlyoutItemModel> menuItems = await ViewModel.CreateMediaContextMenuItems();
+
+            MenuFlyout flyout = new();
+            foreach (BaseMenuFlyoutItemModel item in menuItems)
+            {
+                flyout.Items.Add(item.CreateMenuFlyoutItem());
+            }
+
+            if (args.TryGetPosition(fe, out Windows.Foundation.Point point))
+            {
+                flyout.ShowAt(fe, new FlyoutShowOptions { Position = point });
+            }
+            else
+            {
+                flyout.ShowAt(fe);
+            }
+        });
     }
 
     private void TransportBar_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -423,137 +394,93 @@ internal sealed partial class PlayerPage : BasePage
         }
     }
 
-    private void TogglePin()
+    //
+    // Gesture
+    //
+
+    private readonly PlayerGestureRecognizer _gestureRecognizer = new();
+    private bool _tapPending = false;
+    private bool _tapCancelled = false;
+
+    private void VideoHost_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        ViewModel.SetPinned(!ViewModel.IsPinned);
-        TransportBar.SetPinned(ViewModel.IsPinned);
-        UpdatePinRelatedUI();
-        AppDB.MainRegistry.CreateKey(RegistryNames.STATE).Set(RegistryNames.StateKey.PLAYER_OVERLAY_PINNED, ViewModel.IsPinned);
+        ((UIElement)sender).CapturePointer(e.Pointer);
+        _gestureRecognizer.ProcessDownEvent(e.GetCurrentPoint(VideoHost));
     }
 
-    private void OpenPlaylistPane()
+    private void VideoHost_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        GetMainPageAbility().SetSidePanePage(SidebarView.ITEM_PLAYLIST);
-        GetMainPageAbility().SetSidePaneOpenState(true, force: true);
+        _gestureRecognizer.ProcessMoveEvents(e.GetIntermediatePoints(VideoHost));
     }
 
-    private void ShowPlaybackMoreMenu()
+    private void VideoHost_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
-        List<BaseMenuFlyoutItemModel> menuItems = CreatePlaybackMoreMenuItems();
-        if (menuItems.Count == 0)
-        {
-            return;
-        }
-
-        MenuFlyout flyout = new()
-        {
-            Placement = FlyoutPlacementMode.Top,
-        };
-        foreach (BaseMenuFlyoutItemModel item in menuItems)
-        {
-            flyout.Items.Add(item.CreateMenuFlyoutItem());
-        }
-
-        flyout.ShowAt(TransportBar.MoreButton);
+        ((UIElement)sender).ReleasePointerCapture(e.Pointer);
+        _gestureRecognizer.ProcessUpEvent(e.GetCurrentPoint(VideoHost));
     }
 
-    private List<BaseMenuFlyoutItemModel> CreatePlaybackMoreMenuItems()
+    private void VideoHost_PointerCanceled(object sender, PointerRoutedEventArgs e)
     {
-        List<BaseMenuFlyoutItemModel> items = [];
+        ((UIElement)sender).ReleasePointerCapture(e.Pointer);
+        _gestureRecognizer.ProcessUpEvent(e.GetCurrentPoint(VideoHost));
+    }
 
+    private void GestureRecognizer_Tapped(GestureRecognizer sender, TappedEventArgs e)
+    {
+        if (e.TapCount == 1)
         {
-            bool repeat = ViewModel.Playback.IsRepeat;
-            items.Add(new ToggleMenuFlyoutItemModel()
+            if (_tapPending)
             {
-                Text = StringResourceProvider.Instance.Repeat,
-                IsChecked = repeat,
-                Click = () =>
-                {
-                    ViewModel.Playback.IsRepeat = !repeat;
-                },
-            });
-        }
-
-        {
-            bool shuffle = ViewModel.Playback.IsShuffle;
-            items.Add(new ToggleMenuFlyoutItemModel()
-            {
-                Text = StringResourceProvider.Instance.Shuffle,
-                IsChecked = shuffle,
-                Click = () =>
-                {
-                    ViewModel.Playback.IsShuffle = !shuffle;
-                },
-            });
-        }
-
-        return items;
-    }
-
-    private void SetupFullscreenHandler()
-    {
-        if (_isFullscreenHandlerRegistered)
-        {
-            return;
-        }
-
-        _isFullscreenHandlerRegistered = true;
-        GetMainWindowAbility().RegisterFullscreenChangedHandler(this, isFullscreen =>
-        {
-            ViewModel.SetFullscreen(isFullscreen);
-            TransportBar.SetFullscreen(isFullscreen);
-        });
-    }
-
-    private void UpdateKeyboardAccelerators()
-    {
-        void AddKeyboardAccelerators(string action, Windows.Foundation.TypedEventHandler<KeyboardAccelerator, KeyboardAcceleratorInvokedEventArgs> handler)
-        {
-            foreach (KeyboardAccelerator accelerator in KeyboardShortcutManager.CreateAccelerators(action, handler))
-            {
-                KeyboardAccelerators.Add(accelerator);
+                return;
             }
+
+            _tapPending = true;
+            _tapCancelled = false;
+            CoroutineUtils.Run(async () =>
+            {
+                await Task.Delay(SINGLE_TAP_DELAY_MS);
+
+                _tapPending = false;
+                if (_tapCancelled || !IsStarted)
+                {
+                    return;
+                }
+
+                SetOverlayHold(!_isOverlayVisible);
+            });
         }
-
-        KeyboardAccelerators.Clear();
-
-        AddKeyboardAccelerators(KeyboardShortcutActions.PlayPause, (_, _) => ViewModel.TogglePlayPause());
-        AddKeyboardAccelerators(KeyboardShortcutActions.SeekBackward, (_, _) => ViewModel.SeekBy(-SEEK_STEP_MS));
-        AddKeyboardAccelerators(KeyboardShortcutActions.SeekForward, (_, _) => ViewModel.SeekBy(SEEK_STEP_MS));
-        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeDown, (_, _) => ViewModel.AdjustVolume(-VOLUME_STEP));
-        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeUp, (_, _) => ViewModel.AdjustVolume(VOLUME_STEP));
-        AddKeyboardAccelerators(KeyboardShortcutActions.OpenNextItem, (_, _) => ViewModel.Next());
-        AddKeyboardAccelerators(KeyboardShortcutActions.OpenPreviousItem, (_, _) => ViewModel.Previous());
+        else if (e.TapCount == 2)
+        {
+            _tapCancelled = true;
+            ViewModel.TogglePlayPause();
+        }
     }
 
-    private void OpenMediaInfoPane()
+    private void VideoHost_PointerEntered(object sender, PointerRoutedEventArgs e)
     {
-        GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaInfoChanged).Emit(new()
-        {
-            Media = ViewModel.Media,
-            Playlist = ViewModel.Playlist,
-            ImageDescriptions = [],
-        });
-        GetMainPageAbility().SetSidePanePage(SidebarView.ITEM_MEDIA_INFO);
-        GetMainPageAbility().SetSidePaneOpenState(true, force: true);
+        _isPointerInsideVideo = true;
+        UpdateOverlayState();
     }
 
-    private void ToggleFullscreen()
+    private void VideoHost_PointerExited(object sender, PointerRoutedEventArgs e)
     {
-        IMainWindowAbility ability = GetMainWindowAbility();
-        if (ability.IsFullscreen)
-        {
-            ability.ExitFullscreen();
-        }
-        else
-        {
-            ability.EnterFullscreen();
-        }
+        _isPointerInsideVideo = false;
+        UpdateOverlayState();
     }
 
     //
     // Overlay
     //
+
+    private bool _shouldOverlayVisible = false;
+    private bool _isPointerInsideRootElement = true;
+    private bool _isPointerInsideVideo = false;
+    private double _topOverlayHeight = 0.0;
+    private double _rightOverlayWidth = 0.0;
+    private double _bottomGridHeight = 0.0;
+    private bool _isOverlayVisible = false;
+    private bool _isOverlayHold = false;
+    private long _hideOverlayDeadline = -1;
 
     private void UpdateOverlayState()
     {
@@ -586,7 +513,7 @@ internal sealed partial class PlayerPage : BasePage
             }
             else
             {
-                TryHideOverlay(1000);
+                TryHideOverlay(HIDE_OVERLAY_DELAY_MS);
             }
         }
     }
@@ -596,8 +523,7 @@ internal sealed partial class PlayerPage : BasePage
         if (!_isOverlayVisible ||
             ViewModel.IsPinned ||
             _isOverlayHold ||
-            _shouldOverlayVisible ||
-            !ViewModel.IsAutoPlaying)
+            _shouldOverlayVisible)
         {
             return;
         }
@@ -661,7 +587,7 @@ internal sealed partial class PlayerPage : BasePage
         GetMainPageAbility().SetOverlayVisibility(false);
     }
 
-    private void BottomTileSetHold(bool hold)
+    private void SetOverlayHold(bool hold)
     {
         _isOverlayHold = hold;
 
@@ -689,54 +615,67 @@ internal sealed partial class PlayerPage : BasePage
     }
 
     //
-    // Events
+    // Misc
     //
 
-    private void VideoHost_Tapped(object sender, TappedRoutedEventArgs e)
+    private void TogglePin()
     {
-        BottomTileSetHold(!_isOverlayVisible);
+        ViewModel.SetPinned(!ViewModel.IsPinned);
+        TransportBar.SetPinned(ViewModel.IsPinned);
+        UpdatePinRelatedUI();
+        AppDB.MainRegistry.CreateKey(RegistryNames.STATE).Set(RegistryNames.StateKey.PLAYER_OVERLAY_PINNED, ViewModel.IsPinned);
     }
 
-    private void VideoHost_PointerEntered(object sender, PointerRoutedEventArgs e)
+    private void OpenPlayQueuePane()
     {
-        _isPointerInsideVideo = true;
-        UpdateOverlayState();
+        GetMainPageAbility().SetSidePanePage(SidebarView.ITEM_PLAY_QUEUE);
+        GetMainPageAbility().SetSidePaneOpenState(true, force: true);
     }
 
-    private void VideoHost_PointerExited(object sender, PointerRoutedEventArgs e)
+    private void OpenMediaInfoPane()
     {
-        _isPointerInsideVideo = false;
-        UpdateOverlayState();
-    }
-
-    private void VideoHost_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
-    {
-        if (sender is not FrameworkElement fe)
+        GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaInfoChanged).Emit(new()
         {
-            return;
+            Media = ViewModel.Media,
+            PlayQueue = ViewModel.PlayQueue,
+            ImageDescriptions = [],
+        });
+        GetMainPageAbility().SetSidePanePage(SidebarView.ITEM_MEDIA_INFO);
+        GetMainPageAbility().SetSidePaneOpenState(true, force: true);
+    }
+
+    private void ToggleFullscreen()
+    {
+        IMainWindowAbility ability = GetMainWindowAbility();
+        if (ability.IsFullscreen)
+        {
+            ability.ExitFullscreen();
+        }
+        else
+        {
+            ability.EnterFullscreen();
+        }
+    }
+
+    private void UpdateKeyboardAccelerators()
+    {
+        void AddKeyboardAccelerators(string action, Windows.Foundation.TypedEventHandler<KeyboardAccelerator, KeyboardAcceleratorInvokedEventArgs> handler)
+        {
+            foreach (KeyboardAccelerator accelerator in KeyboardShortcutManager.CreateAccelerators(action, handler))
+            {
+                KeyboardAccelerators.Add(accelerator);
+            }
         }
 
-        args.Handled = true;
+        KeyboardAccelerators.Clear();
 
-        CoroutineUtils.Run(async () =>
-        {
-            IReadOnlyList<BaseMenuFlyoutItemModel> menuItems = await ViewModel.CreateMediaContextMenuItems();
-
-            MenuFlyout flyout = new();
-            foreach (BaseMenuFlyoutItemModel item in menuItems)
-            {
-                flyout.Items.Add(item.CreateMenuFlyoutItem());
-            }
-
-            if (args.TryGetPosition(fe, out Windows.Foundation.Point point))
-            {
-                flyout.ShowAt(fe, new FlyoutShowOptions { Position = point });
-            }
-            else
-            {
-                flyout.ShowAt(fe);
-            }
-        });
+        AddKeyboardAccelerators(KeyboardShortcutActions.PlayPause, (_, _) => ViewModel.TogglePlayPause());
+        AddKeyboardAccelerators(KeyboardShortcutActions.SeekBackward, (_, _) => ViewModel.SeekBy(-SEEK_STEP_MS));
+        AddKeyboardAccelerators(KeyboardShortcutActions.SeekForward, (_, _) => ViewModel.SeekBy(SEEK_STEP_MS));
+        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeDown, (_, _) => ViewModel.AdjustVolume(-VOLUME_STEP));
+        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeUp, (_, _) => ViewModel.AdjustVolume(VOLUME_STEP));
+        AddKeyboardAccelerators(KeyboardShortcutActions.OpenNextItem, (_, _) => ViewModel.Next());
+        AddKeyboardAccelerators(KeyboardShortcutActions.OpenPreviousItem, (_, _) => ViewModel.Previous());
     }
 
     //

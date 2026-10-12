@@ -338,9 +338,9 @@ internal sealed partial class FavoritePage : BasePage
                 return;
             }
 
-            IEnumerable<MediaModel> playlistMedia = item.Parent?.Children.Where(x => x.Type == FavoriteNodeType.Item).Select(x => x.Media).OfType<MediaModel>() ?? [];
-            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(playlistMedia);
-            Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+            IEnumerable<MediaModel> playQueueMedia = item.Parent?.Children.Where(x => x.Type == FavoriteNodeType.Item).Select(x => x.Media).OfType<MediaModel>() ?? [];
+            PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(playQueueMedia);
+            Route route = OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
             OpenMediaHelper.OpenMedia(PageActionHandler, route);
             GetMainPageAbility().SetSidePaneOpenState(false, force: false);
         });
@@ -449,9 +449,9 @@ internal sealed partial class FavoritePage : BasePage
                 return;
             }
 
-            IEnumerable<MediaModel> playlistMedia = item.Parent?.Children.Where(x => x.Type == FavoriteNodeType.Item).Select(x => x.Media).OfType<MediaModel>() ?? [];
-            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(playlistMedia);
-            Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+            IEnumerable<MediaModel> playQueueMedia = item.Parent?.Children.Where(x => x.Type == FavoriteNodeType.Item).Select(x => x.Media).OfType<MediaModel>() ?? [];
+            PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(playQueueMedia);
+            Route route = OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
             GetMainPageAbility().OpenInNewTab(route);
         });
     }
