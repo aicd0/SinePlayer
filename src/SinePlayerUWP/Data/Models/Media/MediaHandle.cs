@@ -128,10 +128,10 @@ internal abstract partial class MediaHandle(MediaType type)
             IReaderToken<int> ratingToken = command.PutQueryInt32(MediaTable.ColumnRating);
             IReaderToken<int> progressToken = command.PutQueryInt32(MediaTable.ColumnProgress);
             IReaderToken<DateTimeOffset> lastVisitToken = command.PutQueryDateTimeOffset(MediaTable.ColumnLastVisit);
-            IReaderToken<long> lastPositionToken = command.PutQueryInt64(MediaTable.ColumnLastPosition);
+            IReaderToken<long> lastPositionToken = command.PutQueryInt64(MediaTable.ColumnLastPositionMs);
             IReaderToken<string> descriptionToken = command.PutQueryString(MediaTable.ColumnDescription);
             IReaderToken<int> completionStatusToken = command.PutQueryInt32(MediaTable.ColumnCompletionStatus);
-            IReaderToken<long> durationToken = command.PutQueryInt64(MediaTable.ColumnDuration);
+            IReaderToken<long> durationToken = command.PutQueryInt64(MediaTable.ColumnDurationMs);
             IReaderToken<string> extToken = command.PutQueryString(MediaTable.ColumnExt);
             using SelectCommand.IReader reader = command.Execute();
 
@@ -566,7 +566,7 @@ internal abstract partial class MediaHandle(MediaType type)
 
             UpdateCommand.Create(MediaTable.Instance)
                 .AppendColumn(MediaTable.ColumnProgress, GetColumnValue(MediaTable.ColumnProgress))
-                .AppendColumn(MediaTable.ColumnLastPosition, GetColumnValue(MediaTable.ColumnLastPosition))
+                .AppendColumn(MediaTable.ColumnLastPositionMs, GetColumnValue(MediaTable.ColumnLastPositionMs))
                 .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
@@ -611,11 +611,11 @@ internal abstract partial class MediaHandle(MediaType type)
             MediaTable.ColumnRating,
             MediaTable.ColumnProgress,
             MediaTable.ColumnLastVisit,
-            MediaTable.ColumnLastPosition,
+            MediaTable.ColumnLastPositionMs,
             MediaTable.ColumnDescription,
             MediaTable.ColumnCompletionStatus,
             MediaTable.ColumnExt,
-            MediaTable.ColumnDuration,
+            MediaTable.ColumnDurationMs,
         ];
     });
 
@@ -631,11 +631,11 @@ internal abstract partial class MediaHandle(MediaType type)
         evaluators[MediaTable.ColumnRating.Name] = i => TypeAssert.AssertInt(i.Rating);
         evaluators[MediaTable.ColumnProgress.Name] = i => TypeAssert.AssertInt(i.Progress);
         evaluators[MediaTable.ColumnLastVisit.Name] = i => TypeAssert.AssertDateTimeOffset(i.LastVisit);
-        evaluators[MediaTable.ColumnLastPosition.Name] = i => TypeAssert.AssertLong(i.LastPositionMs);
+        evaluators[MediaTable.ColumnLastPositionMs.Name] = i => TypeAssert.AssertLong(i.LastPositionMs);
         evaluators[MediaTable.ColumnDescription.Name] = i => TypeAssert.AssertString(i.Description);
         evaluators[MediaTable.ColumnCompletionStatus.Name] = i => TypeAssert.AssertInt((int)i.CompletionStatus);
         evaluators[MediaTable.ColumnExt.Name] = i => TypeAssert.AssertString(JsonSerializer.Serialize(i._ext));
-        evaluators[MediaTable.ColumnDuration.Name] = i => TypeAssert.AssertLong(i.DurationMs);
+        evaluators[MediaTable.ColumnDurationMs.Name] = i => TypeAssert.AssertLong(i.DurationMs);
         return evaluators;
     });
 

@@ -156,7 +156,7 @@ internal class MediaFilterSQLProvider : ISQLCommandProvider
             MediaSQLProviderUtils.VAR_TITLE1 => NotNullAndEmptyCondition(MediaTable.ColumnTitle1),
             MediaSQLProviderUtils.VAR_TITLE2 => NotNullAndEmptyCondition(MediaTable.ColumnTitle2),
             MediaSQLProviderUtils.VAR_PROGRESS => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnProgress), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThanOrEqual),
-            MediaSQLProviderUtils.VAR_DURATION => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnDuration), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThan),
+            MediaSQLProviderUtils.VAR_DURATION => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnDurationMs), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThan),
             MediaSQLProviderUtils.VAR_HIDDEN => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnHidden), ColumnOrValue.FromValue(true)),
             _ => throw new ExpressionException($"Variable '{path1}' cannot be used as a condition"),
         };
@@ -195,7 +195,7 @@ internal class MediaFilterSQLProvider : ISQLCommandProvider
             MediaSQLProviderUtils.VAR_TITLE1 => conditionCreator(MediaTable.ColumnTitle1),
             MediaSQLProviderUtils.VAR_TITLE2 => conditionCreator(MediaTable.ColumnTitle2),
             MediaSQLProviderUtils.VAR_PROGRESS => conditionCreator(MediaTable.ColumnProgress),
-            MediaSQLProviderUtils.VAR_DURATION => conditionCreator(MediaTable.ColumnDuration),
+            MediaSQLProviderUtils.VAR_DURATION => conditionCreator(MediaTable.ColumnDurationMs),
             MediaSQLProviderUtils.VAR_HIDDEN => conditionCreator(MediaTable.ColumnHidden),
             _ => throw new ExpressionException($"Variable '{path1}' cannot be used here"),
         };

@@ -1081,7 +1081,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             }
 
             UpdateCommand.Create(MediaTable.Instance)
-                .AppendColumn(MediaTable.ColumnDuration, _internalModel.GetColumnValue(MediaTable.ColumnDuration))
+                .AppendColumn(MediaTable.ColumnDurationMs, _internalModel.GetColumnValue(MediaTable.ColumnDurationMs))
                 .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });

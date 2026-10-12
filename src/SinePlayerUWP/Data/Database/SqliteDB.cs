@@ -85,14 +85,14 @@ internal static class SqliteDB
         _initialized = true;
     }
 
-    public static void UpdateDatabase(int databaseVersion)
+    public static void UpgradeDatabase(int schemeVersion)
     {
-        switch (databaseVersion)
+        switch (schemeVersion)
         {
             case VERSION:
                 break;
             default:
-                Logger.F(TAG, $"Unknown database version: {databaseVersion}");
+                Logger.F(TAG, $"Unknown database version: {schemeVersion}");
                 break;
         }
     }
@@ -104,8 +104,8 @@ internal static class SqliteDB
 
         string mediaTable = MediaTable.Instance.GetTableName();
         string mediaCollectionTable = MediaCollectionTable.Instance.GetTableName();
-        string tagCategoryTable = MediaTagCategoryTable.Instance.GetTableName();
-        string tagTable = MediaTagTable.Instance.GetTableName();
+        string mediaTagCategoryTable = MediaTagCategoryTable.Instance.GetTableName();
+        string mediaTagTable = MediaTagTable.Instance.GetTableName();
 
         ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + mediaTable + " (" +
             MediaTable.ColumnId.Name + " INTEGER PRIMARY KEY AUTOINCREMENT" +
@@ -117,10 +117,10 @@ internal static class SqliteDB
             "," + MediaTable.ColumnRating.Name + " INTEGER NOT NULL" +
             "," + MediaTable.ColumnProgress.Name + " INTEGER NOT NULL" +
             "," + MediaTable.ColumnLastVisit.Name + " TIMESTAMP NOT NULL" +
-            "," + MediaTable.ColumnLastPosition.Name + " INTEGER NOT NULL" +
+            "," + MediaTable.ColumnLastPositionMs.Name + " INTEGER NOT NULL" +
             "," + MediaTable.ColumnDescription.Name + " TEXT" +
             "," + MediaTable.ColumnCompletionStatus.Name + " INTEGER NOT NULL" +
-            "," + MediaTable.ColumnDuration.Name + " INTEGER NOT NULL" +
+            "," + MediaTable.ColumnDurationMs.Name + " INTEGER NOT NULL" +
             "," + MediaTable.ColumnExt.Name + " TEXT" +
             ")");
 
@@ -129,16 +129,16 @@ internal static class SqliteDB
             "," + MediaCollectionTable.ColumnMediaId.Name + " INTEGER NOT NULL REFERENCES " + mediaTable + "(" + MediaTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
 
-        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + tagCategoryTable + " (" +
+        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + mediaTagCategoryTable + " (" +
             MediaTagCategoryTable.ColumnId.Name + " INTEGER PRIMARY KEY AUTOINCREMENT" +
             "," + MediaTagCategoryTable.ColumnName.Name + " TEXT" +
             "," + MediaTagCategoryTable.ColumnMediaId.Name + " INTEGER REFERENCES " + mediaTable + "(" + MediaTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
 
-        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + tagTable + " (" +
+        ExecuteCommand(MediaDatabase, "CREATE TABLE IF NOT EXISTS " + mediaTagTable + " (" +
             MediaTagTable.ColumnContent.Name + " TEXT" +
             "," + MediaTagTable.ColumnMediaId.Name + " INTEGER NOT NULL" +
-            "," + MediaTagTable.ColumnTagCategoryId.Name + " INTEGER REFERENCES " + tagCategoryTable + "(" + MediaTagCategoryTable.ColumnId.Name + ") ON DELETE CASCADE" +
+            "," + MediaTagTable.ColumnTagCategoryId.Name + " INTEGER REFERENCES " + mediaTagCategoryTable + "(" + MediaTagCategoryTable.ColumnId.Name + ") ON DELETE CASCADE" +
             ")");
     }
 
@@ -147,17 +147,17 @@ internal static class SqliteDB
         _tagsDatabase?.Dispose();
         _tagsDatabase = new SqlDatabase(Path.Combine(DatabaseFolderPath, "Tags.sqlite"));
 
-        string tagCategoryInfoTable = TagCategoriesTable.Instance.GetTableName();
-        string tagInfoTable = TagsTable.Instance.GetTableName();
+        string tagCategoriesTable = TagCategoriesTable.Instance.GetTableName();
+        string tagsTable = TagsTable.Instance.GetTableName();
 
-        ExecuteCommand(TagsDatabase, "CREATE TABLE IF NOT EXISTS " + tagCategoryInfoTable + " (" +
+        ExecuteCommand(TagsDatabase, "CREATE TABLE IF NOT EXISTS " + tagCategoriesTable + " (" +
             TagCategoriesTable.ColumnName.Name + " TEXT NOT NULL PRIMARY KEY" +
             "," + TagCategoriesTable.ColumnExt.Name + " TEXT" +
             ")");
 
-        ExecuteCommand(TagsDatabase, "CREATE TABLE IF NOT EXISTS " + tagInfoTable + " (" +
+        ExecuteCommand(TagsDatabase, "CREATE TABLE IF NOT EXISTS " + tagsTable + " (" +
             TagsTable.ColumnName.Name + " TEXT NOT NULL" +
-            "," + TagsTable.ColumnTagCategory.Name + " TEXT NOT NULL REFERENCES " + tagCategoryInfoTable + "(" + TagCategoriesTable.ColumnName.Name + ") ON DELETE CASCADE ON UPDATE CASCADE" +
+            "," + TagsTable.ColumnTagCategory.Name + " TEXT NOT NULL REFERENCES " + tagCategoriesTable + "(" + TagCategoriesTable.ColumnName.Name + ") ON DELETE CASCADE ON UPDATE CASCADE" +
             "," + TagsTable.ColumnExt.Name + " TEXT" +
             ")");
     }
