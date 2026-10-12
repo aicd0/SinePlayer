@@ -24,6 +24,7 @@ using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Data.Models.Playback;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Navigation;
+using SinePlayerUWP.SDK.Models;
 using SinePlayerUWP.Views.Pages.Main.Sidebar;
 using SinePlayerUWP.Views.Pages.Sidebar.MediaInfo;
 
@@ -334,24 +335,48 @@ internal sealed partial class PlayerPage : BasePage
 
     private async Task LoadPlaylistAsync(string playlistId, string serializedPlayback, long initialPositionMs)
     {
-        if (string.IsNullOrEmpty(playlistId))
-        {
-            return;
-        }
-
-        string? serializedPlaylist = AppDB.MainRegistry.CreateKey(RegistryNames.PLAYLISTS).GetValue<string>(playlistId);
-        if (string.IsNullOrEmpty(serializedPlaylist))
-        {
-            return;
-        }
-
-        PlaylistModel? playlist = await PlaylistModel.CreateFromSerializedString(serializedPlaylist);
-        if (playlist is null)
-        {
-            return;
-        }
-
+        PlaylistModel playlist = await GetPlaylist(playlistId);
         ViewModel.LoadPlaylist(playlist, serializedPlayback, initialPositionMs);
+    }
+
+    private async Task<PlaylistModel> GetPlaylist(string playlistId)
+    {
+        string playlistsRegistry = $"{RegistryNames.TAB_RESOURCES}/{GetMainPageAbility().TabId}/Playlists";
+
+        PlaylistModel? playlist = null;
+        if (!string.IsNullOrEmpty(playlistId))
+        {
+            if (AppDB.MainRegistry.TryGetKey(RegistryNames.PLAYLISTS, out IRegistryKey? key))
+            {
+                if (key.TryGet(playlistId, out string? serializedPlaylist))
+                {
+                    playlist = await PlaylistModel.CreateFromSerializedString(serializedPlaylist);
+                }
+            }
+
+            if (playlist is null && AppDB.MainRegistry.TryGetKey(playlistsRegistry, out key))
+            {
+                if (key.TryGet(playlistId, out string? serializedPlaylist))
+                {
+                    playlist = await PlaylistModel.CreateFromSerializedString(serializedPlaylist);
+                    if (playlist is not null)
+                    {
+                        return playlist;
+                    }
+                }
+            }
+        }
+        else
+        {
+            playlistId = Guid.NewGuid().ToString();
+            Route route = Route.Create(GetMainPageAbility().Url)
+                .WithParam(RouterConstants.ARG_PLAYLIST_ID, playlistId);
+            GetMainPageAbility().SetUrl(route.Url);
+        }
+
+        playlist ??= PlaylistModel.CreateEmpty();
+        AppDB.MainRegistry.CreateKey(playlistsRegistry).Set(playlistId, playlist.ToSerializedString());
+        return playlist;
     }
 
     //
