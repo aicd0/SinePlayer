@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -74,7 +74,7 @@ internal class InitTaskManager
                 NativeDialogResult result = ServiceManager.GetService<INativeService>().ShowDialog(
                     NativeDialogButtonType.OKCancel,
                     NativeDialogIconType.Info,
-                    "Comic Reader UWP",
+                    "Sine Player UWP",
                     "The app is launched in WaitForDebugger mode. Attach a debugger then click OK.");
                 if (result != NativeDialogResult.OK)
                 {

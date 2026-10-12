@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Database.SqlHelpers;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Tables;
 
 namespace SinePlayerUWP.Data.Models.TagInfo;
@@ -251,27 +251,27 @@ internal class TagCategoryInfoModel
             return true;
         });
 
-        List<long> comicIds = [];
-        await ComicHandle.Enqueue(() =>
+        List<long> mediaIds = [];
+        await MediaHandle.Enqueue(() =>
         {
             SelectCommand command = SelectCommand.Create(MediaTagCategoryTable.Instance)
                 .AppendCondition(MediaTagCategoryTable.ColumnName, oldName);
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnComicId);
+            IReaderToken<long> mediaIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnMediaId);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
-                long comicId = comicIdToken.GetValue();
-                comicIds.Add(comicId);
+                long mediaId = mediaIdToken.GetValue();
+                mediaIds.Add(mediaId);
             }
 
             return true;
         });
 
         List<Task> tasks = [];
-        List<ComicModel> comics = await ComicModel.BatchFromId(comicIds);
-        foreach (ComicModel comic in comics)
+        List<MediaModel> mediaItems = await MediaModel.BatchFromId(mediaIds);
+        foreach (MediaModel media in mediaItems)
         {
-            Dictionary<string, HashSet<string>> tags = comic.TagsCopy;
+            Dictionary<string, HashSet<string>> tags = media.TagsCopy;
             if (!tags.TryGetValue(newName, out HashSet<string>? tagSet))
             {
                 tagSet = [];
@@ -287,7 +287,7 @@ internal class TagCategoryInfoModel
                 }
             }
 
-            tasks.Add(comic.SetTags(tags));
+            tasks.Add(media.SetTags(tags));
         }
 
         await Task.WhenAll(tasks);
@@ -302,30 +302,30 @@ internal class TagCategoryInfoModel
             return true;
         });
 
-        HashSet<long> comicIds = [];
-        await ComicHandle.Enqueue(() =>
+        HashSet<long> mediaIds = [];
+        await MediaHandle.Enqueue(() =>
         {
             SelectCommand command = SelectCommand.Create(MediaTagCategoryTable.Instance)
                 .AppendCondition(MediaTagCategoryTable.ColumnName, name);
-            IReaderToken<long> comicIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnComicId);
+            IReaderToken<long> mediaIdToken = command.PutQueryInt64(MediaTagCategoryTable.ColumnMediaId);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
-                long comicId = comicIdToken.GetValue();
-                comicIds.Add(comicId);
+                long mediaId = mediaIdToken.GetValue();
+                mediaIds.Add(mediaId);
             }
 
             return true;
         });
 
         List<Task> tasks = [];
-        List<ComicModel> comics = await ComicModel.BatchFromId(comicIds);
-        foreach (ComicModel comic in comics)
+        List<MediaModel> mediaItems = await MediaModel.BatchFromId(mediaIds);
+        foreach (MediaModel media in mediaItems)
         {
-            Dictionary<string, HashSet<string>> comicTags = comic.TagsCopy;
-            if (comicTags.Remove(name))
+            Dictionary<string, HashSet<string>> mediaTags = media.TagsCopy;
+            if (mediaTags.Remove(name))
             {
-                tasks.Add(comic.SetTags(comicTags));
+                tasks.Add(media.SetTags(mediaTags));
             }
         }
 

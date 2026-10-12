@@ -18,7 +18,7 @@ using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.Core.Common.Algorithm;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.Misc;
 using SinePlayerUWP.Helpers.Navigation;
@@ -79,7 +79,7 @@ internal sealed partial class FavoritePage : BasePage
             }
         }
 
-        static void FillNode(List<FavoriteModel.ExternalNodeModel> it, ObservableCollection<FavoriteItemViewModel> et, Dictionary<long, ComicModel> comicMap)
+        static void FillNode(List<FavoriteModel.ExternalNodeModel> it, ObservableCollection<FavoriteItemViewModel> et, Dictionary<long, MediaModel> mediaMap)
         {
             foreach (FavoriteModel.ExternalNodeModel inode in it)
             {
@@ -88,13 +88,13 @@ internal sealed partial class FavoritePage : BasePage
 
                 if (type == FavoriteNodeType.Filter)
                 {
-                    FillNode(inode.Children, enode.Children, comicMap);
+                    FillNode(inode.Children, enode.Children, mediaMap);
                 }
                 else
                 {
                     enode.Id = inode.Id;
-                    comicMap.TryGetValue(inode.Id, out ComicModel? comic);
-                    enode.Comic = comic;
+                    mediaMap.TryGetValue(inode.Id, out MediaModel? media);
+                    enode.Media = media;
                 }
 
                 et.Add(enode);
@@ -110,21 +110,21 @@ internal sealed partial class FavoritePage : BasePage
         List<long> itemIds = [];
         CollectItemIds(model.Children, itemIds);
 
-        List<ComicModel> comics = await ComicModel.BatchFromId(itemIds);
-        Dictionary<long, ComicModel> comicMap = new();
-        foreach (ComicModel comic in comics)
+        List<MediaModel> mediaItems = await MediaModel.BatchFromId(itemIds);
+        Dictionary<long, MediaModel> mediaMap = new();
+        foreach (MediaModel media in mediaItems)
         {
-            comicMap[comic.Id] = comic;
+            mediaMap[media.Id] = media;
         }
 
         ObservableCollection<FavoriteItemViewModel> items = [];
-        FillNode(model.Children, items, comicMap);
+        FillNode(model.Children, items, mediaMap);
 
         static bool comparer(FavoriteItemViewModel x, FavoriteItemViewModel y) => x.Type == y.Type && x.Id == y.Id;
         static void updater(FavoriteItemViewModel x, FavoriteItemViewModel y)
         {
             x.Name = y.Name;
-            x.Comic = y.Comic;
+            x.Media = y.Media;
             DiffUtils.UpdateCollection(x.Children, y.Children, comparer, updater);
         }
 
@@ -331,17 +331,17 @@ internal sealed partial class FavoritePage : BasePage
                 return;
             }
 
-            ComicModel? comic = item.Comic ?? await ComicModel.FromId(item.Id);
-            if (comic is null)
+            MediaModel? media = item.Media ?? await MediaModel.FromId(item.Id);
+            if (media is null)
             {
                 DeleteItem(item);
                 return;
             }
 
-            IEnumerable<ComicModel> playlistComics = item.Parent?.Children.Where(x => x.Type == FavoriteNodeType.Item).Select(x => x.Comic).OfType<ComicModel>() ?? [];
-            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(playlistComics);
-            Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
-            OpenComicHelper.OpenComic(PageActionHandler, route);
+            IEnumerable<MediaModel> playlistMedia = item.Parent?.Children.Where(x => x.Type == FavoriteNodeType.Item).Select(x => x.Media).OfType<MediaModel>() ?? [];
+            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(playlistMedia);
+            Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+            OpenMediaHelper.OpenMedia(PageActionHandler, route);
             GetMainPageAbility().SetSidePaneOpenState(false, force: false);
         });
     }
@@ -442,16 +442,16 @@ internal sealed partial class FavoritePage : BasePage
         CoroutineUtils.Run(async () =>
         {
             var item = (FavoriteItemViewModel)((MenuFlyoutItem)sender).DataContext;
-            ComicModel? comic = item.Comic ?? await ComicModel.FromId(item.Id);
-            if (comic is null)
+            MediaModel? media = item.Media ?? await MediaModel.FromId(item.Id);
+            if (media is null)
             {
                 DeleteItem(item);
                 return;
             }
 
-            IEnumerable<ComicModel> playlistComics = item.Parent?.Children.Where(x => x.Type == FavoriteNodeType.Item).Select(x => x.Comic).OfType<ComicModel>() ?? [];
-            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(playlistComics);
-            Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
+            IEnumerable<MediaModel> playlistMedia = item.Parent?.Children.Where(x => x.Type == FavoriteNodeType.Item).Select(x => x.Media).OfType<MediaModel>() ?? [];
+            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(playlistMedia);
+            Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
             GetMainPageAbility().OpenInNewTab(route);
         });
     }

@@ -150,14 +150,11 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>Передовой</value>
   </data>
-  <data name="AllComics" xml:space="preserve">
-    <value>Все комиксы</value>
-  </data>
-  <data name="AllComicsIn" xml:space="preserve">
-    <value>Все комиксы в $path</value>
-  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>Все скрытые элементы</value>
+  </data>
+  <data name="AllItems" xml:space="preserve">
+    <value>Все элементы</value>
   </data>
   <data name="AllMatchedResults" xml:space="preserve">
     <value>Все совпавшие результаты</value>
@@ -197,6 +194,9 @@
   </data>
   <data name="Auto" xml:space="preserve">
     <value>Авто</value>
+  </data>
+  <data name="AutoPlayNext" xml:space="preserve">
+    <value>Автоматически воспроизводить следующий элемент</value>
   </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>Автопрокрутка</value>
@@ -240,9 +240,6 @@
   <data name="ClearCache" xml:space="preserve">
     <value>Очистить кэш</value>
   </data>
-  <data name="ClearReaderSettings" xml:space="preserve">
-    <value>Сбросить настройки чтения</value>
-  </data>
   <data name="CloseLastTabBehavior" xml:space="preserve">
     <value>Поведение при закрытии последней вкладки</value>
   </data>
@@ -264,12 +261,6 @@
   <data name="CollectionInformation" xml:space="preserve">
     <value>Информация о коллекции</value>
   </data>
-  <data name="ComicExclusionExplaination" xml:space="preserve">
-    <value>Выбор пункта «добавить в список исключений» не позволит повторно импортировать комикс при следующем обновлении библиотеки.</value>
-  </data>
-  <data name="ComicInfo" xml:space="preserve">
-    <value>Информация о комиксах</value>
-  </data>
   <data name="CompletionStatus" xml:space="preserve">
     <value>Состояние завершения</value>
   </data>
@@ -279,17 +270,17 @@
   <data name="CompletionStatusCompleted" xml:space="preserve">
     <value>Завершено</value>
   </data>
+  <data name="CompletionStatusNotStarted" xml:space="preserve">
+    <value>Не начато</value>
+  </data>
   <data name="CompletionStatusOnHold" xml:space="preserve">
-    <value>Отложено</value>
+    <value>Приостановлено</value>
   </data>
-  <data name="CompletionStatusPlanToRead" xml:space="preserve">
-    <value>Запланировано к чтению</value>
+  <data name="CompletionStatusOngoing" xml:space="preserve">
+    <value>В процессе</value>
   </data>
-  <data name="CompletionStatusReading" xml:space="preserve">
-    <value>Читаю</value>
-  </data>
-  <data name="CompletionStatusUnread" xml:space="preserve">
-    <value>Не прочитано</value>
+  <data name="CompletionStatusPlanned" xml:space="preserve">
+    <value>Запланировано</value>
   </data>
   <data name="Continuous" xml:space="preserve">
     <value>Непрерывный</value>
@@ -368,8 +359,8 @@ $files</value>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>Скачать плагины с GitHub</value>
   </data>
-  <data name="DuringAutoScrolling" xml:space="preserve">
-    <value>Во время автопрокрутки</value>
+  <data name="Duration" xml:space="preserve">
+    <value>Длительность</value>
   </data>
   <data name="Edit" xml:space="preserve">
     <value>Редактировать</value>
@@ -444,7 +435,7 @@ $files</value>
 %rating                  - Соответствует рейтингу. Например: 100 представляет 5 звезды, -1 представляет отсутствие рейтинга.
 %completion_state        - Состояние завершения комикса (0 - не прочитано, 1 - читается, 2 - завершено).
 %progress                - прогресс чтения в процентах. Например: 50 представляет 50%.
-%page_count              - Всего страниц.
+%duration                - Общая длительность.
 
 2. Операторы переменных
 
@@ -544,27 +535,6 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="GoForward" xml:space="preserve">
     <value>Идти вперед</value>
   </data>
-  <data name="GoToFirstPage" xml:space="preserve">
-    <value>Перейти на первую страницу</value>
-  </data>
-  <data name="GoToLastPage" xml:space="preserve">
-    <value>Перейти на последнюю страницу</value>
-  </data>
-  <data name="GoToLeftPage" xml:space="preserve">
-    <value>Перейти на левую страницу</value>
-  </data>
-  <data name="GoToNextPage" xml:space="preserve">
-    <value>Перейти на следующую страницу</value>
-  </data>
-  <data name="GoToPreviousPage" xml:space="preserve">
-    <value>Перейти на предыдущую страницу</value>
-  </data>
-  <data name="GoToRandomPage" xml:space="preserve">
-    <value>Перейти на случайную страницу</value>
-  </data>
-  <data name="GoToRightPage" xml:space="preserve">
-    <value>Перейти на правую страницу</value>
-  </data>
   <data name="Group" xml:space="preserve">
     <value>Группировка</value>
   </data>
@@ -610,8 +580,8 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Images" xml:space="preserve">
     <value>Картинки</value>
   </data>
-  <data name="IncludeHiddenComics" xml:space="preserve">
-    <value>Включать скрытые комиксы</value>
+  <data name="IncludeHiddenItems" xml:space="preserve">
+    <value>Включить скрытые элементы</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>Установить плагин</value>
@@ -653,11 +623,8 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="LanguageExpander.Header" xml:space="preserve">
     <value>Язык</value>
   </data>
-  <data name="LastReadTime" xml:space="preserve">
-    <value>Время последнего чтения</value>
-  </data>
-  <data name="LeftToRight" xml:space="preserve">
-    <value>Слева направо</value>
+  <data name="LastVisitTime" xml:space="preserve">
+    <value>Время последнего посещения</value>
   </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>Нет результатов при текущих настройках фильтра. Попробуйте </value>
@@ -683,8 +650,11 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Links" xml:space="preserve">
     <value>Ссылки</value>
   </data>
-  <data name="MaintainRelativeSize" xml:space="preserve">
-    <value>Сохранять относительный размер</value>
+  <data name="MediaExclusionExplaination" xml:space="preserve">
+    <value>Выбор пункта «добавить в список исключений» не позволит повторно импортировать комикс при следующем обновлении библиотеки.</value>
+  </data>
+  <data name="MediaInfo" xml:space="preserve">
+    <value>Информация о медиафайле</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Создать новую папку</value>
@@ -734,9 +704,6 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Next" xml:space="preserve">
     <value>Следующий</value>
   </data>
-  <data name="NoComicsHint" xml:space="preserve">
-    <value>Ваши комиксы появятся здесь</value>
-  </data>
   <data name="NoContent" xml:space="preserve">
     <value>Нет содержимого для отображения</value>
   </data>
@@ -748,6 +715,9 @@ NOT                      - Логическое не. Например: NOT %tag
   </data>
   <data name="NoKeyboardShortcuts" xml:space="preserve">
     <value>Нет сочетаний клавиш</value>
+  </data>
+  <data name="NoMediaHint" xml:space="preserve">
+    <value>Ваши медиафайлы появятся здесь</value>
   </data>
   <data name="NoPluginsInstalled" xml:space="preserve">
     <value>Нет установленных плагинов</value>
@@ -770,14 +740,11 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="OK" xml:space="preserve">
     <value>ХОРОШО</value>
   </data>
-  <data name="OnlyAppliesToReadingComics" xml:space="preserve">
+  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
     <value>Применяется только к комиксам со статусом «Читается»</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>Открыть</value>
-  </data>
-  <data name="OpenComicDefaultBehavior" xml:space="preserve">
-    <value>Поведение по умолчанию при открытии комикса</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Открыть главную страницу</value>
@@ -791,17 +758,20 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="OpenInNewTab" xml:space="preserve">
     <value>Открыть в новой вкладке</value>
   </data>
+  <data name="OpenItemDefaultBehavior" xml:space="preserve">
+    <value>Поведение по умолчанию при открытии элемента</value>
+  </data>
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>Открыть папку метаданных</value>
   </data>
-  <data name="OpenNextComic" xml:space="preserve">
-    <value>Открыть следующий комикс</value>
+  <data name="OpenNextItem" xml:space="preserve">
+    <value>Открыть следующий элемент</value>
   </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>Открыть папку плагинов</value>
   </data>
-  <data name="OpenPreviousComic" xml:space="preserve">
-    <value>Открыть предыдущий комикс</value>
+  <data name="OpenPreviousItem" xml:space="preserve">
+    <value>Открыть предыдущий элемент</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>Открыть боковую панель</value>
@@ -812,15 +782,6 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Эта операция перезапишет существующие записи.</value>
   </data>
-  <data name="PageCount" xml:space="preserve">
-    <value>Страницы</value>
-  </data>
-  <data name="PageN" xml:space="preserve">
-    <value>Страница $page</value>
-  </data>
-  <data name="PageSpacing" xml:space="preserve">
-    <value>интервал</value>
-  </data>
   <data name="Pause" xml:space="preserve">
     <value>Пауза</value>
   </data>
@@ -830,17 +791,35 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Play" xml:space="preserve">
     <value>Воспроизвести</value>
   </data>
+  <data name="PlayPause" xml:space="preserve">
+    <value>Воспроизведение / Пауза</value>
+  </data>
+  <data name="PlayerExpander.Detail" xml:space="preserve">
+    <value>Общие настройки проигрывателя</value>
+  </data>
+  <data name="PlayerExpander.Header" xml:space="preserve">
+    <value>Проигрыватель</value>
+  </data>
+  <data name="PlayerSettings" xml:space="preserve">
+    <value>Настройки плеера</value>
+  </data>
+  <data name="PlayerStatusError" xml:space="preserve">
+    <value>Произошла ошибка при загрузке</value>
+  </data>
+  <data name="PlayerStatusLoading" xml:space="preserve">
+    <value>Загрузка проигрывателя</value>
+  </data>
+  <data name="Playlist" xml:space="preserve">
+    <value>Плейлист</value>
+  </data>
+  <data name="PlaylistEmpty" xml:space="preserve">
+    <value>Ваш плейлист появится здесь</value>
+  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Управление и настройка плагинов</value>
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>Плагины</value>
-  </data>
-  <data name="PreloadPagesAfter" xml:space="preserve">
-    <value>Предзагрузка страниц (после текущей страницы)</value>
-  </data>
-  <data name="PreloadPagesBefore" xml:space="preserve">
-    <value>Предзагрузка страниц (до текущей страницы)</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>Нажмите сочетание клавиш</value>
@@ -857,40 +836,14 @@ NOT                      - Логическое не. Например: NOT %tag
   <data name="Progress" xml:space="preserve">
     <value>Прогресс</value>
   </data>
-  <data name="PromptBeforeRemovingComics" xml:space="preserve">
-    <value>Запрашивать подтверждение перед удалением комиксов</value>
+  <data name="PromptBeforeRemovingItems" xml:space="preserve">
+    <value>Запрашивать подтверждение перед удалением элементов</value>
   </data>
-  <data name="RandomComic" xml:space="preserve">
-    <value>Случайный комикс</value>
+  <data name="Random" xml:space="preserve">
+    <value>В случайном порядке</value>
   </data>
   <data name="Rating" xml:space="preserve">
     <value>Рейтинг</value>
-  </data>
-  <data name="ReaderExpander.Detail" xml:space="preserve">
-    <value>Настройте считыватель</value>
-  </data>
-  <data name="ReaderExpander.Header" xml:space="preserve">
-    <value>Читатель</value>
-  </data>
-  <data name="ReaderSettingButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Настройки ридера</value>
-  </data>
-  <data name="ReaderStatusError" xml:space="preserve">
-    <value>Произошла ошибка при загрузке</value>
-  </data>
-  <data name="ReaderStatusLoading" xml:space="preserve">
-    <value>Читатель загружается</value>
-  </data>
-  <data name="ReaderTipContent" xml:space="preserve">
-    <value>1. Дважды нажмите, чтобы подогнать страницу по ширине или высоте.
-2. Установите значение «Автопрокрутка» больше 0, чтобы включить автопрокрутку и прокрутку средней кнопкой мыши.
-3. Перетащите страницу, чтобы изменить скорость автопрокрутки.</value>
-  </data>
-  <data name="ReadingList" xml:space="preserve">
-    <value>Список чтения</value>
-  </data>
-  <data name="ReadingListEmpty" xml:space="preserve">
-    <value>Ваш список чтения появится здесь</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>Обновить</value>
@@ -908,7 +861,7 @@ NOT                      - Логическое не. Например: NOT %tag
     <value>Удалить из избранного</value>
   </data>
   <data name="RemoveItemsConfirmation" xml:space="preserve">
-    <value>Следующие $count элемент(ов) будут безвозвратно удалены из вашей библиотеки:
+    <value>Следующие элементы ($count) будут навсегда удалены из вашей библиотеки:
 
 $items</value>
   </data>
@@ -936,6 +889,9 @@ $plugins</value>
   </data>
   <data name="ResetAllSettingsMessage" xml:space="preserve">
     <value>Все настройки будут восстановлены до состояния по умолчанию. Ваши пользовательские данные будут сохранены.</value>
+  </data>
+  <data name="ResetPlayerSettings" xml:space="preserve">
+    <value>Сбросить настройки плеера</value>
   </data>
   <data name="Restore" xml:space="preserve">
     <value>Восстановить</value>
@@ -980,6 +936,12 @@ $plugins</value>
   <data name="SearchResultsOf" xml:space="preserve">
     <value>Результаты '$keyword'</value>
   </data>
+  <data name="SeekBackward" xml:space="preserve">
+    <value>Перемотка назад</value>
+  </data>
+  <data name="SeekForward" xml:space="preserve">
+    <value>Перемотка вперёд</value>
+  </data>
   <data name="Select" xml:space="preserve">
     <value>Выбирать</value>
   </data>
@@ -1010,7 +972,7 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>Настройки</value>
   </data>
-  <data name="ShowHiddenComicButton.Content" xml:space="preserve">
+  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
     <value>Показать скрытые комиксы</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
@@ -1031,17 +993,8 @@ $plugins</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>Функция сортировки</value>
   </data>
-  <data name="SpreadDetection" xml:space="preserve">
-    <value>Определение разворотов</value>
-  </data>
-  <data name="StartEndFromScrollingArea" xml:space="preserve">
-    <value>Использовать начало/конец области прокрутки как начало/конец чтения</value>
-  </data>
   <data name="Statistics" xml:space="preserve">
     <value>Статистика</value>
-  </data>
-  <data name="SwapLeftAndRightPages" xml:space="preserve">
-    <value>Поменять страницы местами</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>Ярлык</value>
@@ -1084,17 +1037,11 @@ $plugins</value>
   <data name="Title2" xml:space="preserve">
     <value>Заголовок 2</value>
   </data>
-  <data name="ToggleAutoScroll" xml:space="preserve">
-    <value>Переключить автопрокрутку</value>
-  </data>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>Переключить полноэкранный режим</value>
   </data>
-  <data name="TotalComics" xml:space="preserve">
-    <value>Всего комиксов</value>
-  </data>
-  <data name="TransitionAnimation" xml:space="preserve">
-    <value>Анимация перелистывания страниц</value>
+  <data name="TotalMedia" xml:space="preserve">
+    <value>Всего медиафайлов</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Режим разворота</value>
@@ -1137,11 +1084,20 @@ $info</value>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>Середина</value>
   </data>
+  <data name="VolumeDown" xml:space="preserve">
+    <value>Уменьшить громкость</value>
+  </data>
+  <data name="VolumeUp" xml:space="preserve">
+    <value>Увеличить громкость</value>
+  </data>
   <data name="Warning" xml:space="preserve">
     <value>Предупреждение</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>Прямо сейчас мы наблюдаем за этими папками:</value>
+  </data>
+  <data name="WhilePlayingVideos" xml:space="preserve">
+    <value>Во время воспроизведения видео</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>Окно $n</value>

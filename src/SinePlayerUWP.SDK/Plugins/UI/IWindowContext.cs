@@ -4,17 +4,17 @@
 using Microsoft.UI.Xaml.Controls;
 
 using SinePlayerUWP.SDK.Models;
-using SinePlayerUWP.SDK.Plugins.Comic;
+using SinePlayerUWP.SDK.Plugins.Media;
 
 namespace SinePlayerUWP.SDK.Plugins.UI;
 
-public delegate void ReadingComicChangedEventHandler(IComicModel? comic);
+public delegate void ForegroundMediaChangedEventHandler(IMediaModel? comic);
 
 public interface IWindowContext
 {
-    event ReadingComicChangedEventHandler? ReadingComicChanged;
+    event ForegroundMediaChangedEventHandler? ForegroundMediaChanged;
 
-    IComicModel? ReadingComic { get; }
+    IMediaModel? ForegroundMedia { get; }
 
     Task<DialogResult> EnqueueDialog(DialogOptions options);
 

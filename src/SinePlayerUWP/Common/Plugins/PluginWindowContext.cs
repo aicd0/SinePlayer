@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -12,7 +12,7 @@ using SinePlayerUWP.Common.BaseUI;
 using SinePlayerUWP.Common.BaseUI.PageAbilities;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.SDK.Models;
-using SinePlayerUWP.SDK.Plugins.Comic;
+using SinePlayerUWP.SDK.Plugins.Media;
 using SinePlayerUWP.SDK.Plugins.UI;
 
 namespace SinePlayerUWP.Common.Plugins;
@@ -48,32 +48,32 @@ internal sealed class PluginWindowContext(int windowId) : IWindowContext
     // Public API
     //
 
-    public void SetReadingComic(IComicModel? comic, Func<Action?, bool> executor)
+    public void SetForegroundMedia(IMediaModel? media, Func<Action?, bool> executor)
     {
-        if (comic == _readingComic)
+        if (media == _foregroundMedia)
         {
             return;
         }
 
-        _readingComic = comic;
-        executor(() => _readingComicChanged?.Invoke(comic));
+        _foregroundMedia = media;
+        executor(() => _foregroundMediaChanged?.Invoke(media));
     }
 
     //
     // IWindowContext Implementation
     //
 
-    private event ReadingComicChangedEventHandler? _readingComicChanged;
+    private event ForegroundMediaChangedEventHandler? _foregroundMediaChanged;
 
-    private IComicModel? _readingComic;
+    private IMediaModel? _foregroundMedia;
 
-    event ReadingComicChangedEventHandler? IWindowContext.ReadingComicChanged
+    event ForegroundMediaChangedEventHandler? IWindowContext.ForegroundMediaChanged
     {
-        add { _readingComicChanged += value; }
-        remove { _readingComicChanged -= value; }
+        add { _foregroundMediaChanged += value; }
+        remove { _foregroundMediaChanged -= value; }
     }
 
-    public IComicModel? ReadingComic => _readingComic;
+    public IMediaModel? ForegroundMedia => _foregroundMedia;
 
     Task<DialogResult> IWindowContext.EnqueueDialog(DialogOptions options)
     {

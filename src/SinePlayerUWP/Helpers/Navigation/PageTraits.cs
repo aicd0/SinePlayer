@@ -6,7 +6,7 @@
 using System;
 
 using SinePlayerUWP.Common.BaseUI;
-using SinePlayerUWP.Views.Pages.Reader;
+using SinePlayerUWP.Views.Pages.Player;
 using SinePlayerUWP.Views.Pages.Settings;
 
 namespace SinePlayerUWP.Helpers.Navigation;
@@ -22,21 +22,21 @@ internal class DefaultPageTrait(Type pageType) : IPageTrait
     public bool AllowMultiplePages => true;
 }
 
-internal class ReaderPageTrait : IPageTrait
+internal class PlayerPageTrait : IPageTrait
 {
     private static IPageTrait _instance;
     public static IPageTrait Instance
     {
         get
         {
-            _instance ??= new ReaderPageTrait();
+            _instance ??= new PlayerPageTrait();
             return _instance;
         }
     }
 
-    private ReaderPageTrait() { }
+    private PlayerPageTrait() { }
 
-    public Type PageType => typeof(ReaderPage);
+    public Type PageType => typeof(PlayerPage);
 
     public bool IsImmersiveMode => true;
 

@@ -3,7 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:base="using:SinePlayerUWP.Common.BaseUI"
-    xmlns:comicselection="using:SinePlayerUWP.UserControls.ComicSelection"
+    xmlns:mediaselection="using:SinePlayerUWP.UserControls.MediaSelection"
     xmlns:controls="using:SinePlayerUWP.UserControls.Misc"
     xmlns:converters="using:SinePlayerUWP.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -39,12 +39,12 @@
             IsHitTestVisible="False"
             Visibility="{x:Bind ViewModel.BackgroundImageUri, Converter={StaticResource StringToVisibilityConverter}, Mode=OneWay}" />
 
-        <comicselection:ComicSelectionView
+        <mediaselection:MediaSelectionView
             x:Name="ItemsView"
             ContentPadding="0,0,0,8"
             ItemViewType="{x:Bind ViewModel.ViewType, Mode=OneWay}"
             ScrollOffsetChanged="ItemsView_ScrollOffsetChanged">
-            <comicselection:ComicSelectionView.HeaderContent>
+            <mediaselection:MediaSelectionView.HeaderContent>
                 <StackPanel
                     x:Name="HeaderRoot"
                     Margin="0,36,0,4"
@@ -93,7 +93,7 @@
                                 ValueChanged="RatingControl_ValueChanged"
                                 Value="{x:Bind ViewModel.Rating, Mode=TwoWay}" />
                             <!--  Tags  -->
-                            <controls:ComicTagsView Margin="0,12,0,0" Tags="{x:Bind ViewModel.ComicTags}" />
+                            <controls:MediaTagsView Margin="0,12,0,0" Tags="{x:Bind ViewModel.MediaTags}" />
                         </StackPanel>
                         <StackPanel
                             Grid.Column="2"
@@ -174,8 +174,8 @@
                         </Grid>
                     </Grid>
                 </StackPanel>
-            </comicselection:ComicSelectionView.HeaderContent>
-        </comicselection:ComicSelectionView>
+            </mediaselection:MediaSelectionView.HeaderContent>
+        </mediaselection:MediaSelectionView>
 
         <Grid x:Name="DockedBarHost" VerticalAlignment="Top" />
     </Grid>

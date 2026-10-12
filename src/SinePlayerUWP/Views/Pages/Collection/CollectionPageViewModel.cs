@@ -14,13 +14,13 @@ using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Threading;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Misc;
 using SinePlayerUWP.Helpers.Navigation;
 using SinePlayerUWP.Helpers.Search;
-using SinePlayerUWP.UserControls.ComicSelection;
+using SinePlayerUWP.UserControls.MediaSelection;
 using SinePlayerUWP.ViewModels;
 
 namespace SinePlayerUWP.Views.Pages.Collection;
@@ -142,8 +142,8 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
 
     public string ItemCountText => StringResourceProvider.Instance.NItems.Replace("$n", ItemCount.ToString());
 
-    private ComicFilterModel.ViewTypeEnum _viewType = ComicFilterModel.ViewTypeEnum.Medium;
-    public ComicFilterModel.ViewTypeEnum ViewType
+    private MediaFilterModel.ViewTypeEnum _viewType = MediaFilterModel.ViewTypeEnum.Medium;
+    public MediaFilterModel.ViewTypeEnum ViewType
     {
         get => _viewType;
         set
@@ -158,31 +158,31 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
         }
     }
 
-    public ComicModel? Collection => _collection;
-    public ObservableCollection<TagCollectionViewModel> ComicTags { get; } = [];
-    public ComicSelectionViewModel ComicSelection { get; }
+    public MediaModel? Collection => _collection;
+    public ObservableCollection<TagCollectionViewModel> MediaTags { get; } = [];
+    public MediaSelectionViewModel MediaSelection { get; }
 
-    public readonly MutableLiveData<IReadOnlyList<ComicItemViewModel>> ResultsLiveData = new();
+    public readonly MutableLiveData<IReadOnlyList<MediaItemViewModel>> ResultsLiveData = new();
     public readonly MutableLiveData<string> TitleLiveData = new();
 
     //
     // Fields
     //
 
-    private readonly ComicSearchEngine _searchEngine = new();
+    private readonly MediaSearchEngine _searchEngine = new();
     private readonly ITaskDispatcher _sharedDispatcher = TaskDispatcher.Factory.NewQueue("CollectionPageQueue");
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
     private long _collectionId = -1;
-    private ComicModel? _collection;
-    private List<ComicModel> _comics = [];
+    private MediaModel? _collection;
+    private List<MediaModel> _mediaItems = [];
     private long _lastSearchTime = 0;
     private int _reloadSubmitted = 0;
     private int _reloadInvalidated = 0;
 
     public CollectionPageViewModel()
     {
-        ComicSelection = new(() => _comics.Count);
+        MediaSelection = new(() => _mediaItems.Count);
     }
 
     //
@@ -201,7 +201,7 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
 
         _searchEngine.SetResultCallback(OnSearchResult);
 
-        ViewType = ComicFilterModel.Instance.LastViewType;
+        ViewType = MediaFilterModel.Instance.LastViewType;
 
         Refresh();
     }
@@ -256,12 +256,12 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private void OnSearchResult(IReadOnlyList<ComicModel> comics)
+    private void OnSearchResult(IReadOnlyList<MediaModel> mediaItems)
     {
-        List<ComicModel> filtered = [.. comics];
+        List<MediaModel> filtered = [.. mediaItems];
         filtered.Sort(CompareByTitle);
 
-        List<ComicItemViewModel> items = BuildItems(filtered);
+        List<MediaItemViewModel> items = BuildItems(filtered);
         CoroutineUtils.RunInMainThread(() => ApplyResults(filtered, items));
     }
 
@@ -271,7 +271,7 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
 
     public void SetRating(double value)
     {
-        ComicModel? collection = _collection;
+        MediaModel? collection = _collection;
         if (collection is null)
         {
             return;
@@ -299,7 +299,7 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
 
     public void ToggleFavorite()
     {
-        ComicModel? collection = _collection;
+        MediaModel? collection = _collection;
         if (collection is null)
         {
             return;
@@ -319,7 +319,7 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
         });
     }
 
-    public void SelectViewType(ComicFilterModel.ViewTypeEnum viewType)
+    public void SelectViewType(MediaFilterModel.ViewTypeEnum viewType)
     {
         if (ViewType == viewType)
         {
@@ -327,7 +327,7 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
         }
 
         ViewType = viewType;
-        ComicFilterModel.Instance.LastViewType = viewType;
+        MediaFilterModel.Instance.LastViewType = viewType;
     }
 
     //
@@ -338,7 +338,7 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
     {
         Logger.I(TAG, "ReloadNoLock");
 
-        ComicModel? collection = await ComicModel.FromId(_collectionId);
+        MediaModel? collection = await MediaModel.FromId(_collectionId);
         if (collection is null || !collection.IsCollection)
         {
             return;
@@ -354,53 +354,53 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
         });
     }
 
-    private void ApplyInfo(ComicModel collection, bool isFavorite)
+    private void ApplyInfo(MediaModel collection, bool isFavorite)
     {
         Title = GetTitle(collection);
         Description = collection.Description;
         int rating = collection.Rating;
         Rating = rating >= 0 ? rating * 0.05F : -1.0;
-        CoverImageUri = ComicExt.GetCoverImageUri(collection);
-        BackgroundImageUri = collection.GetExt(ComicExt.BACKGROUND_IMAGE);
+        CoverImageUri = MediaExt.GetCoverImageUri(collection);
+        BackgroundImageUri = collection.GetExt(MediaExt.BACKGROUND_IMAGE);
         IsEditable = collection.IsEditable;
         IsFavorite = isFavorite;
-        TagCollectionViewModel.Update(ComicTags, collection, _actionHandler);
+        TagCollectionViewModel.Update(MediaTags, collection, _actionHandler);
         TitleLiveData.Emit(collection.Title);
     }
 
-    private void ApplyResults(List<ComicModel> comics, List<ComicItemViewModel> items)
+    private void ApplyResults(List<MediaModel> mediaItems, List<MediaItemViewModel> items)
     {
-        _comics = comics;
-        ItemCount = comics.Count;
+        _mediaItems = mediaItems;
+        ItemCount = mediaItems.Count;
         ResultsLiveData.Emit(items);
     }
 
-    private List<ComicItemViewModel> BuildItems(List<ComicModel> comics)
+    private List<MediaItemViewModel> BuildItems(List<MediaModel> mediaItems)
     {
-        PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(comics);
-        List<ComicItemViewModel> items = [];
-        foreach (ComicModel comic in comics)
+        PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(mediaItems);
+        List<MediaItemViewModel> items = [];
+        foreach (MediaModel media in mediaItems)
         {
-            var item = new ComicItemViewModel(comic)
+            var item = new MediaItemViewModel(media)
             {
                 OnClick = model =>
                 {
-                    if (ComicSelection.IsSelectMode)
+                    if (MediaSelection.IsSelectMode)
                     {
                         return;
                     }
 
-                    Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
-                    OpenComicHelper.OpenComic(_actionHandler, route);
+                    Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                    OpenMediaHelper.OpenMedia(_actionHandler, route);
                 },
                 OnRequestContextFlyoutAsync = model =>
                 {
-                    IEnumerable<ComicModel>? selectedComics = ComicSelection.IsSelectMode ? ComicSelection.GetSelectedComics() : null;
-                    return MenuFlyoutItemsCreator.CreateComicMenuItems(
+                    IEnumerable<MediaModel>? selectedMedia = MediaSelection.IsSelectMode ? MediaSelection.GetSelectedMedia() : null;
+                    return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                         _actionHandler,
-                        comic,
+                        media,
                         playlist: playlist,
-                        selectedItems: selectedComics,
+                        selectedItems: selectedMedia,
                         canSelect: true);
                 },
             };
@@ -415,14 +415,14 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
     // Utilities
     //
 
-    private static string GetTitle(ComicModel collection)
+    private static string GetTitle(MediaModel collection)
     {
         return collection.Title1.Length > 0 && collection.Title2.Length > 0
             ? collection.Title1 + "\n" + collection.Title2
             : collection.Title;
     }
 
-    private static int CompareByTitle(ComicModel a, ComicModel b)
+    private static int CompareByTitle(MediaModel a, MediaModel b)
     {
         int result = string.Compare(a.Title, b.Title, ignoreCase: true);
         return result != 0 ? result : a.Id.CompareTo(b.Id);

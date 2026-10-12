@@ -29,7 +29,7 @@ using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Threading;
 using SinePlayerUWP.Core.Common.Utils;
 using SinePlayerUWP.Data.Database;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Navigation;
@@ -210,7 +210,7 @@ internal sealed partial class MainPage : BasePage
 
         KeyboardShortcutManager.ShortcutsChangedLiveData.Observe(this, _ => UpdateKeyboardAccelerators());
 
-        ComicModel.IsScanningLibraryLiveData.ObserveSticky(this, scanning =>
+        MediaModel.IsScanningLibraryLiveData.ObserveSticky(this, scanning =>
         {
             ViewModel.Refreshing = scanning;
         });

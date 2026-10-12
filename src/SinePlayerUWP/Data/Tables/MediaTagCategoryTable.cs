@@ -12,7 +12,7 @@ internal class MediaTagCategoryTable : ITable
 
     public static Int64Column ColumnId { get; } = new("id");
     public static StringColumn ColumnName { get; } = new("name");
-    public static Int64Column ColumnComicId { get; } = new("comic_id");
+    public static Int64Column ColumnMediaId { get; } = new("media_id");
 
     private MediaTagCategoryTable() { }
 

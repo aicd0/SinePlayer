@@ -40,9 +40,9 @@ internal sealed partial class PlaylistPage : BasePage
 
     private void ObserveData()
     {
-        GlobalEvent.Instance.ComicUpdated.Observe(this, _ =>
+        GlobalEvent.Instance.MediaUpdated.Observe(this, _ =>
         {
-            ViewModel.UpdateComics();
+            ViewModel.UpdateMedia();
         });
 
         GetWindowEventBus().With<PlaybackModel>(EventId.PlaybackChanged).ObserveSticky(this, ViewModel.SetPlayback);

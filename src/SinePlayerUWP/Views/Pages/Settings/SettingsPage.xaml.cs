@@ -44,7 +44,7 @@ internal sealed partial class SettingsPage : BasePage
 
         GeneralSettingsSection.Initialize(ViewModel.Shared);
         ImageSourceSettingsSection.Initialize(this, ViewModel.Shared);
-        ReaderSettingsSection.Initialize(ViewModel.Shared);
+        PlayerSettingsSection.Initialize(ViewModel.Shared);
         AppearanceSettingsSection.Initialize(ViewModel.Shared);
         KeyboardShortcutSettingsSection.Initialize(this, ViewModel.Shared);
         PluginSettingsSection.Initialize(ViewModel.Shared);
@@ -64,7 +64,7 @@ internal sealed partial class SettingsPage : BasePage
 
     private void ObserveData()
     {
-        GlobalEvent.Instance.ComicUpdated.Observe(this, _ =>
+        GlobalEvent.Instance.MediaUpdated.Observe(this, _ =>
         {
             ViewModel.UpdateStatistics();
         });

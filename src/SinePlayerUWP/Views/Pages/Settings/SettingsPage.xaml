@@ -69,13 +69,13 @@
                         </settings:SettingExpander.InnerContent>
                     </settings:SettingExpander>
 
-                    <!--  Reader  -->
+                    <!--  Player  -->
                     <settings:SettingExpander
-                        x:Uid="ReaderExpander"
-                        Glyph="&#xE736;"
+                        x:Uid="PlayerExpander"
+                        Glyph="&#xE768;"
                         IsExpanded="False">
                         <settings:SettingExpander.InnerContent>
-                            <settings:ReaderSettingsView x:Name="ReaderSettingsSection" />
+                            <settings:PlayerSettingsView x:Name="PlayerSettingsSection" />
                         </settings:SettingExpander.InnerContent>
                     </settings:SettingExpander>
 

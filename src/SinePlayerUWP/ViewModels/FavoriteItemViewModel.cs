@@ -5,7 +5,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 
 using SinePlayerUWP.Common.BaseUI;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 
 namespace SinePlayerUWP.ViewModels;
 
@@ -29,7 +29,7 @@ internal partial class FavoriteItemViewModel : BaseViewModel, INotifyPropertyCha
         _expanded = false;
     }
 
-    public ComicModel? Comic { get; set; }
+    public MediaModel? Media { get; set; }
     public string Name { get; set; }
     public string EditingName { get; set; }
     public long Id { get; set; }
@@ -62,7 +62,7 @@ internal partial class FavoriteItemViewModel : BaseViewModel, INotifyPropertyCha
         set { Type = value ? FavoriteNodeType.Item : FavoriteNodeType.Filter; }
     }
 
-    public string ItemGlyph => Comic is null ? "\uE9CE" : (Comic.IsCollection ? "\uF5ED" : "\uE8B9");
+    public string ItemGlyph => Media is null ? "\uE9CE" : (Media.IsCollection ? "\uF5ED" : "\uE8B9");
 
     public void FixParent()
     {

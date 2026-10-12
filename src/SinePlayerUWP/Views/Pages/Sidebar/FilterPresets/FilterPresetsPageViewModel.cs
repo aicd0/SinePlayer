@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System;
@@ -16,7 +16,7 @@ using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Threading;
 using SinePlayerUWP.Core.Common.Utils;
 using SinePlayerUWP.Data.Database;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Misc;
@@ -47,52 +47,52 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _noComicsVisible = false;
-    public bool NoComicsVisible
+    private bool _noMediaVisible = false;
+    public bool NoMediaVisible
     {
-        get => _noComicsVisible;
+        get => _noMediaVisible;
         set
         {
-            if (_noComicsVisible != value)
+            if (_noMediaVisible != value)
             {
-                _noComicsVisible = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NoComicsVisible)));
+                _noMediaVisible = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NoMediaVisible)));
             }
         }
     }
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
-    private readonly ComicSearchEngine _searchEngine = new();
-    private ComicFilterModel.ExternalFilterModel? _selectedFilter;
+    private readonly MediaSearchEngine _searchEngine = new();
+    private MediaFilterModel.ExternalFilterModel? _selectedFilter;
     private bool _searchSubmitted = false;
 
     private readonly ITaskDispatcher _sharedDispatcher = TaskDispatcher.Factory.NewQueue("FilterPresetsPageQueue");
-    private int _updateComicSubmitted = 0;
+    private int _updateMediaSubmitted = 0;
 
     public void Initialize(ActionHandler actionHandler)
     {
         _actionHandler = actionHandler;
-        _searchEngine.ExcludeInCollectionComics = true;
-        _searchEngine.SetResultCallback(OnComicSearchResult);
+        _searchEngine.ExcludeInCollectionMedia = true;
+        _searchEngine.SetResultCallback(OnMediaSearchResult);
     }
 
-    public void UpdateComics()
+    public void UpdateMedia()
     {
-        ScheduleUpdateComics();
+        ScheduleUpdateMedia();
     }
 
-    public List<ComicModel> GetComicSnapshot()
+    public List<MediaModel> GetMediaSnapshot()
     {
-        List<ComicModel> comics = [];
+        List<MediaModel> mediaItems = [];
         foreach (SimpleTreeViewNodeModel node in DataSource)
         {
-            foreach (ComicModel comic in node.CollectDataContext<ComicModel>())
+            foreach (MediaModel media in node.CollectDataContext<MediaModel>())
             {
-                comics.Add(comic);
+                mediaItems.Add(media);
             }
         }
 
-        return comics;
+        return mediaItems;
     }
 
     public void SetSearchText(string searchText)
@@ -134,7 +134,7 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private void SetFilter(ComicFilterModel.ExternalFilterModel filter)
+    private void SetFilter(MediaFilterModel.ExternalFilterModel filter)
     {
         if (_selectedFilter is not null && _selectedFilter.Name == filter.Name)
         {
@@ -142,35 +142,35 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
         }
 
         _selectedFilter = filter;
-        ScheduleUpdateComics();
+        ScheduleUpdateMedia();
     }
 
-    private void ScheduleUpdateComics()
+    private void ScheduleUpdateMedia()
     {
-        if (Interlocked.CompareExchange(ref _updateComicSubmitted, 1, 0) == 1)
+        if (Interlocked.CompareExchange(ref _updateMediaSubmitted, 1, 0) == 1)
         {
             return;
         }
 
         _sharedDispatcher.Submit(() =>
         {
-            Interlocked.Exchange(ref _updateComicSubmitted, 0);
-            UpdateComicsNoLock();
+            Interlocked.Exchange(ref _updateMediaSubmitted, 0);
+            UpdateMediaNoLock();
         });
     }
 
-    private void UpdateComicsNoLock()
+    private void UpdateMediaNoLock()
     {
-        ComicFilterModel.ExternalModel filterModel = ComicFilterModel.Instance.GetModel() ?? new();
-        List<ComicFilterModel.ExternalFilterModel> filters = filterModel.Filters;
+        MediaFilterModel.ExternalModel filterModel = MediaFilterModel.Instance.GetModel() ?? new();
+        List<MediaFilterModel.ExternalFilterModel> filters = filterModel.Filters;
         if (filters == null || filters.Count == 0)
         {
-            filters = [ComicFilterModel.ExternalFilterModel.FromDefault()];
+            filters = [MediaFilterModel.ExternalFilterModel.FromDefault()];
             filterModel.Filters = filters;
         }
 
         filters.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.Ordinal));
-        ComicFilterModel.ExternalFilterModel? selectedFilter = null;
+        MediaFilterModel.ExternalFilterModel? selectedFilter = null;
         if (_selectedFilter is not null)
         {
             selectedFilter = filters.Find(x => x.Name == _selectedFilter.Name);
@@ -205,43 +205,43 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
         FilterPresetDropDownLiveData.Emit(filterPresetDropdown);
 
         _searchEngine.Expression = selectedFilter.Expression;
-        _searchEngine.IncludeHidden = selectedFilter.IncludeHiddenComics;
+        _searchEngine.IncludeHidden = selectedFilter.IncludeHiddenItems;
         _searchEngine.Update();
     }
 
-    private void OnComicSearchResult(IReadOnlyList<ComicModel> items)
+    private void OnMediaSearchResult(IReadOnlyList<MediaModel> items)
     {
         _sharedDispatcher.Submit(() =>
         {
-            ComicFilterModel.ExternalFilterModel filter = _selectedFilter
-                ?? ComicFilterModel.ExternalFilterModel.FromDefault();
-            ComicPropertyModel sortBy = filter.SortBy;
-            ComicPropertyModel? groupBy = filter.GroupBy;
+            MediaFilterModel.ExternalFilterModel filter = _selectedFilter
+                ?? MediaFilterModel.ExternalFilterModel.FromDefault();
+            MediaPropertyModel sortBy = filter.SortBy;
+            MediaPropertyModel? groupBy = filter.GroupBy;
 
             List<SimpleTreeViewNodeModel> dataSource = [];
-            SimpleTreeViewNodeModel ComicToNode(ComicModel comic, PlaylistModel.Builder playlist)
+            SimpleTreeViewNodeModel MediaToNode(MediaModel media, PlaylistModel.Builder playlist)
             {
                 return new()
                 {
-                    DataContext = comic,
+                    DataContext = media,
                     Glyph = "\uE8B9",
-                    Title = comic.Title,
+                    Title = media.Title,
                     CanExpand = false,
                     Clicked = item =>
                     {
-                        Route route = OpenComicHelper.GetComicRoute(comic, playlist: playlist);
-                        OpenComicHelper.OpenComic(_actionHandler, route);
+                        Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                        OpenMediaHelper.OpenMedia(_actionHandler, route);
                     },
                     RequestContextMenuItemsAsync = (primary, selection) =>
                     {
-                        IEnumerable<ComicModel>? selectedComics = !_selectionMode ? null : selection
-                            .Where(x => x.DataContext is ComicModel)
-                            .Select(x => (ComicModel)x.DataContext!);
-                        return MenuFlyoutItemsCreator.CreateComicMenuItems(
+                        IEnumerable<MediaModel>? selectedMedia = !_selectionMode ? null : selection
+                            .Where(x => x.DataContext is MediaModel)
+                            .Select(x => (MediaModel)x.DataContext!);
+                        return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                             _actionHandler,
-                            comic,
+                            media,
                             playlist: playlist,
-                            selectedItems: selectedComics,
+                            selectedItems: selectedMedia,
                             canSelect: !SelectionMode);
                     },
                 };
@@ -249,12 +249,12 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
 
             if (groupBy != null)
             {
-                List<ComicPropertyModel.GroupItem<ComicModel>> groupItems = groupBy.GroupComics(items, x => x,
+                List<MediaPropertyModel.GroupItem<MediaModel>> groupItems = groupBy.GroupMedia(items, x => x,
                     filter.GroupOrderMethod,
                     filter.GroupSortingFunction,
                     filter.GroupSortingProperty,
                     filter.MergeSingleItemGroups);
-                foreach (ComicPropertyModel.GroupItem<ComicModel> item in groupItems)
+                foreach (MediaPropertyModel.GroupItem<MediaModel> item in groupItems)
                 {
                     SimpleTreeViewNodeModel groupNode = new()
                     {
@@ -269,11 +269,11 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
                     };
 
                     List<SimpleTreeViewNodeModel> nodeChildren = [];
-                    List<ComicModel> sorted = sortBy.SortComics(item.Items, x => x, filter.ComicOrderMethod);
-                    PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(sorted);
-                    foreach (ComicModel comic in sorted)
+                    List<MediaModel> sorted = sortBy.SortMedia(item.Items, x => x, filter.MediaOrderMethod);
+                    PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sorted);
+                    foreach (MediaModel media in sorted)
                     {
-                        groupNode.Children.Add(ComicToNode(comic, playlist));
+                        groupNode.Children.Add(MediaToNode(media, playlist));
                     }
 
                     dataSource.Add(groupNode);
@@ -281,11 +281,11 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
             }
             else
             {
-                List<ComicModel> sorted = sortBy.SortComics(items, x => x, filter.ComicOrderMethod);
-                PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddComics(sorted);
-                foreach (ComicModel comic in sorted)
+                List<MediaModel> sorted = sortBy.SortMedia(items, x => x, filter.MediaOrderMethod);
+                PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sorted);
+                foreach (MediaModel media in sorted)
                 {
-                    dataSource.Add(ComicToNode(comic, playlist));
+                    dataSource.Add(MediaToNode(media, playlist));
                 }
             }
 
@@ -302,16 +302,16 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
                 }
 
                 DiffUtils.UpdateCollection(DataSource, dataSource, (x, y) => x.Title == y.Title, UpdateItem);
-                NoComicsVisible = DataSource.Count == 0;
+                NoMediaVisible = DataSource.Count == 0;
             });
         });
     }
 
     private Task<List<BaseMenuFlyoutItemModel>> CreateGroupMenuItems(SimpleTreeViewNodeModel node)
     {
-        List<ComicModel> comics = [.. node.CollectDataContext<ComicModel>()];
-        return MenuFlyoutItemsCreator.CreateComicGroupMenuItems(
-            _actionHandler, comics,
+        List<MediaModel> mediaItems = [.. node.CollectDataContext<MediaModel>()];
+        return MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
+            _actionHandler, mediaItems,
             node.ExpandAll, node.CollapseAll);
     }
 

@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
 using System.Collections.Generic;
@@ -50,25 +50,25 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private List<TapComicBehaviorEntry> _openComicDefaultBaheviors = [];
-    public List<TapComicBehaviorEntry> OpenComicDefaultBaheviors
+    private List<TapMediaBehaviorEntry> _openMediaDefaultBaheviors = [];
+    public List<TapMediaBehaviorEntry> OpenMediaDefaultBaheviors
     {
-        get => _openComicDefaultBaheviors;
+        get => _openMediaDefaultBaheviors;
         set
         {
-            _openComicDefaultBaheviors = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OpenComicDefaultBaheviors)));
+            _openMediaDefaultBaheviors = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OpenMediaDefaultBaheviors)));
         }
     }
 
-    private int _openComicDefaultBaheviorIndex = 0;
-    public int OpenComicDefaultBaheviorIndex
+    private int _openMediaDefaultBaheviorIndex = 0;
+    public int OpenMediaDefaultBaheviorIndex
     {
-        get => _openComicDefaultBaheviorIndex;
+        get => _openMediaDefaultBaheviorIndex;
         set
         {
-            _openComicDefaultBaheviorIndex = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OpenComicDefaultBaheviorIndex)));
+            _openMediaDefaultBaheviorIndex = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OpenMediaDefaultBaheviorIndex)));
         }
     }
 
@@ -94,17 +94,6 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _enableCompressedFileCache = true;
-    public bool EnableCompressedFileCache
-    {
-        get => _enableCompressedFileCache;
-        set
-        {
-            _enableCompressedFileCache = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EnableCompressedFileCache)));
-        }
-    }
-
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
@@ -122,22 +111,21 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         AppSettingsModel.CloseLastTabBehavior = _closeLastTabBehaviors[index].Behavior;
     }
 
-    public void SetOpenComicDefaultBehavior(int index)
+    public void SetOpenMediaDefaultBehavior(int index)
     {
-        if (index == _openComicDefaultBaheviorIndex || index < 0 || index >= _openComicDefaultBaheviors.Count)
+        if (index == _openMediaDefaultBaheviorIndex || index < 0 || index >= _openMediaDefaultBaheviors.Count)
         {
             return;
         }
 
-        _openComicDefaultBaheviorIndex = index;
-        AppSettingsModel.OpenComicDefaultBehavior = _openComicDefaultBaheviors[index].Behavior;
+        _openMediaDefaultBaheviorIndex = index;
+        AppSettingsModel.OpenMediaDefaultBehavior = _openMediaDefaultBaheviors[index].Behavior;
     }
 
     private void Update()
     {
         UpdateCloseLastTabBehavior();
-        UpdateHomePageTapComicBehavior();
-        UpdateCommonSettings();
+        UpdateHomePageTapMediaBehavior();
         CoroutineUtils.Run(UpdateHistory);
     }
 
@@ -167,13 +155,13 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         CloseLastTabBehaviorIndex = selectedIndex;
     }
 
-    private void UpdateHomePageTapComicBehavior()
+    private void UpdateHomePageTapMediaBehavior()
     {
-        AppSettingsModel.OpenComicBehaviorEnum behavior = AppSettingsModel.OpenComicDefaultBehavior;
-        List<TapComicBehaviorEntry> entries = [
-            new(AppSettingsModel.OpenComicBehaviorEnum.OpenInCurrentTab),
-            new(AppSettingsModel.OpenComicBehaviorEnum.OpenInNewTab),
-            new(AppSettingsModel.OpenComicBehaviorEnum.OpenInLastActiveReaderTab),
+        AppSettingsModel.OpenMediaBehaviorEnum behavior = AppSettingsModel.OpenMediaDefaultBehavior;
+        List<TapMediaBehaviorEntry> entries = [
+            new(AppSettingsModel.OpenMediaBehaviorEnum.OpenInCurrentTab),
+            new(AppSettingsModel.OpenMediaBehaviorEnum.OpenInNewTab),
+            new(AppSettingsModel.OpenMediaBehaviorEnum.OpenInLastActiveReaderTab),
         ];
         int selectedIndex = -1;
         for (int i = 0; i < entries.Count; i++)
@@ -190,18 +178,13 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
             selectedIndex = 0;
         }
 
-        OpenComicDefaultBaheviors = entries;
-        OpenComicDefaultBaheviorIndex = selectedIndex;
-    }
-
-    private void UpdateCommonSettings()
-    {
-        EnableCompressedFileCache = AppSettingsModel.EnableCompressedFileCache;
+        OpenMediaDefaultBaheviors = entries;
+        OpenMediaDefaultBaheviorIndex = selectedIndex;
     }
 
     private async Task UpdateHistory()
     {
-        bool hasHistory = !await ComicHistoryItemModel.IsEmptyAsync();
+        bool hasHistory = !await MediaHistoryItemModel.IsEmptyAsync();
         bool saveBrowsingHistory = AppSettingsModel.SaveBrowsingHistory;
 
         IsClearHistoryEnabled = hasHistory;
@@ -230,9 +213,9 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    public class TapComicBehaviorEntry(AppSettingsModel.OpenComicBehaviorEnum behavior)
+    public class TapMediaBehaviorEntry(AppSettingsModel.OpenMediaBehaviorEnum behavior)
     {
-        public AppSettingsModel.OpenComicBehaviorEnum Behavior => behavior;
+        public AppSettingsModel.OpenMediaBehaviorEnum Behavior => behavior;
 
         public string Name
         {
@@ -240,9 +223,9 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
             {
                 return behavior switch
                 {
-                    AppSettingsModel.OpenComicBehaviorEnum.OpenInCurrentTab => StringResourceProvider.Instance.OpenInCurrentTab,
-                    AppSettingsModel.OpenComicBehaviorEnum.OpenInNewTab => StringResourceProvider.Instance.OpenInNewTab,
-                    AppSettingsModel.OpenComicBehaviorEnum.OpenInLastActiveReaderTab => StringResourceProvider.Instance.OpenInLastActiveReaderTab,
+                    AppSettingsModel.OpenMediaBehaviorEnum.OpenInCurrentTab => StringResourceProvider.Instance.OpenInCurrentTab,
+                    AppSettingsModel.OpenMediaBehaviorEnum.OpenInNewTab => StringResourceProvider.Instance.OpenInNewTab,
+                    AppSettingsModel.OpenMediaBehaviorEnum.OpenInLastActiveReaderTab => StringResourceProvider.Instance.OpenInLastActiveReaderTab,
                     _ => throw new InvalidEnumArgumentException(nameof(Behavior)),
                 };
             }

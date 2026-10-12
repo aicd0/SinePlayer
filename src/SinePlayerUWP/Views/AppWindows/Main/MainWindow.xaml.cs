@@ -26,7 +26,7 @@ using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Threading;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Data.Models.Misc;
 using SinePlayerUWP.Helpers.Navigation;
 using SinePlayerUWP.Views.Pages.Main;
@@ -354,9 +354,9 @@ internal sealed partial class MainWindow : Window
 
             if (AppSettingsModel.GetModel().ScanOnLaunch)
             {
-                // Update comic library
+                // Update media library
                 // This operation is deferred to here because it may involve dialog displaying which requires a loaded window
-                ComicModel.RescanLibrary("InitOnAppLaunchInternal");
+                MediaModel.RescanLibrary("InitOnAppLaunchInternal");
             }
         }
 

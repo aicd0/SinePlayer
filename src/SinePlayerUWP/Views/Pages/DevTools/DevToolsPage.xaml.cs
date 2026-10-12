@@ -5,7 +5,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -13,7 +12,6 @@ using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml.Controls;
 
-using SinePlayerUWP.Common.Archive;
 using SinePlayerUWP.Common.BaseUI;
 using SinePlayerUWP.Common.BaseUI.PageAbilities;
 using SinePlayerUWP.Common.Constants;
@@ -144,34 +142,6 @@ internal sealed partial class DevToolsPage : BasePage
     private void PrintMemoryLeakReportButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         SetResult(MemoryLeakTracker.GenerateReport());
-    }
-
-    private void RunArchiveBenchmarkButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-        var button = (Button)sender;
-
-        SetResult("Running archive benchmark...");
-        button.IsEnabled = false;
-
-        CoroutineUtils.Run(async () =>
-        {
-            string report;
-            try
-            {
-                report = await TaskDispatcher.LongRunningThreadPool.Submit(RunArchiveBenchmark);
-            }
-            catch (Exception ex)
-            {
-                Logger.E(TAG, ex);
-                report = ex.ToString();
-            }
-
-            await MainThreadUtils.RunInMainThread(() =>
-            {
-                button.IsEnabled = true;
-                SetResult(report);
-            });
-        });
     }
 
     private void RunGcBenchmarkButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -348,7 +318,7 @@ internal sealed partial class DevToolsPage : BasePage
         GlobalEvent events = GlobalEvent.Instance;
         _counters.Add(new EventCounter("Logs", () => Interlocked.Read(ref _receivedLogCount)));
         ObserveEventCounter("CollectionUpdated", events.CollectionUpdated);
-        ObserveEventCounter("ComicUpdated", events.ComicUpdated);
+        ObserveEventCounter("MediaUpdated", events.MediaUpdated);
         ObserveEventCounter("FilterUpdated", events.FilterUpdated);
         ObserveEventCounter("FavoriteUpdated", events.FavoriteUpdated);
         ObserveEventCounter("HistoryUpdated", events.HistoryUpdated);
@@ -411,112 +381,6 @@ internal sealed partial class DevToolsPage : BasePage
         public string Name { get; } = name;
 
         public long Count => getCount();
-    }
-
-    //
-    // Archive benchmark
-    //
-
-    private static string RunArchiveBenchmark()
-    {
-        const int archiveBenchmarkIterationCount = 10;
-        string[] archiveBenchmarkPaths = [
-            //@"D:\Documents\Comics\[赤坂アカ] かぐや様は告らせたい～天才たちの恋愛頭脳戦～ 第01-15巻\ZipTest.zip",
-            @"D:\Documents\Comics\[赤坂アカ] かぐや様は告らせたい～天才たちの恋愛頭脳戦～ 第01-15巻\7ZTest.7z",
-        ];
-
-        var report = new StringBuilder();
-        report.Append("Iterations: ").Append(archiveBenchmarkIterationCount).AppendLine();
-
-        foreach (string path in archiveBenchmarkPaths)
-        {
-            report.AppendLine();
-            report.Append("File: ").AppendLine(path);
-
-            if (!File.Exists(path))
-            {
-                report.AppendLine("  [Skip] File not found");
-                continue;
-            }
-
-            List<string> fileEntries = [];
-            int totalEntries = 0;
-
-            // Pre-scan to collect all entries.
-            ArchiveManager.VisitEntries(path, entry =>
-            {
-                ++totalEntries;
-                if (!entry.IsDirectory)
-                {
-                    fileEntries.Add(entry.FullName.Replace('/', '\\'));
-                }
-                return ArchiveManager.ICallbackResult.Continue;
-            });
-
-            report.Append("  Entries: ").Append(totalEntries)
-                  .Append(", files: ").Append(fileEntries.Count).AppendLine();
-
-            // 1) Time for iterating all entries.
-            List<double> iterateTimes = [];
-            for (int i = 0; i < archiveBenchmarkIterationCount; ++i)
-            {
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                ArchiveManager.VisitEntries(path, entry =>
-                {
-                    using Stream stream = entry.Open();
-                    return ArchiveManager.ICallbackResult.Continue;
-                });
-                stopwatch.Stop();
-                iterateTimes.Add(stopwatch.Elapsed.TotalMilliseconds);
-            }
-            AppendTiming(report, "Iterate (TryReadEntries)", iterateTimes);
-
-            // 2) Time for opening all entries.
-            List<double> openTimes = [];
-            int openFailures = 0;
-            for (int i = 0; i < archiveBenchmarkIterationCount; ++i)
-            {
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                foreach (string entryName in fileEntries)
-                {
-                    using Stream? entryStream = ArchiveManager.OpenEntry(path, entryName);
-                    if (entryStream is null)
-                    {
-                        ++openFailures;
-                    }
-                }
-                stopwatch.Stop();
-                openTimes.Add(stopwatch.Elapsed.TotalMilliseconds);
-            }
-            AppendTiming(report, "Open all (TryGetFileStream)", openTimes);
-            report.Append("  Open failures: ").AppendLine(openFailures.ToString());
-        }
-
-        return report.ToString();
-    }
-
-    private static void AppendTiming(StringBuilder report, string label, List<double> times)
-    {
-        if (times.Count == 0)
-        {
-            return;
-        }
-
-        double total = 0;
-        double max = 0;
-        foreach (double time in times)
-        {
-            total += time;
-            if (time > max)
-            {
-                max = time;
-            }
-        }
-
-        double average = total / times.Count;
-        report.Append("  ").Append(label)
-              .Append(": avg ").Append(average.ToString("0.###")).Append(" ms")
-              .Append(", max ").Append(max.ToString("0.###")).AppendLine(" ms");
     }
 
     //

@@ -17,11 +17,11 @@ using SinePlayerUWP.Common.Misc;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Common.Lifecycle;
 using SinePlayerUWP.Core.Common.Utils;
-using SinePlayerUWP.Data.Models.Comic;
+using SinePlayerUWP.Data.Models.Media;
 using SinePlayerUWP.Helpers.MenuFlyoutHelpers;
 using SinePlayerUWP.Helpers.Navigation;
 using SinePlayerUWP.UserControls.Misc;
-using SinePlayerUWP.Views.Dialogs.EditComicInfo;
+using SinePlayerUWP.Views.Dialogs.EditMediaInfo;
 
 namespace SinePlayerUWP.Views.Pages.Collection;
 
@@ -45,7 +45,7 @@ internal sealed partial class CollectionPage : BasePage
         base.OnStart(bundle);
 
         PageActionHandler.RegisterProvider(new CustomActionProvider(new CustomActionHandler(ViewModel)));
-        ItemsView.Initialize(ViewModel.ComicSelection, PageActionHandler);
+        ItemsView.Initialize(ViewModel.MediaSelection, PageActionHandler);
         ViewTypeSelector.ViewTypeChanged += ViewModel.SelectViewType;
 
         GetMainPageAbility().SetTitle(StringResourceProvider.Instance.Collection);
@@ -64,13 +64,13 @@ internal sealed partial class CollectionPage : BasePage
 
         if (collectionId >= 0)
         {
-            CoroutineUtils.Run(() => ComicModel.UpdateCollections(triggerCollectionIds: [collectionId]));
+            CoroutineUtils.Run(() => MediaModel.UpdateCollections(triggerCollectionIds: [collectionId]));
         }
     }
 
     private void ObserveData()
     {
-        GlobalEvent.Instance.ComicUpdated.Observe(this, _ =>
+        GlobalEvent.Instance.MediaUpdated.Observe(this, _ =>
         {
             ViewModel.Refresh();
         });
@@ -126,13 +126,13 @@ internal sealed partial class CollectionPage : BasePage
 
     private void EditButton_Click(object sender, RoutedEventArgs e)
     {
-        ComicModel? collection = ViewModel.Collection;
+        MediaModel? collection = ViewModel.Collection;
         if (collection is null)
         {
             return;
         }
 
-        var dialog = new EditComicInfoDialog([collection]);
+        var dialog = new EditMediaInfoDialog([collection]);
         CoroutineUtils.Run(() => dialog.ShowAsync(WindowId));
     }
 
@@ -145,13 +145,13 @@ internal sealed partial class CollectionPage : BasePage
     {
         CoroutineUtils.Run(async () =>
         {
-            ComicModel? collection = ViewModel.Collection;
+            MediaModel? collection = ViewModel.Collection;
             if (collection is null || sender is not FrameworkElement anchor)
             {
                 return;
             }
 
-            List<BaseMenuFlyoutItemModel> menuItems = await MenuFlyoutItemsCreator.CreateComicMenuItems(
+            List<BaseMenuFlyoutItemModel> menuItems = await MenuFlyoutItemsCreator.CreateMediaMenuItems(
                 PageActionHandler,
                 collection);
             if (menuItems.Count == 0)
@@ -262,11 +262,11 @@ internal sealed partial class CollectionPage : BasePage
             bool handled = true;
             switch (source)
             {
-                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_COMIC_ITEM_MENU:
+                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
                     switch (name)
                     {
                         case MenuFlyoutItemsCreator.CUSTOM_ACTION_NAME_SELECT:
-                            viewModel.ComicSelection.SetSelectMode(!viewModel.ComicSelection.IsSelectMode);
+                            viewModel.MediaSelection.SetSelectMode(!viewModel.MediaSelection.IsSelectMode);
                             break;
                         default:
                             handled = false;

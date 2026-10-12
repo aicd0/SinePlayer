@@ -14,8 +14,8 @@
             Margin="0,10"
             HorizontalAlignment="Center"
             FontWeight="SemiBold"
-            Text="{x:Bind StringResource.ReadingListEmpty}"
-            Visibility="{x:Bind ViewModel.NoComicsVisible, Mode=OneWay}" />
+            Text="{x:Bind StringResource.PlaylistEmpty}"
+            Visibility="{x:Bind ViewModel.NoMediaVisible, Mode=OneWay}" />
         <ListView
             x:Name="MainListView"
             ContextRequested="ListView_ContextRequested"
