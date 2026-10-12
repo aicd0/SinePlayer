@@ -83,8 +83,6 @@ public class StringResourceProvider
     public string Done => GetResourceString("Done");
     public string DownloadPluginsFromGitHub => GetResourceString("DownloadPluginsFromGitHub");
     public string Duration => GetResourceString("Duration");
-    public string DuringAutoScrolling => GetResourceString("DuringAutoScrolling");
-    public string DuringPlayback => GetResourceString("DuringPlayback");
     public string Edit => GetResourceString("Edit");
     public string EditImportExclusionList => GetResourceString("EditImportExclusionList");
     public string EditKeyboardShortcut => GetResourceString("EditKeyboardShortcut");
@@ -156,8 +154,7 @@ public class StringResourceProvider
     public string KeyboardKeys => GetResourceString("KeyboardKeys");
     public string KeyboardShortcutInUse => GetResourceString("KeyboardShortcutInUse");
     public string KeyboardShortcutReserved => GetResourceString("KeyboardShortcutReserved");
-    public string LastReadTime => GetResourceString("LastReadTime");
-    public string LeftToRight => GetResourceString("LeftToRight");
+    public string LastVisitTime => GetResourceString("LastVisitTime");
     public string License => GetResourceString("License");
     public string LinkErrorContent => GetResourceString("LinkErrorContent");
     public string LinkErrorTitle => GetResourceString("LinkErrorTitle");
@@ -287,6 +284,7 @@ public class StringResourceProvider
     public string VolumeDown => GetResourceString("VolumeDown");
     public string VolumeUp => GetResourceString("VolumeUp");
     public string Warning => GetResourceString("Warning");
+    public string WhilePlayingVideos => GetResourceString("WhilePlayingVideos");
     public string WindowN => GetResourceString("WindowN");
     //// SECTION MARKER - DO NOT MOVE ////
 

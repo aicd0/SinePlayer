@@ -153,6 +153,9 @@
   <data name="AllHidden" xml:space="preserve">
     <value>모든 숨겨진 항목</value>
   </data>
+  <data name="AllItems" xml:space="preserve">
+    <value>모든 항목</value>
+  </data>
   <data name="AllMatchedResults" xml:space="preserve">
     <value>모든 일치 결과</value>
   </data>
@@ -191,6 +194,9 @@
   </data>
   <data name="Auto" xml:space="preserve">
     <value>자동</value>
+  </data>
+  <data name="AutoPlayNext" xml:space="preserve">
+    <value>다음 항목 자동 재생</value>
   </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>자동 스크롤</value>
@@ -353,8 +359,8 @@ $files</value>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>GitHub에서 플러그인 다운로드</value>
   </data>
-  <data name="DuringAutoScrolling" xml:space="preserve">
-    <value>자동 스크롤 중</value>
+  <data name="Duration" xml:space="preserve">
+    <value>재생 시간</value>
   </data>
   <data name="Edit" xml:space="preserve">
     <value>편집하다</value>
@@ -638,11 +644,8 @@ NOT                  - 논리 not. 예: NOT %tag = "hide this"
   <data name="LanguageExpander.Header" xml:space="preserve">
     <value>언어</value>
   </data>
-  <data name="LastReadTime" xml:space="preserve">
-    <value>마지막 읽기 시간</value>
-  </data>
-  <data name="LeftToRight" xml:space="preserve">
-    <value>왼쪽에서 오른쪽으로</value>
+  <data name="LastVisitTime" xml:space="preserve">
+    <value>마지막 방문 시간</value>
   </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>현재 필터 설정으로는 결과가 없습니다. </value>
@@ -673,6 +676,9 @@ NOT                  - 논리 not. 예: NOT %tag = "hide this"
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>"제외 목록에 추가"를 선택하면 다음에 라이브러리를 업데이트할 때 이 만화가 다시 가져와지지 않습니다.</value>
+  </data>
+  <data name="MediaInfo" xml:space="preserve">
+    <value>미디어 정보</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>새 폴더 만들기</value>
@@ -734,6 +740,9 @@ NOT                  - 논리 not. 예: NOT %tag = "hide this"
   <data name="NoKeyboardShortcuts" xml:space="preserve">
     <value>키보드 단축키가 없습니다</value>
   </data>
+  <data name="NoMediaHint" xml:space="preserve">
+    <value>미디어가 여기에 표시됩니다</value>
+  </data>
   <data name="NoPluginsInstalled" xml:space="preserve">
     <value>설치된 플러그인이 없습니다</value>
   </data>
@@ -773,11 +782,20 @@ NOT                  - 논리 not. 예: NOT %tag = "hide this"
   <data name="OpenInNewTab" xml:space="preserve">
     <value>새 탭에서 열기</value>
   </data>
+  <data name="OpenItemDefaultBehavior" xml:space="preserve">
+    <value>항목을 열 때의 기본 동작</value>
+  </data>
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>메타데이터 폴더 열기</value>
   </data>
+  <data name="OpenNextItem" xml:space="preserve">
+    <value>다음 항목 열기</value>
+  </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>플러그인 폴더 열기</value>
+  </data>
+  <data name="OpenPreviousItem" xml:space="preserve">
+    <value>이전 항목 열기</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>사이드바 열기</value>
@@ -797,8 +815,26 @@ NOT                  - 논리 not. 예: NOT %tag = "hide this"
   <data name="Play" xml:space="preserve">
     <value>재생</value>
   </data>
+  <data name="PlayPause" xml:space="preserve">
+    <value>재생 / 일시 정지</value>
+  </data>
+  <data name="PlayerExpander.Detail" xml:space="preserve">
+    <value>플레이어 전역 설정</value>
+  </data>
+  <data name="PlayerExpander.Header" xml:space="preserve">
+    <value>플레이어</value>
+  </data>
   <data name="PlayerStatusError" xml:space="preserve">
     <value>로딩 중 오류가 발생했습니다.</value>
+  </data>
+  <data name="PlayerStatusLoading" xml:space="preserve">
+    <value>플레이어를 불러오는 중</value>
+  </data>
+  <data name="Playlist" xml:space="preserve">
+    <value>재생 목록</value>
+  </data>
+  <data name="PlaylistEmpty" xml:space="preserve">
+    <value>재생 목록이 여기에 표시됩니다</value>
   </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>플러그인 관리 및 구성</value>
@@ -821,6 +857,12 @@ NOT                  - 논리 not. 예: NOT %tag = "hide this"
   <data name="Progress" xml:space="preserve">
     <value>진행 상황</value>
   </data>
+  <data name="PromptBeforeRemovingItems" xml:space="preserve">
+    <value>항목을 제거하기 전에 확인</value>
+  </data>
+  <data name="Random" xml:space="preserve">
+    <value>무작위 재생</value>
+  </data>
   <data name="Rating" xml:space="preserve">
     <value>점수</value>
   </data>
@@ -838,6 +880,11 @@ NOT                  - 논리 not. 예: NOT %tag = "hide this"
   </data>
   <data name="RemoveFromFavorites" xml:space="preserve">
     <value>즐겨찾기에서 제거</value>
+  </data>
+  <data name="RemoveItemsConfirmation" xml:space="preserve">
+    <value>다음 $count개 항목이 라이브러리에서 영구적으로 삭제됩니다.
+
+$items</value>
   </data>
   <data name="RemoveLocationButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>목록에서 이 폴더를 제거합니다</value>
@@ -906,6 +953,12 @@ $plugins</value>
   </data>
   <data name="SearchResultsOf" xml:space="preserve">
     <value>'$keyword'에 대한 검색 결과</value>
+  </data>
+  <data name="SeekBackward" xml:space="preserve">
+    <value>뒤로 탐색</value>
+  </data>
+  <data name="SeekForward" xml:space="preserve">
+    <value>앞으로 탐색</value>
   </data>
   <data name="Select" xml:space="preserve">
     <value>선택하다</value>
@@ -1005,6 +1058,9 @@ $plugins</value>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>전체 화면 전환</value>
   </data>
+  <data name="TotalMedia" xml:space="preserve">
+    <value>전체 미디어 수</value>
+  </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>양면 모드</value>
   </data>
@@ -1046,11 +1102,20 @@ $info</value>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>보통의</value>
   </data>
+  <data name="VolumeDown" xml:space="preserve">
+    <value>볼륨 낮추기</value>
+  </data>
+  <data name="VolumeUp" xml:space="preserve">
+    <value>볼륨 높이기</value>
+  </data>
   <data name="Warning" xml:space="preserve">
     <value>경고하다</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>지금 우리는 다음 폴더를 감시하고 있습니다:</value>
+  </data>
+  <data name="WhilePlayingVideos" xml:space="preserve">
+    <value>동영상 재생 중</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>창 $n</value>

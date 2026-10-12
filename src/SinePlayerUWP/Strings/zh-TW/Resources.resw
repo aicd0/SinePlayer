@@ -153,6 +153,9 @@
   <data name="AllHidden" xml:space="preserve">
     <value>所有隱藏項</value>
   </data>
+  <data name="AllItems" xml:space="preserve">
+    <value>所有項目</value>
+  </data>
   <data name="AllMatchedResults" xml:space="preserve">
     <value>所有匹配結果</value>
   </data>
@@ -191,6 +194,9 @@
   </data>
   <data name="Auto" xml:space="preserve">
     <value>自動</value>
+  </data>
+  <data name="AutoPlayNext" xml:space="preserve">
+    <value>自動播放下一個項目</value>
   </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>自動捲動</value>
@@ -351,8 +357,8 @@
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>從 GitHub 下載外掛</value>
   </data>
-  <data name="DuringAutoScrolling" xml:space="preserve">
-    <value>自動捲動時</value>
+  <data name="Duration" xml:space="preserve">
+    <value>時長</value>
   </data>
   <data name="Edit" xml:space="preserve">
     <value>編輯</value>
@@ -635,11 +641,8 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="LanguageExpander.Header" xml:space="preserve">
     <value>語言</value>
   </data>
-  <data name="LastReadTime" xml:space="preserve">
-    <value>上次閱讀時間</value>
-  </data>
-  <data name="LeftToRight" xml:space="preserve">
-    <value>自左向右</value>
+  <data name="LastVisitTime" xml:space="preserve">
+    <value>上次造訪時間</value>
   </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>在目前篩選條件下沒有找到結果，嘗試</value>
@@ -670,6 +673,9 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>選擇「加入排除清單」後，下次更新媒體庫時將不會再次匯入此漫畫。</value>
+  </data>
+  <data name="MediaInfo" xml:space="preserve">
+    <value>媒體資訊</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>新建資料夾</value>
@@ -731,6 +737,9 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="NoKeyboardShortcuts" xml:space="preserve">
     <value>沒有鍵盤快捷鍵</value>
   </data>
+  <data name="NoMediaHint" xml:space="preserve">
+    <value>你的媒體將顯示於此</value>
+  </data>
   <data name="NoPluginsInstalled" xml:space="preserve">
     <value>未安裝外掛程式</value>
   </data>
@@ -770,11 +779,20 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="OpenInNewTab" xml:space="preserve">
     <value>在新分頁中開啟</value>
   </data>
+  <data name="OpenItemDefaultBehavior" xml:space="preserve">
+    <value>開啟項目時的預設行為</value>
+  </data>
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>開啟中繼資料資料夾</value>
   </data>
+  <data name="OpenNextItem" xml:space="preserve">
+    <value>開啟下一個項目</value>
+  </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>打開外掛資料夾</value>
+  </data>
+  <data name="OpenPreviousItem" xml:space="preserve">
+    <value>開啟上一個項目</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>打開側邊欄</value>
@@ -794,8 +812,26 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="Play" xml:space="preserve">
     <value>播放</value>
   </data>
+  <data name="PlayPause" xml:space="preserve">
+    <value>播放 / 暫停</value>
+  </data>
+  <data name="PlayerExpander.Detail" xml:space="preserve">
+    <value>播放器全域設定</value>
+  </data>
+  <data name="PlayerExpander.Header" xml:space="preserve">
+    <value>播放器</value>
+  </data>
   <data name="PlayerStatusError" xml:space="preserve">
     <value>載入時發生錯誤</value>
+  </data>
+  <data name="PlayerStatusLoading" xml:space="preserve">
+    <value>播放器正在載入</value>
+  </data>
+  <data name="Playlist" xml:space="preserve">
+    <value>播放清單</value>
+  </data>
+  <data name="PlaylistEmpty" xml:space="preserve">
+    <value>你的播放清單將顯示於此</value>
   </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>管理與設定外掛程式</value>
@@ -818,6 +854,12 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   <data name="Progress" xml:space="preserve">
     <value>進度</value>
   </data>
+  <data name="PromptBeforeRemovingItems" xml:space="preserve">
+    <value>移除項目前先確認</value>
+  </data>
+  <data name="Random" xml:space="preserve">
+    <value>隨機播放</value>
+  </data>
   <data name="Rating" xml:space="preserve">
     <value>評分</value>
   </data>
@@ -835,6 +877,11 @@ NOT                 - 邏輯非。例如：NOT %tag = "hide this"
   </data>
   <data name="RemoveFromFavorites" xml:space="preserve">
     <value>取消收藏</value>
+  </data>
+  <data name="RemoveItemsConfirmation" xml:space="preserve">
+    <value>以下 $count 個項目將從你的媒體庫中永久刪除：
+
+$items</value>
   </data>
   <data name="RemoveLocationButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>從清單中移除目前資料夾</value>
@@ -903,6 +950,12 @@ $plugins</value>
   </data>
   <data name="SearchResultsOf" xml:space="preserve">
     <value>'$keyword' 的搜尋結果</value>
+  </data>
+  <data name="SeekBackward" xml:space="preserve">
+    <value>向後搜尋</value>
+  </data>
+  <data name="SeekForward" xml:space="preserve">
+    <value>向前搜尋</value>
   </data>
   <data name="Select" xml:space="preserve">
     <value>選擇</value>
@@ -1002,6 +1055,9 @@ $plugins</value>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>切換全螢幕</value>
   </data>
+  <data name="TotalMedia" xml:space="preserve">
+    <value>媒體總數</value>
+  </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>雙頁模式</value>
   </data>
@@ -1043,11 +1099,20 @@ $info</value>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>適中</value>
   </data>
+  <data name="VolumeDown" xml:space="preserve">
+    <value>降低音量</value>
+  </data>
+  <data name="VolumeUp" xml:space="preserve">
+    <value>提高音量</value>
+  </data>
   <data name="Warning" xml:space="preserve">
     <value>警告</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>目前，您的倉庫包含以下資料夾：</value>
+  </data>
+  <data name="WhilePlayingVideos" xml:space="preserve">
+    <value>播放影片時</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>視窗 $n</value>

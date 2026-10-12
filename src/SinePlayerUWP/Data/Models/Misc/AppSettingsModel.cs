@@ -479,7 +479,7 @@ internal static class AppSettingsModel
         {
             KeepScreenOnBehaviorEnum.Never => "Never",
             KeepScreenOnBehaviorEnum.Always => "Always",
-            KeepScreenOnBehaviorEnum.DuringPlayback => "DuringPlayback",
+            KeepScreenOnBehaviorEnum.WhilePlayingVideos => "DuringPlayback",
             _ => "DuringAutoScrolling",
         };
     }
@@ -490,8 +490,8 @@ internal static class AppSettingsModel
         {
             "Never" => KeepScreenOnBehaviorEnum.Never,
             "Always" => KeepScreenOnBehaviorEnum.Always,
-            "DuringPlayback" => KeepScreenOnBehaviorEnum.DuringPlayback,
-            _ => KeepScreenOnBehaviorEnum.DuringPlayback,
+            "DuringPlayback" => KeepScreenOnBehaviorEnum.WhilePlayingVideos,
+            _ => KeepScreenOnBehaviorEnum.WhilePlayingVideos,
         };
     }
 
@@ -611,7 +611,7 @@ internal static class AppSettingsModel
     {
         Never,
         Always,
-        DuringPlayback,
+        WhilePlayingVideos,
     }
 
     public enum AppearanceSetting

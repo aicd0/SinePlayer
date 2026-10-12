@@ -131,7 +131,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         List<KeepScreenOnBehaviorEntry> entries = [
             new(AppSettingsModel.KeepScreenOnBehaviorEnum.Never),
             new(AppSettingsModel.KeepScreenOnBehaviorEnum.Always),
-            new(AppSettingsModel.KeepScreenOnBehaviorEnum.DuringPlayback),
+            new(AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos),
         ];
         int selectedIndex = -1;
         for (int i = 0; i < entries.Count; i++)
@@ -168,7 +168,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
                 {
                     AppSettingsModel.KeepScreenOnBehaviorEnum.Never => StringResourceProvider.Instance.Never,
                     AppSettingsModel.KeepScreenOnBehaviorEnum.Always => StringResourceProvider.Instance.Always,
-                    AppSettingsModel.KeepScreenOnBehaviorEnum.DuringPlayback => StringResourceProvider.Instance.DuringPlayback,
+                    AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos => StringResourceProvider.Instance.WhilePlayingVideos,
                     _ => throw new InvalidEnumArgumentException(nameof(Behavior)),
                 };
             }

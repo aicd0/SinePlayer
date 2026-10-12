@@ -29,7 +29,7 @@ internal class MediaPropertyModel
     private const string PROP_TYPE_TAG = "Tag";
     private const string PROP_TYPE_RATING = "Rating";
     private const string PROP_TYPE_COMPLETION_STATUS = "CompletionState";
-    private const string PROP_TYPE_LAST_READ_TIME = "LastReadTime";
+    private const string PROP_TYPE_LAST_VISIT_TIME = "LastVisitTime";
     private const string PROP_TYPE_DURATION = "Duration";
     private const string PROP_TYPE_PLUGIN_VIRTUAL_PROPERTY = "PluginVirtualProperty";
 
@@ -38,7 +38,7 @@ internal class MediaPropertyModel
         PropertyTypeEnum.Progress,
         PropertyTypeEnum.Rating,
         PropertyTypeEnum.CompletionStatus,
-        PropertyTypeEnum.LastReadTime,
+        PropertyTypeEnum.LastVisitTime,
         PropertyTypeEnum.Duration,
     ];
 
@@ -68,7 +68,7 @@ internal class MediaPropertyModel
                 PropertyTypeEnum.Tag => Name,
                 PropertyTypeEnum.Rating => StringResourceProvider.Instance.Rating,
                 PropertyTypeEnum.CompletionStatus => StringResourceProvider.Instance.CompletionStatus,
-                PropertyTypeEnum.LastReadTime => StringResourceProvider.Instance.LastReadTime,
+                PropertyTypeEnum.LastVisitTime => StringResourceProvider.Instance.LastVisitTime,
                 PropertyTypeEnum.Duration => StringResourceProvider.Instance.Duration,
                 _ => string.Empty,
             };
@@ -217,7 +217,7 @@ internal class MediaPropertyModel
             PropertyTypeEnum.Tag => CreateSorter(x => StringUtils.SmartFileNameKeySelector(GetConcatenatedTag(x)), keyComparer: StringUtils.SmartFileNameComparer),
             PropertyTypeEnum.Rating => CreateSorter(x => x.Rating),
             PropertyTypeEnum.CompletionStatus => CreateSorter(x => CompletionStateToComparable(x.CompletionStatus)),
-            PropertyTypeEnum.LastReadTime => CreateSorter(x => x.LastVisit.Ticks),
+            PropertyTypeEnum.LastVisitTime => CreateSorter(x => x.LastVisit.Ticks),
             PropertyTypeEnum.Duration => CreateSorter(x => x.DurationMs),
             PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertySorter(),
             _ => CreateFallbackSorter(),
@@ -375,7 +375,7 @@ internal class MediaPropertyModel
                 PropertyTypeEnum.Tag => CreateSorter(x => StringUtils.SmartFileNameKeySelector(x.GroupName), keyComparer: StringUtils.SmartFileNameComparer),
                 PropertyTypeEnum.Rating => CreateSorter(x => x.Items[0].Rating),
                 PropertyTypeEnum.CompletionStatus => CreateSorter(x => GetCompletionStatusGroupSortingKey(x.Items[0])),
-                PropertyTypeEnum.LastReadTime => CreateSorter(x => x.Items[0].LastVisit.Ticks),
+                PropertyTypeEnum.LastVisitTime => CreateSorter(x => x.Items[0].LastVisit.Ticks),
                 PropertyTypeEnum.Duration => CreateSorter(x => x.Items[0].DurationMs),
                 PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertySorter(),
                 _ => CreateFallbackSorter(),
@@ -413,7 +413,7 @@ internal class MediaPropertyModel
             PropertyTypeEnum.Tag => CreateGrouper(GetTagGroupNames),
             PropertyTypeEnum.Rating => CreateGrouper(x => [GetRatingGroupName(x)]),
             PropertyTypeEnum.CompletionStatus => CreateGrouper(x => [GetCompletionStatusGroupName(x)]),
-            PropertyTypeEnum.LastReadTime => CreateGrouper(x => [GetLastReadTimeGroupName(x)]),
+            PropertyTypeEnum.LastVisitTime => CreateGrouper(x => [GetLastReadTimeGroupName(x)]),
             PropertyTypeEnum.Duration => CreateGrouper(x => [GetDurationGroupName(x)]),
             PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertyGrouper(),
             _ => CreateFallbackGrouper(),
@@ -443,7 +443,7 @@ internal class MediaPropertyModel
                 PropertyTypeEnum.Progress => Math.Max(media.Progress, 0),
                 PropertyTypeEnum.Rating => media.Rating >= 0 ? media.Rating * 0.05 : null,
                 PropertyTypeEnum.CompletionStatus => (int)media.CompletionStatus,
-                PropertyTypeEnum.LastReadTime => media.LastVisit != DateTimeOffset.MinValue ? media.LastVisit.ToUnixTimeMilliseconds() : null,
+                PropertyTypeEnum.LastVisitTime => media.LastVisit != DateTimeOffset.MinValue ? media.LastVisit.ToUnixTimeMilliseconds() : null,
                 PropertyTypeEnum.Duration => media.DurationMs > 0 ? media.DurationMs : null,
                 PropertyTypeEnum.PluginVirtualProperty => sortingPropertyPluginSorter?.AsNumber(media),
                 _ => null,
@@ -551,7 +551,7 @@ internal class MediaPropertyModel
             PropertyTypeEnum.Tag => PROP_TYPE_TAG,
             PropertyTypeEnum.Rating => PROP_TYPE_RATING,
             PropertyTypeEnum.CompletionStatus => PROP_TYPE_COMPLETION_STATUS,
-            PropertyTypeEnum.LastReadTime => PROP_TYPE_LAST_READ_TIME,
+            PropertyTypeEnum.LastVisitTime => PROP_TYPE_LAST_VISIT_TIME,
             PropertyTypeEnum.Duration => PROP_TYPE_DURATION,
             PropertyTypeEnum.PluginVirtualProperty => PROP_TYPE_PLUGIN_VIRTUAL_PROPERTY,
             _ => PROP_TYPE_TITLE,
@@ -572,7 +572,7 @@ internal class MediaPropertyModel
             PROP_TYPE_TAG => PropertyTypeEnum.Tag,
             PROP_TYPE_RATING => PropertyTypeEnum.Rating,
             PROP_TYPE_COMPLETION_STATUS => PropertyTypeEnum.CompletionStatus,
-            PROP_TYPE_LAST_READ_TIME => PropertyTypeEnum.LastReadTime,
+            PROP_TYPE_LAST_VISIT_TIME => PropertyTypeEnum.LastVisitTime,
             PROP_TYPE_DURATION => PropertyTypeEnum.Duration,
             PROP_TYPE_PLUGIN_VIRTUAL_PROPERTY => PropertyTypeEnum.PluginVirtualProperty,
             _ => PropertyTypeEnum.Title,
@@ -593,7 +593,7 @@ internal class MediaPropertyModel
         Rating,
         Tag,
         Title,
-        LastReadTime,
+        LastVisitTime,
         Duration,
         PluginVirtualProperty,
     }

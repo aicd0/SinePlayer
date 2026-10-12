@@ -153,6 +153,9 @@
   <data name="AllHidden" xml:space="preserve">
     <value>Todos los elementos ocultos</value>
   </data>
+  <data name="AllItems" xml:space="preserve">
+    <value>Todos los elementos</value>
+  </data>
   <data name="AllMatchedResults" xml:space="preserve">
     <value>Todos los resultados coincidentes</value>
   </data>
@@ -191,6 +194,9 @@
   </data>
   <data name="Auto" xml:space="preserve">
     <value>Auto</value>
+  </data>
+  <data name="AutoPlayNext" xml:space="preserve">
+    <value>Reproducir automáticamente el siguiente elemento</value>
   </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>Desplazamiento automático</value>
@@ -353,8 +359,8 @@ $files</value>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>Descargar complementos desde GitHub</value>
   </data>
-  <data name="DuringAutoScrolling" xml:space="preserve">
-    <value>Durante el desplazamiento automático</value>
+  <data name="Duration" xml:space="preserve">
+    <value>Duración</value>
   </data>
   <data name="Edit" xml:space="preserve">
     <value>Editar</value>
@@ -637,11 +643,8 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="LanguageExpander.Header" xml:space="preserve">
     <value>Idioma</value>
   </data>
-  <data name="LastReadTime" xml:space="preserve">
-    <value>Hora de última lectura</value>
-  </data>
-  <data name="LeftToRight" xml:space="preserve">
-    <value>De izquierda a derecha</value>
+  <data name="LastVisitTime" xml:space="preserve">
+    <value>Última visita</value>
   </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>No hay resultados con la configuración de filtro actual. Prueba con </value>
@@ -672,6 +675,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Seleccionar "añadir a la lista de exclusión" evitará que el cómic se vuelva a importar la próxima vez que se actualice la biblioteca.</value>
+  </data>
+  <data name="MediaInfo" xml:space="preserve">
+    <value>Información multimedia</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Crear nueva carpeta</value>
@@ -733,6 +739,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="NoKeyboardShortcuts" xml:space="preserve">
     <value>No hay atajos de teclado</value>
   </data>
+  <data name="NoMediaHint" xml:space="preserve">
+    <value>Tus archivos multimedia aparecerán aquí</value>
+  </data>
   <data name="NoPluginsInstalled" xml:space="preserve">
     <value>No hay complementos instalados</value>
   </data>
@@ -772,11 +781,20 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="OpenInNewTab" xml:space="preserve">
     <value>Abrir en nueva pestaña</value>
   </data>
+  <data name="OpenItemDefaultBehavior" xml:space="preserve">
+    <value>Comportamiento predeterminado al abrir un elemento</value>
+  </data>
   <data name="OpenMetadataFolder" xml:space="preserve">
     <value>Abrir carpeta de metadatos</value>
   </data>
+  <data name="OpenNextItem" xml:space="preserve">
+    <value>Abrir el siguiente elemento</value>
+  </data>
   <data name="OpenPluginsFolder" xml:space="preserve">
     <value>Abrir carpeta de plugins</value>
+  </data>
+  <data name="OpenPreviousItem" xml:space="preserve">
+    <value>Abrir el elemento anterior</value>
   </data>
   <data name="OpenSidebar" xml:space="preserve">
     <value>Abrir la barra lateral</value>
@@ -796,8 +814,26 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="Play" xml:space="preserve">
     <value>Reproducir</value>
   </data>
+  <data name="PlayPause" xml:space="preserve">
+    <value>Reproducir / Pausar</value>
+  </data>
+  <data name="PlayerExpander.Detail" xml:space="preserve">
+    <value>Configuración global del reproductor</value>
+  </data>
+  <data name="PlayerExpander.Header" xml:space="preserve">
+    <value>Reproductor</value>
+  </data>
   <data name="PlayerStatusError" xml:space="preserve">
     <value>Se produjo un error durante la carga</value>
+  </data>
+  <data name="PlayerStatusLoading" xml:space="preserve">
+    <value>El reproductor se está cargando</value>
+  </data>
+  <data name="Playlist" xml:space="preserve">
+    <value>Lista de reproducción</value>
+  </data>
+  <data name="PlaylistEmpty" xml:space="preserve">
+    <value>Tu lista de reproducción aparecerá aquí</value>
   </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Administrar y configurar complementos</value>
@@ -820,6 +856,12 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="Progress" xml:space="preserve">
     <value>Progreso</value>
   </data>
+  <data name="PromptBeforeRemovingItems" xml:space="preserve">
+    <value>Preguntar antes de quitar elementos</value>
+  </data>
+  <data name="Random" xml:space="preserve">
+    <value>Aleatorio</value>
+  </data>
   <data name="Rating" xml:space="preserve">
     <value>Puntaje</value>
   </data>
@@ -837,6 +879,11 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="RemoveFromFavorites" xml:space="preserve">
     <value>Eliminar de favoritos</value>
+  </data>
+  <data name="RemoveItemsConfirmation" xml:space="preserve">
+    <value>Los siguientes $count elemento(s) se eliminarán permanentemente de tu biblioteca:
+
+$items</value>
   </data>
   <data name="RemoveLocationButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>Eliminar esta carpeta de la lista</value>
@@ -905,6 +952,12 @@ $plugins</value>
   </data>
   <data name="SearchResultsOf" xml:space="preserve">
     <value>Resultados de '$keyword'</value>
+  </data>
+  <data name="SeekBackward" xml:space="preserve">
+    <value>Retroceder</value>
+  </data>
+  <data name="SeekForward" xml:space="preserve">
+    <value>Avanzar</value>
   </data>
   <data name="Select" xml:space="preserve">
     <value>Seleccionar</value>
@@ -1004,6 +1057,9 @@ Categoría 2: Etiqueta 4, Etiqueta 5</value>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>Alternar pantalla completa</value>
   </data>
+  <data name="TotalMedia" xml:space="preserve">
+    <value>Total de archivos multimedia</value>
+  </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Modo de doble página</value>
   </data>
@@ -1045,11 +1101,20 @@ $info</value>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>Medio</value>
   </data>
+  <data name="VolumeDown" xml:space="preserve">
+    <value>Bajar el volumen</value>
+  </data>
+  <data name="VolumeUp" xml:space="preserve">
+    <value>Subir el volumen</value>
+  </data>
   <data name="Warning" xml:space="preserve">
     <value>Advertencia</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>En este momento estamos viendo estas carpetas:</value>
+  </data>
+  <data name="WhilePlayingVideos" xml:space="preserve">
+    <value>Al reproducir vídeos</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>Ventana $n</value>

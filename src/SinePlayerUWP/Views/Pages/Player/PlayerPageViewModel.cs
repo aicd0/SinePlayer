@@ -715,7 +715,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     {
         bool shouldKeepScreenOn = _isPageActive &&
             (AppSettingsModel.KeepScreenOnBehavior == AppSettingsModel.KeepScreenOnBehaviorEnum.Always ||
-            (AppSettingsModel.KeepScreenOnBehavior == AppSettingsModel.KeepScreenOnBehaviorEnum.DuringPlayback && IsAutoPlaying));
+            (AppSettingsModel.KeepScreenOnBehavior == AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos && IsAutoPlaying));
         if (_isKeepScreenOnActive == shouldKeepScreenOn)
         {
             return;

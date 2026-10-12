@@ -362,12 +362,6 @@ $files</value>
   <data name="Duration" xml:space="preserve">
     <value>Duration</value>
   </data>
-  <data name="DuringAutoScrolling" xml:space="preserve">
-    <value>During auto scrolling</value>
-  </data>
-  <data name="DuringPlayback" xml:space="preserve">
-    <value>While playing</value>
-  </data>
   <data name="Edit" xml:space="preserve">
     <value>Edit</value>
   </data>
@@ -651,11 +645,8 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="LanguageExpander.Header" xml:space="preserve">
     <value>Language</value>
   </data>
-  <data name="LastReadTime" xml:space="preserve">
-    <value>Last read time</value>
-  </data>
-  <data name="LeftToRight" xml:space="preserve">
-    <value>L to R</value>
+  <data name="LastVisitTime" xml:space="preserve">
+    <value>Last visit time</value>
   </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>No results under current filter settings. Try</value>
@@ -829,7 +820,7 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
     <value>Play / Pause</value>
   </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
-    <value>Customize the player</value>
+    <value>Global player configurations</value>
   </data>
   <data name="PlayerExpander.Header" xml:space="preserve">
     <value>Player</value>
@@ -1123,6 +1114,9 @@ $info</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>Right now, we're watching these folders:</value>
+  </data>
+  <data name="WhilePlayingVideos" xml:space="preserve">
+    <value>While playing videos</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>Window $n</value>
