@@ -1,0 +1,763 @@
+// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Runtime.InteropServices;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
+
+using Microsoft.UI;
+using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+
+using SinePlayer.Common.BaseUI;
+using SinePlayer.Common.BaseUI.PageAbilities;
+using SinePlayer.Common.InitTask;
+using SinePlayer.Common.Localization;
+using SinePlayer.Common.Plugins;
+using SinePlayer.Common.Services;
+using SinePlayer.Core.Common.DebugTools;
+using SinePlayer.Core.Common.Lifecycle;
+using SinePlayer.Core.Common.Threading;
+using SinePlayer.Core.Common.Utils;
+using SinePlayer.Data.Models.Media;
+using SinePlayer.Data.Models.Misc;
+using SinePlayer.Helpers.Navigation;
+using SinePlayer.Views.Pages.Main;
+
+using Windows.Win32;
+using Windows.Win32.Foundation;
+
+using WinRT.Interop;
+
+namespace SinePlayer.Views.AppWindows.Main;
+
+internal sealed partial class MainWindow : Window
+{
+    private const string TAG = nameof(MainWindow);
+
+    private static bool sIsFirstWindow = true;
+
+    //
+    // Creators
+    //
+
+    public static void Open()
+    {
+        MainWindow window = new(null, restorePlacement: false);
+        window.Activate();
+    }
+
+    public static void Open(string url, string oldTabId = "", bool restorePlacement = false)
+    {
+        var tab = MainPage.TabJsonModel.Create();
+        tab.Url = url;
+        tab.OldTabId = oldTabId;
+        WindowStateModel windowState = new()
+        {
+            Fullscreen = false,
+            WindowPlacement = null,
+            TabStatus = new()
+            {
+                SelectedIndex = 0,
+                Tabs = [tab],
+            },
+        };
+        MainWindow window = new(windowState, restorePlacement);
+        window.Activate();
+    }
+
+    public static void Open(WindowStateModel windowState)
+    {
+        MainWindow window = new(windowState, restorePlacement: true);
+        window.Activate();
+    }
+
+    //
+    // Member variables
+    //
+
+    // IMPORTANT: Any object referenced by this class need be dereferenced in OnWindowClosed,
+    // or else memory leaks will occur.
+    // See http://github.com/microsoft/microsoft-ui-xaml/issues/7282 for more details.
+
+    private WindowMembers? _members;
+    private WindowMembers Members => _members!;
+
+    private readonly bool _requestRestorePlacement = false;
+    private bool _isMinimized = false;
+
+    //
+    // Properties
+    //
+
+    public MainPage.ITabInfo? CurrentTab => Members._mainPage?.CurrentTab;
+    public bool IsActive => PInvoke.GetActiveWindow() == new HWND(WindowHandle);
+    public WindowLifecycleState LifecycleState { get; private set; } = WindowLifecycleState.Initialized;
+    public IntPtr WindowHandle { get; private set; }
+    public int WindowId { get; }
+
+    //
+    // Constructors
+    //
+
+    private MainWindow(WindowStateModel? windowState, bool restorePlacement)
+    {
+        InitializeComponent();
+
+        WindowId = App.Instance.WindowManager.RegisterWindow(this);
+        WindowHandle = WindowNative.GetWindowHandle(this);
+
+        _members = new(this);
+        Members._requestedWindowState = windowState;
+        _requestRestorePlacement = restorePlacement;
+
+        Title = StringResourceProvider.Instance.AppDisplayName;
+        ExtendsContentIntoTitleBar = true;
+        TrySetSystemBackdrop();
+        SetWindowIcon();
+
+        SubscribeEvents();
+
+        if (DebugUtils.DeveloperMode)
+        {
+            RegisterMessageLoop();
+        }
+    }
+
+    //
+    // Queries
+    //
+
+    public double GetRasterizationScale(double fallbackValue = 1.0)
+    {
+        HWND hWnd = new(WindowHandle);
+        uint dpi = PInvoke.GetDpiForWindow(hWnd);
+        if (dpi <= 0)
+        {
+            return fallbackValue;
+        }
+
+        return dpi / 96.0;
+    }
+
+    public WindowStateModel? GetWindowState()
+    {
+        MainThreadUtils.AssertOnMainThread();
+
+        if (LifecycleState != WindowLifecycleState.Loaded || Members._mainPage is null)
+        {
+            return null;
+        }
+
+        MainPage.MainPageStateJsonModel? tabState = Members._mainPage.GetState();
+        if (tabState is null)
+        {
+            return null;
+        }
+
+        return new()
+        {
+            Fullscreen = _isFullscreen,
+            WindowPlacement = Members._windowPlacementManager.GetWindowPlacement(),
+            TabStatus = tabState,
+        };
+    }
+
+    //
+    // Misc
+    //
+
+    public void OpenTab(string url, string targetTabId, string initiateTabId)
+    {
+        MainThreadUtils.AssertOnMainThread();
+        Enqueue(() =>
+        {
+            MainPage? mainPage = Members._mainPage;
+            if (mainPage is null)
+            {
+                return;
+            }
+
+            var route = Route.Create(url);
+            mainPage.Open(route, targetTabId, initiateTabId);
+        });
+    }
+
+    public void BringToFront()
+    {
+        MainThreadUtils.AssertOnMainThread();
+        Enqueue(() =>
+        {
+            var hWnd = new Windows.Win32.Foundation.HWND(WindowHandle);
+
+            Windows.Win32.UI.WindowsAndMessaging.WINDOWPLACEMENT placement;
+            unsafe
+            {
+                placement = new()
+                {
+                    length = (uint)sizeof(Windows.Win32.UI.WindowsAndMessaging.WINDOWPLACEMENT)
+                };
+            }
+
+            bool gotPlacement = PInvoke.GetWindowPlacement(hWnd, ref placement);
+            if (!gotPlacement || placement.showCmd == Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD.SW_SHOWMINIMIZED)
+            {
+                PInvoke.ShowWindow(hWnd, Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD.SW_RESTORE);
+            }
+
+            PInvoke.SetForegroundWindow(hWnd);
+        });
+    }
+
+    public void EnterFullscreen()
+    {
+        MainThreadUtils.AssertOnMainThread();
+        EnterOrExitFullscreen(true);
+    }
+
+    public void ExitFullscreen()
+    {
+        MainThreadUtils.AssertOnMainThread();
+        EnterOrExitFullscreen(false);
+    }
+
+    //
+    // Event Handlers
+    //
+
+    // IMPORTANT: Handle event registration and unregistration in the code-behind file,
+    // do not use XAML for this purpose in order to prevent memory leaks.
+
+    private void SubscribeEvents()
+    {
+        Closed += Window_Closed;
+        AppWindow.Changed += AppWindow_Changed;
+        ContentFrame.Loaded += ContentFrame_Loaded;
+        ContentFrame.PointerEntered += ContentFrame_PointerEntered;
+        ContentFrame.PointerExited += ContentFrame_PointerExited;
+    }
+
+    private void UnsubscribeEvents()
+    {
+        Closed -= Window_Closed;
+        AppWindow.Changed -= AppWindow_Changed;
+        ContentFrame.Loaded -= ContentFrame_Loaded;
+        ContentFrame.PointerEntered -= ContentFrame_PointerEntered;
+        ContentFrame.PointerExited -= ContentFrame_PointerExited;
+    }
+
+    private void Window_Closed(object sender, WindowEventArgs args)
+    {
+        if (App.Instance.WindowManager.GetAllWindowInfo().Count == 1)
+        {
+            ApplicationService.StartExiting();
+        }
+
+        LifecycleState = WindowLifecycleState.Destroyed;
+
+        // Close all tabs and dispatch stop events
+        Members._mainPage!.CloseAllTabs();
+        Members._mainWindowAbility.GetLifecycleAbility().SetCustomState("Window", ILifecycle.State.Stopped);
+
+        UnsubscribeEvents();
+        UnregisterMessageLoop();
+
+        App.Instance.WindowManager.UnregisterWindow(WindowId);
+        App.Instance.WindowManager.ScheduleSavingWindowState();
+
+        // Dereference members
+        _members = null;
+        ContentFrame.Content = null;
+        ContentFrame = null;
+        WindowHandle = IntPtr.Zero;
+    }
+
+    private void AppWindow_Changed(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (LifecycleState != WindowLifecycleState.Loaded)
+        {
+            return;
+        }
+
+        if (sender.Presenter is OverlappedPresenter presenter)
+        {
+            bool minimized = presenter.State == OverlappedPresenterState.Minimized;
+            if (minimized != _isMinimized)
+            {
+                _isMinimized = minimized;
+                Members._mainWindowAbility.SendMinimizeChangedEvent(minimized);
+            }
+        }
+
+        if (args.DidPositionChange)
+        {
+            App.Instance.WindowManager.ScheduleSavingWindowState();
+        }
+
+        if (args.DidSizeChange)
+        {
+            CoroutineUtils.PostInMainThread(() =>
+            {
+                DispatchFullscreenChangeEvent(IsFullScreen());
+            });
+
+            App.Instance.WindowManager.ScheduleSavingWindowState();
+        }
+    }
+
+    private void ContentFrame_Loaded(object sender, RoutedEventArgs e)
+    {
+        // Load the main page
+        var route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_MAIN);
+        PageNavigationBundle bundle = AppRouter.Process(route)!;
+        bundle.Communicator.RegisterAbility<ILifecycleAwareAbility>(Members._mainWindowAbility);
+        bundle.Communicator.RegisterAbility<IMainWindowAbility>(Members._mainWindowAbility);
+        ContentFrame.Navigate(bundle.PageTrait.PageType, bundle);
+        Members._mainPage = (MainPage)ContentFrame.Content;
+
+        LifecycleState = WindowLifecycleState.Loaded;
+
+        // Restore window placement
+        WindowStateModel? windowState = Members._requestedWindowState;
+        if (windowState is not null && _requestRestorePlacement)
+        {
+            if (windowState.WindowPlacement is not null)
+            {
+                Members._windowPlacementManager.RestoreWindowPlacement(windowState.WindowPlacement);
+            }
+
+            if (windowState.Fullscreen)
+            {
+                EnterOrExitFullscreen(true);
+            }
+        }
+
+        // Load initial tabs
+        Members._mainPage.RestoreState(windowState?.TabStatus);
+
+        if (sIsFirstWindow)
+        {
+            sIsFirstWindow = false;
+
+            // Show crash report if applicable
+            if (!InitTaskManager.Instance.ExitedNormallyLastTime)
+            {
+                DebugUtils.ReportLastCrash();
+            }
+
+            if (AppSettingsModel.GetModel().ScanOnLaunch)
+            {
+                // Update media library
+                // This operation is deferred to here because it may involve dialog displaying which requires a loaded window
+                MediaModel.RescanLibrary("InitOnAppLaunchInternal");
+            }
+        }
+
+        DequeuePendingActions();
+
+        CoroutineUtils.Run(async () =>
+        {
+            await Task.Delay(5000);
+            ApplicationService.StopLaunching();
+        });
+    }
+
+    private void ContentFrame_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        Members._mainWindowAbility.SendPointerInsideRootElementChangedEvent(true);
+    }
+
+    private void ContentFrame_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        Members._mainWindowAbility.SendPointerInsideRootElementChangedEvent(false);
+    }
+
+    //
+    // Win32 Message Loop
+    //
+
+    private void RegisterMessageLoop()
+    {
+        Windows.Win32.Foundation.HWND hwnd = new(WindowHandle);
+        var wndProcDelegate = new Windows.Win32.UI.WindowsAndMessaging.WNDPROC(MessageLoopProc);
+        Members._wndProcDelegate = wndProcDelegate;
+        nint wndPrcPointer = Marshal.GetFunctionPointerForDelegate(wndProcDelegate);
+#if x86
+        nint prevWndProc = PInvoke.SetWindowLong(hwnd, Windows.Win32.UI.WindowsAndMessaging.WINDOW_LONG_PTR_INDEX.GWL_WNDPROC, (int)wndPrcPointer);
+#elif x64 || ARM64
+        nint prevWndProc = PInvoke.SetWindowLongPtr(hwnd, Windows.Win32.UI.WindowsAndMessaging.WINDOW_LONG_PTR_INDEX.GWL_WNDPROC, wndPrcPointer);
+#endif
+        if (prevWndProc == IntPtr.Zero)
+        {
+            Logger.F(TAG, "Failed to register message loop");
+            return;
+        }
+
+        Members._originProc = Marshal.GetDelegateForFunctionPointer<Windows.Win32.UI.WindowsAndMessaging.WNDPROC>(prevWndProc);
+    }
+
+    private void UnregisterMessageLoop()
+    {
+        if (Members._originProc != null && Members._wndProcDelegate != null && WindowHandle != IntPtr.Zero)
+        {
+            Windows.Win32.Foundation.HWND hwnd = new(WindowHandle);
+            nint originProcPtr = Marshal.GetFunctionPointerForDelegate(Members._originProc);
+#if x86
+            nint prevWndProc = PInvoke.SetWindowLong(hwnd, Windows.Win32.UI.WindowsAndMessaging.WINDOW_LONG_PTR_INDEX.GWL_WNDPROC, (int)originProcPtr);
+#elif x64 || ARM64
+            nint prevWndProc = PInvoke.SetWindowLongPtr(hwnd, Windows.Win32.UI.WindowsAndMessaging.WINDOW_LONG_PTR_INDEX.GWL_WNDPROC, originProcPtr);
+#endif
+            if (prevWndProc == IntPtr.Zero)
+            {
+                Logger.F(TAG, "Failed to unregister message loop");
+            }
+        }
+
+        Members._originProc = null;
+        Members._wndProcDelegate = null;
+    }
+
+    private Windows.Win32.Foundation.LRESULT MessageLoopProc(Windows.Win32.Foundation.HWND hwnd,
+        uint uMsg,
+        Windows.Win32.Foundation.WPARAM wParam,
+        Windows.Win32.Foundation.LPARAM lParam)
+    {
+        switch (uMsg)
+        {
+            default:
+                break;
+        }
+
+        return PInvoke.CallWindowProc(Members._originProc, hwnd, uMsg, wParam, lParam);
+    }
+
+    //
+    // Fullscreen
+    //
+
+    private bool _isFullscreen = false;
+
+    private void EnterOrExitFullscreen(bool isFullscreen)
+    {
+        if (IsFullScreen() == isFullscreen)
+        {
+            return;
+        }
+
+        if (isFullscreen)
+        {
+            Members._windowPlacementManager.FreezeWindowPlacement();
+        }
+        else
+        {
+            Members._windowPlacementManager.UnfreezeWindowPlacement();
+        }
+
+        AppWindow.SetPresenter(isFullscreen ? AppWindowPresenterKind.FullScreen : AppWindowPresenterKind.Default);
+        DispatchFullscreenChangeEvent(isFullscreen);
+        App.Instance.WindowManager.ScheduleSavingWindowState();
+    }
+
+    private bool IsFullScreen()
+    {
+        return AppWindow.Presenter.Kind == AppWindowPresenterKind.FullScreen;
+    }
+
+    private void DispatchFullscreenChangeEvent(bool isFullscreen)
+    {
+        if (_isFullscreen == isFullscreen)
+        {
+            return;
+        }
+
+        _isFullscreen = isFullscreen;
+        Members._mainWindowAbility.SendFullscreenChangedEvent(isFullscreen);
+    }
+
+    //
+    // Helpers
+    //
+
+    private void Enqueue(Action action)
+    {
+        switch (LifecycleState)
+        {
+            case WindowLifecycleState.Initialized:
+                Members._pendingActions.Add(action);
+                break;
+            case WindowLifecycleState.Loaded:
+                action();
+                break;
+            case WindowLifecycleState.Destroyed:
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void DequeuePendingActions()
+    {
+        List<Action> pendingActions = [.. Members._pendingActions];
+        Members._pendingActions.Clear();
+        foreach (Action action in pendingActions)
+        {
+            action();
+        }
+    }
+
+    private void TrySetSystemBackdrop()
+    {
+        void SetAcrylicBackdrop()
+        {
+            DesktopAcrylicBackdrop desktopAcrylicBackdrop = new();
+            SystemBackdrop = desktopAcrylicBackdrop;
+        }
+
+        void SetMicaBackdrop(MicaKind kind)
+        {
+            MicaBackdrop micaBackdrop = new()
+            {
+                Kind = kind,
+            };
+            SystemBackdrop = micaBackdrop;
+        }
+
+        bool supportAcrylic = DesktopAcrylicController.IsSupported();
+        bool supportMica = MicaController.IsSupported();
+
+        switch (AppSettingsModel.AppBackground)
+        {
+            case AppSettingsModel.AppBackgroundEnum.None:
+                if (supportMica)
+                {
+                    SetMicaBackdrop(MicaKind.BaseAlt);
+                }
+                else if (supportAcrylic)
+                {
+                    SetAcrylicBackdrop();
+                }
+
+                break;
+            case AppSettingsModel.AppBackgroundEnum.Acrylic:
+                if (supportAcrylic)
+                {
+                    SetAcrylicBackdrop();
+                }
+
+                break;
+            case AppSettingsModel.AppBackgroundEnum.Mica:
+                if (supportMica)
+                {
+                    SetMicaBackdrop(MicaKind.Base);
+                }
+
+                break;
+            case AppSettingsModel.AppBackgroundEnum.MicaAlt:
+                if (supportMica)
+                {
+                    SetMicaBackdrop(MicaKind.BaseAlt);
+                }
+
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void SetWindowIcon()
+    {
+        WindowId windowId = Win32Interop.GetWindowIdFromWindow(WindowHandle);
+        var appWindow = AppWindow.GetFromWindowId(windowId);
+        appWindow.SetIcon(@"Assets\AppIcon.ico");
+    }
+
+    //
+    // Page Ability
+    //
+
+    private class MainWindowAbility(MainWindow window) : IMainWindowAbility, ILifecycleAwareAbility
+    {
+        private readonly int _windowId = window.WindowId;
+        private readonly WeakReference<MainWindow> _windowRef = new(window);
+        private readonly LifecycleAwareAbility _lifecycleAbility = new();
+        private readonly PluginWindowContext _pluginWindowContext = new(window.WindowId);
+        private readonly MutableLiveData<bool> _minimizeLiveData = new(window._isMinimized);
+        private readonly MutableLiveData<bool> _fullscreenLiveData = new(window._isFullscreen);
+        private readonly MutableLiveData<bool> _pointerInsideLiveData = new(true);
+        private int _activeFlyoutCount = 0;
+
+        public bool IsActive => GetWindow()?.IsActive ?? false;
+
+        public bool IsFullscreen => _fullscreenLiveData.Value;
+
+        public bool IsMinimized => _minimizeLiveData.Value;
+
+        public PluginWindowContext PluginWindowContext => _pluginWindowContext;
+
+        public int WindowId => _windowId;
+
+        public SizeF WindowSize
+        {
+            get
+            {
+                Frame? root = GetWindow()?.ContentFrame;
+                if (root is null)
+                {
+                    return SizeF.Empty;
+                }
+
+                return new SizeF((float)root.ActualWidth, (float)root.ActualHeight);
+            }
+        }
+
+        public bool IsFocusLocked => _activeFlyoutCount > 0;
+
+        public PointF GetPointerPosition()
+        {
+            MainWindow? window = GetWindow();
+            if (window is null)
+            {
+                return PointF.Empty;
+            }
+
+            HWND hWnd = new(window.WindowHandle);
+
+            PInvoke.GetCursorPos(out Point screenPoint);
+            Point clientPoint = screenPoint;
+            PInvoke.ScreenToClient(hWnd, ref clientPoint);
+            double scale = window.GetRasterizationScale();
+            double x = clientPoint.X / scale;
+            double y = clientPoint.Y / scale;
+            return new((float)x, (float)y);
+        }
+
+        public double GetRasterizationScale()
+        {
+            return GetWindow()?.GetRasterizationScale() ?? 1.0;
+        }
+
+        public void RegisterPageLifecycleHandler(PageLifecycleEventHandler handler)
+        {
+            _lifecycleAbility.RegisterPageLifecycleHandler(handler);
+        }
+
+        public void UnregisterPageLifecycleHandler(PageLifecycleEventHandler handler)
+        {
+            _lifecycleAbility.UnregisterPageLifecycleHandler(handler);
+        }
+
+        public void RegisterMinimizeChangedHandler(ILifecycleOwner owner, IMainWindowAbility.MinimizeChangedEventHandler handler)
+        {
+            _minimizeLiveData.ObserveSticky(owner, isMinimized =>
+            {
+                handler(isMinimized);
+            });
+        }
+
+        public void SendMinimizeChangedEvent(bool isMinimized)
+        {
+            _minimizeLiveData.Emit(isMinimized);
+        }
+
+        public void RegisterFullscreenChangedHandler(ILifecycleOwner owner, IMainWindowAbility.FullscreenChangedEventHandler handler)
+        {
+            _fullscreenLiveData.ObserveSticky(owner, isFullscreen =>
+            {
+                handler(isFullscreen);
+            });
+        }
+
+        public void SendFullscreenChangedEvent(bool isFullscreen)
+        {
+            _fullscreenLiveData.Emit(isFullscreen);
+        }
+
+        public void RegisterPointerInsideRootElementChangedHandler(ILifecycleOwner owner, IMainWindowAbility.PointerInsideChangedEventHandler handler)
+        {
+            _pointerInsideLiveData.ObserveSticky(owner, isPointerInside =>
+            {
+                handler(isPointerInside);
+            });
+        }
+
+        public void SendPointerInsideRootElementChangedEvent(bool isPointerInside)
+        {
+            _pointerInsideLiveData.Emit(isPointerInside);
+        }
+
+        public void EnterFullscreen()
+        {
+            GetWindow()?.EnterOrExitFullscreen(true);
+        }
+
+        public void ExitFullscreen()
+        {
+            GetWindow()?.EnterOrExitFullscreen(false);
+        }
+
+        public void RequestFocusLock()
+        {
+            _activeFlyoutCount++;
+        }
+
+        public void ReleaseFocusLock()
+        {
+            if (_activeFlyoutCount <= 0)
+            {
+                Logger.F(TAG, "ReleaseFocusLock called when no active flyouts");
+                return;
+            }
+
+            _activeFlyoutCount--;
+        }
+
+        public LifecycleAwareAbility GetLifecycleAbility()
+        {
+            return _lifecycleAbility;
+        }
+
+        private MainWindow? GetWindow()
+        {
+            if (_windowRef.TryGetTarget(out MainWindow? window))
+            {
+                return window;
+            }
+
+            return null;
+        }
+    }
+
+    //
+    // Types
+    //
+
+    private class WindowMembers(MainWindow window)
+    {
+        public Windows.Win32.UI.WindowsAndMessaging.WNDPROC? _originProc;
+        public Windows.Win32.UI.WindowsAndMessaging.WNDPROC? _wndProcDelegate;
+        public readonly WindowPlacementManager _windowPlacementManager = new(window);
+        public readonly MainWindowAbility _mainWindowAbility = new(window);
+        public List<Action> _pendingActions = [];
+        public WindowStateModel? _requestedWindowState = null;
+        public MainPage? _mainPage;
+    }
+
+    public class WindowStateModel
+    {
+        [JsonPropertyName("Fullscreen")]
+        public bool Fullscreen { get; init; }
+
+        [JsonPropertyName("WindowPlacement")]
+        public WindowPlacementManager.SavedWindowState? WindowPlacement { get; init; }
+
+        [JsonPropertyName("TabStatus")]
+        public MainPage.MainPageStateJsonModel? TabStatus { get; init; }
+    }
+}

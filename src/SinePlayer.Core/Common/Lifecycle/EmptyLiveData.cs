@@ -1,0 +1,32 @@
+﻿// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+namespace SinePlayer.Core.Common.Lifecycle;
+
+internal class EmptyLiveData<T> : IMutableLiveData<T> where T : notnull
+{
+    public bool HasValue => false;
+
+    public T? Value => default;
+
+    public void Clear()
+    {
+    }
+
+    public void Emit(T value)
+    {
+    }
+
+    public void Observe(ILifecycleOwner owner, IValueObserver<T> observer, ObserveOptions options)
+    {
+    }
+
+    public void RemoveObserver(IValueObserver<T> observer)
+    {
+    }
+
+    public bool HasObserver(IValueObserver<T> observer)
+    {
+        return false;
+    }
+}

@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a problem with Comic Reader
+about: Report a problem with Sine Player
 title: ''
 labels: ''
 assignees: ''
@@ -40,10 +40,10 @@ Steps to reproduce the behavior:
 <!--
 Run the following commands in Powershell and copy/paste the output.
 " - OS Build: $([Environment]::OSVersion.Version)"
-" - Architecture: $((Get-AppxPackage -Name 49915aicd.SinePlayerUWP).Architecture)"
-" - Application Version: $((Get-AppxPackage -Name 49915aicd.SinePlayerUWP).Version)"
+" - Architecture: $((Get-AppxPackage -Name 49915aicd.SinePlayer).Architecture)"
+" - Application Version: $((Get-AppxPackage -Name 49915aicd.SinePlayer).Version)"
 " - Region: $((Get-Culture).Name)"
-" - Dev Version Installed: $($null -ne (Get-AppxPackage -Name 49915aicd.SinePlayerUWP.Dev))"
+" - Dev Version Installed: $($null -ne (Get-AppxPackage -Name 49915aicd.SinePlayer.Dev))"
 -->
 
 **Additional context**

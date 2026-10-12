@@ -1,0 +1,80 @@
+<base:BaseUserControl
+    x:Class="SinePlayer.Views.Pages.Player.PlayerNavigationBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:base="using:SinePlayer.Common.BaseUI"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:playersettings="using:SinePlayer.UserControls.PlayerSettings"
+    d:DesignHeight="100"
+    d:DesignWidth="100"
+    mc:Ignorable="d">
+
+    <base:BaseUserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Styles/AppBarButton.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </base:BaseUserControl.Resources>
+
+    <!--  Center buttons  -->
+    <StackPanel
+        x:Name="SpCenterButtons"
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center"
+        Orientation="Horizontal">
+
+        <!--  Add to favorites  -->
+        <AppBarButton
+            x:Name="AbbAddToFavorite"
+            Click="OnAddToFavoritesClick"
+            Style="{StaticResource NavigationPageTopTileAppBarButton}">
+            <AppBarButton.Content>
+                <Grid>
+                    <FontIcon x:Name="FiFavoriteUnfilled" Glyph="&#xE734;" />
+                    <FontIcon
+                        x:Name="FiFavoriteFilled"
+                        Foreground="{ThemeResource SystemAccentColor}"
+                        Glyph="&#xE735;" />
+                </Grid>
+            </AppBarButton.Content>
+        </AppBarButton>
+
+        <!--  Player settings  -->
+        <AppBarButton Style="{StaticResource NavigationPageTopTileAppBarButton}" ToolTipService.ToolTip="{x:Bind StringResource.PlayerSettings}">
+            <AppBarButton.Content>
+                <FontIcon Glyph="&#xE713;" />
+            </AppBarButton.Content>
+            <AppBarButton.Flyout>
+                <Flyout
+                    Closed="PlayerSettingFlyout_Closed"
+                    Closing="PlayerSettingFlyout_Closing"
+                    Opened="PlayerSettingFlyout_Opened"
+                    Placement="Bottom">
+                    <Flyout.FlyoutPresenterStyle>
+                        <Style TargetType="FlyoutPresenter">
+                            <Setter Property="CornerRadius" Value="8" />
+                            <Setter Property="Margin" Value="0,4,0,0" />
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="MaxWidth" Value="1000" />
+                        </Style>
+                    </Flyout.FlyoutPresenterStyle>
+                    <playersettings:PlayerSettingsPanel x:Name="MainPlayerSettingPanel" DataChanged="MainPlayerSettingPanel_DataChanged" />
+                </Flyout>
+            </AppBarButton.Flyout>
+        </AppBarButton>
+
+        <!--  Media info  -->
+        <AppBarButton
+            Click="OnMediaInfoClick"
+            Style="{StaticResource NavigationPageTopTileAppBarButton}"
+            ToolTipService.ToolTip="{x:Bind StringResource.MediaInfo}">
+            <AppBarButton.Content>
+                <FontIcon Glyph="&#xE946;" />
+            </AppBarButton.Content>
+        </AppBarButton>
+
+    </StackPanel>
+
+</base:BaseUserControl>
