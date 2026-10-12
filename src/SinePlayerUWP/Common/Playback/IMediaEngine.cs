@@ -10,26 +10,43 @@ using SinePlayerUWP.Common.ErrorHandling;
 
 namespace SinePlayerUWP.Common.Playback;
 
-// Abstraction over a media playback backend (native MediaPlayer today, other
-// engines can be plugged in later). Events are raised on the main thread.
 internal interface IMediaEngine : IDisposable
 {
-    MediaEngineStateEnum State { get; }
+    //
+    // Properties
+    //
+
+    MediaEngineState State { get; }
+
     TimeSpan Position { get; }
+
     TimeSpan Duration { get; }
+
     double Volume { get; }
+
     bool IsMuted { get; }
+
     double PlaybackRate { get; }
 
-    event Action<MediaEngineStateEnum>? StateChanged;
+    //
+    // Events
+    //
+
+    event Action<MediaEngineState>? StateChanged;
+
     event Action? PositionChanged;
+
     event Action? MediaOpened;
+
     event Action? MediaEnded;
+
     event Action<string>? ErrorOccurred;
 
-    // Returns once the media source has been attached; the actual open result
-    // is reported through MediaOpened / ErrorOccurred afterwards.
-    Task<ErrorResult> LoadAsync(string filePath);
+    //
+    // Methods
+    //
+
+    Task<ErrorResult> Load(string filePath);
 
     void Play();
 
@@ -45,6 +62,5 @@ internal interface IMediaEngine : IDisposable
 
     void SetPlaybackRate(double rate);
 
-    // Must be called on the main thread. The surface is created once and reused.
     UIElement CreateVideoSurface();
 }

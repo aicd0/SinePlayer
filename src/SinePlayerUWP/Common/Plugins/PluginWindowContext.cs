@@ -12,7 +12,7 @@ using SinePlayerUWP.Common.BaseUI;
 using SinePlayerUWP.Common.BaseUI.PageAbilities;
 using SinePlayerUWP.Common.Utils;
 using SinePlayerUWP.SDK.Models;
-using SinePlayerUWP.SDK.Plugins.Comic;
+using SinePlayerUWP.SDK.Plugins.Media;
 using SinePlayerUWP.SDK.Plugins.UI;
 
 namespace SinePlayerUWP.Common.Plugins;
@@ -48,32 +48,32 @@ internal sealed class PluginWindowContext(int windowId) : IWindowContext
     // Public API
     //
 
-    public void SetReadingComic(IComicModel? media, Func<Action?, bool> executor)
+    public void SetForegroundMedia(IMediaModel? media, Func<Action?, bool> executor)
     {
-        if (media == _readingMedia)
+        if (media == _foregroundMedia)
         {
             return;
         }
 
-        _readingMedia = media;
-        executor(() => _readingMediaChanged?.Invoke(media));
+        _foregroundMedia = media;
+        executor(() => _foregroundMediaChanged?.Invoke(media));
     }
 
     //
     // IWindowContext Implementation
     //
 
-    private event ReadingComicChangedEventHandler? _readingMediaChanged;
+    private event ForegroundMediaChangedEventHandler? _foregroundMediaChanged;
 
-    private IComicModel? _readingMedia;
+    private IMediaModel? _foregroundMedia;
 
-    event ReadingComicChangedEventHandler? IWindowContext.ReadingComicChanged
+    event ForegroundMediaChangedEventHandler? IWindowContext.ForegroundMediaChanged
     {
-        add { _readingMediaChanged += value; }
-        remove { _readingMediaChanged -= value; }
+        add { _foregroundMediaChanged += value; }
+        remove { _foregroundMediaChanged -= value; }
     }
 
-    public IComicModel? ReadingComic => _readingMedia;
+    public IMediaModel? ForegroundMedia => _foregroundMedia;
 
     Task<DialogResult> IWindowContext.EnqueueDialog(DialogOptions options)
     {

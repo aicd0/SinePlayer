@@ -339,7 +339,7 @@ internal abstract partial class MediaHandle(MediaType type)
     public long LastPositionMs { get; protected set; } = 0;
     public string Description { get; private set; } = string.Empty;
     public IReadOnlyDictionary<string, MediaTagCategory> Tags => _tags;
-    public IReadOnlyDictionary<string, SDK.Plugins.Comic.IComicTagCategory> TagsForPlugin => _tags;
+    public IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory> TagsForPlugin => _tags;
     public long DurationMs { get; set; } = -1;
 
     public abstract bool IsEditable { get; }
@@ -779,30 +779,30 @@ internal abstract partial class MediaHandle(MediaType type)
 
     private partial class ReadOnlyTags(Dictionary<string, MediaTagCategory> source) :
         IReadOnlyDictionary<string, MediaTagCategory>,
-        IReadOnlyDictionary<string, SDK.Plugins.Comic.IComicTagCategory>
+        IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory>
     {
         MediaTagCategory IReadOnlyDictionary<string, MediaTagCategory>.this[string key] => source[key];
 
-        SDK.Plugins.Comic.IComicTagCategory IReadOnlyDictionary<string, SDK.Plugins.Comic.IComicTagCategory>.this[string key] => source[key];
+        SDK.Plugins.Media.IMediaTagCategory IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory>.this[string key] => source[key];
 
         IEnumerable<string> IReadOnlyDictionary<string, MediaTagCategory>.Keys => source.Keys;
 
-        IEnumerable<string> IReadOnlyDictionary<string, SDK.Plugins.Comic.IComicTagCategory>.Keys => source.Keys;
+        IEnumerable<string> IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory>.Keys => source.Keys;
 
         IEnumerable<MediaTagCategory> IReadOnlyDictionary<string, MediaTagCategory>.Values => source.Values;
 
-        IEnumerable<SDK.Plugins.Comic.IComicTagCategory> IReadOnlyDictionary<string, SDK.Plugins.Comic.IComicTagCategory>.Values => source.Values;
+        IEnumerable<SDK.Plugins.Media.IMediaTagCategory> IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory>.Values => source.Values;
 
         int IReadOnlyCollection<KeyValuePair<string, MediaTagCategory>>.Count => source.Count;
 
-        int IReadOnlyCollection<KeyValuePair<string, SDK.Plugins.Comic.IComicTagCategory>>.Count => source.Count;
+        int IReadOnlyCollection<KeyValuePair<string, SDK.Plugins.Media.IMediaTagCategory>>.Count => source.Count;
 
         bool IReadOnlyDictionary<string, MediaTagCategory>.ContainsKey(string key)
         {
             return source.ContainsKey(key);
         }
 
-        bool IReadOnlyDictionary<string, SDK.Plugins.Comic.IComicTagCategory>.ContainsKey(string key)
+        bool IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory>.ContainsKey(string key)
         {
             return source.ContainsKey(key);
         }
@@ -812,7 +812,7 @@ internal abstract partial class MediaHandle(MediaType type)
             return source.GetEnumerator();
         }
 
-        IEnumerator<KeyValuePair<string, SDK.Plugins.Comic.IComicTagCategory>> IEnumerable<KeyValuePair<string, SDK.Plugins.Comic.IComicTagCategory>>.GetEnumerator()
+        IEnumerator<KeyValuePair<string, SDK.Plugins.Media.IMediaTagCategory>> IEnumerable<KeyValuePair<string, SDK.Plugins.Media.IMediaTagCategory>>.GetEnumerator()
         {
             foreach ((string? key, MediaTagCategory? value) in source)
             {
@@ -830,7 +830,7 @@ internal abstract partial class MediaHandle(MediaType type)
             return source.TryGetValue(key, out value);
         }
 
-        bool IReadOnlyDictionary<string, SDK.Plugins.Comic.IComicTagCategory>.TryGetValue(string key, [MaybeNullWhen(false)] out SDK.Plugins.Comic.IComicTagCategory value)
+        bool IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory>.TryGetValue(string key, [MaybeNullWhen(false)] out SDK.Plugins.Media.IMediaTagCategory value)
         {
             bool result = source.TryGetValue(key, out MediaTagCategory? tempValue);
             value = tempValue;

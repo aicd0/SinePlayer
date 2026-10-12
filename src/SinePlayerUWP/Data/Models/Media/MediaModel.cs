@@ -28,7 +28,7 @@ using SinePlayerUWP.SDK.Models;
 
 namespace SinePlayerUWP.Data.Models.Media;
 
-internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.Comic.IComicModel
+internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.Media.IMediaModel
 {
     private const string TAG = nameof(MediaModel);
 
@@ -1108,24 +1108,24 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.C
     // SDK.Plugins.Comic.IComicModel Implementation
     //
 
-    long SDK.Plugins.Comic.IComicModel.Id => Id;
+    long SDK.Plugins.Media.IMediaModel.Id => Id;
 
-    string SDK.Plugins.Comic.IComicModel.Location => Location;
+    string SDK.Plugins.Media.IMediaModel.Location => Location;
 
     // The page-based model was removed with the media reader; the plugin SDK rework is deferred.
-    int SDK.Plugins.Comic.IComicModel.PageCount => -1;
+    int SDK.Plugins.Media.IMediaModel.PageCount => -1;
 
-    string SDK.Plugins.Comic.IComicModel.Title1 => Title1;
+    string SDK.Plugins.Media.IMediaModel.Title1 => Title1;
 
-    string SDK.Plugins.Comic.IComicModel.Title2 => Title2;
+    string SDK.Plugins.Media.IMediaModel.Title2 => Title2;
 
-    string SDK.Plugins.Comic.IComicModel.Description => Description;
+    string SDK.Plugins.Media.IMediaModel.Description => Description;
 
-    int SDK.Plugins.Comic.IComicModel.Rating => Rating;
+    int SDK.Plugins.Media.IMediaModel.Rating => Rating;
 
-    IReadOnlyDictionary<string, SDK.Plugins.Comic.IComicTagCategory> SDK.Plugins.Comic.IComicModel.Tags => _internalModel.TagsForPlugin;
+    IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory> SDK.Plugins.Media.IMediaModel.Tags => _internalModel.TagsForPlugin;
 
-    IReadOnlyDictionary<string, string> SDK.Plugins.Comic.IComicModel.Links
+    IReadOnlyDictionary<string, string> SDK.Plugins.Media.IMediaModel.Links
     {
         get
         {
@@ -1147,37 +1147,37 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.C
         }
     }
 
-    bool SDK.Plugins.Comic.IComicModel.IsHidden => IsHidden;
+    bool SDK.Plugins.Media.IMediaModel.IsHidden => IsHidden;
 
-    SDK.Plugins.Comic.CompletionStatusEnum SDK.Plugins.Comic.IComicModel.CompletionStatus =>
+    SDK.Plugins.Media.CompletionStatusEnum SDK.Plugins.Media.IMediaModel.CompletionStatus =>
         CompletionStatusService.HostEnumToSDKEnum(CompletionStatus);
 
-    Task SDK.Plugins.Comic.IComicModel.SetTitle1(string title)
+    Task SDK.Plugins.Media.IMediaModel.SetTitle1(string title)
     {
         return SetTitle1(title);
     }
 
-    Task SDK.Plugins.Comic.IComicModel.SetTitle2(string title)
+    Task SDK.Plugins.Media.IMediaModel.SetTitle2(string title)
     {
         return SetTitle2(title);
     }
 
-    Task SDK.Plugins.Comic.IComicModel.SetDescription(string description)
+    Task SDK.Plugins.Media.IMediaModel.SetDescription(string description)
     {
         return SetDescription(description);
     }
 
-    Task SDK.Plugins.Comic.IComicModel.SetRating(int rating)
+    Task SDK.Plugins.Media.IMediaModel.SetRating(int rating)
     {
         return SetRating(rating);
     }
 
-    Task SDK.Plugins.Comic.IComicModel.SetTags<T>(IEnumerable<KeyValuePair<string, T>> tags)
+    Task SDK.Plugins.Media.IMediaModel.SetTags<T>(IEnumerable<KeyValuePair<string, T>> tags)
     {
         return SetTags(tags);
     }
 
-    Task SDK.Plugins.Comic.IComicModel.SetLinks(IEnumerable<KeyValuePair<string, string>> links)
+    Task SDK.Plugins.Media.IMediaModel.SetLinks(IEnumerable<KeyValuePair<string, string>> links)
     {
         List<TagLinkModel.LinkModel> linkModels = [];
         foreach (KeyValuePair<string, string> item in links)
@@ -1198,25 +1198,19 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.C
         return FlushExt();
     }
 
-    Task SDK.Plugins.Comic.IComicModel.SetHidden(bool isHidden)
+    Task SDK.Plugins.Media.IMediaModel.SetHidden(bool isHidden)
     {
         return SetHidden(isHidden);
     }
 
-    async Task SDK.Plugins.Comic.IComicModel.SetCompletionStatus(SDK.Plugins.Comic.CompletionStatusEnum status)
+    async Task SDK.Plugins.Media.IMediaModel.SetCompletionStatus(SDK.Plugins.Media.CompletionStatusEnum status)
     {
         CompletionStatusEnum convertedStatus = CompletionStatusService.SDKEnumToHostEnum(status);
         await _internalModel.SaveCompletionStatus(convertedStatus);
         DispatchUpdateEvent([Id]);
     }
 
-    Task<SDK.Plugins.Comic.IComicConnection?> SDK.Plugins.Comic.IComicModel.Open()
-    {
-        // Media playback will be provided by the media engine in a later migration phase.
-        return Task.FromResult<SDK.Plugins.Comic.IComicConnection?>(null);
-    }
-
-    async Task<bool> SDK.Plugins.Comic.IComicModel.MoveToLocation(string location)
+    async Task<bool> SDK.Plugins.Media.IMediaModel.MoveToLocation(string location)
     {
         string oldLocation = Location;
         bool success = await _internalModel.MoveToLocation(location);

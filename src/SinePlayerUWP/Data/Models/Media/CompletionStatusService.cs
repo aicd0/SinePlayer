@@ -47,30 +47,30 @@ internal static class CompletionStatusService
         };
     }
 
-    public static SDK.Plugins.Comic.CompletionStatusEnum HostEnumToSDKEnum(CompletionStatusEnum status)
+    public static SDK.Plugins.Media.CompletionStatusEnum HostEnumToSDKEnum(CompletionStatusEnum status)
     {
         return status switch
         {
-            CompletionStatusEnum.Unread => SDK.Plugins.Comic.CompletionStatusEnum.Unread,
-            CompletionStatusEnum.Reading => SDK.Plugins.Comic.CompletionStatusEnum.Reading,
-            CompletionStatusEnum.Completed => SDK.Plugins.Comic.CompletionStatusEnum.Completed,
-            CompletionStatusEnum.Abandoned => SDK.Plugins.Comic.CompletionStatusEnum.Abandoned,
-            CompletionStatusEnum.PlanToRead => SDK.Plugins.Comic.CompletionStatusEnum.PlanToRead,
-            CompletionStatusEnum.OnHold => SDK.Plugins.Comic.CompletionStatusEnum.OnHold,
+            CompletionStatusEnum.Unread => SDK.Plugins.Media.CompletionStatusEnum.Unread,
+            CompletionStatusEnum.Reading => SDK.Plugins.Media.CompletionStatusEnum.Reading,
+            CompletionStatusEnum.Completed => SDK.Plugins.Media.CompletionStatusEnum.Completed,
+            CompletionStatusEnum.Abandoned => SDK.Plugins.Media.CompletionStatusEnum.Abandoned,
+            CompletionStatusEnum.PlanToRead => SDK.Plugins.Media.CompletionStatusEnum.PlanToRead,
+            CompletionStatusEnum.OnHold => SDK.Plugins.Media.CompletionStatusEnum.OnHold,
             _ => throw new ArgumentException($"Unknwon completion status '{status}'."),
         };
     }
 
-    public static CompletionStatusEnum SDKEnumToHostEnum(SDK.Plugins.Comic.CompletionStatusEnum status)
+    public static CompletionStatusEnum SDKEnumToHostEnum(SDK.Plugins.Media.CompletionStatusEnum status)
     {
         return status switch
         {
-            SDK.Plugins.Comic.CompletionStatusEnum.Unread => CompletionStatusEnum.Unread,
-            SDK.Plugins.Comic.CompletionStatusEnum.Reading => CompletionStatusEnum.Reading,
-            SDK.Plugins.Comic.CompletionStatusEnum.Completed => CompletionStatusEnum.Completed,
-            SDK.Plugins.Comic.CompletionStatusEnum.Abandoned => CompletionStatusEnum.Abandoned,
-            SDK.Plugins.Comic.CompletionStatusEnum.PlanToRead => CompletionStatusEnum.PlanToRead,
-            SDK.Plugins.Comic.CompletionStatusEnum.OnHold => CompletionStatusEnum.OnHold,
+            SDK.Plugins.Media.CompletionStatusEnum.Unread => CompletionStatusEnum.Unread,
+            SDK.Plugins.Media.CompletionStatusEnum.Reading => CompletionStatusEnum.Reading,
+            SDK.Plugins.Media.CompletionStatusEnum.Completed => CompletionStatusEnum.Completed,
+            SDK.Plugins.Media.CompletionStatusEnum.Abandoned => CompletionStatusEnum.Abandoned,
+            SDK.Plugins.Media.CompletionStatusEnum.PlanToRead => CompletionStatusEnum.PlanToRead,
+            SDK.Plugins.Media.CompletionStatusEnum.OnHold => CompletionStatusEnum.OnHold,
             _ => throw new ArgumentException($"Unknwon completion status '{status}'."),
         };
     }

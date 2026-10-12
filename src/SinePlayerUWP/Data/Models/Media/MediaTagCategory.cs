@@ -5,13 +5,13 @@ using System.Collections.Generic;
 
 namespace SinePlayerUWP.Data.Models.Media;
 
-internal class MediaTagCategory(HashSet<string> tags) : SDK.Plugins.Comic.IComicTagCategory
+internal class MediaTagCategory(HashSet<string> tags) : SDK.Plugins.Media.IMediaTagCategory
 {
     public IReadOnlySet<string> Tags { get; } = tags;
 
     //
-    // SDK.Plugins.Comic.IComicTagCategory Implementation
+    // SDK.Plugins.Media.IMediaTagCategory Implementation
     //
 
-    IReadOnlySet<string> SDK.Plugins.Comic.IComicTagCategory.Tags => Tags;
+    IReadOnlySet<string> SDK.Plugins.Media.IMediaTagCategory.Tags => Tags;
 }

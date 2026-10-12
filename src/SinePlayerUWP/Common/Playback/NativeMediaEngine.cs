@@ -19,14 +19,14 @@ using Windows.Storage;
 
 namespace SinePlayerUWP.Common.Playback;
 
-internal sealed class NativeMediaEngine : IMediaEngine
+internal sealed partial class NativeMediaEngine : IMediaEngine
 {
     private const string TAG = nameof(NativeMediaEngine);
 
     private readonly MediaPlayer _player = new();
 
     private MediaPlayerElement? _videoSurface;
-    private MediaEngineStateEnum _state = MediaEngineStateEnum.None;
+    private MediaEngineState _state = MediaEngineState.None;
     private bool _isDisposed = false;
 
     public NativeMediaEngine()
@@ -39,7 +39,7 @@ internal sealed class NativeMediaEngine : IMediaEngine
         _player.MediaFailed += Player_MediaFailed;
     }
 
-    public MediaEngineStateEnum State => _state;
+    public MediaEngineState State => _state;
 
     public TimeSpan Position => _player.PlaybackSession.Position;
 
@@ -51,13 +51,13 @@ internal sealed class NativeMediaEngine : IMediaEngine
 
     public double PlaybackRate => _player.PlaybackSession.PlaybackRate;
 
-    public event Action<MediaEngineStateEnum>? StateChanged;
+    public event Action<MediaEngineState>? StateChanged;
     public event Action? PositionChanged;
     public event Action? MediaOpened;
     public event Action? MediaEnded;
     public event Action<string>? ErrorOccurred;
 
-    public async Task<ErrorResult> LoadAsync(string filePath)
+    public async Task<ErrorResult> Load(string filePath)
     {
         var err = ErrorLogger.Create(TAG);
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
@@ -65,7 +65,7 @@ internal sealed class NativeMediaEngine : IMediaEngine
             return err.Error($"Media file not found: '{filePath}'.");
         }
 
-        SetState(MediaEngineStateEnum.Opening);
+        SetState(MediaEngineState.Opening);
         try
         {
             StorageFile file = await StorageFile.GetFileFromPathAsync(filePath);
@@ -75,14 +75,14 @@ internal sealed class NativeMediaEngine : IMediaEngine
         catch (Exception ex)
         {
             Logger.E(TAG, $"Unable to load media file '{filePath}'", ex);
-            SetState(MediaEngineStateEnum.Error);
+            SetState(MediaEngineState.Error);
             return err.Error(ex);
         }
     }
 
     public void Play()
     {
-        if (_state == MediaEngineStateEnum.Ended)
+        if (_state == MediaEngineState.Ended)
         {
             _player.PlaybackSession.Position = TimeSpan.Zero;
         }
@@ -170,23 +170,23 @@ internal sealed class NativeMediaEngine : IMediaEngine
         switch (sender.PlaybackState)
         {
             case MediaPlaybackState.None:
-                SetState(MediaEngineStateEnum.None);
+                SetState(MediaEngineState.None);
                 break;
             case MediaPlaybackState.Opening:
-                SetState(MediaEngineStateEnum.Opening);
+                SetState(MediaEngineState.Opening);
                 break;
             case MediaPlaybackState.Buffering:
-                if (_state != MediaEngineStateEnum.Playing && _state != MediaEngineStateEnum.Paused)
+                if (_state != MediaEngineState.Playing && _state != MediaEngineState.Paused)
                 {
-                    SetState(MediaEngineStateEnum.Opening);
+                    SetState(MediaEngineState.Opening);
                 }
 
                 break;
             case MediaPlaybackState.Playing:
-                SetState(MediaEngineStateEnum.Playing);
+                SetState(MediaEngineState.Playing);
                 break;
             case MediaPlaybackState.Paused:
-                SetState(MediaEngineStateEnum.Paused);
+                SetState(MediaEngineState.Paused);
                 break;
             default:
                 break;
@@ -205,18 +205,18 @@ internal sealed class NativeMediaEngine : IMediaEngine
 
     private void Player_MediaEnded(MediaPlayer sender, object args)
     {
-        SetState(MediaEngineStateEnum.Ended);
+        SetState(MediaEngineState.Ended);
         CoroutineUtils.RunInMainThread(() => MediaEnded?.Invoke());
     }
 
     private void Player_MediaFailed(MediaPlayer sender, MediaPlayerFailedEventArgs args)
     {
         Logger.E(TAG, $"Media playback failed: {args.ErrorMessage}", null);
-        SetState(MediaEngineStateEnum.Error);
+        SetState(MediaEngineState.Error);
         CoroutineUtils.RunInMainThread(() => ErrorOccurred?.Invoke(args.ErrorMessage));
     }
 
-    private void SetState(MediaEngineStateEnum state)
+    private void SetState(MediaEngineState state)
     {
         if (_state == state)
         {

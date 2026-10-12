@@ -247,7 +247,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (engine.State == MediaEngineStateEnum.Playing)
+        if (engine.State == MediaEngineState.Playing)
         {
             engine.Pause();
         }
@@ -508,7 +508,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
 
         IMediaEngine engine = EnsureEngine();
-        ErrorResult err = await engine.LoadAsync(media.Location);
+        ErrorResult err = await engine.Load(media.Location);
         if (!err.IsSuccessful)
         {
             PlayerStatusLiveData.Emit(new()
@@ -580,19 +580,19 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         return engine;
     }
 
-    private void Engine_StateChanged(MediaEngineStateEnum state)
+    private void Engine_StateChanged(MediaEngineState state)
     {
-        IsPlayingLiveData.Emit(state == MediaEngineStateEnum.Playing);
+        IsPlayingLiveData.Emit(state == MediaEngineState.Playing);
 
         switch (state)
         {
-            case MediaEngineStateEnum.Playing:
+            case MediaEngineState.Playing:
                 IsAutoPlaying = true;
                 break;
-            case MediaEngineStateEnum.None:
-            case MediaEngineStateEnum.Paused:
-            case MediaEngineStateEnum.Ended:
-            case MediaEngineStateEnum.Error:
+            case MediaEngineState.None:
+            case MediaEngineState.Paused:
+            case MediaEngineState.Ended:
+            case MediaEngineState.Error:
                 IsAutoPlaying = false;
                 break;
             default:

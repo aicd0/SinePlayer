@@ -16,7 +16,7 @@ using SinePlayerUWP.Core.Common.AppEnvironment;
 using SinePlayerUWP.Core.Common.DebugTools;
 using SinePlayerUWP.Core.Common.Utils;
 using SinePlayerUWP.Data.Models.Media;
-using SinePlayerUWP.SDK.Plugins.Comic;
+using SinePlayerUWP.SDK.Plugins.Media;
 using SinePlayerUWP.SDK.Plugins.Property;
 
 namespace SinePlayerUWP.Data.Models.Misc;
@@ -77,8 +77,8 @@ internal class MediaPropertyModel
     }
 
     private bool _pluginPropertyInitialized = false;
-    private IVirtualProperty<IComicModel>? _pluginProperty;
-    private IVirtualProperty<IComicModel>? PluginProperty
+    private IVirtualProperty<IMediaModel>? _pluginProperty;
+    private IVirtualProperty<IMediaModel>? PluginProperty
     {
         get
         {
@@ -140,7 +140,7 @@ internal class MediaPropertyModel
     public List<T> SortMedia<T>(IEnumerable<T> items, Func<T, MediaModel> selector, MediaFilterModel.OrderMethodEnum orderMethod)
     {
         IEnumerable<T> preSorted = items.OrderBy(x => StringUtils.SmartFileNameKeySelector(selector(x).Title ?? StringResourceProvider.Instance.Untitled), StringUtils.SmartFileNameComparer);
-        IVirtualPropertySorter<IComicModel>? pluginSorter = PluginProperty?.CreateSorter(preSorted.Select(selector));
+        IVirtualPropertySorter<IMediaModel>? pluginSorter = PluginProperty?.CreateSorter(preSorted.Select(selector));
         IItemSorter<MediaModel> sorter = GetMediaItemSorter(orderMethod, pluginSorter);
         return sorter.Sort(preSorted, selector);
     }
@@ -154,13 +154,13 @@ internal class MediaPropertyModel
         bool mergeSingleItemGroups)
     {
         IEnumerable<T> preSorted = items.OrderBy(x => StringUtils.SmartFileNameKeySelector(selector(x).Title ?? StringResourceProvider.Instance.Untitled), StringUtils.SmartFileNameComparer);
-        IVirtualPropertySorter<IComicModel>? pluginSorter = PluginProperty?.CreateSorter(preSorted.Select(selector));
-        IVirtualPropertySorter<IComicModel>? sortingPropertyPluginSorter = sortingProperty?.PluginProperty?.CreateSorter(preSorted.Select(selector));
+        IVirtualPropertySorter<IMediaModel>? pluginSorter = PluginProperty?.CreateSorter(preSorted.Select(selector));
+        IVirtualPropertySorter<IMediaModel>? sortingPropertyPluginSorter = sortingProperty?.PluginProperty?.CreateSorter(preSorted.Select(selector));
         MediaGrouper grouper = GetMediaGrouper(orderMethod, pluginSorter, sortingFunction, sortingProperty, sortingPropertyPluginSorter);
         return grouper.GroupMedia(preSorted, selector, mergeSingleItemGroups);
     }
 
-    private IItemSorter<MediaModel> GetMediaItemSorter(MediaFilterModel.OrderMethodEnum orderMethod, IVirtualPropertySorter<IComicModel>? pluginSorter)
+    private IItemSorter<MediaModel> GetMediaItemSorter(MediaFilterModel.OrderMethodEnum orderMethod, IVirtualPropertySorter<IMediaModel>? pluginSorter)
     {
         switch (orderMethod)
         {
@@ -224,8 +224,8 @@ internal class MediaPropertyModel
         };
     }
 
-    private MediaGrouper GetMediaGrouper(MediaFilterModel.OrderMethodEnum orderMethod, IVirtualPropertySorter<IComicModel>? pluginSorter,
-        MediaFilterModel.FunctionTypeEnum sortingFunction, MediaPropertyModel? sortingProperty, IVirtualPropertySorter<IComicModel>? sortingPropertyPluginSorter)
+    private MediaGrouper GetMediaGrouper(MediaFilterModel.OrderMethodEnum orderMethod, IVirtualPropertySorter<IMediaModel>? pluginSorter,
+        MediaFilterModel.FunctionTypeEnum sortingFunction, MediaPropertyModel? sortingProperty, IVirtualPropertySorter<IMediaModel>? sortingPropertyPluginSorter)
     {
         string GetTitleGroupName(MediaModel media)
         {
@@ -422,7 +422,7 @@ internal class MediaPropertyModel
 
     private static IGroupSorter<MediaGroup, string> GetGroupSorter(MediaFilterModel.OrderMethodEnum orderMethod,
         MediaFilterModel.FunctionTypeEnum sortingFunction, MediaPropertyModel? sortingProperty,
-        IVirtualPropertySorter<IComicModel>? sortingPropertyPluginSorter, IGroupSorter<MediaGroup, string> defaultSorter)
+        IVirtualPropertySorter<IMediaModel>? sortingPropertyPluginSorter, IGroupSorter<MediaGroup, string> defaultSorter)
     {
         switch (orderMethod)
         {
@@ -527,8 +527,8 @@ internal class MediaPropertyModel
         foreach (PluginContext plugin in plugins)
         {
             string pluginName = plugin.Name;
-            IEnumerable<IVirtualProperty<IComicModel>> pluginProperties = plugin.GetAllMediaVirtualProperties();
-            foreach (IVirtualProperty<IComicModel> property in pluginProperties)
+            IEnumerable<IVirtualProperty<IMediaModel>> pluginProperties = plugin.GetAllMediaVirtualProperties();
+            foreach (IVirtualProperty<IMediaModel> property in pluginProperties)
             {
                 properties.Add(new MediaPropertyModel
                 {
@@ -607,7 +607,7 @@ internal class MediaPropertyModel
         public string? Name { get; set; }
     }
 
-    private class MediaGroup(string groupName, List<MediaModel> items) : IItemGroup<IComicModel>
+    private class MediaGroup(string groupName, List<MediaModel> items) : IItemGroup<IMediaModel>
     {
         public string GroupName { get; } = groupName;
         public IReadOnlyList<MediaModel> Items { get; } = items;
@@ -616,9 +616,9 @@ internal class MediaPropertyModel
         // IItemGroup<IComicModel> implementation
         //
 
-        string IItemGroup<IComicModel>.Name => GroupName;
+        string IItemGroup<IMediaModel>.Name => GroupName;
 
-        IReadOnlyList<IComicModel> IItemGroup<IComicModel>.Items => Items;
+        IReadOnlyList<IMediaModel> IItemGroup<IMediaModel>.Items => Items;
     }
 
     private class MediaGrouper(IGroupSorter<MediaGroup, string> groupSorter, Func<MediaModel, IEnumerable<string>> groupNameSelector)
@@ -760,7 +760,7 @@ internal class MediaPropertyModel
         }
     }
 
-    private class PluginPropertyItemSorter(IVirtualPropertySorter<IComicModel> sorter, MediaFilterModel.OrderMethodEnum orderMethod) : IItemSorter<MediaModel>
+    private class PluginPropertyItemSorter(IVirtualPropertySorter<IMediaModel> sorter, MediaFilterModel.OrderMethodEnum orderMethod) : IItemSorter<MediaModel>
     {
         public List<T> Sort<T>(IEnumerable<T> items, Func<T, MediaModel> selector)
         {
@@ -777,7 +777,7 @@ internal class MediaPropertyModel
         }
     }
 
-    private class PluginPropertyGroupSorter(IVirtualPropertySorter<IComicModel> sorter, MediaFilterModel.OrderMethodEnum orderMethod) : IGroupSorter<MediaGroup, string>
+    private class PluginPropertyGroupSorter(IVirtualPropertySorter<IMediaModel> sorter, MediaFilterModel.OrderMethodEnum orderMethod) : IGroupSorter<MediaGroup, string>
     {
         public List<T> Sort<T>(IEnumerable<T> items, Func<T, MediaGroup> selector, Action<T, string> keyBinder)
         {

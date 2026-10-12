@@ -24,8 +24,8 @@ using SinePlayerUWP.Helpers.Navigation;
 using SinePlayerUWP.Helpers.Search;
 using SinePlayerUWP.SDK.Models;
 using SinePlayerUWP.SDK.Plugins;
-using SinePlayerUWP.SDK.Plugins.Comic;
 using SinePlayerUWP.SDK.Plugins.Common;
+using SinePlayerUWP.SDK.Plugins.Media;
 using SinePlayerUWP.SDK.Plugins.Property;
 using SinePlayerUWP.SDK.Plugins.UI;
 using SinePlayerUWP.SDK.Plugins.UI.Menu;
@@ -94,7 +94,7 @@ internal partial class PluginContext : IPluginContext
         }
     }
 
-    public void DispatchMediaEditedEvent(IComicModel media)
+    public void DispatchMediaEditedEvent(IMediaModel media)
     {
         if (!IsActive)
         {
@@ -120,14 +120,14 @@ internal partial class PluginContext : IPluginContext
         return [.. SafeAction(() => creator.CreateMenuItems(windowContext), []).Select(CreateHostMenuFlyoutItem)];
     }
 
-    public IReadOnlyList<BaseMenuFlyoutItemModel> GetMediaMenuItems(IWindowContext windowContext, IComicModel primary, IEnumerable<IComicModel> selection)
+    public IReadOnlyList<BaseMenuFlyoutItemModel> GetMediaMenuItems(IWindowContext windowContext, IMediaModel primary, IEnumerable<IMediaModel> selection)
     {
         if (!IsActive)
         {
             return [];
         }
 
-        IComicMenuItemCreator? creator = _mediaMenuItemCreator;
+        IMediaMenuItemCreator? creator = _mediaMenuItemCreator;
         if (creator is null)
         {
             return [];
@@ -136,7 +136,7 @@ internal partial class PluginContext : IPluginContext
         return [.. SafeAction(() => creator.CreateMenuItems(windowContext, primary, selection), []).Select(CreateHostMenuFlyoutItem)];
     }
 
-    public IEnumerable<IVirtualProperty<IComicModel>> GetAllMediaVirtualProperties()
+    public IEnumerable<IVirtualProperty<IMediaModel>> GetAllMediaVirtualProperties()
     {
         if (!IsActive)
         {
@@ -156,14 +156,14 @@ internal partial class PluginContext : IPluginContext
         return [.. _sidebarPageProviders];
     }
 
-    public void SetReadingComic(PluginWindowContext windowContext, IComicModel? media)
+    public void SetForegroundMedia(PluginWindowContext windowContext, IMediaModel? media)
     {
         if (!IsActive)
         {
             return;
         }
 
-        windowContext.SetReadingComic(media, SafeAction);
+        windowContext.SetForegroundMedia(media, SafeAction);
     }
 
     //
@@ -172,11 +172,11 @@ internal partial class PluginContext : IPluginContext
 
     private event ComicEditedEventHandler? _mediaEditedEventHandler;
 
-    private readonly Dictionary<string, IVirtualProperty<IComicModel>> _mediaVirtualProperties = [];
+    private readonly Dictionary<string, IVirtualProperty<IMediaModel>> _mediaVirtualProperties = [];
     private readonly List<ISidebarPageProvider> _sidebarPageProviders = [];
     private readonly Lazy<ILogger> _logger;
     private readonly Lazy<IRegistryDatabase> _registryDatabase;
-    private IComicMenuItemCreator? _mediaMenuItemCreator = null;
+    private IMediaMenuItemCreator? _mediaMenuItemCreator = null;
     private ICommonMenuItemCreator? _mainPageMoreMenuItemCreator = null;
 
     event ComicEditedEventHandler? IPluginContext.ComicEdited
@@ -193,7 +193,7 @@ internal partial class PluginContext : IPluginContext
 
     IRegistryDatabase IPluginContext.RegistryDatabase => _registryDatabase.Value;
 
-    IComicMenuItemCreator? IPluginContext.ComicMenuItemCreator
+    IMediaMenuItemCreator? IPluginContext.ComicMenuItemCreator
     {
         get => _mediaMenuItemCreator;
         set => _mediaMenuItemCreator = value;
@@ -220,7 +220,7 @@ internal partial class PluginContext : IPluginContext
         return DialogUtils.EnqueueDialogAsync(dialog);
     }
 
-    async Task<IComicModel?> IPluginContext.GetComic(long id)
+    async Task<IMediaModel?> IPluginContext.GetComic(long id)
     {
         return await MediaModel.FromId(id);
     }
@@ -252,7 +252,7 @@ internal partial class PluginContext : IPluginContext
         AppRouter.RegisterPage(host, pageType);
     }
 
-    void IPluginContext.RegisterComicVirtualProperty(IVirtualProperty<IComicModel> property)
+    void IPluginContext.RegisterComicVirtualProperty(IVirtualProperty<IMediaModel> property)
     {
         ArgumentNullException.ThrowIfNull(property, nameof(property));
 

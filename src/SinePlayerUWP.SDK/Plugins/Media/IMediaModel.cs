@@ -1,9 +1,9 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-namespace SinePlayerUWP.SDK.Plugins.Comic;
+namespace SinePlayerUWP.SDK.Plugins.Media;
 
-public interface IComicModel
+public interface IMediaModel
 {
     long Id { get; }
 
@@ -19,7 +19,7 @@ public interface IComicModel
 
     int Rating { get; }
 
-    IReadOnlyDictionary<string, IComicTagCategory> Tags { get; }
+    IReadOnlyDictionary<string, IMediaTagCategory> Tags { get; }
 
     IReadOnlyDictionary<string, string> Links { get; }
 
@@ -42,8 +42,6 @@ public interface IComicModel
     Task SetHidden(bool isHidden);
 
     Task SetCompletionStatus(CompletionStatusEnum status);
-
-    Task<IComicConnection?> Open();
 
     Task<bool> MoveToLocation(string location);
 }

@@ -3,7 +3,7 @@
 
 namespace SinePlayerUWP.Common.Playback;
 
-internal enum MediaEngineStateEnum
+internal enum MediaEngineState
 {
     None,
     Opening,
