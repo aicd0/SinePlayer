@@ -23,14 +23,14 @@ internal class ApplicationService : IApplicationService
     private const bool PORTABLE = false;
 #endif
 
-    private const string DIR_USER = "user";
+    private const string DIR_USER_DATA = "UserData";
 
 #pragma warning disable CS0162 // Unreachable code detected
     private static readonly Lazy<string> _localFolderPath = new(() =>
     {
         if (PORTABLE)
         {
-            return Path.Combine(GetDeploymentPath(), DIR_USER, "Local");
+            return Path.Combine(GetDeploymentPath(), DIR_USER_DATA, "Local");
         }
         else
         {
@@ -42,7 +42,7 @@ internal class ApplicationService : IApplicationService
     {
         if (PORTABLE)
         {
-            return Path.Combine(GetDeploymentPath(), DIR_USER, "LocalCache");
+            return Path.Combine(GetDeploymentPath(), DIR_USER_DATA, "LocalCache");
         }
         else
         {
@@ -54,7 +54,7 @@ internal class ApplicationService : IApplicationService
     {
         if (PORTABLE)
         {
-            return Path.Combine(GetDeploymentPath(), DIR_USER, "Temporary");
+            return Path.Combine(GetDeploymentPath(), DIR_USER_DATA, "Temporary");
         }
         else
         {

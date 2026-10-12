@@ -676,6 +676,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="More" xml:space="preserve">
     <value>Более</value>
   </data>
+  <data name="Mute" xml:space="preserve">
+    <value>Выключить звук</value>
+  </data>
   <data name="NItems" xml:space="preserve">
     <value>$n элемент(ов)</value>
   </data>
@@ -790,6 +793,12 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="PlayPause" xml:space="preserve">
     <value>Воспроизведение / Пауза</value>
   </data>
+  <data name="PlayQueue" xml:space="preserve">
+    <value>Очередь воспроизведения</value>
+  </data>
+  <data name="PlayQueueEmpty" xml:space="preserve">
+    <value>Ваша очередь воспроизведения появится здесь</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Общие настройки проигрывателя</value>
   </data>
@@ -804,12 +813,6 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   </data>
   <data name="PlayerStatusLoading" xml:space="preserve">
     <value>Загрузка проигрывателя</value>
-  </data>
-  <data name="Playlist" xml:space="preserve">
-    <value>Плейлист</value>
-  </data>
-  <data name="PlaylistEmpty" xml:space="preserve">
-    <value>Ваш плейлист появится здесь</value>
   </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Управление и настройка плагинов</value>
@@ -871,8 +874,14 @@ $plugins</value>
   <data name="RemoveUnreachableItems" xml:space="preserve">
     <value>Автоматически удалять недоступные элементы</value>
   </data>
-  <data name="Repeat" xml:space="preserve">
-    <value>Повтор</value>
+  <data name="RepeatAll" xml:space="preserve">
+    <value>Повтор: Всё</value>
+  </data>
+  <data name="RepeatOff" xml:space="preserve">
+    <value>Повтор: Выкл.</value>
+  </data>
+  <data name="RepeatOne" xml:space="preserve">
+    <value>Повтор: Один элемент</value>
   </data>
   <data name="RescanFilesButton.Content" xml:space="preserve">
     <value>Повторное сканирование файлов</value>
@@ -1059,6 +1068,9 @@ $info</value>
   <data name="Unhide" xml:space="preserve">
     <value>Показать</value>
   </data>
+  <data name="Unmute" xml:space="preserve">
+    <value>Включить звук</value>
+  </data>
   <data name="Unpin" xml:space="preserve">
     <value>Открепить</value>
   </data>
@@ -1079,6 +1091,9 @@ $info</value>
   </data>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>Середина</value>
+  </data>
+  <data name="Volume" xml:space="preserve">
+    <value>Громкость</value>
   </data>
   <data name="VolumeDown" xml:space="preserve">
     <value>Уменьшить громкость</value>

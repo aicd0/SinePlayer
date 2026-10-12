@@ -114,16 +114,16 @@ internal sealed partial class HistoryPage : BasePage
             return;
         }
 
-        IEnumerable<MediaModel> playlistMedia = DataSource.SelectMany(x => x).Select(x => x.Media).OfType<MediaModel>();
-        PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(playlistMedia);
+        IEnumerable<MediaModel> playQueueMedia = DataSource.SelectMany(x => x).Select(x => x.Media).OfType<MediaModel>();
+        PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(playQueueMedia);
         if (newTab)
         {
-            Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+            Route route = OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
             GetMainPageAbility().OpenInNewTab(route);
         }
         else
         {
-            Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+            Route route = OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
             OpenMediaHelper.OpenMedia(PageActionHandler, route);
         }
 

@@ -15,9 +15,9 @@ using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
 
-namespace SinePlayer.Views.Pages.Sidebar.Playlist;
+namespace SinePlayer.Views.Pages.Sidebar.PlayQueue;
 
-internal partial class PlaylistPageViewModel : INotifyPropertyChanged
+internal partial class PlayQueuePageViewModel : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -46,9 +46,9 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
         }
     }
 
-    public ObservableCollection<PlaylistItemViewModel> DataSource { get; set; } = [];
+    public ObservableCollection<PlayQueueItemViewModel> DataSource { get; set; } = [];
 
-    public MutableLiveData<PlaylistItemViewModel> ScrollToItemLiveData = new();
+    public MutableLiveData<PlayQueueItemViewModel> ScrollToItemLiveData = new();
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
     private PlaybackModel _playback = new();
@@ -56,23 +56,23 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
     public void Initialize(ActionHandler actionHandler)
     {
         _actionHandler = actionHandler;
-        UpdatePlaylist();
+        UpdatePlayQueue();
     }
 
     public void Destory()
     {
-        _playback.PlaylistChanged -= Playback_PlaylistChanged;
+        _playback.PlayQueueChanged -= Playback_PlayQueueChanged;
         _playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
     }
 
     public void SetPlayback(PlaybackModel playback)
     {
-        _playback.PlaylistChanged -= Playback_PlaylistChanged;
+        _playback.PlayQueueChanged -= Playback_PlayQueueChanged;
         _playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
         _playback = playback;
-        _playback.PlaylistChanged += Playback_PlaylistChanged;
+        _playback.PlayQueueChanged += Playback_PlayQueueChanged;
         _playback.PlaybackStateChanged += Playback_PlaybackStateChanged;
-        UpdatePlaylist();
+        UpdatePlayQueue();
         UpdatePlaybackState();
     }
 
@@ -89,12 +89,12 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
 
     public void UpdateMedia()
     {
-        UpdatePlaylist();
+        UpdatePlayQueue();
     }
 
-    private void Playback_PlaylistChanged()
+    private void Playback_PlayQueueChanged()
     {
-        UpdatePlaylist();
+        UpdatePlayQueue();
     }
 
     private void Playback_PlaybackStateChanged(PlaybackStateChangedEventArgs args)
@@ -102,23 +102,23 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
         UpdatePlaybackState();
     }
 
-    private void UpdatePlaylist()
+    private void UpdatePlayQueue()
     {
-        List<PlaylistItemViewModel> newPlaylist = [];
-        PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddItems(_playback.Items);
-        foreach (PlaylistModel.PlaylistItem playlistItem in _playback.Items)
+        List<PlayQueueItemViewModel> newPlayQueue = [];
+        PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddItems(_playback.Items);
+        foreach (PlayQueueModel.PlayQueueItem playQueueItem in _playback.Items)
         {
-            newPlaylist.Add(new()
+            newPlayQueue.Add(new()
             {
-                Media = playlistItem.Media,
-                Title = playlistItem.Media.Title,
-                Progress = GetProgressText(playlistItem.Media),
+                Media = playQueueItem.Media,
+                Title = playQueueItem.Media.Title,
+                Progress = GetProgressText(playQueueItem.Media),
                 RequestContextMenuItemsAsync = item =>
                 {
                     return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                         _actionHandler,
-                        playlistItem.Media,
-                        playlist: playlist,
+                        playQueueItem.Media,
+                        playQueue: playQueue,
                         playback: _playback.ToBuilder());
                 },
             });
@@ -126,7 +126,7 @@ internal partial class PlaylistPageViewModel : INotifyPropertyChanged
 
         CoroutineUtils.RunInMainThread(() =>
         {
-            DiffUtils.UpdateCollection(DataSource, newPlaylist, (a, b) => a.Media == b.Media, (a, b) =>
+            DiffUtils.UpdateCollection(DataSource, newPlayQueue, (a, b) => a.Media == b.Media, (a, b) =>
             {
                 a.Title = b.Title;
                 a.Progress = b.Progress;

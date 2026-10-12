@@ -11,6 +11,6 @@ namespace SinePlayer.Views.Pages.Sidebar.MediaInfo;
 internal class MediaChangedEventArgs
 {
     public required MediaModel? Media { get; init; }
-    public required PlaylistModel Playlist { get; init; }
+    public required PlayQueueModel PlayQueue { get; init; }
     public required IReadOnlyList<string> ImageDescriptions { get; init; }
 }

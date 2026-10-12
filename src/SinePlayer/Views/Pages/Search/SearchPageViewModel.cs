@@ -155,7 +155,7 @@ internal partial class SearchPageViewModel : INotifyPropertyChanged
         {
             IEnumerable<MediaModel> sortedMedia = mediaItems.OrderBy(x => x.Title);
             List<MediaItemViewModel> newItems = [];
-            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sortedMedia);
+            PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(sortedMedia);
             foreach (MediaModel media in sortedMedia)
             {
                 MediaItemViewModel item = new(media)
@@ -167,7 +167,7 @@ internal partial class SearchPageViewModel : INotifyPropertyChanged
                             return;
                         }
 
-                        Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                        Route route = OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
                         OpenMediaHelper.OpenMedia(_actionHandler, route);
                     },
                     OnRequestContextFlyoutAsync = model =>
@@ -176,7 +176,7 @@ internal partial class SearchPageViewModel : INotifyPropertyChanged
                         return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                             _actionHandler,
                             media,
-                            playlist: playlist,
+                            playQueue: playQueue,
                             selectedItems: selection,
                             canSelect: true);
                     },

@@ -1,11 +1,11 @@
 <base:BasePage
-    x:Class="SinePlayer.Views.Pages.Sidebar.Playlist.PlaylistPage"
+    x:Class="SinePlayer.Views.Pages.Sidebar.PlayQueue.PlayQueuePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:base="using:SinePlayer.Common.BaseUI"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:playlist="using:SinePlayer.Views.Pages.Sidebar.Playlist"
+    xmlns:playqueue="using:SinePlayer.Views.Pages.Sidebar.PlayQueue"
     Background="Transparent"
     mc:Ignorable="d">
 
@@ -14,7 +14,7 @@
             Margin="0,10"
             HorizontalAlignment="Center"
             FontWeight="SemiBold"
-            Text="{x:Bind StringResource.PlaylistEmpty}"
+            Text="{x:Bind StringResource.PlayQueueEmpty}"
             Visibility="{x:Bind ViewModel.NoMediaVisible, Mode=OneWay}" />
         <ListView
             x:Name="MainListView"
@@ -31,7 +31,7 @@
                 </Style>
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
-                <DataTemplate x:DataType="playlist:PlaylistItemViewModel">
+                <DataTemplate x:DataType="playqueue:PlayQueueItemViewModel">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -41,7 +41,7 @@
                         <FontIcon
                             Grid.Column="0"
                             FontSize="18"
-                            Glyph="&#xE8B9;" />
+                            Glyph="{x:Bind Glyph, Mode=OneWay}" />
                         <TextBlock
                             Grid.Column="1"
                             Margin="8,0,0,2"

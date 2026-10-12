@@ -377,7 +377,7 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
 
     private List<MediaItemViewModel> BuildItems(List<MediaModel> mediaItems)
     {
-        PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(mediaItems);
+        PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(mediaItems);
         List<MediaItemViewModel> items = [];
         foreach (MediaModel media in mediaItems)
         {
@@ -390,7 +390,7 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
                         return;
                     }
 
-                    Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                    Route route = OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
                     OpenMediaHelper.OpenMedia(_actionHandler, route);
                 },
                 OnRequestContextFlyoutAsync = model =>
@@ -399,7 +399,7 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
                     return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                         _actionHandler,
                         media,
-                        playlist: playlist,
+                        playQueue: playQueue,
                         selectedItems: selectedMedia,
                         canSelect: true);
                 },

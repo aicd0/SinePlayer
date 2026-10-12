@@ -964,7 +964,7 @@ internal sealed partial class MainPage : BasePage
             {
                 From = targetElement.Opacity,
                 To = targetOpacity,
-                Duration = TimeSpan.FromSeconds(0.2),
+                Duration = TimeSpan.FromSeconds(0.1),
             };
 
             Storyboard.SetTarget(animation, targetElement);

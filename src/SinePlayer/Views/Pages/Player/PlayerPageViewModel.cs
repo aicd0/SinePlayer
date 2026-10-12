@@ -46,15 +46,13 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public readonly MutableLiveData<string> TitleLiveData = new();
     public readonly MutableLiveData<bool> PlaybackChangeLiveData = new();
     public readonly MutableLiveData<PlayerStatusInfo> PlayerStatusLiveData = new(new() { Status = PlayerStatusEnum.Loading });
-    public readonly MutableLiveData<bool> MediaChangedLiveData = new();
     public readonly MutableLiveData<bool> IsExternalMediaLiveData = new(true);
     public readonly MutableLiveData<bool> IsFavoriteLiveData = new();
     public readonly MutableLiveData<bool> IsPlayingLiveData = new();
     public readonly MutableLiveData<long> PositionLiveData = new();
-    public readonly MutableLiveData<double> VolumeLiveData = new();
+    public readonly MutableLiveData<int> VolumeLiveData = new();
     public readonly MutableLiveData<bool> MuteLiveData = new();
 
     private bool _isFullscreen = false;
@@ -123,14 +121,14 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _isAutoPlaying = false;
-    public bool IsAutoPlaying
+    private bool _isPlaying = false;
+    public bool IsPlaying
     {
-        get => _isAutoPlaying;
+        get => _isPlaying;
         set
         {
-            _isAutoPlaying = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAutoPlaying)));
+            _isPlaying = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsPlaying)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PlayOrPauseButtonTooltip)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PlayOrPauseButtonGlyph)));
         }
@@ -138,12 +136,12 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     public string PlayOrPauseButtonTooltip
     {
-        get => _isAutoPlaying ? StringResourceProvider.Instance.Pause : StringResourceProvider.Instance.Play;
+        get => _isPlaying ? StringResourceProvider.Instance.Pause : StringResourceProvider.Instance.Play;
     }
 
     public string PlayOrPauseButtonGlyph
     {
-        get => _isAutoPlaying ? "\uE769" : "\uE768";
+        get => _isPlaying ? "\uE769" : "\uE768";
     }
 
     private bool _isPlaybackNextEnabled = false;
@@ -179,7 +177,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         }
     }
 
-    public PlaylistModel Playlist { get; private set; } = PlaylistModel.CreateEmpty();
+    public PlayQueueModel PlayQueue { get; private set; } = PlayQueueModel.CreateEmpty();
     public PlaybackModel Playback { get; } = new();
     public PlayerStatusEnum PlayerStatus => PlayerStatusLiveData.Value.Status;
     public MediaModel? Media => _media;
@@ -221,10 +219,10 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         }
     }
 
-    public void LoadPlaylist(PlaylistModel playlist, string? serializedPlayback, long initialPositionMs)
+    public void LoadPlayQueue(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
     {
-        Playlist = playlist;
-        Playback.LoadState(playlist, serializedPlayback, initialPositionMs);
+        PlayQueue = playQueue;
+        Playback.LoadState(playQueue, serializedPlayback, initialPositionMs);
     }
 
     public UIElement GetVideoSurface()
@@ -257,6 +255,21 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         }
     }
 
+    public void CycleRepeatMode()
+    {
+        Playback.RepeatMode = Playback.RepeatMode switch
+        {
+            RepeatMode.Off => RepeatMode.All,
+            RepeatMode.All => RepeatMode.One,
+            _ => RepeatMode.Off,
+        };
+    }
+
+    public void ToggleShuffle()
+    {
+        Playback.IsShuffle = !Playback.IsShuffle;
+    }
+
     public void Next()
     {
         Playback.Next();
@@ -284,7 +297,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         SeekTo(Math.Max(positionMs + deltaMs, 0));
     }
 
-    public void SetVolume(double volume)
+    public void SetVolume(int volume)
     {
         IMediaEngine? engine = _engine;
         if (engine is null)
@@ -292,19 +305,14 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             return;
         }
 
-        engine.SetVolume(volume);
-        VolumeLiveData.Emit(volume);
+        int clampedVolume = Math.Clamp(volume, 0, 100);
+        engine.SetVolume(clampedVolume / 100.0);
+        VolumeLiveData.Emit(clampedVolume);
     }
 
-    public void AdjustVolume(double delta)
+    public void AdjustVolume(int delta)
     {
-        IMediaEngine? engine = _engine;
-        if (engine is null)
-        {
-            return;
-        }
-
-        SetVolume(Math.Clamp(engine.Volume + delta, 0.0, 1.0));
+        SetVolume(VolumeLiveData.Value + delta);
     }
 
     public void SetMuted(bool isMuted)
@@ -404,7 +412,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         return await MenuFlyoutItemsCreator.CreateMediaMenuItems(
             _actionHandler,
             media,
-            playlist: Playlist.ToBuilder(),
+            playQueue: PlayQueue.ToBuilder(),
             playback: Playback.ToBuilder());
     }
 
@@ -413,23 +421,25 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         IsPlaybackNextEnabled = Playback.CanGoNext;
         IsPlaybackPreviousEnabled = Playback.CanGoPrevious;
 
-        PlaylistModel.PlaylistItem? playlistItem = Playback.CurrentItem;
-        if (playlistItem is null)
+        PlayQueueModel.PlayQueueItem? playQueueItem = Playback.CurrentItem;
+        if (playQueueItem is null)
         {
-            TitleLiveData.Emit(StringResourceProvider.Instance.Error);
             PlayerStatusLiveData.Emit(new()
             {
                 Status = PlayerStatusEnum.Error,
-                Description = "The playlist is empty.",
+                Description = "The play queue is empty.",
             });
         }
-        else if (playlistItem.Media != _media || args.Reason == PlaybackStateChangeReason.Refresh)
+        else if (playQueueItem.Media != _media || args.Reason == PlaybackStateChangeReason.Refresh)
         {
-            TitleLiveData.Emit(playlistItem.Media.Title);
-            PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
+            PlayerStatusLiveData.Emit(new()
+            {
+                Status = PlayerStatusEnum.Loading,
+            });
+
             LoadMedia(new()
             {
-                Media = playlistItem.Media,
+                Media = playQueueItem.Media,
                 PlaybackArgs = args,
             });
         }
@@ -462,8 +472,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             {
                 _isLoading = false;
             }
-
-            MediaChangedLiveData.Emit(true);
         });
     }
 
@@ -573,7 +581,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         engine.MediaEnded += Engine_MediaEnded;
         engine.ErrorOccurred += Engine_ErrorOccurred;
         _engine = engine;
-        VolumeLiveData.Emit(engine.Volume);
+        VolumeLiveData.Emit((int)Math.Round(engine.Volume * 100.0));
         MuteLiveData.Emit(engine.IsMuted);
         return engine;
     }
@@ -585,13 +593,13 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         switch (state)
         {
             case MediaEngineState.Playing:
-                IsAutoPlaying = true;
+                IsPlaying = true;
                 break;
             case MediaEngineState.None:
             case MediaEngineState.Paused:
             case MediaEngineState.Ended:
             case MediaEngineState.Error:
-                IsAutoPlaying = false;
+                IsPlaying = false;
                 break;
             default:
                 break;
@@ -661,6 +669,12 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             CoroutineUtils.Run(async () => await media.SetProgress(100, 0));
         }
 
+        if (Playback.RepeatMode == RepeatMode.One)
+        {
+            _engine?.Play();
+            return;
+        }
+
         if (AppSettingsModel.AutoPlayNext)
         {
             Playback.Next();
@@ -713,7 +727,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     {
         bool shouldKeepScreenOn = _isPageActive &&
             (AppSettingsModel.KeepScreenOnBehavior == AppSettingsModel.KeepScreenOnBehaviorEnum.Always ||
-            (AppSettingsModel.KeepScreenOnBehavior == AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos && IsAutoPlaying));
+            (AppSettingsModel.KeepScreenOnBehavior == AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos && IsPlaying));
         if (_isKeepScreenOnActive == shouldKeepScreenOn)
         {
             return;

@@ -25,7 +25,7 @@ internal static class OpenMediaHelper
     public static Route GetMediaRoute(
         MediaModel media,
         long positionMs = -1,
-        PlaylistModel.Builder? playlist = null,
+        PlayQueueModel.Builder? playQueue = null,
         PlaybackModel.Builder? playback = null)
     {
         if (media.IsCollection)
@@ -34,17 +34,17 @@ internal static class OpenMediaHelper
                 .WithParam(RouterConstants.ARG_ID, media.Id.ToString());
         }
 
-        playlist ??= new PlaylistModel.Builder();
-        string itemId = playlist.EnsureMedia(media);
+        playQueue ??= new PlayQueueModel.Builder();
+        string itemId = playQueue.EnsureMedia(media);
 
         playback ??= new PlaybackModel.Builder();
         playback.CurrentId = itemId;
 
-        string playlistId = Guid.NewGuid().ToString();
-        AppDB.MainRegistry.CreateKey(RegistryNames.PLAYLISTS).Set(playlistId, playlist.ToSerializedString());
+        string playQueueId = Guid.NewGuid().ToString();
+        AppDB.MainRegistry.CreateKey(RegistryNames.PLAY_QUEUES).Set(playQueueId, playQueue.ToSerializedString());
 
         Route route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_PLAYER)
-            .WithParam(RouterConstants.ARG_PLAYLIST_ID, playlistId)
+            .WithParam(RouterConstants.ARG_PLAY_QUEUE_ID, playQueueId)
             .WithParam(RouterConstants.ARG_PLAYBACK, playback.ToSerializedString());
 
         if (positionMs >= 0)

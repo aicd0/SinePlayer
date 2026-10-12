@@ -100,7 +100,7 @@ internal partial class MediaInfoPageViewModel : INotifyPropertyChanged
     }
 
     public MediaModel? Media => _media;
-    public PlaylistModel Playlist { get; set; } = PlaylistModel.CreateEmpty();
+    public PlayQueueModel PlayQueue { get; set; } = PlayQueueModel.CreateEmpty();
     public PlaybackModel? Playback { get; set; }
     public bool IsMediaTitle2Visible => MediaTitle2.Length > 0;
     public ObservableCollection<TagCollectionViewModel> MediaTags { get; } = [];

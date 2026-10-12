@@ -676,6 +676,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="More" xml:space="preserve">
     <value>Más</value>
   </data>
+  <data name="Mute" xml:space="preserve">
+    <value>Silenciar</value>
+  </data>
   <data name="NItems" xml:space="preserve">
     <value>$n elemento(s)</value>
   </data>
@@ -790,6 +793,12 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="PlayPause" xml:space="preserve">
     <value>Reproducir / Pausar</value>
   </data>
+  <data name="PlayQueue" xml:space="preserve">
+    <value>Cola de reproducción</value>
+  </data>
+  <data name="PlayQueueEmpty" xml:space="preserve">
+    <value>Tu cola de reproducción aparecerá aquí</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Configuración global del reproductor</value>
   </data>
@@ -804,12 +813,6 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="PlayerStatusLoading" xml:space="preserve">
     <value>El reproductor se está cargando</value>
-  </data>
-  <data name="Playlist" xml:space="preserve">
-    <value>Lista de reproducción</value>
-  </data>
-  <data name="PlaylistEmpty" xml:space="preserve">
-    <value>Tu lista de reproducción aparecerá aquí</value>
   </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Administrar y configurar complementos</value>
@@ -871,8 +874,14 @@ $plugins</value>
   <data name="RemoveUnreachableItems" xml:space="preserve">
     <value>Eliminar automáticamente los elementos inaccesibles</value>
   </data>
-  <data name="Repeat" xml:space="preserve">
-    <value>Repetir</value>
+  <data name="RepeatAll" xml:space="preserve">
+    <value>Repetir: Todo</value>
+  </data>
+  <data name="RepeatOff" xml:space="preserve">
+    <value>Repetir: Desactivado</value>
+  </data>
+  <data name="RepeatOne" xml:space="preserve">
+    <value>Repetir: Uno</value>
   </data>
   <data name="RescanFilesButton.Content" xml:space="preserve">
     <value>Volver a escanear archivos</value>
@@ -1059,6 +1068,9 @@ $info</value>
   <data name="Unhide" xml:space="preserve">
     <value>Mostrar</value>
   </data>
+  <data name="Unmute" xml:space="preserve">
+    <value>Activar sonido</value>
+  </data>
   <data name="Unpin" xml:space="preserve">
     <value>Desfijar</value>
   </data>
@@ -1079,6 +1091,9 @@ $info</value>
   </data>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>Medio</value>
+  </data>
+  <data name="Volume" xml:space="preserve">
+    <value>Volumen</value>
   </data>
   <data name="VolumeDown" xml:space="preserve">
     <value>Bajar el volumen</value>

@@ -21,30 +21,30 @@ internal class PlaybackModel
     public delegate void PlaybackStateChangedEventHandler(PlaybackStateChangedEventArgs args);
     public event PlaybackStateChangedEventHandler? PlaybackStateChanged;
 
-    public delegate void PlaylistChangedEventHandler();
-    public event PlaylistChangedEventHandler? PlaylistChanged;
+    public delegate void PlayQueueChangedEventHandler();
+    public event PlayQueueChangedEventHandler? PlayQueueChanged;
 
-    private PlaylistModel _playlist = PlaylistModel.CreateEmpty();
-    private readonly List<PlaylistModel.PlaylistItem> _items = [];
+    private PlayQueueModel _playQueue = PlayQueueModel.CreateEmpty();
+    private readonly List<PlayQueueModel.PlayQueueItem> _items = [];
     private int _cursor = 0;
     private int _randomSeed = Random.Shared.Next();
     private string? _firstId;
     private long _initialPositionMs = -1;
 
-    public IReadOnlyList<PlaylistModel.PlaylistItem> Items => _items;
-    public bool CanGoNext => _isRepeat || _cursor < _items.Count - 1;
-    public bool CanGoPrevious => _isRepeat || _cursor > 0;
+    public IReadOnlyList<PlayQueueModel.PlayQueueItem> Items => _items;
+    public bool CanGoNext => _repeatMode == RepeatMode.All || _cursor < _items.Count - 1;
+    public bool CanGoPrevious => _repeatMode == RepeatMode.All || _cursor > 0;
 
-    private bool _isRepeat = AppSettingsModel.PlaybackDefaultRepeat;
-    public bool IsRepeat
+    private RepeatMode _repeatMode = AppSettingsModel.PlaybackDefaultRepeatMode;
+    public RepeatMode RepeatMode
     {
-        get => _isRepeat;
+        get => _repeatMode;
         set
         {
-            if (_isRepeat != value)
+            if (_repeatMode != value)
             {
-                _isRepeat = value;
-                AppSettingsModel.PlaybackDefaultRepeat = value;
+                _repeatMode = value;
+                AppSettingsModel.PlaybackDefaultRepeatMode = value;
                 DispatchPlaybackStatusChange(PlaybackStateChangeReason.Other);
             }
         }
@@ -89,7 +89,7 @@ internal class PlaybackModel
         }
     }
 
-    public PlaylistModel.PlaylistItem? CurrentItem
+    public PlayQueueModel.PlayQueueItem? CurrentItem
     {
         get
         {
@@ -108,15 +108,15 @@ internal class PlaybackModel
         {
             CurrentId = CurrentItem?.Id,
             FirstId = _firstId,
-            IsRepeat = _isRepeat,
+            RepeatMode = _repeatMode,
             IsShuffle = _isShuffle,
             RandomSeed = _randomSeed,
         };
     }
 
-    public void LoadState(PlaylistModel playlist, string? serializedPlayback, long initialPositionMs)
+    public void LoadState(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
     {
-        _playlist = playlist;
+        _playQueue = playQueue;
         _initialPositionMs = initialPositionMs;
 
         if (!string.IsNullOrEmpty(serializedPlayback) && FromSerializedString(serializedPlayback))
@@ -124,7 +124,7 @@ internal class PlaybackModel
             return;
         }
 
-        string? firstId = playlist.Items.Count > 0 ? playlist.Items[0].Id : null;
+        string? firstId = playQueue.Items.Count > 0 ? playQueue.Items[0].Id : null;
         _firstId = firstId;
         UpdateInternalStates(firstId);
     }
@@ -138,7 +138,7 @@ internal class PlaybackModel
     {
         if (_cursor >= Items.Count - 1)
         {
-            if (_isRepeat)
+            if (_repeatMode == RepeatMode.All)
             {
                 _cursor = 0;
             }
@@ -160,7 +160,7 @@ internal class PlaybackModel
     {
         if (_cursor <= 0)
         {
-            if (_isRepeat)
+            if (_repeatMode == RepeatMode.All)
             {
                 _cursor = Items.Count - 1;
             }
@@ -183,7 +183,7 @@ internal class PlaybackModel
         PlaybackJsonModel model = new()
         {
             CurrentId = CurrentItem?.Id,
-            IsRepeat = _isRepeat,
+            RepeatMode = _repeatMode,
             IsShuffle = _isShuffle,
             RandomSeed = _randomSeed,
             FirstId = _firstId,
@@ -195,7 +195,7 @@ internal class PlaybackModel
     {
         PopulateItems();
         SetCursorById(currentId);
-        DispatchPlaylistChange();
+        DispatchPlayQueueChange();
         DispatchPlaybackStatusChange(PlaybackStateChangeReason.Other);
     }
 
@@ -217,7 +217,7 @@ internal class PlaybackModel
             return false;
         }
 
-        _isRepeat = model.IsRepeat ?? AppSettingsModel.PlaybackDefaultRepeat;
+        _repeatMode = model.RepeatMode ?? AppSettingsModel.PlaybackDefaultRepeatMode;
         _isShuffle = model.IsShuffle ?? AppSettingsModel.PlaybackDefaultShuffle;
         _randomSeed = model.RandomSeed ?? Random.Shared.Next();
         _firstId = model.FirstId ?? model.CurrentId;
@@ -228,11 +228,11 @@ internal class PlaybackModel
     private void PopulateItems()
     {
         _items.Clear();
-        _items.AddRange(_playlist.Items);
+        _items.AddRange(_playQueue.Items);
 
         if (_isShuffle)
         {
-            List<PlaylistModel.PlaylistItem> newOrder = [.. _items.OrderBy(x =>
+            List<PlayQueueModel.PlayQueueItem> newOrder = [.. _items.OrderBy(x =>
             {
                 Span<byte> buffer = stackalloc byte[sizeof(int) + sizeof(long)];
                 BinaryPrimitives.WriteInt32LittleEndian(buffer, _randomSeed);
@@ -249,7 +249,7 @@ internal class PlaybackModel
                 int index = _items.FindIndex(x => x.Id == _firstId);
                 if (index >= 0)
                 {
-                    PlaylistModel.PlaylistItem firstItem = _items[index];
+                    PlayQueueModel.PlayQueueItem firstItem = _items[index];
                     _items.RemoveAt(index);
                     _items.Insert(0, firstItem);
                 }
@@ -288,9 +288,9 @@ internal class PlaybackModel
         });
     }
 
-    private void DispatchPlaylistChange()
+    private void DispatchPlayQueueChange()
     {
-        PlaylistChanged?.Invoke();
+        PlayQueueChanged?.Invoke();
     }
 
     private class PlaybackJsonModel
@@ -301,8 +301,8 @@ internal class PlaybackModel
         [JsonPropertyName("FirstId")]
         public string? FirstId { get; set; }
 
-        [JsonPropertyName("IsRepeat")]
-        public bool? IsRepeat { get; set; }
+        [JsonPropertyName("RepeatMode")]
+        public RepeatMode? RepeatMode { get; set; }
 
         [JsonPropertyName("IsShuffle")]
         public bool? IsShuffle { get; set; }
@@ -315,7 +315,7 @@ internal class PlaybackModel
     {
         public string? CurrentId { get; set; }
         public string? FirstId { get; set; }
-        public bool? IsRepeat { get; set; }
+        public RepeatMode? RepeatMode { get; set; }
         public bool? IsShuffle { get; set; }
         public int? RandomSeed { get; set; }
 
@@ -324,7 +324,7 @@ internal class PlaybackModel
             PlaybackJsonModel model = new()
             {
                 CurrentId = CurrentId,
-                IsRepeat = IsRepeat,
+                RepeatMode = RepeatMode,
                 IsShuffle = IsShuffle,
                 RandomSeed = RandomSeed,
                 FirstId = FirstId,

@@ -13,21 +13,21 @@ using SinePlayer.Data.Models.Media;
 
 namespace SinePlayer.Data.Models.Misc;
 
-internal class PlaylistModel
+internal class PlayQueueModel
 {
-    private const string TAG = nameof(PlaylistModel);
+    private const string TAG = nameof(PlayQueueModel);
 
-    public static PlaylistModel CreateEmpty()
+    public static PlayQueueModel CreateEmpty()
     {
         return new([]);
     }
 
-    public static async Task<PlaylistModel?> CreateFromSerializedString(string serializedPlaylist)
+    public static async Task<PlayQueueModel?> CreateFromSerializedString(string serializedPlayQueue)
     {
-        List<PlaylistItemJsonModel?>? jsonItems;
+        List<PlayQueueItemJsonModel?>? jsonItems;
         try
         {
-            jsonItems = JsonSerializer.Deserialize<List<PlaylistItemJsonModel?>>(serializedPlaylist);
+            jsonItems = JsonSerializer.Deserialize<List<PlayQueueItemJsonModel?>>(serializedPlayQueue);
         }
         catch (JsonException ex)
         {
@@ -43,10 +43,10 @@ internal class PlaylistModel
         return await CreateFromBuilder(jsonItems.Where(x => x is not null).Select(x => x!));
     }
 
-    private static async Task<PlaylistModel> CreateFromBuilder(IEnumerable<PlaylistItemJsonModel> builder)
+    private static async Task<PlayQueueModel> CreateFromBuilder(IEnumerable<PlayQueueItemJsonModel> builder)
     {
         List<long> mediaIds = [];
-        foreach (PlaylistItemJsonModel jsonItem in builder)
+        foreach (PlayQueueItemJsonModel jsonItem in builder)
         {
             if (!jsonItem.IsExternal.HasValue)
             {
@@ -71,8 +71,8 @@ internal class PlaylistModel
             mediaIdMap[media.Id] = media;
         }
 
-        List<PlaylistItem> items = [];
-        foreach (PlaylistItemJsonModel jsonItem in builder)
+        List<PlayQueueItem> items = [];
+        foreach (PlayQueueItemJsonModel jsonItem in builder)
         {
             if (!jsonItem.IsExternal.HasValue)
             {
@@ -103,11 +103,11 @@ internal class PlaylistModel
         return new(items);
     }
 
-    private readonly List<PlaylistItem> _items;
+    private readonly List<PlayQueueItem> _items;
 
-    public IReadOnlyList<PlaylistItem> Items => _items;
+    public IReadOnlyList<PlayQueueItem> Items => _items;
 
-    private PlaylistModel(List<PlaylistItem> items)
+    private PlayQueueModel(List<PlayQueueItem> items)
     {
         _items = items;
     }
@@ -119,24 +119,24 @@ internal class PlaylistModel
 
     public string ToSerializedString()
     {
-        IEnumerable<PlaylistItemJsonModel> jsonItems = _items
-            .Select(x => new PlaylistItemJsonModel()
+        IEnumerable<PlayQueueItemJsonModel> jsonItems = _items
+            .Select(x => new PlayQueueItemJsonModel()
             {
                 Id = x.Id,
                 IsExternal = x.Media.IsExternal,
                 MediaId = x.Media.Id,
                 Location = x.Media.Location,
             });
-        return JsonSerializer.Serialize(new List<PlaylistItemJsonModel>(jsonItems));
+        return JsonSerializer.Serialize(new List<PlayQueueItemJsonModel>(jsonItems));
     }
 
-    public class PlaylistItem
+    public class PlayQueueItem
     {
         public required string Id { get; init; }
         public required MediaModel Media { get; init; }
     }
 
-    private class PlaylistItemJsonModel
+    private class PlayQueueItemJsonModel
     {
         [JsonPropertyName("Id")]
         public string? Id { get; set; }
@@ -153,18 +153,18 @@ internal class PlaylistModel
 
     public class Builder
     {
-        private readonly List<PlaylistItemJsonModel> _mediaItems = [];
+        private readonly List<PlayQueueItemJsonModel> _mediaItems = [];
 
-        public Builder AddItems(IEnumerable<PlaylistItem> items)
+        public Builder AddItems(IEnumerable<PlayQueueItem> items)
         {
-            foreach (PlaylistItem item in items)
+            foreach (PlayQueueItem item in items)
             {
                 if (item.Media.IsCollection)
                 {
                     continue;
                 }
 
-                _mediaItems.Add(new PlaylistItemJsonModel()
+                _mediaItems.Add(new PlayQueueItemJsonModel()
                 {
                     Id = item.Id,
                     IsExternal = item.Media.IsExternal,
@@ -191,7 +191,7 @@ internal class PlaylistModel
             string? itemId = IdOf(media);
             if (string.IsNullOrEmpty(itemId))
             {
-                var item = new PlaylistItemJsonModel()
+                var item = new PlayQueueItemJsonModel()
                 {
                     IsExternal = media.IsExternal,
                     Location = media.Location,
@@ -211,7 +211,7 @@ internal class PlaylistModel
                 return this;
             }
 
-            _mediaItems.Add(new PlaylistItemJsonModel()
+            _mediaItems.Add(new PlayQueueItemJsonModel()
             {
                 IsExternal = media.IsExternal,
                 Location = media.Location,
@@ -222,7 +222,7 @@ internal class PlaylistModel
 
         public Builder AddMediaLocation(string location)
         {
-            _mediaItems.Add(new PlaylistItemJsonModel()
+            _mediaItems.Add(new PlayQueueItemJsonModel()
             {
                 IsExternal = true,
                 Location = location,
@@ -232,7 +232,7 @@ internal class PlaylistModel
 
         private string? IdOf(MediaModel media)
         {
-            foreach (PlaylistItemJsonModel item in _mediaItems)
+            foreach (PlayQueueItemJsonModel item in _mediaItems)
             {
                 if (media.IsExternal != item.IsExternal)
                 {
@@ -265,7 +265,7 @@ internal class PlaylistModel
             return JsonSerializer.Serialize(_mediaItems);
         }
 
-        private static string EnsureId(PlaylistItemJsonModel item)
+        private static string EnsureId(PlayQueueItemJsonModel item)
         {
             if (string.IsNullOrEmpty(item.Id))
             {

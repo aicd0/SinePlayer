@@ -6,6 +6,7 @@ using System.ComponentModel;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Data.Models.Media;
+using SinePlayer.Helpers.Misc;
 
 namespace SinePlayer.ViewModels;
 
@@ -62,7 +63,8 @@ internal partial class FavoriteItemViewModel : BaseViewModel, INotifyPropertyCha
         set { Type = value ? FavoriteNodeType.Item : FavoriteNodeType.Filter; }
     }
 
-    public string ItemGlyph => Media is null ? "\uE9CE" : (Media.IsCollection ? "\uF5ED" : "\uE8B9");
+    public string ItemGlyph => Media is null ?
+        "\uE9CE" : (Media.IsCollection ? "\uF5ED" : MediaGlyphHelper.GetMediaGlyph(Media));
 
     public void FixParent()
     {

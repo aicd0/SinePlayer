@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Data.Models.Media;
+using SinePlayer.Helpers.Misc;
 
 namespace SinePlayer.ViewModels;
 
@@ -15,7 +16,8 @@ internal class HistoryItemViewModel : BaseViewModel
     public string Time { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
 
-    public string ItemGlyph => Media is null ? "\uE9CE" : (Media.IsCollection ? "\uF5ED" : "\uE8B9");
+    public string ItemGlyph => Media is null ?
+        "\uE9CE" : (Media.IsCollection ? "\uF5ED" : MediaGlyphHelper.GetMediaGlyph(Media));
 }
 
 internal class HistoryGroupViewModel : ObservableCollection<HistoryItemViewModel>

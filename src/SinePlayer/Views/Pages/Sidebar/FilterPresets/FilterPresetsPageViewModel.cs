@@ -219,17 +219,17 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
             MediaPropertyModel? groupBy = filter.GroupBy;
 
             List<SimpleTreeViewNodeModel> dataSource = [];
-            SimpleTreeViewNodeModel MediaToNode(MediaModel media, PlaylistModel.Builder playlist)
+            SimpleTreeViewNodeModel MediaToNode(MediaModel media, PlayQueueModel.Builder playQueue)
             {
                 return new()
                 {
                     DataContext = media,
-                    Glyph = "\uE8B9",
+                    Glyph = MediaGlyphHelper.GetMediaGlyph(media),
                     Title = media.Title,
                     CanExpand = false,
                     Clicked = item =>
                     {
-                        Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                        Route route = OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
                         OpenMediaHelper.OpenMedia(_actionHandler, route);
                     },
                     RequestContextMenuItemsAsync = (primary, selection) =>
@@ -240,7 +240,7 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
                         return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                             _actionHandler,
                             media,
-                            playlist: playlist,
+                            playQueue: playQueue,
                             selectedItems: selectedMedia,
                             canSelect: !SelectionMode);
                     },
@@ -270,10 +270,10 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
 
                     List<SimpleTreeViewNodeModel> nodeChildren = [];
                     List<MediaModel> sorted = sortBy.SortMedia(item.Items, x => x, filter.MediaOrderMethod);
-                    PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sorted);
+                    PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(sorted);
                     foreach (MediaModel media in sorted)
                     {
-                        groupNode.Children.Add(MediaToNode(media, playlist));
+                        groupNode.Children.Add(MediaToNode(media, playQueue));
                     }
 
                     dataSource.Add(groupNode);
@@ -282,10 +282,10 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
             else
             {
                 List<MediaModel> sorted = sortBy.SortMedia(items, x => x, filter.MediaOrderMethod);
-                PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sorted);
+                PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(sorted);
                 foreach (MediaModel media in sorted)
                 {
-                    dataSource.Add(MediaToNode(media, playlist));
+                    dataSource.Add(MediaToNode(media, playQueue));
                 }
             }
 

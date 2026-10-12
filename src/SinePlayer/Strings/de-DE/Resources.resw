@@ -676,6 +676,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="More" xml:space="preserve">
     <value>Mehr</value>
   </data>
+  <data name="Mute" xml:space="preserve">
+    <value>Stummschalten</value>
+  </data>
   <data name="NItems" xml:space="preserve">
     <value>$n Element(e)</value>
   </data>
@@ -790,6 +793,12 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="PlayPause" xml:space="preserve">
     <value>Wiedergabe / Pause</value>
   </data>
+  <data name="PlayQueue" xml:space="preserve">
+    <value>Wiedergabewarteschlange</value>
+  </data>
+  <data name="PlayQueueEmpty" xml:space="preserve">
+    <value>Deine Wiedergabewarteschlange wird hier angezeigt</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Allgemeine Player-Einstellungen</value>
   </data>
@@ -804,12 +813,6 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   </data>
   <data name="PlayerStatusLoading" xml:space="preserve">
     <value>Der Player wird geladen</value>
-  </data>
-  <data name="Playlist" xml:space="preserve">
-    <value>Wiedergabeliste</value>
-  </data>
-  <data name="PlaylistEmpty" xml:space="preserve">
-    <value>Deine Wiedergabeliste wird hier angezeigt</value>
   </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Plugins verwalten und konfigurieren</value>
@@ -871,8 +874,14 @@ $plugins</value>
   <data name="RemoveUnreachableItems" xml:space="preserve">
     <value>Nicht erreichbare Elemente automatisch entfernen</value>
   </data>
-  <data name="Repeat" xml:space="preserve">
-    <value>Wiederholen</value>
+  <data name="RepeatAll" xml:space="preserve">
+    <value>Wiederholen: Alle</value>
+  </data>
+  <data name="RepeatOff" xml:space="preserve">
+    <value>Wiederholen: Aus</value>
+  </data>
+  <data name="RepeatOne" xml:space="preserve">
+    <value>Wiederholen: Einzeln</value>
   </data>
   <data name="RescanFilesButton.Content" xml:space="preserve">
     <value>Dateien erneut scannen</value>
@@ -1059,6 +1068,9 @@ $info</value>
   <data name="Unhide" xml:space="preserve">
     <value>Einblenden</value>
   </data>
+  <data name="Unmute" xml:space="preserve">
+    <value>Ton einschalten</value>
+  </data>
   <data name="Unpin" xml:space="preserve">
     <value>Lösen</value>
   </data>
@@ -1079,6 +1091,9 @@ $info</value>
   </data>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>Medium</value>
+  </data>
+  <data name="Volume" xml:space="preserve">
+    <value>Lautstärke</value>
   </data>
   <data name="VolumeDown" xml:space="preserve">
     <value>Lautstärke verringern</value>

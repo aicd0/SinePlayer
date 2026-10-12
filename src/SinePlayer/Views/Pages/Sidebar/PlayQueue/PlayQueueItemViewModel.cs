@@ -11,14 +11,17 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
+using SinePlayer.Helpers.Misc;
 
-namespace SinePlayer.Views.Pages.Sidebar.Playlist;
+namespace SinePlayer.Views.Pages.Sidebar.PlayQueue;
 
-internal partial class PlaylistItemViewModel : INotifyPropertyChanged
+internal partial class PlayQueueItemViewModel : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public MediaModel? Media { get; set; }
+
+    public string Glyph => MediaGlyphHelper.GetMediaGlyph(Media);
 
     private string _title = string.Empty;
     public string Title
@@ -42,7 +45,7 @@ internal partial class PlaylistItemViewModel : INotifyPropertyChanged
         }
     }
 
-    public Func<PlaylistItemViewModel, Task<List<BaseMenuFlyoutItemModel>>>? RequestContextMenuItemsAsync { get; set; }
+    public Func<PlayQueueItemViewModel, Task<List<BaseMenuFlyoutItemModel>>>? RequestContextMenuItemsAsync { get; set; }
 
     public async Task<FlyoutBase?> CreateContextFlyout()
     {

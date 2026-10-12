@@ -12,15 +12,15 @@ using SinePlayer.Common.Misc;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Playback;
 
-namespace SinePlayer.Views.Pages.Sidebar.Playlist;
+namespace SinePlayer.Views.Pages.Sidebar.PlayQueue;
 
-internal sealed partial class PlaylistPage : BasePage
+internal sealed partial class PlayQueuePage : BasePage
 {
-    private const string TAG = nameof(PlaylistPage);
+    private const string TAG = nameof(PlayQueuePage);
 
-    private readonly PlaylistPageViewModel ViewModel = new();
+    private readonly PlayQueuePageViewModel ViewModel = new();
 
-    public PlaylistPage()
+    public PlayQueuePage()
     {
         InitializeComponent();
     }
@@ -66,7 +66,7 @@ internal sealed partial class PlaylistPage : BasePage
             return;
         }
 
-        if (fe.DataContext is not PlaylistItemViewModel viewModel)
+        if (fe.DataContext is not PlayQueueItemViewModel viewModel)
         {
             return;
         }

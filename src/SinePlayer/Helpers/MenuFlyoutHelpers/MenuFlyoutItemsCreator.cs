@@ -40,7 +40,7 @@ internal static class MenuFlyoutItemsCreator
     public static async Task<List<BaseMenuFlyoutItemModel>> CreateMediaMenuItems(
         ActionHandler actionHandler,
         MediaModel primaryItem,
-        PlaylistModel.Builder? playlist = null,
+        PlayQueueModel.Builder? playQueue = null,
         PlaybackModel.Builder? playback = null,
         IEnumerable<MediaModel>? selectedItems = null,
         bool canOpenWithDefault = false,
@@ -55,7 +55,7 @@ internal static class MenuFlyoutItemsCreator
         {
             if (selectedItems.Any(i => i.Id == primaryItem.Id))
             {
-                playlist = new PlaylistModel.Builder().AddMedia(selectedItems);
+                playQueue = new PlayQueueModel.Builder().AddMedia(selectedItems);
                 canOpenWithDefault = true;
             }
             else
@@ -69,7 +69,7 @@ internal static class MenuFlyoutItemsCreator
 
         Route primaryMediaRoute = OpenMediaHelper.GetMediaRoute(
             primaryItem,
-            playlist: playlist,
+            playQueue: playQueue,
             playback: playback);
 
         List<BaseMenuFlyoutItemModel> items = [];
@@ -79,7 +79,7 @@ internal static class MenuFlyoutItemsCreator
             items.Add(new SimpleMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.Open,
-                Icon = new FontIconSource() { Glyph = "\uE8B9" },
+                Icon = new FontIconSource() { Glyph = MediaGlyphHelper.GetMediaGlyph(primaryItem) },
                 Click = () =>
                 {
                     OpenMediaHelper.OpenMedia(actionHandler, primaryMediaRoute);
@@ -341,7 +341,7 @@ internal static class MenuFlyoutItemsCreator
         MediaModel? randomMedia = mediaItems.Count > 0 ? mediaItems[Random.Shared.Next(mediaItems.Count)] : null;
         if (randomMedia is not null)
         {
-            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(mediaItems);
+            PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(mediaItems);
             result.Add(new SubItemMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.Random,
@@ -349,7 +349,7 @@ internal static class MenuFlyoutItemsCreator
                 Items = await CreateMediaMenuItems(
                     actionHandler,
                     randomMedia,
-                    playlist: playlist,
+                    playQueue: playQueue,
                     canOpenWithDefault: true),
             });
         }

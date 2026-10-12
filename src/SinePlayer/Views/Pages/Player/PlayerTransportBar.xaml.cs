@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml.Input;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.HotKey;
+using SinePlayer.Data.Models.Playback;
 
 namespace SinePlayer.Views.Pages.Player;
 
@@ -24,16 +25,19 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
     public delegate void NextRequestedEventHandler();
     public event NextRequestedEventHandler? NextRequested;
 
-    public delegate void PlaylistRequestedEventHandler();
-    public event PlaylistRequestedEventHandler? PlaylistRequested;
+    public delegate void PlayQueueRequestedEventHandler();
+    public event PlayQueueRequestedEventHandler? PlayQueueRequested;
 
-    public delegate void MoreRequestedEventHandler();
-    public event MoreRequestedEventHandler? MoreRequested;
+    public delegate void RepeatRequestedEventHandler();
+    public event RepeatRequestedEventHandler? RepeatRequested;
+
+    public delegate void ShuffleRequestedEventHandler();
+    public event ShuffleRequestedEventHandler? ShuffleRequested;
 
     public delegate void SeekRequestedEventHandler(long positionMs);
     public event SeekRequestedEventHandler? SeekRequested;
 
-    public delegate void VolumeChangedEventHandler(double volume);
+    public delegate void VolumeChangedEventHandler(int volume);
     public event VolumeChangedEventHandler? VolumeChanged;
 
     public delegate void MuteChangedEventHandler(bool isMuted);
@@ -50,7 +54,9 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
     private bool _isUpdatingSeekSlider = false;
     private bool _isUpdatingVolumeSlider = false;
     private bool _isMuted = false;
+    private int _volume = 100;
     private bool _isPinned = false;
+    private RepeatMode _repeatMode = RepeatMode.Off;
 
     public PlayerTransportBar()
     {
@@ -61,18 +67,16 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
         SeekSlider.AddHandler(PointerCaptureLostEvent, new PointerEventHandler(OnSeekSliderPointerCaptureLost), true);
     }
 
-    public FrameworkElement MoreButton => AbbMore;
-
     public void SetPlaying(bool isPlaying)
     {
-        FiPlayPause.Glyph = isPlaying ? "\uE769" : "\uE768";
-        ShortcutToolTip.Apply(AbbPlayPause, KeyboardShortcutActions.PlayPause, isPlaying ? StringResource.Pause : StringResource.Play);
+        PlayPauseIcon.Glyph = isPlaying ? "\uE769" : "\uE768";
+        ShortcutToolTip.Apply(PlayPauseButton, KeyboardShortcutActions.PlayPause, isPlaying ? StringResource.Pause : StringResource.Play);
     }
 
     public void SetNavigation(bool isPreviousEnabled, bool isNextEnabled)
     {
-        AbbPrevious.IsEnabled = isPreviousEnabled;
-        AbbNext.IsEnabled = isNextEnabled;
+        PreviousButton.IsEnabled = isPreviousEnabled;
+        NextButton.IsEnabled = isNextEnabled;
     }
 
     public void SetPosition(long positionMs, long durationMs)
@@ -107,36 +111,85 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
         }
     }
 
-    public void SetVolume(double volume)
+    public void SetVolume(int volume)
     {
+        _volume = Math.Clamp(volume, 0, 100);
+
         _isUpdatingVolumeSlider = true;
         try
         {
-            VolumeSlider.Value = Math.Clamp(volume, 0.0, 1.0);
+            VolumeSlider.Value = _volume;
         }
         finally
         {
             _isUpdatingVolumeSlider = false;
         }
+
+        UpdateVolumeIcon();
     }
 
     public void SetMuted(bool isMuted)
     {
         _isMuted = isMuted;
-        FiMute.Glyph = isMuted ? "\uE74F" : "\uE767";
+        UpdateVolumeIcon();
+        ToolTipService.SetToolTip(MuteButton, isMuted ? StringResource.Unmute : StringResource.Mute);
     }
 
     public void SetPinned(bool isPinned)
     {
         _isPinned = isPinned;
-        FiPin.Glyph = isPinned ? "\uE77A" : "\uE718";
-        ToolTipService.SetToolTip(AbbPin, isPinned ? StringResource.Unpin : StringResource.Pin);
+        PinIcon.Glyph = isPinned ? "\uE77A" : "\uE718";
+        ToolTipService.SetToolTip(PinButton, isPinned ? StringResource.Unpin : StringResource.Pin);
     }
 
     public void SetFullscreen(bool isFullscreen)
     {
-        FiFullscreen.Glyph = isFullscreen ? "\uE73F" : "\uE740";
-        ShortcutToolTip.Apply(AbbFullscreen, KeyboardShortcutActions.ToggleFullscreen, isFullscreen ? StringResource.ExitFullscreen : StringResource.EnterFullscreen);
+        FullscreenIcon.Glyph = isFullscreen ? "\uE73F" : "\uE740";
+        ShortcutToolTip.Apply(FullscreenButton, KeyboardShortcutActions.ToggleFullscreen, isFullscreen ? StringResource.ExitFullscreen : StringResource.EnterFullscreen);
+    }
+
+    public void SetRepeatMode(RepeatMode repeatMode)
+    {
+        _repeatMode = repeatMode;
+        RepeatIcon.Glyph = repeatMode switch
+        {
+            RepeatMode.All => "\uE8EE",
+            RepeatMode.One => "\uE8ED",
+            _ => "\uF5E7",
+        };
+        ToolTipService.SetToolTip(RepeatButton, repeatMode switch
+        {
+            RepeatMode.All => StringResource.RepeatAll,
+            RepeatMode.One => StringResource.RepeatOne,
+            _ => StringResource.RepeatOff,
+        });
+    }
+
+    public void SetShuffle(bool isShuffle)
+    {
+        ShuffleButton.IsChecked = isShuffle;
+    }
+
+    private void UpdateVolumeIcon()
+    {
+        string glyph;
+        if (_isMuted)
+        {
+            glyph = "\uE74F";
+        }
+        else
+        {
+            glyph = _volume switch
+            {
+                <= 0 => "\uE992",
+                <= 33 => "\uE993",
+                <= 66 => "\uE994",
+                _ => "\uE995",
+            };
+        }
+
+        VolumeIcon.Glyph = glyph;
+        MuteIcon.Glyph = glyph;
     }
 
     private void OnPreviousClick(object sender, RoutedEventArgs e)
@@ -154,14 +207,19 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
         NextRequested?.Invoke();
     }
 
-    private void OnPlaylistClick(object sender, RoutedEventArgs e)
+    private void OnPlayQueueClick(object sender, RoutedEventArgs e)
     {
-        PlaylistRequested?.Invoke();
+        PlayQueueRequested?.Invoke();
     }
 
-    private void OnMoreClick(object sender, RoutedEventArgs e)
+    private void OnRepeatClick(object sender, RoutedEventArgs e)
     {
-        MoreRequested?.Invoke();
+        RepeatRequested?.Invoke();
+    }
+
+    private void OnShuffleClick(object sender, RoutedEventArgs e)
+    {
+        ShuffleRequested?.Invoke();
     }
 
     private void OnMuteClick(object sender, RoutedEventArgs e)
@@ -198,13 +256,14 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
             return;
         }
 
-        if (_isMuted && e.NewValue > 0.0)
+        int volume = (int)Math.Round(e.NewValue);
+        if (_isMuted && volume > 0)
         {
             SetMuted(false);
             MuteChanged?.Invoke(false);
         }
 
-        VolumeChanged?.Invoke(e.NewValue);
+        VolumeChanged?.Invoke(volume);
     }
 
     private void OnSeekSliderPointerPressed(object sender, PointerRoutedEventArgs e)
@@ -235,9 +294,7 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
 
     private void UpdatePositionText(long positionMs)
     {
-        TbPosition.Text = $"{FormatTime(positionMs)} / {FormatTime(_durationMs)}";
-        int percentage = _durationMs > 0 ? (int)Math.Clamp(positionMs * 100 / _durationMs, 0, 100) : 0;
-        TbPositionSecondary.Text = $"{percentage}%";
+        PositionTextBlock.Text = $"{FormatTime(positionMs)} / {FormatTime(_durationMs)}";
     }
 
     private static string FormatTime(long milliseconds)

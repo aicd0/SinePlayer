@@ -145,17 +145,17 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
             currentNode.Media.Add(media);
         }
 
-        SimpleTreeViewNodeModel MediaToNode(MediaModel media, PlaylistModel.Builder playlist)
+        SimpleTreeViewNodeModel MediaToNode(MediaModel media, PlayQueueModel.Builder playQueue)
         {
             return new()
             {
                 DataContext = media,
-                Glyph = "\uE8B9",
+                Glyph = MediaGlyphHelper.GetMediaGlyph(media),
                 Title = media.Title,
                 CanExpand = false,
                 Clicked = item =>
                 {
-                    Route route = OpenMediaHelper.GetMediaRoute(media, playlist: playlist);
+                    Route route = OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
                     OpenMediaHelper.OpenMedia(_actionHandler, route);
                 },
                 RequestContextMenuItemsAsync = (primary, selection) =>
@@ -166,7 +166,7 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
                     return MenuFlyoutItemsCreator.CreateMediaMenuItems(
                         _actionHandler,
                         media,
-                        playlist: playlist,
+                        playQueue: playQueue,
                         selectedItems: selectedMedia,
                         canSelect: !SelectionMode);
                 },
@@ -202,10 +202,10 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
 
             IEnumerable<MediaModel> sortedMedia = folderNode.Media
                 .OrderBy(x => StringUtils.SmartFileNameKeySelector(x.Title), StringUtils.SmartFileNameComparer);
-            PlaylistModel.Builder playlist = new PlaylistModel.Builder().AddMedia(sortedMedia);
+            PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(sortedMedia);
             foreach (MediaModel media in sortedMedia)
             {
-                nodes.Add(MediaToNode(media, playlist));
+                nodes.Add(MediaToNode(media, playQueue));
             }
 
             if (nodes.Count == 1 && nodes[0].CanExpand)
