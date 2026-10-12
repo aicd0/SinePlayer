@@ -1105,7 +1105,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     }
 
     //
-    // SDK.Plugins.Comic.IComicModel Implementation
+    // SDK.Plugins.Media.IMediaModel Implementation
     //
 
     long SDK.Plugins.Media.IMediaModel.Id => Id;

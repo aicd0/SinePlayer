@@ -360,19 +360,6 @@ internal static class AppSettingsModel
         }
     }
 
-    public static bool RestoreLastReadingPositionOnlyAppliesToReadingMedia
-    {
-        get
-        {
-            return _db.Read(model => model.RestoreLastReadingPositionOnlyAppliesToReadingMedia ?? false);
-        }
-        set
-        {
-            _db.Write(model => model.RestoreLastReadingPositionOnlyAppliesToReadingMedia = value);
-            _db.Save();
-        }
-    }
-
     public static bool SendUsageData
     {
         get
@@ -758,9 +745,6 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("RestoreLastReadingPosition")]
         public bool? RestoreLastReadingPosition { get; set; }
-
-        [JsonPropertyName("RestoreLastReadingPositionOnlyAppliesToReadingMedia")]
-        public bool? RestoreLastReadingPositionOnlyAppliesToReadingMedia { get; set; }
 
         [JsonPropertyName("SendUsageData")]
         public bool? SendUsageData { get; set; }

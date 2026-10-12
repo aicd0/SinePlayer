@@ -424,49 +424,49 @@ Kategorie:: Tag1, Tag2    - Überschreibe „Kategorie“ mit „Tag1“ und „
     <value>Oder</value>
   </data>
   <data name="ExpressionReference" xml:space="preserve">
-    <value>Ausdrucksreferenz
+    <value>Referenz für Ausdrücke
 
 1. Variablen
 
-%tag                      - Alle Tags eines Comics abgleichen.
-%title                    - Titel 1 oder Titel 2 abgleichen.
-%title1                   - Titel 1 abgleichen.
-%title2                   - Titel 2 abgleichen.
-%rating                   - Bewertung abgleichen. Beispiel: 100 steht für 5 Sterne, -1 für keine Bewertung.
-%completion_state         - Status der Comic-Vervollständigung (0 - Ungelesen, 1 - Lesen, 2 - Abgeschlossen).
-%progress                 - Lesefortschritt in Prozent. Beispiel: 50 steht für 50 %.
-%duration                 - Gesamtdauer.
+%tag                 - Tags.
+%title               - Titel 1 oder Titel 2.
+%title1              - Titel 1.
+%title2              - Titel 2.
+%rating              - Bewertung. Beispiel: 100 entspricht 5 Sternen, -1 bedeutet keine Bewertung.
+%completion_status   - Abschlussstatus.
+%progress            - Fortschritt in Prozent. Beispiel: 50 entspricht 50 %.
+%duration            - Gesamtdauer.
 
 2. Variablenoperatoren
 
-=                         - Gleich. Beispiel: %title = "Dies ist ein Titel."
-&gt;                         - Größer als. Beispiel: %rating &gt; 3
-&gt;=                        - Größer als oder gleich.
-&lt;                         - Kleiner als.
-&lt;=                        - Kleiner als oder gleich.
-... IN (...)              - Enthalten in. Beispiel:
-                            %rating in (3, 4, 5) - Findet Comics, deren Bewertungen zwischen 3, 4 und 5 liegen.
-                            %tag.language in (languageA, languageB) - Findet Comics, deren Tag-Kategorie „language“ „languageA“ oder „languageB“ enthält.
-                            (authorA, authorB) in %tag.authors - Findet Comics, deren Tag-Kategorie „authors“ sowohl „authorA“ als auch „authorB“ enthält.
-                            apple in %tag - Findet Comics, die den Tag „apple“ enthalten.
+=                    - Gleich. Beispiel: %title = "Hier steht der Titel"
+&gt;                    - Größer als. Beispiel: %rating &gt; 3
+&gt;=                   - Größer als oder gleich.
+&lt;                    - Kleiner als.
+&lt;=                   - Kleiner als oder gleich.
+... IN (...)         - Ist enthalten in. Beispiel:
+                       %rating in (3, 4, 5) - Entspricht Elementen mit den Bewertungen 3, 4 oder 5.
+                       %tag.language in (A, B) - Entspricht Elementen, deren Tag-Kategorie "language" "A" oder "B" enthält.
+                       (A, B) in %tag.artists - Entspricht Elementen, deren Tag-Kategorie "artists" sowohl "A" als auch "B" enthält.
+                       "apple" in %tag - Entspricht Elementen mit dem Tag "apple".
 
 3. Logische Operatoren
 
-AND                       - Logisch und. Beispiel: %tag.fruit = apple AND %title = "Ich habe einen Apfel"
-OR                        - Logisch oder. Beispiel: %title1 = "Apfel ist OK" OR %title2 = "Orange ist auch OK"
-NOT                       - Logisch nicht. Beispiel: NOT %tag = "dieses ausblenden"
+AND                  - Logisches UND. Beispiel: %tag.artists = A AND %title = "Hier steht der Titel"
+OR                   - Logisches ODER. Beispiel: %title1 = "Hier steht Titel 1" OR %title2 = "Hier steht Titel 2"
+NOT                  - Logisches NICHT. Beispiel: NOT %tag = "SomeTag"
 
 4. Klammern
 
-Standardmäßig werden Operatoren von links nach rechts ausgewertet. Verwenden Sie (...), um die Priorität des eingefügten Ausdrucks zu erhöhen. Beispiel:
+Standardmäßig werden Operatoren von links nach rechts ausgewertet. Mit (...) können Sie die Priorität des eingeschlossenen Ausdrucks erhöhen. Beispiel:
 
-%tag.author = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
+    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
 
-Die Auswertung erfolgt in der folgenden Reihenfolge:
+Die Auswertung erfolgt in dieser Reihenfolge:
 
-1. NOT %tag.lang = langB  ==&gt;  Ergebnis1
-2. %tag.language = langA OR Ergebnis1  ==&gt;  Ergebnis2
-3. %tag.author = abc AND Ergebnis2  ==&gt;  Ergebnis3</value>
+    1. NOT %tag.lang = langB  ==&gt;  Ergebnis1
+    2. %tag.language = langA OR Ergebnis1  ==&gt;  Ergebnis2
+    3. %tag.artists = abc AND Ergebnis2  ==&gt;  Ergebnis3</value>
   </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>Ausdruck</value>
@@ -650,7 +650,7 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
     <value>Links</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>Mit der Option „zur Ausschlussliste hinzufügen“ wird verhindert, dass der Comic beim nächsten Aktualisieren der Bibliothek erneut importiert wird.</value>
+    <value>Wenn Sie „zur Ausschlussliste hinzufügen“ auswählen, werden diese Mediendateien beim nächsten Aktualisieren der Bibliothek nicht erneut importiert.</value>
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>Medieninformationen</value>
@@ -738,9 +738,6 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   </data>
   <data name="OK" xml:space="preserve">
     <value>OK</value>
-  </data>
-  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
-    <value>Gilt nur für Comics mit dem Status „Wird gelesen“</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>Öffnen</value>
@@ -871,8 +868,8 @@ $items</value>
     <value>Die folgenden Plugins werden entfernt:
 $plugins</value>
   </data>
-  <data name="RemoveUnreachableCheckBox.Content" xml:space="preserve">
-    <value>Nicht erreichbare Comics automatisch entfernen</value>
+  <data name="RemoveUnreachableItems" xml:space="preserve">
+    <value>Nicht erreichbare Elemente automatisch entfernen</value>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>Wiederholen</value>
@@ -971,8 +968,8 @@ Im abgesicherten Modus starten?</value>
   <data name="Settings" xml:space="preserve">
     <value>Einstellungen</value>
   </data>
-  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
-    <value>Versteckte Comics anzeigen</value>
+  <data name="ShowHiddenItems" xml:space="preserve">
+    <value>Versteckte Elemente anzeigen</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>Im Datei-Explorer anzeigen</value>

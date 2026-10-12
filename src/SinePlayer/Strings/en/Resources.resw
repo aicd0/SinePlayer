@@ -428,47 +428,45 @@ Category:: Tag1, Tag2    - Overwrite "Category" with "Tag1" and "Tag2".</value>
 
 1. Variables
 
-%tag                - Match all tags in a comic.
-%title              - Match title 1 or title 2.
-%title1             - Match title 1.
-%title2             - Match title 2.
-%rating             - Match rating. For example: 100 represents 5 stars, -1 represents no rating.
-%completion_state   - Comic completion state (0 - Unread, 1 - Reading, 2 - Completed).
-%progress           - reading progress, in percentage. For example: 50 represents 50%.
-%duration           - Total duration.
+%tag                 - Tags.
+%title               - Title 1 or Title 2.
+%title1              - Title 1.
+%title2              - Title 2.
+%rating              - Rating. For example, 100 represents 5 stars, and -1 means no rating.
+%completion_status   - Completion status.
+%progress            - Progress, as a percentage. For example, 50 represents 50%.
+%duration            - Total duration.
 
-2. Variable operators
+2. Variable Operators
 
-=                   - Equal. For example: %title = "This is a title"
-&gt;                   - Greater than. For example: %rating &gt; 3
-&gt;=                  - Greater than or equal.
-&lt;                   - Less than.
-&lt;=                  - Less than or equal.
-... IN (...)        - Contained by. For example:
-                      %rating in (3, 4, 5) - Match those comics whose ratings are within 3, 4 and 5.
-                      %tag.language in (languageA, languageB) - Match those comics whose "language" tag category contains "languageA" or "languageB".
-                      (authorA, authorB) in %tag.authors - Match those comics whose "authors" tag category contains both "authorA" and "authorB".
-                      apple in %tag - Match those comics which contains tag "apple".
+=                    - Equal to. For example: %title = "Here's the title"
+&gt;                    - Greater than. For example: %rating &gt; 3
+&gt;=                   - Greater than or equal to.
+&lt;                    - Less than.
+&lt;=                   - Less than or equal to.
+... IN (...)         - Is contained in. For example:
+                       %rating in (3, 4, 5) - Matches items whose ratings are 3, 4, or 5.
+                       %tag.language in (A, B) - Matches items whose "language" tag category contains "A" or "B".
+                       (A, B) in %tag.artists - Matches items whose "artists" tag category contains both "A" and "B".
+                       "apple" in %tag - Matches items that contain the "apple" tag.
 
-3. Logic operators
+3. Logical Operators
 
-AND                 - Logic and. For example: %tag.fruit = apple AND %title = "I have an apple"
-OR                  - Logic or. For example: %title1 = "Apple is OK" OR %title2 = "Orange is also OK"
-NOT                 - Logic not. For example: NOT %tag = "hide this"
+AND                  - Logical AND. For example: %tag.artists = A AND %title = "Here's the title"
+OR                   - Logical OR. For example: %title1 = "Here's title 1" OR %title2 = "Here's title 2"
+NOT                  - Logical NOT. For example: NOT %tag = "SomeTag"
 
 4. Parentheses
 
-By default, operators will be evaluated from left to right. Use (...) to elevate the
-priority of included expression. For example:
+By default, operators are evaluated from left to right. Use (...) to give the enclosed expression higher precedence. For example:
 
-    %tag.author = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
+    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
 
-The evaluation will be performed in the following order:
+The expression will be evaluated in the following order:
 
     1. NOT %tag.lang = langB  ==&gt;  Result1
     2. %tag.language = langA OR Result1  ==&gt;  Result2
-    3. %tag.author = abc AND Result2  ==&gt;  Result3
-</value>
+    3. %tag.artists = abc AND Result2  ==&gt;  Result3</value>
   </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>Expression</value>
@@ -652,7 +650,7 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
     <value>Links</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>Selecting "add to exclusion list" will prevent the comic from being imported again the next time the library is updated.</value>
+    <value>Selecting "add to exclusion list" will prevent these media files from being imported again the next time the library is updated.</value>
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>Media information</value>
@@ -740,9 +738,6 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="OK" xml:space="preserve">
     <value>OK</value>
-  </data>
-  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
-    <value>Only applies to comics in "Reading" status</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>Open</value>
@@ -873,8 +868,8 @@ $items</value>
     <value>The following plugins will be removed:
 $plugins</value>
   </data>
-  <data name="RemoveUnreachableCheckBox.Content" xml:space="preserve">
-    <value>Automatically remove unreachable comics</value>
+  <data name="RemoveUnreachableItems" xml:space="preserve">
+    <value>Automatically remove unreachable items</value>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>Repeat</value>
@@ -973,8 +968,8 @@ Start in Safe Mode?</value>
   <data name="Settings" xml:space="preserve">
     <value>Settings</value>
   </data>
-  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
-    <value>Show hidden comics</value>
+  <data name="ShowHiddenItems" xml:space="preserve">
+    <value>Show hidden items</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>Show in File Explorer</value>

@@ -175,7 +175,6 @@ public class StringResourceProvider
     public string NoTagsHint => GetResourceString("NoTagsHint");
     public string None => GetResourceString("None");
     public string OK => GetResourceString("OK");
-    public string OnlyAppliesToReadingMedia => GetResourceString("OnlyAppliesToReadingMedia");
     public string Open => GetResourceString("Open");
     public string OpenHomePage => GetResourceString("OpenHomePage");
     public string OpenInCurrentTab => GetResourceString("OpenInCurrentTab");
@@ -215,6 +214,7 @@ public class StringResourceProvider
     public string RemoveFromFavorites => GetResourceString("RemoveFromFavorites");
     public string RemoveItemsConfirmation => GetResourceString("RemoveItemsConfirmation");
     public string RemovePluginsConfirmation => GetResourceString("RemovePluginsConfirmation");
+    public string RemoveUnreachableItems => GetResourceString("RemoveUnreachableItems");
     public string Repeat => GetResourceString("Repeat");
     public string Reset => GetResourceString("Reset");
     public string ResetAllSettings => GetResourceString("ResetAllSettings");
@@ -245,6 +245,7 @@ public class StringResourceProvider
     public string SetAsDefault => GetResourceString("SetAsDefault");
     public string SetCompletionState => GetResourceString("SetCompletionState");
     public string Settings => GetResourceString("Settings");
+    public string ShowHiddenItems => GetResourceString("ShowHiddenItems");
     public string ShowInFileExplorer => GetResourceString("ShowInFileExplorer");
     public string ShowTagId => GetResourceString("ShowTagId");
     public string Shuffle => GetResourceString("Shuffle");

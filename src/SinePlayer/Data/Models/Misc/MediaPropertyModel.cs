@@ -613,7 +613,7 @@ internal class MediaPropertyModel
         public IReadOnlyList<MediaModel> Items { get; } = items;
 
         //
-        // IItemGroup<IComicModel> implementation
+        // IItemGroup<IMediaModel> implementation
         //
 
         string IItemGroup<IMediaModel>.Name => GroupName;

@@ -45,17 +45,17 @@
             Content="{x:Bind StringResource.ScanOnLaunch}"
             IsChecked="{x:Bind ViewModel.ScanOnLaunch, Mode=OneWay}" />
         <CheckBox
-            x:Uid="RemoveUnreachableCheckBox"
             Click="RemoveUnreachableCheckBox_Click"
+            Content="{x:Bind StringResource.RemoveUnreachableItems}"
             IsChecked="{x:Bind ViewModel.RemoveUnreachableMedia, Mode=OneWay}" />
         <CheckBox
             Click="PromptBeforeRemovingMediaCheckBox_Click"
             Content="{x:Bind StringResource.PromptBeforeRemovingItems}"
             IsChecked="{x:Bind ViewModel.PromptBeforeRemovingMedia, Mode=OneWay}" />
         <Button
-            x:Uid="ShowHiddenMediaButton"
             Margin="0,32,0,0"
-            Click="ShowHiddenMediaButton_Click" />
+            Click="ShowHiddenMediaButton_Click"
+            Content="{x:Bind StringResource.ShowHiddenItems}" />
     </StackPanel>
 
 </base:BaseUserControl>

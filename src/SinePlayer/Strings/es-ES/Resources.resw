@@ -428,45 +428,45 @@ Categoría:: Etiqueta1, Etiqueta2    - Sobrescribe “Categoría” con “Etiqu
 
 1. Variables
 
-%tag                 - Coincidir con todas las etiquetas de un cómic.
-%title               - Coincidir con el título 1 o el título 2.
-%title1              - Coincidir con el título 1.
-%title2              - Coincidir con el título 2.
-%rating              - Coincidir con la calificación. Por ejemplo: 100 representa 5 estrellas, -1 representa ninguna calificación.
-%completion_state    - Estado de finalización del cómic (0 - Sin leer, 1 - Leyendo, 2 - Completado).
-%progress            - Progreso de lectura, en porcentaje. Por ejemplo: 50 representa el 50%.
+%tag                 - Etiquetas.
+%title               - Título 1 o Título 2.
+%title1              - Título 1.
+%title2              - Título 2.
+%rating              - Valoración. Por ejemplo, 100 representa 5 estrellas y -1 significa que no hay valoración.
+%completion_status   - Estado de finalización.
+%progress            - Progreso en porcentaje. Por ejemplo, 50 representa el 50 %.
 %duration            - Duración total.
 
 2. Operadores de variables
 
-=                    - Igual. Por ejemplo: %title = "Este es un título"
+=                    - Igual a. Por ejemplo: %title = "Este es el título"
 &gt;                    - Mayor que. Por ejemplo: %rating &gt; 3
 &gt;=                   - Mayor o igual que.
 &lt;                    - Menor que.
 &lt;=                   - Menor o igual que.
-... IN (...)         - Contenido por. Por ejemplo:
-                       %rating in (3, 4, 5) - Encuentra los cómics cuyas calificaciones estén entre 3, 4 y 5.
-                       %tag.language in (languageA, languageB) - Encuentra los cómics cuya categoría de etiqueta "language" contenga "languageA" o "languageB".
-                       (authorA, authorB) in %tag.authors - Encuentra los cómics cuya categoría de etiqueta "authors" contenga tanto "authorA" como "authorB".
-                       apple in %tag - Encuentra los cómics que contengan la etiqueta "apple".
+... IN (...)         - Está incluido en. Por ejemplo:
+                       %rating in (3, 4, 5) - Coincide con los elementos cuya valoración es 3, 4 o 5.
+                       %tag.language in (A, B) - Coincide con los elementos cuya categoría de etiquetas "language" contiene "A" o "B".
+                       (A, B) in %tag.artists - Coincide con los elementos cuya categoría de etiquetas "artists" contiene tanto "A" como "B".
+                       "apple" in %tag - Coincide con los elementos que contienen la etiqueta "apple".
 
 3. Operadores lógicos
 
-AND                  - Operador lógico "y". Por ejemplo: %tag.fruit = apple AND %title = "Tengo una manzana".
-OR                   - Operador lógico "o". Por ejemplo: %title1 = "Apple is OK" OR %title2 = "Orange is OK"
-NOT                  - Operador lógico "no". Por ejemplo: NOT %tag = "ocultar esto".
+AND                  - Y lógico. Por ejemplo: %tag.artists = A AND %title = "Este es el título"
+OR                   - O lógico. Por ejemplo: %title1 = "Este es el título 1" OR %title2 = "Este es el título 2"
+NOT                  - Negación lógica. Por ejemplo: NOT %tag = "SomeTag"
 
 4. Paréntesis
 
-Por defecto, los operadores se evalúan de izquierda a derecha. Utilice (...) para aumentar la prioridad de la expresión incluida. Por ejemplo:
+De forma predeterminada, los operadores se evalúan de izquierda a derecha. Usa (...) para dar prioridad a la expresión incluida entre paréntesis. Por ejemplo:
 
-%tag.author = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
+    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
 
 La evaluación se realizará en el siguiente orden:
 
-1. NOT %tag.lang = langB  ==&gt;  Resultado1
-2. %tag.language = langA OR Result1  ==&gt;  Resultado2
-3. %tag.author = abc AND Result2  ==&gt;  Resultado3</value>
+    1. NOT %tag.lang = langB  ==&gt;  Resultado1
+    2. %tag.language = langA OR Resultado1  ==&gt;  Resultado2
+    3. %tag.artists = abc AND Resultado2  ==&gt;  Resultado3</value>
   </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>Expresión</value>
@@ -650,7 +650,7 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
     <value>Campo de golf</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
-    <value>Seleccionar "añadir a la lista de exclusión" evitará que el cómic se vuelva a importar la próxima vez que se actualice la biblioteca.</value>
+    <value>Si seleccionas «añadir a la lista de exclusión», estos archivos multimedia no se volverán a importar la próxima vez que se actualice la biblioteca.</value>
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>Información multimedia</value>
@@ -738,9 +738,6 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="OK" xml:space="preserve">
     <value>DE ACUERDO</value>
-  </data>
-  <data name="OnlyAppliesToReadingMedia" xml:space="preserve">
-    <value>Solo se aplica a los cómics con estado "En lectura"</value>
   </data>
   <data name="Open" xml:space="preserve">
     <value>Abrir</value>
@@ -871,8 +868,8 @@ $items</value>
     <value>Se eliminarán los siguientes complementos:
 $plugins</value>
   </data>
-  <data name="RemoveUnreachableCheckBox.Content" xml:space="preserve">
-    <value>Eliminar automáticamente los cómics inaccesibles</value>
+  <data name="RemoveUnreachableItems" xml:space="preserve">
+    <value>Eliminar automáticamente los elementos inaccesibles</value>
   </data>
   <data name="Repeat" xml:space="preserve">
     <value>Repetir</value>
@@ -971,8 +968,8 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>Ajustes</value>
   </data>
-  <data name="ShowHiddenMediaButton.Content" xml:space="preserve">
-    <value>Mostrar cómics ocultos</value>
+  <data name="ShowHiddenItems" xml:space="preserve">
+    <value>Mostrar elementos ocultos</value>
   </data>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>Mostrar en el Explorador de archivos</value>

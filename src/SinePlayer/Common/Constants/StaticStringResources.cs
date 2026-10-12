@@ -11,7 +11,7 @@ internal static class StaticStringResources
     public const string GITHUB_PLUGINS_REPO_URL = @"https://github.com/aicd0/SinePlayerPlugins";
     public const string SEND_FEEDBACK_URL = @"https://github.com/aicd0/SinePlayer/issues/new/choose";
     public const string PRIVACY_POLICY_URL = @"https://github.com/aicd0/SinePlayer/blob/develop/docs/PrivacyPolicy.md";
-    public const string FEEDBACK_EMAIL = "sine_player_uwp@163.com";
+    public const string FEEDBACK_EMAIL = "sine_player@163.com";
 
     public const string LICENSE = """
 Sine Player / Sine Player SDK
