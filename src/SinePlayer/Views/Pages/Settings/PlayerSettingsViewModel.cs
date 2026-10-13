@@ -86,17 +86,6 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         Shared.UpdateStarted += Update;
     }
 
-    public void SetKeepScreenOnBehavior(int index)
-    {
-        if (index == _keepScreenOnBehaviorIndex || index < 0 || index >= _keepScreenOnBehaviors.Count)
-        {
-            return;
-        }
-
-        _keepScreenOnBehaviorIndex = index;
-        AppSettingsModel.KeepScreenOnBehavior = _keepScreenOnBehaviors[index].Behavior;
-    }
-
     private void Update()
     {
         UpdateBasicPlayerSettings();

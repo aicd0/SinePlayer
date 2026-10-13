@@ -51,7 +51,7 @@ internal sealed partial class MediaSourceSettingsView : BaseUserControl
         bool? isChecked = ((CheckBox)sender).IsChecked;
         if (isChecked.HasValue)
         {
-            ViewModel.SetScanOnLaunch(isChecked.Value);
+            AppSettingsModel.ScanOnLaunch = isChecked.Value;
         }
     }
 
@@ -60,7 +60,7 @@ internal sealed partial class MediaSourceSettingsView : BaseUserControl
         bool? isChecked = ((CheckBox)sender).IsChecked;
         if (isChecked.HasValue)
         {
-            ViewModel.SetRemoveUnreachableMedia(isChecked.Value);
+            AppSettingsModel.RemoveUnreachableMedia = isChecked.Value;
         }
     }
 
@@ -69,7 +69,25 @@ internal sealed partial class MediaSourceSettingsView : BaseUserControl
         bool? isChecked = ((CheckBox)sender).IsChecked;
         if (isChecked.HasValue)
         {
-            ViewModel.SetPromptBeforeRemovingMedia(isChecked.Value);
+            AppSettingsModel.PromptBeforeRemovingMedia = isChecked.Value;
+        }
+    }
+
+    private void AutoDetectCollectionsCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        bool? isChecked = ((CheckBox)sender).IsChecked;
+        if (isChecked.HasValue)
+        {
+            AppSettingsModel.AutoDetectCollections = isChecked.Value;
+        }
+    }
+
+    private void UseFolderNameAsTitleCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        bool? isChecked = ((CheckBox)sender).IsChecked;
+        if (isChecked.HasValue)
+        {
+            AppSettingsModel.UseFolderNameAsTitle = isChecked.Value;
         }
     }
 

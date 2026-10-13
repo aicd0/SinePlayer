@@ -33,6 +33,7 @@ public class StringResourceProvider
     public string ApplyOnNextLaunch => GetResourceString("ApplyOnNextLaunch");
     public string Ascending => GetResourceString("Ascending");
     public string Auto => GetResourceString("Auto");
+    public string AutoDetectCollections => GetResourceString("AutoDetectCollections");
     public string AutoPlayNext => GetResourceString("AutoPlayNext");
     public string AutoScrolling => GetResourceString("AutoScrolling");
     public string AutoSwitch => GetResourceString("AutoSwitch");
@@ -278,6 +279,7 @@ public class StringResourceProvider
     public string Unmute => GetResourceString("Unmute");
     public string Unpin => GetResourceString("Unpin");
     public string Untitled => GetResourceString("Untitled");
+    public string UseFolderNameAsTitle => GetResourceString("UseFolderNameAsTitle");
     public string UseSystemLanguage => GetResourceString("UseSystemLanguage");
     public string Vertical => GetResourceString("Vertical");
     public string ViewType => GetResourceString("ViewType");

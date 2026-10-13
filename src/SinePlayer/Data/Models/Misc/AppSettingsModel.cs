@@ -51,6 +51,19 @@ internal static class AppSettingsModel
         }
     }
 
+    public static bool AutoDetectCollections
+    {
+        get
+        {
+            return _db.Read(model => model.AutoDetectCollections ?? false);
+        }
+        set
+        {
+            _db.Write(model => model.AutoDetectCollections = value);
+            _db.Save();
+        }
+    }
+
     public static bool AutoSwitch
     {
         get
@@ -400,13 +413,112 @@ internal static class AppSettingsModel
         }
     }
 
-    //
-    // Getters
-    //
-
-    public static ExternalModel GetModel()
+    public static bool PromptBeforeRemovingMedia
     {
-        return _db.Read(ExternalModel.From);
+        get
+        {
+            return _db.Read(model => model.PromptBeforeRemovingMedia ?? true);
+        }
+        set
+        {
+            _db.Write(model => model.PromptBeforeRemovingMedia = value);
+            _db.Save();
+        }
+    }
+
+    public static bool RemoveUnreachableMedia
+    {
+        get
+        {
+            return _db.Read(model => model.RemoveUnreachableMedia ?? true);
+        }
+        set
+        {
+            _db.Write(model => model.RemoveUnreachableMedia = value);
+            _db.Save();
+        }
+    }
+
+    public static bool ScanOnLaunch
+    {
+        get
+        {
+            return _db.Read(model => model.ScanOnLaunch ?? true);
+        }
+        set
+        {
+            _db.Write(model => model.ScanOnLaunch = value);
+            _db.Save();
+        }
+    }
+
+    public static bool UseFolderNameAsTitle
+    {
+        get
+        {
+            return _db.Read(model => model.UseFolderNameAsTitle ?? false);
+        }
+        set
+        {
+            _db.Write(model => model.UseFolderNameAsTitle = value);
+            _db.Save();
+        }
+    }
+
+    public static List<string> MediaFolders
+    {
+        get
+        {
+            return _db.Read(model =>
+            {
+                List<string> folders = [];
+                if (model.MediaFolders is not null)
+                {
+                    foreach (string? folder in model.MediaFolders)
+                    {
+                        if (!string.IsNullOrEmpty(folder))
+                        {
+                            folders.Add(folder);
+                        }
+                    }
+                }
+                return folders;
+            });
+        }
+    }
+
+    public static int MediaShuffleRandomSeed
+    {
+        get
+        {
+            return _db.Read(model => model.MediaShuffleRandomSeed ?? 0);
+        }
+        set
+        {
+            _db.Write(model => model.MediaShuffleRandomSeed = value);
+            _db.Save();
+        }
+    }
+
+    public static AppearanceSetting Theme
+    {
+        get
+        {
+            return _db.Read(model =>
+            {
+                int? theme = model.Theme;
+                if (theme is not null && Enum.IsDefined(typeof(AppearanceSetting), theme))
+                {
+                    return (AppearanceSetting)theme;
+                }
+                return AppearanceSetting.UseSystemSetting;
+            });
+        }
+        set
+        {
+            _db.Write(model => model.Theme = (int)value);
+            _db.Save();
+        }
     }
 
     //
@@ -426,12 +538,6 @@ internal static class AppSettingsModel
         _keepScreenOnBehaviorChangeLiveData.Emit(true);
         _keyboardShortcutsChangedLiveData.Emit(true);
         Language = Language; // Language config needs to be applied immediately to take effect on next launch
-    }
-
-    public static void UpdateModel(ExternalModel model)
-    {
-        _db.Write(model.To);
-        _db.Save();
     }
 
     public static void AddMediaFolder(string folderPath)
@@ -609,65 +715,6 @@ internal static class AppSettingsModel
         }
     }
 
-    public class ExternalModel
-    {
-        public List<string> MediaFolders { get; set; } = [];
-        public bool ScanOnLaunch { get; set; }
-        public bool RemoveUnreachableMedia { get; set; }
-        public bool PromptBeforeRemovingMedia { get; set; }
-        public AppearanceSetting Theme { get; set; } = AppearanceSetting.UseSystemSetting;
-        public int MediaShuffleRandomSeed { get; set; }
-
-        public static ExternalModel From(JsonModel model)
-        {
-            ExternalModel externalModel = new()
-            {
-                ScanOnLaunch = model.ScanOnLaunch ?? true,
-                RemoveUnreachableMedia = model.RemoveUnreachableMedia ?? true,
-                PromptBeforeRemovingMedia = model.PromptBeforeRemovingMedia ?? true,
-                MediaShuffleRandomSeed = model.MediaShuffleRandomSeed ?? 0,
-            };
-
-            if (model.MediaFolders is not null)
-            {
-                foreach (string? folder in model.MediaFolders)
-                {
-                    if (string.IsNullOrEmpty(folder))
-                    {
-                        continue;
-                    }
-                    externalModel.MediaFolders.Add(folder);
-                }
-            }
-
-            int? theme = model.Theme;
-            if (theme is null)
-            {
-                externalModel.Theme = AppearanceSetting.UseSystemSetting;
-            }
-            else if (Enum.IsDefined(typeof(AppearanceSetting), theme))
-            {
-                externalModel.Theme = (AppearanceSetting)theme;
-            }
-            else
-            {
-                externalModel.Theme = AppearanceSetting.UseSystemSetting;
-            }
-
-            return externalModel;
-        }
-
-        public void To(JsonModel model)
-        {
-            model.MediaFolders = [.. MediaFolders];
-            model.ScanOnLaunch = ScanOnLaunch;
-            model.RemoveUnreachableMedia = RemoveUnreachableMedia;
-            model.PromptBeforeRemovingMedia = PromptBeforeRemovingMedia;
-            model.Theme = (int)Theme;
-            model.MediaShuffleRandomSeed = MediaShuffleRandomSeed;
-        }
-    }
-
     public enum CloseLastTabBehaviorEnum
     {
         CloseWindow,
@@ -719,6 +766,9 @@ internal static class AppSettingsModel
 
     public class JsonModel
     {
+        [JsonPropertyName("AutoDetectCollections")]
+        public bool? AutoDetectCollections { get; set; }
+
         [JsonPropertyName("AutoPlayNext")]
         public bool? AutoPlayNext { get; set; }
 
@@ -796,5 +846,8 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("Theme")]
         public int? Theme { get; set; }
+
+        [JsonPropertyName("UseFolderNameAsTitle")]
+        public bool? UseFolderNameAsTitle { get; set; }
     }
 }

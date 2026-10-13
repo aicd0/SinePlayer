@@ -86,19 +86,6 @@ internal partial class SettingsPageViewModel : INotifyPropertyChanged
         Shared.UpdateStarted += Update;
     }
 
-    public void SetAppLanguage(int index)
-    {
-        if (index < 0 || index >= _languages.Count || index == _languageIndex)
-        {
-            return;
-        }
-
-        LanguageEntry selectedLanguage = _languages[index];
-        _languageIndex = index;
-        LanguageChanged = true;
-        AppSettingsModel.Language = selectedLanguage.Identifier;
-    }
-
     public void UpdateStatistics()
     {
         CoroutineUtils.Run(UpdateStatisticsInternal);

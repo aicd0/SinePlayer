@@ -106,7 +106,7 @@
                                     MinWidth="200"
                                     DisplayMemberPath="Name"
                                     ItemsSource="{x:Bind ViewModel.Languages, Mode=OneWay}"
-                                    SelectedIndex="{x:Bind ViewModel.LanguageIndex, Mode=OneWay}"
+                                    SelectedIndex="{x:Bind ViewModel.LanguageIndex, Mode=TwoWay}"
                                     SelectionChanged="LanguageComboBox_SelectionChanged" />
                             </StackPanel>
                         </settings:SettingExpander.InnerContent>

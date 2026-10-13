@@ -50,7 +50,7 @@
                 Grid.Column="2"
                 DisplayMemberPath="Name"
                 ItemsSource="{x:Bind ViewModel.KeepScreenOnBehaviors, Mode=OneWay}"
-                SelectedIndex="{x:Bind ViewModel.KeepScreenOnBehaviorIndex, Mode=OneWay}"
+                SelectedIndex="{x:Bind ViewModel.KeepScreenOnBehaviorIndex, Mode=TwoWay}"
                 SelectionChanged="KeepScreenOnBehaviorComboBox_SelectionChanged" />
         </Grid>
     </StackPanel>

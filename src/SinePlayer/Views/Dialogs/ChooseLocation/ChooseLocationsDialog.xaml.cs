@@ -36,7 +36,7 @@ public sealed partial class ChooseLocationsDialog : BaseContentDialog
             IsAddNew = true
         });
 
-        foreach (string folder in AppSettingsModel.GetModel().MediaFolders)
+        foreach (string folder in AppSettingsModel.MediaFolders)
         {
             FolderItemDataSource.Add(new FolderItemViewModel
             {

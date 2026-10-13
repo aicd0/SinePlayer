@@ -195,6 +195,9 @@
   <data name="Auto" xml:space="preserve">
     <value>Auto</value>
   </data>
+  <data name="AutoDetectCollections" xml:space="preserve">
+    <value>Detect collections automatically</value>
+  </data>
   <data name="AutoPlayNext" xml:space="preserve">
     <value>Play the next item automatically</value>
   </data>
@@ -1076,6 +1079,9 @@ $info</value>
   </data>
   <data name="Untitled" xml:space="preserve">
     <value>Untitled</value>
+  </data>
+  <data name="UseFolderNameAsTitle" xml:space="preserve">
+    <value>Use folder name as title in folders with a single item</value>
   </data>
   <data name="UseSystemLanguage" xml:space="preserve">
     <value>Use system language</value>

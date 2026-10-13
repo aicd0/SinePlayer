@@ -39,6 +39,20 @@ internal static class CollectionModel
         });
     }
 
+    public static Task<long> FindIdByLocation(string location)
+    {
+        return MediaHandle.Enqueue(() =>
+        {
+            SelectCommand command = SelectCommand.Create(MediaTable.Instance)
+                .AppendCondition(MediaTable.ColumnLocation, location)
+                .AppendCondition(MediaTable.ColumnType, (long)MediaType.Collection)
+                .Limit(1);
+            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
+            using SelectCommand.IReader reader = command.Execute();
+            return reader.Read() ? idToken.GetValue() : -1L;
+        });
+    }
+
     public static async Task<IReadOnlySet<long>> GetCollectionIdsContainingAll(IEnumerable<long> mediaIds)
     {
         List<long> ids = [.. mediaIds.Where(x => x >= 0).Distinct()];

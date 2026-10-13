@@ -196,7 +196,7 @@ internal class InitTaskManager
 
     private static void InitializeAppTheme()
     {
-        AppSettingsModel.AppearanceSetting themeSetting = AppSettingsModel.GetModel().Theme;
+        AppSettingsModel.AppearanceSetting themeSetting = AppSettingsModel.Theme;
         switch (themeSetting)
         {
             case AppSettingsModel.AppearanceSetting.Light:
