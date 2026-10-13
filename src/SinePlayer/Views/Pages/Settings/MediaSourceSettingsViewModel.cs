@@ -7,9 +7,9 @@ using SinePlayer.Data.Models.Misc;
 
 namespace SinePlayer.Views.Pages.Settings;
 
-internal partial class ImageSourceSettingsViewModel : INotifyPropertyChanged
+internal partial class MediaSourceSettingsViewModel : INotifyPropertyChanged
 {
-    private const string TAG = nameof(ImageSourceSettingsViewModel);
+    private const string TAG = nameof(MediaSourceSettingsViewModel);
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

@@ -29,9 +29,9 @@ internal sealed partial class GeneralSettingsView : BaseUserControl
         ViewModel.SetCloseLastTabBehavior(((ComboBox)sender).SelectedIndex);
     }
 
-    private void OpenMediaDefaultBehaviorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void OpenItemDefaultBehaviorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        ViewModel.SetOpenMediaDefaultBehavior(((ComboBox)sender).SelectedIndex);
+        ViewModel.SetOpenItemDefaultBehavior(((ComboBox)sender).SelectedIndex);
     }
 
     private void ClearAllHistoryButton_Click(object sender, RoutedEventArgs e)
@@ -46,6 +46,15 @@ internal sealed partial class GeneralSettingsView : BaseUserControl
         if (isChecked.HasValue)
         {
             AppSettingsModel.SaveBrowsingHistory = isChecked.Value;
+        }
+    }
+
+    private void RestoreWindowStateCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        bool? isChecked = ((CheckBox)sender).IsChecked;
+        if (isChecked.HasValue)
+        {
+            AppSettingsModel.RestoreWindowState = isChecked.Value;
         }
     }
 }

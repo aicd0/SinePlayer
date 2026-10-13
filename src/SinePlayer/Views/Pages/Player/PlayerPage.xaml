@@ -22,20 +22,15 @@
         <StackPanel
             x:Name="StatusPanel"
             HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Spacing="12">
-            <ProgressRing
-                x:Name="BusyRing"
-                Width="36"
-                Height="36"
-                IsActive="True" />
+            VerticalAlignment="Center">
             <TextBlock
                 x:Name="StatusText"
                 MaxWidth="480"
-                Foreground="White"
+                Foreground="{ThemeResource ForegroundGrey2}"
                 TextAlignment="Center"
                 TextWrapping="Wrap" />
         </StackPanel>
         <player:PlayerTransportBar x:Name="TransportBar" VerticalAlignment="Bottom" />
     </Grid>
+
 </base:BasePage>

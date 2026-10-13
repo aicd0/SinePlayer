@@ -228,11 +228,11 @@
   <data name="CheckForUpdates" xml:space="preserve">
     <value>Rechercher des mises à jour</value>
   </data>
-  <data name="ChooseLocationButton.Content" xml:space="preserve">
-    <value>Choisir où nous recherchons des images</value>
-  </data>
   <data name="ChooseLocationDialog.Title" xml:space="preserve">
     <value>Créez vos collections à partir de vos fichiers locaux</value>
+  </data>
+  <data name="ChooseMediaLocation" xml:space="preserve">
+    <value>Choisir où rechercher les fichiers multimédias</value>
   </data>
   <data name="ClearAllHistory" xml:space="preserve">
     <value>Effacer l’historique</value>
@@ -567,12 +567,6 @@ L'évaluation s'effectuera dans l'ordre suivant :
   <data name="ImageContrast" xml:space="preserve">
     <value>Contraste</value>
   </data>
-  <data name="ImageLocationExpander.Detail" xml:space="preserve">
-    <value>Choisir où nous recherchons des images</value>
-  </data>
-  <data name="ImageLocationExpander.Header" xml:space="preserve">
-    <value>Images sur cet appareil</value>
-  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Saturation</value>
   </data>
@@ -654,6 +648,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>Informations sur le média</value>
+  </data>
+  <data name="MediaOnThisDevice" xml:space="preserve">
+    <value>Médias sur cet appareil</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Créer un nouveau dossier</value>
@@ -751,8 +748,8 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="OpenInCurrentTab" xml:space="preserve">
     <value>Ouvrir dans l’onglet actuel</value>
   </data>
-  <data name="OpenInLastActiveReaderTab" xml:space="preserve">
-    <value>Ouvrir dans le dernier onglet de lecture actif</value>
+  <data name="OpenInLastActivePlayerTab" xml:space="preserve">
+    <value>Ouvrir dans le dernier onglet actif du lecteur</value>
   </data>
   <data name="OpenInNewTab" xml:space="preserve">
     <value>Ouvrir dans un nouvel onglet</value>
@@ -901,8 +898,11 @@ $plugins</value>
   <data name="Restore" xml:space="preserve">
     <value>Restaurer</value>
   </data>
-  <data name="RestoreLastReadingPosition" xml:space="preserve">
+  <data name="RestoreLastPlaybackPosition" xml:space="preserve">
     <value>Restaurer la dernière position de lecture</value>
+  </data>
+  <data name="RestoreWindowState" xml:space="preserve">
+    <value>Restaurer les fenêtres et les onglets au démarrage</value>
   </data>
   <data name="RightToLeft" xml:space="preserve">
     <value>De droite à gauche</value>
@@ -1106,6 +1106,9 @@ $info</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>En ce moment, nous surveillons ces dossiers :</value>
+  </data>
+  <data name="WhilePlaying" xml:space="preserve">
+    <value>Pendant la lecture</value>
   </data>
   <data name="WhilePlayingVideos" xml:space="preserve">
     <value>Pendant la lecture de vidéos</value>

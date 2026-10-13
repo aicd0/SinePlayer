@@ -43,7 +43,7 @@ internal sealed partial class SettingsPage : BasePage
         ViewModel.Initialize();
 
         GeneralSettingsSection.Initialize(ViewModel.Shared);
-        ImageSourceSettingsSection.Initialize(this, ViewModel.Shared);
+        MediaSourceSettingsSection.Initialize(this, ViewModel.Shared);
         PlayerSettingsSection.Initialize(ViewModel.Shared);
         AppearanceSettingsSection.Initialize(ViewModel.Shared);
         KeyboardShortcutSettingsSection.Initialize(this, ViewModel.Shared);

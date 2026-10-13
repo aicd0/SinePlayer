@@ -228,11 +228,11 @@
   <data name="CheckForUpdates" xml:space="preserve">
     <value>업데이트 확인</value>
   </data>
-  <data name="ChooseLocationButton.Content" xml:space="preserve">
-    <value>이미지를 찾을 위치를 선택하세요</value>
-  </data>
   <data name="ChooseLocationDialog.Title" xml:space="preserve">
     <value>로컬 파일에서 컬렉션을 구축하세요</value>
+  </data>
+  <data name="ChooseMediaLocation" xml:space="preserve">
+    <value>미디어 파일을 검색할 위치 선택</value>
   </data>
   <data name="ClearAllHistory" xml:space="preserve">
     <value>기록 모두 지우기</value>
@@ -567,12 +567,6 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="ImageContrast" xml:space="preserve">
     <value>대비</value>
   </data>
-  <data name="ImageLocationExpander.Detail" xml:space="preserve">
-    <value>이미지를 찾을 위치를 선택하세요</value>
-  </data>
-  <data name="ImageLocationExpander.Header" xml:space="preserve">
-    <value>이 장치의 이미지</value>
-  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>채도</value>
   </data>
@@ -654,6 +648,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>미디어 정보</value>
+  </data>
+  <data name="MediaOnThisDevice" xml:space="preserve">
+    <value>이 기기의 미디어</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>새 폴더 만들기</value>
@@ -751,8 +748,8 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="OpenInCurrentTab" xml:space="preserve">
     <value>현재 탭에서 열기</value>
   </data>
-  <data name="OpenInLastActiveReaderTab" xml:space="preserve">
-    <value>마지막으로 활성화된 리더 탭에서 열기</value>
+  <data name="OpenInLastActivePlayerTab" xml:space="preserve">
+    <value>마지막으로 활성화된 플레이어 탭에서 열기</value>
   </data>
   <data name="OpenInNewTab" xml:space="preserve">
     <value>새 탭에서 열기</value>
@@ -901,8 +898,11 @@ $plugins</value>
   <data name="Restore" xml:space="preserve">
     <value>복원</value>
   </data>
-  <data name="RestoreLastReadingPosition" xml:space="preserve">
-    <value>마지막 읽은 위치 복원</value>
+  <data name="RestoreLastPlaybackPosition" xml:space="preserve">
+    <value>마지막 재생 위치 복원</value>
+  </data>
+  <data name="RestoreWindowState" xml:space="preserve">
+    <value>시작할 때 창과 탭 복원</value>
   </data>
   <data name="RightToLeft" xml:space="preserve">
     <value>오른쪽에서 왼쪽으로</value>
@@ -1106,6 +1106,9 @@ $info</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>지금 우리는 다음 폴더를 감시하고 있습니다:</value>
+  </data>
+  <data name="WhilePlaying" xml:space="preserve">
+    <value>재생 중</value>
   </data>
   <data name="WhilePlayingVideos" xml:space="preserve">
     <value>동영상 재생 중</value>

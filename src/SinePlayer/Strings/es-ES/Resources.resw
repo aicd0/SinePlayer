@@ -228,11 +228,11 @@
   <data name="CheckForUpdates" xml:space="preserve">
     <value>Buscar actualizaciones</value>
   </data>
-  <data name="ChooseLocationButton.Content" xml:space="preserve">
-    <value>Elige dónde buscamos imágenes</value>
-  </data>
   <data name="ChooseLocationDialog.Title" xml:space="preserve">
     <value>Crea tus colecciones a partir de tus archivos locales</value>
+  </data>
+  <data name="ChooseMediaLocation" xml:space="preserve">
+    <value>Elegir dónde buscar archivos multimedia</value>
   </data>
   <data name="ClearAllHistory" xml:space="preserve">
     <value>Borrar historial</value>
@@ -567,12 +567,6 @@ La evaluación se realizará en el siguiente orden:
   <data name="ImageContrast" xml:space="preserve">
     <value>Contraste</value>
   </data>
-  <data name="ImageLocationExpander.Detail" xml:space="preserve">
-    <value>Elige dónde buscamos imágenes</value>
-  </data>
-  <data name="ImageLocationExpander.Header" xml:space="preserve">
-    <value>Imágenes en este dispositivo</value>
-  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Saturación</value>
   </data>
@@ -654,6 +648,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>Información multimedia</value>
+  </data>
+  <data name="MediaOnThisDevice" xml:space="preserve">
+    <value>Archivos multimedia en este dispositivo</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Crear nueva carpeta</value>
@@ -751,8 +748,8 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="OpenInCurrentTab" xml:space="preserve">
     <value>Abrir en la pestaña actual</value>
   </data>
-  <data name="OpenInLastActiveReaderTab" xml:space="preserve">
-    <value>Abrir en la última pestaña activa del lector</value>
+  <data name="OpenInLastActivePlayerTab" xml:space="preserve">
+    <value>Abrir en la última pestaña activa del reproductor</value>
   </data>
   <data name="OpenInNewTab" xml:space="preserve">
     <value>Abrir en nueva pestaña</value>
@@ -901,8 +898,11 @@ $plugins</value>
   <data name="Restore" xml:space="preserve">
     <value>Restaurar</value>
   </data>
-  <data name="RestoreLastReadingPosition" xml:space="preserve">
-    <value>Restaurar la última posición de lectura</value>
+  <data name="RestoreLastPlaybackPosition" xml:space="preserve">
+    <value>Restaurar la última posición de reproducción</value>
+  </data>
+  <data name="RestoreWindowState" xml:space="preserve">
+    <value>Restaurar ventanas y pestañas al iniciar</value>
   </data>
   <data name="RightToLeft" xml:space="preserve">
     <value>De derecha a izquierda</value>
@@ -1106,6 +1106,9 @@ $info</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>En este momento estamos viendo estas carpetas:</value>
+  </data>
+  <data name="WhilePlaying" xml:space="preserve">
+    <value>Al reproducir</value>
   </data>
   <data name="WhilePlayingVideos" xml:space="preserve">
     <value>Al reproducir vídeos</value>

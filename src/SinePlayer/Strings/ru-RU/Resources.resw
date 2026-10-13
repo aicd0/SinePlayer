@@ -228,11 +228,11 @@
   <data name="CheckForUpdates" xml:space="preserve">
     <value>Проверить обновления</value>
   </data>
-  <data name="ChooseLocationButton.Content" xml:space="preserve">
-    <value>Выберите, где мы ищем изображения</value>
-  </data>
   <data name="ChooseLocationDialog.Title" xml:space="preserve">
     <value>Создавайте свои коллекции из локальных файлов</value>
+  </data>
+  <data name="ChooseMediaLocation" xml:space="preserve">
+    <value>Выберите, где искать медиафайлы</value>
   </data>
   <data name="ClearAllHistory" xml:space="preserve">
     <value>Очистить историю</value>
@@ -567,12 +567,6 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="ImageContrast" xml:space="preserve">
     <value>Контраст</value>
   </data>
-  <data name="ImageLocationExpander.Detail" xml:space="preserve">
-    <value>Выберите, где мы ищем изображения</value>
-  </data>
-  <data name="ImageLocationExpander.Header" xml:space="preserve">
-    <value>Изображения на этом устройстве</value>
-  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Насыщенность</value>
   </data>
@@ -654,6 +648,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>Информация о медиафайле</value>
+  </data>
+  <data name="MediaOnThisDevice" xml:space="preserve">
+    <value>Медиафайлы на этом устройстве</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Создать новую папку</value>
@@ -751,8 +748,8 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="OpenInCurrentTab" xml:space="preserve">
     <value>Открыть в текущей вкладке</value>
   </data>
-  <data name="OpenInLastActiveReaderTab" xml:space="preserve">
-    <value>Открыть в последней активной вкладке читалки</value>
+  <data name="OpenInLastActivePlayerTab" xml:space="preserve">
+    <value>Открывать в последней активной вкладке плеера</value>
   </data>
   <data name="OpenInNewTab" xml:space="preserve">
     <value>Открыть в новой вкладке</value>
@@ -901,8 +898,11 @@ $plugins</value>
   <data name="Restore" xml:space="preserve">
     <value>Восстановить</value>
   </data>
-  <data name="RestoreLastReadingPosition" xml:space="preserve">
-    <value>Восстанавливать последнюю позицию чтения</value>
+  <data name="RestoreLastPlaybackPosition" xml:space="preserve">
+    <value>Восстанавливать последнюю позицию воспроизведения</value>
+  </data>
+  <data name="RestoreWindowState" xml:space="preserve">
+    <value>Восстанавливать окна и вкладки при запуске</value>
   </data>
   <data name="RightToLeft" xml:space="preserve">
     <value>Справа налево</value>
@@ -1106,6 +1106,9 @@ $info</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>Прямо сейчас мы наблюдаем за этими папками:</value>
+  </data>
+  <data name="WhilePlaying" xml:space="preserve">
+    <value>Во время воспроизведения</value>
   </data>
   <data name="WhilePlayingVideos" xml:space="preserve">
     <value>Во время воспроизведения видео</value>

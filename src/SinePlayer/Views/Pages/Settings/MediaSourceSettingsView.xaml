@@ -1,5 +1,5 @@
 <base:BaseUserControl
-    x:Class="SinePlayer.Views.Pages.Settings.ImageSourceSettingsView"
+    x:Class="SinePlayer.Views.Pages.Settings.MediaSourceSettingsView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:base="using:SinePlayer.Common.BaseUI"
@@ -24,7 +24,7 @@
     </base:BaseUserControl.Resources>
 
     <StackPanel Orientation="Vertical">
-        <Button x:Uid="ChooseLocationButton" Click="ChooseLocationsClick" />
+        <Button Click="ChooseLocationsClick" Content="{x:Bind StringResource.ChooseMediaLocation}" />
         <Button
             Margin="0,8,0,0"
             Click="EditImportExclusionListButton_Click"

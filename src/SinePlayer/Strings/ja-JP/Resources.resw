@@ -228,11 +228,11 @@
   <data name="CheckForUpdates" xml:space="preserve">
     <value>アップデートを確認</value>
   </data>
-  <data name="ChooseLocationButton.Content" xml:space="preserve">
-    <value>画像を検索する場所を選択する</value>
-  </data>
   <data name="ChooseLocationDialog.Title" xml:space="preserve">
     <value>ローカルファイルからコレクションを構築する</value>
+  </data>
+  <data name="ChooseMediaLocation" xml:space="preserve">
+    <value>メディアファイルの検索場所を選択</value>
   </data>
   <data name="ClearAllHistory" xml:space="preserve">
     <value>履歴をすべて消去</value>
@@ -567,12 +567,6 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="ImageContrast" xml:space="preserve">
     <value>コントラスト</value>
   </data>
-  <data name="ImageLocationExpander.Detail" xml:space="preserve">
-    <value>画像の場所を追加または変更する</value>
-  </data>
-  <data name="ImageLocationExpander.Header" xml:space="preserve">
-    <value>このデバイス上の画像</value>
-  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>彩度</value>
   </data>
@@ -654,6 +648,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>メディア情報</value>
+  </data>
+  <data name="MediaOnThisDevice" xml:space="preserve">
+    <value>このデバイス内のメディア</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>新しいフォルダを作成する</value>
@@ -751,8 +748,8 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="OpenInCurrentTab" xml:space="preserve">
     <value>現在のタブで開く</value>
   </data>
-  <data name="OpenInLastActiveReaderTab" xml:space="preserve">
-    <value>最後に使用したリーダータブで開く</value>
+  <data name="OpenInLastActivePlayerTab" xml:space="preserve">
+    <value>最後にアクティブだったプレーヤータブで開く</value>
   </data>
   <data name="OpenInNewTab" xml:space="preserve">
     <value>新しいタブで開く</value>
@@ -901,8 +898,11 @@ $plugins</value>
   <data name="Restore" xml:space="preserve">
     <value>復元</value>
   </data>
-  <data name="RestoreLastReadingPosition" xml:space="preserve">
-    <value>最後の読書位置を復元</value>
+  <data name="RestoreLastPlaybackPosition" xml:space="preserve">
+    <value>前回の再生位置を復元</value>
+  </data>
+  <data name="RestoreWindowState" xml:space="preserve">
+    <value>起動時にウィンドウとタブを復元</value>
   </data>
   <data name="RightToLeft" xml:space="preserve">
     <value>右から左へ</value>
@@ -1106,6 +1106,9 @@ $info</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>現在、リポジトリには次のフォルダーが含まれています。</value>
+  </data>
+  <data name="WhilePlaying" xml:space="preserve">
+    <value>再生中</value>
   </data>
   <data name="WhilePlayingVideos" xml:space="preserve">
     <value>動画の再生中</value>

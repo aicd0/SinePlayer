@@ -244,15 +244,15 @@ internal static class AppSettingsModel
         }
     }
 
-    public static OpenMediaBehaviorEnum OpenMediaDefaultBehavior
+    public static OpenItemBehaviorEnum OpenItemDefaultBehavior
     {
         get
         {
-            return _db.Read(model => ConvertOpenMediaDefaultBehaviorFromJson(model.OpenMediaDefaultBehavior));
+            return _db.Read(model => ConvertOpenItemDefaultBehaviorFromJson(model.OpenItemDefaultBehavior));
         }
         set
         {
-            _db.Write(model => model.OpenMediaDefaultBehavior = ConvertOpenMediaDefaultBehaviorToJson(value));
+            _db.Write(model => model.OpenItemDefaultBehavior = ConvertOpenItemDefaultBehaviorToJson(value));
             _db.Save();
         }
     }
@@ -348,15 +348,28 @@ internal static class AppSettingsModel
         }
     }
 
-    public static bool RestoreLastReadingPosition
+    public static bool RestoreLastPlaybackPosition
     {
         get
         {
-            return _db.Read(model => model.RestoreLastReadingPosition ?? true);
+            return _db.Read(model => model.RestoreLastPlaybackPosition ?? true);
         }
         set
         {
-            _db.Write(model => model.RestoreLastReadingPosition = value);
+            _db.Write(model => model.RestoreLastPlaybackPosition = value);
+            _db.Save();
+        }
+    }
+
+    public static bool RestoreWindowState
+    {
+        get
+        {
+            return _db.Read(model => model.RestoreWindowState ?? false);
+        }
+        set
+        {
+            _db.Write(model => model.RestoreWindowState = value);
             _db.Save();
         }
     }
@@ -491,25 +504,25 @@ internal static class AppSettingsModel
         };
     }
 
-    private static string ConvertOpenMediaDefaultBehaviorToJson(OpenMediaBehaviorEnum behavior)
+    private static string ConvertOpenItemDefaultBehaviorToJson(OpenItemBehaviorEnum behavior)
     {
         return behavior switch
         {
-            OpenMediaBehaviorEnum.OpenInCurrentTab => "OpenInCurrentTab",
-            OpenMediaBehaviorEnum.OpenInNewTab => "OpenInNewTab",
-            OpenMediaBehaviorEnum.OpenInLastActiveReaderTab => "OpenInLastActiveReaderTab",
+            OpenItemBehaviorEnum.OpenInCurrentTab => "OpenInCurrentTab",
+            OpenItemBehaviorEnum.OpenInNewTab => "OpenInNewTab",
+            OpenItemBehaviorEnum.OpenInLastActivePlayerTab => "OpenInLastActivePlayerTab",
             _ => "OpenInCurrentTab",
         };
     }
 
-    private static OpenMediaBehaviorEnum ConvertOpenMediaDefaultBehaviorFromJson(string? behavior)
+    private static OpenItemBehaviorEnum ConvertOpenItemDefaultBehaviorFromJson(string? behavior)
     {
         return behavior switch
         {
-            "OpenInCurrentTab" => OpenMediaBehaviorEnum.OpenInCurrentTab,
-            "OpenInNewTab" => OpenMediaBehaviorEnum.OpenInNewTab,
-            "OpenInLastActiveReaderTab" => OpenMediaBehaviorEnum.OpenInLastActiveReaderTab,
-            _ => OpenMediaBehaviorEnum.OpenInCurrentTab,
+            "OpenInCurrentTab" => OpenItemBehaviorEnum.OpenInCurrentTab,
+            "OpenInNewTab" => OpenItemBehaviorEnum.OpenInNewTab,
+            "OpenInLastActivePlayerTab" => OpenItemBehaviorEnum.OpenInLastActivePlayerTab,
+            _ => OpenItemBehaviorEnum.OpenInCurrentTab,
         };
     }
 
@@ -519,8 +532,9 @@ internal static class AppSettingsModel
         {
             KeepScreenOnBehaviorEnum.Never => "Never",
             KeepScreenOnBehaviorEnum.Always => "Always",
-            KeepScreenOnBehaviorEnum.WhilePlayingVideos => "DuringPlayback",
-            _ => "DuringAutoScrolling",
+            KeepScreenOnBehaviorEnum.WhilePlaying => "WhilePlaying",
+            KeepScreenOnBehaviorEnum.WhilePlayingVideos => "WhilePlayingVideos",
+            _ => "WhilePlayingVideos",
         };
     }
 
@@ -530,7 +544,8 @@ internal static class AppSettingsModel
         {
             "Never" => KeepScreenOnBehaviorEnum.Never,
             "Always" => KeepScreenOnBehaviorEnum.Always,
-            "DuringPlayback" => KeepScreenOnBehaviorEnum.WhilePlayingVideos,
+            "WhilePlaying" => KeepScreenOnBehaviorEnum.WhilePlaying,
+            "WhilePlayingVideos" => KeepScreenOnBehaviorEnum.WhilePlayingVideos,
             _ => KeepScreenOnBehaviorEnum.WhilePlayingVideos,
         };
     }
@@ -590,7 +605,6 @@ internal static class AppSettingsModel
         protected override JsonModel InitializeModel(JsonModel? model)
         {
             model ??= new();
-            model.OpenMediaDefaultBehavior ??= model.HomePageTapMediaBehavior;
             return model;
         }
     }
@@ -660,17 +674,18 @@ internal static class AppSettingsModel
         OpenHomePage,
     }
 
-    public enum OpenMediaBehaviorEnum
+    public enum OpenItemBehaviorEnum
     {
         OpenInCurrentTab,
         OpenInNewTab,
-        OpenInLastActiveReaderTab,
+        OpenInLastActivePlayerTab,
     }
 
     public enum KeepScreenOnBehaviorEnum
     {
         Never,
         Always,
+        WhilePlaying,
         WhilePlayingVideos,
     }
 
@@ -731,8 +746,8 @@ internal static class AppSettingsModel
         [JsonPropertyName("KeyboardShortcuts")]
         public List<KeyboardShortcutJsonModel?>? KeyboardShortcuts { get; set; }
 
-        [JsonPropertyName("OpenMediaDefaultBehavior")]
-        public string? OpenMediaDefaultBehavior { get; set; }
+        [JsonPropertyName("OpenItemDefaultBehavior")]
+        public string? OpenItemDefaultBehavior { get; set; }
 
         [JsonPropertyName("Language")]
         public string? Language { get; set; }
@@ -764,8 +779,11 @@ internal static class AppSettingsModel
         [JsonPropertyName("RemoveUnreachableMedia")]
         public bool? RemoveUnreachableMedia { get; set; }
 
-        [JsonPropertyName("RestoreLastReadingPosition")]
-        public bool? RestoreLastReadingPosition { get; set; }
+        [JsonPropertyName("RestoreLastPlaybackPosition")]
+        public bool? RestoreLastPlaybackPosition { get; set; }
+
+        [JsonPropertyName("RestoreWindowState")]
+        public bool? RestoreWindowState { get; set; }
 
         [JsonPropertyName("SendUsageData")]
         public bool? SendUsageData { get; set; }
@@ -778,12 +796,5 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("Theme")]
         public int? Theme { get; set; }
-
-        //
-        // Legacy
-        //
-
-        [JsonPropertyName("HomePageTapMediaBehavior")]
-        public string? HomePageTapMediaBehavior { get; set; }
     }
 }

@@ -59,13 +59,14 @@
                         </settings:SettingExpander.InnerContent>
                     </settings:SettingExpander>
 
-                    <!--  Image Source  -->
+                    <!--  Media Source  -->
                     <settings:SettingExpander
-                        x:Uid="ImageLocationExpander"
-                        Glyph="&#xEB9F;"
+                        Detail="{x:Bind StringResource.ChooseMediaLocation}"
+                        Glyph="&#xEA69;"
+                        Header="{x:Bind StringResource.MediaOnThisDevice}"
                         IsExpanded="False">
                         <settings:SettingExpander.InnerContent>
-                            <settings:ImageSourceSettingsView x:Name="ImageSourceSettingsSection" />
+                            <settings:MediaSourceSettingsView x:Name="MediaSourceSettingsSection" />
                         </settings:SettingExpander.InnerContent>
                     </settings:SettingExpander>
 

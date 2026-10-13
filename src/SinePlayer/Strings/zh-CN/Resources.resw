@@ -228,11 +228,11 @@
   <data name="CheckForUpdates" xml:space="preserve">
     <value>检查更新</value>
   </data>
-  <data name="ChooseLocationButton.Content" xml:space="preserve">
-    <value>添加或修改图片位置</value>
-  </data>
   <data name="ChooseLocationDialog.Title" xml:space="preserve">
     <value>从以下位置扫描图片</value>
+  </data>
+  <data name="ChooseMediaLocation" xml:space="preserve">
+    <value>选择媒体文件的搜索位置</value>
   </data>
   <data name="ClearAllHistory" xml:space="preserve">
     <value>清除全部历史</value>
@@ -567,12 +567,6 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="ImageContrast" xml:space="preserve">
     <value>对比度</value>
   </data>
-  <data name="ImageLocationExpander.Detail" xml:space="preserve">
-    <value>添加或修改图片位置</value>
-  </data>
-  <data name="ImageLocationExpander.Header" xml:space="preserve">
-    <value>此设备上的图片</value>
-  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>饱和度</value>
   </data>
@@ -654,6 +648,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>媒体信息</value>
+  </data>
+  <data name="MediaOnThisDevice" xml:space="preserve">
+    <value>此设备上的媒体</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>新建文件夹</value>
@@ -751,8 +748,8 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="OpenInCurrentTab" xml:space="preserve">
     <value>在当前标签页中打开</value>
   </data>
-  <data name="OpenInLastActiveReaderTab" xml:space="preserve">
-    <value>在上一个活动的阅读器标签页中打开</value>
+  <data name="OpenInLastActivePlayerTab" xml:space="preserve">
+    <value>在上次活动的播放器标签页中打开</value>
   </data>
   <data name="OpenInNewTab" xml:space="preserve">
     <value>在新标签页中打开</value>
@@ -901,8 +898,11 @@ $plugins</value>
   <data name="Restore" xml:space="preserve">
     <value>恢复</value>
   </data>
-  <data name="RestoreLastReadingPosition" xml:space="preserve">
-    <value>恢复上次阅读位置</value>
+  <data name="RestoreLastPlaybackPosition" xml:space="preserve">
+    <value>恢复上次播放位置</value>
+  </data>
+  <data name="RestoreWindowState" xml:space="preserve">
+    <value>启动时恢复窗口和标签页</value>
   </data>
   <data name="RightToLeft" xml:space="preserve">
     <value>自右向左</value>
@@ -1106,6 +1106,9 @@ $info</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>目前，您的仓库包含如下文件夹：</value>
+  </data>
+  <data name="WhilePlaying" xml:space="preserve">
+    <value>播放时</value>
   </data>
   <data name="WhilePlayingVideos" xml:space="preserve">
     <value>播放视频时</value>

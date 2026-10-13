@@ -18,6 +18,7 @@ using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
+using SinePlayer.Data.Tables;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
 
 namespace SinePlayer.Views.Pages.Player;
@@ -26,6 +27,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 {
     private const long POSITION_SAVE_INTERVAL = 5000;
     private const long POSITION_UI_INTERVAL = 200;
+    private const long ALMOST_ENDED_THRESHOLD_MS = 5000;
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
 
@@ -559,8 +561,14 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
             default:
                 {
-                    bool restorePosition = AppSettingsModel.RestoreLastReadingPosition;
-                    return restorePosition ? media.LastPositionMs : 0;
+                    if (!AppSettingsModel.RestoreLastPlaybackPosition)
+                    {
+                        return 0;
+                    }
+
+                    long positionMs = media.LastPositionMs;
+                    long remainingMs = media.DurationMs - positionMs;
+                    return remainingMs >= 0 && remainingMs < ALMOST_ENDED_THRESHOLD_MS ? 0 : positionMs;
                 }
         }
     }
@@ -725,9 +733,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     private void UpdateKeepScreenOn()
     {
-        bool shouldKeepScreenOn = _isPageActive &&
-            (AppSettingsModel.KeepScreenOnBehavior == AppSettingsModel.KeepScreenOnBehaviorEnum.Always ||
-            (AppSettingsModel.KeepScreenOnBehavior == AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos && IsPlaying));
+        bool shouldKeepScreenOn = _isPageActive && ShouldKeepScreenOn();
         if (_isKeepScreenOnActive == shouldKeepScreenOn)
         {
             return;
@@ -742,6 +748,19 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         {
             DisplayRequestManager.DecrememtKeepScreenOn();
         }
+    }
+
+    private bool ShouldKeepScreenOn()
+    {
+        MediaModel? media = _media;
+        return AppSettingsModel.KeepScreenOnBehavior switch
+        {
+            AppSettingsModel.KeepScreenOnBehaviorEnum.Never => false,
+            AppSettingsModel.KeepScreenOnBehaviorEnum.Always => true,
+            AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlaying => IsPlaying,
+            AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos => IsPlaying && media is not null && media.Type == MediaType.Video,
+            _ => false,
+        };
     }
 
     //

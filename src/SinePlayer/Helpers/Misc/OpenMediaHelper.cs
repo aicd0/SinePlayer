@@ -57,10 +57,10 @@ internal static class OpenMediaHelper
 
     public static void OpenMedia(ActionHandler actionHandler, Route route)
     {
-        AppSettingsModel.OpenMediaBehaviorEnum behavior = AppSettingsModel.OpenMediaDefaultBehavior;
+        AppSettingsModel.OpenItemBehaviorEnum behavior = AppSettingsModel.OpenItemDefaultBehavior;
         switch (behavior)
         {
-            case AppSettingsModel.OpenMediaBehaviorEnum.OpenInCurrentTab:
+            case AppSettingsModel.OpenItemBehaviorEnum.OpenInCurrentTab:
                 {
                     ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
                         .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
@@ -68,7 +68,7 @@ internal static class OpenMediaHelper
                     actionHandler.HandleNoResult(actionModel);
                 }
                 break;
-            case AppSettingsModel.OpenMediaBehaviorEnum.OpenInNewTab:
+            case AppSettingsModel.OpenItemBehaviorEnum.OpenInNewTab:
                 {
                     ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
                         .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
@@ -77,12 +77,12 @@ internal static class OpenMediaHelper
                     actionHandler.HandleNoResult(actionModel);
                 }
                 break;
-            case AppSettingsModel.OpenMediaBehaviorEnum.OpenInLastActiveReaderTab:
+            case AppSettingsModel.OpenItemBehaviorEnum.OpenInLastActivePlayerTab:
                 {
                     IReadOnlyList<Tuple<int, string>> activePlayerTabs = PlayerPage.ActiveTabs;
                     if (activePlayerTabs.Count == 0)
                     {
-                        goto case AppSettingsModel.OpenMediaBehaviorEnum.OpenInNewTab;
+                        goto case AppSettingsModel.OpenItemBehaviorEnum.OpenInNewTab;
                     }
 
                     int windowId = activePlayerTabs[activePlayerTabs.Count - 1].Item1;
@@ -97,7 +97,7 @@ internal static class OpenMediaHelper
                 break;
             default:
                 Logger.F(TAG, $"Unknown enum value {behavior}");
-                goto case AppSettingsModel.OpenMediaBehaviorEnum.OpenInCurrentTab;
+                goto case AppSettingsModel.OpenItemBehaviorEnum.OpenInCurrentTab;
         }
     }
 }
