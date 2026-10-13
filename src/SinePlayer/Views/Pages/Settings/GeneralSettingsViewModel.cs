@@ -50,25 +50,25 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private List<TapMediaBehaviorEntry> _openMediaDefaultBaheviors = [];
-    public List<TapMediaBehaviorEntry> OpenMediaDefaultBaheviors
+    private List<TapMediaBehaviorEntry> _openItemDefaultBaheviors = [];
+    public List<TapMediaBehaviorEntry> OpenItemDefaultBaheviors
     {
-        get => _openMediaDefaultBaheviors;
+        get => _openItemDefaultBaheviors;
         set
         {
-            _openMediaDefaultBaheviors = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OpenMediaDefaultBaheviors)));
+            _openItemDefaultBaheviors = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OpenItemDefaultBaheviors)));
         }
     }
 
-    private int _openMediaDefaultBaheviorIndex = 0;
-    public int OpenMediaDefaultBaheviorIndex
+    private int _openItemDefaultBaheviorIndex = 0;
+    public int OpenItemDefaultBaheviorIndex
     {
-        get => _openMediaDefaultBaheviorIndex;
+        get => _openItemDefaultBaheviorIndex;
         set
         {
-            _openMediaDefaultBaheviorIndex = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OpenMediaDefaultBaheviorIndex)));
+            _openItemDefaultBaheviorIndex = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OpenItemDefaultBaheviorIndex)));
         }
     }
 
@@ -94,6 +94,17 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private bool _restoreWindowState = false;
+    public bool RestoreWindowState
+    {
+        get => _restoreWindowState;
+        set
+        {
+            _restoreWindowState = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RestoreWindowState)));
+        }
+    }
+
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
@@ -111,21 +122,22 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         AppSettingsModel.CloseLastTabBehavior = _closeLastTabBehaviors[index].Behavior;
     }
 
-    public void SetOpenMediaDefaultBehavior(int index)
+    public void SetOpenItemDefaultBehavior(int index)
     {
-        if (index == _openMediaDefaultBaheviorIndex || index < 0 || index >= _openMediaDefaultBaheviors.Count)
+        if (index == _openItemDefaultBaheviorIndex || index < 0 || index >= _openItemDefaultBaheviors.Count)
         {
             return;
         }
 
-        _openMediaDefaultBaheviorIndex = index;
-        AppSettingsModel.OpenMediaDefaultBehavior = _openMediaDefaultBaheviors[index].Behavior;
+        _openItemDefaultBaheviorIndex = index;
+        AppSettingsModel.OpenItemDefaultBehavior = _openItemDefaultBaheviors[index].Behavior;
     }
 
     private void Update()
     {
         UpdateCloseLastTabBehavior();
-        UpdateHomePageTapMediaBehavior();
+        UpdateOpenItemDefaultBahevior();
+        RestoreWindowState = AppSettingsModel.RestoreWindowState;
         CoroutineUtils.Run(UpdateHistory);
     }
 
@@ -155,13 +167,13 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         CloseLastTabBehaviorIndex = selectedIndex;
     }
 
-    private void UpdateHomePageTapMediaBehavior()
+    private void UpdateOpenItemDefaultBahevior()
     {
-        AppSettingsModel.OpenMediaBehaviorEnum behavior = AppSettingsModel.OpenMediaDefaultBehavior;
+        AppSettingsModel.OpenItemBehaviorEnum behavior = AppSettingsModel.OpenItemDefaultBehavior;
         List<TapMediaBehaviorEntry> entries = [
-            new(AppSettingsModel.OpenMediaBehaviorEnum.OpenInCurrentTab),
-            new(AppSettingsModel.OpenMediaBehaviorEnum.OpenInNewTab),
-            new(AppSettingsModel.OpenMediaBehaviorEnum.OpenInLastActiveReaderTab),
+            new(AppSettingsModel.OpenItemBehaviorEnum.OpenInCurrentTab),
+            new(AppSettingsModel.OpenItemBehaviorEnum.OpenInNewTab),
+            new(AppSettingsModel.OpenItemBehaviorEnum.OpenInLastActivePlayerTab),
         ];
         int selectedIndex = -1;
         for (int i = 0; i < entries.Count; i++)
@@ -178,8 +190,8 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
             selectedIndex = 0;
         }
 
-        OpenMediaDefaultBaheviors = entries;
-        OpenMediaDefaultBaheviorIndex = selectedIndex;
+        OpenItemDefaultBaheviors = entries;
+        OpenItemDefaultBaheviorIndex = selectedIndex;
     }
 
     private async Task UpdateHistory()
@@ -213,9 +225,9 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    public class TapMediaBehaviorEntry(AppSettingsModel.OpenMediaBehaviorEnum behavior)
+    public class TapMediaBehaviorEntry(AppSettingsModel.OpenItemBehaviorEnum behavior)
     {
-        public AppSettingsModel.OpenMediaBehaviorEnum Behavior => behavior;
+        public AppSettingsModel.OpenItemBehaviorEnum Behavior => behavior;
 
         public string Name
         {
@@ -223,9 +235,9 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
             {
                 return behavior switch
                 {
-                    AppSettingsModel.OpenMediaBehaviorEnum.OpenInCurrentTab => StringResourceProvider.Instance.OpenInCurrentTab,
-                    AppSettingsModel.OpenMediaBehaviorEnum.OpenInNewTab => StringResourceProvider.Instance.OpenInNewTab,
-                    AppSettingsModel.OpenMediaBehaviorEnum.OpenInLastActiveReaderTab => StringResourceProvider.Instance.OpenInLastActiveReaderTab,
+                    AppSettingsModel.OpenItemBehaviorEnum.OpenInCurrentTab => StringResourceProvider.Instance.OpenInCurrentTab,
+                    AppSettingsModel.OpenItemBehaviorEnum.OpenInNewTab => StringResourceProvider.Instance.OpenInNewTab,
+                    AppSettingsModel.OpenItemBehaviorEnum.OpenInLastActivePlayerTab => StringResourceProvider.Instance.OpenInLastActivePlayerTab,
                     _ => throw new InvalidEnumArgumentException(nameof(Behavior)),
                 };
             }

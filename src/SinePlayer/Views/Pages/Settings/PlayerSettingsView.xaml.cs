@@ -23,12 +23,12 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         ViewModel.Initialize(shared);
     }
 
-    private void RestoreLastReadingPositionCheckBox_Click(object sender, RoutedEventArgs e)
+    private void RestoreLastPlaybackPositionCheckBox_Click(object sender, RoutedEventArgs e)
     {
         bool? isChecked = ((CheckBox)sender).IsChecked;
         if (isChecked.HasValue)
         {
-            AppSettingsModel.RestoreLastReadingPosition = isChecked.Value;
+            AppSettingsModel.RestoreLastPlaybackPosition = isChecked.Value;
         }
     }
 

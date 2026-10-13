@@ -25,14 +25,14 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _restoreLastReadingPosition;
-    public bool RestoreLastReadingPosition
+    private bool _restoreLastPlaybackPosition;
+    public bool RestoreLastPlaybackPosition
     {
-        get => _restoreLastReadingPosition;
+        get => _restoreLastPlaybackPosition;
         set
         {
-            _restoreLastReadingPosition = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RestoreLastReadingPosition)));
+            _restoreLastPlaybackPosition = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RestoreLastPlaybackPosition)));
         }
     }
 
@@ -107,7 +107,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
     {
         CoroutineUtils.RunInMainThread(() =>
         {
-            RestoreLastReadingPosition = AppSettingsModel.RestoreLastReadingPosition;
+            RestoreLastPlaybackPosition = AppSettingsModel.RestoreLastPlaybackPosition;
             AutoToggleOverlaysOnCursor = AppSettingsModel.AutoToggleOverlaysOnCursor;
             AutoPlayNext = AppSettingsModel.AutoPlayNext;
         });
@@ -118,8 +118,9 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         AppSettingsModel.KeepScreenOnBehaviorEnum behavior = AppSettingsModel.KeepScreenOnBehavior;
         List<KeepScreenOnBehaviorEntry> entries = [
             new(AppSettingsModel.KeepScreenOnBehaviorEnum.Never),
-            new(AppSettingsModel.KeepScreenOnBehaviorEnum.Always),
             new(AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos),
+            new(AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlaying),
+            new(AppSettingsModel.KeepScreenOnBehaviorEnum.Always),
         ];
         int selectedIndex = -1;
         for (int i = 0; i < entries.Count; i++)
@@ -156,6 +157,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
                 {
                     AppSettingsModel.KeepScreenOnBehaviorEnum.Never => StringResourceProvider.Instance.Never,
                     AppSettingsModel.KeepScreenOnBehaviorEnum.Always => StringResourceProvider.Instance.Always,
+                    AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlaying => StringResourceProvider.Instance.WhilePlaying,
                     AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos => StringResourceProvider.Instance.WhilePlayingVideos,
                     _ => throw new InvalidEnumArgumentException(nameof(Behavior)),
                 };

@@ -17,7 +17,6 @@ using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Constants;
 using SinePlayer.Common.HotKey;
-using SinePlayer.Common.Localization;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Database;
@@ -259,17 +258,14 @@ internal sealed partial class PlayerPage : BasePage
             switch (status.Status)
             {
                 case PlayerPageViewModel.PlayerStatusEnum.Working:
-                    BusyRing.IsActive = false;
                     StatusPanel.Visibility = Visibility.Collapsed;
                     StatusText.Text = string.Empty;
                     break;
                 case PlayerPageViewModel.PlayerStatusEnum.Loading:
-                    BusyRing.IsActive = true;
                     StatusPanel.Visibility = Visibility.Visible;
-                    StatusText.Text = status.Description;
+                    StatusText.Text = StringResource.PlayerStatusLoading;
                     break;
                 case PlayerPageViewModel.PlayerStatusEnum.Error:
-                    BusyRing.IsActive = false;
                     StatusPanel.Visibility = Visibility.Visible;
                     StatusText.Text = status.Description;
                     break;

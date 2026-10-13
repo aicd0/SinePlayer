@@ -228,11 +228,11 @@
   <data name="CheckForUpdates" xml:space="preserve">
     <value>Check for updates</value>
   </data>
-  <data name="ChooseLocationButton.Content" xml:space="preserve">
-    <value>Choose where we look for images</value>
-  </data>
   <data name="ChooseLocationDialog.Title" xml:space="preserve">
     <value>Build your collections from your local files</value>
+  </data>
+  <data name="ChooseMediaLocation" xml:space="preserve">
+    <value>Choose where we look for media files</value>
   </data>
   <data name="ClearAllHistory" xml:space="preserve">
     <value>Clear all history</value>
@@ -567,12 +567,6 @@ The expression will be evaluated in the following order:
   <data name="ImageContrast" xml:space="preserve">
     <value>Contrast</value>
   </data>
-  <data name="ImageLocationExpander.Detail" xml:space="preserve">
-    <value>Choose where we look for images</value>
-  </data>
-  <data name="ImageLocationExpander.Header" xml:space="preserve">
-    <value>Images on this device</value>
-  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Saturation</value>
   </data>
@@ -654,6 +648,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>Media information</value>
+  </data>
+  <data name="MediaOnThisDevice" xml:space="preserve">
+    <value>Media on this device</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Create new folder</value>
@@ -751,8 +748,8 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="OpenInCurrentTab" xml:space="preserve">
     <value>Open in current tab</value>
   </data>
-  <data name="OpenInLastActiveReaderTab" xml:space="preserve">
-    <value>Open in last active reader tab</value>
+  <data name="OpenInLastActivePlayerTab" xml:space="preserve">
+    <value>Open in last active player tab</value>
   </data>
   <data name="OpenInNewTab" xml:space="preserve">
     <value>Open in new tab</value>
@@ -901,8 +898,11 @@ $plugins</value>
   <data name="Restore" xml:space="preserve">
     <value>Restore</value>
   </data>
-  <data name="RestoreLastReadingPosition" xml:space="preserve">
-    <value>Restore last reading position</value>
+  <data name="RestoreLastPlaybackPosition" xml:space="preserve">
+    <value>Restore last playback position</value>
+  </data>
+  <data name="RestoreWindowState" xml:space="preserve">
+    <value>Restore windows and tabs on launch</value>
   </data>
   <data name="RightToLeft" xml:space="preserve">
     <value>R to L</value>
@@ -1106,6 +1106,9 @@ $info</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>Right now, we're watching these folders:</value>
+  </data>
+  <data name="WhilePlaying" xml:space="preserve">
+    <value>While playing</value>
   </data>
   <data name="WhilePlayingVideos" xml:space="preserve">
     <value>While playing videos</value>

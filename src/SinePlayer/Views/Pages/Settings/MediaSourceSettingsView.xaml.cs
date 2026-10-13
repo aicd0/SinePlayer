@@ -18,11 +18,11 @@ using SinePlayer.Views.Dialogs.ChooseLocation;
 
 namespace SinePlayer.Views.Pages.Settings;
 
-internal sealed partial class ImageSourceSettingsView : BaseUserControl
+internal sealed partial class MediaSourceSettingsView : BaseUserControl
 {
-    public ImageSourceSettingsViewModel ViewModel { get; } = new();
+    public MediaSourceSettingsViewModel ViewModel { get; } = new();
 
-    public ImageSourceSettingsView()
+    public MediaSourceSettingsView()
     {
         InitializeComponent();
     }

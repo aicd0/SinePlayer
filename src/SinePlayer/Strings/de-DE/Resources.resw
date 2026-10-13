@@ -228,11 +228,11 @@
   <data name="CheckForUpdates" xml:space="preserve">
     <value>Nach Updates suchen</value>
   </data>
-  <data name="ChooseLocationButton.Content" xml:space="preserve">
-    <value>Wählen Sie aus, wo wir nach Bildern suchen</value>
-  </data>
   <data name="ChooseLocationDialog.Title" xml:space="preserve">
     <value>Erstellen Sie Ihre Sammlungen aus Ihren lokalen Dateien</value>
+  </data>
+  <data name="ChooseMediaLocation" xml:space="preserve">
+    <value>Wählen Sie aus, wo nach Mediendateien gesucht wird</value>
   </data>
   <data name="ClearAllHistory" xml:space="preserve">
     <value>Verlauf löschen</value>
@@ -567,12 +567,6 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   <data name="ImageContrast" xml:space="preserve">
     <value>Kontrast</value>
   </data>
-  <data name="ImageLocationExpander.Detail" xml:space="preserve">
-    <value>Wählen Sie aus, wo wir nach Bildern suchen</value>
-  </data>
-  <data name="ImageLocationExpander.Header" xml:space="preserve">
-    <value>Bilder auf diesem Gerät</value>
-  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Sättigung</value>
   </data>
@@ -654,6 +648,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   </data>
   <data name="MediaInfo" xml:space="preserve">
     <value>Medieninformationen</value>
+  </data>
+  <data name="MediaOnThisDevice" xml:space="preserve">
+    <value>Medien auf diesem Gerät</value>
   </data>
   <data name="MenuFlyoutCreateNewFolder.Text" xml:space="preserve">
     <value>Neuen Ordner erstellen</value>
@@ -751,8 +748,8 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OpenInCurrentTab" xml:space="preserve">
     <value>Im aktuellen Tab öffnen</value>
   </data>
-  <data name="OpenInLastActiveReaderTab" xml:space="preserve">
-    <value>Im zuletzt aktiven Reader-Tab öffnen</value>
+  <data name="OpenInLastActivePlayerTab" xml:space="preserve">
+    <value>Im zuletzt aktiven Player-Tab öffnen</value>
   </data>
   <data name="OpenInNewTab" xml:space="preserve">
     <value>In neuem Tab öffnen</value>
@@ -901,8 +898,11 @@ $plugins</value>
   <data name="Restore" xml:space="preserve">
     <value>Wiederherstellen</value>
   </data>
-  <data name="RestoreLastReadingPosition" xml:space="preserve">
-    <value>Letzte Leseposition wiederherstellen</value>
+  <data name="RestoreLastPlaybackPosition" xml:space="preserve">
+    <value>Letzte Wiedergabeposition wiederherstellen</value>
+  </data>
+  <data name="RestoreWindowState" xml:space="preserve">
+    <value>Fenster und Tabs beim Start wiederherstellen</value>
   </data>
   <data name="RightToLeft" xml:space="preserve">
     <value>Von rechts nach links</value>
@@ -1106,6 +1106,9 @@ $info</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
     <value>Im Moment beobachten wir diese Ordner:</value>
+  </data>
+  <data name="WhilePlaying" xml:space="preserve">
+    <value>Bei der Wiedergabe</value>
   </data>
   <data name="WhilePlayingVideos" xml:space="preserve">
     <value>Bei der Videowiedergabe</value>

@@ -16,6 +16,7 @@ using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Storage;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
+using SinePlayer.Data.Models.Misc;
 using SinePlayer.Helpers.Misc;
 using SinePlayer.Helpers.Navigation;
 using SinePlayer.Views.AppWindows.Main;
@@ -181,7 +182,7 @@ public partial class App : Application
 
         CoroutineUtils.RunInMainThreadAsync(async () =>
         {
-            if (fromLaunch && !InitTaskManager.Instance.SafeMode)
+            if (fromLaunch && !InitTaskManager.Instance.SafeMode && AppSettingsModel.RestoreWindowState)
             {
                 WindowManager.RestoreWindowState();
             }

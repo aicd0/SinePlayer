@@ -19,9 +19,9 @@
 
     <StackPanel Orientation="Vertical">
         <CheckBox
-            Click="RestoreLastReadingPositionCheckBox_Click"
-            Content="{x:Bind StringResource.RestoreLastReadingPosition}"
-            IsChecked="{x:Bind ViewModel.RestoreLastReadingPosition, Mode=TwoWay}" />
+            Click="RestoreLastPlaybackPositionCheckBox_Click"
+            Content="{x:Bind StringResource.RestoreLastPlaybackPosition}"
+            IsChecked="{x:Bind ViewModel.RestoreLastPlaybackPosition, Mode=TwoWay}" />
         <CheckBox
             Click="AutoToggleOverlaysOnCursorCheckBox_Click"
             Content="{x:Bind StringResource.AutoToggleOverlaysOnCursor}"

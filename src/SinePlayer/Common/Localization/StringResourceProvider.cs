@@ -44,6 +44,7 @@ public class StringResourceProvider
     public string Cancel => GetResourceString("Cancel");
     public string Category => GetResourceString("Category");
     public string CheckForUpdates => GetResourceString("CheckForUpdates");
+    public string ChooseMediaLocation => GetResourceString("ChooseMediaLocation");
     public string ClearAllHistory => GetResourceString("ClearAllHistory");
     public string ClearCache => GetResourceString("ClearCache");
     public string CloseLastTabBehavior => GetResourceString("CloseLastTabBehavior");
@@ -154,6 +155,7 @@ public class StringResourceProvider
     public string Links => GetResourceString("Links");
     public string MediaExclusionExplaination => GetResourceString("MediaExclusionExplaination");
     public string MediaInfo => GetResourceString("MediaInfo");
+    public string MediaOnThisDevice => GetResourceString("MediaOnThisDevice");
     public string MergeSingleItemGroups => GetResourceString("MergeSingleItemGroups");
     public string Miscellaneous => GetResourceString("Miscellaneous");
     public string More => GetResourceString("More");
@@ -179,7 +181,7 @@ public class StringResourceProvider
     public string Open => GetResourceString("Open");
     public string OpenHomePage => GetResourceString("OpenHomePage");
     public string OpenInCurrentTab => GetResourceString("OpenInCurrentTab");
-    public string OpenInLastActiveReaderTab => GetResourceString("OpenInLastActiveReaderTab");
+    public string OpenInLastActivePlayerTab => GetResourceString("OpenInLastActivePlayerTab");
     public string OpenInNewTab => GetResourceString("OpenInNewTab");
     public string OpenItemDefaultBehavior => GetResourceString("OpenItemDefaultBehavior");
     public string OpenMetadataFolder => GetResourceString("OpenMetadataFolder");
@@ -224,7 +226,8 @@ public class StringResourceProvider
     public string ResetAllSettingsMessage => GetResourceString("ResetAllSettingsMessage");
     public string ResetPlayerSettings => GetResourceString("ResetPlayerSettings");
     public string Restore => GetResourceString("Restore");
-    public string RestoreLastReadingPosition => GetResourceString("RestoreLastReadingPosition");
+    public string RestoreLastPlaybackPosition => GetResourceString("RestoreLastPlaybackPosition");
+    public string RestoreWindowState => GetResourceString("RestoreWindowState");
     public string RightToLeft => GetResourceString("RightToLeft");
     public string Rotation => GetResourceString("Rotation");
     public string SafeModeMessage => GetResourceString("SafeModeMessage");
@@ -284,6 +287,7 @@ public class StringResourceProvider
     public string VolumeDown => GetResourceString("VolumeDown");
     public string VolumeUp => GetResourceString("VolumeUp");
     public string Warning => GetResourceString("Warning");
+    public string WhilePlaying => GetResourceString("WhilePlaying");
     public string WhilePlayingVideos => GetResourceString("WhilePlayingVideos");
     public string WindowN => GetResourceString("WindowN");
     //// SECTION MARKER - DO NOT MOVE ////

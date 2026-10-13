@@ -58,10 +58,15 @@
                 Grid.Row="2"
                 Grid.Column="2"
                 DisplayMemberPath="Name"
-                ItemsSource="{x:Bind ViewModel.OpenMediaDefaultBaheviors, Mode=OneWay}"
-                SelectedIndex="{x:Bind ViewModel.OpenMediaDefaultBaheviorIndex, Mode=OneWay}"
-                SelectionChanged="OpenMediaDefaultBehaviorComboBox_SelectionChanged" />
+                ItemsSource="{x:Bind ViewModel.OpenItemDefaultBaheviors, Mode=OneWay}"
+                SelectedIndex="{x:Bind ViewModel.OpenItemDefaultBaheviorIndex, Mode=OneWay}"
+                SelectionChanged="OpenItemDefaultBehaviorComboBox_SelectionChanged" />
         </Grid>
+        <CheckBox
+            Margin="0,16,0,0"
+            Click="RestoreWindowStateCheckBox_Click"
+            Content="{x:Bind StringResource.RestoreWindowState}"
+            IsChecked="{x:Bind ViewModel.RestoreWindowState, Mode=TwoWay}" />
         <CheckBox
             Click="SaveBrowsingHistoryCheckBox_Click"
             Content="{x:Bind StringResource.SaveBrowsingHistory}"
