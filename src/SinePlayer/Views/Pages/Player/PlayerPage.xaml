@@ -7,6 +7,8 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:player="using:SinePlayer.Views.Pages.Player"
+    IsTabStop="True"
+    UseSystemFocusVisuals="False"
     mc:Ignorable="d">
 
     <Grid x:Name="RootGrid" Background="Black">

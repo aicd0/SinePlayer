@@ -99,6 +99,7 @@ internal sealed partial class PlayerPage : BasePage
         AddToActiveTabs();
         UpdateOverlayState();
         ViewModel.SetPageActive(true);
+        FocusPlayer();
     }
 
     protected override void OnPause()
@@ -400,6 +401,7 @@ internal sealed partial class PlayerPage : BasePage
 
     private void VideoHost_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
+        FocusPlayer();
         ((UIElement)sender).CapturePointer(e.Pointer);
         _gestureRecognizer.ProcessDownEvent(e.GetCurrentPoint(VideoHost));
     }
@@ -677,6 +679,11 @@ internal sealed partial class PlayerPage : BasePage
     //
     // Utilities
     //
+
+    private void FocusPlayer()
+    {
+        Focus(FocusState.Programmatic);
+    }
 
     private IMainPageAbilityForTab GetMainPageAbility()
     {

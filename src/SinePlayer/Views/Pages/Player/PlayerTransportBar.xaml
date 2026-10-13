@@ -31,7 +31,9 @@
             <Slider
                 x:Name="SeekSlider"
                 Margin="4,0"
+                AllowFocusOnInteraction="False"
                 IsEnabled="False"
+                IsTabStop="False"
                 IsThumbToolTipEnabled="False"
                 Maximum="1"
                 StepFrequency="1"
@@ -140,6 +142,8 @@
                                         x:Name="VolumeSlider"
                                         Width="160"
                                         VerticalAlignment="Center"
+                                        AllowFocusOnInteraction="False"
+                                        IsTabStop="False"
                                         Maximum="100"
                                         StepFrequency="1"
                                         ValueChanged="OnVolumeValueChanged"
