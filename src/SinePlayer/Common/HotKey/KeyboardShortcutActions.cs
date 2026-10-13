@@ -62,7 +62,7 @@ internal static class KeyboardShortcutActions
         CreateShortcut(PlayPause, VirtualKey.Space),
         CreateShortcut(SeekBackward, VirtualKey.Left),
         CreateShortcut(SeekForward, VirtualKey.Right),
-        CreateShortcut(ToggleFullscreen, VirtualKey.F, VirtualKeyModifiers.Control),
+        CreateShortcut(ToggleFullscreen, VirtualKey.Enter),
         CreateShortcut(VolumeDown, VirtualKey.Down),
         CreateShortcut(VolumeUp, VirtualKey.Up),
     ];
