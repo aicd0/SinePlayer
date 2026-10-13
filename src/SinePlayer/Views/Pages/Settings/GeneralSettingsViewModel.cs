@@ -111,28 +111,6 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         Shared.UpdateStarted += Update;
     }
 
-    public void SetCloseLastTabBehavior(int index)
-    {
-        if (index == _closeLastTabBehaviorIndex || index < 0 || index >= _closeLastTabBehaviors.Count)
-        {
-            return;
-        }
-
-        _closeLastTabBehaviorIndex = index;
-        AppSettingsModel.CloseLastTabBehavior = _closeLastTabBehaviors[index].Behavior;
-    }
-
-    public void SetOpenItemDefaultBehavior(int index)
-    {
-        if (index == _openItemDefaultBaheviorIndex || index < 0 || index >= _openItemDefaultBaheviors.Count)
-        {
-            return;
-        }
-
-        _openItemDefaultBaheviorIndex = index;
-        AppSettingsModel.OpenItemDefaultBehavior = _openItemDefaultBaheviors[index].Behavior;
-    }
-
     private void Update()
     {
         UpdateCloseLastTabBehavior();

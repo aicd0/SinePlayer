@@ -79,45 +79,6 @@ internal partial class AppearanceSettingsViewModel : INotifyPropertyChanged
         Shared.UpdateStarted += Update;
     }
 
-    public void SetBackground(int index)
-    {
-        if (index == _backgroundIndex)
-        {
-            return;
-        }
-
-        if (index < 0 || index >= _backgrounds.Count)
-        {
-            return;
-        }
-
-        AppearanceChanged = true;
-        BackgroundEntry selectedBackground = _backgrounds[index];
-        _backgroundIndex = index;
-        AppSettingsModel.AppBackground = selectedBackground.Value;
-    }
-
-    public void SetAppearance(int index)
-    {
-        if (index == _appearanceIndex)
-        {
-            return;
-        }
-
-        _appearanceIndex = index;
-        AppSettingsModel.AppearanceSetting appearance = index switch
-        {
-            0 => AppSettingsModel.AppearanceSetting.Light,
-            1 => AppSettingsModel.AppearanceSetting.Dark,
-            2 => AppSettingsModel.AppearanceSetting.UseSystemSetting,
-            _ => AppSettingsModel.AppearanceSetting.UseSystemSetting,
-        };
-        AppearanceChanged = true;
-        AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.Theme = appearance;
-        AppSettingsModel.UpdateModel(model);
-    }
-
     private void Update()
     {
         UpdateAppearance();
@@ -128,8 +89,6 @@ internal partial class AppearanceSettingsViewModel : INotifyPropertyChanged
 
     private void UpdateBackground()
     {
-        AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-
         AppSettingsModel.AppBackgroundEnum background = AppSettingsModel.AppBackground;
         List<BackgroundEntry> backgrounds = [
             new(StringResourceProvider.Instance.None, AppSettingsModel.AppBackgroundEnum.None),
@@ -149,9 +108,7 @@ internal partial class AppearanceSettingsViewModel : INotifyPropertyChanged
 
     private void UpdateAppearance()
     {
-        AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-
-        AppSettingsModel.AppearanceSetting appearance = model.Theme;
+        AppSettingsModel.AppearanceSetting appearance = AppSettingsModel.Theme;
         if (!Enum.IsDefined(appearance))
         {
             appearance = AppSettingsModel.AppearanceSetting.UseSystemSetting;

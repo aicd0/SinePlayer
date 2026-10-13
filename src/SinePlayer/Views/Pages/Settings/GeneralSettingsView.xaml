@@ -46,7 +46,7 @@
                 Grid.Column="2"
                 DisplayMemberPath="Name"
                 ItemsSource="{x:Bind ViewModel.CloseLastTabBehaviors, Mode=OneWay}"
-                SelectedIndex="{x:Bind ViewModel.CloseLastTabBehaviorIndex, Mode=OneWay}"
+                SelectedIndex="{x:Bind ViewModel.CloseLastTabBehaviorIndex, Mode=TwoWay}"
                 SelectionChanged="CloseLastTabBehaviorBehaviorComboBox_SelectionChanged" />
             <TextBlock
                 Grid.Row="2"
@@ -59,7 +59,7 @@
                 Grid.Column="2"
                 DisplayMemberPath="Name"
                 ItemsSource="{x:Bind ViewModel.OpenItemDefaultBaheviors, Mode=OneWay}"
-                SelectedIndex="{x:Bind ViewModel.OpenItemDefaultBaheviorIndex, Mode=OneWay}"
+                SelectedIndex="{x:Bind ViewModel.OpenItemDefaultBaheviorIndex, Mode=TwoWay}"
                 SelectionChanged="OpenItemDefaultBehaviorComboBox_SelectionChanged" />
         </Grid>
         <CheckBox

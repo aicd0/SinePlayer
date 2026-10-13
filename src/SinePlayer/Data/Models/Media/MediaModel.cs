@@ -461,8 +461,26 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
     private static async Task RescanLibraryInternal()
     {
-        AppSettingsModel.ExternalModel appSettings = AppSettingsModel.GetModel();
+        static void AddToFolder(Dictionary<string, List<long>> map, string location, long mediaId)
+        {
+            string? folder = Path.GetDirectoryName(location);
+            if (string.IsNullOrEmpty(folder))
+            {
+                return;
+            }
+
+            if (!map.TryGetValue(folder, out List<long>? ids))
+            {
+                ids = [];
+                map[folder] = ids;
+            }
+
+            ids.Add(mediaId);
+        }
+
+        Dictionary<string, List<long>> mediaIdsByFolder = [];
         HashSet<long> changedMediaIds = [];
+        HashSet<long> newMediaIds = [];
 
         // Get all locations from database
         HashSet<string> oldLocations = [];
@@ -470,11 +488,14 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         {
             SelectCommand command = SelectCommand.Create(MediaTable.Instance)
                 .AppendCondition(MediaHandle.CreateMediaOnlyCondition());
+            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             IReaderToken<string> locationToken = command.PutQueryString(MediaTable.ColumnLocation);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
-                oldLocations.Add(locationToken.GetValue());
+                string location = locationToken.GetValue();
+                oldLocations.Add(location);
+                AddToFolder(mediaIdsByFolder, location, idToken.GetValue());
             }
         });
 
@@ -525,6 +546,8 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
                         if (mediaId >= 0)
                         {
                             changedMediaIds.Add(mediaId);
+                            newMediaIds.Add(mediaId);
+                            AddToFolder(mediaIdsByFolder, info.Location, mediaId);
                         }
                     }
                 });
@@ -534,7 +557,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         var watch = new Stopwatch();
         watch.Start();
 
-        foreach (string folderPath in appSettings.MediaFolders)
+        foreach (string folderPath in AppSettingsModel.MediaFolders)
         {
             if (!Directory.Exists(folderPath))
             {
@@ -591,8 +614,37 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
         await FlushPendingLocations();
 
+        // Update collections and titles based on folder structure
+        bool autoDetectCollections = AppSettingsModel.AutoDetectCollections;
+        bool useFolderNameAsTitle = AppSettingsModel.UseFolderNameAsTitle;
+        if ((autoDetectCollections || useFolderNameAsTitle) && newMediaIds.Count > 0)
+        {
+            foreach (KeyValuePair<string, List<long>> pair in mediaIdsByFolder)
+            {
+                string folder = pair.Key;
+                string title = StringUtils.ItemNameFromPath(folder);
+                if (string.IsNullOrEmpty(title))
+                {
+                    continue;
+                }
+
+                if (autoDetectCollections && pair.Value.Count >= 2 && pair.Value.Exists(newMediaIds.Contains))
+                {
+                    await MoveIntoAutoCollection(folder, title, pair.Value);
+                }
+                else if (useFolderNameAsTitle && pair.Value.Count == 1 && newMediaIds.Contains(pair.Value[0]))
+                {
+                    MediaModel? media = await FromId(pair.Value[0]);
+                    if (media is not null && media.Title1 != title)
+                    {
+                        await media.SetTitle1(title);
+                    }
+                }
+            }
+        }
+
         // Remove unreachable media items
-        if (appSettings.RemoveUnreachableMedia)
+        if (AppSettingsModel.RemoveUnreachableMedia)
         {
             List<string> locationRemoved = [.. oldLocations.Except(newLocations)];
 
@@ -609,14 +661,63 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
                 }
             }
 
+            List<MediaModel> removingMedia = [];
+            List<long> removingMediaIds = [];
+
             if (locationRemoved.Count > 0)
             {
-                bool proceed = true;
-                if (appSettings.PromptBeforeRemovingMedia)
+                removingMediaIds = await MediaHandle.Enqueue(() =>
                 {
+                    List<long> mediaIds = [];
+                    foreach (string location in locationRemoved)
+                    {
+                        List<long> ids = [];
+                        SelectCommand command = SelectCommand.Create(MediaTable.Instance)
+                            .AppendCondition(MediaTable.ColumnLocation, location)
+                            .AppendCondition(MediaHandle.CreateMediaOnlyCondition());
+                        IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
+                        using SelectCommand.IReader reader = command.Execute();
+                        while (reader.Read())
+                        {
+                            ids.Add(idToken.GetValue());
+                        }
+
+                        if (ids.Count == 0)
+                        {
+                            Logger.F(TAG, $"Removing: No rows found for location '{location}'");
+                            continue;
+                        }
+
+                        if (ids.Count != 1)
+                        {
+                            Logger.F(TAG, $"Removing: Found {ids.Count} rows for location '{location}'");
+                        }
+
+                        Logger.I(TAG, $"Removing: {location}");
+                        mediaIds.AddRange(ids);
+                    }
+
+                    return mediaIds;
+                });
+
+                removingMedia.AddRange(await BatchFromId(removingMediaIds));
+            }
+
+            List<long> emptyCollectionIds = await GetEmptyAutoCollectionIds(removingMediaIds);
+            if (emptyCollectionIds.Count > 0)
+            {
+                removingMedia.AddRange(await BatchFromId(emptyCollectionIds));
+            }
+
+            if (removingMedia.Count > 0)
+            {
+                bool proceed = true;
+                if (AppSettingsModel.PromptBeforeRemovingMedia)
+                {
+                    List<string> itemNames = [.. removingMedia.Select(x => x.IsCollection ? x.Title : x.Location)];
                     string promptContent = StringResourceProvider.Instance.RemoveItemsConfirmation
-                        .Replace("$count", locationRemoved.Count.ToString())
-                        .Replace("$items", string.Join('\n', locationRemoved));
+                        .Replace("$count", removingMedia.Count.ToString())
+                        .Replace("$items", string.Join('\n', itemNames));
                     DialogOptions options = new DialogOptions.Builder()
                         .SetTitle(StringResourceProvider.Instance.Warning)
                         .SetContent(promptContent)
@@ -629,39 +730,6 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
                 if (proceed)
                 {
-                    List<long> removingMediaIds = [];
-                    await MediaHandle.Enqueue(() =>
-                    {
-                        foreach (string location in locationRemoved)
-                        {
-                            List<long> mediaIds = [];
-                            SelectCommand command = SelectCommand.Create(MediaTable.Instance)
-                                .AppendCondition(MediaTable.ColumnLocation, location)
-                                .AppendCondition(MediaHandle.CreateMediaOnlyCondition());
-                            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
-                            using SelectCommand.IReader reader = command.Execute();
-                            while (reader.Read())
-                            {
-                                mediaIds.Add(idToken.GetValue());
-                            }
-
-                            if (mediaIds.Count == 0)
-                            {
-                                Logger.F(TAG, $"Removing: No rows found for location '{location}'");
-                                continue;
-                            }
-
-                            if (mediaIds.Count != 1)
-                            {
-                                Logger.F(TAG, $"Removing: Found {mediaIds.Count} rows for location '{location}'");
-                            }
-
-                            Logger.I(TAG, $"Removing: {location}");
-                            removingMediaIds.AddRange(mediaIds);
-                        }
-                    });
-
-                    List<MediaModel> removingMedia = await BatchFromId(removingMediaIds);
                     await RemoveMediaInternal(removingMedia);
                 }
             }
@@ -780,6 +848,98 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         }
 
         DispatchUpdateEvent(ids);
+    }
+
+    private static async Task<List<long>> GetEmptyAutoCollectionIds(IReadOnlyList<long> removingMediaIds)
+    {
+        return await MediaHandle.Enqueue(() =>
+        {
+            List<long> collectionIds = [];
+            SelectCommand collectionCommand = SelectCommand.Create(MediaTable.Instance)
+                .AppendCondition(MediaTable.ColumnType, (long)MediaType.Collection);
+            IReaderToken<long> collectionIdToken = collectionCommand.PutQueryInt64(MediaTable.ColumnId);
+            IReaderToken<string> collectionLocationToken = collectionCommand.PutQueryString(MediaTable.ColumnLocation);
+            using (SelectCommand.IReader reader = collectionCommand.Execute())
+            {
+                while (reader.Read())
+                {
+                    if (!string.IsNullOrEmpty(collectionLocationToken.GetValue()))
+                    {
+                        collectionIds.Add(collectionIdToken.GetValue());
+                    }
+                }
+            }
+
+            if (collectionIds.Count == 0)
+            {
+                return collectionIds;
+            }
+
+            Dictionary<long, long> memberCounts = [];
+            SelectCommand memberCommand = SelectCommand.Create(MediaCollectionTable.Instance)
+                .GroupBy(MediaCollectionTable.ColumnCollectionId);
+            IReaderToken<long> memberCollectionIdToken = memberCommand.PutQueryInt64(MediaCollectionTable.ColumnCollectionId);
+            IReaderToken<long> memberCountToken = memberCommand.PutQueryCountAll();
+            using (SelectCommand.IReader reader = memberCommand.Execute())
+            {
+                while (reader.Read())
+                {
+                    memberCounts[memberCollectionIdToken.GetValue()] = memberCountToken.GetValue();
+                }
+            }
+
+            Dictionary<long, long> removingCounts = [];
+            foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(removingMediaIds))
+            {
+                SelectCommand removingCommand = SelectCommand.Create(MediaCollectionTable.Instance)
+                    .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnMediaId), idChunk))
+                    .GroupBy(MediaCollectionTable.ColumnCollectionId);
+                IReaderToken<long> removingCollectionIdToken = removingCommand.PutQueryInt64(MediaCollectionTable.ColumnCollectionId);
+                IReaderToken<long> removingCountToken = removingCommand.PutQueryCountAll();
+                using SelectCommand.IReader reader = removingCommand.Execute();
+                while (reader.Read())
+                {
+                    long collectionId = removingCollectionIdToken.GetValue();
+                    removingCounts[collectionId] = removingCounts.GetValueOrDefault(collectionId) + removingCountToken.GetValue();
+                }
+            }
+
+            collectionIds.RemoveAll(x => memberCounts.GetValueOrDefault(x) != removingCounts.GetValueOrDefault(x));
+            return collectionIds;
+        });
+    }
+
+    private static async Task MoveIntoAutoCollection(string folder, string title, List<long> mediaIds)
+    {
+        MediaModel? collection = null;
+        long collectionId = await CollectionModel.FindIdByLocation(folder);
+        if (collectionId >= 0)
+        {
+            collection = await FromId(collectionId);
+        }
+
+        if (collection is null)
+        {
+            collection = CreateCollection();
+            await collection.SetLocation(folder);
+            await collection.SetTitle1(title);
+            await collection.Save();
+        }
+
+        List<MediaModel> media = await BatchFromId(mediaIds);
+        if (media.Count == 0)
+        {
+            return;
+        }
+
+        await CollectionModel.AddMedia(collection, media);
+
+        if (string.IsNullOrEmpty(MediaExt.GetCoverImageUri(collection)))
+        {
+            MediaModel coverSource = media.OrderBy(x => x.Title1, StringComparer.Ordinal).First();
+            collection.SetExt(MediaExt.COVER_IMAGE, ResourceUri.CreateMediaThumbnail(coverSource.Id).ToString());
+            await collection.FlushExt();
+        }
     }
 
     //

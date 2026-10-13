@@ -103,13 +103,6 @@ internal partial class AdvancedSettingsViewModel : INotifyPropertyChanged
         });
     }
 
-    public void RefreshRandomSeed()
-    {
-        AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.MediaShuffleRandomSeed = Random.Shared.Next();
-        AppSettingsModel.UpdateModel(model);
-    }
-
     private void Update()
     {
         UpdateBasicSettings();

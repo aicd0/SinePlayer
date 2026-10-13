@@ -708,7 +708,7 @@ internal class MediaPropertyModel
                     }
                 case MediaFilterModel.OrderMethodEnum.ShuffleStable:
                     {
-                        var rng = new Random(AppSettingsModel.GetModel().MediaShuffleRandomSeed);
+                        var rng = new Random(AppSettingsModel.MediaShuffleRandomSeed);
                         int salt = rng.Next();
                         return [.. items.OrderBy(x => IdSelector(selector(x)) ^ salt)];
                     }

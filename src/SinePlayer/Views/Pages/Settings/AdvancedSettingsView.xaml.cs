@@ -88,7 +88,7 @@ internal sealed partial class AdvancedSettingsView : BaseUserControl
 
     private void OnRefreshRandomSeedClick(object sender, RoutedEventArgs e)
     {
-        ViewModel.RefreshRandomSeed();
+        AppSettingsModel.MediaShuffleRandomSeed = Random.Shared.Next();
     }
 
     private async void OnOpenUserDataFolderClick(object sender, RoutedEventArgs e)

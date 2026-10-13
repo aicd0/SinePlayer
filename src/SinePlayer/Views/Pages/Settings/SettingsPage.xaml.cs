@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using System.Text;
 
 using Microsoft.UI.Xaml;
@@ -16,6 +17,7 @@ using SinePlayer.Common.Misc;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.AppEnvironment;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Data.Models.Misc;
 
 namespace SinePlayer.Views.Pages.Settings;
 
@@ -97,7 +99,19 @@ internal sealed partial class SettingsPage : BasePage
 
     private void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        ViewModel.SetAppLanguage(((ComboBox)sender).SelectedIndex);
+        int index = ((ComboBox)sender).SelectedIndex;
+        List<SettingsPageViewModel.LanguageEntry> languages = ViewModel.Languages;
+        if (index < 0 || index >= languages.Count)
+        {
+            return;
+        }
+
+        string identifier = languages[index].Identifier;
+        if (AppSettingsModel.Language != identifier)
+        {
+            ViewModel.LanguageChanged = true;
+            AppSettingsModel.Language = identifier;
+        }
     }
 
     private void LicenseHyperlink_Click(Hyperlink sender, HyperlinkClickEventArgs args)

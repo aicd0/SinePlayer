@@ -43,15 +43,23 @@
             Margin="0,16,0,0"
             Click="ScanOnLaunchCheckBox_Click"
             Content="{x:Bind StringResource.ScanOnLaunch}"
-            IsChecked="{x:Bind ViewModel.ScanOnLaunch, Mode=OneWay}" />
+            IsChecked="{x:Bind ViewModel.ScanOnLaunch, Mode=TwoWay}" />
         <CheckBox
             Click="RemoveUnreachableCheckBox_Click"
             Content="{x:Bind StringResource.RemoveUnreachableItems}"
-            IsChecked="{x:Bind ViewModel.RemoveUnreachableMedia, Mode=OneWay}" />
+            IsChecked="{x:Bind ViewModel.RemoveUnreachableMedia, Mode=TwoWay}" />
         <CheckBox
             Click="PromptBeforeRemovingMediaCheckBox_Click"
             Content="{x:Bind StringResource.PromptBeforeRemovingItems}"
-            IsChecked="{x:Bind ViewModel.PromptBeforeRemovingMedia, Mode=OneWay}" />
+            IsChecked="{x:Bind ViewModel.PromptBeforeRemovingMedia, Mode=TwoWay}" />
+        <CheckBox
+            Click="AutoDetectCollectionsCheckBox_Click"
+            Content="{x:Bind StringResource.AutoDetectCollections}"
+            IsChecked="{x:Bind ViewModel.AutoDetectCollections, Mode=TwoWay}" />
+        <CheckBox
+            Click="UseFolderNameAsTitleCheckBox_Click"
+            Content="{x:Bind StringResource.UseFolderNameAsTitle}"
+            IsChecked="{x:Bind ViewModel.UseFolderNameAsTitle, Mode=TwoWay}" />
         <Button
             Margin="0,32,0,0"
             Click="ShowHiddenMediaButton_Click"

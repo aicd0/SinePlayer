@@ -1,6 +1,8 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Collections.Generic;
+
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -52,6 +54,17 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
 
     private void KeepScreenOnBehaviorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        ViewModel.SetKeepScreenOnBehavior(((ComboBox)sender).SelectedIndex);
+        int index = ((ComboBox)sender).SelectedIndex;
+        List<PlayerSettingsViewModel.KeepScreenOnBehaviorEntry> behaviors = ViewModel.KeepScreenOnBehaviors;
+        if (index < 0 || index >= behaviors.Count)
+        {
+            return;
+        }
+
+        AppSettingsModel.KeepScreenOnBehaviorEnum behavior = behaviors[index].Behavior;
+        if (AppSettingsModel.KeepScreenOnBehavior != behavior)
+        {
+            AppSettingsModel.KeepScreenOnBehavior = behavior;
+        }
     }
 }

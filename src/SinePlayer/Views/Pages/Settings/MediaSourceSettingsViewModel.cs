@@ -68,34 +68,32 @@ internal partial class MediaSourceSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private bool _autoDetectCollections = false;
+    public bool AutoDetectCollections
+    {
+        get => _autoDetectCollections;
+        set
+        {
+            _autoDetectCollections = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AutoDetectCollections)));
+        }
+    }
+
+    private bool _useFolderNameAsTitle = false;
+    public bool UseFolderNameAsTitle
+    {
+        get => _useFolderNameAsTitle;
+        set
+        {
+            _useFolderNameAsTitle = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UseFolderNameAsTitle)));
+        }
+    }
+
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
         Shared.UpdateStarted += Update;
-    }
-
-    public void SetScanOnLaunch(bool scanOnLaunch)
-    {
-        _scanOnLaunch = scanOnLaunch;
-        AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.ScanOnLaunch = scanOnLaunch;
-        AppSettingsModel.UpdateModel(model);
-    }
-
-    public void SetRemoveUnreachableMedia(bool removeUnreachableMedia)
-    {
-        _removeUnreachableMedia = removeUnreachableMedia;
-        AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.RemoveUnreachableMedia = removeUnreachableMedia;
-        AppSettingsModel.UpdateModel(model);
-    }
-
-    public void SetPromptBeforeRemovingMedia(bool promptBeforeRemovingMedia)
-    {
-        _promptBeforeRemovingMedia = promptBeforeRemovingMedia;
-        AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        model.PromptBeforeRemovingMedia = promptBeforeRemovingMedia;
-        AppSettingsModel.UpdateModel(model);
     }
 
     private void Update()
@@ -105,13 +103,10 @@ internal partial class MediaSourceSettingsViewModel : INotifyPropertyChanged
 
     private void UpdateBasic()
     {
-        AppSettingsModel.ExternalModel model = AppSettingsModel.GetModel();
-        bool scanOnLaunch = model.ScanOnLaunch;
-        bool removeUnreachableMedia = model.RemoveUnreachableMedia;
-        bool promptBeforeRemovingMedia = model.PromptBeforeRemovingMedia;
-
-        ScanOnLaunch = scanOnLaunch;
-        RemoveUnreachableMedia = removeUnreachableMedia;
-        PromptBeforeRemovingMedia = promptBeforeRemovingMedia;
+        ScanOnLaunch = AppSettingsModel.ScanOnLaunch;
+        RemoveUnreachableMedia = AppSettingsModel.RemoveUnreachableMedia;
+        PromptBeforeRemovingMedia = AppSettingsModel.PromptBeforeRemovingMedia;
+        AutoDetectCollections = AppSettingsModel.AutoDetectCollections;
+        UseFolderNameAsTitle = AppSettingsModel.UseFolderNameAsTitle;
     }
 }
