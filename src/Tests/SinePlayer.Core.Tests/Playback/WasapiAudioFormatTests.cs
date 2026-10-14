@@ -1,0 +1,112 @@
+// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Backends.Wasapi;
+
+namespace SinePlayer.Core.Tests.Playback;
+
+/// <summary>
+/// The descriptor built from a stream is what a device is asked to open, so it is verified exactly:
+/// speaker masks are the KSAUDIO positions and the byte counts have to line up with the samples the
+/// decoder produces.
+/// </summary>
+[TestFixture]
+public class WasapiAudioFormatTests
+{
+    [Test]
+    public void DescribesStereoPcm()
+    {
+        bool described = WasapiAudioFormat.TryDescribe(CreateStream(44100, 2, ChannelLayout.Stereo, AudioSampleFormat.Int16), out WasapiAudioFormat.Descriptor descriptor, out string error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(described, Is.True, error);
+            Assert.That(descriptor.SampleRate, Is.EqualTo(44100));
+            Assert.That(descriptor.ChannelCount, Is.EqualTo(2));
+            Assert.That(descriptor.BitsPerSample, Is.EqualTo(16));
+            Assert.That(descriptor.BlockAlign, Is.EqualTo(4));
+            Assert.That(descriptor.AverageBytesPerSecond, Is.EqualTo(176400));
+            Assert.That(descriptor.IsFloat, Is.False);
+            Assert.That(descriptor.IsExtensible, Is.False);
+            Assert.That(descriptor.ChannelMask, Is.EqualTo(0x3));
+        }
+    }
+
+    [Test]
+    public void DescribesSurroundFloatAsExtensible()
+    {
+        bool described = WasapiAudioFormat.TryDescribe(CreateStream(48000, 6, ChannelLayout.Surround51, AudioSampleFormat.Float32), out WasapiAudioFormat.Descriptor descriptor, out string error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(described, Is.True, error);
+            Assert.That(descriptor.BlockAlign, Is.EqualTo(24));
+            Assert.That(descriptor.AverageBytesPerSecond, Is.EqualTo(1152000));
+            Assert.That(descriptor.IsFloat, Is.True);
+            Assert.That(descriptor.IsExtensible, Is.True);
+            Assert.That(descriptor.ChannelMask, Is.EqualTo(0x3F));
+        }
+    }
+
+    [Test]
+    public void DescribesMonoAsFrontCentre()
+    {
+        bool described = WasapiAudioFormat.TryDescribe(CreateStream(22050, 1, ChannelLayout.Mono, AudioSampleFormat.UInt8), out WasapiAudioFormat.Descriptor descriptor, out string error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(described, Is.True, error);
+            Assert.That(descriptor.ChannelMask, Is.EqualTo(0x4));
+            Assert.That(descriptor.BlockAlign, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void RefusesFormatsADeviceCannotBeAskedFor()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(WasapiAudioFormat.TryDescribe(CreateStream(44100, 2, ChannelLayout.Stereo, AudioSampleFormat.Int24), out _, out string packed), Is.False);
+            Assert.That(packed, Does.Contain("24"));
+
+            Assert.That(WasapiAudioFormat.TryDescribe(CreateStream(44100, 2, ChannelLayout.Stereo, AudioSampleFormat.Unknown), out _, out string unknown), Is.False);
+            Assert.That(unknown, Does.Contain("Unknown"));
+
+            // A layout we cannot name would mean deciding which speaker gets which channel.
+            Assert.That(WasapiAudioFormat.TryDescribe(CreateStream(44100, 6, ChannelLayout.Unknown, AudioSampleFormat.Int16), out _, out string layout), Is.False);
+            Assert.That(layout, Does.Contain("layout"));
+
+            Assert.That(WasapiAudioFormat.TryDescribe(CreateStream(0, 2, ChannelLayout.Stereo, AudioSampleFormat.Int16), out _, out _), Is.False);
+        }
+    }
+
+    [Test]
+    public void SizesEveryFormatItAccepts()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(WasapiAudioFormat.GetBytesPerSample(AudioSampleFormat.UInt8), Is.EqualTo(1));
+            Assert.That(WasapiAudioFormat.GetBytesPerSample(AudioSampleFormat.Int16), Is.EqualTo(2));
+            Assert.That(WasapiAudioFormat.GetBytesPerSample(AudioSampleFormat.Int24), Is.EqualTo(3));
+            Assert.That(WasapiAudioFormat.GetBytesPerSample(AudioSampleFormat.Int32), Is.EqualTo(4));
+            Assert.That(WasapiAudioFormat.GetBytesPerSample(AudioSampleFormat.Float32), Is.EqualTo(4));
+            Assert.That(WasapiAudioFormat.GetBytesPerSample(AudioSampleFormat.Float64), Is.EqualTo(8));
+            Assert.That(WasapiAudioFormat.GetBytesPerSample(AudioSampleFormat.Unknown), Is.EqualTo(0));
+        }
+    }
+
+    private static AudioStreamInfo CreateStream(int sampleRate, int channelCount, ChannelLayout layout, AudioSampleFormat format)
+    {
+        return new AudioStreamInfo
+        {
+            Index = 0,
+            CodecId = "test",
+            SampleRate = sampleRate,
+            ChannelCount = channelCount,
+            ChannelLayout = layout,
+            SampleFormat = format,
+        };
+    }
+}
