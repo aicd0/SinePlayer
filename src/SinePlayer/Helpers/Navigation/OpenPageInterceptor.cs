@@ -11,6 +11,7 @@ using SinePlayer.Views.Pages.Collection;
 using SinePlayer.Views.Pages.DevTools;
 using SinePlayer.Views.Pages.Home;
 using SinePlayer.Views.Pages.Main;
+using SinePlayer.Views.Pages.PlaybackLab;
 using SinePlayer.Views.Pages.Search;
 using SinePlayer.Views.Pages.Sidebar.Favorite;
 using SinePlayer.Views.Pages.Sidebar.FilterPresets;
@@ -40,6 +41,7 @@ internal class OpenPageInterceptor : IRouterInterceptor
         { RouterConstants.HOST_SIDE_PANE_PLAY_QUEUE, new DefaultPageTrait(typeof(PlayQueuePage)) },
         { RouterConstants.HOST_SIDE_PANE_MEDIA_INFO, new DefaultPageTrait(typeof(MediaInfoPage)) },
         { RouterConstants.HOST_DEV_TOOLS, new DefaultPageTrait(typeof(DevToolsPage)) },
+        { RouterConstants.HOST_PLAYBACK_LAB, new DefaultPageTrait(typeof(PlaybackLabPage)) },
     };
 
     private readonly ConcurrentDictionary<string, IPageTrait> _hosts = [];
@@ -62,7 +64,7 @@ internal class OpenPageInterceptor : IRouterInterceptor
             return false;
         }
 
-        if (host == RouterConstants.HOST_DEV_TOOLS && !DebugUtils.DeveloperMode)
+        if ((host == RouterConstants.HOST_DEV_TOOLS || host == RouterConstants.HOST_PLAYBACK_LAB) && !DebugUtils.DeveloperMode)
         {
             navigationBundle = null;
             return false;
