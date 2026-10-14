@@ -1,9 +1,9 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-namespace SinePlayer.Common.Playback;
+namespace SinePlayer.Core.Playback;
 
-internal enum MediaEngineState
+public enum MediaEngineState
 {
     None,
     Opening,

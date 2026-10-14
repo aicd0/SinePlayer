@@ -132,12 +132,22 @@ internal partial class MainPageViewModel : INotifyPropertyChanged
 
     public void OpenDevTools()
     {
+        OpenDeveloperPage(RouterConstants.HOST_DEV_TOOLS);
+    }
+
+    public void OpenPlaybackLab()
+    {
+        OpenDeveloperPage(RouterConstants.HOST_PLAYBACK_LAB);
+    }
+
+    private void OpenDeveloperPage(string host)
+    {
         if (!DebugUtils.DeveloperMode)
         {
             return;
         }
 
-        var route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_DEV_TOOLS);
+        var route = Route.Create(RouterConstants.SCHEME_APP + host);
         ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
             .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
             .AddParameter(OpenTabProvider.PARAM_WINDOW_ID, "-1")
@@ -267,6 +277,13 @@ internal partial class MainPageViewModel : INotifyPropertyChanged
                 Icon = new FontIconSource() { Glyph = "\uEC7A" },
                 ShortcutAction = KeyboardShortcutActions.OpenDevTools,
                 Click = OpenDevTools,
+            });
+
+            items.Add(new SimpleMenuFlyoutItemModel()
+            {
+                Text = "Playback lab",
+                Icon = new FontIconSource() { Glyph = "\uE7F4" },
+                Click = OpenPlaybackLab,
             });
         }
 
