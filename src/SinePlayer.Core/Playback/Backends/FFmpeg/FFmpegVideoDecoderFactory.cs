@@ -29,7 +29,7 @@ public sealed class FFmpegVideoDecoderFactory : IVideoDecoderFactory
         IsHardwareAccelerated = false,
     };
 
-    public PlaybackResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+    public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
@@ -37,10 +37,10 @@ public sealed class FFmpegVideoDecoderFactory : IVideoDecoderFactory
         if (!FFmpegVideoDecoder.TryCreate(source, stream, out FFmpegVideoDecoder? ffmpegDecoder, out string error))
         {
             decoder = null;
-            return PlaybackResult.Failure(error);
+            return PlaybackOperationResult.Failure(error);
         }
 
         decoder = ffmpegDecoder;
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 }

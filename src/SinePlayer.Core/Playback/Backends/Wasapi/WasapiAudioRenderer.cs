@@ -134,18 +134,18 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
         }
     }
 
-    public PlaybackResult Configure(AudioStreamInfo stream)
+    public PlaybackOperationResult Configure(AudioStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
         if (_disposed)
         {
-            return PlaybackResult.Failure("The renderer has already been disposed.");
+            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
         }
 
         if (!WasapiAudioFormat.TryDescribe(stream, out WasapiAudioFormat.Descriptor format, out string descriptionError))
         {
-            return PlaybackResult.Failure(descriptionError);
+            return PlaybackOperationResult.Failure(descriptionError);
         }
 
         Release();
@@ -162,7 +162,7 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
             HRESULT created = PInvoke.CoCreateInstance(MMDeviceEnumeratorClassId, null, CLSCTX.CLSCTX_ALL, out IMMDeviceEnumerator enumerator);
             if (created.Value < 0)
             {
-                return PlaybackResult.Failure($"Unable to reach the audio endpoint enumerator ({created.Value}).");
+                return PlaybackOperationResult.Failure($"Unable to reach the audio endpoint enumerator ({created.Value}).");
             }
 
             enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out IMMDevice device);
@@ -206,35 +206,35 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
             Interlocked.Exchange(ref _underrunCount, 0);
 
             // The endpoint and the enumerator hold no state we need: the client keeps its own reference.
-            return PlaybackResult.Success;
+            return PlaybackOperationResult.Success;
         }
         catch (Exception exception)
         {
             Release();
-            return PlaybackResult.Failure($"Unable to open the audio device: {exception.Message}");
+            return PlaybackOperationResult.Failure($"Unable to open the audio device: {exception.Message}");
         }
     }
 
-    public PlaybackResult Submit(RawAudioBuffer buffer)
+    public PlaybackOperationResult Submit(RawAudioBuffer buffer)
     {
         ArgumentNullException.ThrowIfNull(buffer);
 
         if (_disposed)
         {
-            return PlaybackResult.Failure("The renderer has already been disposed.");
+            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
         }
 
         IAudioRenderClient? renderClient = _renderClient;
         WasapiAudioClock? clock = _clock;
         if (renderClient is null || clock is null)
         {
-            return PlaybackResult.Failure("The audio renderer has not been configured.");
+            return PlaybackOperationResult.Failure("The audio renderer has not been configured.");
         }
 
         int frames = buffer.SampleCount;
         if (frames <= 0)
         {
-            return PlaybackResult.Success;
+            return PlaybackOperationResult.Success;
         }
 
         int required = _format.BlockAlign * frames;
@@ -252,12 +252,12 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
 
         if (!AudioInterleaver.TryInterleave(buffer, _staging, out int byteCount, out string error))
         {
-            return PlaybackResult.Failure(error);
+            return PlaybackOperationResult.Failure(error);
         }
 
         if (byteCount != required)
         {
-            return PlaybackResult.Failure($"The audio block produced {byteCount} byte(s) where {required} were expected.");
+            return PlaybackOperationResult.Failure($"The audio block produced {byteCount} byte(s) where {required} were expected.");
         }
 
         // The stream has to be running before anything is written: a stopped WASAPI stream does not
@@ -282,7 +282,7 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
                 bool stopped = _clock is null || !_clock.IsRunning;
                 if (!stopped && waited >= MaxWaitMilliseconds)
                 {
-                    return PlaybackResult.Failure("The audio device did not free its buffer in time.");
+                    return PlaybackOperationResult.Failure("The audio device did not free its buffer in time.");
                 }
 
                 Thread.Sleep(1);
@@ -303,7 +303,7 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
             }
             catch (Exception exception)
             {
-                return PlaybackResult.Failure($"Unable to queue audio: {exception.Message}");
+                return PlaybackOperationResult.Failure($"Unable to queue audio: {exception.Message}");
             }
 
             offset += bytes;
@@ -313,21 +313,21 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
             _submittedBlocks++;
         }
 
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 
-    public PlaybackResult Flush()
+    public PlaybackOperationResult Flush()
     {
         if (_disposed)
         {
-            return PlaybackResult.Failure("The renderer has already been disposed.");
+            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
         }
 
         IAudioClient? client = _client;
         WasapiAudioClock? clock = _clock;
         if (client is null || clock is null)
         {
-            return PlaybackResult.Failure("The audio renderer has not been configured.");
+            return PlaybackOperationResult.Failure("The audio renderer has not been configured.");
         }
 
         try
@@ -352,11 +352,11 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
                 clock.Start();
             }
 
-            return PlaybackResult.Success;
+            return PlaybackOperationResult.Success;
         }
         catch (Exception exception)
         {
-            return PlaybackResult.Failure($"Unable to flush audio: {exception.Message}");
+            return PlaybackOperationResult.Failure($"Unable to flush audio: {exception.Message}");
         }
     }
 

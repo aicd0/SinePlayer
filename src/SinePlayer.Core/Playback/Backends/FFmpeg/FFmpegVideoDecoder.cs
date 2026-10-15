@@ -181,19 +181,19 @@ public sealed class FFmpegVideoDecoder : IVideoDecoder
         yield return codecId;
     }
 
-    public PlaybackResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+    public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
     {
         List<RawVideoFrame> decoded = [];
         frames = decoded;
 
         if (_disposed)
         {
-            return PlaybackResult.Failure("The decoder has already been disposed.");
+            return PlaybackOperationResult.Failure("The decoder has already been disposed.");
         }
 
         if (packet.Buffer is not FFmpegPacketBuffer packetBuffer)
         {
-            return PlaybackResult.Failure("The packet was not produced by the FFmpeg backend.");
+            return PlaybackOperationResult.Failure("The packet was not produced by the FFmpeg backend.");
         }
 
         _lastPacketTimestamp = packet.Timestamp.Ticks;
@@ -204,7 +204,7 @@ public sealed class FFmpegVideoDecoder : IVideoDecoder
             // The decoder wants its pending output collected before it accepts more input. The packet
             // is still ours at this point, so drain and try once more.
             int pending = decoded.Count;
-            PlaybackResult drainResult = ReceiveFrames(decoded);
+            PlaybackOperationResult drainResult = ReceiveFrames(decoded);
             if (!drainResult.IsSuccessful)
             {
                 return drainResult;
@@ -212,7 +212,7 @@ public sealed class FFmpegVideoDecoder : IVideoDecoder
 
             if (decoded.Count == pending)
             {
-                return PlaybackResult.Failure("The decoder is not accepting input.");
+                return PlaybackOperationResult.Failure("The decoder is not accepting input.");
             }
 
             sendResult = FFmpegNative.avcodec_send_packet(_context, packetBuffer.Packet);
@@ -220,42 +220,42 @@ public sealed class FFmpegVideoDecoder : IVideoDecoder
 
         if (sendResult < 0 && sendResult != FFmpegConstants.ErrorEndOfStream)
         {
-            return PlaybackResult.Failure($"Unable to submit a packet to the decoder: {FFmpegInterop.GetErrorMessage(sendResult)}");
+            return PlaybackOperationResult.Failure($"Unable to submit a packet to the decoder: {FFmpegInterop.GetErrorMessage(sendResult)}");
         }
 
         return ReceiveFrames(decoded);
     }
 
-    public PlaybackResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+    public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
     {
         List<RawVideoFrame> decoded = [];
         frames = decoded;
 
         if (_disposed)
         {
-            return PlaybackResult.Failure("The decoder has already been disposed.");
+            return PlaybackOperationResult.Failure("The decoder has already been disposed.");
         }
 
         // A null packet puts the decoder into draining mode.
         int result = FFmpegNative.avcodec_send_packet(_context, 0);
         if (result < 0 && result != FFmpegConstants.ErrorEndOfStream)
         {
-            return PlaybackResult.Failure($"Unable to drain the decoder: {FFmpegInterop.GetErrorMessage(result)}");
+            return PlaybackOperationResult.Failure($"Unable to drain the decoder: {FFmpegInterop.GetErrorMessage(result)}");
         }
 
         return ReceiveFrames(decoded);
     }
 
-    public PlaybackResult Flush()
+    public PlaybackOperationResult Flush()
     {
         if (_disposed)
         {
-            return PlaybackResult.Failure("The decoder has already been disposed.");
+            return PlaybackOperationResult.Failure("The decoder has already been disposed.");
         }
 
         FFmpegNative.avcodec_flush_buffers(_context);
         FFmpegNative.av_frame_unref(_receiveFrame);
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 
     public void Dispose()
@@ -282,24 +282,24 @@ public sealed class FFmpegVideoDecoder : IVideoDecoder
         }
     }
 
-    private PlaybackResult ReceiveFrames(List<RawVideoFrame> frames)
+    private PlaybackOperationResult ReceiveFrames(List<RawVideoFrame> frames)
     {
         while (true)
         {
             int result = FFmpegNative.avcodec_receive_frame(_context, _receiveFrame);
             if (result == FFmpegConstants.ErrorAgain || result == FFmpegConstants.ErrorEndOfStream)
             {
-                return PlaybackResult.Success;
+                return PlaybackOperationResult.Success;
             }
 
             if (result < 0)
             {
-                return PlaybackResult.Failure($"Unable to receive a decoded frame: {FFmpegInterop.GetErrorMessage(result)}");
+                return PlaybackOperationResult.Failure($"Unable to receive a decoded frame: {FFmpegInterop.GetErrorMessage(result)}");
             }
 
             if (!TryTakeFrame(out RawVideoFrame? frame) || frame is null)
             {
-                return PlaybackResult.Failure("Unable to allocate an FFmpeg frame.");
+                return PlaybackOperationResult.Failure("Unable to allocate an FFmpeg frame.");
             }
 
             frames.Add(frame);

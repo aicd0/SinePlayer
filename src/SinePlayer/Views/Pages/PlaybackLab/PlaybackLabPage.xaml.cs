@@ -45,6 +45,12 @@ internal sealed partial class PlaybackLabPage : BasePage
     private DispatcherQueueTimer? _statusTimer;
     private string _description = string.Empty;
 
+    /// <summary>
+    /// The last thing the pipeline said, kept for the status line. Warnings are lines rather than a value
+    /// with a lifetime, so this only ever holds the most recent one, and a new one replaces it.
+    /// </summary>
+    private string? _warning;
+
     public PlaybackLabPage()
     {
         InitializeComponent();
@@ -107,13 +113,15 @@ internal sealed partial class PlaybackLabPage : BasePage
             _audioRenderer,
             new DefaultSynchronizer());
         pipeline.StateChanged += OnStateChanged;
+        pipeline.WarningRaised += OnWarningRaised;
 
         // Awaited rather than blocked: setup attaches the presentation surface from the playback thread,
         // and the panel can only be touched from this one.
-        PlaybackResult opened = await pipeline.OpenAsync(MediaLocator.Parse(path), _renderTarget);
+        PlaybackOperationResult opened = await pipeline.Open(MediaLocator.Parse(path), _renderTarget);
         if (!opened.IsSuccessful)
         {
             pipeline.StateChanged -= OnStateChanged;
+            pipeline.WarningRaised -= OnWarningRaised;
             pipeline.Dispose();
             Report($"Opening the file failed. {opened.Message}");
             return;
@@ -140,12 +148,14 @@ internal sealed partial class PlaybackLabPage : BasePage
         if (pipeline is not null)
         {
             pipeline.StateChanged -= OnStateChanged;
+            pipeline.WarningRaised -= OnWarningRaised;
             pipeline.Dispose();
         }
 
         // The panel gives the surface back before the swap chain it is showing goes away.
         _renderTarget?.DetachSurface();
         _description = string.Empty;
+        _warning = null;
 
         PlayButton.IsEnabled = false;
         PauseButton.IsEnabled = false;
@@ -153,7 +163,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         SeekForwardButton.IsEnabled = false;
     }
 
-    private void SeekBy(double seconds)
+    private async void SeekBy(double seconds)
     {
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is null)
@@ -172,20 +182,27 @@ internal sealed partial class PlaybackLabPage : BasePage
             target = pipeline.Duration;
         }
 
-        PlaybackResult seeked = pipeline.Seek(target);
+        // Posted like the rest, and awaited here for both halves of the answer: where the seek landed, and
+        // whether the source took it at all — a refused seek leaves playback where it was.
+        PlaybackOperationResult seeked = await pipeline.Seek(target);
         if (!seeked.IsSuccessful)
         {
-            Report($"Seeking failed. {seeked.Message}");
-            return;
+            Report($"The seek was refused. {seeked.Message}");
         }
 
         RefreshStatus();
     }
 
-    private void OnStateChanged()
+    private void OnStateChanged(MediaEngineState state, string? error)
     {
-        // Raised on the playback thread; the status line belongs to the UI thread.
+        // Raised on the playback queue; the status line belongs to the UI thread.
         DispatcherQueue.TryEnqueue(RefreshStatus);
+    }
+
+    private void OnWarningRaised(string warning)
+    {
+        // Raised on the playback queue, and shown where the status line lives.
+        DispatcherQueue.TryEnqueue(() => _warning = warning);
     }
 
     private void StartStatusTimer()
@@ -227,7 +244,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         // The reason playback stopped is the most important thing on this line, so it is never omitted.
         string error = pipeline.Error is null ? string.Empty : $" Error: {pipeline.Error}";
-        string warning = pipeline.Warning is null ? string.Empty : $" {pipeline.Warning}";
+        string warning = _warning is null ? string.Empty : $" {_warning}";
 
         // Drops and underruns are how "stutter" and "glitchy" turn into numbers: a trickle is the
         // synchronizer working, a torrent is the pipeline being starved. The lag says how far the picture
@@ -236,12 +253,23 @@ internal sealed partial class PlaybackLabPage : BasePage
         // clock standing still means: playback is not failing, it is waiting for something to work with.
         string waiting = pipeline.StarvedFor is null ? string.Empty : $" waiting for {pipeline.StarvedFor}.";
         string health = $" dropped {pipeline.DroppedFrameCount}, underruns {_audioRenderer.UnderrunCount}, lag {pipeline.PictureLag.TotalMilliseconds:0} ms.{waiting}";
+
+        // What the compositor did with them is the other half of the picture: frames the pipeline handed over
+        // that never reached the display — presented, then superseded before the screen took them — are drops
+        // no pipeline counter can see, so the display's own count is shown beside the pipeline's. Both are
+        // read once here so the line describes one moment: the display's answer lags by the frame or two
+        // still in flight, so the difference can briefly be short of the number it will settle at.
+        long presented = pipeline.PresentedFrameCount;
+        long? displayed = pipeline.DisplayedFrameCount;
+        string compositor = displayed is null
+            ? string.Empty
+            : $" display took {displayed}, compositor dropped {Math.Max(0, presented - displayed.Value)}.";
         // Decode and render are the two candidates for whatever limits playback, so the line names both
         // rather than leaving the question to a guess.
         string pace = $" decode {pipeline.AverageDecodeMilliseconds:0.0} ms, render {pipeline.AverageRenderMilliseconds:0.0} ms.";
 
         Report($"{pipeline.State}: {_description}. {pipeline.Position:mm\\:ss\\.fff} / {pipeline.Duration:mm\\:ss\\.fff}."
-            + $" {pipeline.PresentedFrameCount} frame(s).{health}{pace}{surface}{error}{warning}");
+            + $" {presented} frame(s).{health}{compositor}{pace}{surface}{error}{warning}");
     }
 
     private static string Describe(PlaybackPipeline pipeline)

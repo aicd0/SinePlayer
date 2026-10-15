@@ -24,7 +24,7 @@ public sealed class D3D11VideoRendererFactory : IComponentFactory<IVideoRenderer
         Description = "Direct3D 11 composition renderer.",
     };
 
-    public PlaybackResult TryCreate(out IVideoRenderer? component)
+    public PlaybackOperationResult TryCreate(out IVideoRenderer? component)
     {
         component = null;
 
@@ -34,7 +34,7 @@ public sealed class D3D11VideoRendererFactory : IComponentFactory<IVideoRenderer
             {
                 if (!D3D11Device.TryCreate(out D3D11Device? device, out string deviceError))
                 {
-                    return PlaybackResult.Failure(deviceError);
+                    return PlaybackOperationResult.Failure(deviceError);
                 }
 
                 _device = device;
@@ -42,11 +42,11 @@ public sealed class D3D11VideoRendererFactory : IComponentFactory<IVideoRenderer
 
             if (!D3D11VideoRenderer.TryCreate(_device!, out D3D11VideoRenderer? renderer, out string rendererError))
             {
-                return PlaybackResult.Failure(rendererError);
+                return PlaybackOperationResult.Failure(rendererError);
             }
 
             component = renderer;
-            return PlaybackResult.Success;
+            return PlaybackOperationResult.Success;
         }
     }
 }

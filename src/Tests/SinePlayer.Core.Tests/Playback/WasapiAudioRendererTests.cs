@@ -39,7 +39,7 @@ public class WasapiAudioRendererTests
             SampleFormat = AudioSampleFormat.Int16,
         };
 
-        PlaybackResult configured = renderer.Configure(stream);
+        PlaybackOperationResult configured = renderer.Configure(stream);
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine offers no audio endpoint to test against: {configured.Message}");
@@ -55,7 +55,7 @@ public class WasapiAudioRendererTests
 
         // A fifth of a second of a quiet tone, which is a fifth of a second of audio played.
         using RawAudioBuffer buffer = CreateBuffer();
-        PlaybackResult submitted = renderer.Submit(buffer);
+        PlaybackOperationResult submitted = renderer.Submit(buffer);
 
         using (Assert.EnterMultipleScope())
         {
@@ -85,7 +85,7 @@ public class WasapiAudioRendererTests
     {
         using WasapiAudioRenderer renderer = new();
 
-        PlaybackResult configured = renderer.Configure(CreateStream());
+        PlaybackOperationResult configured = renderer.Configure(CreateStream());
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine offers no audio endpoint to test against: {configured.Message}");
@@ -114,7 +114,7 @@ public class WasapiAudioRendererTests
             SampleFormat = AudioSampleFormat.Int24,
         };
 
-        PlaybackResult configured = renderer.Configure(stream);
+        PlaybackOperationResult configured = renderer.Configure(stream);
 
         using (Assert.EnterMultipleScope())
         {

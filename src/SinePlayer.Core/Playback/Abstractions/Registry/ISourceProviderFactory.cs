@@ -11,5 +11,5 @@ namespace SinePlayer.Core.Playback.Abstractions.Registry;
 /// </summary>
 public interface ISourceProviderFactory : IComponentFactory
 {
-    PlaybackResult TryOpen(MediaLocator locator, out IMediaSource? source);
+    PlaybackOperationResult TryOpen(MediaLocator locator, out IMediaSource? source);
 }

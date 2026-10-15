@@ -56,7 +56,7 @@ public class D3D11VideoRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
 
         _renderer.SetOutput(target.View, width, height);
-        PlaybackResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         byte[] pixels = target.ReadPixels(_device);
@@ -87,7 +87,7 @@ public class D3D11VideoRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
 
         _renderer.SetOutput(target.View, width, height);
-        PlaybackResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         byte[] pixels = target.ReadPixels(_device);
@@ -110,7 +110,7 @@ public class D3D11VideoRendererTests
         FakeRenderTarget target = new() { SurfaceWidth = 16, SurfaceHeight = 8, RasterizationScale = 1.0 };
         VideoStreamInfo stream = CreateStreamInfo(16, 8);
 
-        PlaybackResult result = _renderer.Configure(stream, target);
+        PlaybackOperationResult result = _renderer.Configure(stream, target);
 
         using (Assert.EnterMultipleScope())
         {
@@ -125,7 +125,7 @@ public class D3D11VideoRendererTests
         FakeRenderTarget target = new() { SurfaceWidth = 8, SurfaceHeight = 4, RasterizationScale = 1.0 };
         VideoStreamInfo stream = CreateStreamInfo(8, 4);
 
-        Assert.That(D3D11SwapChain.TryCreate(_device, 8, 4, out D3D11SwapChain? swapChain, out string error), Is.True, error);
+        Assert.That(D3D11SwapChain.TryCreate(_device, 8, 4, 1.0, out D3D11SwapChain? swapChain, out string error), Is.True, error);
         using D3D11SwapChain ownedSwapChain = swapChain!;
 
         // Draw into the swap chain back buffer without presenting, so the pixels can be verified.
@@ -133,7 +133,7 @@ public class D3D11VideoRendererTests
 
         using FrameBuffer buffer = new(8, 4, (_, _) => (0x11, 0x22, 0x33, 0xFF));
         using RawVideoFrame frame = CreateFrame(8, 4, buffer);
-        PlaybackResult renderResult = _renderer.Render(frame);
+        PlaybackOperationResult renderResult = _renderer.Render(frame);
         Assert.That(renderResult.IsSuccessful, Is.True, renderResult.Message);
 
         byte[] pixels = ownedSwapChain.ReadPixels();
@@ -144,7 +144,7 @@ public class D3D11VideoRendererTests
             Assert.That(pixels[2], Is.EqualTo(0x33));
         }
 
-        PlaybackResult presentResult = ownedSwapChain.Present();
+        PlaybackOperationResult presentResult = ownedSwapChain.Present();
         Assert.That(presentResult.IsSuccessful, Is.True, presentResult.Message);
     }
 
@@ -162,9 +162,156 @@ public class D3D11VideoRendererTests
         };
 
         _renderer.SetOutput(null, 0, 0);
-        PlaybackResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame);
 
         Assert.That(result.IsSuccessful, Is.False);
+    }
+
+    [Test]
+    public void SizesTheSwapChainInPhysicalPixelsAndCancelsTheDisplayScale()
+    {
+        // A 1280x720 logical panel at 150%: the buffer has to be 1920x1080, and the panel's own scale of
+        // 1.5 has to be cancelled, or the display enlarges the picture a second time.
+        FakeRenderTarget target = new() { SurfaceWidth = 1280, SurfaceHeight = 720, RasterizationScale = 1.5 };
+        VideoStreamInfo stream = CreateStreamInfo(1280, 720);
+
+        PlaybackOperationResult result = _renderer.Configure(stream, target);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.IsSuccessful, Is.True, result.Message);
+            Assert.That(_renderer.OutputPixelWidth, Is.EqualTo(1920), "the buffer is the panel's logical size at the display's scale");
+            Assert.That(_renderer.OutputPixelHeight, Is.EqualTo(1080));
+            Assert.That(_renderer.TryGetCompositionTransform(out double scaleX, out double scaleY), Is.True, "the swap chain has to carry the transform");
+            Assert.That(scaleX, Is.EqualTo(1.0 / 1.5).Within(0.0001), "and it has to cancel exactly the panel's scale");
+            Assert.That(scaleY, Is.EqualTo(1.0 / 1.5).Within(0.0001));
+        }
+    }
+
+    [Test]
+    public void KeepsTheBufferSizeAndTransformInStepWhenTheScaleChanges()
+    {
+        FakeRenderTarget target = new() { SurfaceWidth = 200, SurfaceHeight = 100, RasterizationScale = 1.0 };
+        VideoStreamInfo stream = CreateStreamInfo(200, 100);
+        Assert.That(_renderer.Configure(stream, target).IsSuccessful, Is.True);
+
+        using (FrameBuffer buffer = new(200, 100, (_, _) => (0x10, 0x20, 0x30, 0xFF)))
+        using (RawVideoFrame frame = CreateFrame(200, 100, buffer))
+        {
+            Assert.That(_renderer.Render(frame).IsSuccessful, Is.True);
+        }
+
+        Assert.That(_renderer.TryGetCompositionTransform(out double before, out double _), Is.True);
+        Assert.That(before, Is.EqualTo(1.0).Within(0.0001), "a 100% display needs no correction at all");
+
+        // The window moved to a display at 200%, which is what the panel reports as a composition scale
+        // change. Resizing the buffers resets the transform in DXGI, so both have to be redone together —
+        // and a resize that forgot the transform would leave the picture at half size.
+        target.RasterizationScale = 2.0;
+        target.RaiseSizeChanged();
+
+        using (FrameBuffer buffer = new(200, 100, (_, _) => (0x10, 0x20, 0x30, 0xFF)))
+        using (RawVideoFrame frame = CreateFrame(200, 100, buffer))
+        {
+            Assert.That(_renderer.Render(frame).IsSuccessful, Is.True);
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(_renderer.OutputPixelWidth, Is.EqualTo(400));
+            Assert.That(_renderer.OutputPixelHeight, Is.EqualTo(200));
+            Assert.That(_renderer.TryGetCompositionTransform(out double scaleX, out double scaleY), Is.True);
+            Assert.That(scaleX, Is.EqualTo(0.5).Within(0.0001), "the transform has to follow the new scale");
+            Assert.That(scaleY, Is.EqualTo(0.5).Within(0.0001));
+        }
+    }
+
+    [Test]
+    public void TakesUpASurfaceChangeWhilePaused()
+    {
+        FakeRenderTarget target = new() { SurfaceWidth = 100, SurfaceHeight = 50, RasterizationScale = 1.0 };
+        VideoStreamInfo stream = CreateStreamInfo(100, 50);
+        Assert.That(_renderer.Configure(stream, target).IsSuccessful, Is.True);
+
+        using (FrameBuffer buffer = new(100, 50, (_, _) => (0x11, 0x22, 0x33, 0xFF)))
+        using (RawVideoFrame frame = CreateFrame(100, 50, buffer))
+        {
+            Assert.That(_renderer.Render(frame).IsSuccessful, Is.True);
+        }
+
+        // Playback is paused, so nothing is presented: only the host's report of a new surface arrives.
+        target.SurfaceWidth = 200;
+        target.SurfaceHeight = 100;
+        target.RasterizationScale = 2.0;
+        target.RaiseSizeChanged();
+
+        PlaybackOperationResult refreshed = _renderer.RefreshSurface();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(refreshed.IsSuccessful, Is.True, refreshed.Message);
+            Assert.That(_renderer.OutputPixelWidth, Is.EqualTo(400), "the surface has to follow the window");
+            Assert.That(_renderer.OutputPixelHeight, Is.EqualTo(200));
+            Assert.That(_renderer.TryGetCompositionTransform(out double scaleX, out double _), Is.True);
+            Assert.That(scaleX, Is.EqualTo(0.5).Within(0.0001));
+        }
+    }
+
+    [Test]
+    public void RedrawsTheLastFrameWhenTheSurfaceChangesWithoutANewFrame()
+    {
+        const int width = 4;
+        const int height = 4;
+        const byte blue = 0x40;
+        const byte green = 0x50;
+        const byte red = 0x60;
+
+        using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
+        _renderer.SetOutput(target.View, width, height);
+
+        // The frame is released before the redraw, so what appears afterwards can only come from the
+        // planes the renderer kept — which is the whole point: a paused picture has no frame to offer.
+        using (FrameBuffer buffer = new(width, height, (_, _) => (blue, green, red, 0xFF)))
+        using (RawVideoFrame frame = CreateFrame(width, height, buffer))
+        {
+            Assert.That(_renderer.Render(frame).IsSuccessful, Is.True);
+        }
+
+        _device.Context.ClearRenderTargetView(target.View, [0.0f, 0.0f, 0.0f, 1.0f]);
+        Assert.That(target.ReadPixels(_device)[0], Is.Zero, "the surface is emptied first, so what follows is drawn rather than left behind");
+
+        Assert.That(_renderer.RefreshSurface().IsSuccessful, Is.True);
+
+        byte[] pixels = target.ReadPixels(_device);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(pixels[0], Is.EqualTo(blue), "the last picture has to be drawn again");
+            Assert.That(pixels[1], Is.EqualTo(green));
+            Assert.That(pixels[2], Is.EqualTo(red));
+        }
+    }
+
+    [Test]
+    public void RefreshingWithoutAnyFrameIsHarmless()
+    {
+        FakeRenderTarget target = new() { SurfaceWidth = 16, SurfaceHeight = 8, RasterizationScale = 1.0 };
+        VideoStreamInfo stream = CreateStreamInfo(16, 8);
+        Assert.That(_renderer.Configure(stream, target).IsSuccessful, Is.True);
+
+        // Opened and paused before the first frame: there is nothing to draw again, and the resize the
+        // surface reported still has to be taken up.
+        target.SurfaceWidth = 32;
+        target.SurfaceHeight = 16;
+        target.RaiseSizeChanged();
+
+        PlaybackOperationResult refreshed = _renderer.RefreshSurface();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(refreshed.IsSuccessful, Is.True, refreshed.Message);
+            Assert.That(_renderer.OutputPixelWidth, Is.EqualTo(32));
+            Assert.That(_renderer.OutputPixelHeight, Is.EqualTo(16));
+        }
     }
 
     [Test]
@@ -174,7 +321,7 @@ public class D3D11VideoRendererTests
         using RawVideoFrame frame = CreateFrame(4, 4, buffer);
 
         _renderer.SetOutput(null, 0, 0);
-        PlaybackResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame);
 
         Assert.That(result.IsSuccessful, Is.False);
     }
@@ -208,11 +355,11 @@ public class D3D11VideoRendererTests
     /// <summary>Stands in for the host application's presentation element.</summary>
     private sealed class FakeRenderTarget : IVideoRenderTarget
     {
-        public int SurfaceWidth { get; init; }
+        public int SurfaceWidth { get; set; }
 
-        public int SurfaceHeight { get; init; }
+        public int SurfaceHeight { get; set; }
 
-        public double RasterizationScale { get; init; }
+        public double RasterizationScale { get; set; }
 
         public nint AttachedSwapChain { get; private set; }
 

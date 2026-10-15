@@ -25,7 +25,7 @@ public sealed class FFmpegAudioDecoderFactory : IAudioDecoderFactory
         IsHardwareAccelerated = false,
     };
 
-    public PlaybackResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IAudioDecoder? decoder)
+    public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IAudioDecoder? decoder)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
@@ -33,10 +33,10 @@ public sealed class FFmpegAudioDecoderFactory : IAudioDecoderFactory
         if (!FFmpegAudioDecoder.TryCreate(source, stream, out FFmpegAudioDecoder? ffmpegDecoder, out string error))
         {
             decoder = null;
-            return PlaybackResult.Failure(error);
+            return PlaybackOperationResult.Failure(error);
         }
 
         decoder = ffmpegDecoder;
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 }

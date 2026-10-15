@@ -27,11 +27,11 @@ public interface IAudioRenderer : IDisposable
     /// <summary>Audio queued but not yet played, in samples. Drives back-pressure and seek flushing.</summary>
     long QueuedSampleCount { get; }
 
-    PlaybackResult Configure(AudioStreamInfo stream);
+    PlaybackOperationResult Configure(AudioStreamInfo stream);
 
     /// <summary>Queues audio for playback. The caller keeps ownership of the buffer.</summary>
-    PlaybackResult Submit(RawAudioBuffer buffer);
+    PlaybackOperationResult Submit(RawAudioBuffer buffer);
 
     /// <summary>Drops everything queued, for example after a seek.</summary>
-    PlaybackResult Flush();
+    PlaybackOperationResult Flush();
 }

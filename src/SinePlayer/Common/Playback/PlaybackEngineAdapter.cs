@@ -82,21 +82,18 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
             PlaybackPipeline pipeline = CreatePipeline();
             _pipeline = pipeline;
 
+            // Warnings are heard as they happen — during the open for something left out of it, and later for
+            // a device that stops moving. They were only ever looked at once, at load, before.
+            pipeline.WarningRaised += OnPipelineWarningRaised;
+
             // Awaited rather than blocked: setup attaches the presentation surface from the playback
             // thread, and the panel can only be touched from this one.
-            PlaybackResult opened = await pipeline.OpenAsync(MediaLocator.Parse(filePath), EnsureRenderTarget());
+            PlaybackOperationResult opened = await pipeline.Open(MediaLocator.Parse(filePath), EnsureRenderTarget());
             if (!opened.IsSuccessful)
             {
                 Close();
                 SetState(MediaEngineState.Error);
                 return err.Error($"Unable to open media file '{filePath}': {opened.Message}");
-            }
-
-            if (pipeline.Warning is not null)
-            {
-                // Playing on with something left out is a warning, not a failure: the page still gets its
-                // media, and the reason is in the log.
-                Logger.W(TAG, $"{filePath}: {pipeline.Warning}");
             }
 
             StartPositionTimer();
@@ -160,14 +157,23 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
             position = duration;
         }
 
-        PlaybackResult seeked = pipeline.Seek(position);
-        if (!seeked.IsSuccessful)
+        // Posted, like everything else the pipeline offers, and the task is kept for two reasons: it says when
+        // the position has moved, which for a seek while paused is the only chance the page gets to re-read it,
+        // and it says whether the source took the seek at all — a seek a source refuses leaves playback exactly
+        // where it was, so there is nothing for the page to react to beyond the line in the log.
+        CoroutineUtils.Run(async () =>
         {
-            Logger.E(TAG, $"Unable to seek to {position}: {seeked.Message}", null);
-            return;
-        }
+            PlaybackOperationResult seeked = await pipeline.Seek(position);
+            if (!seeked.IsSuccessful)
+            {
+                Logger.W(TAG, $"Seek to {position:g} was refused: {seeked.Message}");
+            }
 
-        RaisePositionChanged();
+            if (ReferenceEquals(_pipeline, pipeline))
+            {
+                RaisePositionChanged();
+            }
+        });
     }
 
     public void SetVolume(double volume)
@@ -235,6 +241,7 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
         if (pipeline is not null)
         {
             pipeline.StateChanged -= OnPipelineStateChanged;
+            pipeline.WarningRaised -= OnPipelineWarningRaised;
             pipeline.Dispose();
         }
 
@@ -284,18 +291,20 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
     }
 
     /// <summary>
-    /// Raised on the playback thread, so the page hears about it on its own thread: it touches live data
-    /// and the status bar, neither of which may be written from where playback runs.
+    /// Raised on the playback queue, which is where every event of the engine is raised, so this only logs:
+    /// playing on with something left out is a warning, not a failure, and the page still gets its media.
     /// </summary>
-    private void OnPipelineStateChanged()
+    private void OnPipelineWarningRaised(string warning)
     {
-        PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is null)
-        {
-            return;
-        }
+        Logger.W(TAG, $"Playback warning: {warning}");
+    }
 
-        MediaEngineState state = pipeline.State;
+    /// <summary>
+    /// Raised on the playback queue, so the page hears about it on its own thread: it touches live data and
+    /// the status bar, neither of which may be written from where playback runs.
+    /// </summary>
+    private void OnPipelineStateChanged(MediaEngineState state, string? error)
+    {
         SetState(state);
 
         if (state == MediaEngineState.Ended)
@@ -304,7 +313,7 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
         }
         else if (state == MediaEngineState.Error)
         {
-            string message = pipeline.Error ?? "Playback failed.";
+            string message = error ?? "Playback failed.";
             Logger.E(TAG, $"Media playback failed: {message}", null);
             CoroutineUtils.RunInMainThread(() => ErrorOccurred?.Invoke(message));
         }

@@ -44,24 +44,30 @@ internal sealed class SwapChainPanelRenderTarget : IVideoRenderTarget
 
     public int SurfaceHeight => _surfaceHeight;
 
-    /// <summary>The scale the swap chain has to be sized by: one surface pixel per logical unit.</summary>
+    /// <summary>
+    /// Physical pixels per logical pixel, as the panel reports it. The engine sizes the swap chain by it
+    /// and cancels it again on the swap chain itself, so the buffer's pixels reach the display unchanged.
+    /// </summary>
     public double RasterizationScale => _scale;
 
     /// <summary>
-    /// A swap chain panel maps its swap chain in <em>logical</em> units and applies its own composition
-    /// scale when it draws, so the surface has to be one pixel per logical unit. Sizing it at device
-    /// resolution (<c>ActualSize × composition scale</c>) makes the surface larger than the panel and
-    /// XAML clips it, which is what cropped the picture to its top-left corner.
+    /// A swap chain panel maps its swap chain in <em>logical</em> units and applies its composition scale
+    /// when it composes, so the surface is reported in logical units and the scale alongside it: the
+    /// engine multiplies the two for the buffer size and cancels the scale with a transform on the swap
+    /// chain. Sizing the buffer here (in physical pixels) without that transform was the combination that
+    /// once made the picture larger than the panel and cropped it to its top-left corner.
     /// <para>
-    /// Rendering at device resolution as well needs a matrix transform on the swap chain to cancel the
-    /// panel's scale; that is recorded as follow-up work in the plan.
+    /// One scale covers both axes: the panel is not rotated or skeued, so X and Y differ only if the XAML
+    /// around it applies a non-uniform transform, which nothing in this app does.
     /// </para>
     /// </summary>
     private void UpdateSurfaceSize()
     {
         _surfaceWidth = (int)Math.Round(_panel.ActualWidth);
         _surfaceHeight = (int)Math.Round(_panel.ActualHeight);
-        _scale = 1.0;
+
+        double scale = _panel.CompositionScaleX;
+        _scale = double.IsFinite(scale) && scale > 0 ? scale : 1.0;
     }
 
     /// <summary>
@@ -178,7 +184,8 @@ internal sealed class SwapChainPanelRenderTarget : IVideoRenderTarget
 
     /// <summary>
     /// Raised when the panel's mapping scale changes, which normally means the window moved to a
-    /// display with a different scale. The surface has to be re-sized to the new scale.
+    /// display with a different scale. The surface has to be re-sized and the swap chain's transform
+    /// re-applied, which the engine does from this event.
     /// </summary>
     private void OnCompositionScaleChanged(SwapChainPanel sender, object args)
     {

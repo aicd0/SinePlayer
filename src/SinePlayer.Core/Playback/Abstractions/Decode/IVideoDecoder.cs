@@ -16,8 +16,8 @@ public interface IVideoDecoder : IMediaDecoder
     /// Decodes one packet. A packet may yield no frame at all, one frame, or several frames when the
     /// codec has reordering or field pairs.
     /// </summary>
-    PlaybackResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames);
+    PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames);
 
     /// <summary>Emits the frames the decoder still holds after the stream ends.</summary>
-    PlaybackResult Drain(out IReadOnlyList<RawVideoFrame> frames);
+    PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames);
 }

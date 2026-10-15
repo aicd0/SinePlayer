@@ -108,7 +108,7 @@ public class D3D11PlanarRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
         _renderer.SetOutput(target.View, Width, Height);
 
-        PlaybackResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame);
 
         Assert.That(result.IsSuccessful, Is.False);
     }
@@ -119,7 +119,7 @@ public class D3D11PlanarRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
 
         _renderer.SetOutput(target.View, Width, Height);
-        PlaybackResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         return target.ReadPixels(_device);
