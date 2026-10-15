@@ -13,7 +13,7 @@ namespace SinePlayer.Core.Playback.Abstractions.Decode;
 /// </summary>
 public interface ISubtitleDecoder : IMediaDecoder
 {
-    PlaybackResult TryDecode(MediaPacket packet, out IReadOnlyList<SubtitleCue> cues);
+    PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<SubtitleCue> cues);
 
-    PlaybackResult Drain(out IReadOnlyList<SubtitleCue> cues);
+    PlaybackOperationResult Drain(out IReadOnlyList<SubtitleCue> cues);
 }

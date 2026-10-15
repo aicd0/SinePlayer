@@ -15,8 +15,8 @@ public interface ISubtitleRenderer : IDisposable
 {
     string Name { get; }
 
-    PlaybackResult Configure();
+    PlaybackOperationResult Configure();
 
     /// <summary>Shows a cue, or clears the current one when <paramref name="cue"/> is null.</summary>
-    PlaybackResult Render(SubtitleCue? cue);
+    PlaybackOperationResult Render(SubtitleCue? cue);
 }

@@ -127,19 +127,19 @@ public sealed class FFmpegAudioDecoder : IAudioDecoder
         return false;
     }
 
-    public PlaybackResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
+    public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
     {
         List<RawAudioBuffer> decoded = [];
         buffers = decoded;
 
         if (_disposed)
         {
-            return PlaybackResult.Failure("The decoder has already been disposed.");
+            return PlaybackOperationResult.Failure("The decoder has already been disposed.");
         }
 
         if (packet.Buffer is not FFmpegPacketBuffer packetBuffer)
         {
-            return PlaybackResult.Failure("The packet was not produced by the FFmpeg backend.");
+            return PlaybackOperationResult.Failure("The packet was not produced by the FFmpeg backend.");
         }
 
         _lastPacketTimestamp = packet.Timestamp.Ticks;
@@ -150,7 +150,7 @@ public sealed class FFmpegAudioDecoder : IAudioDecoder
             // The decoder wants its pending output collected before it accepts more input. The packet
             // is still ours at this point, so drain and try once more.
             int pending = decoded.Count;
-            PlaybackResult drainResult = ReceiveBuffers(decoded);
+            PlaybackOperationResult drainResult = ReceiveBuffers(decoded);
             if (!drainResult.IsSuccessful)
             {
                 return drainResult;
@@ -158,7 +158,7 @@ public sealed class FFmpegAudioDecoder : IAudioDecoder
 
             if (decoded.Count == pending)
             {
-                return PlaybackResult.Failure("The decoder is not accepting input.");
+                return PlaybackOperationResult.Failure("The decoder is not accepting input.");
             }
 
             sendResult = FFmpegNative.avcodec_send_packet(_context, packetBuffer.Packet);
@@ -166,42 +166,42 @@ public sealed class FFmpegAudioDecoder : IAudioDecoder
 
         if (sendResult < 0 && sendResult != FFmpegConstants.ErrorEndOfStream)
         {
-            return PlaybackResult.Failure($"Unable to submit a packet to the decoder: {FFmpegInterop.GetErrorMessage(sendResult)}");
+            return PlaybackOperationResult.Failure($"Unable to submit a packet to the decoder: {FFmpegInterop.GetErrorMessage(sendResult)}");
         }
 
         return ReceiveBuffers(decoded);
     }
 
-    public PlaybackResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
+    public PlaybackOperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
     {
         List<RawAudioBuffer> decoded = [];
         buffers = decoded;
 
         if (_disposed)
         {
-            return PlaybackResult.Failure("The decoder has already been disposed.");
+            return PlaybackOperationResult.Failure("The decoder has already been disposed.");
         }
 
         // A null packet puts the decoder into draining mode.
         int result = FFmpegNative.avcodec_send_packet(_context, 0);
         if (result < 0 && result != FFmpegConstants.ErrorEndOfStream)
         {
-            return PlaybackResult.Failure($"Unable to drain the decoder: {FFmpegInterop.GetErrorMessage(result)}");
+            return PlaybackOperationResult.Failure($"Unable to drain the decoder: {FFmpegInterop.GetErrorMessage(result)}");
         }
 
         return ReceiveBuffers(decoded);
     }
 
-    public PlaybackResult Flush()
+    public PlaybackOperationResult Flush()
     {
         if (_disposed)
         {
-            return PlaybackResult.Failure("The decoder has already been disposed.");
+            return PlaybackOperationResult.Failure("The decoder has already been disposed.");
         }
 
         FFmpegNative.avcodec_flush_buffers(_context);
         FFmpegNative.av_frame_unref(_receiveFrame);
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 
     public void Dispose()
@@ -228,24 +228,24 @@ public sealed class FFmpegAudioDecoder : IAudioDecoder
         }
     }
 
-    private PlaybackResult ReceiveBuffers(List<RawAudioBuffer> buffers)
+    private PlaybackOperationResult ReceiveBuffers(List<RawAudioBuffer> buffers)
     {
         while (true)
         {
             int result = FFmpegNative.avcodec_receive_frame(_context, _receiveFrame);
             if (result == FFmpegConstants.ErrorAgain || result == FFmpegConstants.ErrorEndOfStream)
             {
-                return PlaybackResult.Success;
+                return PlaybackOperationResult.Success;
             }
 
             if (result < 0)
             {
-                return PlaybackResult.Failure($"Unable to receive decoded audio: {FFmpegInterop.GetErrorMessage(result)}");
+                return PlaybackOperationResult.Failure($"Unable to receive decoded audio: {FFmpegInterop.GetErrorMessage(result)}");
             }
 
             if (!TryTakeBuffer(out RawAudioBuffer? buffer, out string error))
             {
-                return PlaybackResult.Failure(error);
+                return PlaybackOperationResult.Failure(error);
             }
 
             buffers.Add(buffer!);

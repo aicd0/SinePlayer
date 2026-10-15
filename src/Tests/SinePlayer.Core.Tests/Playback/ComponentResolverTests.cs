@@ -234,10 +234,10 @@ public class ComponentResolverTests
 
         public ComponentCapabilities Capabilities { get; }
 
-        public PlaybackResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
         {
             decoder = null;
-            return PlaybackResult.Failure("Test factory does not create components.");
+            return PlaybackOperationResult.Failure("Test factory does not create components.");
         }
     }
 
@@ -254,10 +254,10 @@ public class ComponentResolverTests
 
         public ComponentCapabilities Capabilities { get; }
 
-        public PlaybackResult TryOpen(MediaLocator locator, out IMediaSource? source)
+        public PlaybackOperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
         {
             source = null;
-            return PlaybackResult.Failure("Test factory does not create components.");
+            return PlaybackOperationResult.Failure("Test factory does not create components.");
         }
     }
 
@@ -274,10 +274,10 @@ public class ComponentResolverTests
 
         public ComponentCapabilities Capabilities { get; }
 
-        public PlaybackResult TryCreate(out IVideoRenderer? component)
+        public PlaybackOperationResult TryCreate(out IVideoRenderer? component)
         {
             component = null;
-            return PlaybackResult.Failure("Test factory does not create components.");
+            return PlaybackOperationResult.Failure("Test factory does not create components.");
         }
     }
 }

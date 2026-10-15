@@ -134,47 +134,47 @@ public sealed class FFmpegSource : IMediaSource
         return true;
     }
 
-    public PlaybackResult Seek(TimeSpan position)
+    public PlaybackOperationResult Seek(TimeSpan position)
     {
         if (_disposed)
         {
-            return PlaybackResult.Failure("The media source has already been disposed.");
+            return PlaybackOperationResult.Failure("The media source has already been disposed.");
         }
 
         long timestamp = (long)(position.TotalSeconds * FFmpegConstants.TimeBase);
         int result = FFmpegNative.av_seek_frame(_context, -1, timestamp, FFmpegConstants.SeekFlagBackward);
         if (result < 0)
         {
-            return PlaybackResult.Failure($"Unable to seek to {position}: {FFmpegInterop.GetErrorMessage(result)}");
+            return PlaybackOperationResult.Failure($"Unable to seek to {position}: {FFmpegInterop.GetErrorMessage(result)}");
         }
 
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 
-    public PlaybackResult TryReadPacket(out MediaPacket? packet)
+    public PlaybackOperationResult TryReadPacket(out MediaPacket? packet)
     {
         packet = null;
         if (_disposed)
         {
-            return PlaybackResult.Failure("The media source has already been disposed.");
+            return PlaybackOperationResult.Failure("The media source has already been disposed.");
         }
 
         int result = FFmpegNative.av_read_frame(_context, _readPacket);
         if (result == FFmpegConstants.ErrorEndOfStream)
         {
-            return PlaybackResult.Success;
+            return PlaybackOperationResult.Success;
         }
 
         if (result < 0)
         {
-            return PlaybackResult.Failure($"Unable to read the next packet: {FFmpegInterop.GetErrorMessage(result)}");
+            return PlaybackOperationResult.Failure($"Unable to read the next packet: {FFmpegInterop.GetErrorMessage(result)}");
         }
 
         nint owned = FFmpegNative.av_packet_alloc();
         if (owned == 0)
         {
             FFmpegNative.av_packet_unref(_readPacket);
-            return PlaybackResult.Failure("Unable to allocate an FFmpeg packet.");
+            return PlaybackOperationResult.Failure("Unable to allocate an FFmpeg packet.");
         }
 
         int referenceResult = FFmpegNative.av_packet_ref(owned, _readPacket);
@@ -182,11 +182,11 @@ public sealed class FFmpegSource : IMediaSource
         if (referenceResult < 0)
         {
             FFmpegNative.av_packet_free(ref owned);
-            return PlaybackResult.Failure($"Unable to retain packet data: {FFmpegInterop.GetErrorMessage(referenceResult)}");
+            return PlaybackOperationResult.Failure($"Unable to retain packet data: {FFmpegInterop.GetErrorMessage(referenceResult)}");
         }
 
         packet = CreatePacket(owned);
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 
     public void Dispose()

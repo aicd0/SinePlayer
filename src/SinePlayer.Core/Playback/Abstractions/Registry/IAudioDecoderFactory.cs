@@ -13,5 +13,5 @@ public interface IAudioDecoderFactory : IComponentFactory
     /// Creates a decoder that is ready to decode. The source is required because the container holds
     /// the codec configuration the decoder needs; it is only read during this call.
     /// </summary>
-    PlaybackResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IAudioDecoder? decoder);
+    PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IAudioDecoder? decoder);
 }

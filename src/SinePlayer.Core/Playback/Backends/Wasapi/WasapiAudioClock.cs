@@ -86,13 +86,26 @@ internal sealed class WasapiAudioClock : IPlaybackClock
         IsRunning = false;
     }
 
+    /// <summary>
+    /// Points the clock at a new position, from wherever the device is now. The device's own position is
+    /// taken as the zero point rather than assumed to be one: whoever asks for this cannot know whether the
+    /// device has been reset, because the reset belongs to the thread that owns it — a seek is asked for on
+    /// one thread and taken up on another, and the clock is read in between.
+    /// <para>
+    /// That is also what makes this honest while a device still holds audio for the position playback has
+    /// just left: time reads as the position that was asked for, instead of the position plus everything the
+    /// device has played since it was last reset.
+    /// </para>
+    /// </summary>
     public void SetPosition(TimeSpan position)
     {
-        // Called after the pipeline has flushed, so the device is back at its start.
-        lock (_lock)
+        unsafe
         {
-            _base = position;
-            _basePosition = 0;
+            lock (_lock)
+            {
+                _audioClock.GetPosition(out _basePosition);
+                _base = position;
+            }
         }
     }
 

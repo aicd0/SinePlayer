@@ -16,8 +16,8 @@ public interface IAudioDecoder : IMediaDecoder
     /// Decodes one packet. A packet normally yields one buffer but may yield several when the
     /// container packs multiple audio frames together.
     /// </summary>
-    PlaybackResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers);
+    PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers);
 
     /// <summary>Emits the buffers the decoder still holds after the stream ends.</summary>
-    PlaybackResult Drain(out IReadOnlyList<RawAudioBuffer> buffers);
+    PlaybackOperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers);
 }

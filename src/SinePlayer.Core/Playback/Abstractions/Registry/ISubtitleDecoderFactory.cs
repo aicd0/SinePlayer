@@ -13,5 +13,5 @@ public interface ISubtitleDecoderFactory : IComponentFactory
     /// Creates a decoder that is ready to decode. The source is required because the container holds
     /// the codec configuration the decoder needs; it is only read during this call.
     /// </summary>
-    PlaybackResult TryCreate(IMediaSource source, SubtitleStreamInfo stream, out ISubtitleDecoder? decoder);
+    PlaybackOperationResult TryCreate(IMediaSource source, SubtitleStreamInfo stream, out ISubtitleDecoder? decoder);
 }

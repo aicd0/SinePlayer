@@ -138,7 +138,7 @@ public class FFmpegVideoDecoderTests
             Buffer = new ForeignBuffer(),
         };
 
-        PlaybackResult result = decoder.TryDecode(packet, out IReadOnlyList<RawVideoFrame> frames);
+        PlaybackOperationResult result = decoder.TryDecode(packet, out IReadOnlyList<RawVideoFrame> frames);
 
         using (Assert.EnterMultipleScope())
         {
@@ -158,7 +158,7 @@ public class FFmpegVideoDecoderTests
     private FFmpegSource OpenImage()
     {
         FFmpegSourceProviderFactory factory = new();
-        PlaybackResult result = factory.TryOpen(MediaLocator.Parse(_imagePath), out IMediaSource? source);
+        PlaybackOperationResult result = factory.TryOpen(MediaLocator.Parse(_imagePath), out IMediaSource? source);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
         Assert.That(source, Is.InstanceOf<FFmpegSource>());
 
@@ -171,7 +171,7 @@ public class FFmpegVideoDecoderTests
         VideoStreamInfo stream = source.Info.VideoStreams[0];
 
         FFmpegVideoDecoderFactory factory = new();
-        PlaybackResult result = factory.TryCreate(source, stream, DecoderOptions.Default, out IVideoDecoder? decoder);
+        PlaybackOperationResult result = factory.TryCreate(source, stream, DecoderOptions.Default, out IVideoDecoder? decoder);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
         Assert.That(decoder, Is.Not.Null);
@@ -184,7 +184,7 @@ public class FFmpegVideoDecoderTests
         List<RawVideoFrame> frames = [];
         while (true)
         {
-            PlaybackResult readResult = source.TryReadPacket(out MediaPacket? packet);
+            PlaybackOperationResult readResult = source.TryReadPacket(out MediaPacket? packet);
             Assert.That(readResult.IsSuccessful, Is.True, readResult.Message);
             if (packet is null)
             {
@@ -193,13 +193,13 @@ public class FFmpegVideoDecoderTests
 
             using (packet)
             {
-                PlaybackResult decodeResult = decoder.TryDecode(packet, out IReadOnlyList<RawVideoFrame> decoded);
+                PlaybackOperationResult decodeResult = decoder.TryDecode(packet, out IReadOnlyList<RawVideoFrame> decoded);
                 Assert.That(decodeResult.IsSuccessful, Is.True, decodeResult.Message);
                 frames.AddRange(decoded);
             }
         }
 
-        PlaybackResult drainResult = decoder.Drain(out IReadOnlyList<RawVideoFrame> remaining);
+        PlaybackOperationResult drainResult = decoder.Drain(out IReadOnlyList<RawVideoFrame> remaining);
         Assert.That(drainResult.IsSuccessful, Is.True, drainResult.Message);
         frames.AddRange(remaining);
 

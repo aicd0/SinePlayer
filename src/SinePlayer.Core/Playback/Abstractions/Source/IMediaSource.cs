@@ -22,11 +22,11 @@ public interface IMediaSource : IDisposable
     /// Moves the read position so that the next packet of every stream starts at or after
     /// <paramref name="position"/>. Timestamps of subsequent packets stay in the original time base.
     /// </summary>
-    PlaybackResult Seek(TimeSpan position);
+    PlaybackOperationResult Seek(TimeSpan position);
 
     /// <summary>
     /// Reads the next packet. A successful result with a null packet signals the end of the stream,
     /// while an unsuccessful result reports a read error.
     /// </summary>
-    PlaybackResult TryReadPacket(out MediaPacket? packet);
+    PlaybackOperationResult TryReadPacket(out MediaPacket? packet);
 }

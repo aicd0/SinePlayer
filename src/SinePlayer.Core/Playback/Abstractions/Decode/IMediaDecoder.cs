@@ -26,5 +26,5 @@ public interface IMediaDecoder : IDisposable
     bool IsHardwareAccelerated { get; }
 
     /// <summary>Drops buffered state and delayed frames, for example after a seek.</summary>
-    PlaybackResult Flush();
+    PlaybackOperationResult Flush();
 }

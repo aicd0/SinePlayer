@@ -138,7 +138,7 @@ public class FFmpegAudioDecoderTests
             Buffer = new ForeignBuffer(),
         };
 
-        PlaybackResult result = decoder.TryDecode(packet, out IReadOnlyList<RawAudioBuffer> buffers);
+        PlaybackOperationResult result = decoder.TryDecode(packet, out IReadOnlyList<RawAudioBuffer> buffers);
 
         using (Assert.EnterMultipleScope())
         {
@@ -158,7 +158,7 @@ public class FFmpegAudioDecoderTests
     private FFmpegSource OpenWaveFile()
     {
         FFmpegSourceProviderFactory factory = new();
-        PlaybackResult result = factory.TryOpen(MediaLocator.Parse(_wavePath), out IMediaSource? source);
+        PlaybackOperationResult result = factory.TryOpen(MediaLocator.Parse(_wavePath), out IMediaSource? source);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
         Assert.That(source, Is.InstanceOf<FFmpegSource>());
 
@@ -171,7 +171,7 @@ public class FFmpegAudioDecoderTests
         AudioStreamInfo stream = source.Info.AudioStreams[0];
 
         FFmpegAudioDecoderFactory factory = new();
-        PlaybackResult result = factory.TryCreate(source, stream, DecoderOptions.Default, out IAudioDecoder? decoder);
+        PlaybackOperationResult result = factory.TryCreate(source, stream, DecoderOptions.Default, out IAudioDecoder? decoder);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
         Assert.That(decoder, Is.Not.Null);
@@ -184,7 +184,7 @@ public class FFmpegAudioDecoderTests
         List<RawAudioBuffer> buffers = [];
         while (true)
         {
-            PlaybackResult readResult = source.TryReadPacket(out MediaPacket? packet);
+            PlaybackOperationResult readResult = source.TryReadPacket(out MediaPacket? packet);
             Assert.That(readResult.IsSuccessful, Is.True, readResult.Message);
             if (packet is null)
             {
@@ -198,13 +198,13 @@ public class FFmpegAudioDecoderTests
                     continue;
                 }
 
-                PlaybackResult decodeResult = decoder.TryDecode(packet, out IReadOnlyList<RawAudioBuffer> decoded);
+                PlaybackOperationResult decodeResult = decoder.TryDecode(packet, out IReadOnlyList<RawAudioBuffer> decoded);
                 Assert.That(decodeResult.IsSuccessful, Is.True, decodeResult.Message);
                 buffers.AddRange(decoded);
             }
         }
 
-        PlaybackResult drainResult = decoder.Drain(out IReadOnlyList<RawAudioBuffer> remaining);
+        PlaybackOperationResult drainResult = decoder.Drain(out IReadOnlyList<RawAudioBuffer> remaining);
         Assert.That(drainResult.IsSuccessful, Is.True, drainResult.Message);
         buffers.AddRange(remaining);
 

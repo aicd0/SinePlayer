@@ -71,7 +71,7 @@ public class FFmpegSourceTests
         int packetCount = 0;
         while (true)
         {
-            PlaybackResult result = source.TryReadPacket(out MediaPacket? packet);
+            PlaybackOperationResult result = source.TryReadPacket(out MediaPacket? packet);
             Assert.That(result.IsSuccessful, Is.True, result.Message);
             if (packet is null)
             {
@@ -97,7 +97,7 @@ public class FFmpegSourceTests
     {
         using FFmpegSource source = OpenWaveFile();
 
-        PlaybackResult result = source.Seek(TimeSpan.FromSeconds(DurationSeconds / 2));
+        PlaybackOperationResult result = source.Seek(TimeSpan.FromSeconds(DurationSeconds / 2));
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         result = source.TryReadPacket(out MediaPacket? packet);
@@ -117,7 +117,7 @@ public class FFmpegSourceTests
         FFmpegSourceProviderFactory factory = new();
         string path = Path.Combine(Path.GetTempPath(), $"sineplayer-missing-{Guid.NewGuid():N}.mkv");
 
-        PlaybackResult result = factory.TryOpen(MediaLocator.Parse(path), out IMediaSource? source);
+        PlaybackOperationResult result = factory.TryOpen(MediaLocator.Parse(path), out IMediaSource? source);
 
         using (Assert.EnterMultipleScope())
         {
@@ -138,7 +138,7 @@ public class FFmpegSourceTests
     private FFmpegSource OpenWaveFile()
     {
         FFmpegSourceProviderFactory factory = new();
-        PlaybackResult result = factory.TryOpen(MediaLocator.Parse(_wavePath), out IMediaSource? source);
+        PlaybackOperationResult result = factory.TryOpen(MediaLocator.Parse(_wavePath), out IMediaSource? source);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
         Assert.That(source, Is.InstanceOf<FFmpegSource>());
 

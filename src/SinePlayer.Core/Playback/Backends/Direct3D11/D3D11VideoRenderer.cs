@@ -74,14 +74,31 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
         _outputHeight = height;
     }
 
-    public PlaybackResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
+    /// <summary>Size of the surface being drawn into, which a test checks is the display's pixel count.</summary>
+    internal int OutputPixelWidth => _outputWidth;
+
+    internal int OutputPixelHeight => _outputHeight;
+
+    /// <summary>
+    /// The scale transform the swap chain applies when the host composes it, which a test checks is the
+    /// inverse of the display's scale — the pair to <see cref="OutputPixelWidth"/>.
+    /// </summary>
+    internal bool TryGetCompositionTransform(out double scaleX, out double scaleY)
+    {
+        scaleX = 1.0;
+        scaleY = 1.0;
+
+        return _swapChain is not null && _swapChain.TryGetCompositionTransform(out scaleX, out scaleY);
+    }
+
+    public PlaybackOperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(target);
 
         if (_disposed)
         {
-            return PlaybackResult.Failure("The renderer has already been disposed.");
+            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
         }
 
         if (!ReferenceEquals(_target, target))
@@ -95,16 +112,16 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
             target.SurfaceSizeChanged += OnSurfaceSizeChanged;
         }
 
-        (int width, int height) = GetSurfaceSize(target);
+        (int width, int height, double scale) = GetSurfaceSize(target);
 
         if (_swapChain is null)
         {
-            if (!D3D11SwapChain.TryCreate(_device, width, height, out D3D11SwapChain? created, out string error))
+            if (!D3D11SwapChain.TryCreate(_device, width, height, scale, out D3D11SwapChain? created, out string error))
             {
-                return PlaybackResult.Failure(error);
+                return PlaybackOperationResult.Failure(error);
             }
 
-            PlaybackResult attach = created!.AttachTo(target);
+            PlaybackOperationResult attach = created!.AttachTo(target);
             if (!attach.IsSuccessful)
             {
                 created.Dispose();
@@ -115,7 +132,7 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
         }
         else
         {
-            PlaybackResult resize = _swapChain.Resize(width, height);
+            PlaybackOperationResult resize = _swapChain.Resize(width, height, scale);
             if (!resize.IsSuccessful)
             {
                 return resize;
@@ -124,21 +141,21 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
 
         _needsResize = false;
         SetOutput(_swapChain.View, _swapChain.Width, _swapChain.Height);
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 
-    public PlaybackResult Render(RawVideoFrame frame)
+    public PlaybackOperationResult Render(RawVideoFrame frame)
     {
         ArgumentNullException.ThrowIfNull(frame);
 
         if (_disposed)
         {
-            return PlaybackResult.Failure("The renderer has already been disposed.");
+            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
         }
 
         if (_swapChain is not null && _needsResize)
         {
-            PlaybackResult resize = ApplyPendingResize();
+            PlaybackOperationResult resize = ApplyPendingResize();
             if (!resize.IsSuccessful)
             {
                 return resize;
@@ -147,44 +164,67 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
 
         if (_outputView is null || _outputWidth <= 0 || _outputHeight <= 0)
         {
-            return PlaybackResult.Failure("The renderer has no output surface.");
+            return PlaybackOperationResult.Failure("The renderer has no output surface.");
         }
 
         if (frame.Buffer is not IPlanarVideoBuffer buffer)
         {
-            return PlaybackResult.Failure("The frame does not expose readable planes.");
+            return PlaybackOperationResult.Failure("The frame does not expose readable planes.");
         }
 
         if (!_shaders.TryGetPixelShader(frame.Format, out ID3D11PixelShader? pixelShader))
         {
-            return PlaybackResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames.");
+            return PlaybackOperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames.");
         }
 
-        PlaybackResult upload = Upload(frame, buffer);
+        PlaybackOperationResult upload = Upload(frame, buffer);
         if (!upload.IsSuccessful)
         {
             return upload;
         }
 
-        ID3D11DeviceContext context = _device.Context;
-        context.OMSetRenderTargets(1, [_outputView], null);
+        return Draw(pixelShader!);
+    }
 
-        // Anything the picture does not reach has to be painted, or what is left of the frame before it
-        // shows through: the surface is a window, not the video.
-        context.ClearRenderTargetView(_outputView, [0.0f, 0.0f, 0.0f, 1.0f]);
+    public PlaybackOperationResult RefreshSurface()
+    {
+        if (_disposed)
+        {
+            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
+        }
 
-        // Drawn into the part of the surface the frame's shape calls for rather than the whole of it, so
-        // a picture whose shape differs from the window's is letterboxed instead of stretched.
-        (int fittedX, int fittedY, int fittedWidth, int fittedHeight) = VideoFit.Fit(frame.Width, frame.Height, _outputWidth, _outputHeight);
-        D3D11Interop.SetViewport(context, fittedX, fittedY, fittedWidth, fittedHeight);
-        context.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        D3D11Interop.SetShaders(context, _shaders.VertexShader, pixelShader!);
-        D3D11Interop.SetTextures(context, _planeViews, _shaders.Sampler);
+        if (_swapChain is not null && _needsResize)
+        {
+            PlaybackOperationResult resize = ApplyPendingResize();
+            if (!resize.IsSuccessful)
+            {
+                return resize;
+            }
+        }
 
-        // A single triangle covers the whole target, so no vertex or index buffer is needed.
-        context.Draw(3, 0);
+        if (_planeTextures.Length == 0 || _outputView is null)
+        {
+            // Nothing has been drawn yet, or there is no surface of our own to resize: the planes of the
+            // last frame are what would be drawn again, and there are none.
+            return PlaybackOperationResult.Success;
+        }
 
-        return _swapChain is null ? PlaybackResult.Success : _swapChain.Present();
+        if (!_shaders.TryGetPixelShader(_frameFormat, out ID3D11PixelShader? pixelShader))
+        {
+            return PlaybackOperationResult.Success;
+        }
+
+        return Draw(pixelShader!);
+    }
+
+    /// <summary>
+    /// How many frames the display took, when the swap chain can say. The offscreen output a test uses has no
+    /// swap chain at all, so there it says nothing — which is the truth about an offscreen target.
+    /// </summary>
+    public bool TryGetDisplayedFrameCount(out long count)
+    {
+        count = 0;
+        return _swapChain is not null && _swapChain.TryGetDisplayedFrameCount(out count);
     }
 
     public void Dispose()
@@ -207,6 +247,34 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
 
         ReleaseFrameTextures();
         _shaders.Dispose();
+    }
+
+    /// <summary>
+    /// Draws the planes of the last uploaded frame into the output surface and presents it. Kept apart
+    /// from <see cref="Render"/> because the planes outlive the frame: they are what makes it possible to
+    /// show the same picture again after the surface changed.
+    /// </summary>
+    private PlaybackOperationResult Draw(ID3D11PixelShader pixelShader)
+    {
+        ID3D11DeviceContext context = _device.Context;
+        context.OMSetRenderTargets(1, [_outputView], null);
+
+        // Anything the picture does not reach has to be painted, or what is left of the frame before it
+        // shows through: the surface is a window, not the video.
+        context.ClearRenderTargetView(_outputView, [0.0f, 0.0f, 0.0f, 1.0f]);
+
+        // Drawn into the part of the surface the frame's shape calls for rather than the whole of it, so
+        // a picture whose shape differs from the window's is letterboxed instead of stretched.
+        (int fittedX, int fittedY, int fittedWidth, int fittedHeight) = VideoFit.Fit(_frameWidth, _frameHeight, _outputWidth, _outputHeight);
+        D3D11Interop.SetViewport(context, fittedX, fittedY, fittedWidth, fittedHeight);
+        context.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        D3D11Interop.SetShaders(context, _shaders.VertexShader, pixelShader);
+        D3D11Interop.SetTextures(context, _planeViews, _shaders.Sampler);
+
+        // A single triangle covers the whole target, so no vertex or index buffer is needed.
+        context.Draw(3, 0);
+
+        return _swapChain is null ? PlaybackOperationResult.Success : _swapChain.Present();
     }
 
     /// <summary>
@@ -239,10 +307,22 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
         };
     }
 
-    private static (int Width, int Height) GetSurfaceSize(IVideoRenderTarget target)
+    /// <summary>
+    /// The size the swap chain has to be, in physical pixels, and the scale of the host's element that
+    /// has to be cancelled for those pixels to reach the display unchanged.
+    /// </summary>
+    private static (int Width, int Height, double Scale) GetSurfaceSize(IVideoRenderTarget target)
     {
         double scale = target.RasterizationScale > 0 ? target.RasterizationScale : 1.0;
-        return (Math.Max(1, (int)Math.Round(target.SurfaceWidth * scale)), Math.Max(1, (int)Math.Round(target.SurfaceHeight * scale)));
+        if (!double.IsFinite(scale))
+        {
+            scale = 1.0;
+        }
+
+        return (
+            Math.Max(1, (int)Math.Round(target.SurfaceWidth * scale)),
+            Math.Max(1, (int)Math.Round(target.SurfaceHeight * scale)),
+            scale);
     }
 
     private void OnSurfaceSizeChanged()
@@ -250,15 +330,15 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
         _needsResize = true;
     }
 
-    private PlaybackResult ApplyPendingResize()
+    private PlaybackOperationResult ApplyPendingResize()
     {
         if (_swapChain is null || _target is null)
         {
-            return PlaybackResult.Success;
+            return PlaybackOperationResult.Success;
         }
 
-        (int width, int height) = GetSurfaceSize(_target);
-        PlaybackResult resize = _swapChain.Resize(width, height);
+        (int width, int height, double scale) = GetSurfaceSize(_target);
+        PlaybackOperationResult resize = _swapChain.Resize(width, height, scale);
         if (!resize.IsSuccessful)
         {
             return resize;
@@ -266,20 +346,20 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
 
         _needsResize = false;
         SetOutput(_swapChain.View, _swapChain.Width, _swapChain.Height);
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 
-    private PlaybackResult Upload(RawVideoFrame frame, IPlanarVideoBuffer buffer)
+    private PlaybackOperationResult Upload(RawVideoFrame frame, IPlanarVideoBuffer buffer)
     {
         (DXGI_FORMAT Format, int Width, int Height)[] layout = GetPlaneLayout(frame.Format, frame.Width, frame.Height);
         if (layout.Length == 0)
         {
-            return PlaybackResult.Failure($"The Direct3D renderer cannot upload {frame.Format} frames.");
+            return PlaybackOperationResult.Failure($"The Direct3D renderer cannot upload {frame.Format} frames.");
         }
 
         if (buffer.PlaneCount < layout.Length)
         {
-            return PlaybackResult.Failure($"The frame has {buffer.PlaneCount} planes but {frame.Format} needs {layout.Length}.");
+            return PlaybackOperationResult.Failure($"The frame has {buffer.PlaneCount} planes but {frame.Format} needs {layout.Length}.");
         }
 
         if (_planeTextures.Length != layout.Length || _frameWidth != frame.Width || _frameHeight != frame.Height || _frameFormat != frame.Format)
@@ -297,14 +377,14 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
             int stride = buffer.GetPlaneStride(plane);
             if (pixels == 0 || stride <= 0)
             {
-                return PlaybackResult.Failure($"Plane {plane} of the frame is not readable.");
+                return PlaybackOperationResult.Failure($"Plane {plane} of the frame is not readable.");
             }
 
             // The box is expressed in texels, so the source row pitch stays whatever the decoder used.
             D3D11Interop.UploadTexture(_device.Context, _planeTextures[plane], layout[plane].Width, layout[plane].Height, pixels, stride);
         }
 
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 
     private void CreateFrameTextures((DXGI_FORMAT Format, int Width, int Height)[] layout)

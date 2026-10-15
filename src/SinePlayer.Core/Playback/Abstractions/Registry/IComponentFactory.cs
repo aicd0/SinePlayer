@@ -17,5 +17,5 @@ public interface IComponentFactory
 /// </summary>
 public interface IComponentFactory<TComponent> : IComponentFactory
 {
-    PlaybackResult TryCreate(out TComponent? component);
+    PlaybackOperationResult TryCreate(out TComponent? component);
 }

@@ -22,17 +22,17 @@ public sealed class FFmpegSourceProviderFactory : ISourceProviderFactory
         Description = "Opens media through FFmpeg's libavformat demuxers.",
     };
 
-    public PlaybackResult TryOpen(MediaLocator locator, out IMediaSource? source)
+    public PlaybackOperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
     {
         ArgumentNullException.ThrowIfNull(locator);
 
         if (!FFmpegSource.TryOpen(locator, out FFmpegSource? ffmpegSource, out string error))
         {
             source = null;
-            return PlaybackResult.Failure(error);
+            return PlaybackOperationResult.Failure(error);
         }
 
         source = ffmpegSource;
-        return PlaybackResult.Success;
+        return PlaybackOperationResult.Success;
     }
 }

@@ -41,7 +41,7 @@ public class AV1FixtureTests
         TestContext.Progress.WriteLine($"fixture: {path} ({new FileInfo(path).Length} bytes)");
 
         FFmpegSourceProviderFactory sourceFactory = new();
-        PlaybackResult openResult = sourceFactory.TryOpen(MediaLocator.Parse(path), out IMediaSource? source);
+        PlaybackOperationResult openResult = sourceFactory.TryOpen(MediaLocator.Parse(path), out IMediaSource? source);
         Assert.That(openResult.IsSuccessful, Is.True, openResult.Message);
 
         using IMediaSource mediaSource = source!;
@@ -52,7 +52,7 @@ public class AV1FixtureTests
         Assert.That(stream.Height, Is.EqualTo(Av1FixtureFile.Height));
 
         FFmpegVideoDecoderFactory decoderFactory = new();
-        PlaybackResult decoderResult = decoderFactory.TryCreate(mediaSource, stream, DecoderOptions.Default, out IVideoDecoder? decoder);
+        PlaybackOperationResult decoderResult = decoderFactory.TryCreate(mediaSource, stream, DecoderOptions.Default, out IVideoDecoder? decoder);
         Assert.That(decoderResult.IsSuccessful, Is.True, decoderResult.Message);
 
         using IVideoDecoder videoDecoder = decoder!;
@@ -60,7 +60,7 @@ public class AV1FixtureTests
         TimeSpan lastTimestamp = TimeSpan.Zero;
         while (true)
         {
-            PlaybackResult readResult = mediaSource.TryReadPacket(out MediaPacket? packet);
+            PlaybackOperationResult readResult = mediaSource.TryReadPacket(out MediaPacket? packet);
             Assert.That(readResult.IsSuccessful, Is.True, readResult.Message);
             if (packet is null)
             {
@@ -74,7 +74,7 @@ public class AV1FixtureTests
                     continue;
                 }
 
-                PlaybackResult decodeResult = videoDecoder.TryDecode(packet, out IReadOnlyList<RawVideoFrame> frames);
+                PlaybackOperationResult decodeResult = videoDecoder.TryDecode(packet, out IReadOnlyList<RawVideoFrame> frames);
                 Assert.That(decodeResult.IsSuccessful, Is.True, decodeResult.Message);
 
                 foreach (RawVideoFrame frame in frames)
@@ -97,7 +97,7 @@ public class AV1FixtureTests
             }
         }
 
-        PlaybackResult drainResult = videoDecoder.Drain(out IReadOnlyList<RawVideoFrame> tail);
+        PlaybackOperationResult drainResult = videoDecoder.Drain(out IReadOnlyList<RawVideoFrame> tail);
         Assert.That(drainResult.IsSuccessful, Is.True, drainResult.Message);
         foreach (RawVideoFrame frame in tail)
         {

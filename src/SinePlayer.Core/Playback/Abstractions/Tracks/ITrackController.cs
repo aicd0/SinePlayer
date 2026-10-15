@@ -23,5 +23,5 @@ public interface ITrackController
     /// Activates the given stream. Passing null turns the corresponding kind off, which is how a
     /// caller disables audio or subtitles.
     /// </summary>
-    PlaybackResult SelectStream(MediaStreamInfo? stream);
+    PlaybackOperationResult SelectStream(MediaStreamInfo? stream);
 }
