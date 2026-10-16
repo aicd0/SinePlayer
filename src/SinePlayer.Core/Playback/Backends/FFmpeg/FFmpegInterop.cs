@@ -113,21 +113,6 @@ internal static class FFmpegInterop
         };
     }
 
-    internal static string DescribeChannelLayout(AVChannelLayout layout)
-    {
-        unsafe
-        {
-            byte* buffer = stackalloc byte[ErrorBufferSize];
-            int result = FFmpegNative.av_channel_layout_describe((nint)(&layout), (nint)buffer, ErrorBufferSize);
-            if (result < 0)
-            {
-                return string.Empty;
-            }
-
-            return Marshal.PtrToStringUTF8((nint)buffer) ?? string.Empty;
-        }
-    }
-
     internal static string GetErrorMessage(int error)
     {
         unsafe

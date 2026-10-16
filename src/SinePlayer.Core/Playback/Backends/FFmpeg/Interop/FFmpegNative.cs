@@ -40,9 +40,6 @@ internal static partial class FFmpegNative
     internal static partial int av_sample_fmt_is_planar(int format);
 
     [LibraryImport(AvUtil)]
-    internal static partial int av_channel_layout_describe(nint channelLayout, nint buffer, nuint bufferSize);
-
-    [LibraryImport(AvUtil)]
     internal static partial int av_strerror(int error, nint buffer, nuint bufferSize);
 
     //

@@ -70,7 +70,21 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private void OnPlayClicked(object sender, RoutedEventArgs e)
     {
-        _pipeline?.Play();
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            return;
+        }
+
+        if (pipeline.State == MediaEngineState.Ended)
+        {
+            // Asking to play once the file has run out means starting it again. The pipeline outlives the end
+            // of the file, so a seek is all it takes — and it is needed, because a paused seek past the end of
+            // the picture can end the file without the user asking to play it.
+            pipeline.Seek(TimeSpan.Zero);
+        }
+
+        pipeline.Play();
         RefreshStatus();
     }
 
@@ -184,10 +198,21 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         // Posted like the rest, and awaited here for both halves of the answer: where the seek landed, and
         // whether the source took it at all — a refused seek leaves playback where it was.
+        //
+        // The pipeline leaves a seek paused: what it reports is a fact about the file, never a wish to keep
+        // playing. Whether the new position goes on playing is the host's call, and this page is the host —
+        // so "a jump while playing goes on playing", which is what the buttons mean, is decided here. Read
+        // before the seek is posted, because the answer is about what playback was doing when it was asked.
+        bool wasPlaying = pipeline.State == MediaEngineState.Playing;
+
         PlaybackOperationResult seeked = await pipeline.Seek(target);
         if (!seeked.IsSuccessful)
         {
             Report($"The seek was refused. {seeked.Message}");
+        }
+        else if (wasPlaying)
+        {
+            await pipeline.Play();
         }
 
         RefreshStatus();
