@@ -148,17 +148,6 @@ internal sealed class D3D11VideoShaders : IDisposable
         return true;
     }
 
-    /// <summary>Number of textures the pixel shader for a layout expects.</summary>
-    internal static int GetTextureCount(PixelFormat format)
-    {
-        return format switch
-        {
-            PixelFormat.Nv12 => 2,
-            PixelFormat.Yuv420P or PixelFormat.Yuv420P10 or PixelFormat.Yuv422P or PixelFormat.Yuv444P => 3,
-            _ => 1,
-        };
-    }
-
     internal bool TryGetPixelShader(PixelFormat format, out ID3D11PixelShader? pixelShader)
     {
         return _pixelShaders.TryGetValue(format, out pixelShader);

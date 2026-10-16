@@ -795,6 +795,8 @@ Decisions worth reviewing:
 *Verified:* 92/92 tests pass. The new tests seek while playing (resuming, then running to the end) and
 while paused (staying paused, then running to the end).
 *Not verified here:* whether the Lab looks and sounds right, which is yours to judge.
+(Decision 3 is superseded by S9z: a seek now always leaves playback paused and the host's one `Play` decides
+whether it goes on — the app's "a jump while playing keeps playing" lives in the adapter.)
 
 **S8c — Apartments: the engine owns its objects on the thread that uses them.** *Done.*
 The Lab found a defect the tests structurally could not. The Direct3D device was created by the host, on
@@ -1227,7 +1229,9 @@ The two refusal paths needed a source that refuses, which no file on disk does, 
 real source (`LiveRefusingSourceFactory`) and give it a video decoder that never produces a frame
 (`SilentVideoDecoderFactory`) — the real decoder insists on its own source type. The wrapper loops the file
 instead of ending it, which is what makes the test a *live* stream: playback stays `Playing` for as long as the
-test needs to look at it rather than racing to the end of a fixture.
+test needs to look at it rather than racing to the end of a fixture. (The third row's test is now
+`RefusesASeekTheSourceWillNotCarryOut`, renamed by S9z because a refused seek no longer keeps playback playing:
+a seek pauses, and a refusal leaves that pause standing.)
 
 **S9h — Ownership made explicit.** *Done, from a review the user asked for.*
 The complaint was exact: *"I can't tell which thread owns which variables, and which variables are shared
@@ -1599,9 +1603,10 @@ The replacement is the user's model, spelled out precisely enough to build:
   (§2.2), so this removes the queue's last reach into another thread's object; and it makes "the file has run
   out" a statement about a file whose tail is *already queued*, which is what lets a stage's later word about
   itself be taken at face value.
-- **The queue hears about the ending and decides it** — `SourceEndedCore(epoch)` now sets `_sourceEnded`, arms
-  the ending for that position and returns. It treats a stop or a stale epoch as a report that is not about
-  where playback is, and drops it.
+- **The queue hears about the ending and decides it** — `NotifySourceEnded(epoch)` now says the file has run
+  out, arms the ending for that position and returns. (It states the end with the position it is about —
+  `_endedEpoch` — which is what S9q changed from a boolean.) It treats a stale epoch as a report that is not
+  about where playback is, and drops it.
 - **Three words, each from the only thread that can know it:** the decode thread's "no more frames from me for
   this position", the picture's "nothing left to show" (queue empty and nothing held), the sound's "the device
   holds nothing". Each is a message to the queue, repeated while it stays true at `EndingReportMilliseconds`
@@ -1637,7 +1642,715 @@ used to wait out the bounded ends no longer do. `AnswersACommandWhileTheSoundHas
 the complaint itself (the device is jammed after it has taken the whole file, so the ending is outstanding; a
 seek must still be answered within a second), and it was **falsified deliberately**: with a 3 s sleep put back
 in the EOF item, before any epoch check, it fails on exactly that assertion. `EndsWhenTheDeviceHasPlayedOutTheSound`
-covers the other half — the ending arrives when the sound has been heard, not when a timer says so.
+covers the other half — the ending arrives when the sound has been heard, not when a timer says so. (The
+*words* this step introduced are superseded by S9w: a stage no longer repeats its word level-triggered and the
+decode word is gone, because the end of a stream is now handed to a consumer as an entry of its queue. What
+survives is the model: nothing waits, the ending is earned, and a command is answered while the tail plays.)
+
+**S9p — Four questions about shared state, and what they found.** *Done, from the user's review: "1.
+`_tailDecodedFrameTicks` has two writers during playback, reconsider your design; 2. `_clock?.SetPosition(position);`
+why clock can be set by seek directly before it is anchored? 3. `_videoFlushPending` has only one consumer and
+one writer, why cannot use epoch? 4. `SignalChange();` is already contained by PauseCore and PlayCore, why the
+duplicated work?"*
+
+All four were right, and two of them were the same defect seen from different sides.
+
+**1 and 3 are one change: the epoch is the request.** `_videoFlushPending` (written by the queue under
+`_videoDecodeLock`, taken by the decode thread under the same lock) existed to say "the position moved — let
+your decoder go". That is what the epoch *is*, and the decode thread is the only reader, so its memory of
+having done it belongs in a local of its loop (`flushedForEpoch`), exactly like `producedForEpoch`. The flag,
+the lock and one writer of `_tailDecodedFrameTicks` all go: the clear now happens on the thread that owns the
+decoder, in program order with that thread's own writes — which is what the tail needed, because two writers
+(the decode thread publishing progress, the seek retracting it) can land in either order, and the old
+position's tail surviving a seek makes the starvation rule hold the clock back for the distance the seek
+travelled. §2.2 already said the decoder "belongs to the decode thread, which flushes it when it sees the epoch
+move"; the flag and the lock were leftovers from before that was true.
+
+The take-up happens twice per iteration and that is deliberate: at the top of the loop, and again immediately
+before a decode — because a seek that lands while the thread waits inside `TryDequeue` can hand it a packet
+from the new position, and that packet must not reach a decoder still holding the old one. Exactly the fix the
+audio thread needed for its device last step, which is a good sign that the rule is the general one.
+
+**2 is not the same defect but the same family: a decision reading a value that is not yet true.** The seek sets
+the clock so the host can see where playback was sent, and because a seek while paused has no media coming to
+answer with. But the clock only becomes a fact about *media* when the first media of the position anchors it,
+and until then it reads the position the file was *sent* to — which a demuxer lands before. The drop rule was
+the one decision that did not wait for the anchor (starvation already had the guard), so a seek could make the
+picture skip the keyframe distance: frames "late" against a position nothing was playing. It now waits like
+starvation does.
+
+**4 is duplication, and it was real in two of the three cases.** `SetState` signals on every change, so a seek
+that paused and resumed playback woke every thread twice after publishing the same facts, and a seek from the
+end of the file woke them from its state change as well. Only a seek while *paused* — where nothing about the
+state changes and everything about the position does — needs the seek's own signal, and that is now the only
+branch that takes it. The rule is one wake per change: the state change where there is one, the change signal
+where there is not.
+
+*Verified:* 132/132 tests, x64 and ARM64 clean. No test pins 1–3, and saying so is more useful than a
+pretend-one: each closed window is shorter than a frame on any local source (a wake-up, not a wait), and the
+only way to make them deterministic would be a seam in the pipeline that exists for the test's sake. What the
+suite does prove is that nothing was disabled by the guards: the drop tests, the starvation tests and the two
+seek-position tests all still pass, and the guards themselves are now stated as rules in §4.3, §6 and
+Appendix A (items 18 and 19).
+
+**S9q — The end of a file stated with its position, and a stop that says what it means.** *Done, from the
+user's review: "1. Consider also advance epoch on StopCore, so NotifySourceEnded won't have to query
+`_stopRequested` (which breaks symmetry); 2. The epoch value provided to VideoProducedCore is acquired after
+querying `_sourceEnded`; if the `_sourceEnded` is published through epoch (which is your current check),
+`_sourceEnded` have to be acquired after snapshot the epoch, and reset before advancing epoch."*
+
+**1. The stop is a position statement like any other.** `NotifySourceEnded` guarded on two things — the epoch
+(about the position) and `_stopRequested` (about the pipeline) — and the second was there for a real reason: a
+report posted by a thread during a teardown would otherwise arrive after the stop, set "the file has run out"
+for a playback that no longer existed, and be inherited by the *next* playback on the same instance (nothing
+had moved the epoch, so the next playback's epoch was the same number). The fix is the one the user proposed:
+the teardown advances the epoch at its end — "everything in flight belongs to a position that no longer
+exists", exactly what a seek says — and the handler's guard is then one statement. It is last in the teardown
+on purpose: the media threads are joined by then, so none of them can read the new epoch as a request to move
+a cursor that is being disposed (the reader, alone among the threads, *acts* on an epoch change by seeking, and
+a stop is not a request to move).
+
+**2. The statement carries its position, so nothing has to be ordered.** The decode thread read
+`_sourceEnded` and then the epoch, and the pair could be mismatched — the file "had run out" at one position
+and the report carried the next one, which also meant the drain could be tagged with a position whose media
+the decoder had not been flushed for. The boolean is now a tag: `_endedEpoch`, set by the queue with the
+position it is about, read by the stages through `HasRunOut(epoch)`. What that removes is worth listing,
+because each item was a rule somebody had to remember: the seek's `_sourceEnded = false` (nothing to clear —
+a new position is simply not the one the file ran out at), the ordering requirement between the flag and the
+epoch (there is no pair to order), the stop-me flag in the handler (point 1), and `DrainTheTail`'s re-read of
+the gate (the decode thread now snapshots the position once, asks about *that* position, drains for it and
+reports it — the user's point 2 exactly).
+
+*Verified:* 133/133 tests, x64 and ARM64 clean. `PlaysAgainAfterAStop` is new and covers a path that had no
+test at all: stop, reopen on the same instance, play to the end, with the assertion that the second playback
+hands over the whole file. It does **not** pin the teardown window the epoch advance exists for — the advance
+was commented out and the whole suite still passed, which is the honest measure of that window (a report
+posted inside a teardown that lasts milliseconds). The rule is recorded instead: §7's stop paragraph, §8's
+table, §11's new row about a boolean end-of-file flag, and Appendix A item 20.
+
+**The proof that was missing from point 2**, from the next question: *"DrainVideo tags frames with current
+epoch, which is the `_endedEpoch`. How to prove that `_endedEpoch` must be the same epoch of those packets?"* —
+it cannot be proven as it stood, and the counterexample is short: a seek to a position with no packets (the end
+of the file, or a point the reader immediately runs out at) can be reported ended by the reader *before* the
+decode thread's next take-up, so the branch ran with the decoder still holding the *previous* position's media
+while the gate — and therefore the tag — was the new position. Those frames would have been queued as the new
+position's, shown at the new position, and `QueueFrames`'s own epoch check cannot catch it, because that check
+only rejects a tag *older* than the gate.
+
+The fix is to make the tag come from the decoder rather than from the gate: the drain branch now takes the
+position up **first** (flushing if it moved, which discards exactly the media that is no longer wanted) and then
+drains, tags and reports with `flushedForEpoch` — one value for the frames, the report and the memory of having
+drained. That rests on an invariant worth stating once and relying on everywhere: **the decoder holds media of
+`flushedForEpoch` and of nothing else**, because any other position flushes it first. Given that, a drained
+tail is that position's media by construction, and the "proof" is an induction over the loop rather than a
+check: packets are decoded only while the gate still agrees with the packet's own epoch (so
+`epoch == flushedForEpoch` at every decode), and every other production path tags from the packet or from the
+reader's carried-out epoch. The rule is written into §6's list of details that are easy to get wrong, into
+`TakeUpThePosition`'s own doc comment, and as Appendix A item 21 — because the same mistake can be made
+anywhere a producer tags its output with a fresh read of the gate.
+
+**S9r — The line-by-line audit, and why the earlier reviews were not one.** *Done, from the user's question:
+"I found these issues just by static analysis, without actually running the codes. So why can't you find them?
+Please review the entire file line by line. Make sure each line of codes stays there for a reason, do not
+overdesign. The synchronization mechanism has to be simple, straight forward and human readable."*
+
+*(`flushedForEpoch` and `TakeUpThePosition`, named in S9q below, are the same two things this step renamed to
+`decoderEpoch` and `EnsureTheDecoderHolds`; the reason is in the addendum at the end of this entry.)*
+
+**The honest answer first.** The issues were missed because the review was *rhetorical* rather than
+*mechanical*: each design claim was checked against the code by reading the code that the claim was about
+("the epoch says the position, so the tag is consistent"), which confirms the intent and never tests the
+concurrent case. That is what the user's method does differently — list every shared fact, every write and
+every read, and ask what can be observed at that instant — and it is the method this step applied:
+
+1. every field's writes were mapped to their enclosing method (a script, not a reading), and each method's
+   thread was named; a write outside its group's thread is a bug;
+2. every private member was counted across the whole repository: a member with one reference (its declaration)
+   is dead;
+3. every section header and ownership comment was checked against the fields under it;
+4. the reads matter more than the writes, so each read of a shared fact was asked the same question the two
+   real bugs above came from: *what has this thread established about that fact at this point?*
+
+**What it found (five things, all fixed):**
+
+- `WaitForAudioMilliseconds` **referenced nowhere** — a constant whose doc described bounds that S9o had
+  removed. Dead lines keep a purpose alive in the reader's head that the code no longer has.
+- The **device-watch fields' ownership comment** ("owned by that thread and nothing else") was false: the
+  teardown resets all five after the join. Safe, but the sentence a reader relies on was wrong — and it is
+  the sentence that would be used to justify reusing those fields somewhere else.
+- The section header above them, "**Shared between a stage and the queue: volatile**", headed a group with no
+  volatile field and nothing shared: a leftover from `_videoFlushPending`. A header that misdescribes its
+  contents is worse than no header.
+- `NotifySourceEnded` had **lost its doc comment** in an earlier edit of mine — the entry point of the whole
+  ending model, undocumented.
+- `private bool _disposed = false;` — the only default initialiser in the file.
+
+**And one structural finding, which is the "human readable" half of the request:** the state was declared in
+*two* places (a `#region Variables` at the top and a second block in the middle of the file), and the
+ownership comments were in the second one. Every field is now in the single region, in the order §2.2 gives —
+fixed for the life of the pipeline, open state, the queue's own decisions, thread-owned, counters — with the
+constants likewise collected in one region. Reading the state and its owners is now one screen instead of an
+interrogation, and §2.2 states the rule the audit used: a write outside its group's thread is the bug.
+
+**Also removed, found by the same scan outside this file:** `D3D11VideoShaders.GetTextureCount` (a second
+implementation of `FFmpegInterop.GetPlaneCount`, unreferenced) and `FFmpegInterop.DescribeChannelLayout` with
+its `av_channel_layout_describe` P/Invoke (`AudioStreamInfo` carries a structured `ChannelLayout`, so the
+string description was never wired). Left alone and reported rather than deleted: `MediaTypeData`,
+`MediaTypeSubtitle` and `MediaTypeAttachment` (a mirrored constant table), and `avformat_network_init`
+(a declaration for network sources that nothing calls yet).
+
+*Verified:* 133/133 tests, x64 and ARM64 clean. No behaviour changed — this step's diff is declarations,
+comments and dead code, which is exactly what a reviewer should be able to see at a glance: the audit's value
+was in finding the *false statements*, not in new machinery.
+
+**The follow-up, and the last of the three lessons.** The next question was: "Your fix confuses me even more
+than the previous version: `flushedForEpoch` is still taken from `epoch.Current`, not epoch from queue. Why is
+that?" — and the confusion was justified, because the guarantee was in the *ordering* (the take-up ran after
+the dequeue and the decode was gated on the packet's own epoch against the gate), not in where the number came
+from. A proof that lives in the order of three statements inside one function is a proof the reviewer has to
+reconstruct; the code should say it where it happens.
+
+So the position is now a **parameter**: `EnsureTheDecoderHolds(ref decoderEpoch, epoch)`, called three times
+with two different claims — the packet's own epoch immediately before a decode (inside the gate check, so a
+stale packet is dropped rather than flushed for), and *where playback is* at the idle sites and before the
+end-of-file drain (where whatever is let go of is discarded, never tagged). The local is named `decoderEpoch`,
+"the position the decoder belongs to", rather than after the flush that happens to maintain it, and §6 now
+carries a two-row table of what each call site claims. Nothing about the mechanism changed; what changed is
+that the invariant is now visible at the line that relies on it.
+
+That is the third time in three rounds that the same fault line showed up: a tag, a flag and a request can all
+be *correct* and still be unreviewable when the reason is not written where the decision is taken. The design
+rules in §6 and Appendix A now carry it: **a value that is relied on for a position must name where it came
+from, at the point where it is used.**
+
+**S9s — The crash the throwing-decoder test found, and where a guard belongs.** *Done, from a report: "The test
+process crashed while I'm running test" — the host died on my own new test, with the stack pointing at the
+decoder's `TryDecode` leaving the thread.*
+
+**What happened.** The test (`ReportsADecoderThatThrowsAsPlaybackFailing`) wraps the real decoder so it throws
+after a packet, which is how a fault arrives when it comes out of interop rather than out of a return code.
+The decode thread had no guard at all — the `try`/`catch` that used to wrap its loop had been lost in the
+refactor (an earlier edit of mine had emptied the catch body, which the compiler catches as CS0168 but only
+when that content is actually compiled; a stash of stale build outputs hid it once). An exception escaping a
+media thread is not reported anywhere: .NET terminates the process, which in VS shows up as "Test host process
+crashed" and in the application would be a silent exit while a file is playing.
+
+**The policy, from the review that followed:** *"Only try catch the specific place that is expected to throw,
+do not try-catch the entire method."* So the guards are now at the component calls and nowhere else:
+
+| Thread | Guarded call | What the guard does |
+|---|---|---|
+| reader | `source.Seek`, `source.TryReadPacket`, `_audioDecoder.Flush` | the throw becomes the failure the site already handles (a warning for the seek and the flush, `PostFailure` for the read) |
+| video decode | `videoDecoder.TryDecode` (in `DecodeVideo`), `videoDecoder.Drain` (in `DrainVideo`), `_videoDecoder.Flush` (in `EnsureTheDecoderHolds`) | a failure result, except the flush, which cannot be reported through a result and so goes to `PostFailure` |
+| video render | `renderer.Render` (in `Show`), `renderer.RefreshSurface` while paused | the failure result the caller already checks |
+| audio | — | the whole-method catch stays, as the one deliberate exception: its interop surface includes *property reads* (device buffer fill, the device clock) that have no call to guard and no result to return |
+
+The first version of this fix wrapped each media loop instead, and the review rejected it — correctly: a
+loop-level catch reports a bug in the pipeline's own code as a component failure, ending playback as if the
+decoder had died and making the bug unreproducible. The rule is now §7's paragraph and Appendix A item 22,
+with §11 gaining the row for the shape that was rejected.
+
+*Verified:* 134/134 tests, x64 clean; the new test is what pins the guard (it crashes the host when the guard is
+missing), and it asserts the failure's message is the exception's own, so an emptied catch fails it rather than
+passing quietly.
+
+**S9t — Pause parks the threads on their queues, and a seek has to clear them.** *Done, from a report: "I
+changed the behavior: now pause will not block reader and decoder, they are automatically blocked by TryEnqueue,
+which is a better design. However, a seek during pause now is broken: reader and decode is still blocked but
+they are not suppose to. I think the best solution will be reset the queues in SeekCore, which automatically
+unblocks the two threads."*
+
+**The model.** Pause no longer tells the reader or the decoder to stop; it stops the *picture*, and the two
+threads behind it park on their own queues without consulting the state at all — the decoder in
+`TryEnqueue`'s wait for room in the full frame queue, the reader on its read-ahead minimums, which stop
+advancing once nothing is consumed. That is strictly better than a state check: fewer places decide what a
+pause means, no thread wakes to ask, and the same machinery that paces a slow decoder paces a paused one.
+
+**What it broke.** An epoch advance releases nobody. A parked thread is waiting on a *queue*, and a queue
+knows nothing about positions, so the seek's "everything in flight is stale" — which the tags handle perfectly
+— left both producers exactly where they were: the decoder waiting for room that only the paused picture could
+make, and the reader idling because the queues it filled still said "buffered". Consequence: after a paused
+seek, the frames of the new position were not produced, and on resume the old position's queue played out
+first.
+
+**The fix, as proposed, is `MediaQueue.Clear()`** (the user's "reset the queues"): drop what the queue holds,
+dispose it like any media the queue lets go of, and let the producers waiting for room go on. `SeekCore` calls
+it on all three queues, right after the epoch advance — because all three hold media of the position being
+left, and because a clear is a *state* statement where the tags are a *media* statement: the released
+producers hand over what they were holding, still carrying its own epoch, so nothing stale is taken for new,
+and the next thing they produce is for the new position.
+
+**The test, and the one that was wrong first.** `SeeksWhilePausedAndMovesTheReaderAndDecoder` plays a
+0.5 fps fixture, pauses with both producers parked, seeks, and requires the decoder to have produced a frame of
+the *new* position while still paused. The first version of it sought to 20 s and passed *without* the fix:
+the old position's own queue fill reaches ~18 s — the decoder stops with the frame queue full, a few frames
+past whatever the picture last took — so the assertion was measuring the wrong thing. Seeking past what the old
+position can possibly reach (60 s, asserting 50 s) is what makes it discriminate: with the clear commented out
+it fails on the assertion, with it in place it passes.
+
+*Verified:* 135/135 tests, x64 clean. Recorded: §3's queue table (the seek row, the room-wait row, and the
+paragraph that used to say a seek does nothing to a queue), §4's rule 3, §6's step 4, §7's pause bullet (which
+described "freezes all four threads", the old model), I5, §11's new row for the rejected shape ("the tags
+already handle it"), and Appendix A item 23 — a queue paces a thread and cannot tell it the position moved.
+
+**S9u — The position change is one fact (the epoch stops being lock-free).** *Done, from a review: "However
+this introduce a new race condition: 1. After `_epochs.Advance()`; all threads start processing from new
+position; 2. `xxxQueue.Clear()` has a chance to accidentally clear the new packets, causing data loss. In order
+to fix it, I think we need to introduce lock: 1. Make `_epochs` a simple long value; 2. Read and write `_epochs`
+inside the lock; 3. Reset other states inside the lock too, so this becomes an atomic operation."*
+
+The review is right, and the window is wider than "a chance": with the gap widened to 300 ms for a probe, **two
+runs out of three dropped 48 packets of the new position — tag 2, the whole first second and a half including
+the keyframe** — because the reader, woken by its own 15 ms cadence, took up the new epoch, moved the cursor,
+read on, and queued media that the reset then deleted. The probe logged the tags each `Clear` dropped, which is
+what made this measurable rather than a matter of opinion; with the same 300 ms window *inside* the lock, all
+three runs dropped only tag-1 items. (That the pipeline still reported `Playing` in the first case is why the
+probe was written to log tags at all: FFmpeg swallowed the missing keyframe, so the damage was media lost, not
+a failure reported.)
+
+*What changed, exactly as proposed:*
+
+- `EpochGate` is gone; `_epochs` is a `long` that is **only** ever read or written under `_positionLock`, and
+  media threads read it through `ReadEpoch()` — 21 read sites converted, so there is one rule to audit rather
+  than a mix of `Volatile.Read` and locks.
+- `SeekCore` does the whole change in one section: publish the position, advance the epoch, clear the three
+  queues, clear the starvation flags, re-arm the anchor, set the clock's position. `StopCore` advances the
+  epoch under the same lock (after the joins).
+- The reason is recorded where it matters: the epoch alone says what is *stale*, but only the reset says what
+  is *gone*, and a thread that acts between the two produces media the second step deletes.
+
+*What this costs, honestly.* The epoch was a lock-free counter **on purpose** ("a seek has to be able to say
+'everything in flight is worthless' without waiting for whatever that work is doing" — S9i). It is not any
+more: the seek now takes a lock that 21 read sites also take. The cost is bounded — the only writers are the
+queue's own seek and stop, the readers hold it for a load, and nobody holds it while waiting — but the
+rationale has changed, and §2.1's "the epoch needs no lock" claim is now "the epoch needs the lock, because the
+reset has to travel with it". The alternative considered and rejected: a `Clear` that keeps items tagged with
+the current epoch, which needs no lock but puts a tag comparison inside the queue — the one place S9k said the
+tag must not be interpreted.
+
+*Verified:* 135/135 tests, x64 and ARM64 clean; the paused-seek test still passes, and `EpochGate.cs` and its
+test coverage (`MediaQueueTests` never touched it) are deleted. The probe and its instrumentation are gone;
+this entry keeps the measurement. (The lock this step introduced is the shape S9v then replaced with a seqlock;
+what survives from it is the *bracket* — one change, not a sequence of steps.)
+
+**S9v — The position change is published through a seqlock.** *Done, from a review: "Implement a Seqlock to
+improve performance. Most reads shouldn't be locked." Then: "Can you introduce a new SeqLock class?
+PlaybackPipeline is large enough" and "Make SeqLock generic".*
+
+S9u left one honest cost: the epoch is read by 21 sites on three media threads, and every one of them took the
+writer's lock — a reader stalling on a lock is exactly what the threads that move media must not do. The epoch
+is also the ideal seqlock value: it changes only when the user seeks or stops, and is read per packet and per
+frame.
+
+*What changed:*
+
+- `Internal/SeqLock.cs` — `SeqLock<TValue>`: `TValue Read()` without the lock, and
+  `void Change(Func<TValue, TValue> update, Action<TValue>? work = null)`. The sequence is even while the value
+  is settled and odd while it is changing; a reader takes sequence → value → sequence and starts over if either
+  read of the sequence saw a change or the odd half of one. `Change` runs `update` *and* `work` inside the odd
+  window, under the same `Lock` the readers fall back to — that lock is what keeps two changes from interleaving,
+  and it is never held by a reader that got its value on the first try.
+- The pipeline now holds `SeqLock<long> _epochs = new(0)`; the 21 read sites are `_epochs.Read()`, `SeekCore`
+  is `_epochs.Change(epoch => epoch + 1, _ => { … })` and `StopCore` is `_epochs.Change(epoch => epoch + 1)`
+  (nothing to reset after a stop: no queues to clear, no anchor to arm). `ReadEpoch()` and the
+  `_epochLock`/`_epoch`/`_epochSequence` fields are gone.
+- **Why the work is inside the window rather than after it** is S9u's measurement: the reset of the old
+  position's media has to be finished before any thread may act on the new value, or that reset deletes media
+  produced for the new position — 48 packets, keyframe included, when the window was widened to 300 ms. A
+  seqlock whose writer only published the value and then reset would reintroduce exactly that race, with the
+  readers merely unable to see the value during the *publish*.
+- **Generic rather than `long`** because the fact may be several fields: the sequence is read again *after* the
+  value, so a value torn by a change in progress — or replaced by a change that ran entirely between the two
+  reads of the sequence — is rejected and read again. `Read()` is bounded (4 attempts, then it waits for the
+  writer's lock): a change that outlasts several attempts has something slow inside it, and a reader holding a
+  core is a reader delaying the writer. The `finally` re-bumps the sequence even if the work throws, so a
+  reader is never left waiting for a change that is not coming.
+
+*Verified:* 139/139 tests (135 + `SeqLockTests`), x64 and ARM64 clean. The four new tests cover the class's one
+guarantee from both sides (a reader that races a writer never acts on a change that has not finished; a reader
+that meets a deliberately slow change waits for it instead of taking it half-made), the compound value being
+handed out as one fact, and the work being told which value it belongs to.
+
+*Recorded:* §2.1 (the position change is its own shape among the five questions), §2.2's row for the position
+change and the "fixed at construction" row (two locks became one), §6 rule 3, Appendix A item 24, and
+Appendix B's epoch row.
+
+**S9w — The end of a stream is an entry of its queue.** *Done, from a review: "Currently video decoder detects
+playback end by starving + IsEnding, however this is not a reliable way. Add an IsLast field for each item in
+MediaQueue, so that decoder will know for sure it is the last item without getting blocked by the queue first
+or quering epoch. This pattern also applies to video and audio render threads." Then: "Remove TryDequeueEnd,
+add an out bool isLast parameter to TryDequeue, when true, item is null. Avoid using non-null assert (!)
+anywhere."*
+
+The review names a real defect in S9o's model, and it is worth stating exactly: the decode thread learned that
+the stream had ended by finding its queue empty **and then** asking `IsEnding(workingEpoch)` — an empty queue to
+be woken by, and a question about a position. The question was about the position the thread had just made the
+decoder hold (not a fresh read of the epoch), so the answer was *internally* consistent, but the shape itself
+is two faults: the fact is only visible after a wake-up and a timeout (up to 20 ms of nothing to dequeue), and
+it is a fact about the producer held somewhere else — `_endingEpoch` lives in the queue's own decisions, and
+the worker has to ask for it. Nothing about the drain should be a question at all: the reader knows the packet
+stream ended, so it can say so, and it is the reader that knows it first.
+
+*What changed:*
+
+- `MediaQueue<T>` carries an end entry now. `EndStream(tag)` puts an entry behind the media with no item and
+  an `isLast` flag, and `TryDequeue(out T? item, out long tag, out bool isLast, int timeout)` hands it over
+  like any other entry — true, item null, `isLast` set, and the tag of the position that stream belonged to.
+  Three things fall out of that: it is *ordered* (the consumer cannot see it before the media it follows), it
+  *wakes* whoever is waiting (so the end is not something a consumer discovers after a poll), and it takes no
+  room (so a producer can end its stream while the queue is full, which is exactly when the consumer is most
+  likely to be waiting for room). An end entry has no weight and does not count as media, so a producer's
+  pacing and a consumer's "how much is buffered" are about media and nothing else.
+- The reader says the ends of the two streams it owns (`_packetQueue.EndStream`, `_audioQueue.EndStream`,
+  after the audio drain) and *then* posts the pipeline's own statement `NotifySourceEnded(epoch)` — the file
+  ran out at this position, a different fact from either stream's end, and the one the ending is decided on.
+- The decode thread takes the end of the packet stream and drains the decoder into the frame queue; because
+  handing over the tail *is* ending that stream, `DrainVideo` says so (`_frameQueue.EndStream(epoch)`) behind
+  the frames it produced. The thread no longer asks anything: no `IsEnding`, no per-thread memory of having
+  drained a position (the `producedForEpoch` local is gone), and no report of its own — the picture saying it
+  has shown everything already says the tail came out, because it takes the end entry only after every frame
+  the decoder produced.
+- The picture's word comes from the entry: taking the end of the frame stream while holding nothing means
+  everything this position has has been shown. The sound's word is unchanged in substance — the device holds
+  nothing after the stream ended — but it too learns the end from the entry rather than from `IsEnding`.
+- `_videoDecodeEnded` is gone (there is no decode word), the two remaining words are **positions** rather than
+  booleans (`_videoRenderEndedEpoch`, `_audioRenderEndedEpoch`), and `TryNotifyPlaybackEnded` compares them
+  with `_endingEpoch`. Comparing rather than consuming is what makes the words order-free: a stage's stream can
+  end and be reported before the reader's own end-of-file report (different threads, same decision queue), and
+  the word has to survive arriving first — the old code cleared all three flags in `NotifySourceEnded`, which
+  would have thrown away a word that arrived early. (This step decided the ending only while playing and
+  re-asked it from `PlayCore`; S9x removes both.)
+- `IsEnding` is now read in exactly one place — the picture's starvation rule, where an empty frame queue at
+  the end of a file is the picture playing out rather than falling behind.
+
+**The bug this step introduced and the review's rule that found it.** The first version reported the end with
+the thread's own loop variable — `Submit(() => NotifyVideoRenderEnded(heldEpoch))` — and five tests failed with
+playback stuck in `Playing`. A probe printed `video render ended for 0`: the lambda is read when the queue
+reaches it, not when it was written, and by then the next failed dequeue had set the variable back to its
+out-parameter default. The report is about a moment, so it now carries a copy (`endedEpoch`, `playedOut`,
+`ranOutAt`) — the same rule the review had already applied to the tag checks ("the tag has to be right by
+construction"), one level further out. Appendix A item 21 and §11 carry it.
+
+*Also from the review:* no null-forgiving operator anywhere in the pipeline or the queue — the item is
+nullable out of `TryDequeue` because the end entry has none, so consumers check it (`packet is null` after the
+`isLast` branch) instead of asserting it, and `PrepareVideo` guards its source instead of `_source!`.
+
+*Verified:* 142 tests (140 run, 2 skipped without an audio device), x64 clean. New coverage:
+`HandsTheEndOfTheStreamOverAfterEverythingQueuedBeforeIt` and `ReleasesAConsumerWaitingForAnEntryWhenTheStreamEnds`
+in `MediaQueueTests` (the end is ordered, takes no room, wakes a waiter and is handed over once), and
+`ProducesTheTailOfAFileWhenItsPacketStreamEnds` in the pipeline tests — a decoder wrapper that keeps every
+frame until it is drained, so the test can only pass if the tail is produced, which is the one thing a
+pipeline test can see of the difference between "there is nothing right now" and "the stream is over".
+
+*Recorded:* §3's queue table and the paragraph after it, §7's end-of-file model (step 1–5 rewritten; the
+statement is now read in one place), §2.1's first question, §2.2's two rows, I7, §11's two new rows, Appendix
+A items 20–21, and Appendix B's three rows.
+
+**S9x — The ending is not the state's to gate.** *Done, from a review: "Is it possible to remove
+TryNotifyPlaybackEnded in PlayCore as well as _state != MediaEngineState.Playing check in
+TryNotifyPlaybackEnded? If the playback ended during a pause (very rare scenario), just transit to End state."*
+
+S9w left the ending gated on `Playing` and asked again from `PlayCore`, which reads as caution and is really
+two faults. A file that has played out and is then paused stays `Paused` for good: the words are already filed,
+nothing except a resume asks the question again, and the pipeline is holding a file that nothing will play. And
+the resume that "fixes" it reports a `Play` that succeeds and then immediately ends — a caller told it started
+what it finished. The words are the stages saying they have nothing left, so the ending is earned wherever they
+are heard; the state is not part of the fact.
+
+*What changed:*
+
+- `PlayCore` no longer asks. With the gate gone there is nothing to ask about: every word handler decides when
+  it completes the set, the file's own end included, so an ending that is fully said is an ending that happened.
+- `TryNotifyPlaybackEnded` guards on `_state == MediaEngineState.Error` instead of `_state != Playing`. `Error`
+  is the one state the decision must not leave — it is the reason playback cannot continue, and `SetState(Ended)`
+  would clear `_error` and replace a failure with a file that merely finished. `None`/`Opening`/`Ended` need no
+  guard: a stop resets `_endingEpoch` and advances the epoch (and every open goes through `StopCore`), so the
+  position check blocks them, and ending an already-ended pipeline is a no-op.
+- The paused case is now decided by the stage that says the last word: a pause that lands between a word being
+  earned and being heard no longer holds the file open.
+
+*The test, and why it can name the case rather than race for it.* `EndsWhilePausedWhenTheFileHasPlayedOut` plays
+the wave fixture against a device that is one sample short of full — room for every block, and never empty — so
+the sound has nothing left to hand over and the only thing holding the ending up is the device not being empty.
+The pause is then taken **from inside the sound's own question to the device** (`FakeAudioRenderer`'s
+`BeforeReadingQueuedSampleCount`, one-shot), which is the moment the word turns on: the pause is processed, the
+device is allowed to empty, and the word is posted with the pipeline already paused. Without the change the
+pipeline stays `Paused` and the test fails on "the file has to end even though it was paused" — verified, by
+putting the `Playing` guard back and rebuilding (the first attempt at that falsification ran against a stale
+copy of the core assembly in the test output, which is worth remembering: a change to `SinePlayer.Core` needs
+the *solution* built before `dotnet test --no-build` means anything).
+
+*Verified:* 143 tests (141 run, 2 skipped without an audio device), 0 failed, x64 clean; the new test passes in
+~110 ms and was run repeatedly (5/5).
+
+*Recorded:* §7 step 5, I7, §11's new row (the shape that was there before, and what it cost), Appendix A item
+25, Appendix B's ending row, and a forward note in S9w.
+
+**S9y — A failed playback does nothing, and is not torn down.** *Done, from a review: "What is our expectation
+for Error state? If the expectation is stop the playback, shouldn't we trigger StopCore on error? This way
+_state == MediaEngineState.Error will be unnecessary. I'm just proposing an idea, you can disprove me if I was
+wrong." Then: "I think the correct check is state not in (Playing, Pause), since do-nothing should be the
+default behavior, and do-something requires restrict state check."*
+
+The second message is the answer to the first, and it is the better rule. `Error` *is* "playback has stopped" —
+the clock stops, and every media thread parks — but it is deliberately not "the pipeline has been torn down",
+and the reason it is not is the whole of this entry.
+
+*Why not tear down on failure (the review's idea, disproved).*
+
+- **The reason would lose its home, and the scene with it.** `StopCore` ends in `SetState(None, null)`: the
+  error, the `MediaInfo`, every diagnostic counter and the clock are cleared, so `Position` becomes zero — the
+  pipeline could no longer say *what* failed *where*, and describing a failure is exactly what those pieces
+  are for. Keeping `Error` after a teardown instead is worse in a smaller way: `Play` would answer "Nothing is
+  open." rather than "Playback has failed: \<reason\>", because `PlayCore` checks the source first.
+- **A spontaneous failure has no caller to answer.** That is the contrast with an *open*, which fails and
+  leaves `None` because the caller holds the task the reason can travel in. A failure that arrives on its own
+  needs somewhere to *live* until the host looks, and `Error` is that place — I16 read from the other side.
+- **The teardown is four unbounded joins on the queue every command is posted to**, and that queue is shared by
+  every pipeline. A failure is the moment another thread may be stuck inside a component (a hung read, a wedged
+  device submit), so doing it automatically converts "one playback failed, and the app was told why" into "no
+  pipeline in the process accepts a command until the broken thing returns". Today the host decides when to pay
+  that, and it is also who can preserve the evidence first.
+
+*What did change, from the review's rule.* The reader reads for `Playing` and `Paused` and does nothing in any
+other state — checked **in the positive direction** (`_state is not (Playing or Paused)` parks), because
+do-nothing is the default and work is what has to be justified. It is the one thread that works while paused
+(the read-ahead is what a resume starts on). A failed playback is therefore quiet: the reader no longer fills a
+read-ahead and re-checks the queues every 15 ms for a consumer that cannot come, and the other three threads
+were already at rest (the picture and the sound park on the state; the decoder is stopped by the frame queue it
+can no longer empty, which is bounded by that queue — the one remaining place where a failed playback still
+does a queueful of work for nobody). Nothing is released or discarded by parking, which is what keeps the
+failure's scene and reason intact for the host.
+
+*The test.* `StopsReadingOncePlaybackHasFailed` plays the raw fixture against a **paced and counted audio
+decoder** — the reader decodes the sound inline, so a call to that decoder *is* the reader having read another
+packet — and a video decoder that dies on its second packet. Paced, because the failure has to land while the
+reader is still inside its read-ahead for "still reading" and "parked" to be different observations at all; and
+the assertion allows the one read that was already in flight. Falsified by removing the check and rebuilding the
+solution: the reader then finishes the read-ahead and the test fails on "a failed playback has nothing to read
+for". (The first attempt at that falsification was run against a stale core assembly — the same trap S9x
+records: build the *solution* before `dotnet test --no-build`.)
+
+*Found while running the suite, and fixed.* One full-suite run failed `ReportsADecoderThatThrowsAsPlaybackFailing`
+in 26 ms. The cause is that test's own race, not this change's: the decode thread decodes ahead **without asking
+whether anything is playing**, so a decoder that dies can be heard before the test's `Play` is processed — and
+`Play` is then refused *because* playback has already failed. The assertion `Play` succeeds was therefore a coin
+toss in the two decoder-failure tests. Both now don't assert it (with the race named in the comment), and the new
+test does not play at all: it leans on exactly that property — the reader reads, and the decoder decodes, while
+the open's state is still paused.
+
+*Verified:* 144 tests (142 run, 2 skipped without an audio device), 0 failed, three consecutive suite runs, x64
+and ARM64 clean; the new test passes in ~0.4 s and was run repeatedly.
+
+*Recorded:* §7's "what `Error` is, mechanically" paragraph, §4.1's positive-direction rule, §11's new row (the
+teardown that looks tidy and costs three things), Appendix A item 26 (do-nothing is the default), and the two
+test comments that now name the play-versus-failure race.
+
+**S9z — A seek pauses, the host resumes; and the clock is told only what changed.** *Done, from a report: "1.
+I've changed the seek behavior: after a seek, the playback state will always be Paused. The host needs to call
+Play if it wants to resume the playback; 2. StartOrStopClock has no internal dedup, same method can be called
+multiple times in a row."*
+
+The user's first change was already in the working tree: `PlayCore` is for `Paused` only, `PauseCore` for
+`Playing` only, `SeekCore` for `Paused`/`Playing`/`Ended` and it *always* leaves `Paused` (the `wasPlaying` /
+resume pair is gone), all through one `CheckState(out state, params states)` helper. The state is now what
+playback *is*; whether the new position goes on playing is the host's one `Play`. That is a real simplification
+of a genuinely awkward question — "a seek while playing keeps playing" made the state depend on both what the
+file is doing and what the user last asked for, and made the asynchronous refusal undecidable: a source that
+refuses the move is only known *after* the move was accepted, so the old shape had to resume before it could
+know whether there was anything to resume.
+
+*What that cost, and what was done about it.*
+
+- **Seven tests pinned the old contract** and were rewritten, not deleted: `PausesAndResumes` (pausing what is
+  already paused, and playing what is already playing, are now refusals that name the state — pinned);
+  `SeeksWhilePlayingAndKeepsGoing` → `SeeksWhilePlayingAndLeavesItPaused` (the seek leaves it paused, then one
+  `Play` runs the file out); `SeeksWhileTheNextFrameIsStillWaiting` and `StartsWhereTheFileResumesRatherThanWhereTheSeekAsked`
+  (the frame/clock assertions now follow a `Play`); `AnswersACommandWhileTheSoundHasNotPlayedOut` and
+  `EndsWhenTheDeviceHasPlayedOutTheSound` (paused, not playing, is what "not an ending" means now — the second
+  plays on before the ending is earned); `KeepsPlayingWhenTheSourceRefusesToSeek` →
+  `RefusesASeekTheSourceWillNotCarryOut`, whose two cases are now genuinely different commands: refused in
+  advance changes nothing (I16, unchanged), refused when asked is the *move's* pause (I16 amended).
+- **The host's expectation was restored where it belongs.** `PlaybackEngineAdapter.Seek` remembers whether
+  playback was playing *at the moment the seek is asked with*, and plays again once the seek's task completes —
+  including when the source refused it, which is the behaviour that used to be the pipeline's. `PlayerPageViewModel`
+  is untouched, which is the adaptation layer's whole purpose.
+
+*The clock dedup (the second point).* `StartOrStopClock` now asks the clock what it is doing and tells it only
+when the answer changes (`if (start == clock.IsRunning) return;`). Several things decide it in a row — a state
+change, then each starvation flag, or the reverse, and a seek does all of them inside one change — and relying
+on the clock to absorb repeats is relying on something the interface does not promise: the two real clocks
+guard themselves, but a naive `Start` re-anchors from now and a naive `Pause` records a stop that never
+happened. Asking the clock is also what makes the check exact when the clock *instance* is replaced (a switch
+to the device's clock, a new file), which a remembered flag would get wrong.
+
+*The test.* `TellsTheClockOnlyWhenWhatItShouldDoChanges` uses the arrangement where the difference is visible:
+a decoder far too slow for the stream holds the clock (`StarvedFor == "video"`), so the clock is already
+stopped when a `Pause` arrives — and a pipeline that tells the clock anyway says "pause" twice for one fact.
+`FakeAudioRenderer` counts the pipeline's `Start`/`Pause` calls on the device clock (changed or not), which is
+what makes "it was not told" observable at all. Falsified by removing the `IsRunning` check and rebuilding the
+solution: it fails on "the clock is not told what it already knows".
+
+*Verified:* 145 tests (143 run, 2 skipped without an audio device), 0 failed, x64 and ARM64 clean, the app
+project included (the adapter's resuming `Play` is awaited, which is also what makes the position the page
+re-reads afterwards the one playback resumed at).
+
+*Recorded:* §2.1 (two new rules: each command names its states; the state says what playback is doing, never
+what the caller wants), §6's seek steps 1–5, §5's clock bullet, §7's Play bullet, I10 (the clock is *told* only
+on a change, with its pin), I6/I15/I16 (renamed pins, and I16's asynchronous-refusal nuance), §11's new row
+(the command undoing its own pause), and the adapter's comment.
+
+**S9aa — No clock in a queue: `Dequeue` replaces the timed wait, and the sound watches the device instead.**
+*Done, from two reports: "Remove timeoutMilliseconds parameter on TryDequeue, rename TryDequeue to Dequeue and
+returns void. Timeout is a bad design which introduce unpredictability." — then, after the plan was reviewed
+and rejected in three places: "Return bool instead, true for item or isLast signal, false for close".*
+
+The plan the first report produced was wrong in three ways, and the review is why the shape ended up small:
+
+- it kept a "nothing was handed over" word for a wake that carries no entry, with `void` and a documented
+  meaning to interpret. There is no such wake to interpret. `Clear` pulses for the *producer* parked for room
+  (that is what releases the decoder after a seek); a *consumer* has nothing to do about a seek — what it
+  should play next arrives as the next entry, stamped with the position it belongs to — so a clear must leave
+  it waiting, and a condition loop does that by itself. With `bool`, the type says the only two things a wait
+  can end with: an entry, or closed.
+- it called the pause reaching a blocked consumer at its next item a "consequence to accept". Accepting it is
+  what makes it not a consequence: the reader deliberately keeps reading while paused, so the picture reaches
+  its state check within about one decode, and the sound's carried block waits inside `WaitForAudioRoom`,
+  which is state-aware. It also claimed the end-of-file word would "never fire"; under the same review's rule
+  — *after `isLast` for this position, do not ask the queue again until the epoch advances* — the thread is
+  watching the device rather than the queue, and the word fires as before.
+- it claimed the decode thread's eager "hold the decoder" after a seek became lazy in one case. It did not
+  matter: when the thread *is* parked on the packet queue the clear still releases it, and when it was busy
+  the hold happens before the first decode of the new position, which the packet's own epoch check requires.
+
+*What changed.* `MediaQueue<T>.Dequeue(out T? item, out long tag, out bool isLast)`: true is an entry — media,
+or the end of the stream with `isLast` — and false is the queue closed, answered at once and never waited for.
+The wait is one unbounded `Monitor.Wait` inside a condition loop (`while (_items.Count == 0 && !_closed)`), so
+the consumer side now has the same shape as the producer side, which has waited without a clock since S9t.
+Every consumer leaves on false rather than asking again (a closed queue answers immediately, so a loop that
+ignored the word would spin), and each of the four releases is now something a test can drop: `TryEnqueue`,
+`EndStream`, `Clear` (producers only), `Dispose`.
+
+*The one place a clock was doing real work.* The sound's 50 ms poll *was* the end-of-file drain question: after
+the end entry, the device drains asynchronously and nothing wakes the thread. That question moved out of the
+queue and into a **device watch**, which is also where the audio starvation statement was hiding. When the
+queue holds nothing at all (`TryPeek` — not `Count`, which counts media and not the end entry, a defect this
+step made and the suite caught), the sound asks the device instead of the queue, and asks it two things. Time
+should pass while the device still holds audio, because that audio is playing; and it should be held when the
+device holds nothing *and* the file has not run out at this position. So `StarvedFor == "audio"` now means
+"the device has nothing left in it and the pipe is behind it" — a fact about what is being heard rather than
+about how far behind the reader is — and the device emptying after the stream ended is the sound's half of the
+ending, said once per position. This is the one wait in the pipeline paced by a clock, and that is stated
+where it lives: the device is the thing this thread's world is arranged around that cannot signal.
+
+*What the first version got wrong, measurably.* Asking `queue.Count == 0` instead of `TryPeek` meant the end
+entry — which takes no room and is therefore not counted — was never taken: the sound watched the device
+forever, `endedEpoch` never arrived, and twelve tests failed in one run (every audio test that ends a file,
+plus the seek and pause tests behind them). The suite went from 134 passed / 12 failed to 147 / 0 with that one
+line changed.
+
+*Falsified, both ways round.* Removing the close's pulse from `MediaQueue<T>.Dispose` fails
+`ReleasesAConsumerWaitingForAnEntryWhenTheQueueIsClosed` and `ReleasesAProducerWaitingForRoomWhenTheQueueIsClosed`,
+each within its own bounded join rather than by hanging. Disabling the device watch's report and deleting its
+starvation statement fails `EndsWhenTheDeviceHasPlayedOutTheSound`, `EndsWhilePausedWhenTheFileHasPlayedOut`
+and the new `HoldsTheClockBackWhenTheSoundHasNothingToPlay`.
+
+*The hang question, answered before implementing it (from the review).* A failure ends a producer without
+ending its stream, so a consumer parked in a queue waits for the host's `Stop` — and that is not a defect
+because `Error` is terminal: `Play`, `Pause` and `Seek` are all refused from it, the only recovery is `Open`
+(which begins with `StopCore`), and `TryNotifyPlaybackEnded` names the states it accepts, so no late word can
+end a stopped or failed playback. `StopCore` releases every thread by construction and before the first join:
+the stop flag, the state signal, then all three queues closed.
+
+*Verified:* 149 tests (147 run, 2 skipped without an audio device), 0 failed, run twice, x64 and ARM64 clean.
+Three new queue/pipeline tests — `ReleasesAConsumerWaitingForAnEntryWhenTheQueueIsClosed`,
+`DoesNotWakeAConsumerToTellItNothingHappened` (a clear is not a wake), `StopsWhileAThreadIsParkedOnAnEmptyQueue`
+(bounded, so a missing release fails rather than hangs) — and one for the starvation hold,
+`HoldsTheClockBackWhenTheSoundHasNothingToPlay` (starved and clock-stopped are read inside one wait, so a
+stop/start cycle cannot pass for an answer).
+
+*Recorded:* §2 items 6–7 (three timed waits left, and what a queue's wait can and cannot rely on), §3's
+consumer row and the paragraph about what a clear does to a consumer, §4.4's first bullet (the device watch and
+its two questions), §8's flag table and the note on why the two waits are measured differently, §10's I12
+amendment and the new **I17**, §11's row (a timeout in a queue is a sedative, not a backstop), §12 (a freeze
+inside a queue is one of four releases going missing), §13's `StarvedFor` row, Appendix A item 27, and
+Appendix B (the `Dequeue` row and what releases a consumer).
+
+**S9ab — The scripted host was not told the new contract, and a paused file now shows where it is.**
+*Done, from a report and a request: "1. playback seems paused after a seek in PlaybackLab, check your host
+implementation; 2. Draft a plan for this change: After a seek, the video render should render a frame from
+latest epoch dispite the Pause state so the player displays the latest frame preview when seeking during a
+pause." — then, on the plan: "1. I prefer A2, but I want to discuss further: My idea is keeps dequeuing until
+gets the first fresh frame from new epoch. No peek required at all. No new API... 2. There is no need for a
+'second wake'... 3. Uniform of course. 1. U1; 2. I want to move SignalPlaybackStateChange out of SetState, so
+the caller can decide whether and when to trigger the signal".*
+
+*The report was the contract, not a defect in it.* `PlaybackLabPage.SeekBy` awaited `pipeline.Seek(target)`
+and stopped — and a seek now always leaves playback `Paused` (S9z), so the Lab halted after every jump. It is
+a host like any other: it reads `pipeline.State` as the seek is carried out and calls `Play` when playback was
+playing, which is the app adapter's policy in one line. (The app was already right; the Lab is a second host
+and had not been taught.)
+
+*What the request turned into* (the plan is in the conversation; the review is what shaped it):
+
+- **The still.** While paused, nothing of the current position has been shown, so the picture thread takes
+  frames until it gets the position's first one and shows it **once**. `shownEpoch` — set wherever a frame
+  reaches the renderer, playing or paused — is what makes it a still rather than a slideshow. The queue is the
+  only mechanism: no peek, no new API, no second wake, no signal from the decoder — the frame arriving *is*
+  the wake, and the seek's own signal is only what gets the thread into that wait. A frame whose tag is stale
+  is disposed and the loop takes the next; the current position is re-read each time round, because a seek
+  landing while this waits leaves the frame it is about to be handed belonging to nobody. Nothing is anchored,
+  dropped or starved: a still is not a presentation.
+- **U1, the picture's word said at once.** A position with no frame at all — the end entry arrives before any
+  frame does — is a position whose picture has shown everything it has, so the still path says the picture's
+  word there and then instead of leaving it for a presentation that is not coming. Visible consequence: a
+  paused seek past the end of a video-only file now reaches `Ended` (an A/V file still waits for the sound's
+  word, which is only evaluated while playing — the asymmetry S9x already documented, unchanged). The Lab's
+  play button therefore seeks to zero when it is asked to play an ended file, as the adapter does.
+- **The signal moved out of `SetState`, and the seek's signal moved after its epoch change.** `SetState` now
+  moves the state, re-decides the clock and raises `StateChanged`, and tells the threads nothing — a signal is
+  a statement that a change is *complete*, and only the caller knows what its change consists of. Every caller
+  signals when its own change is done: `PlayCore`/`PauseCore` after the state, `SeekCore` **once, after the
+  epoch, the clears and the anchor have moved**, `Fail` and `TryNotifyPlaybackEnded` after theirs, `StopCore`
+  before the join it depends on, `OpenCore` not at all (it starts its threads afterwards, and they read the
+  state when they start).
+
+*What was measured, and what it corrected.* The signal ordering was a **latent defect S9z introduced**: a seek
+signalled with its state change, so a thread woken in between read the position playback had left and waited
+again — and the reader, parked with no timeout once a file has run out, waited for a wake that never came
+(the file did not move; the clock, the state and the seek's answer all said it had). The window is
+microseconds, so the first falsification attempt *passed*; widening it to 150 ms showed the mechanism exactly
+(`TakesUpASeekFromTheEndWithoutAnotherCommand` fails on "the reader has to take up a seek from the end without
+another command"), and removing the signal altogether fails it with no widening at all. Both were run before
+the fix was kept.
+
+*The falsifications, in order, all run before keeping the code:* the seek's signal removed → the reader never
+moves, test fails; the seek's signal before the epoch change with a 150 ms window → same failure; the paused
+branch's still removed → `ShowsTheStillOfThePositionASeekMovesToWhilePaused` and
+`EndsAtOnceWhenThePausedPositionHasNoPicture` both fail; the still's end word removed → the ending test fails
+and nothing else does; `shownEpoch` not updated by the playing path → `DoesNotShowAStillWhenNothingMoved`
+fails *after* the test itself was fixed (its first version counted the frames after the pause, so a still that
+fired as the pause landed was inside its own baseline — the count is now taken before the pause, and the
+arrangement shows two frames while playing with the next one a second away so nothing can slip in between).
+
+*One existing test changed for the new rule.* `ReportsWhatTheDisplayTookWhenTheRendererCanTell` used a
+one-frame bitmap and asserted the renderer's answer arrives while playing: with the still, the file's only
+frame is shown at the open (paused), before the renderer was able to tell anything, so nothing more was
+presented to carry the answer. It now uses a two-frame y4m (`CreateY4mFile` gained a frame-rate argument,
+default unchanged) and the first assertion is honest for a new reason: a renderer that cannot tell says
+nothing, whether or not frames have been offered to it.
+
+*Verified:* 153 tests, all passing, three consecutive full runs (23 s each), x64 and ARM64 clean, and the five
+new/changed tests run four extra times each for flake. New tests: `ShowsTheStillOfThePositionASeekMovesToWhilePaused`
+(one frame, and one only), `DoesNotShowAStillWhenNothingMoved`, `EndsAtOnceWhenThePausedPositionHasNoPicture`,
+`TakesUpASeekFromTheEndWithoutAnotherCommand`.
+
+*Recorded:* §2.1 (the new rule: a state change tells subscribers, the caller wakes the threads), §4.3 (the
+still, and the ending word for a position with no picture), §6 step 5 and §7's pause bullet (a seek signals
+once, after the position has moved; a paused file shows where it is), I4 (the one frame the presentation
+thread waits for has no clock behind it), I11 (the still, both ways round), §11's two new rows (signalling
+with the state change; showing a peeked frame), Appendix A items 28–29, Appendix B (the still and who wakes
+the threads), and the Lab/adapter as hosts that decide whether a jump goes on playing.
 
 **S8h — Video decoding gets a thread of its own.** *Done.*
 The 4K60 file showed the next problem plainly: `decode 12.9 ms` a frame against a 16.7 ms budget with

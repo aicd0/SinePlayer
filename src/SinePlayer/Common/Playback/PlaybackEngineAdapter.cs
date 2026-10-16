@@ -157,16 +157,31 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
             position = duration;
         }
 
-        // Posted, like everything else the pipeline offers, and the task is kept for two reasons: it says when
-        // the position has moved, which for a seek while paused is the only chance the page gets to re-read it,
-        // and it says whether the source took the seek at all — a seek a source refuses leaves playback exactly
-        // where it was, so there is nothing for the page to react to beyond the line in the log.
+        // Posted, like everything else the pipeline offers, and the task is kept for three reasons: it says when
+        // the position has moved, which for a seek while paused is the only chance the page gets to re-read it;
+        // it says whether the source took the seek at all — a seek a source refuses leaves playback exactly
+        // where it was, so there is nothing for the page to react to beyond the line in the log; and it says
+        // when the seek is over, which is when a resumed playback has to start.
         CoroutineUtils.Run(async () =>
         {
+            // The pipeline leaves a seek paused: what it reports is a fact about the file, not a wish to keep
+            // playing. "A jump while playing goes on playing" is the page's expectation, and restoring it is
+            // this layer's business — it is the host. Read as the seek is carried out rather than as it was
+            // asked for, so a pause the user pressed while the seek was in flight is not overruled by this.
+            bool wasPlaying = pipeline.State == MediaEngineState.Playing;
+
             PlaybackOperationResult seeked = await pipeline.Seek(position);
             if (!seeked.IsSuccessful)
             {
                 Logger.W(TAG, $"Seek to {position:g} was refused: {seeked.Message}");
+            }
+            else if (wasPlaying)
+            {
+                // Refused or not, a source that will not be moved only means the position stayed: the sound
+                // and the picture carry on where they were, which is what the user expects of a jump that
+                // could not be made. Awaited, so the position the page re-reads below is the one playback
+                // resumed at.
+                await pipeline.Play();
             }
 
             if (ReferenceEquals(_pipeline, pipeline))
