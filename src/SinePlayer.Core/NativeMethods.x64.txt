@@ -61,7 +61,7 @@ IDXGISwapChain2
 IMMDevice
 IMMDeviceEnumerator
 INVALID_HANDLE_VALUE
-ISimpleAudioVolume
+IAudioStreamVolume
 LocalFree
 MONITORINFOEXW
 MessageBox

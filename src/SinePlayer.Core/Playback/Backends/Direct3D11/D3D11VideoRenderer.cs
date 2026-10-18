@@ -52,6 +52,10 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
 
     public string Name => "d3d11";
 
+    /// <summary>
+    /// Takes ownership of the device it is given: a renderer draws through that device's immediate context, so it
+    /// is the only thing that may use it, and <see cref="Dispose"/> releases it.
+    /// </summary>
     internal static bool TryCreate(D3D11Device device, out D3D11VideoRenderer? renderer, out string error)
     {
         renderer = null;
@@ -247,6 +251,10 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
 
         ReleaseFrameTextures();
         _shaders.Dispose();
+
+        // The device came with this renderer — the factory creates one per call — so it goes with it. A shared
+        // device would have made this a bug; owning it is what lets two pipelines render at the same time.
+        _device.Dispose();
     }
 
     /// <summary>

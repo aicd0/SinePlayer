@@ -38,7 +38,14 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
     private const string TAG = nameof(PlaybackEngineAdapter);
 
     private readonly D3D11VideoRendererFactory _videoRendererFactory = new();
-    private readonly WasapiAudioRenderer _audioRenderer = new();
+    private readonly WasapiAudioRendererFactory _audioRendererFactory = new();
+
+    /// <summary>
+    /// What the host asked for, kept here because the renderer they apply to belongs to a pipeline and is
+    /// made when a file is opened: a volume set before anything is playing still has to reach the device.
+    /// </summary>
+    private double _volume = 1.0;
+    private bool _muted;
 
     private SwapChainPanel? _videoPanel;
     private SwapChainPanelRenderTarget? _renderTarget;
@@ -53,9 +60,9 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
 
     public TimeSpan Duration => _pipeline?.Duration ?? TimeSpan.Zero;
 
-    public double Volume => _audioRenderer.Volume;
+    public double Volume => _volume;
 
-    public bool IsMuted => _audioRenderer.IsMuted;
+    public bool IsMuted => _muted;
 
     /// <summary>The rate the engine plays at, which is the one rate it can honestly report.</summary>
     public double PlaybackRate => 1.0;
@@ -193,12 +200,26 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
 
     public void SetVolume(double volume)
     {
-        _audioRenderer.Volume = Math.Clamp(volume, 0.0, 1.0);
+        _volume = Math.Clamp(volume, 0.0, 1.0);
+
+        // The pipeline is the one that owns the device, so it is asked rather than reached past: when there
+        // is no pipeline yet, the value waits here and is applied to the device the next open creates.
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is not null)
+        {
+            pipeline.Volume = _volume;
+        }
     }
 
     public void SetMuted(bool muted)
     {
-        _audioRenderer.IsMuted = muted;
+        _muted = muted;
+
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is not null)
+        {
+            pipeline.IsMuted = muted;
+        }
     }
 
     /// <summary>
@@ -225,7 +246,6 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
 
         _isDisposed = true;
         Close();
-        _audioRenderer.Dispose();
         _renderTarget?.Dispose();
         _renderTarget = null;
         _videoPanel = null;
@@ -240,7 +260,7 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
             new FFmpegVideoDecoderFactory(),
             _videoRendererFactory,
             new FFmpegAudioDecoderFactory(),
-            _audioRenderer,
+            _audioRendererFactory,
             new DefaultSynchronizer());
         pipeline.StateChanged += OnPipelineStateChanged;
         return pipeline;

@@ -112,6 +112,417 @@ public class PlaybackPipelineTests
         }
     }
 
+    /// <summary>
+    /// A file longer than the read-ahead is what makes the reader wait at all: it fills the minimum, parks,
+    /// and every block the sound plays brings it back. Nothing in the pipeline tells it that — the sound is
+    /// the only thread that knows it took something — so this is what pins the wake from the consumer to the
+    /// reader. A missing one is not a slow pipeline: the reader parks for good and the file never ends.
+    /// </summary>
+    [Test]
+    public void KeepsTheSoundComingAfterTheReadAheadIsUsedUp()
+    {
+        int samples = SampleRate * 3;
+        string path = CreateWaveFile(samples);
+        try
+        {
+            // A device that takes a block every so often, so the read-ahead is used up in steps rather than
+            // in one gulp.
+            FakeAudioRenderer audioRenderer = new() { SubmitDelayMilliseconds = 20 };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            PlaybackOperationResult opened = Open(pipeline, path);
+            Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+
+            pipeline.Play();
+            WaitForPlaybackToFinish(pipeline);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
+                Assert.That(audioRenderer.SubmittedSamples, Is.EqualTo(samples), "every sample of a file read in several passes has to reach the device");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The picture's side of the same arrangement: a file longer than the frame window fills the queue, the
+    /// decoder parks for room, and every frame the picture takes is what brings it back. Nothing else tells
+    /// it — the picture is the only thread that knows it made room — so a missing wake here is a picture that
+    /// stops after one window and never reaches the end of the file.
+    /// </summary>
+    [Test]
+    public void KeepsThePictureComingAfterTheFrameWindowIsUsedUp()
+    {
+        // A real thirty-frame-a-second stream, so the window is used up many times over in a couple of
+        // seconds rather than once every two.
+        string path = Av1FixtureFile.Create();
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
+
+            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+
+            pipeline.Play();
+            WaitForPlaybackToFinish(pipeline);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
+                Assert.That(videoRenderer.RenderedFrames, Is.GreaterThan(Av1FixtureFile.FrameCount / 2),
+                    "a file read into the window in several passes has to keep being shown");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A surface change has to reach the picture thread even when there is no frame to show: a paused
+    /// position whose picture is owed leaves that thread waiting for one, and a window resize is not a frame.
+    /// Nothing about the queue changes, so a thread waiting *in* the queue cannot be told — which is what
+    /// made this case unreachable before every wait moved onto the thread's own node.
+    /// </summary>
+    [Test]
+    public void TakesUpASurfaceChangeWhileThePictureWaitsForItsPosition()
+    {
+        string path = CreateY4mFile(frameCount: 200);
+        try
+        {
+            FakeRenderTarget target = new();
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(
+                videoRenderer,
+                new FakeAudioRenderer(),
+                new ThrottledVideoDecoderFactory { DecodeMilliseconds = 1300, FastPackets = 1 });
+
+            Assert.That(Open(pipeline, path, target).IsSuccessful, Is.True);
+            pipeline.Play();
+            WaitForPresentedFrames(pipeline, 1);
+
+            // Paused and then moved: the position's picture is owed, the decoder is quiet for over a second,
+            // so the thread is waiting for a frame that is not there.
+            Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+            SeekAndWait(pipeline, TimeSpan.FromSeconds(20));
+
+            int before = videoRenderer.RefreshedSurfaces;
+            target.RaiseSizeChanged();
+
+            WaitFor(() => videoRenderer.RefreshedSurfaces > before,
+                "a surface change has to reach a picture that is waiting for a frame", 1500);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The same edge from the other side: a second seek has to reach the thread that is still waiting to be
+    /// handed the first one's picture. The clock's position is the observable — it is the render thread that
+    /// places a new request, and it can only do that by waking.
+    /// </summary>
+    [Test]
+    public void TakesUpASeekWhileThePictureWaitsForItsPosition()
+    {
+        string path = CreateY4mFile(frameCount: 200);
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(
+                videoRenderer,
+                new FakeAudioRenderer(),
+                // Slow enough that the decoder cannot rescue the thread inside the window this checks.
+                new ThrottledVideoDecoderFactory { DecodeMilliseconds = 3000, FastPackets = 1 });
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            pipeline.Play();
+            WaitForPresentedFrames(pipeline, 1);
+
+            Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+            SeekAndWait(pipeline, TimeSpan.FromSeconds(20));
+
+            // The first seek's picture is still owed, so the thread is waiting for it — and the second seek
+            // is not a frame.
+            SeekAndWait(pipeline, TimeSpan.FromSeconds(40));
+
+            WaitFor(() => pipeline.Position >= TimeSpan.FromSeconds(39),
+                "a second seek has to reach a picture that is waiting for the first one", 1500);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The picture holds the clock until this position has something to show. Without it the sound starts
+    /// the clock on its first block and the picture is left behind before it has produced a single frame —
+    /// measured at ten frames dropped and the picture starting 666 ms into the file, and nothing anywhere
+    /// said so.
+    /// </summary>
+    [Test]
+    public void HoldsTheClockBackUntilThePictureHasSomethingToShow()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { SubmitDelayMilliseconds = 30 };
+            using PlaybackPipeline pipeline = CreatePipeline(
+                new FakeVideoRenderer(),
+                audioRenderer,
+                new SlowFirstDecodeVideoDecoderFactory { FirstDecodeMilliseconds = 400 });
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            // The sound has something to hand over almost at once; the picture takes four hundred
+            // milliseconds. Nothing may run in the meantime.
+            WaitFor(() => pipeline.StarvedFor == "video", "the picture has nothing to show, so time has to be held");
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(audioRenderer.ClockIsRunning, Is.False, "a held clock is a stopped clock");
+                Assert.That(pipeline.Position, Is.LessThan(TimeSpan.FromMilliseconds(200)), "the clock is held where the position starts");
+            }
+
+            WaitForPresentedFrames(pipeline, 1);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.DroppedFrameCount, Is.Zero, "the first frames of a position are not late when the clock waited for them");
+                Assert.That(audioRenderer.ClockIsRunning, Is.True, "the first frame is what lets time pass");
+                Assert.That(pipeline.Position, Is.LessThan(TimeSpan.FromMilliseconds(300)), "and the picture starts at the start of the file, not past it");
+            }
+
+            WaitForPresentedFrames(pipeline, 3);
+            Assert.That(pipeline.DroppedFrameCount, Is.Zero, "and nothing after it is dropped either");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The same hold for a position reached by a seek.
+    /// </summary>
+    [Test]
+    public void HoldsTheClockBackUntilThePictureHasSomethingToShowAfterASeek()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { SubmitDelayMilliseconds = 30 };
+            using PlaybackPipeline pipeline = CreatePipeline(
+                new FakeVideoRenderer(),
+                audioRenderer,
+                new SlowFirstDecodeVideoDecoderFactory { FirstDecodeMilliseconds = 400 });
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            // Far enough in that the decoded tail is ahead of where the seek will go back to.
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(500), "playback has to get past the position the seek goes back to");
+
+            SeekAndWait(pipeline, TimeSpan.FromMilliseconds(100));
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            // The new position's first decode takes four hundred milliseconds, and nothing may run in the
+            // meantime — the old tail is not a fact about this position.
+            WaitFor(() => pipeline.StarvedFor == "video", "a position that has produced nothing holds the clock", 150);
+            Assert.That(audioRenderer.ClockIsRunning, Is.False, "the clock is held, so the sound is stopped with it");
+
+            long shown = pipeline.PresentedFrameCount;
+            WaitForPresentedFrames(pipeline, shown + 1);
+            Assert.That(audioRenderer.ClockIsRunning, Is.True, "the first frame of the position lets time pass");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The case that decides between "this position has produced nothing" and "the decoder's tail says it has
+    /// produced nothing": a seek that lands **while the decoder is inside a decode**. The tail is then still
+    /// the position playback has left — a value *ahead* of the new request — so a tail-based verdict finds the
+    /// picture comfortably ahead and lets the clock run through the whole of that decode. The gate makes the
+    /// window deterministic: the decoder is held mid-decode while the position moves underneath it.
+    /// </summary>
+    [Test]
+    public void HoldsTheClockBackWhenAPositionMovesDuringADecode()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { SubmitDelayMilliseconds = 30 };
+            GatedVideoDecoderFactory videoDecoders = new();
+            using PlaybackPipeline pipeline = CreatePipeline(
+                new FakeVideoRenderer(),
+                audioRenderer,
+                videoDecoders);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(500), "playback has to get past the position the seek goes back to");
+
+            // Hold the decoder inside a decode, so its tail keeps the value of the position playback is about
+            // to leave, and move the position underneath it.
+            videoDecoders.Close();
+            Assert.That(videoDecoders.WaitUntilDecoding(), Is.True, "the decoder has to be inside a decode");
+
+            SeekAndWait(pipeline, TimeSpan.FromMilliseconds(100));
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => pipeline.StarvedFor == "video", "a position that has produced nothing holds the clock", 300);
+            Assert.That(audioRenderer.ClockIsRunning, Is.False, "the old position's tail is not a fact about this one");
+
+            videoDecoders.Open();
+            long shown = pipeline.PresentedFrameCount;
+            WaitForPresentedFrames(pipeline, shown + 1);
+            Assert.That(audioRenderer.ClockIsRunning, Is.True, "the first frame of the position lets time pass");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A decoder that can be held inside a decode, so a test can move the position while the decoder is
+    /// working on the old one — which is what a real seek does to a real decoder, and the window in which its
+    /// tail describes a position that no longer exists.
+    /// </summary>
+    private sealed class GatedVideoDecoderFactory : IVideoDecoderFactory
+    {
+        private readonly FFmpegVideoDecoderFactory _inner = new();
+        private readonly ManualResetEventSlim _gate = new(true);
+        private readonly ManualResetEventSlim _decoding = new(false);
+
+        public ComponentCapabilities Capabilities => _inner.Capabilities;
+
+        internal void Close()
+        {
+            _gate.Reset();
+            _decoding.Reset();
+        }
+
+        internal void Open()
+        {
+            _gate.Set();
+        }
+
+        /// <summary>Waits for the decoder to be inside a decode, which is when the gate holds it.</summary>
+        internal bool WaitUntilDecoding() => _decoding.Wait(TimeSpan.FromSeconds(5));
+
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+        {
+            PlaybackOperationResult created = _inner.TryCreate(source, stream, options, out IVideoDecoder? inner);
+            if (!created.IsSuccessful || inner is null)
+            {
+                decoder = null;
+                return created;
+            }
+
+            decoder = new GatedDecoder(inner, this);
+            return PlaybackOperationResult.Success;
+        }
+
+        private sealed class GatedDecoder(IVideoDecoder inner, GatedVideoDecoderFactory owner) : IVideoDecoder
+        {
+            public MediaStreamInfo Stream => inner.Stream;
+
+            public bool IsHardwareAccelerated => inner.IsHardwareAccelerated;
+
+            public PixelFormat OutputFormat => inner.OutputFormat;
+
+            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            {
+                owner._decoding.Set();
+                owner._gate.Wait(TimeSpan.FromSeconds(5));
+                return inner.TryDecode(packet, out frames);
+            }
+
+            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames) => inner.Drain(out frames);
+
+            public PlaybackOperationResult Flush() => inner.Flush();
+
+            public void Dispose() => inner.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A decoder that is slow on the first packet it is given, and on the first packet after every flush —
+    /// which is what a seek costs a real decoder, and what makes the first frames of the new position late
+    /// unless the clock waited for them.
+    /// </summary>
+    private sealed class SlowFirstDecodeVideoDecoderFactory : IVideoDecoderFactory
+    {
+        private readonly FFmpegVideoDecoderFactory _inner = new();
+
+        internal int FirstDecodeMilliseconds { get; init; }
+
+        /// <summary>How long each packet after the first takes, for a decoder that is slow at the start and
+        /// then merely behind.</summary>
+        internal int SubsequentDecodeMilliseconds { get; init; }
+
+        public ComponentCapabilities Capabilities => _inner.Capabilities;
+
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+        {
+            PlaybackOperationResult created = _inner.TryCreate(source, stream, options, out IVideoDecoder? inner);
+            if (!created.IsSuccessful || inner is null)
+            {
+                decoder = null;
+                return created;
+            }
+
+            decoder = new SlowFirstDecoder(inner, FirstDecodeMilliseconds, SubsequentDecodeMilliseconds);
+            return PlaybackOperationResult.Success;
+        }
+
+        private sealed class SlowFirstDecoder(IVideoDecoder inner, int firstDecodeMilliseconds, int subsequentDecodeMilliseconds) : IVideoDecoder
+        {
+            private int _pending = 1;
+
+            public MediaStreamInfo Stream => inner.Stream;
+
+            public bool IsHardwareAccelerated => inner.IsHardwareAccelerated;
+
+            public PixelFormat OutputFormat => inner.OutputFormat;
+
+            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            {
+                bool first = Interlocked.Exchange(ref _pending, 0) == 1;
+                int delay = first ? firstDecodeMilliseconds : subsequentDecodeMilliseconds;
+                if (delay > 0)
+                {
+                    Thread.Sleep(delay);
+                }
+
+                return inner.TryDecode(packet, out frames);
+            }
+
+            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames) => inner.Drain(out frames);
+
+            public PlaybackOperationResult Flush()
+            {
+                PlaybackOperationResult flushed = inner.Flush();
+                Interlocked.Exchange(ref _pending, 1);
+                return flushed;
+            }
+
+            public void Dispose() => inner.Dispose();
+        }
+    }
+
     [Test]
     public void PlaysAnAudioFileThroughTheRenderer()
     {
@@ -164,7 +575,7 @@ public class PlaybackPipelineTests
         string path = CreateWaveFile();
         try
         {
-            FakeAudioRenderer audioRenderer = new() { QueuedSampleCount = SampleRate };
+            FakeAudioRenderer audioRenderer = new() { QueuedSampleCount = SampleRate, NoRoom = true };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
@@ -177,13 +588,62 @@ public class PlaybackPipelineTests
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a device that takes nothing is a wait, not a failure");
                 Assert.That(pipeline.Error, Is.Null);
                 Assert.That(audioRenderer.SubmittedBuffers, Is.Zero, "the device never made room, so nothing was handed over");
+                Assert.That(audioRenderer.AbandonedSubmits, Is.Zero, "waiting for room is not letting go of the block");
             }
 
             // Letting the device take audio again ends the wait, and what was carried through it is played
             // rather than dropped.
             audioRenderer.QueuedSampleCount = 0;
+            audioRenderer.NoRoom = false;
             WaitForPlaybackToFinish(pipeline);
             Assert.That(audioRenderer.SubmittedSamples, Is.EqualTo(SampleCount), "every sample reaches the device once it opens up");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A device with no room parks the sound's thread with the hand-off suspended, not with the thread inside
+    /// the renderer — and a seek has to reach it there. The hand-off belongs to the position it was made for,
+    /// so it is let go of rather than resumed against the new one: the rest of it is a moment nobody is
+    /// playing, and the seek's flush takes back what the device already holds.
+    /// </summary>
+    [Test]
+    public void LetsGoOfTheBlockWhenThePositionMovesWhileTheDeviceHasNoRoom()
+    {
+        string path = CreateWaveFile(SampleRate);
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { QueuedSampleCount = SampleRate, NoRoom = true };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            // The first block is offered to a device that will not take it, so the thread waits for room.
+            WaitFor(() => audioRenderer.SubmitsStarted > 0, "a block has to be offered before it can be stuck");
+            Thread.Sleep(100);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a device with no room is a wait, not a failure");
+                Assert.That(audioRenderer.SubmittedBuffers, Is.Zero, "the block is still on its way, so nothing has been taken");
+                Assert.That(audioRenderer.AbandonedSubmits, Is.Zero, "waiting for room is not letting go of the block");
+            }
+
+            // The position moves on while the hand-off is suspended: this is the wait that used to live inside
+            // the renderer, where a seek could not reach it.
+            SeekAndWait(pipeline, TimeSpan.FromSeconds(0.5));
+            WaitFor(() => audioRenderer.AbandonedSubmits > 0, "the seek has to reach the hand-off that is waiting for room");
+
+            // And the sound carries on from where the seek went.
+            audioRenderer.QueuedSampleCount = 0;
+            audioRenderer.NoRoom = false;
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitForPlaybackToFinish(pipeline);
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
         }
         finally
         {
@@ -196,8 +656,9 @@ public class PlaybackPipelineTests
     /// explain, and the design's answer is to do nothing about it: the device is the clock, so a device that
     /// has stopped is time that has stopped, and the picture waits where it is, losing nothing while it
     /// waits. Doing nothing is not the same as saying nothing, though — a picture that stopped with no reason
-    /// given is exactly what the user is left looking at — so the device is named for as long as it lasts,
-    /// and the picture carries on by itself when the device does.
+    /// given is exactly what the user is left looking at — so the device is *named* when it is found stuck:
+    /// one line, once per stall, and nothing about the recovery, because the picture carrying on is what the
+    /// user sees and a line saying so would be narrating rather than explaining.
     /// </summary>
     [Test]
     public void WaitsForADeviceThatIsNotMovingAndThenCarriesOn()
@@ -205,7 +666,7 @@ public class PlaybackPipelineTests
         string path = RawAudioVideoFixtureFile.Create();
         try
         {
-            FakeAudioRenderer audioRenderer = new() { HoldTheClock = true, QueuedSampleCount = SampleRate };
+            FakeAudioRenderer audioRenderer = new() { HoldTheClock = true, QueuedSampleCount = SampleRate, NoRoom = true };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
             WarningLog warnings = new(pipeline);
 
@@ -221,7 +682,7 @@ public class PlaybackPipelineTests
 
             // The device is given a second of standing still before it is called stuck, so the line arrives
             // when the pipeline decides and not when the test does.
-            WaitForWarning(warnings, "not moving");
+            WaitForWarning(warnings, "stalled");
             long presentedWhileStuck = pipeline.PresentedFrameCount;
 
             using (Assert.EnterMultipleScope())
@@ -230,7 +691,7 @@ public class PlaybackPipelineTests
                 Assert.That(pipeline.Error, Is.Null);
                 Assert.That(audioRenderer.SubmittedBuffers, Is.Zero, "the device never made room, so nothing was handed over");
                 Assert.That(presentedWhileStuck, Is.GreaterThan(0), "the first frame is due at once, so the picture is not the thing that is stuck");
-                Assert.That(warnings.Latest, Does.Contain("not moving"), "a picture that stopped has to say why");
+                Assert.That(warnings.Latest, Does.Contain("stalled"), "a picture that stopped has to say why");
                 Assert.That(warnings.Messages, Has.Count.EqualTo(1), "one stall is one line, not one per check");
             }
 
@@ -241,18 +702,20 @@ public class PlaybackPipelineTests
                 Assert.That(pipeline.PresentedFrameCount, Is.EqualTo(presentedWhileStuck), "nothing can be shown while the clock is not moving");
             }
 
-            // The device plays again, so the clock moves and the picture picks up where it left off. Movement
-            // is what ends the stall, and it is said as one line — the pair to the one that started it.
+            // The device plays again, so the clock moves and the picture picks up where it left off. Nothing
+            // is said about the recovery: what the user sees is the picture moving again, and the line that
+            // named the stall is still the last thing said about the device.
             audioRenderer.QueuedSampleCount = 0;
+            audioRenderer.NoRoom = false;
             audioRenderer.ReleaseTheClock();
-            WaitForWarning(warnings, "moving again");
             WaitForPresentedFrames(pipeline, presentedWhileStuck + 2);
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(pipeline.Error, Is.Null);
                 Assert.That(pipeline.DroppedFrameCount, Is.Zero, "and none of the frames it waited for were lost");
-                Assert.That(warnings.Latest, Does.Contain("moving again"), "the last line is the recovery, not the stall");
+                Assert.That(warnings.Messages, Has.Count.EqualTo(1), "the recovery is not announced");
+                Assert.That(warnings.Latest, Does.Contain("stalled"), "the last line is still the one that named the stall");
             }
         }
         finally
@@ -322,6 +785,111 @@ public class PlaybackPipelineTests
     /// waiting, and never any of the sound. The picture stays in step by skipping, not by falling further
     /// behind on every frame.
     /// </summary>
+    /// <summary>
+    /// The picture's starvation is decided against the clock, and the thread that decides it is the one the
+    /// decoder's quiet leaves parked on an empty queue. Waiting there for an entry with no deadline is how a
+    /// starving picture went unreported: the clock ran on while nothing was being decoded, the hold arrived
+    /// only when the next frame turned up, and by then the picture was as far behind as the decoder had been
+    /// quiet for. What the hold needs is a wait that ends when the *verdict* can change — which, while the
+    /// clock is still the sound's to claim, is not even a question about the media yet.
+    /// </summary>
+    [Test]
+    public void HoldsTheClockBackWhileTheDecoderIsQuiet()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            // The sound's own first block is what claims the clock, and it is handed over on another thread —
+            // so the claim is held back here until after this thread has had its say, which is the arrangement
+            // in which nothing the picture is waiting for would ever make the verdict readable. The device
+            // holding audio is what keeps the sound itself from being the reason time is stopped.
+            FakeAudioRenderer audioRenderer = new() { SubmitDelayMilliseconds = 30, QueuedSampleCount = SampleRate };
+            using PlaybackPipeline pipeline = CreatePipeline(
+                new FakeVideoRenderer(),
+                audioRenderer,
+                new ThrottledVideoDecoderFactory { DecodeMilliseconds = 1500, FastPackets = 1 },
+                audioDecoders: new PacedAudioDecoderFactory { DecodeMilliseconds = 150 });
+
+            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitForPresentedFrames(pipeline, 1);
+
+            // The hold has to arrive while the decoder is still quiet: the threshold is 200 ms and the next
+            // frame is a second and a half away, so this waits well inside the quiet and a wait that ends when
+            // a frame does fails it — which is what the wait this replaces would do.
+            WaitFor(() => pipeline.StarvedFor == "video", "the picture has nothing to show, so time has to be held", 800);
+
+            // Held near the threshold rather than at whatever the clock had run to by the time a frame turned
+            // up: a picture left behind for the whole of the decoder's quiet shows as a gap of about that
+            // length between the clock and the newest decoded frame.
+            TimeSpan held = pipeline.Position;
+            Assert.That(pipeline.Position - pipeline.LastDecodedTimestamp, Is.LessThan(TimeSpan.FromMilliseconds(700)),
+                "the hold is what keeps the clock from running away from a picture that has nothing to show");
+
+            // A held clock is a clock that does not move: the sound waits for the picture rather than leaving
+            // it further behind, which is what reporting the verdict is for.
+            Thread.Sleep(300);
+            Assert.That(pipeline.Position, Is.EqualTo(held), "a held clock does not move");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The cadence itself: the verdict is read at the top of the loop, and the thread is idle between
+    /// iterations, so the wait has to end when the *clock* reaches the point at which a picture this far
+    /// behind counts as starving — a wait that ends only when a frame does reports the starvation as many
+    /// seconds late as the decoder was quiet.
+    /// <para>
+    /// A file with no sound is what makes this the only thing being tested: the clock is claimed by this
+    /// thread as it shows the first frame that plays, so by the time the decoder goes quiet the verdict is
+    /// judgeable and false — the clock is level with the picture — and nothing but the clock's own progress
+    /// would change it. And the cadence is fixed rather than derived from the clock's state, so the hold does
+    /// not depend on the clock having been running, claimed or at any particular rate when the thread went
+    /// idle.
+    /// </para>
+    /// </summary>
+    [Test]
+    public void HoldsTheClockBackWhenTheClockReachesTheThreshold()
+    {
+        // Long enough that the reader is still reading when the decoder goes quiet: a file whose packets have
+        // all been read is a file that has run out, and a picture is not "behind" a file that has run out.
+        string path = CreateY4mFile(frameCount: 200);
+        try
+        {
+            using PlaybackPipeline pipeline = CreatePipeline(
+                new FakeVideoRenderer(),
+                new FakeAudioRenderer(),
+                // Slow enough on the first packet that playback is certainly running before the first frame
+                // arrives — so the frame is a presentation that claims the clock, not the paused position's
+                // still, which claims nothing — and then quiet for 1300 ms with the clock level with it.
+                new SlowFirstDecodeVideoDecoderFactory { FirstDecodeMilliseconds = 400, SubsequentDecodeMilliseconds = 1300 });
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitForPresentedFrames(pipeline, 1);
+
+            // Without the cadence the verdict is only read when a frame arrives — and by then the decoder is
+            // ahead again, so the hold never arrives at all.
+            WaitFor(() => pipeline.StarvedFor == "video", "the clock has run past a picture that has nothing more to show", 1800);
+
+            TimeSpan held = pipeline.Position;
+            Assert.That(held - pipeline.LastDecodedTimestamp, Is.LessThan(TimeSpan.FromMilliseconds(700)),
+                "the hold is what keeps the clock from running away from a picture that has nothing to show");
+
+            Thread.Sleep(300);
+            Assert.That(pipeline.Position, Is.EqualTo(held), "a held clock does not move");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     /// <summary>
     /// The clock is told what to do only when the answer has changed. Several things decide it in a row — a
     /// state change, then each starvation flag, or the reverse — and a clock told the same thing twice is a
@@ -574,12 +1142,13 @@ public class PlaybackPipelineTests
             // Posted, so where the pause takes effect is what says it happened.
             WaitForState(pipeline, MediaEngineState.Paused);
 
+            // The clock is stopped by the render threads rather than by the pause itself — they are the ones
+            // that decide it, and the pause is what wakes them — so the device stops a moment after the state
+            // does, which is the moment this waits for.
+            WaitFor(() => !audioRenderer.ClockIsRunning, "a paused pipeline has to stop the clock");
+
             TimeSpan paused = pipeline.Position;
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused));
-                Assert.That(audioRenderer.ClockIsRunning, Is.False);
-            }
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused));
 
             Thread.Sleep(50);
             Assert.That(pipeline.Position, Is.EqualTo(paused), "a paused pipeline must not move");
@@ -625,13 +1194,16 @@ public class PlaybackPipelineTests
             SeekAndWait(pipeline, target);
 
             // The seek is carried out before the pipeline says so, so everything about it can be read here:
-            // the clock is where the seek asked, and playback is paused whatever it was doing before — a seek
-            // is a state change of its own, and whether the new position goes on playing is the host's call.
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a seek leaves playback paused, whatever it was");
-                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(target - TimeSpan.FromMilliseconds(50)));
-            }
+            // playback is paused whatever it was doing before — a seek is a state change of its own, and
+            // whether the new position goes on playing is the host's call.
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a seek leaves playback paused, whatever it was");
+
+            // Where the clock is, though, is not the seek's to say: the clock belongs to the render threads,
+            // and the one that wakes first places it at the position that was asked for — a moment after the
+            // seek has answered, which is why this is waited for rather than read.
+            WaitFor(
+                () => pipeline.Position >= target - TimeSpan.FromMilliseconds(50),
+                $"The clock is at {pipeline.Position:mm\\:ss\\.fff} where the seek asked for {target:mm\\:ss\\.fff}.");
 
             // And the host's call is one command: play, and the file runs on from there.
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -658,11 +1230,13 @@ public class PlaybackPipelineTests
             var target = TimeSpan.FromSeconds(0.25);
             SeekAndWait(pipeline, target);
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "seeking must not start playback");
-                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(target - TimeSpan.FromMilliseconds(50)));
-            }
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "seeking must not start playback");
+
+            // The clock is placed at the position a seek asked for by the first render thread to wake, which
+            // is a moment after the seek itself has answered.
+            WaitFor(
+                () => pipeline.Position >= target - TimeSpan.FromMilliseconds(50),
+                $"The clock is at {pipeline.Position:mm\\:ss\\.fff} where the seek asked for {target:mm\\:ss\\.fff}.");
 
             pipeline.Play();
             WaitForPlaybackToFinish(pipeline);
@@ -748,7 +1322,14 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "showing a still is not playing");
-                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(TimeSpan.FromSeconds(18)));
+
+                // A still claims no anchor: the clock is left where the seek put it (20 s) rather than moved
+                // to the frame the still showed (18 s — the keyframe a demuxer lands on). Anchoring it would
+                // make the next frame, due at 20 s, two seconds early on resume, and the picture would wait
+                // that out.
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(TimeSpan.FromSeconds(19)), "a still must not move the clock");
+                Assert.That(pipeline.DroppedFrameCount, Is.Zero, "a still is not a presentation, so nothing about it is late");
+                Assert.That(videoRenderer.RenderedFrames, Is.EqualTo(shownBefore + 1), "one frame is offered, not several");
             }
 
             // One frame per position, not a slideshow: the screen keeps the position's picture while nothing
@@ -1008,11 +1589,14 @@ public class PlaybackPipelineTests
             // it once the first frame of the new position arrives. Both are far ahead of the two seconds
             // playback was at. The seek leaves playback paused, which is its own state change and not a
             // failure of the same thing.
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a seek leaves playback paused, whatever it was");
-                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(TimeSpan.FromSeconds(18)));
-            }
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a seek leaves playback paused, whatever it was");
+
+            // Where the clock is, though, is not the seek's to say: the clock belongs to the render threads,
+            // and the one that wakes first places it at the position that was asked for — a moment after the
+            // seek has answered, which is why this is waited for rather than read.
+            WaitFor(
+                () => pipeline.Position >= TimeSpan.FromSeconds(18),
+                "the clock has to be the new position's rather than the one playback has left");
         }
         finally
         {
@@ -1057,6 +1641,7 @@ public class PlaybackPipelineTests
             const int totalSamples = SampleRate * 200 / 30;
             WaitFor(() => audioRenderer.SubmittedSamples >= totalSamples, "the reader has to reach the end of the file");
             audioRenderer.QueuedSampleCount = SampleRate;
+            audioRenderer.NoRoom = true;
 
             var askedAt = Stopwatch.StartNew();
             PlaybackOperationResult seeked = Await(pipeline.Seek(TimeSpan.FromSeconds(1)));
@@ -1096,10 +1681,11 @@ public class PlaybackPipelineTests
             const int totalSamples = SampleRate * 200 / 30;
             WaitFor(() => audioRenderer.SubmittedSamples >= totalSamples, "the reader has to reach the end of the file");
 
-            // Now that the whole sound has been handed over, the device stops taking any more of it, and the
-            // seek puts playback near the end so the picture has almost nothing left to show: what holds the
-            // ending up is the sound and nothing else.
+            // Now that the whole sound has been handed over, the device holds audio and takes none of it,
+            // and the seek puts playback near the end so the picture has almost nothing left to show: what
+            // holds the ending up is the sound and nothing else.
             audioRenderer.QueuedSampleCount = SampleRate;
+            audioRenderer.NoRoom = true;
             Assert.That(Await(pipeline.Seek(TimeSpan.FromSeconds(6))).IsSuccessful, Is.True);
             Thread.Sleep(200);
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a sound that has not played out is not an ending");
@@ -1110,6 +1696,7 @@ public class PlaybackPipelineTests
 
             // The device takes audio again, so the last of the sound is played and the ending is earned.
             audioRenderer.QueuedSampleCount = 0;
+            audioRenderer.NoRoom = false;
             WaitForPlaybackToFinish(pipeline);
         }
         finally
@@ -1136,9 +1723,8 @@ public class PlaybackPipelineTests
         string path = CreateWaveFile();
         try
         {
-            // One sample short of the room the pipeline waits for (100 ms), so every block is accepted and
-            // the device is never empty: the sound has nothing left to hand over, and the only thing holding
-            // the ending up is the device not having played the last of it.
+            // The device still holds audio — the sound has nothing left to hand over, and the only thing
+            // holding the ending up is the device not having played the last of it.
             FakeAudioRenderer audioRenderer = new() { QueuedSampleCount = SampleRate / 10 - 1 };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
@@ -1281,6 +1867,64 @@ public class PlaybackPipelineTests
                 Assert.That(pipeline.PictureLag, Is.LessThan(TimeSpan.FromSeconds(1)), "the picture has to stay in step with the clock");
                 Assert.That(pipeline.DroppedFrameCount, Is.LessThan(5), "frames from the resume point are not late");
             }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A seek places the clock at the position that was asked for, and the media replaces it the moment the
+    /// first of it plays (see <see cref="StartsWhereTheFileResumesRatherThanWhereTheSeekAsked"/>). Every
+    /// decision the clock is made afterwards has to leave it where the media put it: a pause is such a
+    /// decision, and placing the request again on the way would move time forward to a position nothing is
+    /// playing — every frame of it late from then on, and the host reading a position nobody asked for.
+    /// </summary>
+    [Test]
+    public void KeepsTheClockWhereTheMediaPutItWhenSomethingElseChangesIt()
+    {
+        string path = Av1FixtureFile.Create(gopSize: Av1FixtureFile.FrameCount);
+        try
+        {
+            FFmpegSourceProviderFactory sourceFactory = new();
+            Assert.That(sourceFactory.TryOpen(MediaLocator.Parse(path), out IMediaSource? opened).IsSuccessful, Is.True);
+
+            TimeSpan target;
+            if (opened is null)
+            {
+                Assert.Fail("The fixture has to open.");
+                return;
+            }
+
+            using (IMediaSource source = opened)
+            {
+                target = FindASeekThatMisses(source);
+            }
+
+            if (target == TimeSpan.Zero)
+            {
+                Assert.Ignore("The fixture resumes wherever it is asked to, so a seek that misses it cannot be tested.");
+            }
+
+            FakeAudioRenderer audioRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            pipeline.Play();
+            WaitForPresentedFrames(pipeline, 2);
+
+            SeekAndWait(pipeline, target);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            // The media takes the clock over where the file actually resumes, which is behind the request:
+            // that arriving is what says the claim has been made and what must not be placed over again.
+            WaitFor(() => pipeline.Position < target, "the media has to take the clock over where it resumes");
+
+            Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+            WaitFor(() => !audioRenderer.ClockIsRunning, "a paused pipeline has to stop the clock");
+
+            Assert.That(pipeline.Position, Is.LessThan(target), "a decision made after the claim leaves the clock where the media put it");
         }
         finally
         {
@@ -1699,8 +2343,241 @@ public class PlaybackPipelineTests
             videoDecoders ?? new FFmpegVideoDecoderFactory(),
             new FakeVideoRendererFactory(videoRenderer),
             audioDecoders ?? new FFmpegAudioDecoderFactory(),
-            audioRenderer,
+            new FixedAudioRendererFactory(audioRenderer),
             new DefaultSynchronizer());
+    }
+
+    /// <summary>
+    /// A pipeline whose sound devices are made by the factory under test, with a stand-in picture so the file
+    /// only has to contain audio.
+    /// </summary>
+    private static PlaybackPipeline CreatePipeline(IComponentFactory<IAudioRenderer> audioRendererFactory)
+    {
+        return new PlaybackPipeline(
+            new FFmpegSourceProviderFactory(),
+            new FFmpegVideoDecoderFactory(),
+            new FakeVideoRendererFactory(new FakeVideoRenderer()),
+            new FFmpegAudioDecoderFactory(),
+            audioRendererFactory,
+            new DefaultSynchronizer());
+    }
+
+    /// <summary>
+    /// Hands out the one renderer the test is going to inspect. The pipeline creates its own renderer per
+    /// open and disposes it on close, so this is only sound because the stand-in's dispose does nothing and
+    /// it can be configured again — which is exactly what the tests need to read its counters afterwards.
+    /// </summary>
+    private sealed class FixedAudioRendererFactory : IComponentFactory<IAudioRenderer>
+    {
+        private readonly IAudioRenderer _renderer;
+
+        internal FixedAudioRendererFactory(IAudioRenderer renderer)
+        {
+            _renderer = renderer;
+        }
+
+        public ComponentCapabilities Capabilities { get; } = new()
+        {
+            Name = "fake",
+            Description = "The renderer the test reads.",
+        };
+
+        public PlaybackOperationResult TryCreate(out IAudioRenderer? component)
+        {
+            component = _renderer;
+            return PlaybackOperationResult.Success;
+        }
+    }
+
+    /// <summary>
+    /// Two players at once: two pipelines, two devices, two clocks. Nothing in the engine is shared between them —
+    /// this is the test that would fail if a static (a dispatcher, a graphics device, a queue) came back, which is
+    /// exactly the kind of sharing that is invisible until two files are opened.
+    /// </summary>
+    [Test]
+    public void PlaysTwoFilesAtOnceWithoutEitherTouchingTheOther()
+    {
+        string first = CreateWaveFile();
+        string second = CreateWaveFile();
+        try
+        {
+            FakeAudioRenderer firstAudio = new();
+            FakeAudioRenderer secondAudio = new();
+            using PlaybackPipeline firstPipeline = CreatePipeline(new FakeVideoRenderer(), firstAudio);
+            using PlaybackPipeline secondPipeline = CreatePipeline(new FakeVideoRenderer(), secondAudio);
+
+            Assert.That(Open(firstPipeline, first).IsSuccessful, Is.True);
+            Assert.That(Open(secondPipeline, second).IsSuccessful, Is.True);
+            Assert.That(Await(firstPipeline.Play()).IsSuccessful, Is.True);
+            Assert.That(Await(secondPipeline.Play()).IsSuccessful, Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(firstPipeline.State, Is.EqualTo(MediaEngineState.Playing), "both players are playing at once");
+                Assert.That(secondPipeline.State, Is.EqualTo(MediaEngineState.Playing));
+            }
+
+            WaitForPlaybackToFinish(firstPipeline);
+            WaitForPlaybackToFinish(secondPipeline);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(firstPipeline.State, Is.EqualTo(MediaEngineState.Ended), firstPipeline.Error);
+                Assert.That(secondPipeline.State, Is.EqualTo(MediaEngineState.Ended), secondPipeline.Error);
+                Assert.That(firstAudio.SubmittedSamples, Is.EqualTo(SampleCount), "each player feeds its own device, with all of its own sound");
+                Assert.That(secondAudio.SubmittedSamples, Is.EqualTo(SampleCount));
+                Assert.That(firstAudio.SubmittedBuffers, Is.GreaterThan(0));
+                Assert.That(secondAudio.SubmittedBuffers, Is.GreaterThan(0));
+            }
+        }
+        finally
+        {
+            File.Delete(first);
+            File.Delete(second);
+        }
+    }
+
+    /// <summary>
+    /// A renderer that cannot hand a block to its device fails the hand-off, and the pipeline is where that
+    /// becomes an error — not where the thread dies. The message the state carries is the one the failing layer
+    /// produced, context included: the pipeline adds a state, not a diagnosis. (The exception itself is pinned
+    /// to be preserved by <c>WasapiAudioClockTests</c>, which is where it is caught.)
+    /// </summary>
+    [Test]
+    public void ReportsARenderersFailureAsPlaybackFailing()
+    {
+        string path = CreateWaveFile();
+        try
+        {
+            InvalidOperationException failure = new("The device cannot be written to.");
+            FakeAudioRenderer audioRenderer = new() { SubmitFailure = failure };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitForPlaybackToFinish(pipeline);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Error));
+                Assert.That(pipeline.Error, Is.EqualTo($"Unable to queue audio: {failure.Message}"),
+                    "the message the user sees is the one the failing layer produced, with its context");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The sound's device belongs to one pipeline for one open. A renderer that outlived the open would carry
+    /// its clock, its buffer and its flush into the next file — and a renderer shared between two pipelines
+    /// would give them one clock, so the second file would play at the first one's position.
+    /// </summary>
+    [Test]
+    public void CreatesItsOwnAudioRendererForEachOpen()
+    {
+        string path = CreateWaveFile();
+        try
+        {
+            CreatingAudioRendererFactory factory = new();
+
+            using (PlaybackPipeline first = CreatePipeline(factory))
+            {
+                Assert.That(Open(first, path).IsSuccessful, Is.True);
+
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(factory.Created, Has.Count.EqualTo(1), "opening a file asks the factory for a device");
+                    Assert.That(factory.Created[0].DisposeCount, Is.Zero, "the device is in use, so it is not let go of");
+                }
+            }
+
+            FakeAudioRenderer letGo = factory.Created[0];
+            Assert.That(letGo.DisposeCount, Is.EqualTo(1), "closing lets go of the device it was playing on");
+
+            // A second pipeline from the same factory gets a device of its own rather than the one the first
+            // pipeline disposed: that is what makes two pipelines two streams the audio engine mixes.
+            using PlaybackPipeline second = CreatePipeline(factory);
+            Assert.That(Open(second, path).IsSuccessful, Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(factory.Created, Has.Count.EqualTo(2), "a second pipeline gets a second device");
+                Assert.That(factory.Created[1], Is.Not.SameAs(letGo));
+                Assert.That(factory.Created[1].SubmittedSamples, Is.Zero);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The host may set the volume before there is a device to set it on. The value is the pipeline's, so it
+    /// survives the renderer being created per open and reaches the device the next open makes.
+    /// </summary>
+    [Test]
+    public void AppliesTheVolumeSetBeforeAnythingIsOpen()
+    {
+        string path = CreateWaveFile();
+        try
+        {
+            CreatingAudioRendererFactory factory = new();
+            using PlaybackPipeline pipeline = CreatePipeline(factory);
+
+            pipeline.Volume = 0.25;
+            pipeline.IsMuted = true;
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(factory.Created, Has.Count.EqualTo(1));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(factory.Created[0].Volume, Is.EqualTo(0.25), "what the host asked for is what the device gets");
+                Assert.That(factory.Created[0].IsMuted, Is.True);
+
+                // And after the device exists, the same property reaches it.
+                pipeline.Volume = 0.5;
+                Assert.That(factory.Created[0].Volume, Is.EqualTo(0.5));
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Hands out a fresh stand-in device per call, which is what the real factory does, and keeps every one it
+    /// made so a test can see both how many opens asked for a device and what became of each.
+    /// </summary>
+    private sealed class CreatingAudioRendererFactory : IComponentFactory<IAudioRenderer>
+    {
+        private readonly object _lock = new();
+
+        public List<FakeAudioRenderer> Created { get; } = [];
+
+        public ComponentCapabilities Capabilities { get; } = new()
+        {
+            Name = "fake-audio",
+            Description = "A new stand-in device per creation.",
+        };
+
+        public PlaybackOperationResult TryCreate(out IAudioRenderer? component)
+        {
+            FakeAudioRenderer renderer = new();
+            lock (_lock)
+            {
+                Created.Add(renderer);
+            }
+
+            component = renderer;
+            return PlaybackOperationResult.Success;
+        }
     }
 
     /// <summary>
@@ -2121,6 +2998,14 @@ public class PlaybackPipelineTests
         /// <summary>How long one packet takes to decode, which is what makes the decoder too slow.</summary>
         internal int DecodeMilliseconds { get; init; }
 
+        /// <summary>
+        /// How many packets are decoded without the delay, before it starts. A decoder that is slow from the
+        /// very first packet leaves the picture behind the clock before there is anything to judge; one that
+        /// decodes a frame and then goes quiet for seconds is what a picture *starting* to fall behind looks
+        /// like, and it is the arrangement in which the picture's verdict has nothing to wake it.
+        /// </summary>
+        internal int FastPackets { get; init; }
+
         public ComponentCapabilities Capabilities => _inner.Capabilities;
 
         public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
@@ -2132,7 +3017,7 @@ public class PlaybackPipelineTests
                 return created;
             }
 
-            decoder = new ThrottledVideoDecoder(inner, DecodeMilliseconds);
+            decoder = new ThrottledVideoDecoder(inner, DecodeMilliseconds, FastPackets);
             return PlaybackOperationResult.Success;
         }
 
@@ -2140,11 +3025,14 @@ public class PlaybackPipelineTests
         {
             private readonly IVideoDecoder _inner;
             private readonly int _decodeMilliseconds;
+            private readonly int _fastPackets;
+            private int _decoded;
 
-            internal ThrottledVideoDecoder(IVideoDecoder inner, int decodeMilliseconds)
+            internal ThrottledVideoDecoder(IVideoDecoder inner, int decodeMilliseconds, int fastPackets)
             {
                 _inner = inner;
                 _decodeMilliseconds = decodeMilliseconds;
+                _fastPackets = fastPackets;
             }
 
             public MediaStreamInfo Stream => _inner.Stream;
@@ -2155,7 +3043,11 @@ public class PlaybackPipelineTests
 
             public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
             {
-                Thread.Sleep(_decodeMilliseconds);
+                if (Interlocked.Increment(ref _decoded) > _fastPackets)
+                {
+                    Thread.Sleep(_decodeMilliseconds);
+                }
+
                 return _inner.TryDecode(packet, out frames);
             }
 
@@ -2226,7 +3118,16 @@ public class PlaybackPipelineTests
     /// </summary>
     private static void WaitFor(Func<bool> condition, string what)
     {
-        for (int attempt = 0; attempt < 200; attempt++)
+        WaitFor(condition, what, 2000);
+    }
+
+    /// <summary>
+    /// Waits for a condition with a budget of its own, for a test whose subject is *when* something happened:
+    /// what the ordinary budget would let pass is exactly what such a test is about.
+    /// </summary>
+    private static void WaitFor(Func<bool> condition, string what, int milliseconds)
+    {
+        for (int attempt = 0; attempt < milliseconds / 10; attempt++)
         {
             if (condition())
             {
@@ -2573,6 +3474,7 @@ public class PlaybackPipelineTests
         private readonly DeviceClock _clock = new();
         private FrozenClock? _frozenClock;
         private long _queuedSampleCount;
+        private volatile bool _noRoom;
 
         public string Name => "fake";
 
@@ -2586,14 +3488,37 @@ public class PlaybackPipelineTests
 
         public int SubmitDelayMilliseconds { get; init; }
 
+        /// <summary>
+        /// Stands in for a device that cannot be handed audio: the hand-off reports this failure, which is what
+        /// the pipeline is expected to turn into its own error rather than into a dead thread.
+        /// </summary>
+        public Exception? SubmitFailure { get; init; }
+
         /// <summary>Stands in for a device that is playing but whose position never moves.</summary>
         public bool HoldTheClock { get; init; }
+
+        /// <summary>
+        /// Stands in for a device that has no room: a hand-off says so instead of completing, until it is
+        /// given room again. The real renderer asks the device; this one is told, because "a full device" has
+        /// to be arranged rather than waited for.
+        /// </summary>
+        public bool NoRoom
+        {
+            get => _noRoom;
+            set => _noRoom = value;
+        }
 
         public AudioStreamInfo? ConfiguredStream { get; private set; }
 
         public int SubmittedBuffers { get; private set; }
 
         public int SubmittedSamples { get; private set; }
+
+        /// <summary>How many hand-offs the pipeline has started, whether or not they completed.</summary>
+        public int SubmitsStarted { get; private set; }
+
+        /// <summary>How many hand-offs the pipeline let go of before the device had taken the whole block.</summary>
+        public int AbandonedSubmits { get; private set; }
 
         /// <summary>How many times the device has been let go of what it holds.</summary>
         public int FlushCount { get; private set; }
@@ -2616,10 +3541,10 @@ public class PlaybackPipelineTests
 
         /// <summary>
         /// Run on whichever thread is asking the device how much it holds, just before the answer is given.
-        /// The question is asked in two places — for room to hand a block over, and for whether the device has
-        /// played the last of it out — so a test that arms this once there is nothing left to hand over is
-        /// inside the second, which is the only moment "the file ended while the user paused" can be arranged
-        /// rather than raced for. One-shot, because what the test wants is the next answer, not every one.
+        /// The question is asked in one place — whether the device has played the last of it out — so a test
+        /// that arms this once there is nothing left to hand over is inside that question, which is the only
+        /// moment "the file ended while the user paused" can be arranged rather than raced for. One-shot,
+        /// because what the test wants is the next answer, not every one.
         /// </summary>
         public Action? BeforeReadingQueuedSampleCount { get; set; }
 
@@ -2649,16 +3574,15 @@ public class PlaybackPipelineTests
             return PlaybackOperationResult.Success;
         }
 
-        public PlaybackOperationResult Submit(RawAudioBuffer buffer)
+        /// <summary>
+        /// A submit leaves the clock alone: whether the device runs is the pipeline's decision, and a stand-in
+        /// that started it would release a hold the picture depends on — which is what the real renderer used
+        /// to do, and what no test could see while this double was silent about it.
+        /// </summary>
+        public IAudioSubmit Submit(RawAudioBuffer buffer)
         {
-            if (SubmitDelayMilliseconds > 0)
-            {
-                Thread.Sleep(SubmitDelayMilliseconds);
-            }
-
-            SubmittedBuffers++;
-            SubmittedSamples += buffer.SampleCount;
-            return PlaybackOperationResult.Success;
+            SubmitsStarted++;
+            return new FakeAudioSubmit(this, buffer);
         }
 
         public PlaybackOperationResult Flush()
@@ -2677,8 +3601,80 @@ public class PlaybackPipelineTests
             return PlaybackOperationResult.Success;
         }
 
+        /// <summary>How many times the pipeline has let go of this device — once per open it was made for.</summary>
+        public int DisposeCount { get; private set; }
+
         public void Dispose()
         {
+            DisposeCount++;
+        }
+
+        /// <summary>
+        /// One block on its way to the device: it is taken in one go unless the device has no room, in which
+        /// case it says so and keeps its place — which is what the pipeline is expected to wait on and resume,
+        /// and what a double that completed unconditionally could never show.
+        /// </summary>
+        private sealed class FakeAudioSubmit : IAudioSubmit
+        {
+            private readonly FakeAudioRenderer _renderer;
+            private readonly RawAudioBuffer _buffer;
+            private bool _delayed;
+            private bool _finished;
+
+            internal FakeAudioSubmit(FakeAudioRenderer renderer, RawAudioBuffer buffer)
+            {
+                _renderer = renderer;
+                _buffer = buffer;
+            }
+
+            public AudioSubmitYield Current { get; private set; }
+
+            public PlaybackOperationResult Result { get; private set; } = PlaybackOperationResult.Success;
+
+            public bool MoveNext()
+            {
+                if (_finished)
+                {
+                    return false;
+                }
+
+                if (!_delayed)
+                {
+                    _delayed = true;
+                    if (_renderer.SubmitDelayMilliseconds > 0)
+                    {
+                        Thread.Sleep(_renderer.SubmitDelayMilliseconds);
+                    }
+                }
+
+                if (_renderer.NoRoom)
+                {
+                    Current = AudioSubmitYield.NoRoom;
+                    return true;
+                }
+
+                _finished = true;
+
+                if (_renderer.SubmitFailure is Exception failure)
+                {
+                    Result = PlaybackOperationResult.Failure($"Unable to queue audio: {failure.Message}", failure);
+                    return false;
+                }
+
+                _renderer.SubmittedBuffers++;
+                _renderer.SubmittedSamples += _buffer.SampleCount;
+                return false;
+            }
+
+            public void Dispose()
+            {
+                if (!_finished)
+                {
+                    _renderer.AbandonedSubmits++;
+                }
+
+                _finished = true;
+            }
         }
     }
 

@@ -1842,7 +1842,7 @@ do not try-catch the entire method."* So the guards are now at the component cal
 |---|---|---|
 | reader | `source.Seek`, `source.TryReadPacket`, `_audioDecoder.Flush` | the throw becomes the failure the site already handles (a warning for the seek and the flush, `PostFailure` for the read) |
 | video decode | `videoDecoder.TryDecode` (in `DecodeVideo`), `videoDecoder.Drain` (in `DrainVideo`), `_videoDecoder.Flush` (in `EnsureTheDecoderHolds`) | a failure result, except the flush, which cannot be reported through a result and so goes to `PostFailure` |
-| video render | `renderer.Render` (in `Show`), `renderer.RefreshSurface` while paused | the failure result the caller already checks |
+| video render | `renderer.Render` (in `RenderVideoFrame`), `renderer.RefreshSurface` while paused | the failure result the caller already checks |
 | audio | — | the whole-method catch stays, as the one deliberate exception: its interop surface includes *property reads* (device buffer fill, the device clock) that have no call to guard and no result to return |
 
 The first version of this fix wrapped each media loop instead, and the review rejected it — correctly: a
@@ -2351,6 +2351,686 @@ once, after the position has moved; a paused file shows where it is), I4 (the on
 thread waits for has no clock behind it), I11 (the still, both ways round), §11's two new rows (signalling
 with the state change; showing a peeked frame), Appendix A items 28–29, Appendix B (the still and who wakes
 the threads), and the Lab/adapter as hosts that decide whether a jump goes on playing.
+
+**S9ac — One loop that both presents and offers the still.** *Done, from a report: "Can you to merge the loop
+of TryShowTheStill into the main loop so that only one loop exists. Current codes have many duplicated part
+which makes the codes unreadable. Take Video decode section and reader section as example."*
+
+*What the duplication was.* S9ab added the still as a helper with a loop of its own, and it had grown into a
+second copy of the render thread's walk: take an entry, answer the end of the stream, give up on a frame whose
+tag is stale, hand a frame over. Two loops meant two places where any change had to be mirrored — the shape
+the decode thread and the reader never have, because each of them is one loop.
+
+*What replaced it.* The two things the thread does are named once, in one loop, and everything else is a wait:
+
+```csharp
+bool presenting = CheckState(out MediaEngineState state, MediaEngineState.Playing);
+…
+bool offeringTheStill = state == MediaEngineState.Paused && shownEpoch != epoch && endedForEpoch != epoch;
+if (!presenting && !offeringTheStill) { WaitForPlaybackStateChange(stamp); continue; }
+… take (dequeue → end entry → stale tag → adopt) …
+if (presenting) { anchor; drop; wait-for-the-moment; }
+Show(held); shownEpoch = heldEpoch;
+```
+
+Everything the two paths shared — the take, the end-entry word (with its once-per-position dedup), the stale
+tag check, the `Show`, the failure, the `shownEpoch` bookkeeping — is written once. Everything only
+presentation does (starvation, anchoring, the drop rule, waiting for the frame's moment) is inside one
+`if (presenting)`, with the sentence that says why: a still is not a presentation, so none of it applies.
+
+*What falling out of the merge fixed.* A frame taken while playing and not yet shown (waiting for its moment)
+was, on a pause with nothing of the position yet shown, left in hand while the *old* helper took a *newer*
+frame from the queue and showed that as the still — so a resume put the picture back to the older frame. Now
+the held frame *is* the still, and a resume follows it. The helper's own epoch re-read — and with it a second
+`_epochs.Read()` per iteration — is gone too: the loop reads the stamp and the epoch once at the top, in the
+documented order, so a seek landing mid-iteration is caught by the wait's own check.
+
+*The falsifications, re-run against the merged loop.* `offeringTheStill` forced false fails
+`ShowsTheStillOfThePositionASeekMovesToWhilePaused` and `EndsAtOnceWhenThePausedPositionHasNoPicture`; the
+`shownEpoch` term dropped from it fails `DoesNotShowAStillWhenNothingMoved`; and the `if (presenting)` wrapper
+removed fails the still test **after the test was tightened to say what the wrapper is for** — "a still claims
+no anchor": with the wrapper gone the still anchors the clock to the keyframe it showed (18 s) instead of
+leaving it where the seek asked (20 s), and the next frame would then be two seconds early on resume and
+waited out. That assertion (`Position >= 19 s`) and "a still is not a presentation, so nothing about it is
+late" (no drops) are what the wrapper is now pinned by.
+
+*Verified:* 153 tests, all passing, three consecutive full runs, x64 and ARM64 clean. The render section is
+52 lines shorter than it was (99 inserted, 151 deleted across the two files).
+
+*Recorded:* §4.3's still bullet (one loop, presentation steps skipped), §11's peeked-frame row and
+Appendix B's still row (neither names a helper that no longer exists).
+
+**S9ad — The entry becomes a thing, and the picture looks before it takes.** *Done, from a review the user
+asked for: "Review this plan: 1. Turn (long Tag, T? Item, bool IsLast) into a named class MediaItem<T>; 2. All
+MediaQueue API now exposes MediaItem<T> instead; 3. Add a non-blocking bool TryDequeue(MediaItem) API, which
+internally compares object ID." — with the amendments agreed in the review: a blocking `Peek` (the plan was
+silent on the empty queue), `TryDequeue(entry)` with no out parameter, the entry owning nothing, and the
+producer's calls unchanged.*
+
+*Why the wrapper is the right shape.* The conditional take's token had been the *tag* — "the head is still
+the entry I looked at, because a clear always comes with a new position" — which is sound but indirect. As an
+object, the entry *is* the token: identity says exactly what the take needs, and it says it for the end entry
+too, which is an entry with no media in it and therefore indistinguishable from "nothing" in the old
+`TryPeek(out T? item, out long tag)`. That ambiguity was real, not cosmetic: the drop rule wrote
+`closer is not null` to mean "the head is media", and it was correct only by luck. As a bonus, `MediaItem<T>?`
+makes null mean exactly one thing everywhere — the queue is closed — because "the end of the stream" is an
+object like any other.
+
+*What changed.* `MediaItem<T>` (new, `Internal/MediaItem.cs`): sealed, immutable, no `IDisposable`, no
+equality overload — identity is the token, and an overload would silently break it. The queue's consumer side
+is now four words: `Dequeue()` (waits; takes; null = closed), `Peek()` (waits; takes nothing; null = closed),
+`TryPeek(out entry)` (answers now), `TryDequeue(entry)` (takes *that* entry, or nothing, by
+`ReferenceEquals`), with a private `TakeHead()` doing the counting and the pulse once. The producer side is
+unchanged: `Enqueue(T item, long tag)` and `EndStream(long tag)` build the entry on the way in — the entry is
+the queue's thing, and a producer has nothing to build for an end of stream.
+
+*The render loop, which is what all this was for.* `VideoRenderCore` no longer holds a frame across
+iterations: it looks (`Peek`), decides (is this position's next frame due? is it even this position's?), takes
+what it looked at (`TryDequeue`), and settles it inside the same iteration — shown, dropped, or let go of.
+The frame a slow decoder has not produced yet, and the frame whose moment has not come, are waited for *in the
+queue*: the loop holds nothing while it waits, the exits need no cleanup (`queue is null`, a refused surface,
+a render failure, the stop), and there is no `frame`/`frameEpoch` pair to keep straight. The stale-frame
+window is covered where it belongs — the taken entry's tag is checked against the epoch before the anchor is
+claimed — and the take itself cannot hand over anything the loop did not judge: a clear disposes what it
+holds, so a head that is no longer the looked-at entry is refused rather than taken.
+
+*The falsifications, all run before the code was kept.* `TryDequeue` comparing the tag instead of the identity
+fails `TakesTheEntryThatWasLookedAtRatherThanWhateverIsAtTheHead` on "the entry that was looked at is gone, so
+nothing is taken" — the replacement entry carries the same tag, which is exactly why the tag is not a token.
+`Peek` answering without waiting fails `ReleasesAConsumerWaitingForALook` on "there is nothing to look at
+yet". And deleting the loop's wait-for-the-moment (`if (playing && … == FrameSyncAction.Wait)`) fails
+`SeeksWhileTheNextFrameIsStillWaiting` — the frame is shown immediately, and the picture's own bookkeeping
+falls over precisely as the test's arithmetic expects ("showed 0 frame(s) where 1 were expected").
+
+*Verified:* 155 tests (153 run, 2 skipped without an audio device), 0 failed, three consecutive full runs, x64
+and ARM64 clean. Two new queue tests: `ReleasesAConsumerWaitingForALook` (released by an entry, by the end of
+the stream, by a close — the look takes nothing throughout) and
+`TakesTheEntryThatWasLookedAtRatherThanWhateverIsAtTheHead` (identity against a replacement with the same tag,
+deterministic, no timing).
+
+*Recorded:* §3's consumer row (a close releases a consumer with nothing), I17 (the look/take pair, and why
+holding media while waiting is what makes the freeing logic complicated), §4.3's still bullet (nothing is held
+between the look and the hand-over), §12 (the queue's four words), Appendix B (the four waits, and the entry
+row), and `MediaQueue<T>`/`MediaItem<T>`'s own docs.
+
+**S9ae — The clock belongs to the render threads, and nothing is notified.** *Done, from a rule the user
+stated: "The clock can only be modified by video render thread and audio render thread. Introduce a
+_clockLock, read and write starvation flag, anchor flag within the lock by video/audio threads. No more
+notification."*
+
+*Why the notification had to go.* The clock decision had been assembled from two sides: each stage posted what
+it knew ("I have nothing to play", "I am hungry"), the queue turned those into flags, and the threads read the
+result — so the facts lived in one place and the decision in another, and the two were kept in step by posts.
+The user's rule is the other arrangement: the threads that use the clock are the ones that change it, so a
+thread that learns something decides on the spot, and there is nothing left to send, nothing to miss, and no
+second path between a fact and the decision it feeds.
+
+*What changed.* `_clockLock` guards the clock and every fact its decision is made of
+(`_clock`, `_clockEpoch`, `_anchorPending`, `_videoStarved`, `_audioStarved`);
+`UpdateClock()`/`ApplyClock()` run at the top of both render loops, so a state change, a new position or a
+verdict that changed is answered as soon as either thread wakes; `SetVideoStarved`/`SetAudioStarved` write the
+flag and re-decide the clock under one acquisition; the two starvation *posts*
+(`RequestVideoStarved`/`RequestAudioStarved`) are gone. `SetState` no longer touches the clock at all, and
+`SeekCore` no longer arms the anchor, clears the flags or places the position — the seek publishes a request,
+and the render threads notice the epoch it came with. `StarvedFor`, `Position`, the device watch and the drop
+rule read under the lock, and `StopCore` resets the fields under it.
+
+*The consequence, stated rather than discovered later.* The clock's position after a seek, and the clock
+stopping when a pause arrives, are now *asynchronous*: they happen on the first render thread to wake, not
+inside the command. Four tests had asserted them at the moment the command returned
+(`SeeksWhilePlayingAndLeavesItPaused`, `SeeksWhilePausedAndStaysPaused`, `PausesAndResumes`, and
+`SeeksWhileTheNextFrameIsStillWaiting` — missed at first, and it flaked about one run in four until it was
+converted too) and were converted to waits, with the reason written where they are: the clock is the render
+threads' to place and stop.
+
+*The falsifications.* Removing `UpdateClock()` from the audio loop fails `PausesAndResumes`; from the video
+loop it fails `ShowsTheStillOfThePositionASeekMovesToWhilePaused`; filling `AnchorClock` in unconditionally
+fails `WaitsForADeviceThatIsNotMovingAndThenCarriesOn`.
+
+*Verified:* 155 tests (153 run, 2 skipped without an audio device), 0 failed, x64 and ARM64 clean.
+
+**S9af — The clock is decided only when something about it changed, and the claim replaces two fields.**
+*Done, from a review: "Try to minimize lock entrance: 1. Try to merge UpdateClock into starvation detection
+logic, since they are related; 2. Minimize the lock range, first detects for changes (e.g. starvation changed,
+playback state changed, anchor needed), only enters the lock when there are changes as this is an expensive
+operation; 3. Why do we need _clockEpoch?"*
+
+*Why `_clockEpoch` was two fields pretending to be one.* It existed so that "the clock has been placed for this
+position" was decided once *across* two threads: with two render threads both noticing a new epoch, the second
+one had to be told the first had already placed the request, or it would place the request over the media's
+answer if the media had claimed the clock in between. The claim itself already says that. While nothing of the
+media has claimed the clock for a position, the request is the only thing there is to place and placing it
+twice places the same value; once it has been claimed, the claim's own position refuses the request. So
+`_clockEpoch` and `_anchorPending` both disappear into one `volatile long _anchoredEpoch` — the position whose
+clock the media claimed — and with them the whole idea of *arming* an anchor: a new position is simply one
+nothing has claimed yet, which is what the seek always wanted and could not have while the arming belonged to
+the queue.
+
+*What changed.* The video thread computes its verdict and decides the clock in one block at the top of its
+loop (the merged answer to 1): the verdict is all reads — the clock answers its own position, the tail and the
+end of the file are interlocked, the claim and the flags are volatile — and the block is entered only when one
+of its three inputs has changed: the verdict itself, the epoch, or the change stamp (the answer to 2, and the
+stamp is what makes a state change detectable without the lock, since a caller that changes the state always
+signals). The audio thread keeps its verdict's own gate (`SetAudioStarved` returns before the lock when the
+verdict is the one already published) and adds the same stamp/epoch gate for the position and the state, which
+is what an audio-only file needs — there is no video thread in it to stop the clock. `ApplyClock(epoch, state)`
+takes the position and the state as arguments now instead of reading them, so what it decides is exactly what
+the caller detected. Everything else a reader could want without the lock no longer takes it: `Position` is the
+clock's own answer, `StarvedFor` is two volatile reads, the device watch and the drop rule read the claim
+directly.
+
+*The falsifications, all four run against the finished shape.* Removing the placement guard in `ApplyClock`
+passed the whole suite — a **coverage gap, not a proof**: no test caused a decision after the claim had been
+made, so `KeepsTheClockWhereTheMediaPutItWhenSomethingElseChangesIt` was written for it (seek to a position the
+file cannot resume at, play until the media's position replaces the request, pause, and the clock must still be
+where the media put it), and with the guard removed it fails while
+`StartsWhereTheFileResumesRatherThanWhereTheSeekAsked` still passes. Removing the audio thread's clock block
+fails four tests (`PlaysAgainAfterAStop`, `PlaysAnAudioFileThroughTheRenderer`,
+`SeeksWhilePausedAndStaysPaused`, `SeeksWhilePlayingAndLeavesItPaused`); removing the starvation
+recomputation from the merged block fails `HoldsTheClockBackWhenTheVideoCannotCatchUp` and
+`TellsTheClockOnlyWhenWhatItShouldDoChanges`; removing the claim guard fails
+`WaitsForADeviceThatIsNotMovingAndThenCarriesOn`.
+
+*Verified:* 156 tests (154 run, 2 skipped), 0 failed, five consecutive full runs, x64 and ARM64 clean, four
+falsification cycles reverted to this state.
+
+*Recorded:* §5 (the clock belongs to the render threads; the request, the claim, and why a position needs no
+re-arming), §3's table (the position change no longer carries the flags, the anchor or the clock's position; a
+new row for the clock's inputs; the clock object's writers), §6's steps 3–5, §7, I10, I14, §11 (a field for
+"the position the clock has been placed for", and deciding the clock on every iteration under the lock),
+§12 (the clock lock is not the deadlock class), §4.4's ordering rule, Appendix A item 30, and Appendix B.
+
+**S9ag — The picture's wait ends when its verdict could change.** *Done, from a report: "VideoRenderCore has
+a bug: Peek has no timeout, a long blocking makes the thread unable to report the starving state, which
+prevents the clocking from pausing. A fix is to add an optional timeout parameter to Peek. If video is already
+starved, call Peek without timeout. If video is not starving yet, call with timeout=RemainingTime."*
+
+*The bug, confirmed before anything was changed.* The picture's starvation is read at the top of the render
+loop, and the thread is parked on the frame queue between iterations: a decoder that goes quiet leaves it with
+nothing to wake it, so the clock runs on while the picture starves, and the hold arrives when the next frame
+turns up — as late as the decoder was quiet. A test was written for it first
+(`HoldsTheClockBackWhileTheDecoderIsQuiet`, an audio fixture, a fast first frame and a 1.5 s one after it, an
+800 ms bound): against the unfixed code the hold never arrives inside the bound.
+
+*What changed.* `MediaQueue<T>.Peek` takes an optional time (`Peek(int millisecondsTimeout =
+Timeout.Infinite)`), and `IsClosed` — which the queue already had — is what tells a null from a timeout apart
+from a null from a close; the loop distinguishes them and re-reads the verdict on a timeout rather than ending
+the thread. `PlaybackPipeline.IsVideoStarved(epoch, out int waitMilliseconds)` answers both the verdict and
+how long its thread may wait before the verdict could change — the time left before the clock reaches the
+threshold (`(threshold − behind) / rate`, clamped), which is the only thing that changes a judgeable verdict
+without an entry. The loop passes it to the wait, and the two of them are the fix.
+
+*The two amendments, both forced by measurement.* **(a)** "Not starving yet" is three different situations.
+Where the verdict is judgeable it is the clock's progress that changes it, so the deadline is exact. Where it
+is *not* judgeable because nothing of this position has claimed the clock yet, the deadline does not exist —
+and with a sound the claim is the sound's own first block, handed over on *another* thread, so no entry is
+coming either: that wait is bounded by the housekeeping interval (`IdleWaitMilliseconds`) instead. Without a
+sound the claim is made by this thread as it shows the first frame that plays, which is an entry like any
+other, and the wait needs no bound. Measured: with the bound removed, `HoldsTheClockBackWhileTheDecoderIsQuiet`
+fails on three runs of three (before that, the test raced the sound's claim and only failed two runs in three
+— the arrangement was then made deterministic by pacing the sound's first block, which is what puts the
+picture's judgement before the claim every time). **(b)** Where nothing can change the verdict with the clock —
+already starving (only a frame can end it), a clock that is not running, the file run out here, nothing decoded
+yet — no time is given at all: a wait that fires without the verdict changing is a poll, which is the mistake
+the queue's old fixed timeout was removed for (S9aa).
+
+*Two things found on the way, neither of them this bug.* A file whose packets have all been read is a file that
+has run out, and the ending suppresses the verdict — so a *short* file with a slow decoder never reports
+starvation at all, since `IsEnding` is the reader's fact rather than the decoder's end. That is what the first
+version of the test tripped over (a 6-frame fixture: with the ending suppression removed the test passes), and
+it is left alone here: what should replace `IsEnding(epoch)` in that condition — the render thread's own
+`endingEpoch`, i.e. the decoder's stream having ended rather than the reader's file — is a design decision to
+be taken on its own. And a *still* shown for a position that turns out to be playing claims no anchor by
+design, so a fast first frame shown while the state was still `Paused` leaves the clock unclaimed until a
+*second* frame plays; that is what makes amendment (a) reachable rather than theoretical, and the second test
+below depends on it deliberately (a soundless file, where the claim is this thread's own).
+
+*The falsifications.* Removing the deadline (`waitMilliseconds = Timeout.Infinite` in the judgeable case)
+fails `HoldsTheClockBackWhenTheClockReachesTheThreshold` — the hold then arrives with the *next* frame,
+1300 ms later, outside the 800 ms bound — and fails `HoldsTheClockBackWhileTheDecoderIsQuiet` too. Removing the
+unclaimed bound fails `HoldsTheClockBackWhileTheDecoderIsQuiet` in three runs of three. Making the timed look
+wait forever (`Monitor.Wait(_lock)`) fails
+`AnswersNothingWhenTheTimeGivenToALookRunsOut` on "a look with a time on it has to end by itself". The starved
+case arming a deadline anyway is a poll rather than a defect any test can see (the clock is already stopped, so
+a 1 ms wake changes nothing but the processor) — argued from the code rather than measured, and said so.
+
+*Verified:* 159 tests (158 passing), x64 and ARM64 clean, three consecutive full runs. **The one failure was
+not this change, and it was reconciled in S9ah:** the device-stall warnings were rewritten in the working tree
+(`WarningAudioDeviceStalled`, "The audio device is stalled.", one line and no recovery line) while the test
+still expected HEAD's pair ("not moving"/"moving again") — the stall line arriving at all is what proves this
+change left the watch's `expected` condition alone. Three new tests:
+`HoldsTheClockBackWhileTheDecoderIsQuiet` (the sound's claim is the reason the verdict would otherwise stay
+unread), `HoldsTheClockBackWhenTheClockReachesTheThreshold` (a soundless file, where the deadline is the only
+thing that can end the wait), and `AnswersNothingWhenTheTimeGivenToALookRunsOut` (the queue's timed look, and
+`IsClosed` telling a timeout from a close).
+
+*Recorded:* §8 (the wait and its deadline, and the claim case), I12, I17 (the three ways a look can end, and
+why a caller's deadline is not the old sedative), §11's timeout row, §12 (five releases, not four), Appendix A
+item 31, Appendix B (the consumer's four words, and the verdict's owner), and `MediaQueue<T>.Peek`'s own doc.
+
+**S9ah — The device watch's contract is the watchdog's, not the pair's.** *Done, from your decision on the
+reconciliation question: update the test (and the contract) to the new watchdog, rather than restoring the
+"not moving"/"moving again" pair.*
+
+*What the watchdog does.* `CheckStalledAudioClock` (renamed from `WatchDeviceProgress`) is still called by the
+audio thread and still gated on a stall being *expected to show progress* (playing, nothing starved, the
+position claimed, the clock running); it looks every `StalledAudioDeviceCheckIntervalMilliseconds` (100 ms) and
+names a device whose position has not moved for `StalledAudioDeviceThresholdMilliseconds` (1000 ms) with one
+line — `WarningAudioDeviceStalled`, "The audio device is stalled." — once per stall. Movement clears the flag
+and says nothing, so a later stall is named again. A moment in which nothing is expected restarts the
+countdown, as it did before.
+
+*What changed for it.* The test now waits for "stalled", asserts the line count is one *after the device has
+come back* (the recovery is not announced), and pins the recovery by the picture rather than by a message:
+`WaitForPresentedFrames(presentedWhileStuck + 2)`, no drops, and the stall line still the last thing said.
+I13 and §9 were reworded to that contract, with the reason stated rather than implied: a line about a freeze
+explains something the user cannot see, a line about a recovery explains nothing they cannot see — and the
+device watch's own contract row (I9) and the `WarningRaised` row in Appendix B were updated with it.
+
+*Left alone, deliberately.* `MediaEngineDesign.md` (two lines) and `PlaybackPipelineRefactor.md` (its P1/P3
+table) still quote the old pair; they are design narrative rather than the contract this pipeline is held to.
+
+*Verified:* 159 tests, 0 failing, x64 and ARM64 clean, three consecutive full runs.
+
+**S10 — One wait per thread: the communication mechanism rebuilt.** *Done, from a design the user set out:
+"we need a large refactor on the communication machanism: 1. Remove _playbackStateLock and split into 4
+PipelineNodeLock (already implemented) for each thread; 2. Introduce TryWakeXXX() API for each thread, this
+method checks the wake condition and wake the target PipelineNodeLock; 3. Makes all API of MediaQueue
+non-blocking, each thread now waits only on its own PipelineNodeLock. After TryDequeue/TryEnqueue, calls the
+producer/consumer's TryWakeXXX()" — with three amendments from the review that followed: the queue enforces
+no limit (the producer owns the window), the picture's idle wait keeps a cadence, and that cadence must not be
+derived from clock state.*
+
+*Why the previous fix could not be repaired where it stood.* The render thread slept in two locks: the state
+lock and, since S9ag, the frame queue's. A command pulsed only the first, so a thread inside `Peek` could not
+be reached at all — its only releases were an entry, a close, or the timeout. And the timeout was `Infinite`
+in the states that mattered (already starving; paused with a still pending, where the verdict is not computed
+at all), so a pause, a second seek or a surface change could wait forever. `WakesForEachSurfaceChangeWhilePausedRatherThanWaitingForTheBackstop`
+passed only because the queue was full at that moment, so the thread was on the *state* wait. The defect was
+structural: **the waiter waited on a lock the waker did not own**, and no timeout converts two locks into one.
+
+*S10a — the node.* `PipelineNode` (renamed from `PipelineNodeLock.cs` to match the class) documented as the
+one place a thread sleeps: one waiter per node, the stamp read before the decision, a wake that may be
+spurious and must never be missed, a wake that never waits for the woken thread, and `WakeCount` as the
+diagnostic that proves a parked pipeline is not polling. `PipelineNodeTests`: the already-waiting wake, the
+wake that arrives *between* the stamp read and the wait (the window the whole design rests on), the timeout,
+the wake that does not block the waker, and the stamp/wake count. *Falsified:* removing the stamp comparison
+fails `DoesNotSleepWhenAWakeArrivedBeforeTheWait`.
+
+*S10b — the reader.* The reader sleeps on `_readerNode`; the read-ahead wait loses its 15 ms tick
+(`ReaderCheckIntervalMilliseconds` deleted) because the two consumers now call `TryWakeReader()` after a take.
+`SignalPlaybackStateChange` temporarily wakes the node too, so each step converts one thread and the suite
+stays green throughout. *New test:* `KeepsTheSoundComingAfterTheReadAheadIsUsedUp` — a three-second wave read
+in several passes, which is what makes the reader wait at all. *Falsified:* removing the audio take's wake makes
+it fail on "Playback did not finish" (the reader parks for good).
+
+*S10c — the decoder.* `MediaQueue` loses its limit and every wait: `TryEnqueue` (false only when closed),
+`TryDequeue(out entry)`, and no `Monitor` at all. The frame window moves to the decoder
+(`HasRoomForAFrame`, checked **before a packet is taken**), which is what keeps a decoded frame from ever being
+held across a wait — a drain may push the queue past eight for the moment it takes the picture to catch up,
+which is memory rather than correctness. `TryWakeVideoDecode` (packets present **and** room) is called by the
+reader on enqueue, by the picture on take, and by the seek's clear. *New test:*
+`KeepsThePictureComingAfterTheFrameWindowIsUsedUp` — the AV1 fixture, whose 80 frames at 30 fps use the window
+up many times over (the first attempt used a y4m with a frame-rate argument that does not mean what its name
+suggests; the fixture was the problem, not the wake). *Falsified:* removing the take's wake stops the picture
+one window in and the file never ends.
+
+*S10d — the picture, which is the bug.* `TryPeek` plus a wait on `_videoRenderNode`; the contention between a
+frame arriving and the clock reaching a frame's moment is now two waits on one node. `IsVideoStarved(epoch)`
+went back to being a pure predicate: no out-parameter, no `Rate`, no `IsRunning`, no branch that decides
+"nothing can change". **The idle wait while playing is always a fixed cadence**
+(`VideoIdleCheckMilliseconds = 50`) and while paused it is unbounded — because time is the only writer that
+cannot send a wake, and a cadence derived from the clock's state is a prediction about another thread's state.
+`AnchorClock` wakes the picture (the verdict becomes judgeable), the surface event wakes only the picture, and
+`WakeAll` covers the controls. *New tests:* `TakesUpASurfaceChangeWhileThePictureWaitsForItsPosition` and
+`TakesUpASeekWhileThePictureWaitsForItsPosition` — both wait in the paused-with-a-still-pending state, where
+the wait is unbounded and only a wake can reach the thread. *Falsified:* removing the render node from
+`WakeAll` makes both hang — not fail: the parked thread never sees the stop, so the join never returns. That is
+the stated price of there being no backstop, and it was observed rather than assumed.
+
+*S10e — the sound.* The audio thread sleeps on `_audioRenderNode`: the resume wait is unbounded (a control
+wake), the device waits keep `DeviceRoomCheckMilliseconds` on the same node (a device cannot signal), and
+`WaitForAudioRoom`'s paused branch lost its 250 ms tick.
+
+*S10f — the deletion.* `_playbackStateLock`, `_playbackStateStamp`, `SignalPlaybackStateChange`,
+`WaitForPlaybackStateChange`, `MediaQueue.Dequeue`, `MediaQueue.Peek(int)` and every `Monitor` in the queue are
+gone; `SignalPlaybackStateChange` became `WakeAll` (four wakes). `MediaQueueTests` was rewritten to the
+non-blocking contract: seven of its fourteen tests were about waits that no longer exist, and the queue's
+guarantee is now "every word answers at once" (`AnswersAtOnceOnceItIsClosed`).
+
+*S10g — the contract.* `PlaybackPipeline.md`: a new §2.3 with the wake table and its two ordering rules, §2.6/7
+rewritten (one wait per thread; a cadence never derived from clock state), §3's queue table (no maximum, no
+waits, the clear wakes nobody), §7's stop paragraph (a missing wake is a join that never returns), §8's
+cadence, I12 and I17 rewritten, I18 added, §11's two new rejected shapes, §12's release table, Appendix A
+items 31–32, and Appendix B.
+
+*Verified after every step; final state:* 162 tests (160 run, 2 skipped without an audio device), 0 failed,
+three consecutive full runs, x64 and ARM64 clean. Every step compiles on its own, with the pipeline green
+between steps — the transitional `SignalPlaybackStateChange` is why.
+
+**S11 — A position's first media holds the clock, on both sides.** *Done, from a flaw the user named: "video
+render thread waits a fixed time when there is no frame presented in the queue yet, especially when playback is
+just started. Since the audio render thread might have already started the audio rendering (as well as starting
+the clock), the first few frames that come later might be considered as Dropped frames. IsVideoStarved returns
+false since tailTicks < 0... My idea is, both video and audio should be considered starving at the beginning of
+an epoch." — with their two amendments: the verdicts stay in their own threads, and the diagnostic is not to be
+overdesigned.*
+
+*The flaw, confirmed by measurement before anything was changed.* The clock's start was gated only by the sound:
+the audio thread finds the device empty, holds; the first audio block releases it; `ApplyClock` starts. The
+picture's verdict said `tailTicks < 0 → not starved` — "nothing decoded yet is not fallen behind" — which is
+right about behindness and wrong about readiness. Measured with a decoder that takes 400 ms on its first
+packet (audio+video, 100 ms samples): the clock ran to 435 ms with an empty picture, **ten frames were dropped
+as late**, and the picture started at **666 ms** — 0.67 s of the file never shown — with `StarvedFor` empty
+throughout, because a video that has produced nothing had no way to say so.
+
+*The rule.* The picture holds the clock while **this position has produced nothing to show**: nothing shown
+for the epoch (`showingEpoch` — the render loop's own memory) and nothing waiting in its queue. It is asked
+before the clock's claim, because with sound the claim is the first audio block and a claim-first test waves
+the picture through exactly when it has nothing. It is *not* asked from the decoder's tail: the tail is
+written after the frame is enqueued, and while a decode is in flight after a seek it still holds the previous
+position's value — which is *ahead* of the new request, so a tail-based verdict finds the picture comfortably
+ahead. `IsEnding(epoch)` still releases everything (a file that has run out is played out, and that is also
+what releases a position whose picture never produces a frame at all), and an end entry counts as "something
+to show" so a video stream that ends without frames finishes instead of holding. The sound's rule needed no new
+fact — an empty device is already "nothing to play" — but its verdict was published one iteration *after* the
+clock was decided in the same iteration, so it is now set right after the epoch's flush, on the thread that
+owns it.
+
+*The tests.* `HoldsTheClockBackUntilThePictureHasSomethingToShow` (the measured arrangement): the hold is
+reported before the first frame, the clock is stopped, the first frame is shown at the start of the file with
+**zero** drops, and time starts with it. `HoldsTheClockBackUntilThePictureHasSomethingToShowAfterASeek` (a
+backwards seek with the same slow first decode). `HoldsTheClockBackWhenAPositionMovesDuringADecode` — a gated
+decoder held *inside* a decode while the position moves underneath it, which is the only way to make the stale
+tail's window deterministic; a real seek does exactly this to a real decoder.
+
+*The falsifications.* Removing the term brings the measured failure back (10 drops, a 666 ms start). Removing
+the fixed cadence still fails the two cadence tests. And the tail variant (`tail < 0` as the readiness fact)
+passes the startup and seek tests — the decode thread resets the tail within microseconds of the epoch change —
+but **fails the gated test**, which is what makes that test worth its decoder double. One honest note: the
+audio's epoch-start line has no test that distinguishes it, because the ordering it fixes (one start/stop at the
+beginning of a position) is a race whose count is not stable; it is justified by the reasoning, not measured.
+
+*Side effect found and fixed.* `HoldsTheClockBackWhenTheClockReachesTheThreshold`, the silent-file cadence test,
+was racy: the first frame can be presented as the paused position's *still* (claiming nothing) when the decoder
+is fast, and then no frame claims the clock and the verdict is never judgeable. It now uses a decoder that is
+slow on its first packet — so playback is certainly running before the first frame arrives — and 1300 ms after
+it, which is the arrangement the test is about.
+
+*Verified:* 165 tests (163 run, 2 skipped), 0 failed, three consecutive full runs, x64 and ARM64 clean.
+
+*Recorded:* §8's starvation table and the new "both stages hold the clock at the start of a position"
+paragraph, §14.6 (a pathologically slow first decode freezes both, by design), Appendix A item 33, and the
+`IsVideoStarved` doc.
+
+**S11b — The clock is taken once, and `Position` is not a fact to decide on.** *Done, from a review: "Video
+thread should avoid using Position property directly, that's for external caller. Moving the clock existence
+check out of IsVideoStarted and acquire position there." — then: "Why keeping clock == null branch? Does this
+scenario really exist?"*
+
+*The answer is no, and the ordering is what makes it no.* The clock is created or selected during
+`PreparePlayback` — before any thread is started — and `StopCore` nulls it **after** all four joins. So while a
+media thread runs, the field cannot be null; `clock is null` in the video loop, in `ApplyClock`, in
+`CheckStalledAudioClock` and the `_clock?.` in `AnchorClock` were four dead branches, and the previous change
+had added one more (a `Position`-style zero fallback for a case that cannot occur).
+
+*What replaced them.* Each render thread takes the clock **once**, at the top of its loop, with
+`?? throw new InvalidOperationException(...)` — the invariant stated where it is relied on, and a loud pipeline
+bug if a future change breaks the open's ordering. The clock is then handed to the helpers that need it
+(`ApplyClock(clock, epoch, state)`, `AnchorClock(clock, …)`, `SetAudioStarved(clock, …)`,
+`CheckStalledAudioClock(clock)`, `WaitForAudioRoom(clock, epoch)`, `IsVideoStarved(clock, …)`), so the field is
+read by the open, the stop, the two threads' starts and the host's `Position`/`PictureLag` — and by nothing
+else. The threads never read the host's `Position`: it answers zero when there is no clock, which is a state the
+host may see and a running thread cannot be in. `CheckStalledAudioClock` also lost its `_audioDecoder is null`
+check, which was dead for the same reason: the thread is only started when the audio decode exists.
+
+*Recorded:* §5's new lifetime bullet (with why the threads must not read `Position`), Appendix A item 4, and
+Appendix B's clock row.
+
+*Verified:* 165 tests, 0 failed, three consecutive full runs, x64 and ARM64 clean.
+
+**S11c — One clock decision per iteration, and a verdict belongs to the position it was computed for.**
+*Done, from a review: "Why SetAudioStarved receive epoch from _epochs.Read() not local variable workingEpoch
+or epoch" — then: "SetAudioStarved calls ApplyClock, then if (epoch != clockEpoch || stamp != clockStamp) calls
+ApplyClock again. Looks like a waste."*
+
+*The first was a leftover, and the second was worse than waste.* `SetAudioStarved` read `_epochs.Read()` and
+`_state` itself because it had been written before it took a clock; that let a seek landing in between hand a
+verdict computed for one position to another. It now takes the epoch and the state **from the caller** — the
+facts the verdict was reached under — like `ApplyClock` and `IsVideoStarved` already did, and the same
+correction was applied to the loop's own `ApplyClock(clock, epoch, _state)` call, which now passes the
+iteration's `state`.
+
+*The double decision was also load-bearing.* The take-up block called `SetAudioStarved(…, true)`, which decided
+the clock; the block below then decided again for the same epoch and state. Removing it naively would have
+broken a real case, because `SetAudioStarved` returns early when the verdict is unchanged — so a **second seek
+while already starving** skipped its decision, and only the block below placed the clock for the new position.
+The take-up now *feeds* that one decision: it flushes, records that this iteration took up a new position, and
+the decision block — whose condition includes "took up a position" — publishes the verdict and applies the
+clock once, in one lock entrance. The two mid-iteration verdict changes (nothing to hand over; a block arriving)
+still decide on the spot, as they must, and they are after the decision block, so nothing is decided twice.
+
+*Verified:* 165 tests, 0 failed, three consecutive full runs, x64 and ARM64 clean.
+
+*Recorded:* §5's ownership bullet (once per iteration; a take-up always counts and feeds that decision).
+
+**S11d — A hold on the clock is the pipeline's, and the device was releasing it.** *Done, from a question:
+"How is `QueuedLimitMilliseconds` determined? Does the audio renderer have an upper limit on how many data it
+can hold internally? Does the audio renderer block on `Submit`?"*
+
+*The answer to the third one was the bug.* `WasapiAudioRenderer.Submit` ends with
+
+```csharp
+if (!clock.IsRunning) { clock.Start(); }
+```
+
+and its comment explains why: a stopped WASAPI stream does not consume its buffer, so without it the first
+block fills the device and the rest wait forever. That reasoning is sound and the code is wrong, because
+"the rest wait forever" is **the hold**: writing into a stopped device is what holding the clock back means,
+and the device's own buffer filling is what tells the pipeline to stop handing blocks over.
+
+What it cost, measured rather than argued — with the test double made to start the clock on submit, exactly
+as the device did:
+
+* `HoldsTheClockBackUntilThePictureHasSomethingToShow` failed at 445 ms of elapsed time with nothing on
+  screen: the audio thread's first block arrives in milliseconds, the first frame after a slow first decode,
+  and the block *started the clock* — so S11's startup hold never held on real hardware. Its 10 dropped
+  frames were never fixed outside the tests.
+* `HoldsTheClockBackWhenTheVideoCannotCatchUp` failed with the picture 1.30 s behind the sound: each block
+  handed over during a video hold restarted the device, and once the decoder's frame window is full nothing
+  wakes the video thread to pause it again.
+
+*Nothing could see it,* because the double's `Submit` was silent about the clock and the only renderer that
+starts it is the one that needs a device. Two things now make the hole visible: the double documents that a
+submit leaves the clock alone, and the contract is stated where a new backend will read it (`IAudioRenderer`,
+`WasapiAudioRenderer`'s class doc and `Submit`'s comment).
+
+*The fix is the deletion of those four lines,* and the reasoning that makes it safe is worth writing down,
+since it is the answer to "does anything else start the device":
+
+* The clock is started by `ApplyClock` and nowhere else (I10), and the audio thread decides before it hands
+  a block over — `SetAudioStarved(…, false)` comes first, and at the start of a position the verdict change
+  is guaranteed, so a decision always runs before the first submit.
+* The clock is device-position based (`_base` plus frames the device has *played*), so writing into a
+  stopped device offsets nothing: the buffered audio is ahead of the clock, not behind it.
+* A stopped device that fills up parks the sender in `WaitForAudioRoom`, on its own node, where a pause, a
+  seek and a stop all reach it.
+* A park *inside* `Submit` still ends: `StopCore` flushes the renderer before it joins, and `Reset` frees
+  the whole buffer, so the waiting write finds room and returns.
+* `QueuedLimitMilliseconds` (100 ms) sits below the buffer the renderer asks WASAPI for (200 ms), so the
+  sender normally stops before the device is full; when an endpoint refuses the longer buffer the renderer's
+  own wait does the pacing instead, and the hold is still a hold because the stream is stopped.
+
+*(The last four bullets describe the pipeline as it stood at S11d. S11e — immediately below — replaced
+`WaitForAudioRoom` and the 100 ms target with a hand-off that returns, so the wait is the thread's own and no
+number describes the device; the reasoning above about the clock still holds, and the arguments about *where*
+the wait lives are the ones S11e supersedes.)*
+
+*Verified:* 165 tests, 0 failed; x64 and ARM64 clean. The falsification is the pair of failures quoted above,
+run with the double starting the clock and reverted.
+
+*Recorded:* I19, and §2.3's wake table gains the sentence that a hold is enforced by a stopped device.
+
+**S11e — The hand-off returns instead of waiting: `WAIT` → `YIELD`, and the audio thread's wait moves home.**
+*Done, from a review: "Since `Submit` internally implement blocking and timeout for us, there is no need for us
+to add a second threshold. Remove `WaitForAudioRoom`" — then the design that replaced it: "Makes it
+`IEnumerable<SomeInfo> Submit(buffer)`, so we can yield from within Submit if the device has no room. Which
+left the caller to decide what to do: wait (on its own Monitor)? or break … or other ops?"*
+
+*The first proposal was half right and fatal in the half it missed.* `Submit` did block, but its block was a
+1 ms spin loop on the caller's thread, `Thread.Sleep`-ing where no wake could reach it — and its 2 s give-up
+only ran while the clock was running, so a paused device that never drained waited for ever. Deleting
+`WaitForAudioRoom` on top of that would have moved the audio thread's only wait into a place where pause, seek
+and stop could not reach it. The measurement that settled it was the same falsification as S11d: a double that
+starts the clock on submit fails `HoldsTheClockBackUntilThePictureHasSomethingToShow` and
+`HoldsTheClockBackWhenTheVideoCannotCatchUp`.
+
+*What was built.* `Submit` no longer hands over a block; it starts a **hand-off** (`IAudioSubmit`), which the
+caller drives with `MoveNext()`. A hand-off that cannot continue says `AudioSubmitYield.NoRoom` and keeps its
+place; the pipeline then waits on its own node and resumes it. The contract is stated in one place
+(`IAudioSubmit`): single use, `Dispose` abandons (the frames already in the device stay there, so the caller
+flushes), a renderer never sleeps or retries, and a backend that can accept an unbounded amount must impose
+its own high-water mark and yield the same way — otherwise the pipeline becomes "decode the file into RAM".
+
+*What went with it.* `WaitForAudioRoom`, `QueuedLimitMilliseconds` (the second threshold), the 2 s
+`MaxWaitMilliseconds` give-up, the renderer's shared `_staging` field (the bytes moved into the hand-off, and
+are rented per block from `ArrayPool<byte>`), and `StopCore`'s flush-before-the-joins — which existed to free
+the room a parked `Submit` was waiting for, and is now a plain flush after them, when no thread of ours can be
+inside the device (the concurrency question, answered by construction rather than by a lock).
+
+*What replaced them.* An in-flight slot in `AudioRenderCore` (`inFlight`/`inFlightBuffer`), kept across a pause,
+released on completion, dropped on a seek's epoch change, and released in a `finally` so no exit path leaks the
+block. `QueuedSampleCount` lost its back-pressure meaning and is now only "the device still holds something of
+ours" (the sound's half of the ending, and the starvation verdict).
+
+*Verified:* 167 tests, 0 failed (two new), x64 and ARM64 clean. The endpoint was driven for real:
+`SaysItHasNoRoomRatherThanWaiting` fills a 200 ms/9600-frame buffer with a stopped stream and gets `NoRoom`
+back in 7 ms, then gets the room back from `Flush`. Falsifications that failed as they should: a yield treated
+as "let go" (`WaitsForADeviceThatNeverTakesAudio` and the new test both saw the block abandoned instead of
+kept), and a seek that does not reach a suspended hand-off (the new test timed out waiting for the abandon).
+
+*Recorded:* I20, §2.3 (a device wait is the thread's, and why), §4.4, §9, §11 (two rejected shapes: a wait
+inside the renderer, and a queued-limit/capacity number in the pipeline), Appendix A item 34, Appendix B.
+
+**S11f — The sound's device belongs to one pipeline for one open.** *Done, from a request: "Use a factory for
+audio renderer creation as well, so each pipeline owns its own WASAPI audio renderer."*
+
+*Why it was wrong before.* `PlaybackPipeline` took an `IAudioRenderer` **instance**, and every host created
+one and kept it: `PlaybackEngineAdapter` had a single `WasapiAudioRenderer` for the life of the app, and so did
+the Lab. That is one device stream, one clock and one flush shared by every pipeline built from that host — so
+a second pipeline would have played at the first one's position, and closing either would have reset the
+other's device. Nothing enforced "one thread per renderer" either; the pipeline's own submit and flush were the
+only users, by luck of the wiring.
+
+*What changed.* The constructor takes `IComponentFactory<IAudioRenderer>` (`WasapiAudioRendererFactory`, which
+caches nothing) exactly as it already took the video renderer's factory. `PrepareAudio` asks for a renderer,
+configures it, publishes it, and applies the host's volume and mute — a value set before the open is applied to
+the device the open creates, ordered so that neither a concurrent setter nor the open can lose it.
+`StopCore` takes the field away, flushes, and disposes it after every join, so the device is never touched by
+two threads. The render thread also takes the renderer once per iteration, like the clock, instead of reading
+the field at each use.
+
+*What the host had to give up.* `Volume`/`IsMuted` were read off the renderer instance it owned, so both moved
+to `PlaybackPipeline` (kept, applied per device) and the adapter now stores the two values and forwards them to
+whatever pipeline is current. Behaviour is unchanged — including reading them back after setting them, which is
+what the settings page does.
+
+*Verified:* 169 tests, 0 failed (two new), x64 and ARM64 clean, and the real endpoint was driven again
+(200 ms buffer, `NoRoom` in 8 ms). `CreatesItsOwnAudioRendererForEachOpen` fails when `StopCore` is stopped
+from disposing (0 disposals instead of 1), which is the line the change is about. The device tests skipped once
+mid-session with `0x80070490` (no default endpoint enumerating) and passed on the next run: environment, not
+code — the renderer was untouched by this step.
+
+*Recorded:* §2.2's ownership table (one device stream per pipeline per open), §14 items 7–8 (the session
+volume two pipelines share, and the graphics device two pipelines must not), Appendix B.
+
+**S11i — A component does not diagnose; it preserves.** *Done, from a review that rejected the first attempt
+outright: "How do you know it must be 'the device has gone', not other reason?" — then: "we have to preserve the
+original, unaltered exception info so it makes the diagnostic and debug much easier."*
+
+*What I had written was a guess wearing a diagnosis.* Every catch in the WASAPI clock and the renderer's padding
+reads did `catch (Exception) { _deviceLost = true; }` and then reported `"The audio device was lost."` — a
+statement about the world inferred from the mere fact that something had failed. `Stop()` can fail because the
+client was never initialised, the service died, a marshalling bug exists, or memory ran out; none of those is
+"the device is gone", and the string was on its way into the user-facing `Error`.
+
+*What replaced it.* The exception itself. `WasapiAudioClock` keeps the **first** one as `Cause` (a later failure
+is a consequence, and replacing the origin hides it), latches the loss, and reads as a frozen position — it
+cannot throw, because the host's position timer and every frame the picture judges read it. The renderer reports
+that cause on the next `Submit`/`Flush` as `Failure($"{context}: {cause.Message}", cause)`: the context says what
+was being attempted, the message and the object are the original. Deliberately-ignored calls (`Dispose`'s stop,
+the volume members, an endpoint with no session volume) now write the exception out whole at W/D level instead
+of vanishing. And `PlaybackPipeline.Fail` — the single place a failure becomes state — logs `Logger.E(TAG, …,
+exception)`, so **every** failure in the engine reaches the log with its stack through one choke point.
+
+*What is deliberately absent.* No HRESULT table. Enumerating the causes is impossible (the user's point), and a
+partial table would be worse than none: it would classify the listed ones and guess at the rest.
+
+*Verified:* 173 tests, 0 failed (three clock tests, one pipeline test), x64 clean, endpoint tests run for real.
+The falsification was instructive: replacing `_cause ??= exception` with `_cause = exception` **passed** the
+first version of the test, because the clock's own calls early-return once lost — the only second failure comes
+from `ReportDeviceLost`, so the test now reports one that way and fails the overwrite as it should.
+
+*Recorded:* Appendix A item 36 (with the amendment the user made to it: *"A component does not diagnose; it
+preserves, unless it has 100 % confidence on what is really happening"*), §9, Appendix B.
+
+**S11j — Each player is its own stream, and its own device.** *Done, from: "Each player must have its own
+volume/mute" and "video device isolation should go on with (a) Device per renderer."*
+
+*Volume was a session control.* `ISimpleAudioVolume` belongs to the **session**, which belongs to the process, so
+two players shared one slider and one mute button — turning one down turned the other down. The renderer now takes
+`IAudioStreamVolume` (the stream's own service) and applies the level itself; WASAPI has no per-stream mute, so
+mute is the level going to zero while the level the user set is kept, which is what makes unmuting restore it.
+The arithmetic lives in `WasapiVolumeControl` behind a one-method seam, so `WasapiVolumeControlTests` pins it
+without a device. `IAudioStreamVolume` had to be added to the three per-platform `NativeMethods.*.txt` files — the
+root `NativeMethods.txt` is **generated** by a `CopyNativeMethods` target before every build, and editing it
+silently does nothing (I found that the hard way: three compile errors, then a rebuild that reverted it).
+
+*The video device was shared per factory.* A renderer draws through its device's **immediate context**, and a
+frame is a *sequence* of calls on it — upload, set output, bind, draw. D3D11 protects each call, not the sequence,
+so two renderers on one context can have one player's state land between the other's setup and its draw, and a
+frame is composited into the wrong surface. The factory now creates a device per renderer, and the renderer owns
+and disposes it. Cost: one device per simultaneous player; benefit: correctness by construction rather than by a
+rule every caller must remember.
+
+*Verified:* 178 tests, 0 failed, x64 and ARM64 clean; every GPU test and every endpoint test ran for real (not
+skipped). New: `WasapiVolumeControlTests` (3), `PlaysTwoFilesAtOnceWithoutEitherTouchingTheOther` (two pipelines,
+two devices, two clocks, both to `Ended` with all of their own sound), and
+`CreatesItsNextRendererAfterThePreviousOneWasLetGoOf`. The last one was falsified by restoring the cached device —
+it fails with `ObjectDisposedException`, which is exactly the state a shared device leaves behind.
+
+*Recorded:* §14 items 7–8 rewritten (per-stream volume; a device per renderer), Appendix B.
+
+**S11g — The claim of the clock is not a wake.** *Done, from a review that would not accept the previous
+answer: "Why `AnchorClock` has to call `_videoRenderNode.Wake()`? … what's the consequence of removing it?" —
+then: "Why audio thread starts at T not K? The reader reads from K and provided K to audio threads."*
+
+*My first two answers were wrong, and the user was right both times.* I claimed the wake mattered because the
+sound anchors at the seek target while the picture's newest frame is a keyframe behind. It does not: `Seek` is
+`av_seek_frame(…, -1, ts, AVSEEK_FLAG_BACKWARD)`, nothing filters what is read, and `DecodeAudio` enqueues the
+first buffer after the seek with **its own** timestamp — so the sound anchors on the keyframe the demuxer
+landed on, which is exactly where the picture's newest decoded frame is (§5 says so in as many words). At the
+claim, `behind ≈ 0`: the verdict cannot flip. I then offered a "pre-roll still" path that fails for the same
+reason, and a "50 ms promptness" figure that was arithmetically real but attached to a transition that cannot
+happen.
+
+*What the verdict can be.* Walking `IsVideoStarved` at the claim instant: nothing shown and nothing waiting →
+`true` before *and* after, because the readiness term precedes the gate; something shown or waiting → the tail
+is the same position's keyframe, so `behind` is a few milliseconds at most, below either threshold; `tail < 0`
+→ `false` either way. The state that turns a picture starved later is the clock advancing while the decoder is
+quiet, which is a time-shaped fact the cadence owns (§8). And the wake could only ever land on a bounded wait:
+the anchor is claimed only while playing, so the paused infinite wait is never in play.
+
+*What changed.* The wake is deleted, so the claim publishes a fact with no publisher-to-sleeper edge — the one
+fact in the table like that, and deliberately so. §2.3's row is gone, §8's sentence now says *why* the claim
+needs none, and Appendix A item 35 asks the question that would have caught this earlier: **can the fact's
+transition change the answer at the moment it happens?** A wake that cannot is worse than none, because the
+table then claims a dependency the code does not have — and this one misled a reviewer and me in the same
+conversation.
+
+*Verified:* 169 tests, 0 failed with the wake removed (and with it in place, before), x64 clean. There is
+nothing to falsify: the change is the removal of an edge with no reachable effect, and the argument for that
+is the case analysis above, which the tests can only fail to contradict.
 
 **S8h — Video decoding gets a thread of its own.** *Done.*
 The 4K60 file showed the next problem plainly: `decode 12.9 ms` a frame against a 16.7 ms budget with
