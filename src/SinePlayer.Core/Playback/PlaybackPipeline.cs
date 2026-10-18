@@ -32,12 +32,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private const int VideoStarvationResumeMilliseconds = 100;
     private const int VideoIdleTimeoutMilliseconds = 50;
     private const int AudioIdleTimeoutMilliseconds = 5;
-
-    private const int StalledAudioDeviceCheckIntervalMilliseconds = 100;
-    private const int StalledAudioDeviceThresholdMilliseconds = 1000;
-    private static readonly long StalledAudioDeviceCheckIntervalTicks = Stopwatch.Frequency * StalledAudioDeviceCheckIntervalMilliseconds / 1000;
-    private static readonly long StalledAudioDeviceThresholdTicks = Stopwatch.Frequency * StalledAudioDeviceThresholdMilliseconds / 1000;
-    private const string WarningAudioDeviceStalled = "The audio device is stalled.";
+    private const int ClockSyncToleranceMilliseconds = 10;
 
     #endregion
 
@@ -93,10 +88,14 @@ public sealed partial class PlaybackPipeline : IDisposable
     private long _audioRenderEndedEpoch = -1;
 
     private readonly Lock _clockLock = new();
-    private volatile IPlaybackClock? _clock;
+    private readonly IPlaybackClock _clock = new StopwatchClock();
     private long _anchoredEpoch = -1;
     private volatile bool _videoStarved;
     private volatile bool _audioStarved;
+
+    private long _readerTailEpoch = -1;
+    private long _readerTailVideoTicks = -1;
+    private long _readerTailAudioTicks = -1;
 
     private long _presentedFrameCount;
     private long _droppedFrameCount;
@@ -104,14 +103,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private long _decodedFrameCount;
     private long _decodeTicks;
     private long _renderTicks;
-    private long _pictureTicks;
-    private long _tailDecodedFrameTicks = -1;
-
-    private TimeSpan _devicePosition;
-    private long _deviceMovedAt;
-    private long _deviceCheckedAt;
-    private long _deviceWatchEpoch = -1;
-    private bool _deviceStallReported;
+    private long _pictureTicks = -1;
 
     public PlaybackPipeline(
         ISourceProviderFactory sourceFactory,
@@ -148,7 +140,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public TimeSpan Duration => _info?.Duration ?? TimeSpan.Zero;
 
-    public TimeSpan Position => _clock?.Position ?? TimeSpan.Zero;
+    public TimeSpan Position => _clock.Position;
 
     public long PresentedFrameCount => Interlocked.Read(ref _presentedFrameCount);
 
@@ -187,12 +179,12 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
-    internal TimeSpan LastDecodedTimestamp
+    internal TimeSpan LastPresentedTimestamp
     {
         get
         {
-            long ticks = Interlocked.Read(ref _tailDecodedFrameTicks);
-            return ticks > 0 ? TimeSpan.FromTicks(ticks) : TimeSpan.Zero;
+            long ticks = Interlocked.Read(ref _pictureTicks);
+            return ticks < 0 ? TimeSpan.Zero : TimeSpan.FromTicks(ticks);
         }
     }
 
@@ -219,7 +211,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         get
         {
             long ticks = Interlocked.Read(ref _pictureTicks);
-            if (ticks == 0 || PresentedFrameCount == 0)
+            if (ticks < 0 || PresentedFrameCount == 0)
             {
                 return TimeSpan.Zero;
             }
@@ -292,6 +284,13 @@ public sealed partial class PlaybackPipeline : IDisposable
             return result;
         }
 
+        _audioQueue?.Dispose();
+        _audioQueue = new MediaQueue<RawAudioBuffer>(weigh: buffer => Math.Max(1, buffer.SampleCount));
+        _packetQueue?.Dispose();
+        _packetQueue = new MediaQueue<MediaPacket>();
+        _frameQueue?.Dispose();
+        _frameQueue = new MediaQueue<RawVideoFrame>();
+
         SetState(MediaEngineState.Paused);
 
         _stopRequested = false;
@@ -357,11 +356,6 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
         }
 
-        lock (_clockLock)
-        {
-            _clock ??= new StopwatchClock();
-        }
-
         Volatile.Write(ref _pendingSeekPosition, 0);
 
         return PlaybackOperationResult.Success;
@@ -395,15 +389,8 @@ public sealed partial class PlaybackPipeline : IDisposable
         renderer.Volume = Volatile.Read(ref _volume);
         renderer.IsMuted = Volatile.Read(ref _muted);
 
-        lock (_clockLock)
-        {
-            _clock = renderer.Clock;
-        }
-
         _audioMinimumSamples = Math.Max(1, (long)stream.SampleRate * AudioMinimumMilliseconds / 1000);
         _audioWakeSamples = _audioMinimumSamples / 2;
-        _audioQueue?.Dispose();
-        _audioQueue = new MediaQueue<RawAudioBuffer>(weigh: buffer => Math.Max(1, buffer.SampleCount));
 
         return PlaybackOperationResult.Success;
     }
@@ -446,12 +433,6 @@ public sealed partial class PlaybackPipeline : IDisposable
             _videoTarget = target;
             target.SurfaceSizeChanged += VideoTarget_SurfaceSizeChanged;
         }
-
-        _packetQueue?.Dispose();
-        _packetQueue = new MediaQueue<MediaPacket>();
-
-        _frameQueue?.Dispose();
-        _frameQueue = new MediaQueue<RawVideoFrame>();
 
         return PlaybackOperationResult.Success;
     }
@@ -639,31 +620,31 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         lock (_clockLock)
         {
-            _clock = null;
+            _clock.Pause();
             _anchoredEpoch = -1;
             _videoStarved = false;
             _audioStarved = false;
         }
 
+        _info = null;
         _videoStreamInfo = null;
         _audioStreamInfo = null;
-        _info = null;
+
         Interlocked.Exchange(ref _endingEpoch, -1);
         _videoRenderEndedEpoch = -1;
         _audioRenderEndedEpoch = -1;
-        _devicePosition = TimeSpan.Zero;
-        _deviceMovedAt = 0;
-        _deviceCheckedAt = 0;
-        _deviceWatchEpoch = -1;
-        _deviceStallReported = false;
+
+        Volatile.Write(ref _readerTailEpoch, -1);
+        Interlocked.Exchange(ref _readerTailVideoTicks, -1);
+        Interlocked.Exchange(ref _readerTailAudioTicks, -1);
+
         Interlocked.Exchange(ref _presentedFrameCount, 0);
         Interlocked.Exchange(ref _droppedFrameCount, 0);
         Interlocked.Exchange(ref _displayedFrameCount, -1);
         Interlocked.Exchange(ref _decodedFrameCount, 0);
         Interlocked.Exchange(ref _decodeTicks, 0);
         Interlocked.Exchange(ref _renderTicks, 0);
-        Interlocked.Exchange(ref _pictureTicks, 0);
-        Interlocked.Exchange(ref _tailDecodedFrameTicks, -1);
+        Interlocked.Exchange(ref _pictureTicks, -1);
 
         _epochs.Change(epoch => epoch + 1);
 
@@ -786,6 +767,10 @@ public sealed partial class PlaybackPipeline : IDisposable
             {
                 var target = TimeSpan.FromTicks(Volatile.Read(ref _pendingSeekPosition));
                 workingEpoch = newEpoch;
+
+                Volatile.Write(ref _readerTailEpoch, newEpoch);
+                Interlocked.Exchange(ref _readerTailVideoTicks, -1);
+                Interlocked.Exchange(ref _readerTailAudioTicks, -1);
 
                 PlaybackOperationResult seeked;
                 try
@@ -915,6 +900,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             if (packet.StreamIndex == audioStreamInfo.Index)
             {
+                AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailAudioTicks);
                 return DecodeAudio(audioDecoder, packet, epoch);
             }
         }
@@ -934,6 +920,8 @@ public sealed partial class PlaybackPipeline : IDisposable
                 {
                     return PlaybackOperationResult.Failure("The video packet queue is not available.");
                 }
+
+                AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailVideoTicks);
 
                 if (packetQueue.TryEnqueue(packet, epoch))
                 {
@@ -1069,6 +1057,38 @@ public sealed partial class PlaybackPipeline : IDisposable
         return PlaybackOperationResult.Success;
     }
 
+    private void AdvanceReaderTail(long epoch, TimeSpan timestamp, ref long oldTicks)
+    {
+        if (Volatile.Read(ref _readerTailEpoch) != epoch)
+        {
+            return;
+        }
+
+        long ticks = timestamp.Ticks;
+
+        if (ticks > Interlocked.Read(ref oldTicks))
+        {
+            Interlocked.Exchange(ref oldTicks, ticks);
+        }
+    }
+
+    private bool IsStreamSpent(long epoch, TimeSpan position, ref long ticks)
+    {
+        if (Volatile.Read(ref _readerTailEpoch) != epoch)
+        {
+            return false;
+        }
+
+        long ticksLocal = Interlocked.Read(ref ticks);
+        if (ticksLocal < 0 || ticksLocal >= position.Ticks)
+        {
+            return false;
+        }
+
+        long maxTicks = Math.Max(Interlocked.Read(ref _readerTailVideoTicks), Interlocked.Read(ref _readerTailAudioTicks));
+        return maxTicks >= position.Ticks;
+    }
+
     #endregion
 
     #region Video decode
@@ -1122,7 +1142,6 @@ public sealed partial class PlaybackPipeline : IDisposable
                     return;
                 }
 
-                Interlocked.Exchange(ref _tailDecodedFrameTicks, -1);
                 continue;
             }
 
@@ -1263,8 +1282,6 @@ public sealed partial class PlaybackPipeline : IDisposable
                 frame.Dispose();
                 continue;
             }
-
-            Interlocked.Exchange(ref _tailDecodedFrameTicks, frame.Timestamp.Ticks);
         }
 
         if (!fastExit && frameQueue is not null)
@@ -1294,23 +1311,35 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void VideoRenderCore()
     {
-        long showingEpoch = -1;
+        long workingEpoch = -1;
+        long firstFrameEpoch = -1;
+        long firstFrameTicks = -1;
         long endingEpoch = -1;
-        long clockEpoch = -1;
-        long clockStamp = -1;
 
-        while (!_stopRequested)
+        MediaQueue<RawVideoFrame>? queue = _frameQueue ?? throw new InvalidOperationException("No video queue found.");
+
+        void DequeueAndDispose(MediaItem<RawVideoFrame> expected)
         {
-            MediaQueue<RawVideoFrame>? queue = _frameQueue;
-            if (queue is null)
+            if (!queue.TryDequeue(expected))
             {
                 return;
             }
 
+            expected.Item?.Dispose();
+            TryWakeVideoDecode();
+        }
+
+        while (!_stopRequested)
+        {
             long stamp = _videoRenderNode.Stamp;
             long epoch = _epochs.Read();
             bool playing = CheckState(out MediaEngineState state, MediaEngineState.Playing);
-            IPlaybackClock clock = _clock ?? throw new InvalidOperationException("The picture has no clock.");
+
+            if (workingEpoch != epoch)
+            {
+                workingEpoch = epoch;
+                Interlocked.Exchange(ref _pictureTicks, -1);
+            }
 
             IVideoRenderer? renderer = _videoRenderer;
             if (renderer is not null && state is MediaEngineState.Paused or MediaEngineState.Ended)
@@ -1333,27 +1362,19 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
 
             MediaItem<RawVideoFrame>? entry = queue.TryPeek(out MediaItem<RawVideoFrame>? head) ? head : null;
-            TimeSpan position = clock.Position;
+            TimeSpan position = _clock.Position;
+            bool offeringTheStill = state == MediaEngineState.Paused && firstFrameEpoch != epoch && endingEpoch != epoch;
 
-            bool starved = _videoStarved;
-            if (playing)
+            bool starved = _videoDecoder is not null && endingEpoch != epoch && entry is null;
+            starved = starved && !IsStreamSpent(epoch, position, ref _readerTailVideoTicks);
+            starved = starved && (firstFrameEpoch != epoch || IsVideoStarved(position));
+
+            lock (_clockLock)
             {
-                starved = IsVideoStarved(position, epoch, showingEpoch, entry is not null);
+                _videoStarved = starved;
+                StartOrPauseClock(epoch, state);
             }
 
-            if (starved != _videoStarved || epoch != clockEpoch || stamp != clockStamp)
-            {
-                lock (_clockLock)
-                {
-                    _videoStarved = starved;
-                    ApplyClock(clock, epoch, state);
-                }
-
-                clockEpoch = epoch;
-                clockStamp = stamp;
-            }
-
-            bool offeringTheStill = state == MediaEngineState.Paused && showingEpoch != epoch && endingEpoch != epoch;
             if (!playing && !offeringTheStill)
             {
                 _videoRenderNode.Wait(stamp);
@@ -1371,10 +1392,47 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
+            if (entry.Epoch != epoch)
+            {
+                DequeueAndDispose(entry);
+                continue;
+            }
+
             RawVideoFrame? frame = entry.Item;
 
-            if (playing && frame is not null && entry.Epoch == epoch
-                && _synchronizer.Evaluate(frame.Timestamp, position) == FrameSyncAction.Wait)
+            if (entry.IsLast || frame is null)
+            {
+                if (endingEpoch != entry.Epoch)
+                {
+                    endingEpoch = entry.Epoch;
+
+                    long epochCopy = entry.Epoch;
+                    Submit(() => NotifyVideoRenderEnded(epochCopy));
+                }
+
+                DequeueAndDispose(entry);
+                continue;
+            }
+
+            FrameSyncAction syncAction = _synchronizer.Evaluate(frame.Timestamp, position);
+
+            if (playing && _audioDecoder is null)
+            {
+                TimeSpan anchor = firstFrameEpoch == epoch ? TimeSpan.FromTicks(firstFrameTicks) : frame.Timestamp;
+
+                lock (_clockLock)
+                {
+                    if (AnchorClock(epoch, anchor))
+                    {
+                        position = _clock.Position;
+                        syncAction = _synchronizer.Evaluate(frame.Timestamp, position);
+                    }
+
+                    StartOrPauseClock(epoch, state);
+                }
+            }
+
+            if (playing && syncAction == FrameSyncAction.Wait)
             {
                 int remaining = (int)Math.Clamp((frame.Timestamp - position).TotalMilliseconds, 1, VideoIdleTimeoutMilliseconds);
                 _videoRenderNode.Wait(stamp, remaining);
@@ -1390,40 +1448,14 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             using (frame)
             {
-                if (entry.Epoch != epoch)
+                if (playing
+                    && syncAction == FrameSyncAction.Drop
+                    && queue.TryPeek(out MediaItem<RawVideoFrame>? closer)
+                    && closer.Item is not null
+                    && closer.Epoch == epoch)
                 {
+                    Interlocked.Increment(ref _droppedFrameCount);
                     continue;
-                }
-
-                if (entry.IsLast || frame is null)
-                {
-                    if (endingEpoch != entry.Epoch)
-                    {
-                        endingEpoch = entry.Epoch;
-
-                        long epochCopy = entry.Epoch;
-                        Submit(() => NotifyVideoRenderEnded(epochCopy));
-                    }
-
-                    continue;
-                }
-
-                if (playing)
-                {
-                    if (_audioDecoder is null)
-                    {
-                        AnchorClock(clock, frame.Timestamp, entry.Epoch);
-                    }
-
-                    if (Volatile.Read(ref _anchoredEpoch) == entry.Epoch
-                        && _synchronizer.Evaluate(frame.Timestamp, position) == FrameSyncAction.Drop
-                        && queue.TryPeek(out MediaItem<RawVideoFrame>? closer)
-                        && closer.Item is not null
-                        && closer.Epoch == entry.Epoch)
-                    {
-                        Interlocked.Increment(ref _droppedFrameCount);
-                        continue;
-                    }
                 }
 
                 PlaybackOperationResult shown = RenderVideoFrame(frame);
@@ -1433,7 +1465,11 @@ public sealed partial class PlaybackPipeline : IDisposable
                     return;
                 }
 
-                showingEpoch = entry.Epoch;
+                if (firstFrameEpoch != epoch)
+                {
+                    firstFrameEpoch = epoch;
+                    firstFrameTicks = frame.Timestamp.Ticks;
+                }
             }
         }
     }
@@ -1475,25 +1511,15 @@ public sealed partial class PlaybackPipeline : IDisposable
         return PlaybackOperationResult.Success;
     }
 
-    private bool IsVideoStarved(TimeSpan position, long epoch, long showingEpoch, bool hasEntry)
+    private bool IsVideoStarved(TimeSpan position)
     {
-        if (IsEnding(epoch))
+        long presentedTicks = Interlocked.Read(ref _pictureTicks);
+        if (presentedTicks < 0)
         {
             return false;
         }
 
-        if (showingEpoch != epoch && !hasEntry)
-        {
-            return true;
-        }
-
-        long tailTicks = Interlocked.Read(ref _tailDecodedFrameTicks);
-        if (tailTicks < 0 || Volatile.Read(ref _anchoredEpoch) != epoch)
-        {
-            return false;
-        }
-
-        TimeSpan behind = position - TimeSpan.FromTicks(tailTicks);
+        TimeSpan behind = position - TimeSpan.FromTicks(presentedTicks);
         return _videoStarved
             ? behind > TimeSpan.FromMilliseconds(VideoStarvationResumeMilliseconds)
             : behind > TimeSpan.FromMilliseconds(VideoStarvationMilliseconds);
@@ -1517,13 +1543,15 @@ public sealed partial class PlaybackPipeline : IDisposable
         long workingEpoch = -1;
         long endingEpoch = -1;
         long playedOutEpoch = -1;
-        long clockEpoch = -1;
-        long clockStamp = -1;
+        TimeSpan? clockOffset = null;
 
         IAudioSubmit? inFlightSubmit = null;
         RawAudioBuffer? inFlightBuffer = null;
 
-        void ReleaseInFlight()
+        IAudioRenderer? renderer = _audioRenderer;
+        MediaQueue<RawAudioBuffer>? queue = _audioQueue ?? throw new InvalidOperationException("No audio queue found.");
+
+        void ReleaseInFlightAudio()
         {
             inFlightSubmit?.Dispose();
             inFlightSubmit = null;
@@ -1533,40 +1561,48 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         while (!_stopRequested)
         {
-            MediaQueue<RawAudioBuffer>? queue = _audioQueue;
-            if (queue is null)
-            {
-                goto CleanUp;
-            }
-
             long stamp = _audioRenderNode.Stamp;
             long epoch = _epochs.Read();
             bool playing = CheckState(out MediaEngineState state, MediaEngineState.Playing);
-            IPlaybackClock clock = _clock ?? throw new InvalidOperationException("The sound has no clock.");
-            IAudioRenderer renderer = _audioRenderer ?? throw new InvalidOperationException("The sound has no renderer.");
+
+            if (renderer is null)
+            {
+                _audioRenderNode.Wait(stamp);
+                continue;
+            }
+
+            IPlaybackClock deviceClock = renderer.Clock;
 
             bool epochChanged = workingEpoch != epoch;
             if (epochChanged)
             {
                 workingEpoch = epoch;
-                ReleaseInFlight();
+                clockOffset = null;
+                ReleaseInFlightAudio();
                 renderer.Flush();
             }
 
-            if (epochChanged || epoch != clockEpoch || stamp != clockStamp)
+            lock (_clockLock)
             {
-                lock (_clockLock)
+                if (epochChanged)
                 {
-                    if (epochChanged)
-                    {
-                        _audioStarved = true;
-                    }
-
-                    ApplyClock(clock, epoch, state);
+                    _audioStarved = true;
                 }
 
-                clockEpoch = epoch;
-                clockStamp = stamp;
+                StartOrPauseClock(epoch, state);
+
+                bool clockRunning = _clock.IsRunning;
+                if (clockRunning != deviceClock.IsRunning)
+                {
+                    if (clockRunning)
+                    {
+                        deviceClock.Start();
+                    }
+                    else
+                    {
+                        deviceClock.Pause();
+                    }
+                }
             }
 
             if (!playing)
@@ -1575,14 +1611,18 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
-            CheckStalledAudioClock(clock);
+            bool deviceHasAudio = renderer.QueuedSampleCount > 0;
+            if (deviceHasAudio && clockOffset is TimeSpan offset)
+            {
+                SyncClock(_clock, deviceClock, offset);
+            }
 
             if (inFlightSubmit is not null)
             {
                 if (!inFlightSubmit.MoveNext())
                 {
                     PlaybackOperationResult submitted = inFlightSubmit.Result;
-                    ReleaseInFlight();
+                    ReleaseInFlightAudio();
 
                     if (!submitted.IsSuccessful)
                     {
@@ -1599,9 +1639,14 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             if (!queue.TryPeek(out MediaItem<RawAudioBuffer>? _))
             {
-                bool deviceHasAudio = renderer.QueuedSampleCount > 0;
                 bool ending = endingEpoch == epoch;
-                SetAudioStarved(clock, epoch, state, !deviceHasAudio && !ending);
+                bool starved = !deviceHasAudio && !ending && !IsStreamSpent(epoch, _clock.Position, ref _readerTailAudioTicks);
+
+                lock (_clockLock)
+                {
+                    _audioStarved = starved;
+                    StartOrPauseClock(epoch, state);
+                }
 
                 if (ending && !deviceHasAudio && playedOutEpoch != endingEpoch)
                 {
@@ -1643,85 +1688,56 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
-            SetAudioStarved(clock, epoch, state, false);
-            AnchorClock(clock, buffer.Timestamp, epoch);
+            lock (_clockLock)
+            {
+                _audioStarved = false;
+
+                if (AnchorClock(epoch, buffer.Timestamp))
+                {
+                    clockOffset = deviceClock.Position - buffer.Timestamp;
+                }
+
+                StartOrPauseClock(epoch, state);
+            }
 
             inFlightSubmit = renderer.Submit(buffer);
             inFlightBuffer = buffer;
         }
 
     CleanUp:
-        ReleaseInFlight();
+        ReleaseInFlightAudio();
     }
 
-    private void CheckStalledAudioClock(IPlaybackClock clock)
+    private void SyncClock(IPlaybackClock clock, IPlaybackClock deviceClock, TimeSpan offset)
     {
-        long epoch = _epochs.Read();
-        if (_deviceWatchEpoch != epoch)
+        TimeSpan deviceTime;
+        TimeSpan localTime;
+        try
         {
-            _deviceWatchEpoch = epoch;
-            _deviceCheckedAt = 0;
-            _deviceStallReported = false;
+            deviceTime = deviceClock.Position;
+            localTime = clock.Position;
         }
-
-        long now = Stopwatch.GetTimestamp();
-
-        if (_deviceCheckedAt == 0)
+        catch (Exception ex)
         {
-            _deviceCheckedAt = now;
-            _deviceMovedAt = now;
-            _devicePosition = clock.Position;
+            Logger.E(TAG, ex);
             return;
         }
 
-        if (now - _deviceCheckedAt < StalledAudioDeviceCheckIntervalTicks)
-        {
-            return;
-        }
-
-        _deviceCheckedAt = now;
-
-        bool expected = _state == MediaEngineState.Playing
-            && !_videoStarved
-            && !_audioStarved
-            && Volatile.Read(ref _anchoredEpoch) == epoch
-            && clock.IsRunning;
-
-        TimeSpan position = clock.Position;
-        bool moved = position != _devicePosition;
-        _devicePosition = position;
-
-        if (moved)
-        {
-            _deviceMovedAt = now;
-            _deviceStallReported = false;
-            return;
-        }
-
-        if (!expected)
-        {
-            _deviceMovedAt = now;
-            return;
-        }
-
-        if (now - _deviceMovedAt >= StalledAudioDeviceThresholdTicks && !_deviceStallReported)
-        {
-            _deviceStallReported = true;
-            PostWarning(WarningAudioDeviceStalled);
-        }
-    }
-
-    private void SetAudioStarved(IPlaybackClock clock, long epoch, MediaEngineState state, bool value)
-    {
-        if (_audioStarved == value)
+        TimeSpan expected = deviceTime - offset;
+        if (Math.Abs((expected - localTime).TotalMilliseconds) <= ClockSyncToleranceMilliseconds)
         {
             return;
         }
 
         lock (_clockLock)
         {
-            _audioStarved = value;
-            ApplyClock(clock, epoch, state);
+            if (!clock.IsRunning)
+            {
+                // Sync is only valid when the clock is running.
+                return;
+            }
+
+            clock.SetPosition(expected);
         }
     }
 
@@ -1754,42 +1770,46 @@ public sealed partial class PlaybackPipeline : IDisposable
         return Interlocked.Read(ref _endingEpoch) == epoch;
     }
 
-    private void ApplyClock(IPlaybackClock clock, long epoch, MediaEngineState state)
+    private void StartOrPauseClock(long epoch, MediaEngineState state)
     {
-        if (Volatile.Read(ref _anchoredEpoch) != epoch)
+        bool anchored = _anchoredEpoch == epoch;
+        if (!anchored)
         {
             // This sync is inaccurate, but it is the best that can be done for now.
-            clock.SetPosition(TimeSpan.FromTicks(Volatile.Read(ref _pendingSeekPosition)));
+            _clock.SetPosition(TimeSpan.FromTicks(Volatile.Read(ref _pendingSeekPosition)));
         }
 
         bool start = state == MediaEngineState.Playing && !_videoStarved && !_audioStarved;
-        if (start == clock.IsRunning)
+        if (start == _clock.IsRunning)
+        {
+            return;
+        }
+
+        if (start && !anchored)
         {
             return;
         }
 
         if (start)
         {
-            clock.Start();
+            _clock.Start();
         }
         else
         {
-            clock.Pause();
+            _clock.Pause();
         }
     }
 
-    private void AnchorClock(IPlaybackClock clock, TimeSpan mediaTimestamp, long epoch)
+    private bool AnchorClock(long epoch, TimeSpan mediaTimestamp)
     {
-        lock (_clockLock)
+        if (_anchoredEpoch == epoch)
         {
-            if (_anchoredEpoch == epoch)
-            {
-                return;
-            }
-
-            _anchoredEpoch = epoch;
-            clock.SetPosition(mediaTimestamp);
+            return false;
         }
+
+        _anchoredEpoch = epoch;
+        _clock.SetPosition(mediaTimestamp);
+        return true;
     }
 
     private void WakeAll()

@@ -488,6 +488,9 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
 
     private void Release()
     {
+        // The clock is let go of before the device is: nothing outside the renderer reads it any more, and a reader
+        // that still holds it must not reach into a client this method is about to drop.
+        _clock?.OnDeviceReleased();
         _clock = null;
         _renderClient = null;
         _volume = null;

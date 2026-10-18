@@ -92,6 +92,11 @@ How each is answered, because two of them are deliberately *not* fixed:
 | P4 | **Removed.** The reader is paced by its own forward reading, not by room in a queue, so video back-pressure cannot reach the sound at all — this was the coupling under several of the six reports |
 | P5 | **Partly addressed, and said so rather than implied.** Every wait is now interruptible and epoch-checked and the class remarks state the rules, but the invariants are still comments rather than types; the one wait that remains another component's is recorded in §3.5 |
 
+> **Superseded in part — S11o.** The stall line named in P1 and P3 is gone: the watchdog that raised it was
+> removed, because a device that is late and a device that is broken report the same frozen position and the line
+> was therefore a guess with a threshold behind it. The design's answer to a stalled device is now to wait and say
+> nothing (§9 and §14 of [PlaybackPipeline.md](./PlaybackPipeline.md)). Everything else in this table still holds.
+
 ## 3. The design: five rules
 
 **Every stage waits only for what it alone owns, and every wait it takes ends without another stage having to
@@ -186,12 +191,11 @@ minimums. Nothing fails, nothing is dropped and nothing needs a special case —
 previous design's special case (`WaitForAudioRoom`'s nudge, the stall guard, the decode gate) was itself the
 chief source of stalls.
 
-What the design does owe the user is the *reason*, so the device is named: after one second of working state
-with a claimed anchor and a position that has not moved, the pipeline raises one warning line —
-`The audio device is not moving.` — and the position moving again raises the pair to it,
-`The audio device is moving again.` (Warnings as lines rather than as a state: see S9e in
-[MediaEngineImplementationPlan.md](./MediaEngineImplementationPlan.md).) No state change, no error, no
-interruption.
+What the design does owe the user is the *reason* — and since S11o the pipeline does not pretend to have one.
+A watchdog that named the device (`The audio device is not moving.`) was removed: the engine cannot tell a slow
+device from a broken one, so the line was a guess with a threshold behind it, and the freeze is now silent —
+`Position` stopped while the state is `Playing` and nothing starving (§9 and §14 of
+[PlaybackPipeline.md](./PlaybackPipeline.md)). No state change, no error, no interruption either way.
 
 **What this does not cover, stated rather than implied:** a presentation thread stuck *inside* the renderer — a
 GPU hang — grows the frame queue until the decoder stops, but it produces no lag against the clock, so it is
@@ -204,7 +208,7 @@ The old failures were all one shape: a cycle of waits. Each edge of that cycle i
 
 | The old edge | What it is now |
 |---|---|
-| Presentation waits for the clock; the clock waits for the device | Still true, and allowed to be: the device is the outside world, and a stopped device is a wait that the starvation/notice paths name rather than a deadlock |
+| Presentation waits for the clock; the clock waits for the device | Still true, and allowed to be: the device is the outside world, and a stopped device is a wait that nothing in the engine names or breaks (§3.5) |
 | Presentation waits for a frame; the decoder waits for room; the reader waits for the packet queue | Broken twice over: the reader never waits for a queue (unbounded, self-paced), so a stopped decoder cannot stop the reader; and a seek releases both waits through the epoch |
 | The reader stops ⇒ no audio ⇒ the clock never moves | Broken by the reader's own rule: it blocks only on the file and idles only when both queues are already full, so audio production never waits on the picture |
 | The decoder waits for the clock (So it cannot run while the device is stalled) | Deleted: the decoder waits for frame-queue room only, and the presentation thread is the only thing that consults the clock |

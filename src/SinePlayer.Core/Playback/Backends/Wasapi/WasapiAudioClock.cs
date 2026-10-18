@@ -217,6 +217,19 @@ internal sealed class WasapiAudioClock : IPlaybackClock
     }
 
     /// <summary>
+    /// Says that the renderer has let go of the device, so this clock must stop touching it. A reader may still
+    /// hold the clock — the pipeline's corrected clock reads it on another thread until it is replaced — and it must
+    /// keep answering, from the last position it knew, rather than reaching into a released client.
+    /// </summary>
+    internal void OnDeviceReleased()
+    {
+        lock (_lock)
+        {
+            _deviceLost = true;
+        }
+    }
+
+    /// <summary>
     /// Latches the first failure. Called with the lock held, or with an exception that must be recorded as a
     /// whole: the flag is published after its cause, so whoever sees the flag can read the cause.
     /// </summary>
