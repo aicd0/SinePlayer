@@ -15,6 +15,7 @@ using SinePlayer.Core.Playback;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
+using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -38,7 +39,12 @@ internal sealed partial class PlaybackLabPage : BasePage
     ];
 
     private readonly D3D11VideoRendererFactory _videoRendererFactory = new();
-    private readonly WasapiAudioRenderer _audioRenderer = new();
+
+    /// <summary>
+    /// The sound's device is created by the pipeline that plays it, so it is captured here rather than held:
+    /// this page only reads the device's underrun count for its status line and never disposes it.
+    /// </summary>
+    private readonly CapturingAudioRendererFactory _audioRendererFactory = new();
 
     private PlaybackPipeline? _pipeline;
     private SwapChainPanelRenderTarget? _renderTarget;
@@ -124,7 +130,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             new FFmpegVideoDecoderFactory(),
             _videoRendererFactory,
             new FFmpegAudioDecoderFactory(),
-            _audioRenderer,
+            _audioRendererFactory,
             new DefaultSynchronizer());
         pipeline.StateChanged += OnStateChanged;
         pipeline.WarningRaised += OnWarningRaised;
@@ -277,7 +283,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         // "dropped" counts decoded frames that were never shown, and a stage being waited for is what the
         // clock standing still means: playback is not failing, it is waiting for something to work with.
         string waiting = pipeline.StarvedFor is null ? string.Empty : $" waiting for {pipeline.StarvedFor}.";
-        string health = $" dropped {pipeline.DroppedFrameCount}, underruns {_audioRenderer.UnderrunCount}, lag {pipeline.PictureLag.TotalMilliseconds:0} ms.{waiting}";
+        string health = $" dropped {pipeline.DroppedFrameCount}, underruns {_audioRendererFactory.Created?.UnderrunCount ?? 0}, lag {pipeline.PictureLag.TotalMilliseconds:0} ms.{waiting}";
 
         // What the compositor did with them is the other half of the picture: frames the pipeline handed over
         // that never reached the display — presented, then superseded before the screen took them — are drops
@@ -322,5 +328,29 @@ internal sealed partial class PlaybackLabPage : BasePage
     private void Report(string message)
     {
         StatusText.Text = message;
+    }
+
+    /// <summary>
+    /// Hands the pipeline a real renderer and keeps it for the status line, which reads the device's own
+    /// underrun count. The pipeline owns the instance it was given and disposes it when the file closes; this
+    /// only ever reads a counter, so a disposed instance still answers correctly.
+    /// </summary>
+    private sealed class CapturingAudioRendererFactory : IComponentFactory<IAudioRenderer>
+    {
+        public WasapiAudioRenderer? Created { get; private set; }
+
+        public ComponentCapabilities Capabilities { get; } = new()
+        {
+            Name = "wasapi",
+            Description = "Plays audio on the default output device through WASAPI in shared mode.",
+        };
+
+        public PlaybackOperationResult TryCreate(out IAudioRenderer? component)
+        {
+            WasapiAudioRenderer renderer = new();
+            Created = renderer;
+            component = renderer;
+            return PlaybackOperationResult.Success;
+        }
     }
 }

@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Buffers;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -27,8 +28,15 @@ namespace SinePlayer.Core.Playback.Backends.Wasapi;
 /// interleaving the decoder's planes and keeping the device buffer fed.
 /// </para>
 /// <para>
-/// <see cref="Submit"/> hands over one block at a time and waits for the device when its buffer is
-/// full, so it belongs on the thread the pipeline dedicates to audio rather than on a caller's thread.
+/// <see cref="Submit"/> never waits for the device: a device with no room is reported by the hand-off it
+/// returns, so the pipeline waits on its own thread (<see cref="IAudioSubmit"/>) where a pause, a seek and a
+/// stop can reach it.
+/// </para>
+/// <para>
+/// The clock's running state is the pipeline's alone: this class starts and stops the stream only where
+/// the pipeline asks it to through <see cref="Clock"/>, and a hand-off into a stopped stream leaves it
+/// stopped. A renderer that started the stream on its own would make every clock hold advisory, because
+/// the hold is already decided by the time the block reaches it.
 /// </para>
 /// </summary>
 public sealed class WasapiAudioRenderer : IAudioRenderer
@@ -37,7 +45,6 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
     private const ushort WaveFormatIeeeFloat = 3;
     private const ushort WaveFormatExtensible = 0xFFFE;
     private const int ExtensibleExtraSize = 22;
-    private const int MaxWaitMilliseconds = 2000;
 
     private const string TAG = nameof(WasapiAudioRenderer);
 
@@ -49,10 +56,9 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
 
     private IAudioClient? _client;
     private IAudioRenderClient? _renderClient;
-    private ISimpleAudioVolume? _volume;
+    private WasapiVolumeControl? _volume;
     private WasapiAudioClock? _clock;
     private WasapiAudioFormat.Descriptor _format;
-    private byte[] _staging = [];
     private int _bufferFrameCount;
     private double _volumeLevel = 1.0;
     private bool _muted;
@@ -74,38 +80,32 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
 
     public string Name => "wasapi";
 
+    /// <summary>
+    /// The sound's level, 0 to 1, for <em>this renderer only</em>. It is the stream's volume rather than the
+    /// process session's, which is what lets two players play at two levels at once.
+    /// </summary>
     public double Volume
     {
         get => _volumeLevel;
         set
         {
             _volumeLevel = Math.Clamp(value, 0.0, 1.0);
-            try
-            {
-                _volume?.SetMasterVolume((float)_volumeLevel, Guid.Empty);
-            }
-            catch (Exception)
-            {
-                // A device that has gone away is reported by the next submit; volume is not worth
-                // failing a caller over.
-            }
+            ApplyVolume();
         }
     }
 
+    /// <summary>
+    /// Whether this renderer's sound is muted. WASAPI has no per-stream mute, so this is the level going to zero
+    /// while the level the user set is kept: that is what lets unmuting restore it, and it keeps the control
+    /// per-stream rather than falling back to the session's mute, which would silence every player at once.
+    /// </summary>
     public bool IsMuted
     {
         get => _muted;
         set
         {
             _muted = value;
-            try
-            {
-                _volume?.SetMute(value, Guid.Empty);
-            }
-            catch (Exception)
-            {
-                // As above: the failure surfaces where it matters, not here.
-            }
+            ApplyVolume();
         }
     }
 
@@ -127,8 +127,11 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
                 client.GetCurrentPadding(out uint padding);
                 return padding;
             }
-            catch (Exception)
+            catch (Exception exception)
             {
+                // The failure is preserved, not described: what the padding read threw is the diagnosis, and the
+                // next hand-off or flush reports it as a pipeline error rather than a crash.
+                _clock?.ReportDeviceLost(exception);
                 return 0;
             }
         }
@@ -180,17 +183,24 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
             // Volume control is a convenience: a device that refuses the service still plays.
             try
             {
-                client.GetService(typeof(ISimpleAudioVolume).GUID, out object volumeService);
-                if (volumeService is ISimpleAudioVolume simpleVolume)
+                // The stream's own volume, not the session's: a session belongs to the process, so two players
+                // sharing one would share one slider. This service is what makes each player independent.
+                client.GetService(typeof(IAudioStreamVolume).GUID, out object volumeService);
+                if (volumeService is IAudioStreamVolume streamVolume)
                 {
-                    _volume = simpleVolume;
-                    _volume.SetMasterVolume((float)_volumeLevel, Guid.Empty);
-                    _volume.SetMute(_muted, Guid.Empty);
+                    _volume = WasapiVolumeControl.Create(streamVolume);
+                }
+                else
+                {
+                    Logger.W(TAG, "The audio device offers no per-stream volume, so volume and mute are not applied.");
                 }
             }
-            catch (Exception)
+            catch (Exception exception)
             {
-                // Not every endpoint offers a session volume; playback does not depend on it.
+                // Per-player volume is a convenience; playback does not depend on it. The exception is written
+                // out whole so that "this endpoint has no stream volume" is distinguishable from anything else
+                // that went wrong here — and nothing is claimed about the device.
+                Logger.W(TAG, $"Unable to take the audio stream's volume control: {exception}");
             }
 
             _client = client;
@@ -198,12 +208,14 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
             _clock = new WasapiAudioClock(client, audioClock, frequency);
             _format = format;
             _bufferFrameCount = (int)bufferFrameCount;
-            _staging = new byte[format.BlockAlign * 4096];
 
             // A new stream starts with an empty device and no history, so what the last one counted says
             // nothing about this one.
             _submittedBlocks = 0;
             Interlocked.Exchange(ref _underrunCount, 0);
+
+            // The device starts at full volume, so what the host asked for is applied to the new stream here.
+            ApplyVolume();
 
             // The endpoint and the enumerator hold no state we need: the client keeps its own reference.
             return PlaybackOperationResult.Success;
@@ -215,26 +227,34 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
         }
     }
 
-    public PlaybackOperationResult Submit(RawAudioBuffer buffer)
+    /// <inheritdoc/>
+    public IAudioSubmit Submit(RawAudioBuffer buffer)
     {
         ArgumentNullException.ThrowIfNull(buffer);
 
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
+            return new FinishedAudioSubmit(PlaybackOperationResult.Failure("The renderer has already been disposed."));
         }
 
         IAudioRenderClient? renderClient = _renderClient;
-        WasapiAudioClock? clock = _clock;
-        if (renderClient is null || clock is null)
+        if (renderClient is null)
         {
-            return PlaybackOperationResult.Failure("The audio renderer has not been configured.");
+            return new FinishedAudioSubmit(PlaybackOperationResult.Failure("The audio renderer has not been configured."));
+        }
+
+        if (_clock is WasapiAudioClock lost && lost.DeviceLost)
+        {
+            // The device cannot be used, so the block cannot be handed over and no amount of waiting will
+            // change that. The original failure is carried rather than described, and it is what turns this
+            // into the pipeline's error instead of a thread waiting for a device that is never coming back.
+            return new FinishedAudioSubmit(DeviceFailure(lost, "Unable to hand audio to the device"));
         }
 
         int frames = buffer.SampleCount;
         if (frames <= 0)
         {
-            return PlaybackOperationResult.Success;
+            return new FinishedAudioSubmit(PlaybackOperationResult.Success);
         }
 
         int required = _format.BlockAlign * frames;
@@ -245,75 +265,28 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
         {
             Interlocked.Increment(ref _underrunCount);
         }
-        if (_staging.Length < required)
-        {
-            _staging = new byte[required];
-        }
 
-        if (!AudioInterleaver.TryInterleave(buffer, _staging, out int byteCount, out string error))
+        // The block is turned into device bytes once, here, for two reasons: the hand-off then holds nothing
+        // but bytes, so the caller's buffer is free the moment this returns; and the conversion cannot fail
+        // halfway through a device write, where the failure would be indistinguishable from a short one.
+        byte[] staging = ArrayPool<byte>.Shared.Rent(required);
+        if (!AudioInterleaver.TryInterleave(buffer, staging, out int byteCount, out string error))
         {
-            return PlaybackOperationResult.Failure(error);
+            ArrayPool<byte>.Shared.Return(staging);
+            return new FinishedAudioSubmit(PlaybackOperationResult.Failure(error));
         }
 
         if (byteCount != required)
         {
-            return PlaybackOperationResult.Failure($"The audio block produced {byteCount} byte(s) where {required} were expected.");
+            ArrayPool<byte>.Shared.Return(staging);
+            return new FinishedAudioSubmit(PlaybackOperationResult.Failure($"The audio block produced {byteCount} byte(s) where {required} were expected."));
         }
 
-        // The stream has to be running before anything is written: a stopped WASAPI stream does not
-        // consume its buffer, so the first block would fill it and the rest would wait forever.
-        if (!clock.IsRunning)
-        {
-            clock.Start();
-        }
-
-        // The whole block is turned into device bytes once, then handed over in whatever chunks the
-        // device has room for: a decoded block is normally larger than the device buffer, so insisting
-        // on room for all of it would never succeed.
-        int offset = 0;
-        int waited = 0;
-        while (offset < byteCount)
-        {
-            uint free = GetFreeFrameCount();
-            if (free == 0)
-            {
-                // A stopped stream means the caller paused: the device keeps what it already holds and
-                // resumes from there, so waiting is right and giving up would only lose audio.
-                bool stopped = _clock is null || !_clock.IsRunning;
-                if (!stopped && waited >= MaxWaitMilliseconds)
-                {
-                    return PlaybackOperationResult.Failure("The audio device did not free its buffer in time.");
-                }
-
-                Thread.Sleep(1);
-                waited = stopped ? 0 : waited + 1;
-                continue;
-            }
-
-            int chunkFrames = Math.Min((int)free, (byteCount - offset) / _format.BlockAlign);
-            int bytes = chunkFrames * _format.BlockAlign;
-            try
-            {
-                unsafe
-                {
-                    renderClient.GetBuffer((uint)chunkFrames, out byte* destination);
-                    Marshal.Copy(_staging, offset, (nint)destination, bytes);
-                    renderClient.ReleaseBuffer((uint)chunkFrames, 0);
-                }
-            }
-            catch (Exception exception)
-            {
-                return PlaybackOperationResult.Failure($"Unable to queue audio: {exception.Message}");
-            }
-
-            offset += bytes;
-
-            // The device accepted audio, so the next wait is a fresh one.
-            waited = 0;
-            _submittedBlocks++;
-        }
-
-        return PlaybackOperationResult.Success;
+        // A stopped stream is written into rather than started: it keeps what it is given, plays it from the
+        // first frame when it is started, and its buffer filling up is what makes the hand-off yield. Whether
+        // the stream runs is the pipeline's decision and nothing here may make it: a hand-off that started
+        // the stream would release a hold on the clock that the picture depends on.
+        return new WasapiAudioSubmit(this, renderClient, staging, byteCount);
     }
 
     public PlaybackOperationResult Flush()
@@ -328,6 +301,11 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
         if (client is null || clock is null)
         {
             return PlaybackOperationResult.Failure("The audio renderer has not been configured.");
+        }
+
+        if (clock.DeviceLost)
+        {
+            return DeviceFailure(clock, "Unable to flush audio");
         }
 
         try
@@ -356,7 +334,10 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
         }
         catch (Exception exception)
         {
-            return PlaybackOperationResult.Failure($"Unable to flush audio: {exception.Message}");
+            // A reset that fails is recorded as well as reported, so the next hand-off refuses rather than
+            // trying again — and the exception itself is what is reported.
+            clock.ReportDeviceLost(exception);
+            return PlaybackOperationResult.Failure($"Unable to flush audio: {exception.Message}", exception);
         }
     }
 
@@ -373,9 +354,11 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
         {
             _client?.Stop();
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            // The device may already be gone; there is nothing left to stop in that case.
+            // The device may already be gone; there is nothing left to stop in that case, and a dispose that
+            // threw would fault the teardown. The exception is written out whole all the same.
+            Logger.W(TAG, $"Unable to stop the audio device: {exception}");
         }
 
         Release();
@@ -446,6 +429,18 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
         }
     }
 
+    /// <summary>
+    /// A failure to use a device that has already refused once. The context says what was being attempted and
+    /// the exception is carried whole, because only its own message and stack can say what actually happened.
+    /// </summary>
+    private static PlaybackOperationResult DeviceFailure(WasapiAudioClock clock, string context)
+    {
+        Exception? cause = clock.Cause;
+        return cause is null
+            ? PlaybackOperationResult.Failure($"{context}: the audio device cannot be used.")
+            : PlaybackOperationResult.Failure($"{context}: {cause.Message}", cause);
+    }
+
     private uint GetFreeFrameCount()
     {
         IAudioClient? client = _client;
@@ -454,8 +449,41 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
             return 0;
         }
 
-        client.GetCurrentPadding(out uint padding);
-        return padding >= (uint)_bufferFrameCount ? 0 : (uint)_bufferFrameCount - padding;
+        try
+        {
+            client.GetCurrentPadding(out uint padding);
+            return padding >= (uint)_bufferFrameCount ? 0 : (uint)_bufferFrameCount - padding;
+        }
+        catch (Exception exception)
+        {
+            // No room is the conservative answer for a device that cannot say how full it is, and the failure
+            // is preserved so the hand-off that asked fails on its next step instead of waiting for room for
+            // ever.
+            _clock?.ReportDeviceLost(exception);
+            return 0;
+        }
+    }
+
+    private void OnChunkWritten()
+    {
+        _submittedBlocks++;
+    }
+
+    /// <summary>
+    /// Hands this stream its level. A failure is logged whole and never latched as a device loss: the volume is a
+    /// convenience, and a volume call that failed says nothing about whether audio can still be handed over —
+    /// claiming otherwise would put this exception in front of the real one.
+    /// </summary>
+    private void ApplyVolume()
+    {
+        try
+        {
+            _volume?.Apply((float)_volumeLevel, _muted);
+        }
+        catch (Exception exception)
+        {
+            Logger.W(TAG, $"Unable to set the audio volume: {exception}");
+        }
     }
 
     private void Release()
@@ -465,6 +493,144 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
         _volume = null;
         _client = null;
         _bufferFrameCount = 0;
+    }
+
+    /// <summary>
+    /// One block being handed to the device. It writes what the device has room for and returns, so the
+    /// caller owns every wait (<see cref="IAudioSubmit"/>); nothing here sleeps, retries or gives up.
+    /// Its state is the block's own — the bytes, how far through them it is — so two hand-offs cannot
+    /// share a buffer and an abandoned one leaves nothing behind in the renderer.
+    /// </summary>
+    private sealed class WasapiAudioSubmit : IAudioSubmit
+    {
+        private readonly WasapiAudioRenderer _owner;
+        private readonly IAudioRenderClient _renderClient;
+        private readonly byte[] _staging;
+        private readonly int _byteCount;
+        private int _offset;
+        private bool _finished;
+        private PlaybackOperationResult _result = PlaybackOperationResult.Success;
+        private AudioSubmitYield _current;
+
+        internal WasapiAudioSubmit(WasapiAudioRenderer owner, IAudioRenderClient renderClient, byte[] staging, int byteCount)
+        {
+            _owner = owner;
+            _renderClient = renderClient;
+            _staging = staging;
+            _byteCount = byteCount;
+        }
+
+        public AudioSubmitYield Current => _current;
+
+        public PlaybackOperationResult Result => _result;
+
+        public bool MoveNext()
+        {
+            if (_finished)
+            {
+                return false;
+            }
+
+            if (_owner._clock is WasapiAudioClock lost && lost.DeviceLost)
+            {
+                Finish(DeviceFailure(lost, "Unable to hand audio to the device"));
+                return false;
+            }
+
+            while (true)
+            {
+                if (_offset >= _byteCount)
+                {
+                    Finish(PlaybackOperationResult.Success);
+                    return false;
+                }
+
+                uint free = _owner.GetFreeFrameCount();
+                if (free == 0)
+                {
+                    if (_owner._clock is WasapiAudioClock gone && gone.DeviceLost)
+                    {
+                        // No room because the padding read threw, not because the device is full: yielding
+                        // here would wait for a device that is never coming back.
+                        Finish(DeviceFailure(gone, "Unable to hand audio to the device"));
+                        return false;
+                    }
+
+                    // The device is full, or stopped. Which of those it is cannot be told from here and does
+                    // not need to be: the caller can see the state and the position, and its wait is the one
+                    // a pause, a seek and a stop can end.
+                    _current = AudioSubmitYield.NoRoom;
+                    return true;
+                }
+
+                int chunkFrames = Math.Min((int)free, (_byteCount - _offset) / _owner._format.BlockAlign);
+                if (chunkFrames <= 0)
+                {
+                    Finish(PlaybackOperationResult.Failure($"The audio block left {_byteCount - _offset} byte(s) that no whole frame can be made of."));
+                    return false;
+                }
+
+                int bytes = chunkFrames * _owner._format.BlockAlign;
+                try
+                {
+                    unsafe
+                    {
+                        _renderClient.GetBuffer((uint)chunkFrames, out byte* destination);
+                        Marshal.Copy(_staging, _offset, (nint)destination, bytes);
+                        _renderClient.ReleaseBuffer((uint)chunkFrames, 0);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    _owner._clock?.ReportDeviceLost(exception);
+                    Finish(PlaybackOperationResult.Failure($"Unable to queue audio: {exception.Message}", exception));
+                    return false;
+                }
+
+                _offset += bytes;
+                _owner.OnChunkWritten();
+            }
+        }
+
+        /// <summary>
+        /// Abandons a hand-off that is still suspended. What is already in the device stays there — a
+        /// renderer cannot take it back — which is why the caller flushes before it feeds another position.
+        /// </summary>
+        public void Dispose()
+        {
+            ArrayPool<byte>.Shared.Return(_staging);
+            _finished = true;
+        }
+
+        private void Finish(PlaybackOperationResult result)
+        {
+            _result = result;
+            _finished = true;
+        }
+    }
+
+    /// <summary>A hand-off that was over before it began: nothing to write, or something that went wrong.</summary>
+    private sealed class FinishedAudioSubmit : IAudioSubmit
+    {
+        private readonly PlaybackOperationResult _result;
+
+        internal FinishedAudioSubmit(PlaybackOperationResult result)
+        {
+            _result = result;
+        }
+
+        public AudioSubmitYield Current => AudioSubmitYield.NoRoom;
+
+        public PlaybackOperationResult Result => _result;
+
+        public bool MoveNext()
+        {
+            return false;
+        }
+
+        public void Dispose()
+        {
+        }
     }
 }
 
