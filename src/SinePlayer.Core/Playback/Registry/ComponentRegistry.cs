@@ -1,12 +1,9 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-using System.Collections.Generic;
-
 using SinePlayer.Core.Playback.Abstractions.Registry;
 
-namespace SinePlayer.Core.Playback.Internal.Registry;
+namespace SinePlayer.Core.Playback.Registry;
 
 /// <summary>
 /// Default registry. Registration is expected to happen while the engine is being built; reads may

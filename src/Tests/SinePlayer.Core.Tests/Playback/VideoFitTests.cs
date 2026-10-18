@@ -1,8 +1,6 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 
 namespace SinePlayer.Core.Tests.Playback;

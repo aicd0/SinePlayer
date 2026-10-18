@@ -15,7 +15,7 @@ using SinePlayer.Common.Misc;
 using SinePlayer.Common.Playback;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
-using SinePlayer.Core.Playback;
+using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;

@@ -1,11 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-using System.IO;
 using System.Runtime.InteropServices;
-
-using NUnit.Framework;
 
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;

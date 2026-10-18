@@ -6,21 +6,20 @@ using System.Collections.Generic;
 
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.Playback.WinUI;
 using SinePlayer.Common.Utils;
-using SinePlayer.Core.Playback;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
-using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Registry;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Wasapi;
-using SinePlayer.Core.Playback.Internal.Timing;
+using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Timing;
 
 namespace SinePlayer.Views.Pages.PlaybackLab;
 

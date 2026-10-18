@@ -1,17 +1,13 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 using SinePlayer.Core.Playback.Abstractions.Filter;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 
-namespace SinePlayer.Core.Playback.Internal.Selection;
+namespace SinePlayer.Core.Playback.Selection;
 
 /// <summary>
 /// Turns registered components plus facts about the media into ordered candidate lists. The pipeline

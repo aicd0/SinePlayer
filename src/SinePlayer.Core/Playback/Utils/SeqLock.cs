@@ -1,10 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-using System.Threading;
-
-namespace SinePlayer.Core.Playback.Internal;
+namespace SinePlayer.Core.Playback.Utils;
 
 /// <summary>
 /// A value that changes rarely and is read constantly: read without a lock, changed as one atomic fact.

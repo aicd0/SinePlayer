@@ -3,7 +3,7 @@
 
 using System.Diagnostics.CodeAnalysis;
 
-namespace SinePlayer.Core.Playback.Internal;
+namespace SinePlayer.Core.Playback.Pipeline;
 
 /// <summary>
 /// A queue between one stage of playback and the next: a producer adds, a consumer takes, and every entry

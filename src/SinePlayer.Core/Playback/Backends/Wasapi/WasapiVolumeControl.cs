@@ -1,8 +1,6 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-
 using Windows.Win32.Media.Audio;
 
 namespace SinePlayer.Core.Playback.Backends.Wasapi;

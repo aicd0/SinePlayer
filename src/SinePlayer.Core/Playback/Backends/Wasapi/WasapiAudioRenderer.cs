@@ -1,10 +1,8 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
 using System.Buffers;
 using System.Runtime.InteropServices;
-using System.Threading;
 
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Playback.Abstractions;
