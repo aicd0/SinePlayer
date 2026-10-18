@@ -1,23 +1,19 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Text;
-using System.Threading;
 
-using SinePlayer.Core.Playback;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
-using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Registry;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
-using SinePlayer.Core.Playback.Internal.Timing;
+using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Timing;
 
 namespace SinePlayer.Core.Tests.Playback;
 
@@ -3725,7 +3721,8 @@ public class PlaybackPipelineTests
             }
 
             set => _queuedSampleCount = value;
-        }        public PlaybackOperationResult Configure(AudioStreamInfo stream)
+        }
+        public PlaybackOperationResult Configure(AudioStreamInfo stream)
         {
             if (!CanConfigure)
             {

@@ -13,13 +13,13 @@ using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Playback.WinUI;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
-using SinePlayer.Core.Playback;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Wasapi;
-using SinePlayer.Core.Playback.Internal.Timing;
+using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Timing;
 
 namespace SinePlayer.Common.Playback;
 

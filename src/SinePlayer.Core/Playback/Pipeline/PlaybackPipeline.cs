@@ -12,10 +12,10 @@ using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
-using SinePlayer.Core.Playback.Internal;
-using SinePlayer.Core.Playback.Internal.Timing;
+using SinePlayer.Core.Playback.Timing;
+using SinePlayer.Core.Playback.Utils;
 
-namespace SinePlayer.Core.Playback;
+namespace SinePlayer.Core.Playback.Pipeline;
 
 public sealed partial class PlaybackPipeline : IDisposable
 {

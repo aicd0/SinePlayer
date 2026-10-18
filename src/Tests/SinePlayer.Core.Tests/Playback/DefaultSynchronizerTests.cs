@@ -1,10 +1,8 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-
 using SinePlayer.Core.Playback.Abstractions.Timing;
-using SinePlayer.Core.Playback.Internal.Timing;
+using SinePlayer.Core.Playback.Timing;
 
 namespace SinePlayer.Core.Tests.Playback;
 

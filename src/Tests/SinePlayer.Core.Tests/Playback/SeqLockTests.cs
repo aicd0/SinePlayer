@@ -1,12 +1,9 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading;
 
-using SinePlayer.Core.Playback.Internal;
+using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Tests.Playback;
 

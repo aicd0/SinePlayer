@@ -1,12 +1,11 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
 using System.Diagnostics;
 
 using SinePlayer.Core.Playback.Abstractions.Timing;
 
-namespace SinePlayer.Core.Playback.Internal.Timing;
+namespace SinePlayer.Core.Playback.Timing;
 
 /// <summary>
 /// A clock for playback with no audio to follow, driven by the wall clock. Audio is the better master

@@ -1,11 +1,9 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System;
-
 using SinePlayer.Core.Playback.Abstractions.Timing;
 
-namespace SinePlayer.Core.Playback.Internal.Timing;
+namespace SinePlayer.Core.Playback.Timing;
 
 /// <summary>
 /// Decides what to do with a frame by how far it is from the clock: early frames are offered again

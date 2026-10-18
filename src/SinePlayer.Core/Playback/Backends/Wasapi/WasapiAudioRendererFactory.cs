@@ -2,8 +2,8 @@
 // Licensed under the MIT License.
 
 using SinePlayer.Core.Playback.Abstractions;
-using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Registry;
+using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Backends.Wasapi;
 

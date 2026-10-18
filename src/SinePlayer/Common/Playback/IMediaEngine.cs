@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 
 using SinePlayer.Common.ErrorHandling;
-using SinePlayer.Core.Playback;
+using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Common.Playback;
 

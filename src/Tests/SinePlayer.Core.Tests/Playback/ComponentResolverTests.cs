@@ -1,17 +1,14 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-using System.Collections.Generic;
-using System.Linq;
-
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
-using SinePlayer.Core.Playback.Internal.Registry;
-using SinePlayer.Core.Playback.Internal.Selection;
+using SinePlayer.Core.Playback.Registry;
+using SinePlayer.Core.Playback.Selection;
 
 namespace SinePlayer.Core.Tests.Playback;
 

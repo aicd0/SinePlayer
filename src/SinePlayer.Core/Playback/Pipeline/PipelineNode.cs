@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
-namespace SinePlayer.Core.Playback.Internal;
+namespace SinePlayer.Core.Playback.Pipeline;
 
 /// <summary>
 /// The one place a thread of the pipeline sleeps, and the only thing another thread does to wake it.
