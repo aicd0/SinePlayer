@@ -396,10 +396,12 @@ Three consequences worth stating, because all three are load-bearing:
 What is *not* protected, deliberately: if the clock never moves, the picture never moves. That is correct —
 the sound is the leader and a picture that ran on regardless would be out of sync — and the one remaining way
 to reach it is a device that takes audio and never reports playing it. Nothing inside the engine can repair
-that, so it is reported instead, as two lines on the engine's warning event: `The audio device is not moving.`
-and, when it does, `The audio device is moving again.` The full rule set, the rules a change must not break,
-and the reasoning behind each line are in [PlaybackPipeline.md](./PlaybackPipeline.md); the review that
-produced them is in [PlaybackPipelineRefactor.md](./PlaybackPipelineRefactor.md).
+that, and nothing inside it names it either: a device that is late and a device that is broken are the same
+frozen reading from the engine's side of the call, so there is no line to raise that is not a guess. What the
+engine has instead is the shape of the freeze — `Position` stopped while the state is `Playing` and nothing is
+starving — which is in §9 and §14 of [PlaybackPipeline.md](./PlaybackPipeline.md), along with the full rule
+set, the rules a change must not break, and the reasoning behind each line; the review that produced them is
+in [PlaybackPipelineRefactor.md](./PlaybackPipelineRefactor.md).
 
 ---
 

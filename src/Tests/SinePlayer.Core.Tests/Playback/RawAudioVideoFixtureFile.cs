@@ -78,7 +78,12 @@ internal static partial class RawAudioVideoFixtureFile
 
     /// <param name="frameCount">How many video frames the file holds. The packet queue holds 64, so a file
     /// that is meant to run the reader into it needs more than that.</param>
-    internal static string Create(int frameCount = 200)
+    /// <param name="videoFramesAfterTheSound">How many of those frames come after the last sample of audio, which
+    /// is the ordinary shape of a real file: the container's duration is the longest stream's, so the picture
+    /// usually ends a frame or two after the sound, and in an edited or damaged file it can end much later.</param>
+    /// <param name="soundSecondsAfterThePicture">How much sound comes after the last video frame, which is the same
+    /// shape the other way round: a sound that runs on when the picture has ended.</param>
+    internal static string Create(int frameCount = 200, int videoFramesAfterTheSound = 0, int soundSecondsAfterThePicture = 0)
     {
         FFmpegRuntime.EnsureInitialized();
 
@@ -114,10 +119,16 @@ internal static partial class RawAudioVideoFixtureFile
             byte[] pixels = new byte[Width * Height * 3 / 2];
             byte[] samples = new byte[SamplesPerAudioPacket * Channels * sizeof(short)];
             int samplesWritten = 0;
+            int framesWithSound = Math.Max(1, frameCount - Math.Clamp(videoFramesAfterTheSound, 0, frameCount - 1));
             for (int index = 0; index < frameCount; index++)
             {
                 FillPixels(pixels, index);
                 WritePacket(muxer, videoLayout, pixels, pixels.Length, index, 1, FrameRate, PacketFlagKey);
+
+                if (index >= framesWithSound)
+                {
+                    continue;
+                }
 
                 int wanted = SampleRate * (index + 1) / FrameRate;
                 while (samplesWritten < wanted)
@@ -127,6 +138,17 @@ internal static partial class RawAudioVideoFixtureFile
                     WritePacket(muxer, audioLayout, samples, count * Channels * sizeof(short), samplesWritten, count, SampleRate, 0);
                     samplesWritten += count;
                 }
+            }
+
+            // The sound running on past the last frame: written after the picture has ended, which is where a real
+            // file puts it too — the streams are interleaved until one of them runs out.
+            int totalSamples = SampleRate * framesWithSound / FrameRate + SampleRate * Math.Max(0, soundSecondsAfterThePicture);
+            while (samplesWritten < totalSamples)
+            {
+                int count = Math.Min(SamplesPerAudioPacket, totalSamples - samplesWritten);
+                FillSamples(samples, count, samplesWritten);
+                WritePacket(muxer, audioLayout, samples, count * Channels * sizeof(short), samplesWritten, count, SampleRate, 0);
+                samplesWritten += count;
             }
 
             int trailerResult = av_write_trailer(muxer);
