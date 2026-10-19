@@ -58,6 +58,28 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private bool _autoPlayOnOpen;
+    public bool AutoPlayOnOpen
+    {
+        get => _autoPlayOnOpen;
+        set
+        {
+            _autoPlayOnOpen = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AutoPlayOnOpen)));
+        }
+    }
+
+    private bool _pauseOnLeaveTab;
+    public bool PauseOnLeaveTab
+    {
+        get => _pauseOnLeaveTab;
+        set
+        {
+            _pauseOnLeaveTab = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PauseOnLeaveTab)));
+        }
+    }
+
     private List<KeepScreenOnBehaviorEntry> _keepScreenOnBehaviors = [];
     public List<KeepScreenOnBehaviorEntry> KeepScreenOnBehaviors
     {
@@ -99,6 +121,8 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             RestoreLastPlaybackPosition = AppSettingsModel.RestoreLastPlaybackPosition;
             AutoToggleOverlaysOnCursor = AppSettingsModel.AutoToggleOverlaysOnCursor;
             AutoPlayNext = AppSettingsModel.AutoPlayNext;
+            AutoPlayOnOpen = AppSettingsModel.AutoPlayOnOpen;
+            PauseOnLeaveTab = AppSettingsModel.PauseOnLeaveTab;
         });
     }
 

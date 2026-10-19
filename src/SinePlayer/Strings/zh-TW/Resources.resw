@@ -201,6 +201,9 @@
   <data name="AutoPlayNext" xml:space="preserve">
     <value>自動播放下一個項目</value>
   </data>
+  <data name="AutoPlayOnOpen" xml:space="preserve">
+    <value>開啟媒體檔案時開始播放</value>
+  </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>自動捲動</value>
   </data>
@@ -208,7 +211,7 @@
     <value>自動切換</value>
   </data>
   <data name="AutoToggleOverlaysOnCursor" xml:space="preserve">
-    <value>根據游標位置自動顯示或隱藏未固定的浮層</value>
+    <value>根據游標位置顯示或隱藏未固定的疊加層</value>
   </data>
   <data name="Background" xml:space="preserve">
     <value>背景</value>
@@ -781,6 +784,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   </data>
   <data name="Pause" xml:space="preserve">
     <value>暫停</value>
+  </data>
+  <data name="PauseOnLeaveTab" xml:space="preserve">
+    <value>離開播放器分頁時暫停</value>
   </data>
   <data name="Pin" xml:space="preserve">
     <value>固定</value>

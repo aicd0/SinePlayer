@@ -201,6 +201,9 @@
   <data name="AutoPlayNext" xml:space="preserve">
     <value>Lire automatiquement l’élément suivant</value>
   </data>
+  <data name="AutoPlayOnOpen" xml:space="preserve">
+    <value>Démarrer la lecture à l’ouverture d’un fichier multimédia</value>
+  </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>Défilement automatique</value>
   </data>
@@ -208,7 +211,7 @@
     <value>Changement automatique</value>
   </data>
   <data name="AutoToggleOverlaysOnCursor" xml:space="preserve">
-    <value>Afficher ou masquer automatiquement les superpositions non épinglées selon la position du curseur</value>
+    <value>Afficher ou masquer les superpositions non épinglées selon la position du curseur</value>
   </data>
   <data name="Background" xml:space="preserve">
     <value>Arrière-plan</value>
@@ -783,6 +786,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="Pause" xml:space="preserve">
     <value>Pause</value>
+  </data>
+  <data name="PauseOnLeaveTab" xml:space="preserve">
+    <value>Mettre en pause en quittant l’onglet du lecteur</value>
   </data>
   <data name="Pin" xml:space="preserve">
     <value>Épingler</value>

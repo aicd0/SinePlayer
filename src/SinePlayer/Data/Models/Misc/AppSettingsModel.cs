@@ -103,6 +103,32 @@ internal static class AppSettingsModel
         }
     }
 
+    public static bool AutoPlayOnOpen
+    {
+        get
+        {
+            return _db.Read(model => model.AutoPlayOnOpen ?? true);
+        }
+        set
+        {
+            _db.Write(model => model.AutoPlayOnOpen = value);
+            _db.Save();
+        }
+    }
+
+    public static bool PauseOnLeaveTab
+    {
+        get
+        {
+            return _db.Read(model => model.PauseOnLeaveTab ?? true);
+        }
+        set
+        {
+            _db.Write(model => model.PauseOnLeaveTab = value);
+            _db.Save();
+        }
+    }
+
     public static bool PlayerMuted
     {
         get
@@ -771,6 +797,12 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("AutoPlayNext")]
         public bool? AutoPlayNext { get; set; }
+
+        [JsonPropertyName("AutoPlayOnOpen")]
+        public bool? AutoPlayOnOpen { get; set; }
+
+        [JsonPropertyName("PauseOnLeaveTab")]
+        public bool? PauseOnLeaveTab { get; set; }
 
         [JsonPropertyName("AutoSwitch")]
         public bool? AutoSwitch { get; set; }

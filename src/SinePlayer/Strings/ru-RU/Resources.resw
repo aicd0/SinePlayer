@@ -201,6 +201,9 @@
   <data name="AutoPlayNext" xml:space="preserve">
     <value>Автоматически воспроизводить следующий элемент</value>
   </data>
+  <data name="AutoPlayOnOpen" xml:space="preserve">
+    <value>Начинать воспроизведение при открытии медиафайла</value>
+  </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>Автопрокрутка</value>
   </data>
@@ -208,7 +211,7 @@
     <value>Автоматическое переключение</value>
   </data>
   <data name="AutoToggleOverlaysOnCursor" xml:space="preserve">
-    <value>Автоматически показывать или скрывать незакреплённые оверлеи в зависимости от положения курсора</value>
+    <value>Показывать или скрывать незакреплённые наложения в зависимости от положения курсора</value>
   </data>
   <data name="Background" xml:space="preserve">
     <value>Фон</value>
@@ -783,6 +786,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   </data>
   <data name="Pause" xml:space="preserve">
     <value>Пауза</value>
+  </data>
+  <data name="PauseOnLeaveTab" xml:space="preserve">
+    <value>Приостанавливать воспроизведение при переходе с вкладки плеера</value>
   </data>
   <data name="Pin" xml:space="preserve">
     <value>Закрепить</value>

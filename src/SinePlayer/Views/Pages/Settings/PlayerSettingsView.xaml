@@ -30,6 +30,14 @@
             Click="AutoPlayNextCheckBox_Click"
             Content="{x:Bind StringResource.AutoPlayNext}"
             IsChecked="{x:Bind ViewModel.AutoPlayNext, Mode=TwoWay}" />
+        <CheckBox
+            Click="AutoPlayOnOpenCheckBox_Click"
+            Content="{x:Bind StringResource.AutoPlayOnOpen}"
+            IsChecked="{x:Bind ViewModel.AutoPlayOnOpen, Mode=TwoWay}" />
+        <CheckBox
+            Click="PauseOnLeaveTabCheckBox_Click"
+            Content="{x:Bind StringResource.PauseOnLeaveTab}"
+            IsChecked="{x:Bind ViewModel.PauseOnLeaveTab, Mode=TwoWay}" />
         <Grid Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />

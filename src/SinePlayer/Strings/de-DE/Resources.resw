@@ -201,6 +201,9 @@
   <data name="AutoPlayNext" xml:space="preserve">
     <value>Nächstes Element automatisch abspielen</value>
   </data>
+  <data name="AutoPlayOnOpen" xml:space="preserve">
+    <value>Wiedergabe beim Öffnen einer Mediendatei starten</value>
+  </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>Automatisches scrollen</value>
   </data>
@@ -208,7 +211,7 @@
     <value>Automatischer wechsel</value>
   </data>
   <data name="AutoToggleOverlaysOnCursor" xml:space="preserve">
-    <value>Nicht angeheftete Overlays automatisch je nach Cursorposition ein- oder ausblenden</value>
+    <value>Nicht angeheftete Overlays je nach Cursorposition ein- oder ausblenden</value>
   </data>
   <data name="Background" xml:space="preserve">
     <value>Hintergrund</value>
@@ -783,6 +786,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   </data>
   <data name="Pause" xml:space="preserve">
     <value>Pause</value>
+  </data>
+  <data name="PauseOnLeaveTab" xml:space="preserve">
+    <value>Wiedergabe beim Verlassen des Player-Tabs pausieren</value>
   </data>
   <data name="Pin" xml:space="preserve">
     <value>Anheften</value>

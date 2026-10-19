@@ -201,6 +201,9 @@
   <data name="AutoPlayNext" xml:space="preserve">
     <value>다음 항목 자동 재생</value>
   </data>
+  <data name="AutoPlayOnOpen" xml:space="preserve">
+    <value>미디어 파일을 열면 재생 시작</value>
+  </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>자동 스크롤</value>
   </data>
@@ -208,7 +211,7 @@
     <value>자동 전환</value>
   </data>
   <data name="AutoToggleOverlaysOnCursor" xml:space="preserve">
-    <value>커서 위치에 따라 고정되지 않은 오버레이 자동 표시 또는 숨기기</value>
+    <value>커서 위치에 따라 고정되지 않은 오버레이 표시 또는 숨기기</value>
   </data>
   <data name="Background" xml:space="preserve">
     <value>배경</value>
@@ -783,6 +786,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   </data>
   <data name="Pause" xml:space="preserve">
     <value>일시정지</value>
+  </data>
+  <data name="PauseOnLeaveTab" xml:space="preserve">
+    <value>플레이어 탭을 벗어나면 일시 정지</value>
   </data>
   <data name="Pin" xml:space="preserve">
     <value>고정</value>

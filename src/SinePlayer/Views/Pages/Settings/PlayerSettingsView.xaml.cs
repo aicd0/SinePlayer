@@ -52,6 +52,24 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
+    private void AutoPlayOnOpenCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        bool? isChecked = ((CheckBox)sender).IsChecked;
+        if (isChecked.HasValue)
+        {
+            AppSettingsModel.AutoPlayOnOpen = isChecked.Value;
+        }
+    }
+
+    private void PauseOnLeaveTabCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        bool? isChecked = ((CheckBox)sender).IsChecked;
+        if (isChecked.HasValue)
+        {
+            AppSettingsModel.PauseOnLeaveTab = isChecked.Value;
+        }
+    }
+
     private void KeepScreenOnBehaviorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         int index = ((ComboBox)sender).SelectedIndex;
