@@ -1,5 +1,5 @@
 // Copyright (c) aicd0. All rights reserved.
-// Licensed under the MIT License.
+// Licensed under the GNU General Public License v3.0 or later.
 
 using System.Diagnostics;
 using System.Text;
@@ -155,7 +155,7 @@ public class PlaybackPipelineTests
     {
         // A real thirty-frame-a-second stream, so the window is used up many times over in a couple of
         // seconds rather than once every two.
-        string path = Av1FixtureFile.Create();
+        string path = VideoFixtureFile.CreateAv1();
         try
         {
             FakeVideoRenderer videoRenderer = new();
@@ -170,7 +170,7 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
-                Assert.That(videoRenderer.RenderedFrames, Is.GreaterThan(Av1FixtureFile.FrameCount / 2),
+                Assert.That(videoRenderer.RenderedFrames, Is.GreaterThan(VideoFixtureFile.FrameCount / 2),
                     "a file read into the window in several passes has to keep being shown");
             }
         }
@@ -1961,7 +1961,7 @@ public class PlaybackPipelineTests
         // A seek cannot land wherever it likes: a demuxer stops at the keyframe at or before the position
         // it was given. Anchoring the clock to the position that was asked for leaves the picture that far
         // behind the sound, every frame of it late enough to be dropped, and the picture never moves again.
-        string path = Av1FixtureFile.Create(gopSize: Av1FixtureFile.FrameCount);
+        string path = VideoFixtureFile.CreateAv1(gopSize: VideoFixtureFile.FrameCount);
         try
         {
             FFmpegSourceProviderFactory sourceFactory = new();
@@ -2026,7 +2026,7 @@ public class PlaybackPipelineTests
     [Test]
     public void KeepsTheClockWhereTheMediaPutItWhenSomethingElseChangesIt()
     {
-        string path = Av1FixtureFile.Create(gopSize: Av1FixtureFile.FrameCount);
+        string path = VideoFixtureFile.CreateAv1(gopSize: VideoFixtureFile.FrameCount);
         try
         {
             FFmpegSourceProviderFactory sourceFactory = new();

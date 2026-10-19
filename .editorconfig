@@ -20,7 +20,7 @@ insert_final_newline = false
 # Organize usings
 dotnet_separate_import_directive_groups = true
 dotnet_sort_system_directives_first = true
-file_header_template = Copyright (c) aicd0. All rights reserved.\nLicensed under the MIT License.
+file_header_template = Copyright (c) aicd0. All rights reserved.\nLicensed under the GNU General Public License v3.0 or later.
 
 # this. and Me. preferences
 dotnet_style_qualification_for_event = false:error
