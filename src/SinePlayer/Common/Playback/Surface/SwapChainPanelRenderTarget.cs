@@ -11,7 +11,7 @@ using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Core.Playback.Abstractions.Render;
 
-namespace SinePlayer.Common.Playback.WinUI;
+namespace SinePlayer.Common.Playback.Surface;
 
 /// <summary>
 /// Binds the engine's swap chain to a XAML panel. This is the only place that knows how the engine's

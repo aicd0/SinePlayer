@@ -195,6 +195,9 @@
   <data name="Auto" xml:space="preserve">
     <value>Авто</value>
   </data>
+  <data name="AutoDetectCollections" xml:space="preserve">
+    <value>Автоматически обнаруживать коллекции</value>
+  </data>
   <data name="AutoPlayNext" xml:space="preserve">
     <value>Автоматически воспроизводить следующий элемент</value>
   </data>
@@ -646,7 +649,7 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Если выбрать «добавить в список исключений», эти медиафайлы не будут импортированы повторно при следующем обновлении библиотеки.</value>
   </data>
-  <data name="MediaInfo" xml:space="preserve">
+  <data name="MediaInformation" xml:space="preserve">
     <value>Информация о медиафайле</value>
   </data>
   <data name="MediaOnThisDevice" xml:space="preserve">
@@ -795,6 +798,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>Ваша очередь воспроизведения появится здесь</value>
+  </data>
+  <data name="PlaybackInformation" xml:space="preserve">
+    <value>Информация о воспроизведении</value>
   </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Общие настройки проигрывателя</value>
@@ -1076,6 +1082,9 @@ $info</value>
   </data>
   <data name="Untitled" xml:space="preserve">
     <value>Безымянный</value>
+  </data>
+  <data name="UseFolderNameAsTitle" xml:space="preserve">
+    <value>Использовать имя папки в качестве названия, если в ней только один элемент</value>
   </data>
   <data name="UseSystemLanguage" xml:space="preserve">
     <value>Использовать системный язык</value>

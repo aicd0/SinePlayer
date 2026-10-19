@@ -195,6 +195,9 @@
   <data name="Auto" xml:space="preserve">
     <value>Auto</value>
   </data>
+  <data name="AutoDetectCollections" xml:space="preserve">
+    <value>Detectar colecciones automáticamente</value>
+  </data>
   <data name="AutoPlayNext" xml:space="preserve">
     <value>Reproducir automáticamente el siguiente elemento</value>
   </data>
@@ -646,7 +649,7 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Si seleccionas «añadir a la lista de exclusión», estos archivos multimedia no se volverán a importar la próxima vez que se actualice la biblioteca.</value>
   </data>
-  <data name="MediaInfo" xml:space="preserve">
+  <data name="MediaInformation" xml:space="preserve">
     <value>Información multimedia</value>
   </data>
   <data name="MediaOnThisDevice" xml:space="preserve">
@@ -795,6 +798,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>Tu cola de reproducción aparecerá aquí</value>
+  </data>
+  <data name="PlaybackInformation" xml:space="preserve">
+    <value>Información de reproducción</value>
   </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Configuración global del reproductor</value>
@@ -1076,6 +1082,9 @@ $info</value>
   </data>
   <data name="Untitled" xml:space="preserve">
     <value>Intitulado</value>
+  </data>
+  <data name="UseFolderNameAsTitle" xml:space="preserve">
+    <value>Usar el nombre de la carpeta como título si contiene un solo elemento</value>
   </data>
   <data name="UseSystemLanguage" xml:space="preserve">
     <value>Utilizar el lenguaje del sistema</value>

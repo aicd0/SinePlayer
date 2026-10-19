@@ -8,7 +8,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
 using SinePlayer.Common.BaseUI;
-using SinePlayer.Common.Playback.WinUI;
+using SinePlayer.Common.Playback.Surface;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;

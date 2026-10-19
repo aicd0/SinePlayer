@@ -1,0 +1,165 @@
+// Copyright (c) aicd0. All rights reserved.
+// Licensed under the MIT License.
+
+using System;
+using System.Collections.Generic;
+
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+
+using SinePlayer.Common.BaseUI;
+using SinePlayer.Common.Constants;
+using SinePlayer.Common.ErrorHandling;
+using SinePlayer.Common.Playback;
+using SinePlayer.Common.Utils;
+using SinePlayer.Core.Common.Utils;
+using SinePlayer.Views.Pages.Sidebar.MediaInfo;
+
+namespace SinePlayer.Views.Pages.Sidebar.PlaybackInfo;
+
+internal sealed partial class PlaybackInfoPage : BasePage
+{
+    private const int RefreshIntervalMilliseconds = 500;
+
+    private readonly PlaybackInfoPageViewModel ViewModel = new();
+
+    private readonly List<TextBlock?> _valueCells = [];
+
+    private IPlaybackInfoProvider? _provider;
+    private DispatcherQueueTimer? _timer;
+
+    private int _builtStructureVersion = -1;
+
+    public PlaybackInfoPage()
+    {
+        InitializeComponent();
+    }
+
+    protected override void OnStart(PageBundle bundle)
+    {
+        base.OnStart(bundle);
+
+        GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaChanged).ObserveSticky(this, args =>
+        {
+            _provider = args.PlaybackInfoProvider;
+            Refresh();
+        });
+
+        _timer = DispatcherQueue.CreateTimer();
+        _timer.Interval = TimeSpan.FromMilliseconds(RefreshIntervalMilliseconds);
+        _timer.Tick += Timer_Tick;
+        _timer.Start();
+
+        Refresh();
+    }
+
+    protected override void OnResume()
+    {
+        base.OnResume();
+        _timer?.Start();
+        Refresh();
+    }
+
+    protected override void OnPause()
+    {
+        base.OnPause();
+        _timer?.Stop();
+    }
+
+    protected override void OnStop()
+    {
+        base.OnStop();
+
+        if (_timer is not null)
+        {
+            _timer.Stop();
+            _timer.Tick -= Timer_Tick;
+            _timer = null;
+        }
+
+        _provider = null;
+    }
+
+    private void Timer_Tick(DispatcherQueueTimer sender, object args)
+    {
+        Refresh();
+    }
+
+    private void CopyButton_Click(object sender, RoutedEventArgs e)
+    {
+        ErrorResult copied = ClipboardUtils.SetText(ViewModel.BuildCopyText());
+        copied.DisplayErrorMessage(PageActionHandler);
+    }
+
+    private void Refresh()
+    {
+        ViewModel.Update(_provider);
+
+        if (_builtStructureVersion != ViewModel.StructureVersion)
+        {
+            _builtStructureVersion = ViewModel.StructureVersion;
+            BuildTable();
+            return;
+        }
+
+        WriteValues();
+    }
+
+    private void BuildTable()
+    {
+        TableGrid.Children.Clear();
+        TableGrid.RowDefinitions.Clear();
+        _valueCells.Clear();
+
+        IReadOnlyList<PlaybackInfoRow> rows = ViewModel.Rows;
+        for (int index = 0; index < rows.Count; index++)
+        {
+            PlaybackInfoRow row = rows[index];
+            TableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            if (row.IsGroup)
+            {
+                TextBlock title = CreateCell("GroupTitleText", row.Name);
+                Grid.SetRow(title, index);
+                Grid.SetColumnSpan(title, 2);
+                TableGrid.Children.Add(title);
+                _valueCells.Add(null);
+                continue;
+            }
+
+            TextBlock name = CreateCell("NameText", row.Name);
+            Grid.SetRow(name, index);
+            Grid.SetColumn(name, 0);
+            TableGrid.Children.Add(name);
+
+            TextBlock value = CreateCell("ValueText", row.Value);
+            Grid.SetRow(value, index);
+            Grid.SetColumn(value, 1);
+            TableGrid.Children.Add(value);
+
+            _valueCells.Add(value);
+        }
+    }
+
+    private void WriteValues()
+    {
+        IReadOnlyList<PlaybackInfoRow> rows = ViewModel.Rows;
+        for (int index = 0; index < rows.Count && index < _valueCells.Count; index++)
+        {
+            if (_valueCells[index] is TextBlock value)
+            {
+                value.Text = rows[index].Value;
+            }
+        }
+    }
+
+    private TextBlock CreateCell(string styleKey, string text)
+    {
+        return new TextBlock
+        {
+            Style = (Style)Resources[styleKey],
+            Text = text,
+        };
+    }
+}

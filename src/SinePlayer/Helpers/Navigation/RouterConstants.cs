@@ -21,6 +21,7 @@ internal static class RouterConstants
     public const string HOST_SIDE_PANE_FILTER_PRESETS = "side_pane_filter_presets";
     public const string HOST_SIDE_PANE_PLAY_QUEUE = "side_pane_play_queue";
     public const string HOST_SIDE_PANE_MEDIA_INFO = "side_pane_media_info";
+    public const string HOST_SIDE_PANE_PLAYBACK_INFO = "side_pane_playback_info";
     public const string HOST_DEV_TOOLS = "dev_tools";
     public const string HOST_PLAYBACK_LAB = "playback_lab";
 

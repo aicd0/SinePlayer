@@ -195,6 +195,9 @@
   <data name="Auto" xml:space="preserve">
     <value>Auto</value>
   </data>
+  <data name="AutoDetectCollections" xml:space="preserve">
+    <value>Détecter automatiquement les collections</value>
+  </data>
   <data name="AutoPlayNext" xml:space="preserve">
     <value>Lire automatiquement l’élément suivant</value>
   </data>
@@ -646,7 +649,7 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>En sélectionnant « ajouter à la liste d’exclusion », ces fichiers multimédias ne seront pas importés à nouveau lors de la prochaine mise à jour de la bibliothèque.</value>
   </data>
-  <data name="MediaInfo" xml:space="preserve">
+  <data name="MediaInformation" xml:space="preserve">
     <value>Informations sur le média</value>
   </data>
   <data name="MediaOnThisDevice" xml:space="preserve">
@@ -795,6 +798,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>Votre file d’attente de lecture apparaîtra ici</value>
+  </data>
+  <data name="PlaybackInformation" xml:space="preserve">
+    <value>Informations de lecture</value>
   </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Paramètres généraux du lecteur</value>
@@ -1076,6 +1082,9 @@ $info</value>
   </data>
   <data name="Untitled" xml:space="preserve">
     <value>Anonyme</value>
+  </data>
+  <data name="UseFolderNameAsTitle" xml:space="preserve">
+    <value>Utiliser le nom du dossier comme titre lorsque celui-ci ne contient qu’un seul élément</value>
   </data>
   <data name="UseSystemLanguage" xml:space="preserve">
     <value>Utiliser la langue du système</value>

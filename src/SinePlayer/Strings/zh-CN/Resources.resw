@@ -195,6 +195,9 @@
   <data name="Auto" xml:space="preserve">
     <value>自动</value>
   </data>
+  <data name="AutoDetectCollections" xml:space="preserve">
+    <value>自动检测合集</value>
+  </data>
   <data name="AutoPlayNext" xml:space="preserve">
     <value>自动播放下一项</value>
   </data>
@@ -646,7 +649,7 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>选择“添加到排除列表”后，下次更新媒体库时将不会再次导入这些媒体文件。</value>
   </data>
-  <data name="MediaInfo" xml:space="preserve">
+  <data name="MediaInformation" xml:space="preserve">
     <value>媒体信息</value>
   </data>
   <data name="MediaOnThisDevice" xml:space="preserve">
@@ -795,6 +798,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>你的播放队列将显示在这里</value>
+  </data>
+  <data name="PlaybackInformation" xml:space="preserve">
+    <value>播放信息</value>
   </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>播放器全局设置</value>
@@ -1076,6 +1082,9 @@ $info</value>
   </data>
   <data name="Untitled" xml:space="preserve">
     <value>未命名</value>
+  </data>
+  <data name="UseFolderNameAsTitle" xml:space="preserve">
+    <value>文件夹中只有一个项目时，使用文件夹名称作为标题</value>
   </data>
   <data name="UseSystemLanguage" xml:space="preserve">
     <value>使用系统语言</value>

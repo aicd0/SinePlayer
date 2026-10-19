@@ -67,11 +67,21 @@
 
         <!--  Media info  -->
         <AppBarButton
-            Click="OnMediaInfoClick"
+            Click="MediaInfoButton_Click"
             Style="{StaticResource NavigationPageTopTileAppBarButton}"
-            ToolTipService.ToolTip="{x:Bind StringResource.MediaInfo}">
+            ToolTipService.ToolTip="{x:Bind StringResource.MediaInformation}">
             <AppBarButton.Content>
                 <FontIcon Glyph="&#xE946;" />
+            </AppBarButton.Content>
+        </AppBarButton>
+
+        <!--  Playback info  -->
+        <AppBarButton
+            Click="PlaybackInfoButton_Click"
+            Style="{StaticResource NavigationPageTopTileAppBarButton}"
+            ToolTipService.ToolTip="{x:Bind StringResource.PlaybackInformation}">
+            <AppBarButton.Content>
+                <FontIcon Glyph="&#xE9D9;" />
             </AppBarButton.Content>
         </AppBarButton>
 

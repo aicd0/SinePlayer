@@ -45,6 +45,7 @@ GetWindowRect
 IAudioClient
 IAudioClock
 IAudioRenderClient
+IAudioStreamVolume
 ID3D11Device
 ID3D11DeviceContext
 ID3D11PixelShader
@@ -61,7 +62,6 @@ IDXGISwapChain2
 IMMDevice
 IMMDeviceEnumerator
 INVALID_HANDLE_VALUE
-IAudioStreamVolume
 LocalFree
 MONITORINFOEXW
 MessageBox

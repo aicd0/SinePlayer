@@ -73,7 +73,7 @@ internal sealed partial class MediaInfoPage : BasePage
             ViewModel.Reload();
         });
 
-        GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaInfoChanged).ObserveSticky(this, args =>
+        GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaChanged).ObserveSticky(this, args =>
         {
             ViewModel.SetMedia(args.Media);
             ViewModel.SetImageDescriptions(args.ImageDescriptions);

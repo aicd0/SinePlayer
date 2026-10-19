@@ -7,7 +7,6 @@ using System.IO;
 using System.Threading.Tasks;
 
 using SinePlayer.Common.ErrorHandling;
-using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Storage;
 
 using Windows.ApplicationModel.DataTransfer;
@@ -18,11 +17,12 @@ namespace SinePlayer.Common.Utils;
 
 internal static class ClipboardUtils
 {
-    private const string TAG = nameof(ClipboardUtils);
     private const string TEMP_FOLDER_NAME = "Clipboard";
 
-    public static void SetText(string text)
+    public static ErrorResult SetText(string text)
     {
+        var err = ErrorLogger.Create(nameof(SetText));
+
         try
         {
             var dataPackage = new DataPackage();
@@ -32,8 +32,10 @@ internal static class ClipboardUtils
         }
         catch (Exception ex)
         {
-            Logger.E(TAG, "Failed to set clipboard text.", ex);
+            return err.Error(ex);
         }
+
+        return err.Success();
     }
 
     public static async Task<ErrorResult> SetImage(Stream stream)
