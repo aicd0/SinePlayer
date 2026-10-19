@@ -35,6 +35,7 @@ public class StringResourceProvider
     public string Auto => GetResourceString("Auto");
     public string AutoDetectCollections => GetResourceString("AutoDetectCollections");
     public string AutoPlayNext => GetResourceString("AutoPlayNext");
+    public string AutoPlayOnOpen => GetResourceString("AutoPlayOnOpen");
     public string AutoScrolling => GetResourceString("AutoScrolling");
     public string AutoSwitch => GetResourceString("AutoSwitch");
     public string AutoToggleOverlaysOnCursor => GetResourceString("AutoToggleOverlaysOnCursor");
@@ -193,6 +194,7 @@ public class StringResourceProvider
     public string OpenUserDataFolder => GetResourceString("OpenUserDataFolder");
     public string OverwriteExistingEntries => GetResourceString("OverwriteExistingEntries");
     public string Pause => GetResourceString("Pause");
+    public string PauseOnLeaveTab => GetResourceString("PauseOnLeaveTab");
     public string Pin => GetResourceString("Pin");
     public string Play => GetResourceString("Play");
     public string PlayPause => GetResourceString("PlayPause");

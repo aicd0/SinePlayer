@@ -201,6 +201,9 @@
   <data name="AutoPlayNext" xml:space="preserve">
     <value>Reproducir automáticamente el siguiente elemento</value>
   </data>
+  <data name="AutoPlayOnOpen" xml:space="preserve">
+    <value>Iniciar la reproducción al abrir un archivo multimedia</value>
+  </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>Desplazamiento automático</value>
   </data>
@@ -208,7 +211,7 @@
     <value>Cambio automático</value>
   </data>
   <data name="AutoToggleOverlaysOnCursor" xml:space="preserve">
-    <value>Mostrar u ocultar automáticamente las superposiciones no fijadas según la posición del cursor</value>
+    <value>Mostrar u ocultar las superposiciones no fijadas según la posición del cursor</value>
   </data>
   <data name="Background" xml:space="preserve">
     <value>Fondo</value>
@@ -783,6 +786,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="Pause" xml:space="preserve">
     <value>Pausa</value>
+  </data>
+  <data name="PauseOnLeaveTab" xml:space="preserve">
+    <value>Pausar al salir de la pestaña del reproductor</value>
   </data>
   <data name="Pin" xml:space="preserve">
     <value>Fijar</value>

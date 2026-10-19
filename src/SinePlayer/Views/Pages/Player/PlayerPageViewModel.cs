@@ -27,10 +27,13 @@ namespace SinePlayer.Views.Pages.Player;
 internal partial class PlayerPageViewModel : INotifyPropertyChanged
 {
     private const long POSITION_SAVE_INTERVAL = 5000;
+    private const int VOLUME_SAVE_DELAY_MS = 500;
     private const long POSITION_UI_INTERVAL = 200;
     private const long ALMOST_ENDED_THRESHOLD_MS = 5000;
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
+    private bool _volumeSaveScheduled;
+    private bool _playbackPendingOnActivate;
 
     // Media status
     private MediaModel? _media;
@@ -200,13 +203,9 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     public void Destory()
     {
-        SaveCurrentPosition();
         Playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
-        _isInitialized = false;
-        _pendingMedia = null;
-        _pendingStartPositionMs = -1;
-        SaveVolumeAndMute();
-        _isPageActive = false;
+
+        SaveCurrentPosition();
         UpdateKeepScreenOn();
 
         IMediaEngine? engine = _engine;
@@ -220,6 +219,11 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             engine.ErrorOccurred -= Engine_ErrorOccurred;
             engine.Dispose();
         }
+
+        _isInitialized = false;
+        _pendingMedia = null;
+        _pendingStartPositionMs = -1;
+        _isPageActive = false;
     }
 
     public void LoadPlayQueue(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
@@ -240,9 +244,29 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     public void Pause()
     {
-        _engine?.Pause();
+        if (AppSettingsModel.PauseOnLeaveTab)
+        {
+            _engine?.Pause();
+        }
+
         SaveCurrentPosition();
-        SaveVolumeAndMute();
+    }
+
+    public void SetPageActive(bool isPageActive)
+    {
+        _isPageActive = isPageActive;
+        UpdateKeepScreenOn();
+
+        if (isPageActive && _playbackPendingOnActivate)
+        {
+            _playbackPendingOnActivate = false;
+            _engine?.Play();
+        }
+    }
+
+    public void RefreshKeepScreenOn()
+    {
+        UpdateKeepScreenOn();
     }
 
     public void TogglePlayPause()
@@ -316,6 +340,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         int clampedVolume = Math.Clamp(volume, 0, 100);
         engine.SetVolume(clampedVolume / 100.0);
         VolumeLiveData.Emit(clampedVolume);
+        SaveVolumeAndMute();
     }
 
     public void AdjustVolume(int delta)
@@ -333,6 +358,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
         engine.SetMuted(isMuted);
         MuteLiveData.Emit(isMuted);
+        SaveVolumeAndMute();
     }
 
     public void SetIsFavorite(bool isFavorite, bool writeDatabase)
@@ -424,36 +450,9 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             playback: Playback.ToBuilder());
     }
 
-    private void Playback_PlaybackStateChanged(PlaybackStateChangedEventArgs args)
-    {
-        IsPlaybackNextEnabled = Playback.CanGoNext;
-        IsPlaybackPreviousEnabled = Playback.CanGoPrevious;
-
-        PlayQueueModel.PlayQueueItem? playQueueItem = Playback.CurrentItem;
-        if (playQueueItem is null)
-        {
-            PlayerStatusLiveData.Emit(new()
-            {
-                Status = PlayerStatusEnum.Error,
-                Description = "The play queue is empty.",
-            });
-        }
-        else if (playQueueItem.Media != _media || args.Reason == PlaybackStateChangeReason.Refresh)
-        {
-            PlayerStatusLiveData.Emit(new()
-            {
-                Status = PlayerStatusEnum.Loading,
-            });
-
-            LoadMedia(new()
-            {
-                Media = playQueueItem.Media,
-                PlaybackArgs = args,
-            });
-        }
-
-        PlaybackChangeLiveData.Emit(true);
-    }
+    //
+    // Load
+    //
 
     private void LoadMedia(LoadMediaArgs args)
     {
@@ -535,21 +534,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private void SaveCurrentPosition()
-    {
-        MediaModel? media = _media;
-        IMediaEngine? engine = _engine;
-        if (media is null || engine is null || media.IsExternal)
-        {
-            return;
-        }
-
-        long positionMs = engine.Position.Ticks / TimeSpan.TicksPerMillisecond;
-        long durationMs = engine.Duration.Ticks / TimeSpan.TicksPerMillisecond;
-        int progress = durationMs > 0 ? (int)Math.Clamp(positionMs * 100 / durationMs, 0, 100) : -1;
-        CoroutineUtils.Run(async () => await media.SetProgress(progress, positionMs));
-    }
-
     private static long ResolveStartPositionMs(MediaModel media, PlaybackStateChangedEventArgs args)
     {
         long overridePositionMs = args.InitialPositionMs;
@@ -578,6 +562,10 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
                 }
         }
     }
+
+    //
+    // Engine
+    //
 
     private IMediaEngine EnsureEngine()
     {
@@ -672,7 +660,18 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
         PositionLiveData.Emit(startPositionMs > 0 ? startPositionMs : 0);
         PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Working });
-        engine.Play();
+
+        if (AppSettingsModel.AutoPlayOnOpen)
+        {
+            if (_isPageActive)
+            {
+                engine.Play();
+            }
+            else
+            {
+                _playbackPendingOnActivate = true;
+            }
+        }
     }
 
     private void Engine_MediaEnded()
@@ -704,38 +703,9 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         });
     }
 
-    private void UpdateFavoriteStatusInternal(MediaModel media)
-    {
-        bool isFavorite = !media.IsExternal && FavoriteModel.Instance.FromId(media.Id) != null;
-        SetIsFavorite(isFavorite, false);
-    }
-
     //
-    // Player state
+    // Screen on
     //
-
-    public void SetPageActive(bool isPageActive)
-    {
-        _isPageActive = isPageActive;
-        UpdateKeepScreenOn();
-    }
-
-    public void RefreshKeepScreenOn()
-    {
-        UpdateKeepScreenOn();
-    }
-
-    private void SaveVolumeAndMute()
-    {
-        IMediaEngine? engine = _engine;
-        if (engine is null)
-        {
-            return;
-        }
-
-        AppSettingsModel.PlayerVolume = engine.Volume;
-        AppSettingsModel.PlayerMuted = engine.IsMuted;
-    }
 
     private void UpdateKeepScreenOn()
     {
@@ -767,6 +737,86 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos => IsPlaying && media is not null && media.Type == MediaType.Video,
             _ => false,
         };
+    }
+
+    //
+    // Misc
+    //
+
+    private void Playback_PlaybackStateChanged(PlaybackStateChangedEventArgs args)
+    {
+        IsPlaybackNextEnabled = Playback.CanGoNext;
+        IsPlaybackPreviousEnabled = Playback.CanGoPrevious;
+
+        PlayQueueModel.PlayQueueItem? playQueueItem = Playback.CurrentItem;
+        if (playQueueItem is null)
+        {
+            PlayerStatusLiveData.Emit(new()
+            {
+                Status = PlayerStatusEnum.Error,
+                Description = "The play queue is empty.",
+            });
+        }
+        else if (playQueueItem.Media != _media || args.Reason == PlaybackStateChangeReason.Refresh)
+        {
+            PlayerStatusLiveData.Emit(new()
+            {
+                Status = PlayerStatusEnum.Loading,
+            });
+
+            LoadMedia(new()
+            {
+                Media = playQueueItem.Media,
+                PlaybackArgs = args,
+            });
+        }
+
+        PlaybackChangeLiveData.Emit(true);
+    }
+
+    private void SaveCurrentPosition()
+    {
+        MediaModel? media = _media;
+        IMediaEngine? engine = _engine;
+        if (media is null || engine is null || media.IsExternal)
+        {
+            return;
+        }
+
+        long positionMs = engine.Position.Ticks / TimeSpan.TicksPerMillisecond;
+        long durationMs = engine.Duration.Ticks / TimeSpan.TicksPerMillisecond;
+        int progress = durationMs > 0 ? (int)Math.Clamp(positionMs * 100 / durationMs, 0, 100) : -1;
+        CoroutineUtils.Run(async () => await media.SetProgress(progress, positionMs));
+    }
+
+    private void SaveVolumeAndMute()
+    {
+        if (_volumeSaveScheduled)
+        {
+            return;
+        }
+
+        _volumeSaveScheduled = true;
+        CoroutineUtils.Run(async () =>
+        {
+            await Task.Delay(VOLUME_SAVE_DELAY_MS);
+            _volumeSaveScheduled = false;
+
+            IMediaEngine? engine = _engine;
+            if (engine is null)
+            {
+                return;
+            }
+
+            AppSettingsModel.PlayerVolume = engine.Volume;
+            AppSettingsModel.PlayerMuted = engine.IsMuted;
+        });
+    }
+
+    private void UpdateFavoriteStatusInternal(MediaModel media)
+    {
+        bool isFavorite = !media.IsExternal && FavoriteModel.Instance.FromId(media.Id) != null;
+        SetIsFavorite(isFavorite, false);
     }
 
     //

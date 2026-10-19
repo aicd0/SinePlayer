@@ -201,6 +201,9 @@
   <data name="AutoPlayNext" xml:space="preserve">
     <value>次の項目を自動再生</value>
   </data>
+  <data name="AutoPlayOnOpen" xml:space="preserve">
+    <value>メディアファイルを開いたときに再生を開始</value>
+  </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>自動スクロール</value>
   </data>
@@ -208,7 +211,7 @@
     <value>自動切り替え</value>
   </data>
   <data name="AutoToggleOverlaysOnCursor" xml:space="preserve">
-    <value>カーソルの位置に応じて固定されていないオーバーレイを自動的に表示・非表示</value>
+    <value>カーソルの位置に応じて固定されていないオーバーレイを表示・非表示</value>
   </data>
   <data name="Background" xml:space="preserve">
     <value>背景</value>
@@ -783,6 +786,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="Pause" xml:space="preserve">
     <value>一時停止</value>
+  </data>
+  <data name="PauseOnLeaveTab" xml:space="preserve">
+    <value>プレーヤーのタブを離れたときに一時停止</value>
   </data>
   <data name="Pin" xml:space="preserve">
     <value>ピン留めする</value>

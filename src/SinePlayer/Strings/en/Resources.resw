@@ -201,6 +201,9 @@
   <data name="AutoPlayNext" xml:space="preserve">
     <value>Play the next item automatically</value>
   </data>
+  <data name="AutoPlayOnOpen" xml:space="preserve">
+    <value>Start playing when a media file is opened</value>
+  </data>
   <data name="AutoScrolling" xml:space="preserve">
     <value>Auto scrolling</value>
   </data>
@@ -208,7 +211,7 @@
     <value>Auto switch</value>
   </data>
   <data name="AutoToggleOverlaysOnCursor" xml:space="preserve">
-    <value>Automatically show or hide unpinned overlays based on cursor position</value>
+    <value>Show or hide unpinned overlays based on cursor position</value>
   </data>
   <data name="Background" xml:space="preserve">
     <value>Background</value>
@@ -783,6 +786,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="Pause" xml:space="preserve">
     <value>Pause</value>
+  </data>
+  <data name="PauseOnLeaveTab" xml:space="preserve">
+    <value>Pause when leaving the player tab</value>
   </data>
   <data name="Pin" xml:space="preserve">
     <value>Pin</value>
