@@ -195,6 +195,9 @@
   <data name="Auto" xml:space="preserve">
     <value>自動</value>
   </data>
+  <data name="AutoDetectCollections" xml:space="preserve">
+    <value>コレクションを自動検出</value>
+  </data>
   <data name="AutoPlayNext" xml:space="preserve">
     <value>次の項目を自動再生</value>
   </data>
@@ -646,7 +649,7 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>「除外リストに追加」を選択すると、次回ライブラリを更新したときに、これらのメディアファイルは再インポートされません。</value>
   </data>
-  <data name="MediaInfo" xml:space="preserve">
+  <data name="MediaInformation" xml:space="preserve">
     <value>メディア情報</value>
   </data>
   <data name="MediaOnThisDevice" xml:space="preserve">
@@ -795,6 +798,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>再生キューがここに表示されます</value>
+  </data>
+  <data name="PlaybackInformation" xml:space="preserve">
+    <value>再生情報</value>
   </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>プレーヤーの全般設定</value>
@@ -1076,6 +1082,9 @@ $info</value>
   </data>
   <data name="Untitled" xml:space="preserve">
     <value>名前なし</value>
+  </data>
+  <data name="UseFolderNameAsTitle" xml:space="preserve">
+    <value>項目が1つだけのフォルダーではフォルダー名をタイトルとして使用</value>
   </data>
   <data name="UseSystemLanguage" xml:space="preserve">
     <value>システム言語を使用する</value>

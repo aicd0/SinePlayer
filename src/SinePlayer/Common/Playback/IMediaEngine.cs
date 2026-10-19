@@ -29,6 +29,8 @@ internal interface IMediaEngine : IDisposable
 
     double PlaybackRate { get; }
 
+    IPlaybackInfoProvider PlaybackInfoProvider { get; }
+
     //
     // Events
     //

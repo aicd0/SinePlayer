@@ -99,6 +99,7 @@ internal sealed partial class PlayerPage : BasePage
         AddToActiveTabs();
         UpdateOverlayState();
         ViewModel.SetPageActive(true);
+        SyncCurrentMedia();
         FocusPlayer();
     }
 
@@ -123,7 +124,8 @@ internal sealed partial class PlayerPage : BasePage
         var bar = new PlayerNavigationBar();
         bar.Initialize(GetMainWindowAbility());
         bar.FavoriteChanged += isFavorite => ViewModel.SetIsFavorite(isFavorite, true);
-        bar.InfoPaneExpanded += OpenMediaInfoPane;
+        bar.MediaInfoRequested += OpenMediaInfoPane;
+        bar.PlaybackInfoRequested += ShowPlaybackInfo;
         GetMainPageAbility().SetCustomCenteredNavigationBar(bar);
         _navigationBar = bar;
     }
@@ -243,12 +245,7 @@ internal sealed partial class PlayerPage : BasePage
                 _navigationBar?.SetPlayerSettings(media);
             }
 
-            GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaInfoChanged).Emit(new()
-            {
-                Media = media,
-                PlayQueue = ViewModel.PlayQueue,
-                ImageDescriptions = [],
-            });
+            SyncCurrentMedia();
         }, new ObserveOptions()
         {
             PublishBehavior = LiveDataPublishBehavior.ActiveOnStart,
@@ -632,14 +629,25 @@ internal sealed partial class PlayerPage : BasePage
 
     private void OpenMediaInfoPane()
     {
-        GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaInfoChanged).Emit(new()
+        GetMainPageAbility().SetSidePanePage(SidebarView.ITEM_MEDIA_INFO);
+        GetMainPageAbility().SetSidePaneOpenState(true, force: true);
+    }
+
+    private void ShowPlaybackInfo()
+    {
+        GetMainPageAbility().SetSidePanePage(SidebarView.ITEM_PLAYBACK_INFO);
+        GetMainPageAbility().SetSidePaneOpenState(true, force: true);
+    }
+
+    private void SyncCurrentMedia()
+    {
+        GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaChanged).Emit(new()
         {
             Media = ViewModel.Media,
             PlayQueue = ViewModel.PlayQueue,
             ImageDescriptions = [],
+            PlaybackInfoProvider = ViewModel.GetPlaybackInfo(),
         });
-        GetMainPageAbility().SetSidePanePage(SidebarView.ITEM_MEDIA_INFO);
-        GetMainPageAbility().SetSidePaneOpenState(true, force: true);
     }
 
     private void ToggleFullscreen()

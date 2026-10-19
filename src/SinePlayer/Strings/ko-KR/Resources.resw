@@ -195,6 +195,9 @@
   <data name="Auto" xml:space="preserve">
     <value>자동</value>
   </data>
+  <data name="AutoDetectCollections" xml:space="preserve">
+    <value>컬렉션 자동 감지</value>
+  </data>
   <data name="AutoPlayNext" xml:space="preserve">
     <value>다음 항목 자동 재생</value>
   </data>
@@ -646,7 +649,7 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>'제외 목록에 추가'를 선택하면 다음에 라이브러리를 업데이트할 때 해당 미디어 파일을 다시 가져오지 않습니다.</value>
   </data>
-  <data name="MediaInfo" xml:space="preserve">
+  <data name="MediaInformation" xml:space="preserve">
     <value>미디어 정보</value>
   </data>
   <data name="MediaOnThisDevice" xml:space="preserve">
@@ -795,6 +798,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>재생 대기열이 여기에 표시됩니다</value>
+  </data>
+  <data name="PlaybackInformation" xml:space="preserve">
+    <value>재생 정보</value>
   </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>플레이어 전역 설정</value>
@@ -1076,6 +1082,9 @@ $info</value>
   </data>
   <data name="Untitled" xml:space="preserve">
     <value>이름 없음</value>
+  </data>
+  <data name="UseFolderNameAsTitle" xml:space="preserve">
+    <value>항목이 하나만 있는 폴더에서는 폴더 이름을 제목으로 사용</value>
   </data>
   <data name="UseSystemLanguage" xml:space="preserve">
     <value>시스템 언어 사용</value>

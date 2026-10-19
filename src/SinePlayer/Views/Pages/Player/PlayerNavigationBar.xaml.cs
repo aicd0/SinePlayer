@@ -18,8 +18,11 @@ internal sealed partial class PlayerNavigationBar : BaseUserControl
     public delegate void FavoriteChangedEventHandler(bool isFavorite);
     public event FavoriteChangedEventHandler? FavoriteChanged;
 
-    public delegate void InfoPaneExpandedEventHandler();
-    public event InfoPaneExpandedEventHandler? InfoPaneExpanded;
+    public delegate void MediaInfoRequestedEventHandler();
+    public event MediaInfoRequestedEventHandler? MediaInfoRequested;
+
+    public delegate void PlaybackInfoRequestedEventHandler();
+    public event PlaybackInfoRequestedEventHandler? PlaybackInfoRequested;
 
     public delegate void PlayerSettingsChangedEventHandler(PlayerSettingsModel settings);
     public event PlayerSettingsChangedEventHandler? PlayerSettingsChanged;
@@ -65,9 +68,14 @@ internal sealed partial class PlayerNavigationBar : BaseUserControl
         SetFavorite(!_isFavorite);
     }
 
-    private void OnMediaInfoClick(object sender, RoutedEventArgs e)
+    private void MediaInfoButton_Click(object sender, RoutedEventArgs e)
     {
-        InfoPaneExpanded?.Invoke();
+        MediaInfoRequested?.Invoke();
+    }
+
+    private void PlaybackInfoButton_Click(object sender, RoutedEventArgs e)
+    {
+        PlaybackInfoRequested?.Invoke();
     }
 
     private void PlayerSettingFlyout_Closing(FlyoutBase sender, FlyoutBaseClosingEventArgs args)

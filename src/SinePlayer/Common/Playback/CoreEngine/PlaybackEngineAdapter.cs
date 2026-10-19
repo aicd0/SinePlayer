@@ -10,7 +10,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Common.ErrorHandling;
-using SinePlayer.Common.Playback.WinUI;
+using SinePlayer.Common.Playback.Surface;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
@@ -21,7 +21,7 @@ using SinePlayer.Core.Playback.Backends.Wasapi;
 using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Core.Playback.Timing;
 
-namespace SinePlayer.Common.Playback;
+namespace SinePlayer.Common.Playback.CoreEngine;
 
 /// <summary>
 /// Presents <see cref="PlaybackPipeline"/> through the port the player page has always used. The page goes
@@ -51,6 +51,8 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
     private SwapChainPanelRenderTarget? _renderTarget;
     private PlaybackPipeline? _pipeline;
     private DispatcherQueueTimer? _positionTimer;
+
+    private readonly PlaybackInfoHandle _playbackInfo = new();
     private MediaEngineState _state = MediaEngineState.None;
     private bool _isDisposed;
 
@@ -66,6 +68,8 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
 
     /// <summary>The rate the engine plays at, which is the one rate it can honestly report.</summary>
     public double PlaybackRate => 1.0;
+
+    public IPlaybackInfoProvider PlaybackInfoProvider => _playbackInfo;
 
     public event Action<MediaEngineState>? StateChanged;
     public event Action? PositionChanged;
@@ -88,6 +92,7 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
         {
             PlaybackPipeline pipeline = CreatePipeline();
             _pipeline = pipeline;
+            _playbackInfo.Attach(pipeline);
 
             // Warnings are heard as they happen — during the open for something left out of it, and later for
             // a device that stops moving. They were only ever looked at once, at load, before.
@@ -245,6 +250,9 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
         }
 
         _isDisposed = true;
+
+        // Close detaches the handle before it disposes the pipeline, so a pane that is still open reads "nothing"
+        // from here on without reaching this object at all.
         Close();
         _renderTarget?.Dispose();
         _renderTarget = null;
@@ -273,6 +281,11 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
 
         PlaybackPipeline? pipeline = _pipeline;
         _pipeline = null;
+
+        // Before the pipeline is disposed: a pane that is still open reads on its own timer, and the handle must
+        // answer "nothing" from here on without reaching the pipeline at all.
+        _playbackInfo.Detach();
+
         if (pipeline is not null)
         {
             pipeline.StateChanged -= OnPipelineStateChanged;

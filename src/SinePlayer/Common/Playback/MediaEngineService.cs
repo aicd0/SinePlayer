@@ -1,6 +1,8 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the MIT License.
 
+using SinePlayer.Common.Playback.CoreEngine;
+
 namespace SinePlayer.Common.Playback;
 
 /// <summary>

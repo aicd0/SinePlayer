@@ -10,5 +10,5 @@ internal class EventId
     public const string TitleBarOpacity = "TitleBarOpacity";
     public const string CloseTab = "CloseTab";
     public const string PlaybackChanged = "PlaybackChanged";
-    public const string MediaInfoChanged = "MediaInfoChanged";
+    public const string MediaChanged = "MediaChanged";
 }

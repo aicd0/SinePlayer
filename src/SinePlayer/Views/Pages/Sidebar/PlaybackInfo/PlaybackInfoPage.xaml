@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<base:BasePage
+    x:Class="SinePlayer.Views.Pages.Sidebar.PlaybackInfo.PlaybackInfoPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:base="using:SinePlayer.Common.BaseUI"
+    xmlns:converters="using:SinePlayer.Converters"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:SinePlayer.Views.Pages.Sidebar.PlaybackInfo"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Styles/AppBarButton.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <converters:BooleanToVisibilityNegationConverter x:Key="BooleanToVisibilityNegationConverter" />
+
+            <Style x:Key="GroupTitleText" TargetType="TextBlock">
+                <Setter Property="Margin" Value="0,16,0,4" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="Foreground" Value="{ThemeResource ForegroundGrey2}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="NameText" TargetType="TextBlock">
+                <Setter Property="Margin" Value="0,4,16,0" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontWeight" Value="SemiLight" />
+                <Setter Property="Foreground" Value="{ThemeResource ForegroundGrey2}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="ValueText" TargetType="TextBlock">
+                <Setter Property="Margin" Value="0,4,0,0" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="IsTextSelectionEnabled" Value="True" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+        </ResourceDictionary>
+    </Page.Resources>
+
+    <Grid>
+        <TextBlock
+            Margin="0,10"
+            HorizontalAlignment="Center"
+            FontWeight="SemiBold"
+            Text="{x:Bind StringResource.NoContent}"
+            Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
+
+        <ScrollViewer
+            Padding="16,0"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollBarVisibility="Auto"
+            Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay, Converter={StaticResource BooleanToVisibilityNegationConverter}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid x:Name="TableGrid" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                </Grid>
+
+                <Button
+                    Grid.Row="1"
+                    Margin="0,16,0,16"
+                    HorizontalAlignment="Left"
+                    Click="CopyButton_Click"
+                    Content="{x:Bind StringResource.Copy}" />
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</base:BasePage>

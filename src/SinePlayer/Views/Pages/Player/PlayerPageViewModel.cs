@@ -233,6 +233,11 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         return EnsureEngine().CreateVideoSurface();
     }
 
+    public IPlaybackInfoProvider? GetPlaybackInfo()
+    {
+        return _engine?.PlaybackInfoProvider;
+    }
+
     public void Pause()
     {
         _engine?.Pause();

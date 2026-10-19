@@ -138,6 +138,10 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public bool HasAudio => _audioStreamInfo is not null;
 
+    public bool IsVideoHardwareAccelerated => _videoDecoder?.IsHardwareAccelerated ?? false;
+
+    public bool IsAudioHardwareAccelerated => _audioDecoder?.IsHardwareAccelerated ?? false;
+
     public TimeSpan Duration => _info?.Duration ?? TimeSpan.Zero;
 
     public TimeSpan Position => _clock.Position;

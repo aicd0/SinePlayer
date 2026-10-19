@@ -155,7 +155,7 @@ public class StringResourceProvider
     public string LinkErrorTitle => GetResourceString("LinkErrorTitle");
     public string Links => GetResourceString("Links");
     public string MediaExclusionExplaination => GetResourceString("MediaExclusionExplaination");
-    public string MediaInfo => GetResourceString("MediaInfo");
+    public string MediaInformation => GetResourceString("MediaInformation");
     public string MediaOnThisDevice => GetResourceString("MediaOnThisDevice");
     public string MergeSingleItemGroups => GetResourceString("MergeSingleItemGroups");
     public string Miscellaneous => GetResourceString("Miscellaneous");
@@ -198,6 +198,7 @@ public class StringResourceProvider
     public string PlayPause => GetResourceString("PlayPause");
     public string PlayQueue => GetResourceString("PlayQueue");
     public string PlayQueueEmpty => GetResourceString("PlayQueueEmpty");
+    public string PlaybackInformation => GetResourceString("PlaybackInformation");
     public string PlayerSettings => GetResourceString("PlayerSettings");
     public string PlayerStatusError => GetResourceString("PlayerStatusError");
     public string PlayerStatusLoading => GetResourceString("PlayerStatusLoading");

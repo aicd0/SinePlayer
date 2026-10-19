@@ -649,7 +649,7 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Selecting "add to exclusion list" will prevent these media files from being imported again the next time the library is updated.</value>
   </data>
-  <data name="MediaInfo" xml:space="preserve">
+  <data name="MediaInformation" xml:space="preserve">
     <value>Media information</value>
   </data>
   <data name="MediaOnThisDevice" xml:space="preserve">
@@ -798,6 +798,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>Your play queue appears here</value>
+  </data>
+  <data name="PlaybackInformation" xml:space="preserve">
+    <value>Playback information</value>
   </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Global player configurations</value>

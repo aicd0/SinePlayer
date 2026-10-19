@@ -37,7 +37,7 @@
             <!--  Information  -->
             <ScrollViewer
                 Grid.Row="0"
-                Padding="15,0,15,0"
+                Padding="16,0"
                 VerticalScrollBarVisibility="Auto">
                 <StackPanel Orientation="Vertical">
                     <Grid Height="34" />

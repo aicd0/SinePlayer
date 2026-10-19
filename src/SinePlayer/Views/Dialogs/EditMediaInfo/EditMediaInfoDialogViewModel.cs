@@ -544,7 +544,7 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
     {
         if (!IsCollectionOnlyMode)
         {
-            return StringResourceProvider.Instance.MediaInfo;
+            return StringResourceProvider.Instance.MediaInformation;
         }
 
         if (IsCreationMode)
