@@ -25,4 +25,4 @@ Sine Player can be extended with plugins (written in C#). See [Sine Player Plugi
 If Sine Player is not working properly, you can [submit an issue on GitHub](https://github.com/aicd0/SinePlayer/issues/new/choose). If you know how to fix an issue, it is also encouraged to create a [pull request](https://github.com/aicd0/SinePlayer/pulls) for it.
 
 ## License
-Licensed under the [MIT License](LICENSE.md).
+Licensed under the [GNU General Public License v3.0 or later](LICENSE.md).

@@ -1,5 +1,5 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
-// Licensed under the MIT License.
+// Licensed under the GNU General Public License v3.0 or later.
 
 // Licensed to the Microsoft Corporation under one or more agreements.
 // The Microsoft Corporation licenses this file to you under the MIT license.
