@@ -112,7 +112,7 @@ src/SinePlayer.Core/Playback/
 Namespaces match folders exactly (`SinePlayer.Core.Playback.Abstractions.Decode`, …), which makes the
 isolation rules below visible in every type name.
 
-### 4.2 Dependency rules (enforced by review; by test in S16)
+### 4.2 Dependency rules (enforced by review, and by the architecture test from S16)
 
 ```
 Abstractions      → BCL + SinePlayer.Core.Common        (nothing else)
@@ -3493,7 +3493,7 @@ done, and track selection — the one scenario with no fallout on the others —
 | **S14d** ✅ | Component selection rework (added during S14; not in the original plan) | The resolver as the only source of what to use, and `Reconcile` as the only way to change what is playing | medium — five rounds, see below |
 | **S14e** ✅ | Failure and resynchronisation: a device failure is a warning and a fallback rather than the end of playback, a rebuilt chain restarts at the position playback is at, and the read-ahead stops depending on a renderer telling the truth. Supersedes parts of S14d. | Suite + eight new tests | medium — see below |
 | **S15** | Audio filter chain + volume filter | Volume and mute applied in the chain by the host, so no renderer has to provide them — and `Volume` is gone from the pipeline | medium |
-| **S16** | Isolation hardening | Architecture test fails on an FFmpeg type crossing the boundary | small |
+| **S16** ✅ | Isolation hardening | Architecture test fails on an FFmpeg type crossing the boundary | small |
 
 Sequencing notes:
 
@@ -4008,16 +4008,27 @@ keep working, now reading the player's own level. Nothing is localized beyond wh
 *What it does not cover.* Video effects (v2), filters that change the sample format, per-stream effect selection
 beyond master volume, and enabling or disabling an effect without the restart `Reconcile` performs.
 
-**S16 — Isolation hardening.** *Small, and it turns a rule that is currently true by discipline into a gate.*
+**S16 — Isolation hardening.** *Done. Small, and it turns a rule that was true by discipline into a gate.*
 
-*What was measured:* scanning the engine outside `Backends/FFmpeg` for FFmpeg names finds exactly one mention, in a
-doc comment quoting libavcodec — no type crosses the boundary today. §4.2 is therefore honoured, but by review
-only.
+*What was measured.* Scanning the engine outside `Backends/FFmpeg` for FFmpeg names finds exactly one mention, in a
+doc comment quoting libavcodec — no type crossed the boundary by the time this step was written either.
 
-*What to add:* a test over the engine assembly's types and member signatures asserting that nothing outside
-`SinePlayer.Core.Playback.Backends.FFmpeg` mentions the interop namespace or the backend's types. That is the
-cheapest insurance in the plan against the failure it was written for: a backend detail leaking upward until the
-design is FFmpeg-shaped without anyone deciding that.
+*What it adds.* `ArchitectureTests.NoFFmpegTypeCrossesTheEngineBoundary` walks every type in `SinePlayer.Core` that
+is not in `Backends.FFmpeg` and asks what each one is made of: its base type and interfaces, its fields, properties
+and events, the return type and parameters of every method and constructor, and the constraints of every generic
+parameter — all of them including private members, because a backend detail kept in a private field is exactly the
+drift the rule exists for. A type from the backend namespace reached directly, as an array or pointer element, as a
+generic argument (`List<AVFrame>`), or as a constraint fails the test, and the message names the member and the type
+so the report is a fix rather than an investigation. The test first asserts that the assembly really holds the
+backend, so a scan that found nothing cannot pass by finding nothing.
+
+*Verified.* Green on the tree, and proved non-vacuous the only way that counts: an `internal static AVFrame
+LeakProbe` planted on `PlaybackPipeline` made it fail with `PlaybackPipeline.LeakProbe → …Interop.AVFrame`, and it
+passed again once the probe was removed. 251 tests, x64 and ARM64 clean.
+
+*What is still by review.* The other half of §4.2 — no WinUI type in the engine — has no test. It is true today (the
+engine assembly references no `Microsoft.UI` type at all) and can be added to the same scan when there is a reason
+to; the rule it protects is about the app-side presentation host, which is where a whitelist would be needed.
 
 ### Phase 4 — v2
 
