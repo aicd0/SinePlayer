@@ -648,7 +648,9 @@ Decisions worth reviewing:
 3. **A frame that omits a plane it claims is rejected up front** rather than sampled as garbage; the
    error names the format. A test asserts the rejection.
 4. **The Lab is a page, not a window**, registered as `playback_lab` behind the same developer-mode
-   gate as the dev tools page, with a menu entry beside it. It picks a file, opens it with
+   gate as the dev tools page, with a menu entry beside it (**since moved: the Lab is opened by a button on the
+   Dev tools page**, which is where developer surfaces belong, so the main menu carries one entry instead of two).
+   It picks a file, opens it with
    `FFmpegSourceProviderFactory`, creates a decoder with `FFmpegVideoDecoderFactory`, creates a
    renderer with `D3D11VideoRendererFactory`, and runs a frame timer that reads packets, decodes and
    renders. That is a hand-written version of what `PlaybackPipeline` (S8) will do, which is why the
@@ -1533,7 +1535,7 @@ fraction of a millisecond the measurement says it is, and `dropped` staying at z
 decode. If `render` stays at 18 ms, the wait is somewhere else and this entry is wrong — the honest thing for
 the record to say.
 
-*Also recorded:* §13 of [PlaybackPipeline.md](./PlaybackPipeline.md) now says what `AverageRenderMilliseconds`
+*Also recorded:* §13 of [PlaybackPipeline.md](./PlaybackPipeline.md) now says what `AverageVideoRenderMilliseconds`
 contains and warns that a figure near the frame interval may be a wait hiding inside a stage rather than a
 stage that is slow — the mistake this report was one step away from. §4.3 gained "the display is a consumer,
 not a clock" as a rule, and §11 gained the row with the measurement.

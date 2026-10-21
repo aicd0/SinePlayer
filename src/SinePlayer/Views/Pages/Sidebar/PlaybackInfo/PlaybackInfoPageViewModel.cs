@@ -66,79 +66,73 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             rows.Add(PlaybackInfoRow.Group(key, name));
         }
 
-        Group("group.media", "Media");
-        Add("media.container", "Container", media.ContainerId);
-        Add("media.length", "Length", FormatTime(media.Duration));
+        Group("group.media", StringResource.Media);
+        Add("media.container", StringResource.Container, media.ContainerId);
+        Add("media.duration", StringResource.Duration, FormatTime(media.Duration));
         if (media.Bitrate > 0)
         {
-            Add("media.bitrate", "Bit rate", FormatBitrate(media.Bitrate));
+            Add("media.bitrate", StringResource.BitRate, FormatBitrate(media.Bitrate));
         }
 
         foreach (VideoStreamInfo video in media.VideoStreams)
         {
-            Group("group.video", "Video");
-            Add("video.codec", "Codec", FormatCodec(video));
-            Add("video.resolution", "Resolution", video.Width + "×" + video.Height);
+            Group("group.video", StringResource.Video);
+            Add("video.codec", StringResource.Codec, FormatCodec(video));
+            Add("video.resolution", StringResource.Resolution, video.Width + "×" + video.Height);
             if (video.FrameRate > 0)
             {
-                Add("video.framerate", "Frame rate", video.FrameRate.ToString("0.###", CultureInfo.InvariantCulture) + " fps");
+                Add("video.framerate", StringResource.FrameRate, video.FrameRate.ToString("0.###", CultureInfo.InvariantCulture) + " fps");
             }
 
-            Add("video.pixelformat", "Pixel format", video.PixelFormat.ToString().ToLowerInvariant());
+            Add("video.pixelformat", StringResource.PixelFormat, video.PixelFormat.ToString().ToLowerInvariant());
             if (video.BitDepth > 0)
             {
-                Add("video.bitdepth", "Bit depth", video.BitDepth.ToString(CultureInfo.InvariantCulture));
+                Add("video.bitdepth", StringResource.BitDepth, video.BitDepth.ToString(CultureInfo.InvariantCulture));
             }
 
             if (video.RotationDegrees != 0)
             {
-                Add("video.rotation", "Rotation", video.RotationDegrees.ToString(CultureInfo.InvariantCulture) + "°");
+                Add("video.rotation", StringResource.Rotation, video.RotationDegrees.ToString(CultureInfo.InvariantCulture) + "°");
             }
 
             if (video.Bitrate > 0)
             {
-                Add("video.bitrate", "Bit rate", FormatBitrate(video.Bitrate));
+                Add("video.bitrate", StringResource.BitRate, FormatBitrate(video.Bitrate));
             }
 
-            Add("video.decoder", "Decoder", info.IsVideoHardwareAccelerated ? "Hardware" : "Software");
+            Add("video.decoder", StringResource.Decoder, info.VideoDecoderName ?? StringResource.None);
+            Add("video.decoder.mode", StringResource.DecodeMode, info.IsVideoHardwareAccelerated ? StringResource.Hardware : StringResource.Software);
+            Add("video.renderer", StringResource.Renderer, info.VideoRendererName ?? StringResource.None);
         }
 
         foreach (AudioStreamInfo audio in media.AudioStreams)
         {
-            Group("group.audio", "Audio");
-            Add("audio.codec", "Codec", FormatCodec(audio));
-            Add("audio.samplerate", "Sample rate", audio.SampleRate.ToString(CultureInfo.InvariantCulture) + " Hz");
-            Add("audio.channels", "Channels", audio.ChannelCount.ToString(CultureInfo.InvariantCulture));
-            Add("audio.layout", "Channel layout", audio.ChannelLayout.ToString().ToLowerInvariant());
-            Add("audio.sampleformat", "Sample format", audio.SampleFormat.ToString().ToLowerInvariant());
+            Group("group.audio", StringResource.Audio);
+            Add("audio.codec", StringResource.Codec, FormatCodec(audio));
+            Add("audio.samplerate", StringResource.SampleRate, audio.SampleRate.ToString(CultureInfo.InvariantCulture) + " Hz");
+            Add("audio.channels", StringResource.Channels, audio.ChannelCount.ToString(CultureInfo.InvariantCulture));
+            Add("audio.layout", StringResource.ChannelLayout, audio.ChannelLayout.ToString().ToLowerInvariant());
+            Add("audio.sampleformat", StringResource.SampleFormat, audio.SampleFormat.ToString().ToLowerInvariant());
             if (audio.Bitrate > 0)
             {
-                Add("audio.bitrate", "Bit rate", FormatBitrate(audio.Bitrate));
+                Add("audio.bitrate", StringResource.BitRate, FormatBitrate(audio.Bitrate));
             }
 
-            Add("audio.decoder", "Decoder", info.IsAudioHardwareAccelerated ? "Hardware" : "Software");
+            Add("audio.decoder", StringResource.Decoder, info.AudioDecoderName ?? StringResource.None);
+            Add("audio.decoder.mode", StringResource.DecodeMode, info.IsAudioHardwareAccelerated ? StringResource.Hardware : StringResource.Software);
+            Add("audio.renderer", StringResource.Renderer, info.AudioRendererName ?? StringResource.None);
         }
 
-        Group("group.playback", "Playback");
-        Add("playback.state", "State", info.State.ToString() + (string.IsNullOrEmpty(info.Error) ? string.Empty : $" ({info.Error})"));
-        Add("playback.position", "Position", FormatTime(info.Position));
-        Add("playback.presented", "Presented frames", info.PresentedFrames.ToString(CultureInfo.InvariantCulture));
-        Add("playback.dropped", "Dropped frames", info.DroppedFrames.ToString(CultureInfo.InvariantCulture));
-        if (info.DisplayedFrames is long displayed)
-        {
-            Add("playback.displayed", "Displayed frames", displayed.ToString(CultureInfo.InvariantCulture));
-        }
+        Group("group.playback", StringResource.Playback);
+        Add("playback.state", StringResource.State, info.State.ToString() + (string.IsNullOrEmpty(info.Error) ? string.Empty : $" ({info.Error})"));
+        Add("playback.position", StringResource.Position, FormatTime(info.Position));
+        Add("playback.presented", StringResource.PresentedFrames, info.PresentedFrames.ToString(CultureInfo.InvariantCulture));
+        Add("playback.dropped", StringResource.DroppedFrames, info.DroppedFrames.ToString(CultureInfo.InvariantCulture));
 
-        Add("playback.lag", "Picture lag", FormatMilliseconds(info.PictureLag.TotalMilliseconds));
-        Add("playback.decode", "Decode time", FormatMilliseconds(info.AverageDecodeMilliseconds));
-        Add("playback.render", "Render time", FormatMilliseconds(info.AverageRenderMilliseconds));
-        if (!string.IsNullOrEmpty(info.StarvedFor))
-        {
-            Add("playback.starved", "Waiting for", info.StarvedFor == "video" ? "Video" : "Audio");
-        }
-
-        Add("playback.volume", "Volume", Math.Round(info.Volume * 100.0).ToString(CultureInfo.InvariantCulture) + "%");
-        Add("playback.muted", "Muted", info.IsMuted ? "Yes" : "No");
+        Add("playback.lag", StringResource.PictureLag, FormatMilliseconds(info.PictureLag.TotalMilliseconds));
+        Add("playback.decode.video", StringResource.VideoDecodeTime, FormatMilliseconds(info.AverageVideoDecodeMilliseconds));
+        Add("playback.render.video", StringResource.VideoRenderTime, FormatMilliseconds(info.AverageVideoRenderMilliseconds));
+        Add("playback.underruns", StringResource.AudioUnderruns, info.AudioUnderruns.ToString(CultureInfo.InvariantCulture));
 
         Apply(rows, keys);
     }

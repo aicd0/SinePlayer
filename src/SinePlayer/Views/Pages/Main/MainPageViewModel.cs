@@ -135,11 +135,6 @@ internal partial class MainPageViewModel : INotifyPropertyChanged
         OpenDeveloperPage(RouterConstants.HOST_DEV_TOOLS);
     }
 
-    public void OpenPlaybackLab()
-    {
-        OpenDeveloperPage(RouterConstants.HOST_PLAYBACK_LAB);
-    }
-
     private void OpenDeveloperPage(string host)
     {
         if (!DebugUtils.DeveloperMode)
@@ -277,13 +272,6 @@ internal partial class MainPageViewModel : INotifyPropertyChanged
                 Icon = new FontIconSource() { Glyph = "\uEC7A" },
                 ShortcutAction = KeyboardShortcutActions.OpenDevTools,
                 Click = OpenDevTools,
-            });
-
-            items.Add(new SimpleMenuFlyoutItemModel()
-            {
-                Text = "Playback lab",
-                Icon = new FontIconSource() { Glyph = "\uE7F4" },
-                Click = OpenPlaybackLab,
             });
         }
 

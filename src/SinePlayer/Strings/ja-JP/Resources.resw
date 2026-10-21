@@ -192,6 +192,12 @@
   <data name="Ascending" xml:space="preserve">
     <value>上昇</value>
   </data>
+  <data name="Audio" xml:space="preserve">
+    <value>オーディオ</value>
+  </data>
+  <data name="AudioUnderruns" xml:space="preserve">
+    <value>音声バッファー不足</value>
+  </data>
   <data name="Auto" xml:space="preserve">
     <value>自動</value>
   </data>
@@ -222,6 +228,12 @@
   <data name="BackgroundImage" xml:space="preserve">
     <value>背景画像</value>
   </data>
+  <data name="BitDepth" xml:space="preserve">
+    <value>ビット深度</value>
+  </data>
+  <data name="BitRate" xml:space="preserve">
+    <value>ビットレート</value>
+  </data>
   <data name="Calculating" xml:space="preserve">
     <value>計算中...</value>
   </data>
@@ -230,6 +242,12 @@
   </data>
   <data name="Category" xml:space="preserve">
     <value>カテゴリ</value>
+  </data>
+  <data name="ChannelLayout" xml:space="preserve">
+    <value>チャンネル配置</value>
+  </data>
+  <data name="Channels" xml:space="preserve">
+    <value>チャンネル数</value>
   </data>
   <data name="CheckForUpdates" xml:space="preserve">
     <value>アップデートを確認</value>
@@ -257,6 +275,9 @@
   </data>
   <data name="CloseWindow" xml:space="preserve">
     <value>ウィンドウを閉じる</value>
+  </data>
+  <data name="Codec" xml:space="preserve">
+    <value>コーデック</value>
   </data>
   <data name="CollapseAll" xml:space="preserve">
     <value>すべて折りたたむ</value>
@@ -288,6 +309,9 @@
   <data name="CompletionStatusPlanned" xml:space="preserve">
     <value>予定</value>
   </data>
+  <data name="Container" xml:space="preserve">
+    <value>コンテナ</value>
+  </data>
   <data name="Continuous" xml:space="preserve">
     <value>連続</value>
   </data>
@@ -317,6 +341,12 @@
   </data>
   <data name="DebugModeWarning" xml:space="preserve">
     <value>デバッグモードを有効にすると、アプリケーションが不安定になる可能性があります。続行してもよろしいですか?</value>
+  </data>
+  <data name="DecodeMode" xml:space="preserve">
+    <value>デコードモード</value>
+  </data>
+  <data name="Decoder" xml:space="preserve">
+    <value>デコーダー</value>
   </data>
   <data name="Default" xml:space="preserve">
     <value>デフォルト</value>
@@ -364,6 +394,9 @@ $files</value>
   </data>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>GitHubからプラグインをダウンロード</value>
+  </data>
+  <data name="DroppedFrames" xml:space="preserve">
+    <value>ドロップフレーム数</value>
   </data>
   <data name="Duration" xml:space="preserve">
     <value>再生時間</value>
@@ -513,6 +546,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="Folders" xml:space="preserve">
     <value>フォルダー</value>
   </data>
+  <data name="FrameRate" xml:space="preserve">
+    <value>フレームレート</value>
+  </data>
   <data name="FunctionAverage" xml:space="preserve">
     <value>平均</value>
   </data>
@@ -542,6 +578,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="Group" xml:space="preserve">
     <value>グループ化</value>
+  </data>
+  <data name="Hardware" xml:space="preserve">
+    <value>ハードウェア</value>
   </data>
   <data name="Help" xml:space="preserve">
     <value>ヘルプ</value>
@@ -625,6 +664,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="LastVisitTime" xml:space="preserve">
     <value>前回のアクセス日時</value>
   </data>
+  <data name="Library" xml:space="preserve">
+    <value>ライブラリ</value>
+  </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>現在のフィルタ条件では結果が見つかりません。</value>
   </data>
@@ -633,9 +675,6 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="LibraryEmptyPart3.Text" xml:space="preserve">
     <value>を試してください。</value>
-  </data>
-  <data name="LibraryHeader.Text" xml:space="preserve">
-    <value>図書館</value>
   </data>
   <data name="License" xml:space="preserve">
     <value>ライセンス</value>
@@ -648,6 +687,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="Links" xml:space="preserve">
     <value>リンク</value>
+  </data>
+  <data name="Media" xml:space="preserve">
+    <value>メディア</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>「除外リストに追加」を選択すると、次回ライブラリを更新したときに、これらのメディアファイルは再インポートされません。</value>
@@ -790,8 +832,14 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="PauseOnLeaveTab" xml:space="preserve">
     <value>プレーヤーのタブを離れたときに一時停止</value>
   </data>
+  <data name="PictureLag" xml:space="preserve">
+    <value>映像遅延</value>
+  </data>
   <data name="Pin" xml:space="preserve">
     <value>ピン留めする</value>
+  </data>
+  <data name="PixelFormat" xml:space="preserve">
+    <value>ピクセル形式</value>
   </data>
   <data name="Play" xml:space="preserve">
     <value>再生</value>
@@ -804,6 +852,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>再生キューがここに表示されます</value>
+  </data>
+  <data name="Playback" xml:space="preserve">
+    <value>再生</value>
   </data>
   <data name="PlaybackInformation" xml:space="preserve">
     <value>再生情報</value>
@@ -828,6 +879,12 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>プラグイン</value>
+  </data>
+  <data name="Position" xml:space="preserve">
+    <value>再生位置</value>
+  </data>
+  <data name="PresentedFrames" xml:space="preserve">
+    <value>表示済みフレーム数</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>キーの組み合わせを押してください</value>
@@ -883,6 +940,9 @@ $plugins</value>
   <data name="RemoveUnreachableItems" xml:space="preserve">
     <value>アクセスできない項目を自動的に削除</value>
   </data>
+  <data name="Renderer" xml:space="preserve">
+    <value>レンダラー</value>
+  </data>
   <data name="RepeatAll" xml:space="preserve">
     <value>リピート：すべて</value>
   </data>
@@ -907,6 +967,9 @@ $plugins</value>
   <data name="ResetPlayerSettings" xml:space="preserve">
     <value>プレーヤーの設定をリセット</value>
   </data>
+  <data name="Resolution" xml:space="preserve">
+    <value>解像度</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>復元</value>
   </data>
@@ -925,6 +988,12 @@ $plugins</value>
   <data name="SafeModeMessage" xml:space="preserve">
     <value>前回、アプリは正常に終了しませんでした。
 セーフモードで起動しますか？</value>
+  </data>
+  <data name="SampleFormat" xml:space="preserve">
+    <value>サンプル形式</value>
+  </data>
+  <data name="SampleRate" xml:space="preserve">
+    <value>サンプルレート</value>
   </data>
   <data name="Save" xml:space="preserve">
     <value>保存</value>
@@ -1004,11 +1073,17 @@ $plugins</value>
   <data name="ShuffleStable" xml:space="preserve">
     <value>シャッフル（安定）</value>
   </data>
+  <data name="Software" xml:space="preserve">
+    <value>ソフトウェア</value>
+  </data>
   <data name="Sort" xml:space="preserve">
     <value>ソート</value>
   </data>
   <data name="SortingFunction" xml:space="preserve">
     <value>ソート機能</value>
+  </data>
+  <data name="State" xml:space="preserve">
+    <value>状態</value>
   </data>
   <data name="Statistics" xml:space="preserve">
     <value>統計</value>
@@ -1097,6 +1172,15 @@ $info</value>
   </data>
   <data name="Vertical" xml:space="preserve">
     <value>垂直</value>
+  </data>
+  <data name="Video" xml:space="preserve">
+    <value>ビデオ</value>
+  </data>
+  <data name="VideoDecodeTime" xml:space="preserve">
+    <value>映像デコード時間</value>
+  </data>
+  <data name="VideoRenderTime" xml:space="preserve">
+    <value>映像レンダリング時間</value>
   </data>
   <data name="ViewType" xml:space="preserve">
     <value>ビュー</value>

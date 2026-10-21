@@ -91,15 +91,15 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         SelectorBarItem selectedItem = sender.SelectedItem;
         if (selectedItem == SelectorBarItem1)
         {
-            selectedTabKey = "General";
-            GeneralSettingsGrid.Visibility = Visibility.Visible;
-            SecondSettingsGrid.Visibility = Visibility.Collapsed;
+            selectedTabKey = "Video";
+            VideoSettingsGrid.Visibility = Visibility.Visible;
+            AudioSettingsGrid.Visibility = Visibility.Collapsed;
         }
         else if (selectedItem == SelectorBarItem2)
         {
-            selectedTabKey = "Second";
-            SecondSettingsGrid.Visibility = Visibility.Visible;
-            GeneralSettingsGrid.Visibility = Visibility.Collapsed;
+            selectedTabKey = "Audio";
+            AudioSettingsGrid.Visibility = Visibility.Visible;
+            VideoSettingsGrid.Visibility = Visibility.Collapsed;
         }
 
         AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).Set(RegistryNames.StateKey.SELECTED_PLAYER_SETTINGS_TAB, selectedTabKey);
@@ -183,8 +183,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateUIInternal()
     {
-        ViewModel.GeneralTabTitle = StringResourceProvider.Instance.General;
-        ViewModel.SecondTabTitle = StringResourceProvider.Instance.Image;
+        ViewModel.VideoTabTitle = StringResource.Video;
+        ViewModel.AudioTabTitle = StringResource.Audio;
 
         PresetDropDownButton.Flyout = CreatePresetContextMenu(_mediaSettings);
         PresetDropDownButton.Content = _mediaSettings.PresetKey == PlayerSettingsModel.PRESET_KEY_CUSTOM ?
@@ -201,11 +201,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         if (presets.Count == 0)
         {
-            presets.Add(new Tuple<string, string>(StringResourceProvider.Instance.Default, PlayerSettingsModel.PRESET_KEY_DEFAULT));
+            presets.Add(new Tuple<string, string>(StringResource.Default, PlayerSettingsModel.PRESET_KEY_DEFAULT));
         }
 
         presets.Sort((a, b) => StringComparer.CurrentCultureIgnoreCase.Compare(a.Item1, b.Item1));
-        presets.Add(new Tuple<string, string>(StringResourceProvider.Instance.Custom, PlayerSettingsModel.PRESET_KEY_CUSTOM));
+        presets.Add(new Tuple<string, string>(StringResource.Custom, PlayerSettingsModel.PRESET_KEY_CUSTOM));
 
         List<BaseMenuFlyoutItemModel> items = [];
         foreach (Tuple<string, string> preset in presets)

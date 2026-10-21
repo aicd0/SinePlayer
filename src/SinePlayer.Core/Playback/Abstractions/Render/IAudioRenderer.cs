@@ -11,6 +11,8 @@ public interface IAudioRenderer : IDisposable
 {
     string Name { get; }
 
+    long UnderrunCount { get; }
+
     IPlaybackClock Clock { get; }
 
     long QueuedSampleCount { get; }

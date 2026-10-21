@@ -269,58 +269,51 @@ public sealed class FFmpegSource : IMediaSource
         MediaStreamKind kind = FFmpegInterop.ToStreamKind(parameters->CodecType);
         string codecId = FFmpegInterop.GetCodecId(parameters->CodecId);
 
-        switch (kind)
+        return kind switch
         {
-            case MediaStreamKind.Video:
-                return new VideoStreamInfo
-                {
-                    Index = stream->Index,
-                    CodecId = codecId,
-                    Profile = FFmpegInterop.GetProfileName(parameters->CodecId, parameters->Profile),
-                    Language = FFmpegInterop.GetMetadata(stream->Metadata, "language"),
-                    Title = FFmpegInterop.GetMetadata(stream->Metadata, "title"),
-                    Bitrate = parameters->BitRate,
-                    IsDefault = (stream->Disposition & DispositionDefault) != 0,
-                    Width = parameters->Width,
-                    Height = parameters->Height,
-                    FrameRate = ResolveFrameRate(stream, parameters),
-                    PixelFormat = FFmpegInterop.ToPixelFormat(parameters->Format),
-                    BitDepth = parameters->BitsPerRawSample,
-                };
-
-            case MediaStreamKind.Audio:
-                return new AudioStreamInfo
-                {
-                    Index = stream->Index,
-                    CodecId = codecId,
-                    Profile = FFmpegInterop.GetProfileName(parameters->CodecId, parameters->Profile),
-                    Language = FFmpegInterop.GetMetadata(stream->Metadata, "language"),
-                    Title = FFmpegInterop.GetMetadata(stream->Metadata, "title"),
-                    Bitrate = parameters->BitRate,
-                    IsDefault = (stream->Disposition & DispositionDefault) != 0,
-                    SampleRate = parameters->SampleRate,
-                    ChannelCount = parameters->ChannelLayout.ChannelCount,
-                    ChannelLayout = FFmpegInterop.ToChannelLayout(parameters->ChannelLayout.ChannelCount),
-                    SampleFormat = FFmpegInterop.ToSampleFormat(parameters->Format),
-                };
-
-            case MediaStreamKind.Subtitle:
-                return new SubtitleStreamInfo
-                {
-                    Index = stream->Index,
-                    CodecId = codecId,
-                    Profile = FFmpegInterop.GetProfileName(parameters->CodecId, parameters->Profile),
-                    Language = FFmpegInterop.GetMetadata(stream->Metadata, "language"),
-                    Title = FFmpegInterop.GetMetadata(stream->Metadata, "title"),
-                    Bitrate = parameters->BitRate,
-                    IsDefault = (stream->Disposition & DispositionDefault) != 0,
-                    IsForced = (stream->Disposition & DispositionForced) != 0,
-                    IsBitmap = IsBitmapSubtitle(codecId),
-                };
-
-            default:
-                return null;
-        }
+            MediaStreamKind.Video => new VideoStreamInfo
+            {
+                Index = stream->Index,
+                CodecId = codecId,
+                Profile = FFmpegInterop.GetProfileName(parameters->CodecId, parameters->Profile),
+                Language = FFmpegInterop.GetMetadata(stream->Metadata, "language"),
+                Title = FFmpegInterop.GetMetadata(stream->Metadata, "title"),
+                Bitrate = parameters->BitRate,
+                IsDefault = (stream->Disposition & DispositionDefault) != 0,
+                Width = parameters->Width,
+                Height = parameters->Height,
+                FrameRate = ResolveFrameRate(stream, parameters),
+                PixelFormat = FFmpegInterop.ToPixelFormat(parameters->Format),
+                BitDepth = parameters->BitsPerRawSample,
+            },
+            MediaStreamKind.Audio => new AudioStreamInfo
+            {
+                Index = stream->Index,
+                CodecId = codecId,
+                Profile = FFmpegInterop.GetProfileName(parameters->CodecId, parameters->Profile),
+                Language = FFmpegInterop.GetMetadata(stream->Metadata, "language"),
+                Title = FFmpegInterop.GetMetadata(stream->Metadata, "title"),
+                Bitrate = parameters->BitRate,
+                IsDefault = (stream->Disposition & DispositionDefault) != 0,
+                SampleRate = parameters->SampleRate,
+                ChannelCount = parameters->ChannelLayout.ChannelCount,
+                ChannelLayout = FFmpegInterop.ToChannelLayout(parameters->ChannelLayout.ChannelCount),
+                SampleFormat = FFmpegInterop.ToSampleFormat(parameters->Format),
+            },
+            MediaStreamKind.Subtitle => new SubtitleStreamInfo
+            {
+                Index = stream->Index,
+                CodecId = codecId,
+                Profile = FFmpegInterop.GetProfileName(parameters->CodecId, parameters->Profile),
+                Language = FFmpegInterop.GetMetadata(stream->Metadata, "language"),
+                Title = FFmpegInterop.GetMetadata(stream->Metadata, "title"),
+                Bitrate = parameters->BitRate,
+                IsDefault = (stream->Disposition & DispositionDefault) != 0,
+                IsForced = (stream->Disposition & DispositionForced) != 0,
+                IsBitmap = IsBitmapSubtitle(codecId),
+            },
+            _ => null,
+        };
     }
 
     private static unsafe double ResolveFrameRate(AVStream* stream, AVCodecParameters* parameters)

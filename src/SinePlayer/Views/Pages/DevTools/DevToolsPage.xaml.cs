@@ -12,6 +12,8 @@ using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml.Controls;
 
+using SinePlayer.Common.Actions;
+using SinePlayer.Common.Actions.Providers;
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Constants;
@@ -23,6 +25,7 @@ using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Database;
+using SinePlayer.Helpers.Navigation;
 using SinePlayer.SDK.Models;
 using SinePlayer.ViewModels;
 
@@ -104,6 +107,21 @@ internal sealed partial class DevToolsPage : BasePage
     {
         DebugModel.SaveJsonConfig("null");
         RestoreConfig();
+    }
+
+    private void OpenPlaybackLabButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (!DebugUtils.DeveloperMode)
+        {
+            return;
+        }
+
+        var route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_PLAYBACK_LAB);
+        ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
+            .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
+            .AddParameter(OpenTabProvider.PARAM_WINDOW_ID, "-1")
+            .Build();
+        PageActionHandler.HandleNoResult(actionModel);
     }
 
     private void CrashAppButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)

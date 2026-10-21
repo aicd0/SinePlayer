@@ -220,6 +220,7 @@ internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
 
     private sealed class Decoder(VideoStreamInfo stream) : IVideoDecoder
     {
+        public string Name => "synthetic";
         public MediaStreamInfo Stream => stream;
 
         public string Signature => "synthetic:video";
@@ -276,6 +277,7 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
 
     private sealed class Decoder(AudioStreamInfo stream) : IAudioDecoder
     {
+        public string Name => "synthetic";
         public MediaStreamInfo Stream => stream;
 
         public string Signature => "synthetic:audio";

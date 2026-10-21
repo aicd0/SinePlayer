@@ -8,16 +8,7 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
 
-/// <summary>
-/// A decoder that decodes nothing and plays silence, for the same reason <see cref="NullVideoDecoder"/> exists.
-/// <para>
-/// Every packet becomes one block of silent samples at the packet's timestamp, as long as the packet lasts and in
-/// the stream's own rate, channel count and format. That is enough to keep the audio chain buffering, submitting
-/// and running dry exactly as it would — a real device is handed silence it can play, not a payload it cannot
-/// read — with no codec involved.
-/// </para>
-/// </summary>
-public sealed class NullAudioDecoder : IAudioDecoder
+public sealed partial class NullAudioDecoder : IAudioDecoder
 {
     private readonly AudioStreamInfo _stream;
 
@@ -25,6 +16,8 @@ public sealed class NullAudioDecoder : IAudioDecoder
     {
         _stream = stream;
     }
+
+    public string Name => "Null";
 
     public MediaStreamInfo Stream => _stream;
 

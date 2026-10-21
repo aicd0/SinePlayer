@@ -192,6 +192,12 @@
   <data name="Ascending" xml:space="preserve">
     <value>升序</value>
   </data>
+  <data name="Audio" xml:space="preserve">
+    <value>音訊</value>
+  </data>
+  <data name="AudioUnderruns" xml:space="preserve">
+    <value>音訊緩衝不足次數</value>
+  </data>
   <data name="Auto" xml:space="preserve">
     <value>自動</value>
   </data>
@@ -222,6 +228,12 @@
   <data name="BackgroundImage" xml:space="preserve">
     <value>背景圖片</value>
   </data>
+  <data name="BitDepth" xml:space="preserve">
+    <value>位元深度</value>
+  </data>
+  <data name="BitRate" xml:space="preserve">
+    <value>位元率</value>
+  </data>
   <data name="Calculating" xml:space="preserve">
     <value>計算中...</value>
   </data>
@@ -230,6 +242,12 @@
   </data>
   <data name="Category" xml:space="preserve">
     <value>類別</value>
+  </data>
+  <data name="ChannelLayout" xml:space="preserve">
+    <value>聲道配置</value>
+  </data>
+  <data name="Channels" xml:space="preserve">
+    <value>聲道數</value>
   </data>
   <data name="CheckForUpdates" xml:space="preserve">
     <value>檢查更新</value>
@@ -257,6 +275,9 @@
   </data>
   <data name="CloseWindow" xml:space="preserve">
     <value>關閉視窗</value>
+  </data>
+  <data name="Codec" xml:space="preserve">
+    <value>編解碼器</value>
   </data>
   <data name="CollapseAll" xml:space="preserve">
     <value>折疊全部</value>
@@ -288,6 +309,9 @@
   <data name="CompletionStatusPlanned" xml:space="preserve">
     <value>計劃中</value>
   </data>
+  <data name="Container" xml:space="preserve">
+    <value>封裝格式</value>
+  </data>
   <data name="Continuous" xml:space="preserve">
     <value>連續</value>
   </data>
@@ -317,6 +341,12 @@
   </data>
   <data name="DebugModeWarning" xml:space="preserve">
     <value>開啟偵錯模式可能會使應用程式不穩定，確認繼續嗎？</value>
+  </data>
+  <data name="DecodeMode" xml:space="preserve">
+    <value>解碼模式</value>
+  </data>
+  <data name="Decoder" xml:space="preserve">
+    <value>解碼器</value>
   </data>
   <data name="Default" xml:space="preserve">
     <value>預設</value>
@@ -362,6 +392,9 @@
   </data>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>從 GitHub 下載外掛</value>
+  </data>
+  <data name="DroppedFrames" xml:space="preserve">
+    <value>丟棄影格數</value>
   </data>
   <data name="Duration" xml:space="preserve">
     <value>時長</value>
@@ -511,6 +544,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="Folders" xml:space="preserve">
     <value>資料夾</value>
   </data>
+  <data name="FrameRate" xml:space="preserve">
+    <value>影格率</value>
+  </data>
   <data name="FunctionAverage" xml:space="preserve">
     <value>平均</value>
   </data>
@@ -540,6 +576,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   </data>
   <data name="Group" xml:space="preserve">
     <value>分組</value>
+  </data>
+  <data name="Hardware" xml:space="preserve">
+    <value>硬體</value>
   </data>
   <data name="Help" xml:space="preserve">
     <value>幫助</value>
@@ -623,6 +662,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="LastVisitTime" xml:space="preserve">
     <value>上次造訪時間</value>
   </data>
+  <data name="Library" xml:space="preserve">
+    <value>媒體庫</value>
+  </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>在目前篩選條件下沒有找到結果，嘗試</value>
   </data>
@@ -631,9 +673,6 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   </data>
   <data name="LibraryEmptyPart3.Text" xml:space="preserve">
     <value>。</value>
-  </data>
-  <data name="LibraryHeader.Text" xml:space="preserve">
-    <value>庫</value>
   </data>
   <data name="License" xml:space="preserve">
     <value>許可證</value>
@@ -646,6 +685,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   </data>
   <data name="Links" xml:space="preserve">
     <value>連結</value>
+  </data>
+  <data name="Media" xml:space="preserve">
+    <value>媒體</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>選擇「加入排除清單」後，下次更新媒體庫時將不會再次匯入這些媒體檔案。</value>
@@ -788,8 +830,14 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="PauseOnLeaveTab" xml:space="preserve">
     <value>離開播放器分頁時暫停</value>
   </data>
+  <data name="PictureLag" xml:space="preserve">
+    <value>畫面延遲</value>
+  </data>
   <data name="Pin" xml:space="preserve">
     <value>固定</value>
+  </data>
+  <data name="PixelFormat" xml:space="preserve">
+    <value>像素格式</value>
   </data>
   <data name="Play" xml:space="preserve">
     <value>播放</value>
@@ -802,6 +850,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>你的播放佇列將顯示於此</value>
+  </data>
+  <data name="Playback" xml:space="preserve">
+    <value>播放</value>
   </data>
   <data name="PlaybackInformation" xml:space="preserve">
     <value>播放資訊</value>
@@ -826,6 +877,12 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>外掛程式</value>
+  </data>
+  <data name="Position" xml:space="preserve">
+    <value>播放位置</value>
+  </data>
+  <data name="PresentedFrames" xml:space="preserve">
+    <value>已顯示影格數</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>按下組合鍵</value>
@@ -881,6 +938,9 @@ $plugins</value>
   <data name="RemoveUnreachableItems" xml:space="preserve">
     <value>自動移除無法存取的項目</value>
   </data>
+  <data name="Renderer" xml:space="preserve">
+    <value>算繪器</value>
+  </data>
   <data name="RepeatAll" xml:space="preserve">
     <value>循環：全部</value>
   </data>
@@ -905,6 +965,9 @@ $plugins</value>
   <data name="ResetPlayerSettings" xml:space="preserve">
     <value>重設播放器設定</value>
   </data>
+  <data name="Resolution" xml:space="preserve">
+    <value>解析度</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>恢復</value>
   </data>
@@ -923,6 +986,12 @@ $plugins</value>
   <data name="SafeModeMessage" xml:space="preserve">
     <value>應用程式上次未正常結束。
 是否以安全模式啟動？</value>
+  </data>
+  <data name="SampleFormat" xml:space="preserve">
+    <value>取樣格式</value>
+  </data>
+  <data name="SampleRate" xml:space="preserve">
+    <value>取樣率</value>
   </data>
   <data name="Save" xml:space="preserve">
     <value>儲存</value>
@@ -1002,11 +1071,17 @@ $plugins</value>
   <data name="ShuffleStable" xml:space="preserve">
     <value>隨機（穩定）</value>
   </data>
+  <data name="Software" xml:space="preserve">
+    <value>軟體</value>
+  </data>
   <data name="Sort" xml:space="preserve">
     <value>排序</value>
   </data>
   <data name="SortingFunction" xml:space="preserve">
     <value>排序函數</value>
+  </data>
+  <data name="State" xml:space="preserve">
+    <value>狀態</value>
   </data>
   <data name="Statistics" xml:space="preserve">
     <value>統計資訊</value>
@@ -1095,6 +1170,15 @@ $info</value>
   </data>
   <data name="Vertical" xml:space="preserve">
     <value>縱向</value>
+  </data>
+  <data name="Video" xml:space="preserve">
+    <value>影片</value>
+  </data>
+  <data name="VideoDecodeTime" xml:space="preserve">
+    <value>影片解碼時間</value>
+  </data>
+  <data name="VideoRenderTime" xml:space="preserve">
+    <value>影片算繪時間</value>
   </data>
   <data name="ViewType" xml:space="preserve">
     <value>視圖</value>

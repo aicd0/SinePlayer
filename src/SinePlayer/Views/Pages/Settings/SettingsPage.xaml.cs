@@ -16,13 +16,31 @@ using SinePlayer.Common.Localization;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.AppEnvironment;
+using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Data.Models.Misc;
 
 namespace SinePlayer.Views.Pages.Settings;
 
 internal sealed partial class SettingsPage : BasePage
 {
+    private const string TAG = nameof(SettingsPage);
+
+    private static readonly Lazy<string> sFFmpegVersion = new(() =>
+    {
+        try
+        {
+            FFmpegRuntime.EnsureInitialized();
+            return FFmpegRuntime.Version ?? "Unknown";
+        }
+        catch (Exception ex)
+        {
+            Logger.E(TAG, ex);
+            return "Unavailable";
+        }
+    });
+
     private SettingsPageViewModel ViewModel { get; } = new();
 
     public SettingsPage()
@@ -161,6 +179,9 @@ internal sealed partial class SettingsPage : BasePage
             .AppendLine()
             .Append("SDK ")
             .Append(EnvironmentProvider.Instance.GetSDKVersion())
+            .AppendLine()
+            .Append("FFmpeg ")
+            .Append(sFFmpegVersion.Value)
             .AppendLine()
             .Append(aboutCopyright);
         ViewModel.AboutText = aboutTextBuilder.ToString();

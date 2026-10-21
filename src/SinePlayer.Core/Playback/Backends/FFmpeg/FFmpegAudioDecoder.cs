@@ -18,10 +18,11 @@ namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 /// All calls happen on one thread; the decoder holds no locks.
 /// </para>
 /// </summary>
-public sealed class FFmpegAudioDecoder : IAudioDecoder
+public sealed partial class FFmpegAudioDecoder : IAudioDecoder
 {
     private readonly AudioStreamInfo _stream;
     private readonly AVRational _timeBase;
+    private readonly string _decoderName;
 
     private nint _context;
     private nint _receiveFrame;
@@ -29,16 +30,19 @@ public sealed class FFmpegAudioDecoder : IAudioDecoder
     private long _lastPacketTimestamp;
     private bool _disposed;
 
-    private FFmpegAudioDecoder(AudioStreamInfo stream, nint context, nint receiveFrame, AVRational timeBase)
+    private FFmpegAudioDecoder(AudioStreamInfo stream, nint context, nint receiveFrame, AVRational timeBase, string decoderName)
     {
         _stream = stream;
         _context = context;
         _receiveFrame = receiveFrame;
         _timeBase = timeBase;
+        _decoderName = decoderName;
 
         // Best effort until the first buffer reveals the format the decoder actually chose.
         _outputFormat = stream.SampleFormat;
     }
+
+    public string Name => _decoderName;
 
     public MediaStreamInfo Stream => _stream;
 
@@ -115,7 +119,7 @@ public sealed class FFmpegAudioDecoder : IAudioDecoder
                 continue;
             }
 
-            decoder = new FFmpegAudioDecoder(stream, context, receiveFrame, ffmpegSource.GetTimeBase(stream.Index));
+            decoder = new FFmpegAudioDecoder(stream, context, receiveFrame, ffmpegSource.GetTimeBase(stream.Index), name);
             error = string.Empty;
             return true;
         }

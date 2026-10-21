@@ -72,10 +72,6 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
 
     public MediaStreamInfo Stream { get; }
 
-    /// <summary>
-    /// True once a frame has come back from the GPU. Asking for hardware is not the same thing as getting
-    /// it: libavcodec falls back to the software decoder of the same codec without saying so.
-    /// </summary>
     public bool IsHardwareAccelerated => _hardware;
 
     /// <summary>
@@ -87,8 +83,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
 
     public PixelFormat OutputFormat => _outputFormat;
 
-    /// <summary>The decoder libavcodec was actually opened with, which is what a fallback changes.</summary>
-    internal string DecoderName => _decoderName;
+    public string Name => _decoderName;
 
     /// <summary>
     /// The thread setting the decoder was opened with: zero means "as many as the machine has", which is

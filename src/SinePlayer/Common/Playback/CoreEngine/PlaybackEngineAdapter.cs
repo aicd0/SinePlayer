@@ -81,7 +81,6 @@ internal sealed partial class PlaybackEngineAdapter : IMediaEngine
             PlaybackPipeline pipeline = CreatePipeline();
             _pipeline = pipeline;
             _playbackInfo.Attach(pipeline);
-            _playbackInfo.ReportLevel(_volume, _muted);
 
             // The level of the sound is a filter, and the engine is the host of the pipeline, so it is the one
             // that makes the filter and holds it: a new pipeline gets a new one, set to what the player has
@@ -203,7 +202,6 @@ internal sealed partial class PlaybackEngineAdapter : IMediaEngine
     public void SetVolume(double volume)
     {
         _volume = Math.Clamp(volume, 0.0, 1.0);
-        _playbackInfo.ReportLevel(_volume, _muted);
 
         // The filter is where the level lives now, and it is this engine's own: setting it is all it takes, and
         // it applies to the next block rather than to what has already been handed to the device.
@@ -213,7 +211,6 @@ internal sealed partial class PlaybackEngineAdapter : IMediaEngine
     public void SetMuted(bool muted)
     {
         _muted = muted;
-        _playbackInfo.ReportLevel(_volume, _muted);
         _gain?.SetLevel(_volume, _muted);
     }
 
