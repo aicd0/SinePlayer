@@ -15,4 +15,11 @@ public interface IGpuVideoBuffer : IMediaBuffer
 
     /// <summary>Slice of the texture array that holds this frame.</summary>
     int SubresourceIndex { get; }
+
+    /// <summary>
+    /// A second reference to the same picture, for a consumer that draws it after the frame itself is gone:
+    /// a surface that changed while playback is paused re-draws the last frame, and by then the decoder may
+    /// have asked for its slice back. Null when the buffer cannot take one.
+    /// </summary>
+    IGpuVideoBuffer? Retain();
 }

@@ -34,18 +34,26 @@ internal sealed class D3D11Device : IDisposable
 
     private ID3D11Device? _device;
     private ID3D11DeviceContext? _context;
+    private nint _nativeDevice;
     private bool _disposed;
 
     private D3D11Device(ID3D11Device device, ID3D11DeviceContext context, D3D_FEATURE_LEVEL featureLevel)
     {
         _device = device;
         _context = context;
+        _nativeDevice = Marshal.GetComInterfaceForObject(device, typeof(ID3D11Device));
         FeatureLevel = featureLevel;
     }
 
     internal ID3D11Device Device => _device ?? throw new ObjectDisposedException(nameof(D3D11Device));
 
     internal ID3D11DeviceContext Context => _context ?? throw new ObjectDisposedException(nameof(D3D11Device));
+
+    /// <summary>
+    /// The device as the native pointer a decoder can be handed, valid for as long as this object lives.
+    /// It carries a reference of its own so that it stays valid even after the interfaces above are gone.
+    /// </summary>
+    internal nint NativeDevice => _nativeDevice;
 
     internal D3D_FEATURE_LEVEL FeatureLevel { get; }
 
@@ -89,6 +97,14 @@ internal sealed class D3D11Device : IDisposable
         }
 
         _disposed = true;
+
+        nint nativeDevice = _nativeDevice;
+        _nativeDevice = 0;
+        if (nativeDevice != 0)
+        {
+            Marshal.Release(nativeDevice);
+        }
+
         D3D11Interop.Release(_context);
         _context = null;
         D3D11Interop.Release(_device);

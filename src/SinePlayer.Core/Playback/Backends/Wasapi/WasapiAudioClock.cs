@@ -7,25 +7,6 @@ using Windows.Win32.Media.Audio;
 
 namespace SinePlayer.Core.Playback.Backends.Wasapi;
 
-/// <summary>
-/// The clock of a WASAPI render stream. The device knows how much audio has actually reached the
-/// speakers, so its position is the truth that video is matched against — including when the engine is
-/// converting the sample rate, because the engine's timeline is exactly what is being heard.
-/// <para>
-/// The device position never moves backwards except when the stream is reset, so the position is a base
-/// plus the distance the device has travelled since that base was taken. That also makes
-/// <see cref="Start"/> and <see cref="Pause"/> free: a stopped stream simply stops advancing.
-/// </para>
-/// <para>
-/// A device can be invalidated at any moment — unplugged, disabled, pre-empted, or re-formatted — and every
-/// call to it then fails. That is the one kind of failure this class answers itself: the clock cannot throw at
-/// whoever reads it (the host's position timer reads it, and so does every frame the picture judges), so the
-/// failure is latched, the clock reads as the position it was last put at, and the *original exception* is kept
-/// for the renderer to report on its next hand-off or flush — which is what turns it into a pipeline error (§9)
-/// rather than a dead process. Nothing is re-worded: this class records that a call failed and by what, never
-/// why it thinks the call failed.
-/// </para>
-/// </summary>
 internal sealed class WasapiAudioClock : IPlaybackClock
 {
     private readonly IWasapiClockDevice _device;
@@ -117,6 +98,7 @@ internal sealed class WasapiAudioClock : IPlaybackClock
         catch (Exception exception)
         {
             MarkLost(exception);
+            throw;
         }
     }
 
@@ -127,8 +109,6 @@ internal sealed class WasapiAudioClock : IPlaybackClock
             return;
         }
 
-        // A stream whose stop failed is not known to be stopped, so `IsRunning` is left alone: what is known is
-        // that the device is gone, and that is the fact the renderer reports.
         try
         {
             _device.Stop();
@@ -137,6 +117,7 @@ internal sealed class WasapiAudioClock : IPlaybackClock
         catch (Exception exception)
         {
             MarkLost(exception);
+            throw;
         }
     }
 

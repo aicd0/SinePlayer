@@ -1,5 +1,7 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
+
+using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
@@ -21,14 +23,46 @@ namespace SinePlayer.Core.Playback.Backends.Direct3D11;
 /// render target that frames are read back from, which is how the pipeline is verified without a
 /// window.
 /// </para>
+/// <para>
+/// It is also the pipeline's <see cref="IGpuDevice"/>: a decoder that decodes on this device hands out
+/// textures this renderer can sample, and both take <see cref="DeviceLock"/> so that two threads never
+/// build a sequence of calls on one context at the same time.
+/// </para>
 /// </summary>
-internal sealed class D3D11VideoRenderer : IVideoRenderer
+internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 {
+    /// <summary>The texture registers the array shader samples; the plane shaders use the three before them.</summary>
+    private const uint GpuTextureSlot = 3;
+
     private readonly D3D11Device _device;
     private readonly D3D11VideoShaders _shaders;
+    private readonly object _deviceLock = new();
 
     private ID3D11Texture2D[] _planeTextures = [];
     private ID3D11ShaderResourceView[] _planeViews = [];
+
+    /// <summary>
+    /// Views over the decoder's own texture, which is where a hardware frame is drawn from. They hold a
+    /// reference to that texture, and the retained frame is what keeps the decoder from reusing its slice.
+    /// </summary>
+    private ID3D11ShaderResourceView[] _gpuViews = [];
+    private IGpuVideoBuffer? _retainedFrame;
+    private nint _gpuTexture;
+    private int _gpuSlice = -1;
+
+    /// <summary>How much of the texture the picture fills, which is less than all of it when it was padded.</summary>
+    private (float X, float Y) _gpuTexCoordScale = (1.0f, 1.0f);
+
+    /// <summary>The same transform the last draw used, so a redraw shows the same picture.</summary>
+    private (float X, float Y) _lastTexCoordScale = (1.0f, 1.0f);
+
+    /// <summary>The one number the vertex shader is given: where in its texture the picture lies.</summary>
+    private readonly ID3D11Buffer _frameTransform;
+
+    private ID3D11PixelShader? _lastPixelShader;
+    private ID3D11ShaderResourceView[] _lastViews = [];
+    private uint _lastSlot;
+
     private int _frameWidth;
     private int _frameHeight;
     private PixelFormat _frameFormat = PixelFormat.Unknown;
@@ -46,9 +80,21 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
     {
         _device = device;
         _shaders = shaders;
+        _frameTransform = D3D11Interop.CreateConstantBuffer(device.Device);
     }
 
     public string Name => "d3d11";
+
+    /// <summary>
+    /// The renderer is the device: it owns the Direct3D device and the lock that guards its context, so what it
+    /// hands out is itself. A caller asks the renderer rather than casting it, because casting would be asking the
+    /// compiler what a renderer is instead of asking the renderer what it draws with.
+    /// </summary>
+    public IGpuDevice? GpuDevice => this;
+
+    public nint NativeDevice => _device.NativeDevice;
+
+    public object DeviceLock => _deviceLock;
 
     /// <summary>
     /// Takes ownership of the device it is given: a renderer draws through that device's immediate context, so it
@@ -155,37 +201,58 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
             return PlaybackOperationResult.Failure("The renderer has already been disposed.");
         }
 
-        if (_swapChain is not null && _needsResize)
+        // A decoder sharing this device calls into the same immediate context from its own thread, and
+        // everything below is one sequence of calls that has to arrive intact.
+        lock (_deviceLock)
         {
-            PlaybackOperationResult resize = ApplyPendingResize();
-            if (!resize.IsSuccessful)
+            if (_swapChain is not null && _needsResize)
             {
-                return resize;
+                PlaybackOperationResult resize = ApplyPendingResize();
+                if (!resize.IsSuccessful)
+                {
+                    return resize;
+                }
             }
-        }
 
-        if (_outputView is null || _outputWidth <= 0 || _outputHeight <= 0)
-        {
-            return PlaybackOperationResult.Failure("The renderer has no output surface.");
-        }
+            if (_outputView is null || _outputWidth <= 0 || _outputHeight <= 0)
+            {
+                return PlaybackOperationResult.Failure("The renderer has no output surface.");
+            }
 
-        if (frame.Buffer is not IPlanarVideoBuffer buffer)
-        {
-            return PlaybackOperationResult.Failure("The frame does not expose readable planes.");
-        }
+            if (frame.Buffer is IGpuVideoBuffer gpuBuffer)
+            {
+                if (!_shaders.TryGetArrayPixelShader(frame.Format, out ID3D11PixelShader? arrayShader))
+                {
+                    return PlaybackOperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames that are still on the GPU.");
+                }
 
-        if (!_shaders.TryGetPixelShader(frame.Format, out ID3D11PixelShader? pixelShader))
-        {
-            return PlaybackOperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames.");
-        }
+                PlaybackOperationResult bound = BindGpuFrame(frame, gpuBuffer);
+                if (!bound.IsSuccessful)
+                {
+                    return bound;
+                }
 
-        PlaybackOperationResult upload = Upload(frame, buffer);
-        if (!upload.IsSuccessful)
-        {
-            return upload;
-        }
+                return Draw(arrayShader!, _gpuViews, GpuTextureSlot, _gpuTexCoordScale);
+            }
 
-        return Draw(pixelShader!);
+            if (frame.Buffer is not IPlanarVideoBuffer buffer)
+            {
+                return PlaybackOperationResult.Failure("The frame does not expose readable planes.");
+            }
+
+            if (!_shaders.TryGetPixelShader(frame.Format, out ID3D11PixelShader? pixelShader))
+            {
+                return PlaybackOperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames.");
+            }
+
+            PlaybackOperationResult upload = Upload(frame, buffer);
+            if (!upload.IsSuccessful)
+            {
+                return upload;
+            }
+
+            return Draw(pixelShader!, _planeViews, 0, (1.0f, 1.0f));
+        }
     }
 
     public PlaybackOperationResult RefreshSurface()
@@ -195,28 +262,26 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
             return PlaybackOperationResult.Failure("The renderer has already been disposed.");
         }
 
-        if (_swapChain is not null && _needsResize)
+        lock (_deviceLock)
         {
-            PlaybackOperationResult resize = ApplyPendingResize();
-            if (!resize.IsSuccessful)
+            if (_swapChain is not null && _needsResize)
             {
-                return resize;
+                PlaybackOperationResult resize = ApplyPendingResize();
+                if (!resize.IsSuccessful)
+                {
+                    return resize;
+                }
             }
-        }
 
-        if (_planeTextures.Length == 0 || _outputView is null)
-        {
-            // Nothing has been drawn yet, or there is no surface of our own to resize: the planes of the
-            // last frame are what would be drawn again, and there are none.
-            return PlaybackOperationResult.Success;
-        }
+            if (_lastPixelShader is null || _lastViews.Length == 0 || _outputView is null)
+            {
+                // Nothing has been drawn yet, or there is no surface of our own to resize: what would be
+                // drawn again is the last frame, and there is none.
+                return PlaybackOperationResult.Success;
+            }
 
-        if (!_shaders.TryGetPixelShader(_frameFormat, out ID3D11PixelShader? pixelShader))
-        {
-            return PlaybackOperationResult.Success;
+            return Draw(_lastPixelShader, _lastViews, _lastSlot, _lastTexCoordScale);
         }
-
-        return Draw(pixelShader!);
     }
 
     /// <summary>
@@ -248,6 +313,7 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
         _swapChain = null;
 
         ReleaseFrameTextures();
+        D3D11Interop.Release(_frameTransform);
         _shaders.Dispose();
 
         // The device came with this renderer — the factory creates one per call — so it goes with it. A shared
@@ -260,7 +326,7 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
     /// from <see cref="Render"/> because the planes outlive the frame: they are what makes it possible to
     /// show the same picture again after the surface changed.
     /// </summary>
-    private PlaybackOperationResult Draw(ID3D11PixelShader pixelShader)
+    private PlaybackOperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, (float X, float Y) texCoordScale)
     {
         ID3D11DeviceContext context = _device.Context;
         context.OMSetRenderTargets(1, [_outputView], null);
@@ -275,12 +341,117 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
         D3D11Interop.SetViewport(context, fittedX, fittedY, fittedWidth, fittedHeight);
         context.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         D3D11Interop.SetShaders(context, _shaders.VertexShader, pixelShader);
-        D3D11Interop.SetTextures(context, _planeViews, _shaders.Sampler);
+
+        // Where the picture lies inside the texture it is drawn from: all of it for an uploaded frame, less
+        // for one a hardware decoder padded.
+        D3D11Interop.SetTexCoordScale(context, _frameTransform, texCoordScale.X, texCoordScale.Y);
+        D3D11Interop.SetVertexConstantBuffer(context, 0, _frameTransform);
+
+        D3D11Interop.SetTextures(context, textureSlot, views, _shaders.Sampler);
 
         // A single triangle covers the whole target, so no vertex or index buffer is needed.
         context.Draw(3, 0);
 
+        _lastPixelShader = pixelShader;
+        _lastViews = views;
+        _lastSlot = textureSlot;
+        _lastTexCoordScale = texCoordScale;
+
         return _swapChain is null ? PlaybackOperationResult.Success : _swapChain.Present();
+    }
+
+    /// <summary>
+    /// Points the renderer at the planes of a frame that is still a texture. Nothing is copied: the planes
+    /// are views cast out of the texture the decoder wrote, over the slice the frame lives in. The frame is
+    /// retained because those views outlive the call — a redraw after the surface changed uses them again.
+    /// </summary>
+    private PlaybackOperationResult BindGpuFrame(RawVideoFrame frame, IGpuVideoBuffer buffer)
+    {
+        if (frame.Format != PixelFormat.Nv12)
+        {
+            return PlaybackOperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} hardware frames.");
+        }
+
+        if (_gpuViews.Length == 2 && _gpuTexture == buffer.NativeTexture && _gpuSlice == buffer.SubresourceIndex && _frameFormat == frame.Format && _frameWidth == frame.Width && _frameHeight == frame.Height)
+        {
+            return PlaybackOperationResult.Success;
+        }
+
+        var texture = (ID3D11Resource)Marshal.GetObjectForIUnknown(buffer.NativeTexture);
+        try
+        {
+            ID3D11ShaderResourceView? luma = CreateSliceView(texture, buffer.SubresourceIndex, DXGI_FORMAT.DXGI_FORMAT_R8_UNORM);
+            ID3D11ShaderResourceView? chroma = luma is null ? null : CreateSliceView(texture, buffer.SubresourceIndex, DXGI_FORMAT.DXGI_FORMAT_R8G8_UNORM);
+
+            if (luma is null || chroma is null)
+            {
+                D3D11Interop.Release(luma);
+                D3D11Interop.Release(chroma);
+                return PlaybackOperationResult.Failure("The device does not offer a shader view of the decoded texture.");
+            }
+
+            ReleaseFrameTextures();
+
+            _gpuViews = [luma, chroma];
+            _gpuTexture = buffer.NativeTexture;
+            _gpuSlice = buffer.SubresourceIndex;
+            _retainedFrame = buffer.Retain();
+            _frameWidth = frame.Width;
+            _frameHeight = frame.Height;
+            _frameFormat = frame.Format;
+            _gpuTexCoordScale = GetTexCoordScale(texture, frame);
+            return PlaybackOperationResult.Success;
+        }
+        finally
+        {
+            D3D11Interop.Release(texture);
+        }
+    }
+
+    /// <summary>
+    /// How much of the texture holds the picture. A hardware decoder decodes into a texture it aligned for
+    /// its own use, so a 1080-high picture can live in 1088 or 1152 rows: the rows below the picture were never
+    /// written, and sampling them puts a band of whatever they happen to contain — nothing, which converts to
+    /// green — along the bottom of the picture.
+    /// </summary>
+    private static (float X, float Y) GetTexCoordScale(ID3D11Resource resource, RawVideoFrame frame)
+    {
+        if (resource is not ID3D11Texture2D texture)
+        {
+            return (1.0f, 1.0f);
+        }
+
+        D3D11_TEXTURE2D_DESC description = D3D11Interop.GetDescription(texture);
+        if (description.Width <= 0 || description.Height <= 0)
+        {
+            return (1.0f, 1.0f);
+        }
+
+        float x = Math.Min(1.0f, frame.Width / (float)description.Width);
+        float y = Math.Min(1.0f, frame.Height / (float)description.Height);
+        return (x, y);
+    }
+
+    /// <summary>
+    /// One plane of a semi-planar texture, as a view a shader can sample. Libavcodec stores a frame as an
+    /// array of textures, so the view names the slice; the plane is selected by the view's format.
+    /// </summary>
+    private ID3D11ShaderResourceView? CreateSliceView(ID3D11Resource texture, int slice, DXGI_FORMAT format)
+    {
+        D3D11_SHADER_RESOURCE_VIEW_DESC description = new()
+        {
+            Format = format,
+            ViewDimension = D3D_SRV_DIMENSION.D3D_SRV_DIMENSION_TEXTURE2DARRAY,
+        };
+        description.Anonymous.Texture2DArray = new D3D11_TEX2D_ARRAY_SRV
+        {
+            MostDetailedMip = 0,
+            MipLevels = 1,
+            FirstArraySlice = (uint)slice,
+            ArraySize = 1,
+        };
+
+        return D3D11Interop.TryCreateShaderResourceView(_device.Device, texture, description);
     }
 
     /// <summary>
@@ -429,8 +600,23 @@ internal sealed class D3D11VideoRenderer : IVideoRenderer
             D3D11Interop.Release(texture);
         }
 
+        foreach (ID3D11ShaderResourceView view in _gpuViews)
+        {
+            D3D11Interop.Release(view);
+        }
+
         _planeViews = [];
         _planeTextures = [];
+        _gpuViews = [];
+        _gpuTexture = 0;
+        _gpuSlice = -1;
+
+        // The views above held the texture; the frame held the slice. Both go together.
+        _retainedFrame?.Dispose();
+        _retainedFrame = null;
+
+        _lastPixelShader = null;
+        _lastViews = [];
         _frameFormat = PixelFormat.Unknown;
         _frameWidth = 0;
         _frameHeight = 0;

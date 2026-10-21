@@ -3,18 +3,15 @@
 
 namespace SinePlayer.Core.Playback.Abstractions.Registry;
 
-/// <summary>
-/// Where components are declared. Registration happens once while the engine is being built up; the
-/// pipeline only ever asks for candidates, so a component can be added or removed without it
-/// changing.
-/// </summary>
 public interface IComponentRegistry
 {
-    void Register(ExtensionPoint extensionPoint, IComponentFactory factory);
+    IComponentRegistry Clone();
 
-    /// <summary>
-    /// Factories registered for a role, in registration order. Selection is what imposes an order
-    /// based on the media and the caller's preferences.
-    /// </summary>
-    IReadOnlyList<IComponentFactory> GetFactories(ExtensionPoint extensionPoint);
+    IReadOnlyList<TFactory> GetComponents<TFactory>() where TFactory : class, IComponentFactory;
+
+    void Register(IComponentFactory factory);
+
+    bool Remove(IComponentFactory factory);
+
+    int Clear<TFactory>() where TFactory : class, IComponentFactory;
 }

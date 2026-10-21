@@ -46,11 +46,14 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
 
     private const string TAG = nameof(WasapiAudioRenderer);
 
-    /// <summary>The class id of the endpoint enumerator, which is not in the Win32 metadata.</summary>
-    private static readonly Guid MMDeviceEnumeratorClassId = new("BCDE0395-E52F-467C-8E3D-C4579291692E");
-
     private static readonly Guid SubTypePcm = new("00000001-0000-0010-8000-00AA00389B71");
     private static readonly Guid SubTypeIeeeFloat = new("00000003-0000-0010-8000-00AA00389B71");
+
+    /// <summary>The endpoint to open, or null for the one Windows would pick.</summary>
+    private readonly string? _endpointId;
+
+    /// <summary>What the endpoint is called, for the reports that say which device is playing.</summary>
+    private readonly string? _endpointName;
 
     private IAudioClient? _client;
     private IAudioRenderClient? _renderClient;
@@ -64,6 +67,14 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
     private int _submittedBlocks;
     private long _underrunCount;
 
+    /// <param name="endpointId">The output device to open, or null for the one Windows would pick.</param>
+    /// <param name="endpointName">What that device is called, for the reports that say which one is playing.</param>
+    public WasapiAudioRenderer(string? endpointId = null, string? endpointName = null)
+    {
+        _endpointId = endpointId;
+        _endpointName = endpointName;
+    }
+
     /// <summary>
     /// How often the device ran dry between two submits. Every one of them is an audible gap, so this
     /// is the number that says whether the pipeline is keeping the device fed.
@@ -76,7 +87,7 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
     /// </summary>
     internal int BufferFrameCount => _bufferFrameCount;
 
-    public string Name => "wasapi";
+    public string Name => _endpointName is null ? "wasapi" : $"wasapi ({_endpointName})";
 
     /// <summary>
     /// The sound's level, 0 to 1, for <em>this renderer only</em>. It is the stream's volume rather than the
@@ -160,13 +171,24 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
                 PInvoke.CoInitializeEx(null, COINIT.COINIT_MULTITHREADED);
             }
 
-            HRESULT created = PInvoke.CoCreateInstance(MMDeviceEnumeratorClassId, null, CLSCTX.CLSCTX_ALL, out IMMDeviceEnumerator enumerator);
+            HRESULT created = PInvoke.CoCreateInstance(WasapiAudioEndpoints.MMDeviceEnumeratorClassId, null, CLSCTX.CLSCTX_ALL, out IMMDeviceEnumerator enumerator);
             if (created.Value < 0)
             {
                 return PlaybackOperationResult.Failure($"Unable to reach the audio endpoint enumerator ({created.Value}).");
             }
 
-            enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out IMMDevice device);
+            // The device the caller chose, or the one Windows would choose: the only difference between the two
+            // is which lookup is asked, so a named endpoint behaves exactly like the default one from here on.
+            IMMDevice device;
+            if (_endpointId is null)
+            {
+                enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out device);
+            }
+            else
+            {
+                enumerator.GetDevice(_endpointId, out device);
+            }
+
             device.Activate(typeof(IAudioClient).GUID, CLSCTX.CLSCTX_ALL, null, out object activated);
 
             var client = (IAudioClient)activated;

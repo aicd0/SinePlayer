@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System.Runtime.InteropServices;
@@ -110,6 +110,38 @@ public class D3D11PlanarRendererTests
         PlaybackOperationResult result = _renderer.Render(frame);
 
         Assert.That(result.IsSuccessful, Is.False);
+    }
+
+    [Test]
+    public void WaitsForTheDeviceLockBeforeDrawing()
+    {
+        // A decoder sharing this device holds the same lock around its own calls, so a draw that did not take
+        // it could build its sequence on the immediate context while another thread was building one too.
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [0xEB]),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x80, 0x80]));
+
+        using RawVideoFrame frame = CreateFrame(PixelFormat.Nv12, buffer);
+        using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
+        _renderer.SetOutput(target.View, Width, Height);
+
+        object deviceLock = _renderer.DeviceLock;
+        Task<PlaybackOperationResult> draw;
+        bool blocked;
+        Monitor.Enter(deviceLock);
+        try
+        {
+            draw = Task.Run(() => _renderer.Render(frame));
+            blocked = !draw.Wait(TimeSpan.FromMilliseconds(250));
+        }
+        finally
+        {
+            Monitor.Exit(deviceLock);
+        }
+
+        Assert.That(blocked, Is.True, "a draw has to wait while another thread holds the device lock");
+        Assert.That(draw.Wait(TimeSpan.FromSeconds(5)), Is.True, "the draw has to finish once the lock is free");
+        Assert.That(draw.Result.IsSuccessful, Is.True, draw.Result.Message);
     }
 
     private byte[] Render(PixelFormat format, PlanarFrameBuffer buffer)

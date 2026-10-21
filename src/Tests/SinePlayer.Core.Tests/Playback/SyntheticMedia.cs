@@ -54,8 +54,6 @@ internal sealed class SyntheticSourceProviderFactory : ISourceProviderFactory
         _script = script;
     }
 
-    public ComponentCapabilities Capabilities { get; } = new() { Name = "synthetic" };
-
     public PlaybackOperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
     {
         _opened = new SyntheticMediaSource(_script);
@@ -211,17 +209,20 @@ internal sealed class SyntheticMediaBuffer : IMediaBuffer
 
 internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
 {
-    public ComponentCapabilities Capabilities { get; } = new() { Name = "synthetic video" };
-
-    public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+    public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
     {
-        decoder = new Decoder(stream);
+        creator = new FixedCreator<IVideoDecoder>(Signature, () => new Decoder(stream));
         return PlaybackOperationResult.Success;
     }
+
+    /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>
+    internal string Signature => "synthetic:video";
 
     private sealed class Decoder(VideoStreamInfo stream) : IVideoDecoder
     {
         public MediaStreamInfo Stream => stream;
+
+        public string Signature => "synthetic:video";
 
         public bool IsHardwareAccelerated => false;
 
@@ -264,17 +265,20 @@ internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
 
 internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
 {
-    public ComponentCapabilities Capabilities { get; } = new() { Name = "synthetic audio" };
-
-    public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IAudioDecoder? decoder)
+    public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
     {
-        decoder = new Decoder(stream);
+        creator = new FixedCreator<IAudioDecoder>(Signature, () => new Decoder(stream));
         return PlaybackOperationResult.Success;
     }
+
+    /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>
+    internal string Signature => "synthetic:audio";
 
     private sealed class Decoder(AudioStreamInfo stream) : IAudioDecoder
     {
         public MediaStreamInfo Stream => stream;
+
+        public string Signature => "synthetic:audio";
 
         public bool IsHardwareAccelerated => false;
 

@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Playback.Abstractions;
@@ -7,274 +7,208 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
+using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Registry;
 using SinePlayer.Core.Playback.Selection;
 
 namespace SinePlayer.Core.Tests.Playback;
 
+/// <summary>
+/// The resolver is what the pipeline reads and what the host writes. It does not decide eligibility — a factory
+/// says what it can offer, and what it offers is what gets offered to the caller — so what is left to pin is that
+/// the order is the host's, that a clone is a copy, and that what is offered is a sequence to be walked.
+/// </summary>
 [TestFixture]
 public class ComponentResolverTests
 {
-    private const string CODEC_H264 = "h264";
-    private const string CODEC_HEVC = "hevc";
-
     [Test]
-    public void DecoderSelectionKeepsOnlyMatchingCodecs()
+    public void KeepsTheRegistrationOrder()
     {
         ComponentRegistry registry = new();
-        registry.Register(new FakeVideoDecoderFactory("h264Decoder", false, 0, CODEC_H264));
-        registry.Register(new FakeVideoDecoderFactory("hevcDecoder", false, 0, CODEC_HEVC));
+        NullVideoRendererFactory first = new();
+        NullVideoRendererFactory second = new("null:second");
+        NullVideoRendererFactory third = new("null:third");
+        registry.Register(first);
+        registry.Register(second);
+        registry.Register(third);
 
         ComponentResolver resolver = new(registry);
 
-        IReadOnlyList<IVideoDecoderFactory> candidates = resolver.ResolveVideoDecoders(CreateVideoStream(CODEC_H264), ComponentSelectionOptions.Default);
+        Assert.That(Renderers(resolver), Is.EqualTo(new[] { first, second, third }));
+    }
 
-        Assert.That(NamesOf(candidates), Is.EqualTo(new[] { "h264Decoder" }));
+    /// <summary>
+    /// A resolver over a live registry follows it, which is what makes a reconcile see an edit rather than the
+    /// state the file was opened with.
+    /// </summary>
+    [Test]
+    public void ReadingTheLiveRegistryFollowsIt()
+    {
+        ComponentRegistry registry = new();
+        ComponentResolver resolver = new(registry);
+
+        NullAudioRendererFactory device = new();
+        registry.Register(device);
+
+        Assert.That(resolver.GetComponents<IAudioRendererFactory>(), Is.EqualTo(new[] { device }));
     }
 
     [Test]
-    public void DecoderSelectionAcceptsFactoryWithoutCodecRestriction()
+    public void ACloneReadsWhatItCopied()
     {
         ComponentRegistry registry = new();
-        registry.Register(new FakeVideoDecoderFactory("universalDecoder", false, 0));
+        NullAudioRendererFactory first = new();
+        registry.Register(first);
 
-        ComponentResolver resolver = new(registry);
+        ComponentResolver live = new(registry);
+        ComponentResolver clone = live.Clone();
 
-        IReadOnlyList<IVideoDecoderFactory> candidates = resolver.ResolveVideoDecoders(CreateVideoStream(CODEC_HEVC), ComponentSelectionOptions.Default);
-
-        Assert.That(NamesOf(candidates), Is.EqualTo(new[] { "universalDecoder" }));
-    }
-
-    [Test]
-    public void DecoderSelectionReturnsEmptyWhenNothingMatches()
-    {
-        ComponentRegistry registry = new();
-        registry.Register(new FakeVideoDecoderFactory("h264Decoder", false, 0, CODEC_H264));
-
-        ComponentResolver resolver = new(registry);
-
-        IReadOnlyList<IVideoDecoderFactory> candidates = resolver.ResolveVideoDecoders(CreateVideoStream(CODEC_HEVC), ComponentSelectionOptions.Default);
-
-        Assert.That(candidates, Is.Empty);
-    }
-
-    [Test]
-    public void HardwareIsPreferredBeforeSoftware()
-    {
-        ComponentRegistry registry = new();
-        registry.Register(new FakeVideoDecoderFactory("softwareDecoder", false, 100, CODEC_H264));
-        registry.Register(new FakeVideoDecoderFactory("hardwareDecoder", true, 0, CODEC_H264));
-
-        ComponentResolver resolver = new(registry);
-
-        IReadOnlyList<IVideoDecoderFactory> candidates = resolver.ResolveVideoDecoders(
-            CreateVideoStream(CODEC_H264),
-            new ComponentSelectionOptions { PreferHardwareAcceleration = true });
-
-        Assert.That(NamesOf(candidates), Is.EqualTo(new[] { "hardwareDecoder", "softwareDecoder" }));
-    }
-
-    [Test]
-    public void SoftwareIsPreferredBeforeHardwareWhenRequested()
-    {
-        ComponentRegistry registry = new();
-        registry.Register(new FakeVideoDecoderFactory("hardwareDecoder", true, 100, CODEC_H264));
-        registry.Register(new FakeVideoDecoderFactory("softwareDecoder", false, 0, CODEC_H264));
-
-        ComponentResolver resolver = new(registry);
-
-        IReadOnlyList<IVideoDecoderFactory> candidates = resolver.ResolveVideoDecoders(
-            CreateVideoStream(CODEC_H264),
-            new ComponentSelectionOptions { PreferHardwareAcceleration = false });
-
-        Assert.That(NamesOf(candidates), Is.EqualTo(new[] { "softwareDecoder", "hardwareDecoder" }));
-    }
-
-    [Test]
-    public void DisallowingFallbackRemovesNonPreferredKind()
-    {
-        ComponentRegistry registry = new();
-        registry.Register(new FakeVideoDecoderFactory("softwareDecoder", false, 100, CODEC_H264));
-        registry.Register(new FakeVideoDecoderFactory("hardwareDecoder", true, 0, CODEC_H264));
-
-        ComponentResolver resolver = new(registry);
-
-        IReadOnlyList<IVideoDecoderFactory> candidates = resolver.ResolveVideoDecoders(
-            CreateVideoStream(CODEC_H264),
-            new ComponentSelectionOptions { PreferHardwareAcceleration = true, AllowFallback = false });
-
-        Assert.That(NamesOf(candidates), Is.EqualTo(new[] { "hardwareDecoder" }));
-    }
-
-    [Test]
-    public void PriorityBreaksTiesWithinSameKind()
-    {
-        ComponentRegistry registry = new();
-        registry.Register(new FakeVideoDecoderFactory("lowPriority", false, 1, CODEC_H264));
-        registry.Register(new FakeVideoDecoderFactory("highPriority", false, 2, CODEC_H264));
-
-        ComponentResolver resolver = new(registry);
-
-        IReadOnlyList<IVideoDecoderFactory> candidates = resolver.ResolveVideoDecoders(CreateVideoStream(CODEC_H264), ComponentSelectionOptions.Default);
-
-        Assert.That(NamesOf(candidates), Is.EqualTo(new[] { "highPriority", "lowPriority" }));
-    }
-
-    [Test]
-    public void RegistrationOrderBreaksRemainingTies()
-    {
-        ComponentRegistry registry = new();
-        registry.Register(new FakeVideoDecoderFactory("first", false, 5, CODEC_H264));
-        registry.Register(new FakeVideoDecoderFactory("second", false, 5, CODEC_H264));
-
-        ComponentResolver resolver = new(registry);
-
-        IReadOnlyList<IVideoDecoderFactory> candidates = resolver.ResolveVideoDecoders(CreateVideoStream(CODEC_H264), ComponentSelectionOptions.Default);
-
-        Assert.That(NamesOf(candidates), Is.EqualTo(new[] { "first", "second" }));
-    }
-
-    [Test]
-    public void PreferredNameOverridesAutomaticOrdering()
-    {
-        ComponentRegistry registry = new();
-        registry.Register(new FakeVideoDecoderFactory("hardwareDecoder", true, 100, CODEC_H264));
-        registry.Register(new FakeVideoDecoderFactory("softwareDecoder", false, 0, CODEC_H264));
-
-        ComponentResolver resolver = new(registry);
-
-        IReadOnlyList<IVideoDecoderFactory> candidates = resolver.ResolveVideoDecoders(
-            CreateVideoStream(CODEC_H264),
-            new ComponentSelectionOptions { PreferHardwareAcceleration = true, PreferredName = "softwareDecoder" });
-
-        Assert.That(NamesOf(candidates), Is.EqualTo(new[] { "softwareDecoder", "hardwareDecoder" }));
-    }
-
-    [Test]
-    public void SourceProvidersAreFilteredByScheme()
-    {
-        ComponentRegistry registry = new();
-        registry.Register(new FakeSourceProviderFactory("fileProvider", MediaLocator.SchemeFile));
-        registry.Register(new FakeSourceProviderFactory("networkProvider", "http", "https"));
-
-        ComponentResolver resolver = new(registry);
+        registry.Register(new NullAudioRendererFactory("null:second"));
+        registry.Remove(first);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                NamesOf(resolver.ResolveSourceProviders(MediaLocator.Parse(@"C:\movie.mkv"))),
-                Is.EqualTo(new[] { "fileProvider" }));
-            Assert.That(
-                NamesOf(resolver.ResolveSourceProviders(MediaLocator.Parse("https://example.com/movie.mkv"))),
-                Is.EqualTo(new[] { "networkProvider" }));
+            Assert.That(clone.GetComponents<IAudioRendererFactory>(), Is.EqualTo(new[] { first }), "a clone is a copy");
+            Assert.That(live.GetComponents<IAudioRendererFactory>().Count, Is.EqualTo(1), "the live registry moved on");
+            Assert.That(live.GetComponents<IAudioRendererFactory>()[0], Is.Not.SameAs(first));
+        }
+    }
+
+    /// <summary>
+    /// A clone is a whole resolver, so it can be registered into — onto its own registry, which is what "sharing
+    /// nothing" means.
+    /// </summary>
+    [Test]
+    public void ACloneCanBeChangedWithoutReachingTheOriginal()
+    {
+        ComponentResolver original = new();
+        NullVideoRendererFactory renderer = new();
+        original.Register(renderer);
+
+        ComponentResolver clone = original.Clone();
+        clone.Clear<IVideoRendererFactory>();
+        clone.Register(new NullVideoRendererFactory("null:clone"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Renderers(original), Is.EqualTo(new[] { renderer }), "the original kept what it had");
+            Assert.That(Renderers(clone).Count, Is.EqualTo(1));
+            Assert.That(Renderers(clone)[0], Is.Not.SameAs(renderer));
         }
     }
 
     [Test]
-    public void RendersWithoutHardwareDistinctionAreOrderedByPriority()
+    public void ACloneCarriesThePreferences()
     {
-        ComponentRegistry registry = new();
-        registry.Register(new FakeVideoRendererFactory("swapChainRenderer", 1));
-        registry.Register(new FakeVideoRendererFactory("softwareRenderer", 2));
+        ComponentResolver original = new() { Preferences = new PlaybackPreferences { PreferHardwareDecoding = false } };
 
-        ComponentResolver resolver = new(registry);
+        ComponentResolver clone = original.Clone();
+        clone.Preferences = clone.Preferences with { PreferHardwareDecoding = true };
 
-        IReadOnlyList<IComponentFactory<IVideoRenderer>> candidates = resolver.ResolveVideoRenderers(ComponentSelectionOptions.Default);
-
-        Assert.That(NamesOf(candidates), Is.EqualTo(new[] { "softwareRenderer", "swapChainRenderer" }));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(clone.Preferences.PreferHardwareDecoding, Is.True);
+            Assert.That(original.Preferences.PreferHardwareDecoding, Is.False, "the setting belongs to each resolver");
+        }
     }
 
     [Test]
-    public void CapabilitiesListReflectsRegistrationOrder()
+    public void AResolverThatOwnsItsRegistryStartsEmpty()
     {
-        ComponentRegistry registry = new();
-        registry.Register(new FakeVideoDecoderFactory("first", false, 0, CODEC_H264));
-        registry.Register(new FakeVideoDecoderFactory("second", true, 0, CODEC_HEVC));
+        ComponentResolver resolver = new();
 
-        ComponentResolver resolver = new(registry);
-
-        IReadOnlyList<ComponentCapabilities> capabilities = resolver.GetCapabilities(ExtensionPoint.VideoDecoder);
-
-        Assert.That(capabilities.Select(item => item.Name), Is.EqualTo(new[] { "first", "second" }));
-    }
-
-    private static VideoStreamInfo CreateVideoStream(string codecId)
-    {
-        return new VideoStreamInfo
+        using (Assert.EnterMultipleScope())
         {
-            Index = 0,
-            CodecId = codecId,
-            Width = 1920,
-            Height = 1080,
-            FrameRate = 30.0,
-            PixelFormat = PixelFormat.Yuv420P,
-        };
-    }
-
-    private static string[] NamesOf<TFactory>(IReadOnlyList<TFactory> factories) where TFactory : IComponentFactory
-    {
-        return [.. factories.Select(factory => factory.Capabilities.Name)];
-    }
-
-    private sealed class FakeVideoDecoderFactory : IVideoDecoderFactory
-    {
-        public FakeVideoDecoderFactory(string name, bool isHardwareAccelerated, int priority, params string[] codecIds)
-        {
-            Capabilities = new ComponentCapabilities
-            {
-                Name = name,
-                Priority = priority,
-                IsHardwareAccelerated = isHardwareAccelerated,
-                CodecIds = codecIds.Length > 0 ? codecIds : null,
-            };
-        }
-
-        public ComponentCapabilities Capabilities { get; }
-
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
-        {
-            decoder = null;
-            return PlaybackOperationResult.Failure("Test factory does not create components.");
+            Assert.That(Renderers(resolver), Is.Empty);
+            Assert.That(resolver.Preferences, Is.SameAs(PlaybackPreferences.Default));
         }
     }
 
-    private sealed class FakeSourceProviderFactory : ISourceProviderFactory
+    /// <summary>
+    /// A factory that offers nothing is a backend saying it cannot serve this machine, so no creator for it is in
+    /// the sequence and whoever walks it never learns it was registered.
+    /// </summary>
+    [Test]
+    public void AFactoryThatOffersNothingAddsNoCreator()
     {
-        public FakeSourceProviderFactory(string name, params string[] schemes)
-        {
-            Capabilities = new ComponentCapabilities
-            {
-                Name = name,
-                Schemes = schemes.Length > 0 ? schemes : null,
-            };
-        }
+        ComponentResolver resolver = new();
+        resolver.Register(new DecliningVideoRendererFactory("declines"));
+        resolver.Register(new NullVideoRendererFactory());
 
-        public ComponentCapabilities Capabilities { get; }
+        List<IComponentCreator<IVideoRenderer>> creators = [.. resolver.ResolveVideoRenderers()];
 
-        public PlaybackOperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
+        using (Assert.EnterMultipleScope())
         {
-            source = null;
-            return PlaybackOperationResult.Failure("Test factory does not create components.");
+            Assert.That(creators, Has.Count.EqualTo(1), "only the registration that offered something is in the sequence");
+            Assert.That(creators[0].Create(out IVideoRenderer? renderer).IsSuccessful, Is.True);
+            Assert.That(renderer, Is.TypeOf<NullVideoRenderer>());
+            renderer?.Dispose();
         }
     }
 
-    private sealed class FakeVideoRendererFactory : IComponentFactory<IVideoRenderer>
+    /// <summary>
+    /// Everything that offers something is offered, in the order the host registered it: which one is worth taking
+    /// is the caller's decision, not the resolver's.
+    /// </summary>
+    [Test]
+    public void EveryOfferIsInTheSequenceInRegistrationOrder()
     {
-        public FakeVideoRendererFactory(string name, int priority)
+        ComponentResolver resolver = new();
+        resolver.Register(new NullVideoRendererFactory());
+        resolver.Register(new NullVideoRendererFactory("null:second"));
+
+        Assert.That(resolver.ResolveVideoRenderers().Select(creator => creator.Signature), Is.EqualTo(new[] { "null:video-renderer", "null:second" }));
+    }
+
+    /// <summary>
+    /// Hardware decoding is a requirement, so the sequence is the field asked twice: what the registrations would
+    /// make with it, and then — because a file that plays in software beats one that does not play — the same
+    /// registrations asked without it.
+    /// </summary>
+    [Test]
+    public void AVideoDecoderSequenceAsksForHardwareFirstAndThenWithout()
+    {
+        ComponentResolver resolver = new() { Preferences = new PlaybackPreferences { PreferHardwareDecoding = true } };
+        resolver.Register(new RecordingVideoDecoderFactory());
+
+        using SyntheticMediaSource source = new(new SyntheticMediaScript());
+        List<IComponentCreator<IVideoDecoder>> creators = [.. resolver.ResolveVideoDecoders(source, source.Info.VideoStreams[0], gpuDevice: null, bufferedFrames: 4)];
+
+        using (Assert.EnterMultipleScope())
         {
-            Capabilities = new ComponentCapabilities
-            {
-                Name = name,
-                Priority = priority,
-            };
+            Assert.That(creators, Has.Count.EqualTo(2), "the same registration asked both ways");
+            Assert.That(creators[0].Signature, Does.StartWith("hardware:"), "the requirement is tried first");
+            Assert.That(creators[1].Signature, Does.StartWith("software:"), "and the fallback is the same factory without it");
+        }
+    }
+
+    private static IReadOnlyList<IVideoRendererFactory> Renderers(ComponentResolver resolver)
+    {
+        return resolver.GetComponents<IVideoRendererFactory>();
+    }
+
+    /// <summary>A factory that cannot serve whatever it is asked about, and says so by offering nothing.</summary>
+    private sealed class DecliningVideoRendererFactory(string name) : IVideoRendererFactory
+    {
+        public override string ToString()
+        {
+            return name;
         }
 
-        public ComponentCapabilities Capabilities { get; }
-
-        public PlaybackOperationResult TryCreate(out IVideoRenderer? component)
+        public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
         {
-            component = null;
-            return PlaybackOperationResult.Failure("Test factory does not create components.");
+            creator = null;
+            return PlaybackOperationResult.Failure($"{name} cannot serve this machine.");
+        }
+    }
+
+    /// <summary>A factory that offers a creator for each way it is asked, so a sequence shows what was asked of it.</summary>
+    private sealed class RecordingVideoDecoderFactory : IVideoDecoderFactory
+    {
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        {
+            creator = new FixedCreator<IVideoDecoder>(options.HardwareDecoding ? "hardware:decoder" : "software:decoder", () => null);
+            return PlaybackOperationResult.Success;
         }
     }
 }

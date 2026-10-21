@@ -13,6 +13,8 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Registry;
+using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Timing;
 
 namespace SinePlayer.Core.Tests.Playback;
@@ -399,9 +401,6 @@ public class PlaybackPipelineTests
         private readonly FFmpegVideoDecoderFactory _inner = new();
         private readonly ManualResetEventSlim _gate = new(true);
         private readonly ManualResetEventSlim _decoding = new(false);
-
-        public ComponentCapabilities Capabilities => _inner.Capabilities;
-
         internal void Close()
         {
             _gate.Reset();
@@ -416,17 +415,10 @@ public class PlaybackPipelineTests
         /// <summary>Waits for the decoder to be inside a decode, which is when the gate holds it.</summary>
         internal bool WaitUntilDecoding() => _decoding.Wait(TimeSpan.FromSeconds(5));
 
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult created = _inner.TryCreate(source, stream, options, out IVideoDecoder? inner);
-            if (!created.IsSuccessful || inner is null)
-            {
-                decoder = null;
-                return created;
-            }
-
-            decoder = new GatedDecoder(inner, this);
-            return PlaybackOperationResult.Success;
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            return TestCreators.Wrap(offered, inner, component => new GatedDecoder(component, this), out creator);
         }
 
         private sealed class GatedDecoder(IVideoDecoder inner, GatedVideoDecoderFactory owner) : IVideoDecoder
@@ -466,20 +458,10 @@ public class PlaybackPipelineTests
         /// <summary>How long each packet after the first takes, for a decoder that is slow at the start and
         /// then merely behind.</summary>
         internal int SubsequentDecodeMilliseconds { get; init; }
-
-        public ComponentCapabilities Capabilities => _inner.Capabilities;
-
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult created = _inner.TryCreate(source, stream, options, out IVideoDecoder? inner);
-            if (!created.IsSuccessful || inner is null)
-            {
-                decoder = null;
-                return created;
-            }
-
-            decoder = new SlowFirstDecoder(inner, FirstDecodeMilliseconds, SubsequentDecodeMilliseconds);
-            return PlaybackOperationResult.Success;
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            return TestCreators.Wrap(offered, inner, component => new SlowFirstDecoder(component, FirstDecodeMilliseconds, SubsequentDecodeMilliseconds), out creator);
         }
 
         private sealed class SlowFirstDecoder(IVideoDecoder inner, int firstDecodeMilliseconds, int subsequentDecodeMilliseconds) : IVideoDecoder
@@ -1539,16 +1521,75 @@ public class PlaybackPipelineTests
     /// </para>
     /// </summary>
     /// <summary>
+    /// A device that keeps none of what it is given is indistinguishable, from the queue's side, from one that plays
+    /// perfectly: it holds nothing and accepts everything, so the queue it is fed from never fills. Only the clock can
+    /// tell them apart — the sound taken runs away from the sound played — and when it does, the pipeline stops handing
+    /// over sound until the device has caught up, which is what keeps the lead, and with it the memory, bounded.
+    /// </summary>
+    [Test]
+    public void HoldsSoundBackFromADeviceThatDoesNotPlayIt()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            // The default stand-in is exactly this device: it holds nothing and completes every hand-off at once.
+            FakeAudioRenderer audioRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            const string reported = "The audio device is not playing what it is given.";
+            WaitFor(() => warnings.Messages.Contains(reported), "the device to be found out");
+            TimeSpan positionAtFallback = pipeline.Position;
+
+            // Enough wall time for the sound to have been handed over several times over, if nothing held it back.
+            for (int sample = 0; sample < 6; sample++)
+            {
+                Thread.Sleep(150);
+
+                var submitted = TimeSpan.FromSeconds((double)audioRenderer.SubmittedSamples / SampleRate);
+                TimeSpan lead = submitted - pipeline.Position;
+
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(lead, Is.LessThan(TimeSpan.FromSeconds(4)),
+                        $"the sound runs at most the pipeline's patience ahead of the clock (at {pipeline.Position:mm\\:ss\\.fff}, submitted {submitted:mm\\:ss\\.fff})");
+                    Assert.That(audioRenderer.SubmitsStarted, Is.GreaterThan(0));
+                }
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(warnings.Messages.Count(message => message == reported), Is.EqualTo(1), "a device is reported once, not once per iteration");
+                Assert.That(pipeline.Position, Is.GreaterThan(positionAtFallback), "the position carries on at the clock's pace");
+                Assert.That(pipeline.Error, Is.Null, "a device that does not play is not a failed playback");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "playback itself is still going");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
     /// The end of a file is played out by the stages that still hold media, and the queue is told about it
     /// rather than held by it: the queue every command is posted to has to stay free while the tail plays
     /// out, or a seek is answered when the file has finished instead of when it was asked for. The device is
     /// jammed here after it has taken the whole of the sound, which leaves the ending outstanding for as long
     /// as the sound has not been heard.
+    /// <para>
+    /// The file is two seconds long on purpose: handing over the whole of the sound is only a device keeping up
+    /// while what it has been given is not far ahead of the position. A file longer than the pipeline's patience
+    /// with a device that keeps nothing is <c>ReportsADeviceThatTakesSoundAndNeverPlaysIt</c>, a different case.
+    /// </para>
     /// </summary>
     [Test]
     public void AnswersACommandWhileTheSoundHasNotPlayedOut()
     {
-        string path = RawAudioVideoFixtureFile.Create();
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 60);
         try
         {
             FakeAudioRenderer audioRenderer = new();
@@ -1557,10 +1598,10 @@ public class PlaybackPipelineTests
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
-            // The fixture is 200 frames at 30 fps with 44.1 kHz sound, so a device that has been handed this
+            // The fixture is 60 frames at 30 fps with 44.1 kHz sound, so a device that has been handed this
             // many samples has been handed the whole of the file's audio — and the reader, which is ahead of
             // the device everywhere else, has read the end of the file to do it.
-            const int totalSamples = SampleRate * 200 / 30;
+            const int totalSamples = SampleRate * 60 / 30;
             WaitFor(() => audioRenderer.SubmittedSamples >= totalSamples, "the reader has to reach the end of the file");
             audioRenderer.QueuedSampleCount = SampleRate;
             audioRenderer.NoRoom = true;
@@ -1591,7 +1632,7 @@ public class PlaybackPipelineTests
     [Test]
     public void EndsWhenTheDeviceHasPlayedOutTheSound()
     {
-        string path = RawAudioVideoFixtureFile.Create();
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 60);
         try
         {
             FakeAudioRenderer audioRenderer = new();
@@ -1600,7 +1641,7 @@ public class PlaybackPipelineTests
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
-            const int totalSamples = SampleRate * 200 / 30;
+            const int totalSamples = SampleRate * 60 / 30;
             WaitFor(() => audioRenderer.SubmittedSamples >= totalSamples, "the reader has to reach the end of the file");
 
             // Now that the whole sound has been handed over, the device holds audio and takes none of it,
@@ -1608,7 +1649,7 @@ public class PlaybackPipelineTests
             // holds the ending up is the sound and nothing else.
             audioRenderer.QueuedSampleCount = SampleRate;
             audioRenderer.NoRoom = true;
-            Assert.That(Await(pipeline.Seek(TimeSpan.FromSeconds(6))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Seek(TimeSpan.FromSeconds(1.8))).IsSuccessful, Is.True);
             Thread.Sleep(200);
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a sound that has not played out is not an ending");
 
@@ -2103,11 +2144,12 @@ public class PlaybackPipelineTests
     [Test]
     public void KeepsPlayingVideoWhenAudioCannotBeOpened()
     {
-        string path = RawAudioVideoFixtureFile.Create();
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 12);
         try
         {
             FakeAudioRenderer audioRenderer = new() { CanConfigure = false, RefusalReason = "no device here" };
-            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
             WarningLog warnings = new(pipeline);
 
             PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
@@ -2119,7 +2161,21 @@ public class PlaybackPipelineTests
                 Assert.That(opened.IsSuccessful, Is.True, opened.Message);
                 Assert.That(warnings.Latest, Does.Contain("no device here"));
                 Assert.That(pipeline.State, Is.Not.EqualTo(MediaEngineState.Error));
-                Assert.That(pipeline.HasAudio, Is.False);
+
+                // The stream is still part of the file; what is missing is a chain to play it, and one may be built
+                // later. So the sound is reported as present and unplayed, rather than pretended away.
+                Assert.That(pipeline.HasAudio, Is.True, "the file's audio stream does not stop existing because no device would take it");
+            }
+
+            // The end still has to arrive: the sound can never be played out, so the audio thread has to report the
+            // end of the sound itself, or the pipeline waits for a device that is not there and never ends.
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitForPlaybackToFinish(pipeline);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
+                Assert.That(videoRenderer.RenderedFrames, Is.GreaterThan(0), "the picture played without the sound");
             }
         }
         finally
@@ -2473,35 +2529,975 @@ public class PlaybackPipelineTests
         }
     }
 
+    /// <summary>
+    /// The registry decides which decoders can serve a stream; the pipeline walks the list it is given and
+    /// takes the first that opens. A factory that refuses has to leave the file to the next one.
+    /// </summary>
+    [Test]
+    public void LetsTheNextDecoderServeAFileWhenTheFirstOneRefuses()
+    {
+        RecordingVideoDecoderFactory silent = new();
+
+        string path = CreateBitmapFile();
+        try
+        {
+            IComponentRegistry registry = new ComponentRegistry();
+            registry.Register(new RefusingVideoDecoderFactory());
+            registry.Register(silent);
+
+            using PlaybackPipeline pipeline = CreatePipeline(registry, new FakeVideoRenderer(), new FakeAudioRenderer());
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True, pipeline.Error);
+            Assert.That(silent.Options, Is.Not.Null, "the second decoder has to be the one that was created");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A pipeline with nothing to open files with says so rather than faulting: the source provider is a
+    /// property, so forgetting it is an omission a caller has to be told about.
+    /// </summary>
+    [Test]
+    public void ReportsWhenNoSourceProviderWasSupplied()
+    {
+        using PlaybackPipeline pipeline = new();
+
+        PlaybackOperationResult opened = Open(pipeline, CreateBitmapFile());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(opened.IsSuccessful, Is.False);
+            Assert.That(opened.Message, Does.Contain("source provider"));
+
+            // A failed open closes whatever was playing, like every other way an open can fail.
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.None));
+        }
+    }
+
+    /// <summary>
+    /// The audio slots are resolved from the registry like everything else, so a factory that refuses leaves
+    /// the file to the next one instead of ending the open.
+    /// </summary>
+    [Test]
+    public void LetsTheNextAudioDecoderServeTheFileWhenTheFirstOneRefuses()
+    {
+        string path = CreateWaveFile();
+        try
+        {
+            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            {
+                components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
+                components.Register(new RefusingAudioDecoderFactory());
+                components.Register(new FFmpegAudioDecoderFactory());
+            });
+
+            PlaybackOperationResult opened = Open(pipeline, path);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+                Assert.That(pipeline.HasAudio, Is.True);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The sound device is resolved from the registry too, which is what makes "play through that device" a
+    /// registration rather than a factory handed to a setter.
+    /// </summary>
+    [Test]
+    public void LetsTheNextAudioRendererServeTheFileWhenTheFirstOneRefuses()
+    {
+        string path = CreateWaveFile();
+        try
+        {
+            FakeAudioRenderer audioRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            {
+                components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                components.Register(new RefusingAudioRendererFactory());
+                components.Register(new FixedAudioRendererFactory(audioRenderer));
+                components.Register(new FFmpegAudioDecoderFactory());
+            });
+
+            PlaybackOperationResult opened = Open(pipeline, path);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+                Assert.That(audioRenderer.ConfiguredStream, Is.Not.Null, "the second device has to be the one that was configured");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>The picture's output is resolved the same way, so a device that cannot be made is skipped.</summary>
+    [Test]
+    public void LetsTheNextVideoRendererServeTheFileWhenTheFirstOneRefuses()
+    {
+        string path = CreateBitmapFile();
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            {
+                components.Register(new RefusingVideoRendererFactory());
+                components.Register(new FakeVideoRendererFactory(videoRenderer));
+                components.Register(new FFmpegVideoDecoderFactory());
+                components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
+            });
+
+            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+                Assert.That(videoRenderer.ConfiguredStream, Is.Not.Null, "the second renderer has to be the one that was configured");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>What a refusal leaves the caller with is the decoder's own reason, not a generic one.</summary>
+    [Test]
+    public void ReportsWhyNoDecoderCouldServeTheFile()
+    {
+        string path = CreateBitmapFile();
+        try
+        {
+            IComponentRegistry registry = new ComponentRegistry();
+            registry.Register(new RefusingVideoDecoderFactory());
+
+            using PlaybackPipeline pipeline = CreatePipeline(registry, new FakeVideoRenderer(), new FakeAudioRenderer());
+
+            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+
+            Assert.That(opened.IsSuccessful, Is.False);
+            Assert.That(opened.Message, Does.Contain("refuses the stream"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The video decoder can be replaced while a file plays. It has to be a replacement and not a restart: the
+    /// state stays playing, the position stays where it was, and frames keep coming — from the new decoder.
+    /// </summary>
+    [Test]
+    public void ReplacesTheVideoDecoderWithoutLeavingPlayback()
+    {
+        string path = CreateY4mFile(frameCount: 60, frameRate: "30:1");
+        try
+        {
+            RecordingOptionsVideoDecoderFactory decoders = new();
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer(), videoDecoders: decoders);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way");
+
+            long rendered = videoRenderer.RenderedFrames;
+            TimeSpan position = pipeline.Position;
+
+            // The host says what it wants by changing the registry, then tells the pipeline to look again.
+            pipeline.Components.Preferences = pipeline.Components.Preferences with { PreferHardwareDecoding = false };
+            PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+
+            Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
+
+            WaitFor(() => decoders.RequestCount >= 2, "the decoder to be replaced");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(decoders.GetRequest(1).HardwareDecoding, Is.False, "the new decoder has to be created with the new preference");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "changing the decoder is not a pause");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position - TimeSpan.FromSeconds(1)), "the stream has to pick up where it was");
+            }
+
+            WaitFor(() => videoRenderer.RenderedFrames > rendered, "frames to keep coming from the new decoder");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// What the pipeline reports is the decoder that is running, not the one that was asked for: switching the kind
+    /// of decoder moves the report with it, and playback carries on through the new one.
+    /// <para>
+    /// The two stand-ins decode exactly the same way and differ only in what they say about themselves, because that
+    /// is what the report is about. Whether a real hardware decoder can be built for a file is a property of the
+    /// machine and the codec, so a test that waited for one would be testing the machine.
+    /// </para>
+    /// </summary>
+    [Test]
+    public void ReportsTheDecoderThatIsRunning()
+    {
+        string path = CreateY4mFile(frameCount: 60, frameRate: "30:1");
+        try
+        {
+            IComponentRegistry registry = new ComponentRegistry();
+            registry.Register(new FlaggedVideoDecoderFactory(hardware: true, "flagged:hardware"));
+
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(registry, videoRenderer, new FakeAudioRenderer());
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+
+            // The decoder is taken over by the decode thread, so what is running is reported once it has it.
+            WaitFor(() => pipeline.IsVideoHardwareAccelerated, "the decoder that says it runs on hardware");
+
+            Await(pipeline.Play());
+            WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way");
+
+            long rendered = videoRenderer.RenderedFrames;
+            pipeline.Components.Clear<IVideoDecoderFactory>();
+            pipeline.Components.Register(new FlaggedVideoDecoderFactory(hardware: false, "flagged:software"));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            WaitFor(() => !pipeline.IsVideoHardwareAccelerated, "the replacement to be reported");
+
+            WaitFor(() => videoRenderer.RenderedFrames > rendered, "the new decoder to keep the picture coming");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The video renderer can be replaced while a file plays: the factory the caller names makes the new one,
+    /// the picture carries on without a pause, and the renderer it replaced is released. It goes through the
+    /// same rebuild as a decoder switch, because a decoder decodes on the device its renderer owns.
+    /// </summary>
+    [Test]
+    public void SwapsTheVideoRendererWithoutLeavingPlayback()
+    {
+        string path = CreateY4mFile(frameCount: 60, frameRate: "30:1");
+        try
+        {
+            FakeVideoRenderer first = new() { Name = "first" };
+            FakeVideoRenderer second = new() { Name = "second" };
+            RecordingOptionsVideoDecoderFactory decoders = new();
+            using PlaybackPipeline pipeline = CreatePipeline(first, new FakeAudioRenderer(), videoDecoders: decoders);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
+            Assert.That(pipeline.VideoRendererName, Is.EqualTo("first"));
+            Assert.That(decoders.RequestCount, Is.EqualTo(1), "the decoder was created for the first renderer");
+
+            TimeSpan position = pipeline.Position;
+            SwapVideoRenderer(pipeline, new FakeVideoRendererFactory(second));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            WaitFor(() => second.RenderedFrames > 0, "the new renderer to be drawing");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.VideoRendererName, Is.EqualTo("second"));
+                Assert.That(first.DisposeCount, Is.EqualTo(1), "the renderer that was replaced has to be released");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "changing the renderer is not a pause");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position - TimeSpan.FromSeconds(1)), "the stream has to pick up where it was");
+            }
+
+            // A new renderer brings a new device, so the decoder is rebuilt even though the decoder registry was
+            // not touched: frames decoded before the swap belong to a device that is no longer drawing.
+            WaitFor(() => decoders.RequestCount >= 2, "the decoder to be rebuilt on the new renderer's device");
+
+            long rendered = second.RenderedFrames;
+            WaitFor(() => second.RenderedFrames > rendered, "frames to keep coming through the new renderer");
+
+            // The choice outlives the file, like the decoder's: the next one is drawn by the same factory.
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(pipeline.VideoRendererName, Is.EqualTo("second"), "the next file opens with the chosen renderer");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The renderer can be replaced while a file plays, and playback stays where it is. A rebuilt chain is a fresh
+    /// start — what the old one decoded is not what the new one will decode — so the stream is started again at the
+    /// position playback has reached: the device is flushed and fed from there, and what matters is that the position
+    /// neither rewinds nor jumps.
+    /// </summary>
+    [Test]
+    public void SwapsTheVideoRendererWithoutMovingPlayback()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeVideoRenderer first = new() { Name = "first" };
+            FakeVideoRenderer second = new() { Name = "second" };
+
+            // A device that plays what it is given, so "kept playing" is something this test can see.
+            FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(first, audioRenderer);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
+            WaitFor(() => audioRenderer.SubmittedSamples > 0, "the sound to be playing");
+
+            int flushed = audioRenderer.FlushCount;
+            TimeSpan position = pipeline.Position;
+
+            SwapVideoRenderer(pipeline, new FakeVideoRendererFactory(second));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.VideoRendererName == "second", "the new renderer to take over");
+            WaitFor(() => second.RenderedFrames > 0, "the new renderer to draw");
+
+            // Long enough that a device which was going to be let go of would have been let go of by now.
+            TimeSpan afterSwap = pipeline.Position;
+            WaitFor(() => pipeline.Position > afterSwap + TimeSpan.FromMilliseconds(200), "the clock to keep running");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(audioRenderer.FlushCount, Is.EqualTo(flushed + 1), "the stream is started again where playback is, which flushes the device");
+                Assert.That(audioRenderer.ClockIsRunning, Is.True, "the device keeps playing");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "changing the picture is not a pause");
+                Assert.That(pipeline.Position, Is.GreaterThan(position), "the file has to keep playing, not be moved");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A renderer can be swapped while the picture is not moving, and the swap happens then rather than when
+    /// playback resumes. The render thread is asleep in that state — an unbounded wait on its own node — so
+    /// what makes it look at the request is the wake the request leaves behind.
+    /// </summary>
+    [Test]
+    public void SwapsTheVideoRendererWhilePaused()
+    {
+        string path = CreateY4mFile(frameCount: 60, frameRate: "30:1");
+        try
+        {
+            FakeVideoRenderer first = new() { Name = "first" };
+            FakeVideoRenderer second = new() { Name = "second" };
+            using PlaybackPipeline pipeline = CreatePipeline(first, new FakeAudioRenderer());
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
+            Await(pipeline.Pause());
+
+            SwapVideoRenderer(pipeline, new FakeVideoRendererFactory(second));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.VideoRendererName == "second", "the swap to happen while the picture is still");
+
+            Await(pipeline.Play());
+            WaitFor(() => second.RenderedFrames > 0, "the new renderer to draw once playback resumes");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A creator that cannot make what it said it would is passed over for the next registration: a machine that
+    /// will not give what one factory promised may well give what the next one offers, and a picture that only
+    /// comes from the second one is worth more than a report about the first.
+    /// </summary>
+    [Test]
+    public void PassesOverACreatorThatCannotMakeItsComponent()
+    {
+        string path = CreateY4mFile(frameCount: 60, frameRate: "30:1");
+        try
+        {
+            FakeVideoRenderer first = new() { Name = "first" };
+            FakeVideoRenderer second = new() { Name = "second" };
+            using PlaybackPipeline pipeline = CreatePipeline(first, new FakeAudioRenderer());
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
+
+            // The registration that promises a renderer it cannot build comes first; the one that can comes second.
+            pipeline.Components.Clear<IVideoRendererFactory>();
+            pipeline.Components.Register(new FailingVideoRendererFactory("broken"));
+            pipeline.Components.Register(new FakeVideoRendererFactory(second));
+
+            PlaybackOperationResult swapped = Await(pipeline.Reconcile());
+
+            Assert.That(swapped.IsSuccessful, Is.True, swapped.Message);
+
+            // The swap is published by the reconcile and taken up by the render thread, so the name changes a beat
+            // after the command returns.
+            WaitFor(() => pipeline.VideoRendererName == "second", "the registration that could deliver to be the one running");
+
+            WaitFor(() => second.RenderedFrames > 0, "the second renderer to draw");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A renderer that cannot be made must not take the running one down with it: the caller is told, and the
+    /// picture keeps coming from the renderer that was already drawing.
+    /// </summary>
+    [Test]
+    public void KeepsTheRunningRendererWhenTheNewOneFails()
+    {
+        string path = CreateY4mFile(frameCount: 60, frameRate: "30:1");
+        try
+        {
+            FakeVideoRenderer first = new() { Name = "first" };
+            using PlaybackPipeline pipeline = CreatePipeline(first, new FakeAudioRenderer());
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
+
+            long rendered = first.RenderedFrames;
+
+            // The renderer that works is removed from the registry, so what is left is one that offers a renderer
+            // it cannot build: the reconcile has to say so and leave the running renderer alone.
+            SwapVideoRenderer(pipeline, new FailingVideoRendererFactory("broken"));
+
+            PlaybackOperationResult swapped = Await(pipeline.Reconcile());
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(swapped.IsSuccessful, Is.False, "a renderer that cannot be made is the caller's failure to see");
+                Assert.That(swapped.Message, Does.Contain("refuses"));
+                Assert.That(pipeline.VideoRendererName, Is.EqualTo("first"), "the running renderer is untouched");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
+            }
+
+            WaitFor(() => first.RenderedFrames > rendered, "the running renderer to carry on");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The device the sound comes out of can be replaced while a file plays. The new device takes over on the
+    /// audio thread, the one being replaced is flushed and released there, and playback carries on: the state
+    /// stays playing, the clock keeps moving, and the level the host set survives the swap. A rebuilt chain restarts
+    /// the stream where playback is, so the device now in use is flushed once as part of that — and the position is
+    /// still where it was, which is what "the file does not move for it" means.
+    /// </summary>
+    [Test]
+    public void SwapsTheAudioRendererWithoutLeavingPlayback()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 5);
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            // A device that never takes the audio is the state a swap is interesting in: playback waits for it,
+            // so the file cannot run out while the test is setting the swap up.
+            FakeAudioRenderer first = new() { Name = "first", QueuedSampleCount = SampleRate, NoRoom = true };
+            FakeAudioRenderer second = new() { Name = "second", QueuedSampleCount = SampleRate };
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, first);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            pipeline.Volume = 0.25;
+            Await(pipeline.Play());
+            WaitFor(() => first.SubmitsStarted > 0, "the pipeline to be handing the device audio");
+            Assert.That(pipeline.AudioRendererName, Is.EqualTo("first"));
+
+            TimeSpan position = pipeline.Position;
+            SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(second));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            WaitFor(() => second.SubmittedBuffers > 0, "the new device to be playing");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.AudioRendererName, Is.EqualTo("second"));
+                Assert.That(first.DisposeCount, Is.EqualTo(1), "the device that was replaced has to be released");
+                Assert.That(second.Volume, Is.EqualTo(0.25), "the level is the pipeline's, so the new device gets it");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "changing the device is not a pause");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position - TimeSpan.FromSeconds(1)), "the stream has to pick up where it was");
+                Assert.That(second.FlushCount, Is.EqualTo(1), "the stream is started again where it stands, which is a flush of the device now in use");
+            }
+
+            WaitFor(() => pipeline.Position > position, "the clock to keep moving");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A device that cannot be opened must not take the running one down with it: the caller is told, and the
+    /// sound keeps coming out of the device that was already playing.
+    /// </summary>
+    [Test]
+    public void KeepsTheRunningAudioRendererWhenTheNewOneFails()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 5);
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            FakeAudioRenderer first = new() { Name = "first", QueuedSampleCount = SampleRate, NoRoom = true };
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, first);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => first.SubmitsStarted > 0, "the pipeline to be handing the device audio");
+
+            TimeSpan position = pipeline.Position;
+            FakeAudioRenderer refuses = new() { CanConfigure = false, RefusalReason = "This device refuses the stream." };
+            SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(refuses));
+            PlaybackOperationResult swapped = Await(pipeline.Reconcile());
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(swapped.IsSuccessful, Is.False, "a device that cannot be opened is the caller's failure to see");
+                Assert.That(swapped.Message, Does.Contain("refuses"));
+                Assert.That(pipeline.AudioRendererName, Is.EqualTo("first"), "the playing device is untouched");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
+            }
+
+            WaitFor(() => pipeline.Position > position, "the clock to keep moving");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The audio decoder is rebuilt too, on the thread that decodes audio — the reader. It is the last slot to
+    /// get the treatment the video decoder has had since S13, and the reason it is worth having: without it,
+    /// "which audio decoder" could only ever be answered at open. Nothing else moves for it: the device is not
+    /// flushed and the clock is not re-anchored, because neither the bitstream still to come nor the sound
+    /// already decoded was ever paired with the decoder that made it.
+    /// </summary>
+    [Test]
+    public void ReplacesTheAudioDecoderWithoutLeavingPlayback()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 5);
+        try
+        {
+            // A device that plays what it is handed, so the file lasts as long as its sound does, and a decoder that
+            // is slow on purpose, so the reader is still reading when the swap lands — which is the state where a
+            // new decoder has something left to decode.
+            FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            {
+                components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                components.Register(new FixedAudioRendererFactory(audioRenderer));
+                components.Register(new PacedAudioDecoderFactory());
+            });
+
+            PlaybackOperationResult opened = Open(pipeline, path);
+            Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+            Await(pipeline.Play());
+            WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
+
+            // A second audio decoder under a signature of its own, in place of the one playing: the decoder changes,
+            // and the reader is the thread that has to act on it.
+            int before = audioRenderer.SubmittedBuffers;
+            int flushed = audioRenderer.FlushCount;
+            TimeSpan position = pipeline.Position;
+
+            pipeline.Components.Clear<IAudioDecoderFactory>();
+            pipeline.Components.Register(new NamedAudioDecoderFactory("audio-second"));
+
+            PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "replacing an audio decoder is not a pause");
+            }
+
+            WaitFor(() => audioRenderer.SubmittedBuffers > before, $"the new decoder to keep the sound coming ({before} before, {audioRenderer.SubmittedBuffers} now, {pipeline.State}, starved {pipeline.StarvedFor ?? "nothing"})");
+
+            using (Assert.EnterMultipleScope())
+            {
+                // A rebuilt chain restarts the stream at the position playback has reached, and restarting it is a flush
+                // of the device: what it held belonged to the chains that were replaced.
+                Assert.That(audioRenderer.FlushCount, Is.EqualTo(flushed + 1), "the stream is started again where it stands");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position), "the clock is not re-anchored");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// One reconcile applies everything that changed, not the last thing: a host that swaps the picture's
+    /// output and the sound's device in one edit gets both, and one call.
+    /// </summary>
+    [Test]
+    public void AppliesBothChainsInOneReconcile()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeVideoRenderer firstVideo = new() { Name = "first-video" };
+            FakeVideoRenderer secondVideo = new() { Name = "second-video" };
+
+            // The first device holds what it is given, the way a real one does — a device with room for the whole
+            // file would take all of it before the swap and leave the new one nothing to play.
+            FakeAudioRenderer firstAudio = new() { Name = "first-audio", QueuedSampleCount = SampleRate, NoRoom = true };
+            FakeAudioRenderer secondAudio = new() { Name = "second-audio", QueuedSampleCount = SampleRate };
+
+            using PlaybackPipeline pipeline = CreatePipeline(firstVideo, firstAudio);
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => firstVideo.RenderedFrames > 2, "playback to be under way");
+
+            SwapVideoRenderer(pipeline, new FakeVideoRendererFactory(secondVideo));
+            SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(secondAudio));
+
+            PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+
+            Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
+
+            WaitFor(() => secondVideo.RenderedFrames > 0, "the new video renderer to draw");
+            WaitFor(() => secondAudio.SubmitsStarted > 0, "the new audio device to be handed sound");
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>Asking for the decoder that is already running changes nothing.</summary>
+    [Test]
+    public void KeepsTheRunningDecoderWhenThePreferenceIsUnchanged()
+    {
+        string path = CreateY4mFile(frameCount: 60, frameRate: "30:1");
+        try
+        {
+            RecordingOptionsVideoDecoderFactory decoders = new();
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer(), videoDecoders: decoders);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => decoders.RequestCount >= 1, "the decoder to be created");
+
+            long rendered = videoRenderer.RenderedFrames;
+
+            // Asking for what is already in force is not a change: the resolver is asked again, and because the
+            // answer is the decoder that is running, nothing is built.
+            PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+
+            Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
+
+            WaitFor(() => videoRenderer.RenderedFrames > rendered, "playback to go on");
+            Assert.That(decoders.RequestCount, Is.EqualTo(2), "the running decoder was offered again and not rebuilt");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A decoder that cannot be created must not take playback down with it: the running one stays, the reconcile
+    /// reports why, and the stream carries on.
+    /// </summary>
+    [Test]
+    public void KeepsTheRunningDecoderWhenTheReplacementFails()
+    {
+        string path = CreateY4mFile(frameCount: 60, frameRate: "30:1");
+        try
+        {
+            RecordingOptionsVideoDecoderFactory decoders = new();
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer(), videoDecoders: decoders);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way");
+
+            long rendered = videoRenderer.RenderedFrames;
+
+            // A decoder that refuses is the only one left, so nothing can be built to replace the running one — the
+            // reconcile says so, and because nothing was published the picture never stops.
+            pipeline.Components.Clear<IVideoDecoderFactory>();
+            pipeline.Components.Register(new RefusingVideoDecoderFactory());
+
+            PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(reconciled.IsSuccessful, Is.False, "a replacement that cannot be built is the caller's to see");
+                Assert.That(reconciled.Message, Does.Contain("refuses the stream"), "the reason is the decoder's own");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a failed replacement is not a playback failure");
+            }
+
+            WaitFor(() => videoRenderer.RenderedFrames > rendered, "the running decoder to carry on");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A renderer that draws with a GPU offers the device it draws through. The pipeline has to hand it to the
+    /// decoder it creates next: a decoder on that device produces textures the renderer can sample, and one on
+    /// a device of its own produces frames that have to be copied back.
+    /// </summary>
+    [Test]
+    public void GivesTheDecoderTheDeviceItsRendererDrawsWith()
+    {
+        GpuDeviceVideoRenderer renderer = new();
+        RecordingVideoDecoderFactory decoders = new();
+
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            using PlaybackPipeline pipeline = CreatePipeline(renderer, new FakeAudioRenderer(), videoDecoders: decoders);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            WaitFor(() => decoders.Options is not null, "the decoder to be created");
+
+            // The whole thing, not just the handle: the lock that guards the device is what keeps the decode
+            // thread and the drawing thread off one context at a time. What the pipeline handed over has to be the
+            // device the renderer exposes, not something it worked out from the renderer's type.
+            Assert.That(decoders.Options!.GpuDevice, Is.SameAs(renderer.GpuDevice));
+            Assert.That(decoders.Options.BufferedFrames, Is.GreaterThanOrEqualTo(8), "the decoder has to know how many frames the pipeline keeps alive");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static PlaybackPipeline CreatePipeline(
-        FakeVideoRenderer videoRenderer,
+        IVideoRenderer videoRenderer,
         FakeAudioRenderer audioRenderer,
         IVideoDecoderFactory? videoDecoders = null,
         ISourceProviderFactory? sourceFactory = null,
         IAudioDecoderFactory? audioDecoders = null)
     {
-        return new PlaybackPipeline(
-            sourceFactory ?? new FFmpegSourceProviderFactory(),
-            videoDecoders ?? new FFmpegVideoDecoderFactory(),
-            new FakeVideoRendererFactory(videoRenderer),
-            audioDecoders ?? new FFmpegAudioDecoderFactory(),
-            new FixedAudioRendererFactory(audioRenderer),
-            new DefaultSynchronizer());
+        PlaybackPipeline pipeline = new()
+        {
+            SourceFactory = sourceFactory ?? new FFmpegSourceProviderFactory(),
+        };
+
+        pipeline.Components.Register(videoDecoders ?? new FFmpegVideoDecoderFactory());
+        pipeline.Components.Register(new FakeVideoRendererFactory(videoRenderer));
+        pipeline.Components.Register(audioDecoders ?? new FFmpegAudioDecoderFactory());
+        pipeline.Components.Register(new FixedAudioRendererFactory(audioRenderer));
+        return pipeline;
     }
 
     /// <summary>
     /// A pipeline whose sound devices are made by the factory under test, with a stand-in picture so the file
     /// only has to contain audio.
     /// </summary>
-    private static PlaybackPipeline CreatePipeline(IComponentFactory<IAudioRenderer> audioRendererFactory)
+    private static PlaybackPipeline CreatePipeline(IAudioRendererFactory audioRendererFactory)
     {
-        return new PlaybackPipeline(
-            new FFmpegSourceProviderFactory(),
-            new FFmpegVideoDecoderFactory(),
-            new FakeVideoRendererFactory(new FakeVideoRenderer()),
-            new FFmpegAudioDecoderFactory(),
-            audioRendererFactory,
-            new DefaultSynchronizer());
+        PlaybackPipeline pipeline = new() { SourceFactory = new FFmpegSourceProviderFactory() };
+
+        pipeline.Components.Register(new FFmpegVideoDecoderFactory());
+        pipeline.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+        pipeline.Components.Register(new FFmpegAudioDecoderFactory());
+        pipeline.Components.Register(audioRendererFactory);
+        return pipeline;
+    }
+
+    /// <summary>
+    /// A signature nothing else will have. The pipeline decides what to swap by comparing signatures, so a stand-in
+    /// that wants to be recognised as a *new* component has to say something new — the same stand-in handed over
+    /// again keeps the signature it already had, which is what "not a change" has to look like.
+    /// </summary>
+    private static string NextSignature(string kind)
+    {
+        return $"{kind}-{Interlocked.Increment(ref _signatures)}";
+    }
+
+    private static int _signatures;
+
+    /// <summary>
+    /// Puts a new renderer in place of the one the pipeline is drawing with. A test holds the factory it
+    /// registered, not the instance the pipeline built from it, so the role is emptied instead of one entry being
+    /// replaced — which is what a host that wants "this one instead" does anyway.
+    /// </summary>
+    private static void SwapVideoRenderer(PlaybackPipeline pipeline, IVideoRendererFactory factory)
+    {
+        pipeline.Components.Clear<IVideoRendererFactory>();
+        pipeline.Components.Register(factory);
+    }
+
+    private static void SwapAudioRenderer(PlaybackPipeline pipeline, IAudioRendererFactory factory)
+    {
+        pipeline.Components.Clear<IAudioRendererFactory>();
+        pipeline.Components.Register(factory);
+    }
+
+    /// <summary>A pipeline whose registrations are made by the test, which is what a host does.</summary>
+    private static PlaybackPipeline CreatePipeline(Action<ComponentResolver> register)
+    {
+        PlaybackPipeline pipeline = new() { SourceFactory = new FFmpegSourceProviderFactory() };
+        register(pipeline.Components);
+        return pipeline;
+    }
+
+    /// <summary>A pipeline over an explicit registry, for the tests that are about selection itself.</summary>
+    private static PlaybackPipeline CreatePipeline(IComponentRegistry registry, IVideoRenderer videoRenderer, FakeAudioRenderer audioRenderer)
+    {
+        registry.Register(new FakeVideoRendererFactory(videoRenderer));
+        registry.Register(new FFmpegAudioDecoderFactory());
+        registry.Register(new FixedAudioRendererFactory(audioRenderer));
+
+        return new PlaybackPipeline
+        {
+            SourceFactory = new FFmpegSourceProviderFactory(),
+            Components = new ComponentResolver(registry),
+        };
+    }
+
+    /// <summary>
+    /// A decoder that refuses every stream in the one place a refusal can be explained — the creator — which is
+    /// what a factory that cannot handle a codec does.
+    /// </summary>
+    private sealed class RefusingVideoDecoderFactory : IVideoDecoderFactory
+    {
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        {
+            creator = new Creator();
+            return PlaybackOperationResult.Success;
+        }
+
+        private sealed class Creator : IComponentCreator<IVideoDecoder>
+        {
+            public string Signature => "refusing:video";
+
+            public PlaybackOperationResult Create(out IVideoDecoder? component)
+            {
+                component = null;
+                return PlaybackOperationResult.Failure("This decoder refuses the stream.");
+            }
+        }
+    }
+
+    /// <summary>The real decoder, wrapped so that a test can read the settings each request was made with.</summary>
+    private sealed class RecordingOptionsVideoDecoderFactory : IVideoDecoderFactory
+    {
+        private readonly FFmpegVideoDecoderFactory _inner = new();
+        private readonly List<DecoderOptions> _requests = [];
+
+        internal int RequestCount
+        {
+            get
+            {
+                lock (_requests)
+                {
+                    return _requests.Count;
+                }
+            }
+        }
+        /// <summary>The requests, in order. Read it through <see cref="GetRequest"/> so a test never races one.</summary>
+        internal DecoderOptions GetRequest(int index)
+        {
+            lock (_requests)
+            {
+                return _requests[index];
+            }
+        }
+
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        {
+            lock (_requests)
+            {
+                _requests.Add(options);
+            }
+
+            return _inner.TryCreate(source, stream, options, out creator);
+        }
+    }
+
+    /// <summary>
+    /// A decoder that serves only the kind of request it declares: the one that was asked for serves it, and the
+    /// other kind offers nothing rather than quietly serving it anyway — which is what makes the requirement a
+    /// requirement and the order alone unable to override it.
+    /// </summary>
+    /// <summary>
+    /// The real decoder, decoding exactly as it always would, saying something else about where it runs — which is
+    /// the one thing a report can be tested against without depending on what the machine can do.
+    /// </summary>
+    private sealed class FlaggedVideoDecoderFactory(bool hardware, string signature) : IVideoDecoderFactory
+    {
+        private readonly FFmpegVideoDecoderFactory _inner = new();
+
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        {
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            creator = offered.IsSuccessful && inner is not null ? new Creator(inner, hardware, signature) : null;
+            return creator is null ? offered : PlaybackOperationResult.Success;
+        }
+
+        private sealed class Creator(IComponentCreator<IVideoDecoder> inner, bool hardware, string signature) : IComponentCreator<IVideoDecoder>
+        {
+            public string Signature => signature;
+
+            public PlaybackOperationResult Create(out IVideoDecoder? component)
+            {
+                PlaybackOperationResult created = inner.Create(out IVideoDecoder? made);
+                component = created.IsSuccessful && made is not null ? new Decoder(made, hardware) : null;
+                return created;
+            }
+        }
+
+        private sealed class Decoder(IVideoDecoder inner, bool hardware) : IVideoDecoder
+        {
+            public MediaStreamInfo Stream => inner.Stream;
+
+            public bool IsHardwareAccelerated => hardware;
+
+            public PixelFormat OutputFormat => inner.OutputFormat;
+
+            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> buffers)
+            {
+                return inner.TryDecode(packet, out buffers);
+            }
+
+            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> buffers)
+            {
+                return inner.Drain(out buffers);
+            }
+
+            public PlaybackOperationResult Flush()
+            {
+                return inner.Flush();
+            }
+
+            public void Dispose()
+            {
+                inner.Dispose();
+            }
+        }
     }
 
     /// <summary>
@@ -2509,24 +3505,19 @@ public class PlaybackPipelineTests
     /// open and disposes it on close, so this is only sound because the stand-in's dispose does nothing and
     /// it can be configured again — which is exactly what the tests need to read its counters afterwards.
     /// </summary>
-    private sealed class FixedAudioRendererFactory : IComponentFactory<IAudioRenderer>
+    private sealed class FixedAudioRendererFactory : IAudioRendererFactory
     {
         private readonly IAudioRenderer _renderer;
+        private readonly string _signature = NextSignature("fixed-audio");
 
         internal FixedAudioRendererFactory(IAudioRenderer renderer)
         {
             _renderer = renderer;
         }
 
-        public ComponentCapabilities Capabilities { get; } = new()
+        public PlaybackOperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
         {
-            Name = "fake",
-            Description = "The renderer the test reads.",
-        };
-
-        public PlaybackOperationResult TryCreate(out IAudioRenderer? component)
-        {
-            component = _renderer;
+            creator = new FixedCreator<IAudioRenderer>(_signature, () => _renderer);
             return PlaybackOperationResult.Success;
         }
     }
@@ -2577,31 +3568,146 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
-    /// A renderer that cannot hand a block to its device fails the hand-off, and the pipeline is where that
-    /// becomes an error — not where the thread dies. The message the state carries is the one the failing layer
-    /// produced, context included: the pipeline adds a state, not a diagnosis. (The exception itself is pinned
-    /// to be preserved by <c>WasapiAudioClockTests</c>, which is where it is caught.)
+    /// The cure for a failed device is a new one. Because the sound it could not take was spent rather than piled up,
+    /// the swap finds playback where it is and hands what is left to the device that replaced the failed one.
     /// </summary>
     [Test]
-    public void ReportsARenderersFailureAsPlaybackFailing()
+    public void BringsTheSoundBackWhenAFailedDeviceIsSwapped()
     {
-        string path = CreateWaveFile();
+        string path = CreateWaveFile(sampleCount: SampleRate * 2);
         try
         {
             InvalidOperationException failure = new("The device cannot be written to.");
-            FakeAudioRenderer audioRenderer = new() { SubmitFailure = failure };
-            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+            FakeAudioRenderer failed = new() { Name = "failed", SubmitFailure = failure };
+            FakeAudioRenderer healthy = new() { Name = "healthy", PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), failed);
+            WarningLog warnings = new(pipeline);
 
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => warnings.Messages.Contains($"Unable to queue audio: {failure.Message}"), "the failed device to be reported");
+
+            SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(healthy));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            WaitFor(() => healthy.SubmittedBuffers > 0, "the device that replaced the failed one to take sound");
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the sound is back, so playback never left");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The other half of the same rule: a picture device that has failed must not hold the end of the file back.
+    /// The frames it can no longer take are spent, so the end marker still reaches the render thread and the
+    /// playback still ends — a picture that has nothing left to show is not a picture that never ends.
+    /// </summary>
+    [Test]
+    public void EndsWhenThePictureDeviceNeverComesBack()
+    {
+        string path = CreateY4mFile(frameCount: 15, frameRate: "30:1");
+        try
+        {
+            FakeVideoRenderer failed = new() { Name = "failed", RenderFailure = "The device was removed." };
+            using PlaybackPipeline pipeline = CreatePipeline(failed, new FakeAudioRenderer());
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitForPlaybackToFinish(pipeline);
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Error));
-                Assert.That(pipeline.Error, Is.EqualTo($"Unable to queue audio: {failure.Message}"),
+                Assert.That(warnings.Messages, Does.Contain("The device was removed."), "the failure is still reported");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), "the frames were spent, so the file still ended");
+                Assert.That(pipeline.Error, Is.Null, "a failed device is not a failed playback");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A renderer that can no longer present is a failed device, and the swap that replaces it is the cure. So the
+    /// thread keeps drawing nothing rather than exiting — exiting would put the pipeline in a state where the swap
+    /// is refused — and the device that replaces it carries on from there.
+    /// </summary>
+    [Test]
+    public void BringsThePictureBackWhenAFailedDeviceIsSwapped()
+    {
+        string path = CreateY4mFile(frameCount: 90, frameRate: "30:1");
+        try
+        {
+            FakeVideoRenderer failed = new() { Name = "failed", RenderFailure = "The device was removed." };
+            FakeVideoRenderer healthy = new() { Name = "healthy" };
+            using PlaybackPipeline pipeline = CreatePipeline(failed, new FakeAudioRenderer());
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => warnings.Messages.Contains("The device was removed."), "the failed device to be reported");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a failed device is not a failed playback");
+                Assert.That(pipeline.Error, Is.Null);
+            }
+
+            SwapVideoRenderer(pipeline, new FakeVideoRendererFactory(healthy));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            WaitFor(() => healthy.RenderedFrames > 0, "the device that replaced the failed one to draw");
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the picture is back, so playback never left");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A renderer that cannot hand a block to its device has a failed device, not a failed file: the failure is
+    /// reported as a warning and playback carries on. The sound it can no longer take is spent — at the pace the
+    /// clock would have played it, which is what this test measures: the file lasts as long as it says it does, so
+    /// nothing is thrown away early and a device that replaced this one would still have sound to play. Failing the
+    /// playback instead would leave it in a state where a renderer swap is refused, which is the one thing that
+    /// could have fixed it.
+    /// </summary>
+    [Test]
+    public void KeepsGoingWhenTheDeviceStopsTakingTheSound()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate);
+        try
+        {
+            InvalidOperationException failure = new("The device cannot be written to.");
+            FakeAudioRenderer audioRenderer = new() { SubmitFailure = failure };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            var elapsed = System.Diagnostics.Stopwatch.StartNew();
+            WaitForPlaybackToFinish(pipeline);
+            elapsed.Stop();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(warnings.Messages, Does.Contain($"Unable to queue audio: {failure.Message}"),
                     "the message the user sees is the one the failing layer produced, with its context");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), "the sound is spent, so the file still ends");
+                Assert.That(pipeline.Error, Is.Null, "a failed device is not a failed playback");
+                Assert.That(elapsed.Elapsed, Is.GreaterThan(TimeSpan.FromMilliseconds(800)),
+                    "the second of sound is spent as a second, not swallowed in one gulp");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(TimeSpan.FromMilliseconds(900)),
+                    "and the position travels with it, so a device swap resumes where playback actually is");
             }
         }
         finally
@@ -2694,19 +3800,14 @@ public class PlaybackPipelineTests
     /// Hands out a fresh stand-in device per call, which is what the real factory does, and keeps every one it
     /// made so a test can see both how many opens asked for a device and what became of each.
     /// </summary>
-    private sealed class CreatingAudioRendererFactory : IComponentFactory<IAudioRenderer>
+    private sealed class CreatingAudioRendererFactory : IAudioRendererFactory
     {
         private readonly object _lock = new();
+        private readonly string _signature = NextSignature("created-audio");
 
         public List<FakeAudioRenderer> Created { get; } = [];
 
-        public ComponentCapabilities Capabilities { get; } = new()
-        {
-            Name = "fake-audio",
-            Description = "A new stand-in device per creation.",
-        };
-
-        public PlaybackOperationResult TryCreate(out IAudioRenderer? component)
+        public PlaybackOperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
         {
             FakeAudioRenderer renderer = new();
             lock (_lock)
@@ -2714,8 +3815,437 @@ public class PlaybackPipelineTests
                 Created.Add(renderer);
             }
 
-            component = renderer;
+            creator = new FixedCreator<IAudioRenderer>(_signature, () => renderer);
             return PlaybackOperationResult.Success;
+        }
+    }
+
+    /// <summary>
+    /// The end of a file is not the place to find out that playback failed. A decoder that cannot give up its tail
+    /// has lost the tail, and that is all: the stream is already over, so the end still goes out and the failure is
+    /// reported rather than becoming the state of a playback that played. A hardware decoder whose device is gone by
+    /// the time the file ends is exactly this.
+    /// </summary>
+    [Test]
+    public void EndsWhenTheDecoderCannotGiveUpItsTail()
+    {
+        string path = CreateY4mFile(frameCount: 15, frameRate: "30:1");
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer(), videoDecoders: new BrokenDrainVideoDecoderFactory(returnsNothing: false));
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitForPlaybackToFinish(pipeline);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(warnings.Messages, Does.Contain("The decoder could not flush its tail."));
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), "the stream was over; losing its tail does not unend it");
+                Assert.That(pipeline.Error, Is.Null, "a failed tail is not a failed playback");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The same moment, with the other kind of broken drain: a decoder that says it succeeded and hands back nothing
+    /// at all. That used to be walked as a list, which is an exception on a thread with no one to catch it, so this
+    /// test failing as a crash is the point of it.
+    /// </summary>
+    [Test]
+    public void SurvivesADrainThatHandsBackNoTailAtAll()
+    {
+        string path = CreateY4mFile(frameCount: 15, frameRate: "30:1");
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer(), videoDecoders: new BrokenDrainVideoDecoderFactory(returnsNothing: true));
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitForPlaybackToFinish(pipeline);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(warnings.Messages, Does.Contain("The video decoder returned no frames."));
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended));
+                Assert.That(pipeline.Error, Is.Null);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A device whose stream will not start is the same failure as one that will not take a block, reached through
+    /// the other call: the clock lets it out, the pipeline reports it once and spends the sound instead of asking a
+    /// dead device to start on every iteration. And because the failure is a device rather than a file, the swap to
+    /// a working one still cures it.
+    /// </summary>
+    [Test]
+    public void KeepsGoingWhenTheDeviceWillNotStart()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 2);
+        try
+        {
+            InvalidOperationException failure = new("The device will not start.");
+            FakeAudioRenderer failed = new() { Name = "failed", ClockStartFailure = failure };
+            FakeAudioRenderer healthy = new() { Name = "healthy", PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), failed);
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => warnings.Messages.Contains(failure.Message), "the failed start to be reported");
+            Assert.That(warnings.Messages.Count(message => message == failure.Message), Is.EqualTo(1), "a dead device is reported once, not once per iteration");
+            Assert.That(failed.ClockStarts, Is.LessThan(5), "and it is not asked to start again");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a failed device is not a failed playback");
+                Assert.That(pipeline.Error, Is.Null);
+            }
+
+            SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(healthy));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            WaitFor(() => healthy.SubmittedBuffers > 0, "the device that replaced the failed one to take sound");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The read-ahead must be bounded for a file with no picture, too. A picture file is paced by its packet queue;
+    /// an audio-only file never puts anything in that queue, so if the packet term is asked for unconditionally the
+    /// condition "enough packets are queued" can never be met and the reader decodes the whole file at once — the
+    /// sound side of the same bug, and the decoded blocks make it the more expensive one.
+    /// </summary>
+    [Test]
+    public void DoesNotReadAnAudioOnlyFileAllAtOnce()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 3);
+        try
+        {
+            // The device is full: it takes one block and then holds it, so the sound queue is the only thing the
+            // reader can be paced by. An audio packet is decoded on the reader's own thread, so one decode is one
+            // packet read — and a reader that ignores the queue reads the whole file in the first moment.
+            PacedAudioDecoderFactory decoders = new() { DecodeMilliseconds = 0 };
+            FakeAudioRenderer audioRenderer = new() { NoRoom = true };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer, audioDecoders: decoders);
+
+            PlaybackOperationResult opened = Open(pipeline, path);
+            Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            // Long enough for the pre-buffer to be filled many times over, if it were not a bound at all.
+            Thread.Sleep(800);
+            int early = decoders.Decodes;
+
+            // Let the device take everything, so the file finishes and the total can be compared against.
+            audioRenderer.NoRoom = false;
+            WaitForPlaybackToFinish(pipeline);
+            int total = decoders.Decodes;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(total, Is.GreaterThan(4), "the file has to be read in several packets, or this measures nothing");
+                Assert.That(early, Is.LessThan(total / 2), $"the reader ran ahead: {early} of {total} packets were read while the sound queue should have held it to about half a second");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A device can arrive after playback has begun — one that was plugged in, or one that replaced a failed. The
+    /// sound has to still be there when it does. That depends on the read-ahead being bounded while no chain is
+    /// decoding: a target the sound queue can never reach lets the reader take the whole file at once, and a device
+    /// attached afterwards finds nothing left to play.
+    /// </summary>
+    [Test]
+    public void TakesSoundWhenADeviceArrivesAfterPlaybackBegan()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeAudioRenderer refusing = new() { CanConfigure = false, RefusalReason = "no device yet" };
+            FakeAudioRenderer late = new() { Name = "late" };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), refusing);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True, "the picture still plays without a device");
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(300), "playback to be under way");
+
+            SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(late));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            WaitFor(() => late.SubmittedBuffers > 0, "the device that arrived to be given sound");
+            Assert.That(pipeline.AudioRendererName, Is.EqualTo("late"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A device that arrives after the position was set still has to have its offset chosen. The picture armed the
+    /// position — or an earlier device did — so arming is not a reason to choose one, and a device that is not synced
+    /// to leaves the pipeline free-running on its own stopwatch for the rest of the position. A device running three
+    /// times as fast is what makes the difference visible.
+    /// </summary>
+    [Test]
+    public void SyncsToADeviceThatArrivesAfterThePositionWasSet()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeAudioRenderer refusing = new() { CanConfigure = false, RefusalReason = "no device yet" };
+            FakeAudioRenderer late = new() { Name = "late", ClockRate = 3.0 };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), refusing);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True, "the picture still plays without a device");
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(300), "playback to be under way");
+
+            SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(late));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            WaitFor(() => late.SubmittedBuffers > 0, "the device that arrived to be given sound");
+
+            // A device that holds sound is what makes the pipeline correct its clock, and this one runs at three times
+            // real time: a clock that follows it travels three hundred milliseconds per hundred.
+            late.QueuedSampleCount = SampleRate;
+            TimeSpan before = pipeline.Position;
+            Thread.Sleep(300);
+            TimeSpan advanced = pipeline.Position - before;
+
+            Assert.That(advanced, Is.GreaterThan(TimeSpan.FromMilliseconds(500)),
+                "the clock follows the device that arrived, rather than free-running on its own stopwatch");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A device that dies while a hand-off is waiting for room is found out through the clock, and the hand-off has
+    /// to be let go of at that point: the device block is skipped from then on, so it would never be polled again —
+    /// its block would stay alive and the device would keep whatever it had acquired until the next swap.
+    /// </summary>
+    [Test]
+    public void LetsGoOfAHandOffWhenTheDeviceDiesDuringIt()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 3);
+        try
+        {
+            InvalidOperationException pausing = new("The device will not stop.");
+            FakeAudioRenderer audioRenderer = new() { NoRoom = true, ClockPauseFailure = pausing };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => audioRenderer.SubmitsStarted > 0, "a hand-off to be waiting for room");
+
+            // Pausing is what makes the pipeline ask the device's clock to stop, and stopping a dead device throws.
+            Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+            WaitFor(() => warnings.Messages.Contains(pausing.Message), "the dead device to be reported");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(audioRenderer.AbandonedSubmits, Is.EqualTo(1), "the hand-off that was waiting for room is let go of, not left pending for ever");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a failed device is not a failed playback");
+                Assert.That(pipeline.Error, Is.Null);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A seek after the device has failed is where the two halves of the spend path meet: the clock is the only
+    /// pacing the sound has left, and a clock that is armed per position is only armed by the sound itself. If the
+    /// arm is taken only when a device is present, the position after a seek has nothing to start it, the sound is
+    /// never spent, and the file never ends.
+    /// </summary>
+    [Test]
+    public void KeepsGoingAfterASeekWhenTheDeviceHasFailed()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 3);
+        try
+        {
+            InvalidOperationException failure = new("The device cannot be written to.");
+            FakeAudioRenderer audioRenderer = new() { SubmitFailure = failure };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => warnings.Messages.Contains($"Unable to queue audio: {failure.Message}"), "the failed device to be reported");
+
+            SeekAndWait(pipeline, TimeSpan.FromSeconds(1));
+
+            // A seek leaves playback paused, so this is the caller resuming it: the position is new and the device is
+            // still dead, which is exactly the state the spend path has to be able to carry on from.
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            // Two seconds of sound are left, and the sound is what paces them now: the clock has to be armed for the
+            // new position and started, or nothing is ever spent again.
+            WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(1.5), "the clock to carry on from where the seek put it", 3000);
+            WaitForPlaybackToFinish(pipeline);
+
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The sound's half of the same moment: an audio decoder that cannot give up its tail must not take the end of
+    /// the file with it. The reader publishes both end markers right after this drain, so failing there would leave
+    /// the picture and the sound waiting for a stream that is already over.
+    /// </summary>
+    [Test]
+    public void EndsWhenTheSoundDecoderCannotGiveUpItsTail()
+    {
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 12);
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer, audioDecoders: new BrokenDrainAudioDecoderFactory());
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitForPlaybackToFinish(pipeline);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(warnings.Messages, Does.Contain("The decoder could not flush its tail."));
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), "the stream was over; losing its tail does not unend it");
+                Assert.That(pipeline.Error, Is.Null);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>The real audio decoder wrapped so that its end-of-stream drain refuses.</summary>
+    private sealed class BrokenDrainAudioDecoderFactory : IAudioDecoderFactory
+    {
+        private readonly FFmpegAudioDecoderFactory _inner = new();
+
+        public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        {
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
+            return TestCreators.Wrap(offered, inner, component => new BrokenDrainAudioDecoder(component), out creator);
+        }
+
+        private sealed class BrokenDrainAudioDecoder(IAudioDecoder inner) : IAudioDecoder
+        {
+            public MediaStreamInfo Stream => inner.Stream;
+
+            public bool IsHardwareAccelerated => inner.IsHardwareAccelerated;
+
+            public AudioSampleFormat OutputFormat => inner.OutputFormat;
+
+            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
+            {
+                return inner.TryDecode(packet, out buffers);
+            }
+
+            public PlaybackOperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
+            {
+                buffers = [];
+                return PlaybackOperationResult.Failure("The decoder could not flush its tail.");
+            }
+
+            public PlaybackOperationResult Flush()
+            {
+                return inner.Flush();
+            }
+
+            public void Dispose()
+            {
+                inner.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The real decoder wrapped so that its end-of-stream drain is broken — the shape of a hardware decoder whose
+    /// device has gone by the time the file ends. Either it reports a failure, or it breaks the contract and says it
+    /// succeeded without handing anything back.
+    /// </summary>
+    private sealed class BrokenDrainVideoDecoderFactory(bool returnsNothing) : IVideoDecoderFactory
+    {
+        private readonly FFmpegVideoDecoderFactory _inner = new();
+
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        {
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            return TestCreators.Wrap(offered, inner, component => new BrokenDrainVideoDecoder(component, returnsNothing), out creator);
+        }
+
+        private sealed class BrokenDrainVideoDecoder(IVideoDecoder inner, bool returnsNothing) : IVideoDecoder
+        {
+            public MediaStreamInfo Stream => inner.Stream;
+
+            public bool IsHardwareAccelerated => inner.IsHardwareAccelerated;
+
+            public PixelFormat OutputFormat => inner.OutputFormat;
+
+            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            {
+                return inner.TryDecode(packet, out frames);
+            }
+
+            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+            {
+                if (returnsNothing)
+                {
+                    frames = null!;
+                    return PlaybackOperationResult.Success;
+                }
+
+                frames = [];
+                return PlaybackOperationResult.Failure("The decoder could not flush its tail.");
+            }
+
+            public PlaybackOperationResult Flush()
+            {
+                return inner.Flush();
+            }
+
+            public void Dispose()
+            {
+                inner.Dispose();
+            }
         }
     }
 
@@ -2729,20 +4259,10 @@ public class PlaybackPipelineTests
     private sealed class DelayedVideoDecoderFactory : IVideoDecoderFactory
     {
         private readonly FFmpegVideoDecoderFactory _inner = new();
-
-        public ComponentCapabilities Capabilities => _inner.Capabilities;
-
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult created = _inner.TryCreate(source, stream, options, out IVideoDecoder? inner);
-            if (!created.IsSuccessful || inner is null)
-            {
-                decoder = null;
-                return created;
-            }
-
-            decoder = new DelayedVideoDecoder(inner);
-            return PlaybackOperationResult.Success;
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            return TestCreators.Wrap(offered, inner, component => new DelayedVideoDecoder(component), out creator);
         }
 
         private sealed class DelayedVideoDecoder : IVideoDecoder
@@ -2820,9 +4340,6 @@ public class PlaybackPipelineTests
     private sealed class LiveRefusingSourceFactory(bool refusesInAdvance) : ISourceProviderFactory
     {
         private readonly FFmpegSourceProviderFactory _inner = new();
-
-        public ComponentCapabilities Capabilities => _inner.Capabilities;
-
         public PlaybackOperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
         {
             PlaybackOperationResult opened = _inner.TryOpen(locator, out IMediaSource? inner);
@@ -2881,20 +4398,10 @@ public class PlaybackPipelineTests
         internal int DecodeMilliseconds { get; init; } = DecodePaceMilliseconds;
 
         public int Decodes => Volatile.Read(ref _decodes);
-
-        public ComponentCapabilities Capabilities => _inner.Capabilities;
-
-        public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IAudioDecoder? decoder)
+        public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
         {
-            PlaybackOperationResult created = _inner.TryCreate(source, stream, options, out IAudioDecoder? inner);
-            if (!created.IsSuccessful || inner is null)
-            {
-                decoder = null;
-                return created;
-            }
-
-            decoder = new PacedAudioDecoder(inner, this, DecodeMilliseconds);
-            return PlaybackOperationResult.Success;
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
+            return TestCreators.Wrap(offered, inner, component => new PacedAudioDecoder(component, this, DecodeMilliseconds), out creator);
         }
 
         private sealed class PacedAudioDecoder(IAudioDecoder inner, PacedAudioDecoderFactory owner, int decodeMilliseconds) : IAudioDecoder
@@ -2942,20 +4449,10 @@ public class PlaybackPipelineTests
 
         /// <summary>How many packets decode cleanly before the decoder throws.</summary>
         internal int PacketsBeforeThrow { get; init; } = 1;
-
-        public ComponentCapabilities Capabilities => _inner.Capabilities;
-
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult created = _inner.TryCreate(source, stream, options, out IVideoDecoder? inner);
-            if (!created.IsSuccessful || inner is null)
-            {
-                decoder = null;
-                return created;
-            }
-
-            decoder = new ThrowingVideoDecoder(inner, PacketsBeforeThrow);
-            return PlaybackOperationResult.Success;
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            return TestCreators.Wrap(offered, inner, component => new ThrowingVideoDecoder(component, PacketsBeforeThrow), out creator);
         }
 
         private sealed class ThrowingVideoDecoder : IVideoDecoder
@@ -3010,15 +4507,9 @@ public class PlaybackPipelineTests
     /// </summary>
     private sealed class SilentVideoDecoderFactory : IVideoDecoderFactory
     {
-        public ComponentCapabilities Capabilities { get; } = new()
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            Name = "silent-video",
-            Description = "A decoder that never produces a frame.",
-        };
-
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
-        {
-            decoder = new SilentVideoDecoder(stream);
+            creator = new FixedCreator<IVideoDecoder>("silent:video", () => new SilentVideoDecoder(stream));
             return PlaybackOperationResult.Success;
         }
 
@@ -3064,20 +4555,10 @@ public class PlaybackPipelineTests
 
         /// <summary>How many packets decode cleanly before the decoder gives up.</summary>
         internal int PacketsBeforeFailure { get; init; } = 1;
-
-        public ComponentCapabilities Capabilities => _inner.Capabilities;
-
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult created = _inner.TryCreate(source, stream, options, out IVideoDecoder? inner);
-            if (!created.IsSuccessful || inner is null)
-            {
-                decoder = null;
-                return created;
-            }
-
-            decoder = new FailingVideoDecoder(inner, PacketsBeforeFailure);
-            return PlaybackOperationResult.Success;
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            return TestCreators.Wrap(offered, inner, component => new FailingVideoDecoder(component, PacketsBeforeFailure), out creator);
         }
 
         private sealed class FailingVideoDecoder : IVideoDecoder
@@ -3144,20 +4625,10 @@ public class PlaybackPipelineTests
         /// like, and it is the arrangement in which the picture's verdict has nothing to wake it.
         /// </summary>
         internal int FastPackets { get; init; }
-
-        public ComponentCapabilities Capabilities => _inner.Capabilities;
-
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult created = _inner.TryCreate(source, stream, options, out IVideoDecoder? inner);
-            if (!created.IsSuccessful || inner is null)
-            {
-                decoder = null;
-                return created;
-            }
-
-            decoder = new ThrottledVideoDecoder(inner, DecodeMilliseconds, FastPackets);
-            return PlaybackOperationResult.Success;
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            return TestCreators.Wrap(offered, inner, component => new ThrottledVideoDecoder(component, DecodeMilliseconds, FastPackets), out creator);
         }
 
         private sealed class ThrottledVideoDecoder : IVideoDecoder
@@ -3208,27 +4679,79 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// A renderer that draws with a GPU and says so. Nothing is drawn: the tests that use it are about what the
+    /// pipeline does with the offer, not about pixels.
+    /// </summary>
+    private sealed class GpuDeviceVideoRenderer : IVideoRenderer, IGpuDevice
+    {
+        public string Name => "gpu-device-video";
+
+        /// <summary>It is its own device, which is what a renderer that draws with one hands out.</summary>
+        public IGpuDevice? GpuDevice => this;
+
+        public nint NativeDevice => 1;
+
+        public object DeviceLock { get; } = new();
+
+        public PlaybackOperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
+        {
+            return PlaybackOperationResult.Success;
+        }
+
+        public PlaybackOperationResult Render(RawVideoFrame frame)
+        {
+            return PlaybackOperationResult.Success;
+        }
+
+        public PlaybackOperationResult RefreshSurface()
+        {
+            return PlaybackOperationResult.Success;
+        }
+
+        public bool TryGetDisplayedFrameCount(out long count)
+        {
+            count = 0;
+            return false;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    /// <summary>
+    /// A video decoder that produces no frames and remembers the settings it was created with, which is how a
+    /// test reads what the pipeline handed its decoder.
+    /// </summary>
+    private sealed class RecordingVideoDecoderFactory : IVideoDecoderFactory
+    {
+        private readonly SilentVideoDecoderFactory _inner = new();
+
+        internal DecoderOptions? Options { get; private set; }
+        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        {
+            Options = options;
+            return _inner.TryCreate(source, stream, options, out creator);
+        }
+    }
+
+    /// <summary>
     /// Hands the same stand-in renderer to the pipeline. The pipeline creates its renderer itself, on
     /// the thread that will use it, so that the graphics device belongs to that apartment.
     /// </summary>
-    private sealed class FakeVideoRendererFactory : IComponentFactory<IVideoRenderer>
+    private sealed class FakeVideoRendererFactory : IVideoRendererFactory
     {
         private readonly IVideoRenderer _renderer;
+        private readonly string _signature = NextSignature("fake-video");
 
         internal FakeVideoRendererFactory(IVideoRenderer renderer)
         {
             _renderer = renderer;
         }
 
-        public ComponentCapabilities Capabilities { get; } = new()
+        public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
         {
-            Name = "fake-video",
-            Description = "Stand-in video renderer.",
-        };
-
-        public PlaybackOperationResult TryCreate(out IVideoRenderer? component)
-        {
-            component = _renderer;
+            creator = new FixedCreator<IVideoRenderer>(_signature, () => _renderer);
             return PlaybackOperationResult.Success;
         }
     }
@@ -3552,7 +5075,10 @@ public class PlaybackPipelineTests
 
     private sealed class FakeVideoRenderer : IVideoRenderer
     {
-        public string Name => "fake";
+        public string Name { get; init; } = "fake";
+
+        /// <summary>Nothing: a stand-in presents nothing, so no decoder is asked to decode onto it.</summary>
+        public IGpuDevice? GpuDevice => null;
 
         public VideoStreamInfo? ConfiguredStream { get; private set; }
 
@@ -3563,6 +5089,12 @@ public class PlaybackPipelineTests
         /// <summary>Stands in for a renderer that needs longer to show a frame than the file gives it.</summary>
         public int RenderDelayMilliseconds { get; init; }
 
+        /// <summary>
+        /// Stands in for a device that can no longer present — a removed adapter, a lost device. Every draw reports
+        /// this failure, which is what the pipeline is expected to survive rather than exit on.
+        /// </summary>
+        public string? RenderFailure { get; init; }
+
         public PlaybackOperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
         {
             ConfiguredStream = stream;
@@ -3572,6 +5104,11 @@ public class PlaybackPipelineTests
 
         public PlaybackOperationResult Render(RawVideoFrame frame)
         {
+            if (RenderFailure is string failure)
+            {
+                return PlaybackOperationResult.Failure(failure);
+            }
+
             if (RenderDelayMilliseconds > 0)
             {
                 Thread.Sleep(RenderDelayMilliseconds);
@@ -3586,6 +5123,9 @@ public class PlaybackPipelineTests
         /// presented; the stand-in does not keep a surface of its own, so taking it up is nothing.
         /// </summary>
         public int RefreshedSurfaces { get; private set; }
+
+        /// <summary>How many times the pipeline let this renderer go, which is what a swap has to do to the one it replaces.</summary>
+        public int DisposeCount { get; private set; }
 
         public PlaybackOperationResult RefreshSurface()
         {
@@ -3607,6 +5147,91 @@ public class PlaybackPipelineTests
 
         public void Dispose()
         {
+            DisposeCount++;
+        }
+    }
+
+    /// <summary>A factory that refuses to make a renderer, which is a device that cannot be created or a surface
+    /// that cannot be presented into.</summary>
+    private sealed class RefusingAudioRendererFactory : IAudioRendererFactory
+    {
+        public PlaybackOperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+        {
+            creator = null;
+            return PlaybackOperationResult.Failure("This audio device refuses to be opened.");
+        }
+    }
+
+    /// <summary>A factory that refuses every stream, the same way a decoder with no path for a codec does.</summary>
+    private sealed class RefusingAudioDecoderFactory : IAudioDecoderFactory
+    {
+        public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        {
+            creator = null;
+            return PlaybackOperationResult.Failure("This audio decoder refuses the stream.");
+        }
+    }
+
+    /// <summary>
+    /// The real audio decoder under a signature of its own, so that a test can register it beside the plain one and
+    /// have the pipeline see a different decoder — which is what "the decoder was replaced" means now.
+    /// </summary>
+    private sealed class NamedAudioDecoderFactory : IAudioDecoderFactory
+    {
+        private readonly FFmpegAudioDecoderFactory _inner = new();
+        private readonly string _signature;
+
+        internal NamedAudioDecoderFactory(string signature)
+        {
+            _signature = signature;
+        }
+
+        public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        {
+            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
+            creator = offered.IsSuccessful && inner is not null ? new SignatureCreator(inner, _signature) : null;
+            return creator is null ? offered : PlaybackOperationResult.Success;
+        }
+
+        /// <summary>Passes everything through but the signature, which is the only thing that makes this a change.</summary>
+        private sealed class SignatureCreator(IComponentCreator<IAudioDecoder> inner, string signature) : IComponentCreator<IAudioDecoder>
+        {
+            public string Signature => signature;
+
+            public PlaybackOperationResult Create(out IAudioDecoder? component)
+            {
+                return inner.Create(out component);
+            }
+        }
+    }
+
+    private sealed class RefusingVideoRendererFactory : IVideoRendererFactory
+    {
+        public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+        {
+            creator = null;
+            return PlaybackOperationResult.Failure("This renderer refuses to be made.");
+        }
+    }
+
+    /// <summary>Offers a renderer and then cannot build it, which is an offer that has to be passed over.</summary>
+    private sealed class FailingVideoRendererFactory(string signature) : IVideoRendererFactory
+    {
+        public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+        {
+            creator = new Creator(signature);
+            return PlaybackOperationResult.Success;
+        }
+
+        private sealed class Creator(string signature) : IComponentCreator<IVideoRenderer>
+        {
+            public string Signature => signature;
+
+            public PlaybackOperationResult Create(out IVideoRenderer? component)
+            {
+                component = null;
+                return PlaybackOperationResult.Failure("This renderer refuses to be made.");
+            }
         }
     }
 
@@ -3616,8 +5241,9 @@ public class PlaybackPipelineTests
         private long _queuedSampleCount;
         private volatile bool _noRoom;
 
-        public string Name => "fake";
+        public string Name { get; init; } = "fake";
 
+        /// <summary>One signature per instance: a second stand-in device is a different device, to a caller.</summary>
         public double Volume { get; set; } = 1.0;
 
         public bool IsMuted { get; set; }
@@ -3662,11 +5288,41 @@ public class PlaybackPipelineTests
 
         public bool ClockIsRunning => Clock.IsRunning;
 
+        /// <summary>
+        /// Stands in for a device whose stream will not start: starting it throws, which is what the clock of a real
+        /// device does — the pipeline has to turn that into a report, not into a dead audio thread.
+        /// </summary>
+        public Exception? ClockStartFailure
+        {
+            get => _clock.StartFailure;
+            init => _clock.StartFailure = value;
+        }
+
+        /// <summary>
+        /// Stands in for a device that dies while a hand-off is still waiting for room: the pipeline finds out when it
+        /// next asks the device's clock to stop, which is the moment a pending hand-off has to be let go of.
+        /// </summary>
+        public Exception? ClockPauseFailure
+        {
+            get => _clock.PauseFailure;
+            init => _clock.PauseFailure = value;
+        }
+
         /// <summary>How many times the pipeline has told the device's clock to start, changed or not.</summary>
         public int ClockStarts => _clock.Starts;
 
         /// <summary>How many times the pipeline has told the device's clock to pause, changed or not.</summary>
         public int ClockPauses => _clock.Pauses;
+
+        /// <summary>
+        /// How fast this device's clock runs against real time. A device that runs fast is how "the pipeline follows
+        /// the device" — rather than free-running on its own stopwatch — becomes something a test can see.
+        /// </summary>
+        public double ClockRate
+        {
+            get => _clock.RateMultiplier;
+            init => _clock.RateMultiplier = value;
+        }
 
         public IPlaybackClock Clock => PlaysWhatItIsGiven ? PlayingDevice : _clock;
 
@@ -3872,21 +5528,48 @@ public class PlaybackPipelineTests
         /// <summary>How many times the pipeline has told this clock to pause — changed or not.</summary>
         public int Pauses => Volatile.Read(ref _pauses);
 
+        /// <summary>
+        /// Stands in for a device whose stream will not start: the command throws, as the WASAPI clock lets it, and
+        /// the pipeline is where that has to become a report rather than a dead thread.
+        /// </summary>
+        public Exception? StartFailure { get; set; }
+
+        /// <summary>The same for stopping, which is where a device that died while a hand-off was in flight is found.</summary>
+        public Exception? PauseFailure { get; set; }
+
+        /// <summary>
+        /// How fast this device's clock runs against real time. A device that runs ahead is how "the pipeline follows
+        /// the device" — rather than free-running on its own stopwatch — becomes something a test can see.
+        /// </summary>
+        public double RateMultiplier { get; set; } = 1.0;
+
         public bool IsRunning => _device.IsRunning;
 
         public double Rate => 1.0;
 
-        public TimeSpan Position => _base + (_device.Position - _zero);
+        public TimeSpan Position => _base + TimeSpan.FromTicks((long)((_device.Position - _zero).Ticks * RateMultiplier));
 
         public void Start()
         {
             Interlocked.Increment(ref _starts);
+
+            if (StartFailure is Exception failure)
+            {
+                throw failure;
+            }
+
             _device.Start();
         }
 
         public void Pause()
         {
             Interlocked.Increment(ref _pauses);
+
+            if (PauseFailure is Exception failure)
+            {
+                throw failure;
+            }
+
             _device.Pause();
         }
 

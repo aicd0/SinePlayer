@@ -30,6 +30,9 @@ internal static partial class FFmpegNative
     [LibraryImport(AvUtil)]
     internal static partial nint av_get_pix_fmt_name(int format);
 
+    [LibraryImport(AvUtil, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial int av_get_pix_fmt(string name);
+
     [LibraryImport(AvUtil)]
     internal static partial nint av_get_sample_fmt_name(int format);
 
@@ -136,7 +139,29 @@ internal static partial class FFmpegNative
     internal static partial void av_frame_unref(nint frame);
 
     [LibraryImport(AvUtil)]
+    internal static partial int av_frame_ref(nint destination, nint source);
+
+    [LibraryImport(AvUtil)]
     internal static partial void av_frame_move_ref(nint destination, nint source);
+
+    //
+    // libavutil, hardware frames
+    //
+
+    [LibraryImport(AvUtil)]
+    internal static partial int av_hwdevice_ctx_create(ref nint deviceContext, int deviceType, nint device, nint options, int flags);
+
+    [LibraryImport(AvUtil)]
+    internal static partial nint av_hwdevice_ctx_alloc(int deviceType);
+
+    [LibraryImport(AvUtil)]
+    internal static partial int av_hwdevice_ctx_init(nint deviceContext);
+
+    [LibraryImport(AvUtil)]
+    internal static partial void av_buffer_unref(ref nint buffer);
+
+    [LibraryImport(AvUtil)]
+    internal static partial int av_hwframe_transfer_data(nint destination, nint source, int flags);
 
     //
     // libavutil, dictionary access

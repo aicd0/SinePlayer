@@ -10,6 +10,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -20,37 +21,56 @@
             Spacing="8">
             <Button
                 x:Name="OpenButton"
-                Click="OnOpenClicked"
+                Click="OpenButton_Click"
                 Content="Open image or video" />
             <Button
                 x:Name="PlayButton"
-                Click="OnPlayClicked"
-                Content="Play"
-                IsEnabled="False" />
+                Click="PlayButton_Click"
+                Content="Play" />
             <Button
                 x:Name="PauseButton"
-                Click="OnPauseClicked"
-                Content="Pause"
-                IsEnabled="False" />
+                Click="PauseButton_Click"
+                Content="Pause" />
             <Button
                 x:Name="SeekBackButton"
-                Click="OnSeekBackClicked"
-                Content="-10s"
-                IsEnabled="False" />
+                Click="SeekBackButton_Click"
+                Content="-10s" />
             <Button
                 x:Name="SeekForwardButton"
-                Click="OnSeekForwardClicked"
-                Content="+30s"
-                IsEnabled="False" />
+                Click="SeekForwardButton_Click"
+                Content="+30s" />
         </StackPanel>
 
-        <Grid Grid.Row="1" Background="Black">
+        <StackPanel
+            Grid.Row="1"
+            Margin="12,0,12,12"
+            Orientation="Horizontal"
+            Spacing="8">
+            <ComboBox
+                x:Name="VideoDecoderPicker"
+                Header="Video decoder"
+                SelectionChanged="VideoDecoderPicker_SelectionChanged" />
+            <ComboBox
+                x:Name="AudioDecoderPicker"
+                Header="Audio decoder"
+                SelectionChanged="AudioDecoderPicker_SelectionChanged" />
+            <ComboBox
+                x:Name="VideoRendererPicker"
+                Header="Video renderer"
+                SelectionChanged="VideoRendererPicker_SelectionChanged" />
+            <ComboBox
+                x:Name="AudioRendererPicker"
+                Header="Audio renderer"
+                SelectionChanged="AudioRendererPicker_SelectionChanged" />
+        </StackPanel>
+
+        <Grid Grid.Row="2" Background="Black">
             <SwapChainPanel x:Name="VideoPanel" />
         </Grid>
 
         <TextBlock
             x:Name="StatusText"
-            Grid.Row="2"
+            Grid.Row="3"
             Margin="12"
             IsTextSelectionEnabled="True"
             Text="Pick a file to play it through the engine: FFmpeg decodes, Direct3D 11 presents and WASAPI plays the sound."

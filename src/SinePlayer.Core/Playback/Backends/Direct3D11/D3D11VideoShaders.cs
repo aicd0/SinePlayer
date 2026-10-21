@@ -20,6 +20,15 @@ internal sealed class D3D11VideoShaders : IDisposable
     /// belong to the frame once the engine carries them, and become a shader variant at that point.
     /// </summary>
     private const string ShaderSource = """
+        // The part of the texture the picture occupies. A hardware decoder pads the texture it decodes into,
+        // so the picture is smaller than the texture it lies in, and sampling all of it would put the padded
+        // rows — which nothing wrote — along the bottom of the picture.
+        cbuffer FrameTransform : register(b0)
+        {
+            float2 TexCoordScale;
+            float2 Unused;
+        };
+
         struct VSOutput
         {
             float4 Position : SV_POSITION;
@@ -31,13 +40,19 @@ internal sealed class D3D11VideoShaders : IDisposable
             VSOutput output;
             float2 uv = float2((vertexId << 1) & 2, vertexId & 2);
             output.Position = float4(uv * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
-            output.TexCoord = uv;
+            output.TexCoord = uv * TexCoordScale;
             return output;
         }
 
         Texture2D FirstTexture : register(t0);
         Texture2D SecondTexture : register(t1);
         Texture2D ThirdTexture : register(t2);
+
+        // A decoded frame is a slice of a texture array, and Direct3D has no view of one slice as a plain
+        // texture: the same planes are sampled as arrays, with the slice taken out by the view itself.
+        Texture2DArray FirstPlaneArray : register(t3);
+        Texture2DArray SecondPlaneArray : register(t4);
+
         SamplerState VideoSampler : register(s0);
 
         float3 ConvertYuvToRgb(float y, float2 chroma)
@@ -69,9 +84,17 @@ internal sealed class D3D11VideoShaders : IDisposable
             float cr = ThirdTexture.Sample(VideoSampler, input.TexCoord).r;
             return float4(ConvertYuvToRgb(luma, float2(cb, cr)), 1.0);
         }
+
+        float4 PSMainSemiPlanarArray(VSOutput input) : SV_TARGET
+        {
+            float luma = FirstPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).r;
+            float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).rg;
+            return float4(ConvertYuvToRgb(luma, chroma), 1.0);
+        }
         """;
 
     private readonly Dictionary<PixelFormat, ID3D11PixelShader> _pixelShaders = [];
+    private readonly Dictionary<PixelFormat, ID3D11PixelShader> _arrayPixelShaders = [];
 
     private ID3D11VertexShader? _vertexShader;
     private ID3D11SamplerState? _sampler;
@@ -132,6 +155,12 @@ internal sealed class D3D11VideoShaders : IDisposable
                 created.Dispose();
                 return false;
             }
+
+            if (!created.TryAddArrayPixelShader(device, PixelFormat.Nv12, "PSMainSemiPlanarArray", out error))
+            {
+                created.Dispose();
+                return false;
+            }
         }
         catch (Exception exception)
         {
@@ -149,6 +178,14 @@ internal sealed class D3D11VideoShaders : IDisposable
         return _pixelShaders.TryGetValue(format, out pixelShader);
     }
 
+    /// <summary>
+    /// The shader for a frame that is still a texture, whose planes are sampled as slices of an array.
+    /// </summary>
+    internal bool TryGetArrayPixelShader(PixelFormat format, out ID3D11PixelShader? pixelShader)
+    {
+        return _arrayPixelShaders.TryGetValue(format, out pixelShader);
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -163,7 +200,13 @@ internal sealed class D3D11VideoShaders : IDisposable
             D3D11Interop.Release(pixelShader);
         }
 
+        foreach (ID3D11PixelShader pixelShader in _arrayPixelShaders.Values)
+        {
+            D3D11Interop.Release(pixelShader);
+        }
+
         _pixelShaders.Clear();
+        _arrayPixelShaders.Clear();
         D3D11Interop.Release(_sampler);
         _sampler = null;
         D3D11Interop.Release(_vertexShader);
@@ -178,6 +221,17 @@ internal sealed class D3D11VideoShaders : IDisposable
         }
 
         _pixelShaders[format] = D3D11Interop.CreatePixelShader(device.Device, bytecode!);
+        return true;
+    }
+
+    private bool TryAddArrayPixelShader(D3D11Device device, PixelFormat format, string entryPoint, out string error)
+    {
+        if (!D3D11Interop.TryCompileShader(ShaderSource, entryPoint, "ps_5_0", out ID3DBlob? bytecode, out error))
+        {
+            return false;
+        }
+
+        _arrayPixelShaders[format] = D3D11Interop.CreatePixelShader(device.Device, bytecode!);
         return true;
     }
 }

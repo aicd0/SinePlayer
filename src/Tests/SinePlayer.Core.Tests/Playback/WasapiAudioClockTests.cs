@@ -7,10 +7,11 @@ namespace SinePlayer.Core.Tests.Playback;
 
 /// <summary>
 /// What the clock does when its device fails. Two rules are pinned here, and they are the whole of the class's
-/// error handling: a reader never gets an exception (the host's position timer and every frame the picture
-/// judges read this clock), and the failure is kept **exactly as it was thrown** — same instance, same message,
-/// same stack — because only the layer that failed knows what happened. The first failure is the one kept:
-/// everything after it is a consequence, and replacing the origin with it would hide the cause.
+/// error handling: a **reader** never gets an exception (the host's position timer and every frame the picture
+/// judges read this clock), while a **command** to the device throws once — after the clock has already latched the
+/// failure, so it keeps answering from where it stands. The failure is kept **exactly as it was thrown** — same
+/// instance, same message, same stack — because only the layer that failed knows what happened. The first failure
+/// is the one kept: everything after it is a consequence, and replacing the origin with it would hide the cause.
 /// </summary>
 [TestFixture]
 public class WasapiAudioClockTests
@@ -41,8 +42,12 @@ public class WasapiAudioClockTests
         Assert.That(clock.Cause, Is.SameAs(first), "the first failure is the origin; a later one does not replace it");
     }
 
+    /// <summary>
+    /// A command to the device that fails is not a secret, but a read is: the pipeline catches the one, and no
+    /// reader ever catches the other.
+    /// </summary>
     [Test]
-    public void DoesNotLetAFailingStartOrStopEscape()
+    public void RaisesAFailingStartOrStopAndKeepsTheFailure()
     {
         FakeClockDevice device = new();
         WasapiAudioClock clock = new(device, Frequency);
@@ -50,13 +55,16 @@ public class WasapiAudioClockTests
         InvalidOperationException refused = new("the device will not start");
         device.NextFailure = refused;
 
-        Assert.DoesNotThrow(clock.Start);
+        InvalidOperationException? thrown = Assert.Throws<InvalidOperationException>(clock.Start);
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(thrown, Is.SameAs(refused), "what travels is the device's own exception, not a description of it");
             Assert.That(clock.IsRunning, Is.False, "a stream that did not start is not running");
-            Assert.That(clock.DeviceLost, Is.True);
+            Assert.That(clock.DeviceLost, Is.True, "and the clock has stopped with it, for whoever reads it");
             Assert.That(clock.Cause, Is.SameAs(refused));
         }
+
+        Assert.That(clock.Position, Is.EqualTo(TimeSpan.Zero), "a lost clock still answers, which is the half that must not throw");
 
         FakeClockDevice running = new();
         WasapiAudioClock started = new(running, Frequency);
@@ -66,9 +74,10 @@ public class WasapiAudioClockTests
         InvalidOperationException stuck = new("the device will not stop");
         running.NextFailure = stuck;
 
-        Assert.DoesNotThrow(started.Pause);
+        InvalidOperationException? stuckThrown = Assert.Throws<InvalidOperationException>(started.Pause);
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(stuckThrown, Is.SameAs(stuck));
             Assert.That(started.IsRunning, Is.True, "whether the stream stopped is not known once the stop failed, so nothing is claimed");
             Assert.That(started.DeviceLost, Is.True);
             Assert.That(started.Cause, Is.SameAs(stuck));

@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
+using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -166,9 +167,13 @@ public class FFmpegAudioDecoderTests
         AudioStreamInfo stream = source.Info.AudioStreams[0];
 
         FFmpegAudioDecoderFactory factory = new();
-        PlaybackOperationResult result = factory.TryCreate(source, stream, DecoderOptions.Default, out IAudioDecoder? decoder);
+        PlaybackOperationResult result = factory.TryCreate(source, stream, DecoderOptions.Default, out IComponentCreator<IAudioDecoder>? creator);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
+        Assert.That(creator, Is.Not.Null);
+
+        PlaybackOperationResult created = creator!.Create(out IAudioDecoder? decoder);
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
         Assert.That(decoder, Is.Not.Null);
 
         return decoder!;

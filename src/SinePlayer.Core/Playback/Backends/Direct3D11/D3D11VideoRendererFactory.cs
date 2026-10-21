@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Playback.Abstractions;
@@ -19,32 +19,49 @@ namespace SinePlayer.Core.Playback.Backends.Direct3D11;
 /// device per simultaneous player, and nothing is shared between them to lose.
 /// </para>
 /// </summary>
-public sealed class D3D11VideoRendererFactory : IComponentFactory<IVideoRenderer>
+public sealed class D3D11VideoRendererFactory : IVideoRendererFactory
 {
-    public ComponentCapabilities Capabilities { get; } = new()
+    private readonly string _signature;
+
+    public D3D11VideoRendererFactory(string signature = "d3d11")
     {
-        Name = "d3d11",
-        Description = "Direct3D 11 composition renderer.",
-    };
+        ArgumentException.ThrowIfNullOrWhiteSpace(signature);
+        _signature = signature;
+    }
 
-    public PlaybackOperationResult TryCreate(out IVideoRenderer? component)
+    public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
     {
-        component = null;
-
-        if (!D3D11Device.TryCreate(out D3D11Device? device, out string deviceError) || device is null)
-        {
-            return PlaybackOperationResult.Failure(
-                string.IsNullOrEmpty(deviceError) ? "No Direct3D device was created." : deviceError);
-        }
-
-        if (!D3D11VideoRenderer.TryCreate(device, out D3D11VideoRenderer? renderer, out string rendererError))
-        {
-            // The renderer would have been the device's owner, so nothing else can release it.
-            device.Dispose();
-            return PlaybackOperationResult.Failure(rendererError);
-        }
-
-        component = renderer;
+        creator = new Creator(_signature);
         return PlaybackOperationResult.Success;
+    }
+
+    /// <summary>
+    /// Builds the device and the renderer on demand. The signature is the factory's, so what this would be is
+    /// known without a device — which is what keeps a reconcile that changes nothing from creating one.
+    /// </summary>
+    private sealed class Creator(string signature) : IComponentCreator<IVideoRenderer>
+    {
+        public string Signature => signature;
+
+        public PlaybackOperationResult Create(out IVideoRenderer? component)
+        {
+            component = null;
+
+            if (!D3D11Device.TryCreate(out D3D11Device? device, out string deviceError) || device is null)
+            {
+                return PlaybackOperationResult.Failure(
+                    string.IsNullOrEmpty(deviceError) ? "No Direct3D device was created." : deviceError);
+            }
+
+            if (!D3D11VideoRenderer.TryCreate(device, out D3D11VideoRenderer? created, out string rendererError))
+            {
+                // The renderer would have been the device's owner, so nothing else can release it.
+                device.Dispose();
+                return PlaybackOperationResult.Failure(rendererError);
+            }
+
+            component = created;
+            return PlaybackOperationResult.Success;
+        }
     }
 }
