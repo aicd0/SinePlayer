@@ -19,7 +19,6 @@ using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Wasapi;
 using SinePlayer.Core.Playback.Pipeline;
-using SinePlayer.Core.Playback.Timing;
 
 namespace SinePlayer.Common.Playback.CoreEngine;
 
@@ -263,13 +262,16 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
     {
         // The components are chosen here rather than inside the pipeline, which is what lets the whole
         // backend be replaced without the pipeline noticing.
-        PlaybackPipeline pipeline = new(
-            new FFmpegSourceProviderFactory(),
-            new FFmpegVideoDecoderFactory(),
-            _videoRendererFactory,
-            new FFmpegAudioDecoderFactory(),
-            _audioRendererFactory,
-            new DefaultSynchronizer());
+        PlaybackPipeline pipeline = new()
+        {
+            SourceFactory = new FFmpegSourceProviderFactory(),
+        };
+
+        pipeline.Components.Register(new FFmpegVideoDecoderFactory());
+        pipeline.Components.Register(new FFmpegAudioDecoderFactory());
+        pipeline.Components.Register(_videoRendererFactory);
+        pipeline.Components.Register(_audioRendererFactory);
+
         pipeline.StateChanged += OnPipelineStateChanged;
         return pipeline;
     }

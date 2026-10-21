@@ -8,18 +8,12 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
 /// <summary>
-/// Registers libavformat as the engine's media source. It declares no scheme restriction because
+/// Registers libavformat as the engine's media source. It accepts any locator because
 /// FFmpeg brings its own protocol layer, which is what makes a local file and a network stream work
 /// through the same component.
 /// </summary>
 public sealed class FFmpegSourceProviderFactory : ISourceProviderFactory
 {
-    public ComponentCapabilities Capabilities { get; } = new()
-    {
-        Name = "ffmpeg",
-        Description = "Opens media through FFmpeg's libavformat demuxers.",
-    };
-
     public PlaybackOperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
     {
         ArgumentNullException.ThrowIfNull(locator);

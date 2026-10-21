@@ -85,6 +85,54 @@ internal struct AVPacket
     public AVRational TimeBase;
 }
 
+/// <summary>
+/// The leading part of <c>AVCodecContext</c>, down to the <c>get_format</c> callback. It is declared
+/// field by field up to there because that callback is written into the context before the decoder is
+/// opened, and a field is only addressable when everything in front of it is present.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct AVCodecContext
+{
+    public nint AvClass;
+    public int LogLevelOffset;
+    public int CodecType;
+    public nint Codec;
+    public int CodecId;
+    public uint CodecTag;
+    public nint PrivateData;
+    public nint Internal;
+    public nint Opaque;
+    public long BitRate;
+    public int Flags;
+    public int Flags2;
+    public nint Extradata;
+    public int ExtradataSize;
+    public AVRational TimeBase;
+    public AVRational PacketTimeBase;
+    public AVRational FrameRate;
+    public int Delay;
+    public int Width;
+    public int Height;
+    public int CodedWidth;
+    public int CodedHeight;
+    public AVRational SampleAspectRatio;
+    public int PixelFormat;
+    public int SoftwarePixelFormat;
+    public int ColorPrimaries;
+    public int ColorTransfer;
+    public int ColorSpace;
+    public int ColorRange;
+    public int ChromaLocation;
+    public int FieldOrder;
+    public int ReferenceCount;
+    public int HasBFrames;
+    public int SliceFlags;
+    public nint DrawHorizontalBand;
+
+    /// <summary><c>enum AVPixelFormat (*get_format)(AVCodecContext *, const enum AVPixelFormat *)</c>.</summary>
+    public nint GetFormat;
+}
+
 [StructLayout(LayoutKind.Sequential)]
 internal struct AVStream
 {
@@ -102,6 +150,63 @@ internal struct AVStream
     public AVRational SampleAspectRatio;
     public nint Metadata;
     public AVRational AverageFrameRate;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct AVBufferRef
+{
+    public nint Buffer;
+    public nint Data;
+    public int Size;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct AVHWDeviceContext
+{
+    public nint AvClass;
+    public int Type;
+    public nint HardwareContext;
+    public nint Free;
+    public nint UserOpaque;
+}
+
+/// <summary>
+/// The D3D11 context of a hardware decoder, as <c>AVHWDeviceContext.hwctx</c> points at it. Unlike most
+/// libavutil structs this one starts with the device itself. The three lock fields are the only way to keep
+/// a decoder and a renderer off one immediate context at the same time; libavcodec calls them around every
+/// use of the context it makes.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct AVD3D11VADeviceContext
+{
+    public nint Device;
+    public nint DeviceContext;
+    public nint VideoDevice;
+    public nint VideoContext;
+    public nint Lock;
+    public nint Unlock;
+    public nint LockContext;
+}
+
+/// <summary>
+/// The frames context libavcodec decodes hardware frames into. Its <c>sw_format</c> is the layout of the
+/// pixels inside the texture, which is what a renderer has to sample them as.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct AVHWFramesContext
+{
+    public nint AvClass;
+    public nint DeviceRef;
+    public nint DeviceContext;
+    public nint HardwareContext;
+    public nint Internal;
+    public nint Opaque;
+    public nint GetBuffer;
+    public int InitialPoolSize;
+    public int Format;
+    public int SoftwareFormat;
+    public int Width;
+    public int Height;
 }
 
 [StructLayout(LayoutKind.Sequential)]

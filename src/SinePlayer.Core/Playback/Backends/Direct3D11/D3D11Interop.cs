@@ -54,6 +54,43 @@ internal static class D3D11Interop
     }
 
     /// <summary>
+    /// A constant buffer holding one transform. Small and updated per frame, which is what a default-usage
+    /// buffer is for — and sixteen bytes, because that is the smallest size Direct3D accepts.
+    /// </summary>
+    internal static ID3D11Buffer CreateConstantBuffer(ID3D11Device device)
+    {
+        D3D11_BUFFER_DESC description = new()
+        {
+            ByteWidth = 16,
+            Usage = D3D11_USAGE.D3D11_USAGE_DEFAULT,
+            BindFlags = D3D11_BIND_FLAG.D3D11_BIND_CONSTANT_BUFFER,
+        };
+
+        Graphics_Direct3D11_ID3D11Device_Extensions.CreateBuffer(device, in description, null, out ID3D11Buffer buffer);
+        return buffer;
+    }
+
+    /// <summary>
+    /// Writes the texture coordinates a picture occupies inside its texture: one where the two are the same
+    /// size, less than one where a hardware decoder padded the texture.
+    /// </summary>
+    internal static unsafe void SetTexCoordScale(ID3D11DeviceContext context, ID3D11Buffer buffer, float x, float y)
+    {
+        float* values = stackalloc float[4];
+        values[0] = x;
+        values[1] = y;
+        values[2] = 0.0f;
+        values[3] = 0.0f;
+
+        Graphics_Direct3D11_ID3D11DeviceContext_Extensions.UpdateSubresource(context, buffer, 0, null, values, 0, 0);
+    }
+
+    internal static void SetVertexConstantBuffer(ID3D11DeviceContext context, uint slot, ID3D11Buffer buffer)
+    {
+        context.VSSetConstantBuffers(slot, 1, [buffer]);
+    }
+
+    /// <summary>
     /// Replaces a region of a texture from system memory whose rows may be wider than the region.
     /// </summary>
     internal static unsafe void UploadTexture(ID3D11DeviceContext context, ID3D11Resource resource, int width, int height, nint source, int sourceStride)
@@ -99,14 +136,75 @@ internal static class D3D11Interop
         Graphics_Direct3D11_ID3D11DeviceContext_Extensions.PSSetShader(context, pixelShader, null);
     }
 
-    internal static void SetTextures(ID3D11DeviceContext context, ID3D11ShaderResourceView[] views, ID3D11SamplerState sampler)
+    internal static void SetTextures(ID3D11DeviceContext context, uint startSlot, ID3D11ShaderResourceView[] views, ID3D11SamplerState sampler)
     {
-        context.PSSetShaderResources(0, (uint)views.Length, views);
+        context.PSSetShaderResources(startSlot, (uint)views.Length, views);
         Graphics_Direct3D11_ID3D11DeviceContext_Extensions.PSSetSamplers(context, 0, [sampler]);
     }
 
+    /// <summary>
+    /// Creates a view with a description, which is how one slice of an array — or one plane cast out of a
+    /// video texture — is addressed. Null when the device refuses the description, which is the honest answer
+    /// for a cast a driver does not support.
+    /// </summary>
+    internal static ID3D11ShaderResourceView? TryCreateShaderResourceView(ID3D11Device device, ID3D11Resource resource, D3D11_SHADER_RESOURCE_VIEW_DESC description)
+    {
+        try
+        {
+            Graphics_Direct3D11_ID3D11Device_Extensions.CreateShaderResourceView(device, resource, description, out ID3D11ShaderResourceView? view);
+            return view;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Copies one slice of a texture into another. A staged copy of a video frame is one slice of the pool
+    /// it was decoded into, which is why this is not <c>CopyResource</c>.
+    /// </summary>
+    internal static void CopySubresource(ID3D11DeviceContext context, ID3D11Resource destination, uint destinationSubresource, ID3D11Resource source, uint sourceSubresource)
+    {
+        Graphics_Direct3D11_ID3D11DeviceContext_Extensions.CopySubresourceRegion(
+            context,
+            destination,
+            destinationSubresource,
+            0,
+            0,
+            0,
+            source,
+            sourceSubresource,
+            null);
+    }
+
+    /// <summary>Reads rows of a staging texture into managed memory, where a row may be wider than the region.</summary>
+    internal static unsafe void ReadRows(ID3D11DeviceContext context, ID3D11Resource staged, byte[] destination, int width, int height, int bytesPerRow)
+    {
+        Graphics_Direct3D11_ID3D11DeviceContext_Extensions.Map(
+            context,
+            staged,
+            0,
+            D3D11_MAP.D3D11_MAP_READ,
+            0,
+            out D3D11_MAPPED_SUBRESOURCE mapped);
+
+        try
+        {
+            for (int y = 0; y < height; y++)
+            {
+                nint row = (nint)mapped.pData + (y * (int)mapped.RowPitch);
+                Marshal.Copy(row, destination, y * bytesPerRow, bytesPerRow);
+            }
+        }
+        finally
+        {
+            context.Unmap(staged, 0);
+        }
+    }
+
     /// <summary>Reads a texture back into managed memory. Used by tests and by frame capture.</summary>
-    internal static unsafe byte[] ReadPixels(ID3D11Device device, ID3D11DeviceContext context, ID3D11Texture2D source, int width, int height)
+    internal static byte[] ReadPixels(ID3D11Device device, ID3D11DeviceContext context, ID3D11Texture2D source, int width, int height)
     {
         D3D11_TEXTURE2D_DESC description = new()
         {
@@ -121,30 +219,17 @@ internal static class D3D11Interop
         };
 
         ID3D11Texture2D staging = CreateTexture2D(device, description);
-        context.CopyResource(staging, source);
-
-        Graphics_Direct3D11_ID3D11DeviceContext_Extensions.Map(
-            context,
-            staging,
-            0,
-            D3D11_MAP.D3D11_MAP_READ,
-            0,
-            out D3D11_MAPPED_SUBRESOURCE mapped);
-
         try
         {
-            byte[] pixels = new byte[width * height * 4];
-            for (int y = 0; y < height; y++)
-            {
-                nint row = (nint)mapped.pData + (y * (int)mapped.RowPitch);
-                Marshal.Copy(row, pixels, y * width * 4, width * 4);
-            }
+            context.CopyResource(staging, source);
 
+            byte[] pixels = new byte[width * height * 4];
+            ReadRows(context, staging, pixels, width, height, width * 4);
             return pixels;
         }
         finally
         {
-            context.Unmap(staging, 0);
+            Release(staging);
         }
     }
 

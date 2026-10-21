@@ -1,5 +1,5 @@
 // Copyright (c) aicd0. All rights reserved.
-// Licensed under the MIT License.
+// Licensed under the GNU General Public License v3.0 or later.
 
 using System.Runtime.InteropServices;
 
@@ -9,11 +9,11 @@ using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 namespace SinePlayer.Core.Tests.Playback;
 
 /// <summary>
-/// Writes a real, temporally compressed video stream with libaom, muxed into an MP4. A file made this way
-/// has a sequence header, reference frames and a keyframe structure, which is what the short fixtures
-/// written by hand cannot have — and the keyframe structure is the whole point of <paramref name="gopSize"/>.
+/// Writes a real, temporally compressed video stream, muxed into an MP4. A file made this way has a
+/// sequence header, reference frames and a keyframe structure, which is what the short fixtures written
+/// by hand cannot have — and the keyframe structure is the whole point of <paramref name="gopSize"/>.
 /// </summary>
-internal static partial class Av1FixtureFile
+internal static partial class VideoFixtureFile
 {
     internal const int Width = 64;
     internal const int Height = 64;
@@ -67,37 +67,57 @@ internal static partial class Av1FixtureFile
     [LibraryImport(FFmpegNative.AvFormat)]
     private static partial void avformat_free_context(nint context);
 
+    /// <summary>An AV1 stream, with libaom deciding where its keyframes land.</summary>
     /// <param name="frameCount">How many frames the stream holds.</param>
     /// <param name="gopSize">
     /// What to ask the encoder for. libaom places its keyframes where it likes and takes no notice of this,
     /// so a caller that cares where a seek lands has to look at the stream rather than ask for it.
     /// </param>
-    internal static string Create(int frameCount = FrameCount, int gopSize = 4)
+    internal static string CreateAv1(int frameCount = FrameCount, int gopSize = 4, int width = Width, int height = Height)
+    {
+        return Create("libaom-av1", "av1", frameCount, gopSize, width, height);
+    }
+
+    /// <summary>
+    /// An H.264 stream. This is the codec to reach for when the decoder itself is what is being tested:
+    /// FFmpeg's H.264 decoder decodes in software and on the GPU, so the same decoder is reached either
+    /// way, unlike AV1 where the two are separate decoders.
+    /// </summary>
+    internal static string CreateH264(int frameCount = FrameCount, int gopSize = 4, int width = Width, int height = Height)
+    {
+        return Create("libx264", "h264", frameCount, gopSize, width, height);
+    }
+
+    private static string Create(string encoderName, string expectedCodecId, int frameCount, int gopSize, int width, int height)
     {
         FFmpegRuntime.EnsureInitialized();
 
         const int frameRate = 30;
-        nint codec = avcodec_find_encoder_by_name("libaom-av1");
+        nint codec = avcodec_find_encoder_by_name(encoderName);
         if (codec == 0)
         {
-            Assert.Ignore("This FFmpeg build has no libaom-av1 encoder to generate the fixture with.");
+            Assert.Ignore($"This FFmpeg build has no {encoderName} encoder to generate the fixture with.");
         }
 
         int mediaType = Marshal.ReadInt32(codec, IntPtr.Size * 2);
         int codecId = Marshal.ReadInt32(codec, (IntPtr.Size * 2) + 4);
-        Assert.That(Marshal.PtrToStringAnsi(FFmpegNative.avcodec_get_name(codecId)), Is.EqualTo("av1"), "The AVCodec layout is not the one this fixture assumes.");
+        Assert.That(Marshal.PtrToStringAnsi(FFmpegNative.avcodec_get_name(codecId)), Is.EqualTo(expectedCodecId), "The AVCodec layout is not the one this fixture assumes.");
 
         nint context = FFmpegNative.avcodec_alloc_context3(codec);
-        SetEncoderGeometry(context, mediaType, codecId, frameRate);
+        SetEncoderGeometry(context, mediaType, codecId, frameRate, width, height);
         Set(context, "time_base", $"1/{frameRate}");
         Set(context, "g", gopSize.ToString());
         Set(context, "b", "500000");
+
+        // No B-frames: the packets then arrive in display order, which is the only order the muxer is
+        // given, and a decoding test has one fewer thing to explain.
+        Set(context, "bf", "0");
         Set(context, "threads", "1");
 
         int openResult = FFmpegNative.avcodec_open2(context, codec, 0);
         Assert.That(openResult, Is.GreaterThanOrEqualTo(0), $"open: {FFmpegInterop.GetErrorMessage(openResult)}");
 
-        string path = Path.Combine(Path.GetTempPath(), $"sineplayer-av1-fixture-{Guid.NewGuid():N}.mp4");
+        string path = Path.Combine(Path.GetTempPath(), $"sineplayer-video-fixture-{Guid.NewGuid():N}.mp4");
         int allocResult = avformat_alloc_output_context2(out nint muxer, 0, "mp4", path);
         Assert.That(allocResult, Is.GreaterThanOrEqualTo(0), $"muxer: {FFmpegInterop.GetErrorMessage(allocResult)}");
 
@@ -118,7 +138,7 @@ internal static partial class Av1FixtureFile
         var encoderTimeBase = new Rational { Numerator = 1, Denominator = frameRate };
         for (int index = 0; index < frameCount; index++)
         {
-            nint frame = CreateFrame(index);
+            nint frame = CreateFrame(index, width, height);
             int sendResult = avcodec_send_frame(context, frame);
             Assert.That(sendResult, Is.GreaterThanOrEqualTo(0), $"send: {FFmpegInterop.GetErrorMessage(sendResult)}");
             WritePackets(context, muxer, stream, encoderTimeBase);
@@ -138,15 +158,15 @@ internal static partial class Av1FixtureFile
         return path;
     }
 
-    private static void SetEncoderGeometry(nint context, int mediaType, int codecId, int frameRate)
+    private static void SetEncoderGeometry(nint context, int mediaType, int codecId, int frameRate, int width, int height)
     {
         var parameters = new AVCodecParameters
         {
             CodecType = mediaType,
             CodecId = codecId,
             Format = PixelFormatYuv420p,
-            Width = Width,
-            Height = Height,
+            Width = width,
+            Height = height,
             SampleAspectRatio = new Rational { Numerator = 1, Denominator = 1 },
             Framerate = new Rational { Numerator = frameRate, Denominator = 1 },
             FieldOrder = 1,
@@ -170,11 +190,11 @@ internal static partial class Av1FixtureFile
         }
     }
 
-    private static nint CreateFrame(int index)
+    private static nint CreateFrame(int index, int width, int height)
     {
         nint frame = FFmpegNative.av_frame_alloc();
-        Marshal.WriteInt32(frame + (int)Marshal.OffsetOf<AVFrame>(nameof(AVFrame.Width)), Width);
-        Marshal.WriteInt32(frame + (int)Marshal.OffsetOf<AVFrame>(nameof(AVFrame.Height)), Height);
+        Marshal.WriteInt32(frame + (int)Marshal.OffsetOf<AVFrame>(nameof(AVFrame.Width)), width);
+        Marshal.WriteInt32(frame + (int)Marshal.OffsetOf<AVFrame>(nameof(AVFrame.Height)), height);
         Marshal.WriteInt32(frame + (int)Marshal.OffsetOf<AVFrame>(nameof(AVFrame.Format)), PixelFormatYuv420p);
         Marshal.WriteInt64(frame + (int)Marshal.OffsetOf<AVFrame>(nameof(AVFrame.Pts)), index);
 
@@ -184,9 +204,9 @@ internal static partial class Av1FixtureFile
         int strideOffset = (int)Marshal.OffsetOf<AVFrame>(nameof(AVFrame.LineSize));
         int lumaStride = Marshal.ReadInt32(frame + strideOffset);
         nint luma = Marshal.ReadIntPtr(frame);
-        for (int y = 0; y < Height; y++)
+        for (int y = 0; y < height; y++)
         {
-            for (int x = 0; x < Width; x++)
+            for (int x = 0; x < width; x++)
             {
                 Marshal.WriteByte(luma + (y * lumaStride) + x, (byte)((x + y + (index * 16)) & 0xFF));
             }
@@ -196,9 +216,9 @@ internal static partial class Av1FixtureFile
         {
             nint chroma = Marshal.ReadIntPtr(frame, plane * IntPtr.Size);
             int chromaStride = Marshal.ReadInt32(frame + strideOffset + (plane * sizeof(int)));
-            for (int y = 0; y < Height / 2; y++)
+            for (int y = 0; y < height / 2; y++)
             {
-                for (int x = 0; x < Width / 2; x++)
+                for (int x = 0; x < width / 2; x++)
                 {
                     Marshal.WriteByte(chroma + (y * chromaStride) + x, (byte)(128 + (plane * 8)));
                 }

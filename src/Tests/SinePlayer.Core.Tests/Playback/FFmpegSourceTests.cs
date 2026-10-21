@@ -124,14 +124,6 @@ public class FFmpegSourceTests
         }
     }
 
-    [Test]
-    public void ProviderDeclaresNoSchemeRestriction()
-    {
-        FFmpegSourceProviderFactory factory = new();
-
-        Assert.That(factory.Capabilities.Schemes, Is.Null);
-    }
-
     private FFmpegSource OpenWaveFile()
     {
         FFmpegSourceProviderFactory factory = new();

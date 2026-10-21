@@ -1,205 +1,143 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions.Filter;
+using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
+using SinePlayer.Core.Playback.Registry;
 
 namespace SinePlayer.Core.Playback.Selection;
 
-/// <summary>
-/// Turns registered components plus facts about the media into ordered candidate lists. The pipeline
-/// always walks the list and stops at the first candidate it can actually create, which is what makes
-/// fallback — hardware to software decoding, for example — a property of selection rather than a
-/// special case inside the pipeline.
-/// <para>
-/// Every method returns an empty list when nothing matches; deciding that this is an error belongs to
-/// the caller, which knows whether the stream could have been played at all.
-/// </para>
-/// </summary>
 public sealed class ComponentResolver
 {
-    private readonly IComponentRegistry _registry;
+    private readonly IComponentRegistry _components;
+    private PlaybackPreferences _preferences = PlaybackPreferences.Default;
+
+    public ComponentResolver() : this(new ComponentRegistry())
+    {
+    }
 
     public ComponentResolver(IComponentRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
-        _registry = registry;
+        _components = registry;
     }
 
-    /// <summary>
-    /// Capabilities of every component registered for a role, in registration order. This is what a
-    /// settings surface lists when the user chooses a decoder or a renderer.
-    /// </summary>
-    public IReadOnlyList<ComponentCapabilities> GetCapabilities(ExtensionPoint extensionPoint)
+    public PlaybackPreferences Preferences
     {
-        List<ComponentCapabilities> result = [];
-        foreach (IComponentFactory factory in _registry.GetFactories(extensionPoint))
+        get => Volatile.Read(ref _preferences);
+        set
         {
-            result.Add(factory.Capabilities);
+            ArgumentNullException.ThrowIfNull(value);
+            Volatile.Write(ref _preferences, value);
         }
-
-        return result;
     }
 
-    public IReadOnlyList<ISourceProviderFactory> ResolveSourceProviders(MediaLocator locator)
+    public ComponentResolver Clone()
     {
-        List<ISourceProviderFactory> candidates = [];
-        foreach (ISourceProviderFactory factory in GetTypedFactories<ISourceProviderFactory>(ExtensionPoint.SourceProvider))
+        return new ComponentResolver(_components.Clone()) { Preferences = Preferences };
+    }
+
+    public IReadOnlyList<TFactory> GetComponents<TFactory>() where TFactory : class, IComponentFactory
+    {
+        return _components.GetComponents<TFactory>();
+    }
+
+    public void Register(IComponentFactory factory)
+    {
+        _components.Register(factory);
+    }
+
+    public bool Remove(IComponentFactory factory)
+    {
+        return _components.Remove(factory);
+    }
+
+    public int Clear<TFactory>() where TFactory : class, IComponentFactory
+    {
+        return _components.Clear<TFactory>();
+    }
+
+    #region Resolution
+
+    public IEnumerable<IComponentCreator<IVideoRenderer>> ResolveVideoRenderers()
+    {
+        foreach (IVideoRendererFactory factory in _components.GetComponents<IVideoRendererFactory>())
         {
-            if (!SupportsScheme(factory.Capabilities, locator.Scheme))
+            if (factory.TryCreate(out IComponentCreator<IVideoRenderer>? creator).IsSuccessful && creator is not null)
             {
-                continue;
+                yield return creator;
             }
-
-            candidates.Add(factory);
         }
-
-        return OrderByPriority(candidates, ComponentSelectionOptions.Default);
     }
 
-    public IReadOnlyList<IVideoDecoderFactory> ResolveVideoDecoders(VideoStreamInfo stream, ComponentSelectionOptions options)
+    public IEnumerable<IComponentCreator<IAudioRenderer>> ResolveAudioRenderers()
     {
+        foreach (IAudioRendererFactory factory in _components.GetComponents<IAudioRendererFactory>())
+        {
+            if (factory.TryCreate(out IComponentCreator<IAudioRenderer>? creator).IsSuccessful && creator is not null)
+            {
+                yield return creator;
+            }
+        }
+    }
+
+    public IEnumerable<IComponentCreator<IAudioDecoder>> ResolveAudioDecoders(IMediaSource source, AudioStreamInfo stream)
+    {
+        ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(stream);
 
-        List<IVideoDecoderFactory> candidates = [];
-        foreach (IVideoDecoderFactory factory in GetTypedFactories<IVideoDecoderFactory>(ExtensionPoint.VideoDecoder))
-        {
-            if (!SupportsCodec(factory.Capabilities, stream.CodecId))
-            {
-                continue;
-            }
-
-            candidates.Add(factory);
-        }
-
-        return OrderByPreference(candidates, options);
+        return EnumerateAudioDecoders(source, stream);
     }
 
-    public IReadOnlyList<IAudioDecoderFactory> ResolveAudioDecoders(AudioStreamInfo stream, ComponentSelectionOptions options)
+    public IEnumerable<IComponentCreator<IVideoDecoder>> ResolveVideoDecoders(IMediaSource source, VideoStreamInfo stream, IGpuDevice? gpuDevice, int bufferedFrames)
     {
+        ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(stream);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bufferedFrames);
 
-        List<IAudioDecoderFactory> candidates = [];
-        foreach (IAudioDecoderFactory factory in GetTypedFactories<IAudioDecoderFactory>(ExtensionPoint.AudioDecoder))
+        return EnumerateVideoDecoders(source, stream, gpuDevice, bufferedFrames, Preferences.PreferHardwareDecoding);
+    }
+
+    private IEnumerable<IComponentCreator<IAudioDecoder>> EnumerateAudioDecoders(IMediaSource source, AudioStreamInfo stream)
+    {
+        foreach (IAudioDecoderFactory factory in _components.GetComponents<IAudioDecoderFactory>())
         {
-            if (!SupportsCodec(factory.Capabilities, stream.CodecId))
+            if (factory.TryCreate(source, stream, DecoderOptions.Default, out IComponentCreator<IAudioDecoder>? creator).IsSuccessful && creator is not null)
             {
-                continue;
+                yield return creator;
             }
-
-            candidates.Add(factory);
         }
-
-        return OrderByPreference(candidates, options);
     }
 
-    public IReadOnlyList<ISubtitleDecoderFactory> ResolveSubtitleDecoders(SubtitleStreamInfo stream, ComponentSelectionOptions options)
+    private IEnumerable<IComponentCreator<IVideoDecoder>> EnumerateVideoDecoders(IMediaSource source, VideoStreamInfo stream, IGpuDevice? gpuDevice, int bufferedFrames, bool hardwareDecoding)
     {
-        ArgumentNullException.ThrowIfNull(stream);
-
-        List<ISubtitleDecoderFactory> candidates = [];
-        foreach (ISubtitleDecoderFactory factory in GetTypedFactories<ISubtitleDecoderFactory>(ExtensionPoint.SubtitleDecoder))
+        DecoderOptions options = new()
         {
-            if (!SupportsCodec(factory.Capabilities, stream.CodecId))
-            {
-                continue;
-            }
+            HardwareDecoding = hardwareDecoding,
+            GpuDevice = gpuDevice,
+            BufferedFrames = bufferedFrames,
+        };
 
-            candidates.Add(factory);
-        }
-
-        return OrderByPriority(candidates, options);
-    }
-
-    public IReadOnlyList<IComponentFactory<IVideoRenderer>> ResolveVideoRenderers(ComponentSelectionOptions options)
-    {
-        return OrderByPriority(GetTypedFactories<IComponentFactory<IVideoRenderer>>(ExtensionPoint.VideoRenderer), options);
-    }
-
-    public IReadOnlyList<IComponentFactory<IAudioRenderer>> ResolveAudioRenderers(ComponentSelectionOptions options)
-    {
-        return OrderByPriority(GetTypedFactories<IComponentFactory<IAudioRenderer>>(ExtensionPoint.AudioRenderer), options);
-    }
-
-    /// <summary>
-    /// Video filters available for a stream. Filter order inside the chain is the caller's decision, so
-    /// this list is ordered by preference only, for enumeration.
-    /// </summary>
-    public IReadOnlyList<IComponentFactory<IVideoFilter>> ResolveVideoFilters(ComponentSelectionOptions options)
-    {
-        return OrderByPriority(GetTypedFactories<IComponentFactory<IVideoFilter>>(ExtensionPoint.VideoFilter), options);
-    }
-
-    /// <summary>
-    /// Audio filters available for a stream. See <see cref="ResolveVideoFilters"/> for the ordering
-    /// caveat.
-    /// </summary>
-    public IReadOnlyList<IComponentFactory<IAudioFilter>> ResolveAudioFilters(ComponentSelectionOptions options)
-    {
-        return OrderByPriority(GetTypedFactories<IComponentFactory<IAudioFilter>>(ExtensionPoint.AudioFilter), options);
-    }
-
-    private List<TFactory> GetTypedFactories<TFactory>(ExtensionPoint extensionPoint)
-    {
-        List<TFactory> result = [];
-        foreach (IComponentFactory factory in _registry.GetFactories(extensionPoint))
+        foreach (IVideoDecoderFactory factory in _components.GetComponents<IVideoDecoderFactory>())
         {
-            if (factory is TFactory typed)
+            if (factory.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? creator).IsSuccessful && creator is not null)
             {
-                result.Add(typed);
+                yield return creator;
             }
         }
 
-        return result;
-    }
-
-    /// <summary>
-    /// Orders candidates that have no hardware or software distinction: the caller's named choice
-    /// first, then by declared priority, with registration order breaking remaining ties.
-    /// </summary>
-    private static IReadOnlyList<TFactory> OrderByPriority<TFactory>(List<TFactory> candidates, ComponentSelectionOptions options) where TFactory : IComponentFactory
-    {
-        IEnumerable<TFactory> ordered = candidates
-            .OrderByDescending(factory => IsPreferredName(factory, options.PreferredName))
-            .ThenByDescending(factory => factory.Capabilities.Priority);
-
-        return [.. ordered];
-    }
-
-    /// <summary>
-    /// Orders decoder candidates: the caller's named choice first, then the preferred kind, then by
-    /// declared priority. When fallback is disallowed the non-preferred kind is removed entirely.
-    /// </summary>
-    private static IReadOnlyList<TFactory> OrderByPreference<TFactory>(List<TFactory> candidates, ComponentSelectionOptions options) where TFactory : IComponentFactory
-    {
-        if (!options.AllowFallback)
+        if (hardwareDecoding)
         {
-            candidates.RemoveAll(factory => factory.Capabilities.IsHardwareAccelerated != options.PreferHardwareAcceleration);
+            foreach (IComponentCreator<IVideoDecoder> creator in EnumerateVideoDecoders(source, stream, gpuDevice, bufferedFrames, hardwareDecoding: false))
+            {
+                yield return creator;
+            }
         }
-
-        IEnumerable<TFactory> ordered = candidates
-            .OrderByDescending(factory => IsPreferredName(factory, options.PreferredName))
-            .ThenByDescending(factory => factory.Capabilities.IsHardwareAccelerated == options.PreferHardwareAcceleration)
-            .ThenByDescending(factory => factory.Capabilities.Priority);
-
-        return [.. ordered];
     }
 
-    private static bool IsPreferredName(IComponentFactory factory, string? preferredName)
-    {
-        return preferredName is not null && string.Equals(factory.Capabilities.Name, preferredName, StringComparison.Ordinal);
-    }
-
-    private static bool SupportsCodec(ComponentCapabilities capabilities, string codecId)
-    {
-        return capabilities.CodecIds is null || capabilities.CodecIds.Contains(codecId);
-    }
-
-    private static bool SupportsScheme(ComponentCapabilities capabilities, string scheme)
-    {
-        return capabilities.Schemes is null || capabilities.Schemes.Contains(scheme);
-    }
+    #endregion
 }

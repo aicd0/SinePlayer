@@ -21,17 +21,50 @@ namespace SinePlayer.Core.Playback.Backends.Wasapi;
 /// then the pipeline's volume is the session's volume.
 /// </para>
 /// </summary>
-public sealed class WasapiAudioRendererFactory : IComponentFactory<IAudioRenderer>
+public sealed class WasapiAudioRendererFactory : IAudioRendererFactory
 {
-    public ComponentCapabilities Capabilities { get; } = new()
-    {
-        Name = "wasapi",
-        Description = "Plays audio on the default output device through WASAPI in shared mode.",
-    };
+    private readonly string? _endpointId;
+    private readonly string? _endpointName;
 
-    public PlaybackOperationResult TryCreate(out IAudioRenderer? component)
+    public WasapiAudioRendererFactory()
     {
-        component = new WasapiAudioRenderer();
+    }
+
+    private WasapiAudioRendererFactory(string endpointId, string endpointName)
+    {
+        _endpointId = endpointId;
+        _endpointName = endpointName;
+    }
+
+    /// <summary>
+    /// A factory that opens one particular output device rather than the default one — which is how a caller
+    /// picks the device the sound comes out of.
+    /// </summary>
+    public static WasapiAudioRendererFactory For(WasapiAudioEndpoint endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        return new WasapiAudioRendererFactory(endpoint.Id, endpoint.Name);
+    }
+
+    public PlaybackOperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+    {
+        creator = new Creator(_endpointId, _endpointName);
         return PlaybackOperationResult.Success;
+    }
+
+    /// <summary>
+    /// Opens the device on demand. Nothing here is opened by being offered, which is what lets a reconcile that
+    /// changes nothing leave the device playing alone.
+    /// </summary>
+    private sealed class Creator(string? endpointId, string? endpointName) : IComponentCreator<IAudioRenderer>
+    {
+        /// <summary>The device this would open. Must match what the renderer reports for itself.</summary>
+        public string Signature => endpointId is null ? "wasapi" : $"wasapi:{endpointId}";
+
+        public PlaybackOperationResult Create(out IAudioRenderer? component)
+        {
+            component = new WasapiAudioRenderer(endpointId, endpointName);
+            return PlaybackOperationResult.Success;
+        }
     }
 }

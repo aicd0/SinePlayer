@@ -10,35 +10,48 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
 /// <summary>
-/// Registers libavcodec as a software video decoder. It restricts itself to no codec because FFmpeg
-/// covers far more than the engine could enumerate, and selection is driven by whatever the container
-/// reports.
+/// Registers libavcodec as a video decoder. It restricts itself to no codec because FFmpeg covers far more than
+/// the engine could enumerate, so a stream it cannot decode fails when it is asked to decode it, and the next
+/// registered decoder is offered its turn.
 /// <para>
-/// A hardware decoder registers alongside this one with a higher kind preference; this factory stays
-/// the fallback, which is exactly what <c>ComponentSelectionOptions.AllowFallback</c> orders.
+/// It decodes on the GPU only when asked to and only when the codec has a decoder there; asked to and unable, it
+/// fails rather than quietly copying frames back to memory, because the request is what tells the caller what it
+/// is going to get. Giving it up is the resolver's decision, and it makes it by asking again without it.
 /// </para>
 /// </summary>
 public sealed class FFmpegVideoDecoderFactory : IVideoDecoderFactory
 {
-    public ComponentCapabilities Capabilities { get; } = new()
-    {
-        Name = "ffmpeg-software-video",
-        Description = "FFmpeg software video decoder.",
-        IsHardwareAccelerated = false,
-    };
-
-    public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IVideoDecoder? decoder)
+    public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (!FFmpegVideoDecoder.TryCreate(source, stream, out FFmpegVideoDecoder? ffmpegDecoder, out string error))
-        {
-            decoder = null;
-            return PlaybackOperationResult.Failure(error);
-        }
-
-        decoder = ffmpegDecoder;
+        creator = new Creator(source, stream, options);
         return PlaybackOperationResult.Success;
+    }
+
+    /// <summary>
+    /// What libavcodec would be asked for, decided from the options alone — which is the point: the signature says
+    /// whether this is a change, and opening a decoder to answer that would defeat it.
+    /// </summary>
+    private sealed class Creator(IMediaSource source, VideoStreamInfo stream, DecoderOptions options) : IComponentCreator<IVideoDecoder>
+    {
+        public string Signature => options.HardwareDecoding ? "ffmpeg:video:hw" : "ffmpeg:video:sw";
+
+        public PlaybackOperationResult Create(out IVideoDecoder? component)
+        {
+            component = null;
+
+            // Frames stay on the GPU only when the decoder has the pipeline's device: a texture is readable by the
+            // device that wrote it, so one decoded on a device of its own would have to be copied back first.
+            bool gpuFrames = options.GpuDevice is not null;
+            if (!FFmpegVideoDecoder.TryCreate(source, stream, options.HardwareDecoding, gpuFrames, options.GpuDevice, options.BufferedFrames, out FFmpegVideoDecoder? ffmpegDecoder, out string error))
+            {
+                return PlaybackOperationResult.Failure(error);
+            }
+
+            component = ffmpegDecoder;
+            return PlaybackOperationResult.Success;
+        }
     }
 }

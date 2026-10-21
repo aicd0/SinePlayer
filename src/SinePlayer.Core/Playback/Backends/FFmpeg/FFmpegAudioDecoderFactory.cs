@@ -16,25 +16,31 @@ namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 /// </summary>
 public sealed class FFmpegAudioDecoderFactory : IAudioDecoderFactory
 {
-    public ComponentCapabilities Capabilities { get; } = new()
-    {
-        Name = "ffmpeg-software-audio",
-        Description = "FFmpeg software audio decoder.",
-        IsHardwareAccelerated = false,
-    };
-
-    public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IAudioDecoder? decoder)
+    public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (!FFmpegAudioDecoder.TryCreate(source, stream, out FFmpegAudioDecoder? ffmpegDecoder, out string error))
-        {
-            decoder = null;
-            return PlaybackOperationResult.Failure(error);
-        }
-
-        decoder = ffmpegDecoder;
+        creator = new Creator(source, stream);
         return PlaybackOperationResult.Success;
+    }
+
+    /// <summary>One backend, one kind of decoder, so the signature says nothing more than which backend it is.</summary>
+    private sealed class Creator(IMediaSource source, AudioStreamInfo stream) : IComponentCreator<IAudioDecoder>
+    {
+        public string Signature => "ffmpeg:audio";
+
+        public PlaybackOperationResult Create(out IAudioDecoder? component)
+        {
+            component = null;
+
+            if (!FFmpegAudioDecoder.TryCreate(source, stream, out FFmpegAudioDecoder? ffmpegDecoder, out string error))
+            {
+                return PlaybackOperationResult.Failure(error);
+            }
+
+            component = ffmpegDecoder;
+            return PlaybackOperationResult.Success;
+        }
     }
 }

@@ -25,7 +25,7 @@ ready.
 | 3 | Switch video renderer | Yes |
 | 4 | Switch audio renderer | Yes |
 | 5 | High-performance post-effects | Yes (chain + rotation/scale first) |
-| 6 | Select video/audio/subtitle channels | Yes (video/audio rendered; subtitle enumerated only) |
+| 6 | Select video/audio/subtitle channels | **v2** — see Phase 4 in §6; the contracts and the reader are shaped for it |
 | 7 | Query playback info | Yes |
 
 **Explicitly deferred — but the framework must not block them**
@@ -34,7 +34,8 @@ ready.
 |---|---|
 | Subtitle rendering | `ISubtitleDecoder` / `ISubtitleRenderer` contracts exist and the pipeline has the slot; the demuxer enumerates subtitle streams so they appear in info/track lists. No implementation; the engine degrades gracefully when no subtitle renderer is registered. |
 | Plugin surface | The registry is `internal` in v1 and is *not* exposed through `IPluginContext`. Its API is designed so that exposing it later is purely additive (register a factory = one call). No plugin contract changes in v1. |
-| Fallback policy | Component resolution always goes through a selectable policy object. v1 ships exactly one policy (registry-only, no platform fallback). A fallback strategy is a later *addition*, not a redesign. The legacy `Windows.Media.*` path is removed, so there is no fallback in v1. |
+| Fallback policy | Component resolution always goes through a selectable policy object. v1 ships exactly one policy (registry-only, no platform fallback). A fallback strategy is a later *addition*, not a redesign. The legacy `Windows.Media.*` path is removed, so there is no fallback in v1. **Note:** falling back from a hardware decoder to a software one *inside* the registry is not this deferred policy — it is part of S13, because a hardware decoder that cannot open is a capability problem, not a platform one. S13a already falls back when the device or the decoder does not open; a decoder that opens and then produces nothing needs S13c's selection. |
+| Track selection (scenario 6) | `ITrackController` exists with no implementer, `MediaInfo` enumerates every stream, and the reader already skips what nobody selected — so v2 adds a chain rebuild and a picker, not a redesign. Plan in §6 (Phase 4). |
 
 ## 3. Working agreements
 
@@ -51,6 +52,24 @@ ready.
 6. **Verification before advancing.** Each step lists how it is verified, including a
    development harness ("Playback Lab") so the engine can be driven before the player is switched
    over.
+7. **No app code until S14 is finished** (rule added during S13d). Engine, tests and the Playback Lab
+   only: the Lab is where a new capability is exercised, and the player page, its view model and the
+   settings surfaces wait. A capability that needs a user-facing switch therefore finishes its engine
+   half and parks the surface, rather than reaching into the player to prove itself.
+8. **The resolver is the only source of what to use** (rule added during S14d). A host registers components,
+   orders them, and sets preferences on `PlaybackPipeline.Components`; nothing else says which decoder or
+   renderer runs, and the pipeline holds no choice of its own. Registration order **is** the order — nothing in
+   the engine re-sorts it, which is what makes "I chose this one" answerable. Changing what is *playing* takes
+   one more step: `Reconcile()`. Registering alone changes nothing, so several edits can be made and applied
+   once. The resolver is also the only place the **candidates** come from (rule added during S14d-6, restated in
+   S14d-13): it answers with the creators to try, each of which makes its own component, so the pipeline can never
+   pick one thing and describe another. Walking that sequence is the pipeline's (rule added during S14d-13): a
+   creator whose signature is the one running means nothing is built, and a creator that cannot make what it
+   offered is passed over for the next. Whether a component is a **change** is the component's own answer, through
+   `Signature`: a replacement that cannot be told apart from what is already running is not a swap, and the
+   running one stays. A factory describes what it would make before making it (rule added during S14d-8), so
+   asking "is this a change?" never costs the thing being asked about. Nothing in the registry is labelled (rule added during S14d-7): a role is the factory
+   interface, a registration is the instance, and neither a display name nor an enum stands between them.
 
 ## 4. Structure and coupling
 
@@ -72,10 +91,9 @@ src/SinePlayer.Core/Playback/
 │  ├─ Render/    IVideoRenderTarget, IVideoRenderer, IAudioRenderer, ISubtitleRenderer
 │  ├─ Timing/    IPlaybackClock, ISynchronizer, FrameSyncAction
 │  ├─ Tracks/    ITrackController
-│  └─ Registry/  IComponentRegistry, IComponentFactory, ISourceProviderFactory,
-│                IVideoDecoderFactory, IAudioDecoderFactory, ISubtitleDecoderFactory,
-│                ComponentCapabilities, ComponentSelectionOptions, ExtensionPoint,
-│                ComponentRegistryExtensions
+│  └─ Registry/  IComponentRegistry, IComponentFactory, IComponentCreator,
+│                ISourceProviderFactory, IVideoDecoderFactory, IAudioDecoderFactory,
+│                ISubtitleDecoderFactory, PlaybackPreferences
 ├─ Internal/                      # orchestration + cross-cutting implementation
 │  ├─ Registry/  ComponentRegistry.cs
 │  ├─ Selection/ ComponentResolver.cs
@@ -89,7 +107,9 @@ src/SinePlayer.Core/Playback/
    ├─ Direct3D11/   D3D11Device, D3D11Interop, D3D11VideoShaders, D3D11RenderTarget,
    │                D3D11SwapChain, D3D11VideoRenderer, D3D11VideoRendererFactory
    │                (COM interop generated by CsWin32 from NativeMethods.$(Platform).txt)
-   └─ Wasapi/       WasapiAudioRenderer
+   ├─ Wasapi/       WasapiAudioRenderer
+   └─ Null/         NullVideoDecoder, NullAudioDecoder, NullVideoRenderer, NullAudioRenderer
+                    (and one factory for each: a component that does nothing, for switching tests)
 ```
 
 Namespaces match folders exactly (`SinePlayer.Core.Playback.Abstractions.Decode`, …), which makes the
@@ -3452,40 +3472,373 @@ pin "no maximum" and "the decoder waits for the picture"), x64 and ARM64 build c
 
 - **The 4K60 question.** If `underruns` still climbs on that file, the machine is decoding 4K60 AV1 in
   software (12.9 ms a frame) and presenting 4K (11.1 ms a frame) at the edge of its ability. Two things help
-  and both are already on the list: hardware decode (**S12**) removes most of the decode cost, and a cheaper
+  and both are already on the list: hardware decode (**S13**) removes most of the decode cost, and a cheaper
   frame upload would remove much of the other. Neither is a substitute for the priority policy now in place,
   which is what stops a slow machine from taking it out on the sound.
-- **S10.** Media info query surfaced to the port and the player — codec, bitrate, sample rate, FPS, HW/SW.
-  `PlaybackPipeline.MediaInfo` already carries it; the port needs a member and the player a place to show
-  it.
+- **S13a.** Hardware video decode whose frames come back in system memory — the first half of the answer to
+  the question above, and done since this note was written.
 - **Watch for.** `PlaybackEngineAdapter` refuses `SetPlaybackRate` rather than pretending; if speed control
   is wanted, the pipeline needs rate support (the clock can already be retimed, the audio device cannot).
 - **The Lab stays** as an internal dev tool: it is the only place that shows decode/render cost, drops,
   underruns and picture lag side by side.
 
-### Phase 3 — Flexibility (the seven scenarios)
+### Phase 3 — Flexibility (the five scenarios v1 keeps)
+
+Phase 2 consumed S1–S11p (the orchestration rework, then the clock and starvation work), so Phase 3 continues at
+**S12** rather than restarting at S10. Two rows moved since this table was first written: media information is
+done, and track selection — the one scenario with no fallout on the others — is deferred to v2 (Phase 4).
 
 | Step | Goal | Verify | Review size |
 |---|---|---|---|
-| **S10** | Media info query surfaced to the port and the player | Info dialog/page shows codec, bitrate, sample rate, FPS, HW/SW | small |
-| **S11** | Track selection | Switch video/audio tracks during playback | medium |
-| **S12** | Hardware video decode + HW/SW switching | Toggle HW/SW at runtime; capability-driven | large (highest risk) |
-| **S13** | Renderer switching | Swap video renderer / audio device at runtime | medium |
-| **S14** | Filter chain + first effects | Rotation and scaling applied in-pipeline | medium |
-| **S15** | Isolation hardening | Architecture test fails on an FFmpeg type crossing the boundary | small |
-| **S16** | *(deferred)* subtitle rendering, plugin surface, fallback policy | — | later |
+| **S12** ✅ | Media info query surfaced to the port and the player | Playback information pane shows container, per-stream codec, bitrate, sample rate, FPS, and the decoder's hardware/software answer | small |
+| **S13** ✅ | Hardware video decode + HW/SW switching | Toggle HW/SW at runtime; capability-driven, with software fallback | large (highest risk) — eight rounds, see below |
+| **S14** ✅ | Renderer switching | Swap video renderer / audio device at runtime | medium — four rounds, see below |
+| **S14d** ✅ | Component selection rework (added during S14; not in the original plan) | The resolver as the only source of what to use, and `Reconcile` as the only way to change what is playing | medium — five rounds, see below |
+| **S15** | Filter chain + first effects | Rotation and scaling applied in-pipeline | medium |
+| **S16** | Isolation hardening | Architecture test fails on an FFmpeg type crossing the boundary | small |
+| **S17** | *(deferred)* subtitle rendering, plugin surface, fallback policy | — | later |
 
 Sequencing notes:
 
-- **S12 is the highest technical risk.** It is placed after the renderer works so there is a
-  stable place to land HW frames, but it can be pulled forward to immediately after S6 if you
-  prefer to de-risk early. Because `RawVideoFrame` is GPU-capable from S2, pulling it forward is
-  a pure reordering.
-- **S10–S14 are independent of each other** and can be reordered or parallelized to taste. Each
-  adds a capability interface and wires a small amount of UI; none changes the port shape.
-- **S14 is intentionally minimal**: the filter *chain* plus one or two simple filters is enough to
-  prove scenario 5's architecture. Additional effects (color balancing, tone mapping) are
-  incremental additions afterwards.
+- **S13 is the highest technical risk, and it is done.** The 4K60 AV1 file that motivated this engine was decoded in
+  software at 12.9 ms a frame and could not hold its frame rate; it now decodes on the GPU with no copy per frame.
+- **S12–S16 are independent of each other** and can be reordered; each adds a capability and a small amount of
+  UI, and none changes the port shape.
+- **S15 is intentionally minimal**: the filter *chain* plus one or two simple filters proves scenario 5's
+  architecture; more effects are incremental additions afterwards.
+
+**S12 — Media information reaches the port and the player.** *Done. The plan's Phase 3 row of that name, reshaped
+during review from a dialog into a pane.*
+
+*What was built.* `PlaybackPipeline` reports the chosen decoders' own answers (`IsVideoHardwareAccelerated`,
+`IsAudioHardwareAccelerated`) beside the demuxer's `MediaInfo`. The app port gained `IPlaybackInfoProvider`,
+implemented by a `PlaybackInfoHandle` that holds the pipeline and nothing else — attached when a file opens, and
+detached *before* the pipeline is disposed, so a pane that keeps it answers "nothing" instead of reaching a
+disposed engine. A new sidebar pane ("Playback information", route `side_pane_playback_info`) renders it as a
+two-column table refreshed every 500 ms, with a Copy button that writes `key: value` lines sorted by key.
+
+*Reviewed into shape rather than written once.* The playback pane and the media-info pane now share one
+`MediaChanged` event (a second one was added and removed); the provider is a member of `IMediaEngine` rather than a
+separate capability interface; the `PlaybackInfo` record was folded into that interface; the row names are
+hard-coded English for now; and the table is a single `Grid`, so its name column is as wide as the widest name in
+it rather than a hand-picked `MinWidth`.
+
+*Deliberately not done.* Nothing is localized beyond English. A file with several streams of one kind would
+produce duplicate keys in the copied text, because a key carries no stream index — moot until track selection (v2)
+makes several streams reachable. `IsVideoHardwareAccelerated` reads `false` for everything until S13, which is
+where the answer starts to mean something.
+
+**S13 — Hardware video decode.** *Complete; what remains is a surface, and it is deferred with the others.*
+
+| Round | What it adds |
+|---|---|
+| **S13a** ✅ | Hardware decoding whose frames come back in system memory. `FFmpegHardware` owns the D3D11 device, the `get_format` callback and the one hand-written field offset the ABI needs; `FFmpegVideoDecoder` opens with a device, copies each hardware frame out with `av_hwframe_transfer_data`, and reports `IsHardwareAccelerated` from the frame it actually got rather than from what it asked for. `DecoderOptions.PreferHardware` is the request, and every failure on the way falls back to the same decoder opened without a device. |
+| **S13b-1** ✅ | Frames that never leave the GPU: a hardware frame is handed out as `FFmpegGpuVideoFrameBuffer`, an `IGpuVideoBuffer` over the texture libavcodec wrote, with no copy at all. |
+| **S13b-2** ✅ | Decoding on a device the caller owns. `DecoderOptions.GpuDevice` carries it; the device context is allocated around it with `av_hwdevice_ctx_alloc` and the device receives a reference of its own, because libavcodec releases whatever it is given. No sharing, no handle, no copy. |
+| **S13b-3a** ✅ | One device per pipeline, and a lock to match: the renderer offers `IGpuDevice`, `PrepareVideo` hands it to the decoder it creates next, and both take the same recursive lock — libavcodec through `AVD3D11VADeviceContext.lock/unlock`, the renderer around a whole draw. |
+| **S13b-3b** ✅ | The renderer draws the texture where it lies: `R8_UNORM` and `R8G8_UNORM` views are cast out of the decoded texture over the frame's array slice, and an array-sampling variant of the semi-planar shader reads both planes. No copy, no CPU traffic. `gpuFrames` follows the device: a decoder with the pipeline's GPU hands out textures, one with a device of its own still copies back. `IGpuVideoBuffer.Retain()` exists because a redraw after a surface change outlives the frame, and holding the reference is what stops libavcodec from reusing the slice. |
+| **S13c** ✅ | Selection and fallback, both halves. A decoder that opened and then produced nothing is replaced by the next candidate — which is what makes libavcodec's hardware-only AV1 decoder usable, so it is now tried first with libdav1d behind it. And the candidates come from the registry: the pipeline takes a `ComponentResolver` and walks `ResolveVideoDecoders(stream, options)`, so what can serve a stream and in what order is decided where components are registered, not inside the pipeline. |
+| **S13d-1** ✅ | The replacement mechanism. `SetVideoDecoderHardwareAcceleration(bool)` records a *pending* preference and raises the epoch, which is already the engine's "everything you were doing is void" signal: the decode thread flushes, throws away what the old decoder produced and builds a new decoder from the registry, so playback never stops and no other thread ever touches a decoder that is being swapped. |
+| **S13d-2a** ✅ | What is running: the pipeline records the *component* the decoder came from and reports it as `VideoDecoderName`, so `PlaybackInfo` can say `Hardware (ffmpeg-video)` instead of only which kind it is. The component's name rather than libavcodec's own (`h264`, `libdav1d`) because that is what a settings surface picks and what a replacement changes; the library's name is a diagnostic for a surface that asks for one. The Lab has the toggle that calls `SetVideoDecoderHardwareAcceleration`, and its status line names the decoder beside its decode cost. |
+| **S13d-2b** ✅ | The choice itself, engine-side. `VideoDecoderSelection` is the choice — a kind and, optionally, one component by name — and it reaches the resolver as `ComponentSelectionOptions`, so a name is honoured by selection rather than by the decoders. The name is the stronger wish: naming a software decoder while preferring hardware runs that decoder, because a caller who names one has said something more specific than "prefer hardware". The pipeline keeps the last choice, so a file opened afterwards is decoded the same way, and `SetVideoDecoderHardwareAcceleration` is now a thin caller of `SetVideoDecoder` that sets the kind alone. |
+
+*Verified for a).* `DecodesOnTheGpuWithTheSamePictureTheCpuProduces` decodes a generated H.264 stream twice, once
+asking for hardware and once for software, and compares the luma: the GPU has to produce the picture the CPU
+produced. On the development machine it engages and matches within one. `FallsBackToSoftwareWhenTheCodecHasNoHardwareDecoder`
+pins the other half — a bitmap, which no GPU decodes, still decodes when hardware is asked for.
+
+*Verified for b-1 and b-2).* `KeepsTheFrameOnTheDeviceItWasGiven` creates a device the way the renderer does,
+hands it to the decoder, decodes one frame and checks that the decoder reports exactly that device, that the
+frame is a texture, and that copying its slice back through **that** device yields the software decoder's
+picture — a copy through any other device would not be allowed at all.
+
+*Verified for b-3a).* Three tests, two of them falsified before being trusted: `GivesTheDecoderTheDeviceItsRendererDrawsWith`
+pins the wiring, `WaitsForTheDeviceLockBeforeDrawing` blocks a draw from another thread by holding the renderer's
+lock, and `DecodingWaitsForTheDeviceLock` does the same to a decode — with the lock callbacks left unwritten it
+completes in 100 ms instead of waiting.
+
+*Verified for b-3b).* `DrawsAHardwareFrameWithoutCopyingItBack` decodes a hardware frame, checks it has no planes
+to read, draws it and compares the result with the same picture drawn through the plane-upload path: identical
+within one. Swapping the two cast views — luma as `R8G8`, chroma as `R8` — makes it fail, so the comparison really
+does depend on the planes being addressed correctly. 189 tests, x64 and ARM64 clean.
+
+*Verified for S13d-1.* `ReplacesTheVideoDecoderWithoutLeavingPlayback` plays a generated stream through a recording
+factory, asks for the other decoder, and waits for the second request while the picture keeps arriving — with the
+rebuild disabled it never comes. `KeepsTheRunningDecoderWhenThePreferenceIsUnchanged` asks for what is already
+running and requires that no second decoder is created, and `KeepsTheRunningDecoderWhenTheReplacementFails` makes the
+factory refuse the second request and requires the stream to carry on, one warning saying why, and playback still
+`Playing`. 197 tests, x64 and ARM64 clean.
+
+*Verified for S13d-2a.* `ReportsTheDecoderThatIsRunning` registers a decoder that serves hardware requests only
+and one that serves software requests only, opens a file (hardware is the default, so the first one runs), switches,
+and waits for the report to move to the second while the picture keeps coming. Leaving the name out of the
+replacement makes it fail on the first assertion. `KeepsTheRunningDecoderWhenTheReplacementFails` also requires the
+name to stay put when the replacement could not be made, so "what is running" never claims a decoder that never
+started. 195 tests plus 3 environment-dependent skips, x64 and ARM64 clean.
+
+*A failure a real file found, and the fix.* A 1080p60 AV1 file played for a moment and then stopped with
+`Unable to submit a packet to the decoder: Cannot allocate memory`. Nothing was wrong with the stream or the decoder:
+libavcodec sizes a D3D11 pool at twelve surfaces and **fails** rather than waits when they are all in use, and the
+pipeline's own frame window is eight frames plus the renderer's retained one — so the decoder ran out of surfaces
+while the queue was doing exactly what it was designed to do. FFmpeg says so on its log, which is worth reading
+before guessing: `Consider setting extra_hw_frames to a larger value (currently set to -1, giving a pool size of 12)`.
+`DecoderOptions.BufferedFrames` is the fix and the shape of it: the caller states how many decoded frames it may be
+holding, and the decoder sizes its pool for them (`extra_hw_frames`), because a pool is the decoder's to size and the
+number is the caller's to know. The pipeline passes the queue's capacity plus the few frames that are in flight;
+`LeavesRoomInThePoolForTheFramesTheCallerHolds` holds twelve of them and requires four more decodes to succeed,
+which fails with the same "cannot allocate memory" when the option is not passed. 199 tests, x64 and ARM64 clean.
+
+*The other thing the same file showed: a green line along the bottom.* A hardware decoder decodes into a texture it
+sized for itself, and the picture is smaller than that texture: probed on this machine, a 1920x1080 picture lives in
+1920x**1088** for H.264 and 1920x**1152** for AV1. The rows below the picture are never written, and sampling the whole
+texture across the picture's viewport draws them along the bottom, where "nothing" converts to green. The vertex shader
+now takes a texture-coordinate scale from a constant buffer — the picture's size over the texture's — so a padded
+texture is sampled over the part that holds the picture. `DrawsAPaddedHardwareTextureWithoutShowingThePadding` draws a
+1080p hardware frame and the same picture decoded on the CPU into the same target and requires them to match: at that
+size the 64x64 test's comparison passes either way, because a 64x64 picture needs no padding, and returning the scale
+to one makes this one fail on the extra rows. Nothing about it is visible in the pipeline's counters: the frame count,
+the render cost and the drops are all unchanged, which is why the picture itself has to be compared.
+
+*What is still outstanding.* Only the surface, and it is now deliberately later: no app code is touched until S14 is
+finished, so the player's settings panel waits. What the engine offers a surface today is `SetVideoDecoder` (a kind,
+a component by name, or both) and `VideoDecoderName` (what is running) — both exercised from tests and the Lab's
+hardware checkbox, and neither reachable from the player page. A picker that lists the decoders the registry offers
+for the open stream is the small piece that would make the name path usable in the Lab, and it is not needed to
+prove anything the tests do not already prove. And the measurement of the 4K60 AV1 file can be made now that it
+decodes on the GPU.
+
+*Verified for S13d-2b.* `LetsANamedDecoderWinOverThePreferredKind` registers the real decoder twice under the names
+`hardware-video` and `software-video`, opens a file (the kind decides, so `hardware-video` runs), then asks for
+`software-video` while still preferring hardware: the named one has to be the one running, which is the resolver's
+ordering and not a decoder's own preference. Dropping the name from the `ComponentSelectionOptions` before it reaches
+the resolver makes it fail on that assertion. The same test then opens the file again and requires the chosen decoder
+to be used at open, which is the "the choice outlives the file" claim — a choice the pipeline keeps rather than one it
+is told once per file.
+
+*Verified for S13c.* The first half: `FallsBackToTheNextDecoderWhenTheFirstProducesNothing` opens the AV1 stream
+with `av1` first and no device — the decoder opens and then fails on the first packet, as libavcodec's AV1 decoder
+does without a GPU — and the stream still decodes, with the decoder reporting `libdav1d`. Disabling the fallback
+makes it fail. `LeavesADecoderThatProducedFramesAlone` pins the other side: a decoder that has produced a frame is
+never replaced. `DecodesAv1OnTheGpuWhenTheMachineHasTheDecoderForIt` reports whether this machine decodes AV1 on the
+GPU — it does here, and every AV1 test in the suite now runs that way, seek and clock ones included. The second
+half: `LetsTheNextDecoderServeAFileWhenTheFirstOneRefuses` registers a factory that refuses and one that works, and
+the file is opened by the second; `ReportsWhyNoDecoderCouldServeTheFile` keeps the refusing factory's own reason as
+the open's failure. 194 tests, x64 and ARM64 clean.
+
+*Two things a) learned.* FFmpeg's native AV1 decoder has no software path: given a device but no AV1 hardware
+support it fails at the first packet, and without a device it fails the same way. That is why its candidate order
+had to stay software-first until a decoder that produces nothing could be replaced — which S13c's first half now
+does, so the order flipped. And hardware decoding pins the decoder to one thread, which is why
+`DoesNotLeaveTheDecoderOnOneThread` now asks for the software path explicitly.
+
+*One thing b-1 learned.* The layout of the pixels inside a hardware frame is neither the frame's own format (that
+is the hardware one) nor `AVCodecContext.sw_pix_fmt` (that is the software decoder's `yuv420p`): it is
+`AVHWFramesContext.sw_format`, which says `nv12`. Reading the wrong one would have made every renderer pick the
+wrong shader.
+
+*Two things b-2 decided.* The device has to be one per **pipeline**, not shared between pipelines: the renderer
+owns it, and a decoder borrows it (a reference of its own, handed to libavcodec). And sharing a texture across two
+devices was dropped rather than implemented — a keyed mutex only orders anything if the producer takes it, which
+libavcodec will not do, so that route would have needed a fence per frame on top of the pool interop.
+
+*Two things d-1 learned.* A test that decodes one frame to prove the decoder takes the device lock cannot tell a
+decoder that takes it from one that does not: libavcodec takes the lock around the calls that touch the device
+context, and a single frame may need none of them, so the test intermittently passed its own 250 ms "must block"
+check by finishing too fast to matter. It now decodes the rest of the stream under the held lock. Decoding it also
+showed the other half of hardware frames: a frame that is alive pins a slice of the decoder's pool, so the whole
+file cannot be collected into a list the way a software decode can — the helper that only counts frames disposes each
+one, and a list of hardware frames runs the pool dry and fails with `AVERROR_INVALIDDATA`.
+
+And one regression the refactor caused, which the S13b-3a test caught: the new `CreateVideoDecoder` helper built its
+`DecoderOptions` from `_videoRenderer`, but it is called *before* the newly created renderer is assigned to that
+field, so `GpuDevice` came out null and every decoder silently fell back to decoding into memory. The device is now
+a parameter of the helper, taken from the renderer at hand rather than from the field that will hold it later.
+
+*One thing b-3a learned.* A draw has to take the lock around the **whole** sequence, not per call, and the
+recursive kind is required: libavcodec states that in the header, and it is what lets a caller that already holds
+the lock call in again.
+
+*What b-3b starts from.* It was planned around a video processor, because Direct3D appeared to offer no shader
+access to a semi-planar plane. A probe says otherwise: `CreateShaderResourceView` refuses `DXGI_FORMAT_NV12` on
+such a texture but **accepts** `R8_UNORM` and `R8G8_UNORM` views of it, which are exactly the planes a shader
+needs. What the offscreen comparison has to settle is whether those cast views address the planes correctly; the
+video processor stays the fallback if they do not.
+
+*Numbers worth writing down.* `get_format` is at byte 192 of `AVCodecContext`, `hw_frames_ctx` at 552 and
+`hw_device_ctx` at 560 in the pinned headers, taken with a compiler against them rather than counted by hand;
+the first is reached through the declared part of the struct, the other two by offset, and `FFmpegRuntime`'s
+major-version check is what keeps them honest.
+
+**S14 — Renderer switching.** *Done: both halves of the mechanism, and the device picker.*
+
+| Round | What it adds |
+|---|---|
+| **S14a** ✅ | The property the swap stands on: a decoder that decodes on a renderer's device keeps that device alive by itself. It holds a reference of its own, and libavcodec holds one to the immediate context it derives from the device, so disposing the renderer is one release among several — which is what makes the swap a piece of bookkeeping rather than a two-thread handshake. |
+| **S14b** ✅ | `SetVideoRenderer(factory)`: the new renderer is built and configured on the playback queue, so one that cannot be made changes nothing; it takes over on the render thread, which is the only thread that calls into a renderer, so the one it replaces is disposed where no draw can be in flight; and the video chain is then rebuilt around the new device, because every frame decoded so far belongs to the old one. The factory is remembered, so the next file opens with it, and `VideoRendererName` says what is drawing. The Lab has a *New renderer* button, which is the only way to exercise the real path — a test has no panel to present into. |
+| **S14c-1** ✅ | The audio half's mechanism: `SetAudioRenderer(factory)`. The new device is built and configured on the playback queue — so one that cannot be opened changes nothing — and takes over on the audio thread, the only thread that hands it audio, so the device being replaced is flushed and released where no hand-off can be in flight. The host's volume and mute are applied to the new device because they belong to the pipeline rather than to a device. |
+| **S14c-2** ✅ | The picker. `WasapiAudioEndpoints.TryGetRenderEndpoints()` lists the active output devices (id, friendly name from the property store, and which one is the default), `WasapiAudioRendererFactory.For(endpoint)` opens that device rather than the default one, and the Lab has an output-device list that swaps on selection. A device whose property store refuses gets its id as the name rather than no entry, so a list is never missing a device it can play through. |
+
+*Verified for S14a.* `KeepsDecodingAfterTheRendererItWasBuiltOnIsGone` builds a hardware decoder on a renderer's
+device, decodes a frame, disposes the renderer, and requires another frame — on the GPU — from the same decoder.
+Without the decoder's own reference to the device the test host **crashes** rather than fails, which is what a
+use-after-free looks like from a test and the reason the reference is not an optimisation.
+
+*Verified for S14c-1.* `SwapsTheAudioRendererWithoutLeavingPlayback` plays a file through a device that never
+takes the audio, swaps to a second one, and requires the new device to be handed sound while the state stays
+`Playing`, the clock keeps moving, the replaced device is released, and the level the host set reaches the new
+device. Making the audio thread ignore the pending device makes it fail on "the new device to be playing", so the
+assertions really do depend on the swap happening where it says. `KeepsTheRunningAudioRendererWhenTheNewOneFails`
+requires a device that cannot be opened to be the caller's failure to see, with the playing device untouched and
+the clock still moving. 207 tests, x64 and ARM64 clean.
+
+*Verified for S14c-2.* `ListsTheOutputDevicesThisMachineHas` reads the list and pins what a picker needs: every
+entry has an id and a name, Windows has at most one default, and the default comes first when there is one. The
+development machine reports no output device at all, so the test skips after proving the call itself succeeds —
+which is still worth having, because a missing CsWin32 symbol or a wrong signature fails there rather than in the
+Lab. The friendly names come from the device property store (`IPropertyStore` + `PKEY_Device_FriendlyName`), and a
+device that refuses it is listed by its id instead of being dropped.
+
+*What the picker is not.* It lists devices, not renderer implementations: `wasapi` is the only audio renderer there
+is, so choosing a device is the only choice that exists today. The video side keeps its *New renderer* button
+rather than a list of one entry — when a second video renderer exists, the same shape (a list fed by what the
+registry offers) is what it should become.
+
+*One thing the audio half needed that the video half did not.* The audio thread captures its renderer in a local
+when it starts — it is the only thread that calls into it — so the swap had to happen there rather than through
+the field alone: the pending device is taken at the top of that thread's loop, and the field is updated beside the
+local so that `Volume`, `IsMuted` and the reports follow it. The video thread had no such local, which is why its
+swap could be a helper.
+
+*What the tests cannot say about an audio swap.* A stand-in device consumes everything instantly, so "the sound
+keeps coming" is not observable there; the tests assert that the clock keeps moving and that the new device is
+handed audio, and the audible result needs the Lab and two real endpoints.
+
+*Verified for S14b.* `SwapsTheVideoRendererWithoutLeavingPlayback` plays, asks for a second renderer, and requires
+the new one to draw while the state stays `Playing`, the position stays put and the replaced renderer is released;
+reopening the file then has to use the factory that was chosen. `SwapsTheVideoRendererWhilePaused` requires the
+swap to happen with the picture standing still, which it cannot without the wake — the render thread is asleep in
+an unbounded wait there, and removing the wake makes the test fail on that assertion and nothing else.
+`KeepsTheRunningRendererWhenTheNewOneFails` requires a factory that refuses to be a failure the caller sees, with
+the running renderer still drawing. 205 tests, x64 and ARM64 clean.
+
+*What the swap does not do.* It does not avoid the black frame between the new swap chain being attached (at
+configure time) and the first picture being drawn (after the rebuild), and it does not keep the last picture
+across the swap: `RefreshSurface` redraws from the renderer that has the frame, and the new one has none yet. Both
+are visible as a single black frame on a real panel, and neither is wrong for a renderer that was just replaced.
+
+**S14d — Component selection rework.** *Done. The resolver is the only source of what to use, and `Reconcile` is
+the only way to change what is playing.*
+
+| Round | What it adds |
+|---|---|
+| **S14d-1** ✅ | The registry becomes what a host *changes*, not just what it declares. *(Superseded by S14d-7: identity was a name then, and S14d-10: the snapshot became a clone.)* A component's identity is its name, unique within its role (`Register` refuses a second one rather than leaving "which is running" unanswerable); `Replace` keeps a component in its position; `Remove` and `Reorder` exist, and `Reorder` takes only the names to move to the front, so "prefer this one" does not require knowing everything else; `Version` moves on every real change, so a caller can skip work when nothing was touched — while putting the same instance back is not a change; a snapshot freezes everything at one instant, which is what a decision spanning two roles needs. |
+| **S14d-2** ✅ | The video chain decided as one thing. `PlaybackPreferences` (one object, `PreferHardwareDecoding` today) lives on the resolver; `ResolveVideoChain` returns the renderers to try, the decoders to try, and whether any renderer can keep frames on the GPU. `Capabilities.IsHardwareAccelerated` now has a defined meaning for a video renderer — it draws on the GPU and lends its device — and `D3D11VideoRendererFactory` declares it, so "hardware decode is preferred but no renderer offers a device" is a fact a caller can see instead of a copy it discovers per frame. |
+| **S14d-3** ✅ | The pipeline has no constructor arguments left: `SourceFactory` is a property (null means `Open` says so and closes what was playing, like every other failed open), `Components` is a `ComponentResolver` the pipeline never replaces, and `Synchronizer` defaults to the shipped policy. **Audio is now selected the way video is** — decoder and renderer both walk the registry's ordered candidates, which is what gives audio a selection at all; a factory a caller swapped in still comes first until the swaps become registrations. The resolver gained the host-facing registration API (`Register`, `Replace`, `Remove`, `MoveToFront`, `Preferences`) and can be built over a registry, over nothing, or over a copy of one. |
+| **S14d-4** ✅ | `Reconcile()` replaces the four setters. It resolves both chains from one snapshot, compares them instance by instance with what it applied last time, and applies only what differs — building anything that can fail before publishing anything, so a renderer that cannot be created leaves the running one drawing and returns the failure. The renderers are then published and taken over by the threads that own them, which raise the epoch themselves: that ordering is what keeps a decoder from being rebuilt on a device that is about to be replaced. Audio decoding gets its first rebuild path, consumed by the reader thread, which is the only thread that decodes audio. The answer names what changed (`ComponentChange`, by component), so a host or a status line can say *what* rather than *that*. *(Superseded by S14d-6: the answer says only whether the change was applied.)* |
+| **S14d-5** ✅ | The surface and the residue. The Lab's three switches (hardware decoding, new renderer, output device) all edit the resolver and reconcile through one helper, and the status line now says what a reconcile applied — `video.renderer fake-video → fake-video`, by name — beside the counters that say what is actually running. Two dead test helpers and the `VideoDecoderSelection` type are deleted. The rule is recorded in §3.8: the resolver is the only source of what to use, registration order is the only order, and `Reconcile` is the only way to change what is playing. |
+| **S14d-6** (awaiting review) | Creation moves into the resolver, and the pipeline is reduced to one method. `TryCreateVideoRenderer`, `TryCreateAudioRenderer`, `TryCreateVideoDecoder` and `TryCreateAudioDecoder` walk the registrations and answer with a component, or with a failure that says why nothing could be made; `Clone()` gives a resolver over one picture of the registry carrying the same preferences. `PlaybackPipeline.BuildChains()` takes no arguments and returns nothing but a result: it reads the streams, the surface and what is running from fields, builds both chains, keeps a component whose **signature** matches the one already going to run (`IMediaDecoder.Signature`, `IVideoRenderer.Signature`, `IAudioRenderer.Signature` — what a component *is*, as opposed to the `Name` it shows people), and publishes the rest as the pending renderer or decoder that the owning thread takes over. `Open` and `Reconcile` are the same call, so neither can drift: an open is a reconcile where nothing is running yet. |
+| **S14d-7** (awaiting review) | The registry loses its labels. `ExtensionPoint` is deleted: a role is the factory interface itself, so registrations are stored as `Map<Type, IComponentFactory>` and asked for by type (`GetComponents<IVideoDecoderFactory>()`) — the role is discovered from the instance once, at `Register`, and a factory implementing two roles or none is refused rather than guessed at. Names go with it: a component is addressed by the instance the host registered (`Replace(existing, replacement)`, `Remove(factory)`, `MoveToFront(params IComponentFactory[])`), because that is the only identity a registration needed once the diff became `Signature`. `RegisteredComponent`, `ComponentRegistryExtensions`, `ComponentResolverExtensions` and `ComponentCapability`-era leftovers are deleted. The decoder-name properties go with them: what the pipeline reports about decoding is `IsVideoHardwareAccelerated`/`IsAudioHardwareAccelerated` and what it reports about the sinks is each renderer's own `Name`, so no string the engine invented is published. |
+| **S14d-8** (awaiting review) | Factories stop making components and start offering them. `IVideoDecoderFactory`, `IAudioDecoderFactory`, `IVideoRendererFactory` and `IAudioRendererFactory` answer with an `IComponentCreator<T>`: what it would make (`Signature`) and the one call that makes it (`Create`). The resolver asks the registrations what they would make, compares that with the signature the pipeline says is running, and creates only when the two differ — so a reconcile that changes nothing costs no graphics device, no decoder and no output stream, where the previous shape built everything to compare and threw it away. It makes the hardware fallback cheap for the same reason: after falling back, the software creator matches what is running, so the next reconcile builds nothing. An *offer* is a commitment: a factory that offers nothing is passed over and the next registration is asked, while a factory whose creator then fails to build something is the chosen one, and its failure is returned rather than hidden behind the next registration. *(Superseded in part by S14d-13: a creator that cannot build its component is passed over too.)* |
+| **S14d-9** (awaiting review) | Null backends, so switching can be tested without a codec, a window or an output device. `NullVideoDecoder` and `NullAudioDecoder` produce something a real backend can still take — a fixed 16×16 black YUV420P frame per video packet at the packet's own timestamp, and a block of silence per audio packet in the stream's own format and length — so every stage downstream still queues, submits and runs dry exactly as it would, and a null decoder can be paired with a real renderer rather than only with a null one. `NullVideoRenderer` counts and drops frames; `NullAudioRenderer` takes every block, holds nothing and reports a stopwatch as its clock. Each has a factory (`NullVideoDecoderFactory`, …) that never refuses and takes a signature, so two can be registered at once and a switch between them is a real change. `RenderedFrameCount` and `SubmittedSampleCount` are what a test or the Lab watches to see the swap land. The Lab's second row became four pickers — video decoder, audio decoder, video renderer, audio renderer — in place of the hardware toggle, the new-renderer button and the device list. Each starts on **Auto**, an entry that registers everything its role can register in the order the picker lists it; the entries below it pin one component. Choosing an entry clears the role, registers what it holds and reconciles, so no record of what was registered is kept anywhere else: `IComponentRegistry.Clear<TFactory>()` empties a role, which is what let the page drop its mirror of the registry. |
+| **S14d-10** (awaiting review) | `ComponentSnapshot` and `IComponentSource` are deleted. They existed only to be what a cloned resolver reads, and a clone can own a copy of the registry instead: `IComponentRegistry.Clone()` returns an independent registry — the same registrations in the same order, nothing shared — and `ComponentResolver.Clone()` wraps one with the same preferences. A resolver therefore has exactly one kind of source, its own registry, so a clone is registrable (onto its own copy) and there is no longer a "cannot register into this" case to explain. `CreateSnapshot` goes with them. |
+| **S14d-11** (awaiting review) | The registry is reduced to what a host actually says. `Version`, `Replace` and `MoveToFront` are deleted: nothing in the pipeline, the app or the Lab called them, and each existed for a design that no longer does. `Version` was how a reconcile skipped work when nothing changed — it now asks each factory what it would make and compares signatures, so no counter is needed. `Replace` and `MoveToFront` were how a host changed one entry in a role's order — a host now says "this role is now this one" with `Clear<TFactory>()` followed by `Register`, and the order is the order it registers in. What remains is five members: `Register`, `Remove`, `Clear`, `GetComponents`, `Clone`. |
+| **S14d-12** (awaiting review) | A renderer states what it draws with instead of being cast to it. `IVideoRenderer` gained `IGpuDevice? GpuDevice` — the device the renderer draws with, or null when it draws on the CPU — and the pipeline asks for it (`renderer?.GpuDevice`) instead of `(renderer as IGpuDevice)`. `D3D11VideoRenderer` answers with itself, since it owns the device and the lock that guards its context; the null and stand-in renderers answer null. The interface had been a hint to the compiler ("this renderer happens to be a device") where it should have been a fact the renderer states. |
+| **S14d-13** (awaiting review) | The resolver hands out sequences instead of deciding one component. `CreateVideoRenderer`, `CreateAudioRenderer`, `CreateVideoDecoder` and `CreateAudioDecoder` become `ResolveVideoRenderers()`, `ResolveAudioRenderers()`, `ResolveVideoDecoders(...)` and `ResolveAudioDecoders(...)`, each returning `IEnumerable<IComponentCreator<T>>` — every registration that offered something, in registration order. Which one is worth taking is the caller's decision, so the "a creator that then fails is final" rule becomes "walk on to the next", because a machine that will not give what one factory promised may well give what the next one offers. `PlaybackPipeline` gains one helper that walks a sequence: a creator whose signature is the one running is the answer "nothing to do" and nothing is built, any other is asked to make its component, and a creator that cannot is passed over — the last failure is what the caller hears when the sequence runs out. Hardware decoding stays a requirement by being a second pass: `ResolveVideoDecoders` yields the registrations asked with it and then the same registrations asked without it, which reads as the fallback it is rather than as a loop inside a resolver. |
+| **S14d-14** (awaiting review) | A component and its signature become one thing. `PendingComponent<T>` was already the pair — a component and the signature of the creator that made it — but only for what was waiting to be installed, so what was running had its component in one field and its signature in another (`_videoRenderer` and `_videoRendererSignature`, four of each). The type is renamed `ComponentSlot<TComponent>` and used for both: each role has a slot that is running and a slot that is pending, and taking a component over is moving the slot from one to the other. That deletes the four signature fields, makes the two writes of a takeover one (there is no longer a moment where a renderer is running and its signature is still the old one), and lets `Resolve` hand back exactly what the caller publishes — the pipeline has no place left where a component and its signature are separate variables. |
+| **S14d-15** (awaiting review) | The picture changes without moving the file. A video decoder or renderer swap used to invalidate everything — `DiscardInFlightAndReseek` raised the global epoch, so the reader sought, the audio device was flushed and the clock was re-anchored — because the epoch was the one token every stage understood. But only the picture's two components are coupled, to one another, through the device the decoder decodes on; nothing else was ever paired with them. The pipeline gains `_videoChain`, a token no other stage reads: `StartVideoChain()` runs on the render thread when it swaps the renderer and in `BuildChains` when only a decoder changed, and it drops what the old pair produced and wakes the decode thread, which takes the newest decoder, starts at the next keyframe — a freshly opened decoder has no reference picture — and checks every batch against the chain it was decoded for, so a batch finished a moment too late is dropped rather than drawn by a renderer on another device. The reader, the audio queue, the device and the clock are untouched, which is what a swap now costs instead of a repositioned file. The renderer's device also became part of the decoder's identity: a renderer that is being replaced forces the decoder to be built again, because two hardware decoders' signatures say nothing about which device they decode on, and keeping the old one would hand the new renderer frames it cannot sample. A swap while paused still shows a picture, because a chain that has not drawn yet is owed the still. *(The chain token and the dropped media are superseded by S14d-17: a queued picture now says which decoder made it, and the renderer skips the ones that are not its own.)* |
+| **S14d-16** (awaiting review) | The sound stops moving the file too. `DiscardInFlightAndReseek` is gone: with the picture on its own chain, the two remaining callers were both audio, and neither had a reason to raise the epoch. The reader installs a new audio decoder at the top of its loop instead of inside the epoch branch — what is still to come is the same bitstream and what was decoded is sound any device can take, so neither was ever paired with the decoder that made it. A new audio device re-states one thing only: where its clock stands relative to the pipeline's (`deviceClock.Position - _clock.Position`), because it has played nothing yet. The epoch is now advanced by exactly two things — a seek and a stop — which is what it always meant; a change to any component is a change of chain, not a change of position. |
+| **S14d-17** (awaiting review) | An entry says what it is for, not just what it holds. `MediaItem<T>` becomes three types — `PacketItem`, `AudioItem` and `FrameItem` — and `MediaQueue<TItem>` takes the item type, so each queue carries exactly the tags its stage has to compare: a packet and a block of sound were made for a position (`SourceEpoch`), and a picture was also made by a particular decoder (`DecoderEpoch`). The token that used to do that job, `_videoChain`, is gone, and so is the drop it needed: nothing is purged, and a renderer that has just taken over walks past the pictures made for the device it replaced instead of the queue being emptied under it. `DecoderEpoch` advances only when a decoder and the renderer it decodes for are replaced together, because that is the only change that makes what is already decoded unusable — a decoder replaced on its own keeps its generation, so the frames already queued keep being drawn while the new decoder waits for a picture it can start from, which is a better picture than the stall it used to cost. `Clear()` is still there and still used by a seek: with the tags in place a seek would only pay for draining stale entries, so it is a latency choice rather than a correctness one. *(The bespoke queue itself is superseded by S14d-18.)* |
+| **S14d-18** (awaiting review) | The queues are the framework's. `MediaItem` and `MediaQueue` are deleted: an entry is a `readonly record struct` declared where it is used (`PacketEntry`, `AudioEntry`, `FrameEntry` — the last carrying the decoder generation as well as the position), and the queue is `ConcurrentQueue<T>`. Two facts make a lock-free queue sufficient where a bespoke one was needed: each queue has exactly one consumer and nothing else removes an entry, so a look is what a take returns and a picture can be judged before it is owned; and a stale entry is skipped by the consumer rather than purged, so a seek and a decoder swap no longer empty anything. What the queue used to supply and no longer has: `Clear` (a seek only advances the position — the tags make the queued entries recognisable as old), close-plus-dispose (a stop joins the threads and then drains what nobody took), and a weight (the sound queue keeps a sample count alongside, which is what the reader paces itself by). `MediaQueueTests` goes with the class: what it pinned — order, the end-of-stream entry, release on close — is now the framework's behaviour or the pipeline's, and the pipeline tests cover it. |
+| **S14d-19** (awaiting review) | A swap is one step, and a generation lives on the component that has it. `ComponentSlot<T>` gains a `Version`, and what used to be a pipeline field (`_decoderEpoch`) becomes two properties of the slots: a decoder and the renderer it was built for carry the same version, a decoder replaced on its own keeps the version the drawing renderer has, and a picture records the version of the decoder that made it (`FrameEntry.ComponentVersion`) so a renderer can skip the ones that are not its own. Nothing is compared against a counter in the pipeline any more — the question "is this frame mine?" is answered by the two components that were handed over together. Around that, `_componentLock`: `BuildChains` decides and publishes under it, and each of the four threads takes its half under it, so a reconcile can never read what is waiting while a swap is moving it, and a swap can never land between a reconcile's question and its answer. What the lock does not cover is releasing a replaced component — a codec that is closing or a device that is being flushed is disposed after the lock is let go, so a slow release cannot hold up a reconcile. |
+
+*Verified for S14d-1.* Eleven tests. `RefusesTwoComponentsWithTheSameName` pins identity; `ReplacesAComponentInPlace`
+
+pins that a replacement keeps its position (a device change is not a promotion); `ASnapshotDoesNotSeeLaterChanges`
+pins the picture — falsified by handing out the live list, which makes it fail immediately; and
+`VersionChangesOnlyWhenSomethingChanges` pins the no-op case that makes reconciling cheap, falsified by letting a
+same-instance replace bump the version. `StaysConsistentWhileRegistrationsAndReadsRace` runs three writer threads
+against a reader for 2,000 steps each and requires every read to be one complete state (no duplicate names) — the
+lock's actual job, stated as an assertion.
+
+*Verified for S14d-2.* `TheChainKeepsTheOrderOfBothHalvesAndReportsTheDevice` pins the pair and the honest answer
+for a chain that cannot keep frames on the GPU (`SaysWhenNoRendererCanKeepFramesOnTheGpu`), and
+`ReorderingPutsTheNamedDecoderFirst` pins that the order is the host's. *Superseded in part by S14d-4:* this round
+also ordered the renderers that offer a device first, which was removed two rounds later — see "Order is the only
+order" below. The ordering was mine, not a requirement, and the host's order is the one that survived.
+
+*One thing the plan changed while implementing it.* `PreferredName` and `AllowFallback` were scheduled for deletion
+here; they were not deleted until S14d-4. They are what the S13d-2b test proves
+(`LetsANamedDecoderWinOverThePreferredKind`), and their replacement — order decided by the host's registrations —
+did not exist until `Reconcile` landed. Removing them first would have taken away a capability a round before its
+replacement could be proven.
+
+*Verified for S14d-3.* `ReportsWhenNoSourceProviderWasSupplied` pins the omission as a failure with a message and
+leaves nothing open. Three resolution tests prove the walks are real rather than incidental:
+`LetsTheNextAudioDecoderServeTheFileWhenTheFirstOneRefuses`, `LetsTheNextAudioRendererServeTheFileWhenTheFirstOneRefuses`
+and `LetsTheNextVideoRendererServeTheFileWhenTheFirstOneRefuses` each register a refusing factory ahead of a working
+one and require the second to be the one that is used — emptying the audio renderer's candidate list makes the second
+one fail on "the second device has to be the one that was configured", so the assertion depends on the registry walk
+and not on the helper. 226 tests, three consecutive clean runs, x64 and ARM64 clean.
+
+*Verified for S14d-4.* The seven switch tests were rewritten to the new shape and keep their claims:
+`ReplacesTheVideoDecoderWithoutLeavingPlayback` changes the preference and reconciles, and requires the new
+decoder to be created with it while the state and position hold; `ReportsTheDecoderThatIsRunning` requires the
+report to move with the registry's order; `SwapsTheVideoRendererWithoutLeavingPlayback` now also requires the
+**decoder to be rebuilt on the new renderer's device** — the assertion that failed twice while the code was wrong,
+once because the plan was published after the renderer (the render thread could raise the epoch before the decoder
+plan existed) and once because the test could not see the rebuild at all. `ReplacesTheAudioDecoderWithoutLeavingPlayback`
+is the round's new capability: an audio decoder replaced while playing, on the reader thread, with playback never
+pausing. `AppliesBothChainsInOneReconcile` replaces the video renderer and the audio device in one edit and
+requires both to be applied and reported by one call. `KeepsTheRunningDecoderWhenThePreferenceIsUnchanged` requires
+a reconcile that finds nothing to do to change nothing (and report nothing). `KeepsTheRunningDecoderWhenTheReplacementFails`
+and `KeepsTheRunningRendererWhenTheNewOneFails` leave the registry holding only a factory that refuses, and require
+a warning and a failure respectively — with the running component untouched. 223 tests, x64 and ARM64 clean.
+
+*Two things this round changed that were not in the plan.*
+
+**Order is the only order.** The plan said the diff would be conservative; it did not anticipate that three
+orderings were still competing. `ComponentResolver` sorted decoders by hardware-versus-software kind and then by a
+declared `Priority`, so a host could not put a software decoder first while preferring hardware — the exact thing
+`Reorder` is for. Registration order is now the order, everywhere, and `ComponentSelectionOptions` (name,
+preference, fallback) is deleted: the host orders candidates, and `PlaybackPreferences` only says how a decoder
+should be *created*. `ComponentCapabilities.Priority` stays as advice for a host building a list, and the resolver
+tests now pin that it is ignored.
+
+**Not one epoch, but one per owning thread.** The earlier plan claimed a reconcile raises one epoch. It cannot,
+and the reason is the reason the design works: the render thread raises it *after* swapping, so no decoder is
+rebuilt on a device that is about to go, and the audio thread does the same for the device it owns. A reconcile
+that changes both chains therefore produces two epoch changes, each from the thread that owns what changed. A
+change with no renderer behind it is voided by the reconcile itself.
+
+*One observation about the suite.* A run immediately after a heavy build produced 33 failures across timing-sensitive
+audio tests, then three consecutive runs of the same binaries were clean (222 passed, 4 skipped, 50 s each, against
+81 s for the failing run). The tests that failed are the ones that wait on the clock with a deadline, so a loaded
+machine reads as a stall. Recorded here rather than dismissed: a real stall and a busy machine look the same to those
+tests, and that is a limitation of the test design, not of the engine. A second, unrelated trap appeared in this
+round: restoring a file from a backup gives it an **older** timestamp than the binary built from the falsified
+version, so MSBuild skips it and the old binary runs — a falsification "restore" needs `/t:Rebuild`, not `/t:Build`.
+
+*Verified for S14d-5.* No new tests: the switches it touches are exercised by the Lab, and the helper it introduces
+is display only. The proof it matters is that everything else still passes — 223 tests, x64 and ARM64 clean — with
+the old selection API gone from the tree entirely.
+
+*Verified for S14d-11.* No new tests: the three members it deletes had no callers left in the engine, the app or the Lab, so what proves it is that everything else still passes. The registry tests it removed — `ReplacesAComponentInPlace`, `MovingToFrontPutsTheNamedComponentsFirstAndKeepsTheRestInOrder`, `VersionChangesOnlyWhenSomethingChanges` — are deleted rather than rewritten, because the premise each pinned (a counter, a slot replacement, a reordering) no longer exists; `ACloneDoesNotSeeLaterChanges` keeps its claim and now compares registrations instead of a version.
+These tests pre-date the rework and are kept as the record of what each round pinned; the ones named here that no longer exist were deleted in the rounds noted above.
+
+### Phase 4 (v2) — deferred
+
+**Track selection** (scenario 6) is dropped from v1: it is the only scenario that changes none of the others, and
+its cost is a chain-rebuild mechanism nothing else needs. The contracts and the reader are already shaped for it —
+`ITrackController` exists with no implementer, `MediaInfo` enumerates every stream, and the reader skips the ones
+nobody selected. Three steps when it comes back:
+
+| Step | Goal |
+|---|---|
+| **T1** | The pipeline can change one chain, audio first. A switch disposes that chain's decoder, bumps the epoch, re-creates the decoder for the new stream and resumes the previous state, reusing the seek path to keep the position. Verify with a fixture that muxes two audio tracks. |
+| **T2** | Video track switching. The renderer already reallocates when a frame's size or format changes, so a different-resolution track needs no reconfigure. |
+| **T3** | The switch reaches a surface: the Lab first, then a Tracks section in the player's settings panel, with subtitle streams listed but disabled. |
+
+Subtitle rendering, the plugin surface and the fallback policy stay deferred with it.
 
 ## 7. Risks
 
@@ -3494,13 +3847,14 @@ Sequencing notes:
 | x64 and arm64 FFmpeg binaries come from different channels | Version drift between architectures | `FFmpegRuntime` asserts the major versions at startup and reports what it found; supplying the arm64 files is the remaining step |
 | Native payload size (~183 MB/arch) | Package size | Decoupled boundary allows a trimmed custom FFmpeg build later without API changes |
 | x86 builds but cannot play media | Known gap on 32-bit devices | Accepted and parked; the FFmpeg source problem is tracked independently of the engine design |
-| A pipeline test fails about once in ten suite runs | A red build that means nothing, and a real defect would hide among the noise | Unresolved. Seen once for `PlaysAVideoOnlyFileToTheEnd` (at 47 ms, no message captured) and once for another timing-bounded test; each passes alone and in repeated runs. Prime suspect is a test bounded at a few seconds being starved when the suite follows another run back to back — the audio tests open the real device, so the suite is not cheap |
+| A pipeline test fails about once in ten suite runs | A red build that means nothing, and a real defect would hide among the noise | **Resolved — and it was not the tests.** In one process the whole assembly failed 17 of 209 while every one of them passed alone, and a two-pipeline test reproduced it without the suite at all. The snapshot of a stalled pipeline said it in one line: the reader had read the file to its end, `_readerTailVideoTicks` was still `-1` (no packet had ever been routed), and the pipeline was `Ended` at `00:00.000` with nothing shown — an *early* end, not a hang, so every test that waits for a frame simply ran out its budget. The cause: `RoutePacket` decides what a packet is for from the chain that is *running*, and the first video decoder is installed by the decode thread, so a reader that got in first dropped every packet down the "a stream nobody selected" path — a path that returns success — and then announced the end of the file. Two rules came out of it. **The reader routes by stream, never by component**: whether a decoder exists is not a fact for the reader to consult, so a packet is queued and the decode thread drops it if no chain can take it (it cannot eat the first GOP, because the swap is drained at the top of every iteration before a packet is taken, and the end marker is never dropped). **An end signal must be taken, not just posted**: the reader enqueues the audio end marker whether or not a chain exists, but the audio thread parked on `renderer is null` before it ever looked at the queue — so a file whose audio could not be opened never ended, and the pipeline sat in `Playing` after the picture had finished. The thread now consumes the queue with no device (spending the sound it cannot play) and reports the marker. The stream stays *selected* either way: the audio stream exists whether or not a device will take it, and a chain can be built for it later, so nulling the stream info would have made the failure permanent. The suite went from 187 of 209 in one process to 209 of 209, repeatedly |
 | No fixture with audio *and* video | A defect whose cycle needs both cannot be reproduced in a test — the S8i freeze is the first of them, and it had to be reasoned out rather than measured | **Resolved in S8m** by `RawAudioVideoFixtureFile`: uncompressed frames and PCM written by hand into Matroska, intra-only and 200 frames long. It has already paid for itself by reproducing the reader-starvation deadlock that reasoning had missed twice |
 | D3D/WinUI interop complexity (swap-chain attach, device loss) | Schedule, stability | COM interop is generated by CsWin32 rather than handwritten, so the ABI cannot drift; the swap chain remains the step that needs on-screen verification |
 | A device that stops consuming audio | The one stall that can still stop the picture — and it is supposed to | **S8o:** this is no longer a special case. The device *is* the clock, so a device that takes nothing is time that has not moved: the audio thread waits for room without a deadline, the picture waits for a clock that is not moving, the reader idles once both queues are full, and nothing is dropped or failed. **S9e:** it is said as one line, `The audio device is not moving.`, raised on the audio thread a second into the stall and paired with `The audio device is moving again.` when the position moves |
 | A device that accepts audio and never reports playing it | Every wait in the video path ends at the clock, so the picture stops and cannot be told to carry on | Same case as above, and the same answer: a wait that is visible (`StarvedFor`) and reported (one `WarningRaised` line). Nothing more can be done from inside the engine, and the report is what turns a mystery into a device problem |
 | An audio block can claim the clock anchor with a pre-seek timestamp | The picture would sit behind the sound by up to a keyframe, which looks exactly like a seek that half-worked | Mitigated in S8o: `Seek` re-arms the anchor *after* flushing, so a claim made for the old position cannot outlive the seek — the next block or frame through `AnchorClock` re-points the clock at where playback now is |
 | Every stage's liveness derives from the audio device | A device that stops reporting stops the picture *and* the sound, with no message: the sixth report | **Resolved in S8o** — the answer was not to give playback a second source of time but to make every wait end somewhere the device does not own: the reader waits only on the file, the decoder only on the picture, and the two waits that do end at the device are the ones that are supposed to (and are named while they last). See [PlaybackPipelineRefactor.md](./PlaybackPipelineRefactor.md) |
+| A device fails mid-playback (lost adapter, removed endpoint) | One bad device would end the whole playback in a state where a renderer swap is refused — so the one cure available would be the one thing not allowed | **Resolved in S14e: a failed device is spent, not fatal.** The video and audio threads report a warning and keep going. Frames and buffers are spent rather than queued, so the end of the file is still reached and reported; the sound is spent at the clock's pace, so the position a swap would resume from is preserved; and the swap itself clears the failure and takes over. **Neither queue paces the read unless a chain fills it** — the read-ahead is driven by two targets (500 ms of sound, 32/64 picture packets) and each one is only consulted while something can meet it. A target that can never be met never lets the reader wait, so it reads the file at once: unbounded memory in `_audioQueue` for an audio-only file (decoded blocks, the expensive one), and unbounded in `_packetQueue` when the sound has no decoder (which also leaves a device attached later with nothing to play). Pinned by `DoesNotReadAnAudioOnlyFileAllAtOnce` (33 of 33 packets read in the first moment before the gate, about six after it) and `TakesSoundWhenADeviceArrivesAfterPlaybackBegan`. **A device that takes sound and never plays it is throttled, not trusted**: it holds nothing, so the queue it is fed from never fills and every consumer-reported bound says "no room needed" — while the sound it is given runs away from what has been played. When the last block taken is more than 3 s past the position, the sound is held back until the device has caught up (reported once per position and device — `The audio device is not playing what it is given.`), and while it is held back the clock is kept running, because otherwise the lead it is measured by could never shrink. `tailBufferPosition` is the evidence: the end of the last block taken, which for a working device can only be a queue target and a device buffer ahead of the clock. Pinned by `HoldsSoundBackFromADeviceThatDoesNotPlayIt`. **Reconcile rebuilds and resynchronises, and the two are separate steps**: `BuildChains` reports what it replaced through a `ChainChanges` flags value and wakes nobody; the *caller* decides. `Open` ignores both (the threads have not started). `Reconcile` treats any change as a new start — it advances the epoch with the position playback is at, which flushes the decoders, drops what was queued for the old chains and re-anchors the clock. That is a position decision, not part of building a chain, which is why the swap helpers know nothing about it. The consequence is deliberate: a swap now restarts the stream where it stands instead of carrying the old chains' media across (`SwapsTheVideoRendererWithoutMovingPlayback`, `SwapsTheAudioRendererWithoutLeavingPlayback`, `ReplacesTheAudioDecoderWithoutLeavingPlayback`). **A clock offset is chosen when a device appears, not only when the position is armed**: arming belongs to the sound and happens once per position, so a device that arrives after the picture armed the position would never get an offset — and `SyncClock` would stay off for the rest of that position, leaving the pipeline free-running on its own stopwatch. Measured before the change: 300 ms of position in 300 ms of wall time against a device running at 3×; `SyncsToADeviceThatArrivesAfterThePositionWasSet` pins it. **A device command throws, a device read does not**: `WasapiAudioClock.Start`/`Pause` latch the failure and let the exception out, because the pipeline is the single site that decides what it means — swallowing it there left the audio thread asking a dead device to start on every iteration and finding out only through a later hand-off. `Position` still never throws, because the host's timer and the picture both read it. Pinned by `EndsWhenThePictureDeviceNeverComesBack`, `BringsThePictureBackWhenAFailedDeviceIsSwapped`, `KeepsGoingWhenTheDeviceStopsTakingTheSound`, `BringsTheSoundBackWhenAFailedDeviceIsSwapped`, `KeepsGoingWhenTheDeviceWillNotStart`, `KeepsGoingAfterASeekWhenTheDeviceHasFailed`, `LetsGoOfAHandOffWhenTheDeviceDiesDuringIt`, and `RaisesAFailingStartOrStopAndKeepsTheFailure`. **Decoder failures stay fatal mid-stream** — a decoder is not a device that can be swapped from underneath, and `ReportsADecoderThatDiesAsPlaybackFailing` / `ReportsADecoderThatThrowsAsPlaybackFailing` pin that. **An end-of-stream drain is the exception**: it runs after the last packet has been read, so a decoder that cannot give up its tail has lost the tail and nothing more — the failure is reported as a warning and the end still goes out, or the picture and the sound would both wait for a stream that is already over. Pinned by `EndsWhenTheDecoderCannotGiveUpItsTail`, `EndsWhenTheSoundDecoderCannotGiveUpItsTail`, and `SurvivesADrainThatHandsBackNoTailAtAll` (a successful drain that hands back no list used to be walked as one, which is an exception on a thread with no one to catch it) |
 | A/V sync and clock correctness | Core quality | Intro S7; keep `IPlaybackClock`/`ISynchronizer` swappable so alternatives can be compared |
 | Silent coupling to FFmpeg over time | Loses the main design goal | Hard rules in §4.2 + architecture test in S15 |
 | Long gap before user-visible payoff | Review fatigue | Playback Lab gives visible progress from S4 |
@@ -3512,5 +3866,8 @@ Sequencing notes:
    `Backends/FFmpeg` (enforced by test).
 3. `PlayerPageViewModel` differs from today only by the `using` line plus the deliberate feature
    wiring added in S10+.
-4. Scenarios 1–7 are reachable through the engine's capability interfaces and verified in the app.
+4. Scenarios 1–5 and 7 are reachable through the engine's capability interfaces and verified in the app.
+   Scenario 6 (track selection) is v2 (Phase 4 in §6) — and its contracts are present but unimplemented.
+   Scenarios 1–4 are reachable *through the engine* today (`Components` + `Reconcile`); reaching them from the
+   player's own UI is the remaining surface work, deferred with the rest by §3.7.
 5. Subtitle, plugin, and fallback hooks are present as contracts/slots but unimplemented.
