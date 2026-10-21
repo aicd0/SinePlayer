@@ -12,13 +12,12 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 
 using SinePlayer.Common.BaseUI;
+using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Playback.Surface;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
-using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
-using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -58,7 +57,6 @@ internal sealed partial class PlaybackLabPage : BasePage
         }
     }
 
-    private readonly CreatedComponents _components = new();
     private PlaybackPipeline? _pipeline;
     private GainAudioFilter? _gain;
     private SwapChainPanelRenderTarget? _renderTarget;
@@ -70,20 +68,29 @@ internal sealed partial class PlaybackLabPage : BasePage
     public PlaybackLabPage()
     {
         InitializeComponent();
-        Unloaded += PlaybackLabPage_Unloaded;
         PopulatePickers();
+    }
+
+    protected override void OnStart(PageBundle bundle)
+    {
+        base.OnStart(bundle);
+
+        GetMainPageAbility().SetTitle("Playback lab");
+        GetMainPageAbility().SetIcon(new SymbolIconSource() { Symbol = Symbol.Repair });
+    }
+
+    protected override void OnStop()
+    {
+        base.OnStop();
+
+        CloseMedia();
+        _renderTarget?.Dispose();
+        _renderTarget = null;
     }
 
     //
     // Events
     //
-
-    private void PlaybackLabPage_Unloaded(object sender, RoutedEventArgs e)
-    {
-        CloseMedia();
-        _renderTarget?.Dispose();
-        _renderTarget = null;
-    }
 
     private async void OpenButton_Click(object sender, RoutedEventArgs e)
     {
@@ -364,8 +371,8 @@ internal sealed partial class PlaybackLabPage : BasePage
         _updatingPickers = true;
         try
         {
-            RecordingVideoDecoderFactory ffmpegVideoDecoder = new(_components, new FFmpegVideoDecoderFactory());
-            RecordingVideoDecoderFactory nullVideoDecoder = new(_components, new NullVideoDecoderFactory());
+            IVideoDecoderFactory ffmpegVideoDecoder = new FFmpegVideoDecoderFactory();
+            IVideoDecoderFactory nullVideoDecoder = new NullVideoDecoderFactory();
             VideoDecoderPicker.ItemsSource = new ComponentChoice[]
             {
                 new("Auto", [ffmpegVideoDecoder, nullVideoDecoder], HardwareDecoding: true),
@@ -374,8 +381,8 @@ internal sealed partial class PlaybackLabPage : BasePage
                 new("Nothing", [nullVideoDecoder]),
             };
 
-            RecordingAudioDecoderFactory ffmpegAudioDecoder = new(_components, new FFmpegAudioDecoderFactory());
-            RecordingAudioDecoderFactory nullAudioDecoder = new(_components, new NullAudioDecoderFactory());
+            IAudioDecoderFactory ffmpegAudioDecoder = new FFmpegAudioDecoderFactory();
+            IAudioDecoderFactory nullAudioDecoder = new NullAudioDecoderFactory();
             AudioDecoderPicker.ItemsSource = new ComponentChoice[]
             {
                 new("Auto", [ffmpegAudioDecoder, nullAudioDecoder]),
@@ -383,8 +390,8 @@ internal sealed partial class PlaybackLabPage : BasePage
                 new("Nothing", [nullAudioDecoder]),
             };
 
-            RecordingVideoRendererFactory d3d11VideoRenderer = new(_components, new D3D11VideoRendererFactory());
-            RecordingVideoRendererFactory nullVideoRenderer = new(_components, new NullVideoRendererFactory());
+            IVideoRendererFactory d3d11VideoRenderer = new D3D11VideoRendererFactory();
+            IVideoRendererFactory nullVideoRenderer = new NullVideoRendererFactory();
             VideoRendererPicker.ItemsSource = new ComponentChoice[]
             {
                 new("Auto", [d3d11VideoRenderer, nullVideoRenderer]),
@@ -398,7 +405,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             {
                 foreach (WasapiAudioEndpoint endpoint in endpoints)
                 {
-                    RecordingAudioRendererFactory device = new(_components, WasapiAudioRendererFactory.For(endpoint));
+                    IAudioRendererFactory device = WasapiAudioRendererFactory.For(endpoint);
                     allAudioRenderers.Add(device);
                     audioRenderers.Add(new ComponentChoice(
                         endpoint.IsDefault ? $"{endpoint.Name} (default)" : endpoint.Name,
@@ -412,12 +419,12 @@ internal sealed partial class PlaybackLabPage : BasePage
 
             if (audioRenderers.Count == 0)
             {
-                RecordingAudioRendererFactory defaultDevice = new(_components, new WasapiAudioRendererFactory());
+                IAudioRendererFactory defaultDevice = new WasapiAudioRendererFactory();
                 allAudioRenderers.Add(defaultDevice);
                 audioRenderers.Add(new ComponentChoice("WASAPI (default)", [defaultDevice]));
             }
 
-            RecordingAudioRendererFactory nullAudioRenderer = new(_components, new NullAudioRendererFactory());
+            IAudioRendererFactory nullAudioRenderer = new NullAudioRendererFactory();
             allAudioRenderers.Add(nullAudioRenderer);
             audioRenderers.Add(new ComponentChoice("Nothing", [nullAudioRenderer]));
             audioRenderers.Insert(0, new ComponentChoice("Auto", allAudioRenderers));
@@ -456,7 +463,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         // "dropped" counts decoded frames that were never shown, and a stage being waited for is what the
         // clock standing still means: playback is not failing, it is waiting for something to work with.
         string waiting = pipeline.StarvedFor is null ? string.Empty : $" waiting for {pipeline.StarvedFor}.";
-        long underruns = (_components.AudioRenderer as WasapiAudioRenderer)?.UnderrunCount ?? 0;
+        long underruns = pipeline.AudioUnderruns;
         string health = $" dropped {pipeline.DroppedFrameCount}, underruns {underruns}, lag {pipeline.PictureLag.TotalMilliseconds:0} ms.{waiting}";
 
         // What the compositor did with them is the other half of the picture: frames the pipeline handed over
@@ -478,7 +485,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         string chain = pipeline.AudioFilters.Count == 0
             ? "no audio filters"
             : $"filters {string.Join(", ", pipeline.AudioFilters.Filters.Select(filter => filter.Name))}";
-        string pace = $" decode {pipeline.AverageDecodeMilliseconds:0.0} ms {decoding}, render {pipeline.AverageRenderMilliseconds:0.0} ms by {renderer}{sound}, {chain}.";
+        string pace = $" decode {pipeline.AverageVideoDecodeMilliseconds:0.0} ms {decoding}, render {pipeline.AverageVideoRenderMilliseconds:0.0} ms by {renderer}{sound}, {chain}.";
 
         Report($"{pipeline.State}: {_description}. {pipeline.Position:mm\\:ss\\.fff} / {pipeline.Duration:mm\\:ss\\.fff}."
             + $" {presented} frame(s).{health}{compositor}{pace}{surface}{error}{warning}");
@@ -524,81 +531,17 @@ internal sealed partial class PlaybackLabPage : BasePage
     }
 
     //
-    // Types
+    // Utilities
     //
 
-    private sealed class CreatedComponents
+    private IMainPageAbilityForTab GetMainPageAbility()
     {
-        internal IVideoDecoder? VideoDecoder { get; set; }
-        internal IAudioDecoder? AudioDecoder { get; set; }
-        internal IVideoRenderer? VideoRenderer { get; set; }
-        internal IAudioRenderer? AudioRenderer { get; set; }
+        return GetAbility<IMainPageAbilityForTab>()!;
     }
 
-    private sealed class RecordingCreator<TComponent>(IComponentCreator<TComponent> inner, Action<TComponent> record) : IComponentCreator<TComponent>
-        where TComponent : class
-    {
-        public string Signature => inner.Signature;
-
-        public PlaybackOperationResult Create(out TComponent? component)
-        {
-            PlaybackOperationResult created = inner.Create(out component);
-            if (component is not null)
-            {
-                record(component);
-            }
-
-            return created;
-        }
-    }
-
-    private sealed class RecordingVideoDecoderFactory(CreatedComponents components, IVideoDecoderFactory wrapped) : IVideoDecoderFactory
-    {
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
-        {
-            PlaybackOperationResult offered = wrapped.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
-            creator = offered.IsSuccessful && inner is not null
-                ? new RecordingCreator<IVideoDecoder>(inner, component => components.VideoDecoder = component)
-                : null;
-            return creator is null ? offered : PlaybackOperationResult.Success;
-        }
-    }
-
-    private sealed class RecordingAudioDecoderFactory(CreatedComponents components, IAudioDecoderFactory wrapped) : IAudioDecoderFactory
-    {
-        public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
-        {
-            PlaybackOperationResult offered = wrapped.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
-            creator = offered.IsSuccessful && inner is not null
-                ? new RecordingCreator<IAudioDecoder>(inner, component => components.AudioDecoder = component)
-                : null;
-            return creator is null ? offered : PlaybackOperationResult.Success;
-        }
-    }
-
-    private sealed class RecordingVideoRendererFactory(CreatedComponents components, IVideoRendererFactory wrapped) : IVideoRendererFactory
-    {
-        public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
-        {
-            PlaybackOperationResult offered = wrapped.TryCreate(out IComponentCreator<IVideoRenderer>? inner);
-            creator = offered.IsSuccessful && inner is not null
-                ? new RecordingCreator<IVideoRenderer>(inner, component => components.VideoRenderer = component)
-                : null;
-            return creator is null ? offered : PlaybackOperationResult.Success;
-        }
-    }
-
-    private sealed class RecordingAudioRendererFactory(CreatedComponents components, IAudioRendererFactory wrapped) : IAudioRendererFactory
-    {
-        public PlaybackOperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
-        {
-            PlaybackOperationResult offered = wrapped.TryCreate(out IComponentCreator<IAudioRenderer>? inner);
-            creator = offered.IsSuccessful && inner is not null
-                ? new RecordingCreator<IAudioRenderer>(inner, component => components.AudioRenderer = component)
-                : null;
-            return creator is null ? offered : PlaybackOperationResult.Success;
-        }
-    }
+    //
+    // Types
+    //
 
     private sealed record ComponentChoice(string Name, IReadOnlyList<IComponentFactory> Factories, bool? HardwareDecoding = null)
     {

@@ -11,8 +11,6 @@ namespace SinePlayer.Common.Playback.CoreEngine;
 internal sealed class PlaybackInfoHandle : IPlaybackInfoProvider
 {
     private volatile PlaybackPipeline? _pipeline;
-    private volatile float _volume = 1.0f;
-    private volatile bool _muted;
 
     public MediaInfo? Media => _pipeline?.MediaInfo;
 
@@ -26,19 +24,21 @@ internal sealed class PlaybackInfoHandle : IPlaybackInfoProvider
 
     public long DroppedFrames => _pipeline?.DroppedFrameCount ?? 0;
 
-    public long? DisplayedFrames => _pipeline?.DisplayedFrameCount;
-
     public TimeSpan PictureLag => _pipeline?.PictureLag ?? TimeSpan.Zero;
 
-    public double AverageDecodeMilliseconds => _pipeline?.AverageDecodeMilliseconds ?? 0;
+    public double AverageVideoDecodeMilliseconds => _pipeline?.AverageVideoDecodeMilliseconds ?? 0;
 
-    public double AverageRenderMilliseconds => _pipeline?.AverageRenderMilliseconds ?? 0;
+    public double AverageVideoRenderMilliseconds => _pipeline?.AverageVideoRenderMilliseconds ?? 0;
 
-    public string? StarvedFor => _pipeline?.StarvedFor;
+    public long AudioUnderruns => _pipeline?.AudioUnderruns ?? 0;
 
-    public double Volume => _pipeline is null ? 0.0 : _volume;
+    public string? VideoDecoderName => _pipeline?.VideoDecoderName;
 
-    public bool IsMuted => _pipeline is not null && _muted;
+    public string? AudioDecoderName => _pipeline?.AudioDecoderName;
+
+    public string? VideoRendererName => _pipeline?.VideoRendererName;
+
+    public string? AudioRendererName => _pipeline?.AudioRendererName;
 
     public bool IsVideoHardwareAccelerated => _pipeline?.IsVideoHardwareAccelerated ?? false;
 
@@ -52,11 +52,5 @@ internal sealed class PlaybackInfoHandle : IPlaybackInfoProvider
     internal void Detach()
     {
         _pipeline = null;
-    }
-
-    internal void ReportLevel(double volume, bool muted)
-    {
-        _volume = (float)volume;
-        _muted = muted;
     }
 }

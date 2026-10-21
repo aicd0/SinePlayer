@@ -133,6 +133,10 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public bool HasAudio => _audioStreamInfo is not null;
 
+    public string? VideoDecoderName => _videoDecoder?.Component.Name;
+
+    public string? AudioDecoderName => _audioDecoder?.Component.Name;
+
     public string? VideoRendererName => _videoRenderer?.Component.Name;
 
     public string? AudioRendererName => _audioRenderer?.Component.Name;
@@ -169,7 +173,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
-    public double AverageDecodeMilliseconds
+    public double AverageVideoDecodeMilliseconds
     {
         get
         {
@@ -178,7 +182,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
-    public double AverageRenderMilliseconds
+    public double AverageVideoRenderMilliseconds
     {
         get
         {
@@ -186,6 +190,8 @@ public sealed partial class PlaybackPipeline : IDisposable
             return frames <= 0 ? 0 : Interlocked.Read(ref _renderTicks) * 1000.0 / Stopwatch.Frequency / frames;
         }
     }
+
+    public long AudioUnderruns => _audioRenderer?.Component.UnderrunCount ?? 0;
 
     public TimeSpan PictureLag
     {

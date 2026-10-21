@@ -192,6 +192,12 @@
   <data name="Ascending" xml:space="preserve">
     <value>Ascendente</value>
   </data>
+  <data name="Audio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="AudioUnderruns" xml:space="preserve">
+    <value>Interrupciones por falta de audio</value>
+  </data>
   <data name="Auto" xml:space="preserve">
     <value>Auto</value>
   </data>
@@ -222,6 +228,12 @@
   <data name="BackgroundImage" xml:space="preserve">
     <value>Imagen de fondo</value>
   </data>
+  <data name="BitDepth" xml:space="preserve">
+    <value>Profundidad de bits</value>
+  </data>
+  <data name="BitRate" xml:space="preserve">
+    <value>Tasa de bits</value>
+  </data>
   <data name="Calculating" xml:space="preserve">
     <value>Calculador...</value>
   </data>
@@ -230,6 +242,12 @@
   </data>
   <data name="Category" xml:space="preserve">
     <value>Categoría</value>
+  </data>
+  <data name="ChannelLayout" xml:space="preserve">
+    <value>Distribución de canales</value>
+  </data>
+  <data name="Channels" xml:space="preserve">
+    <value>Canales</value>
   </data>
   <data name="CheckForUpdates" xml:space="preserve">
     <value>Buscar actualizaciones</value>
@@ -257,6 +275,9 @@
   </data>
   <data name="CloseWindow" xml:space="preserve">
     <value>Cerrar ventana</value>
+  </data>
+  <data name="Codec" xml:space="preserve">
+    <value>Códec</value>
   </data>
   <data name="CollapseAll" xml:space="preserve">
     <value>Contraer todo</value>
@@ -288,6 +309,9 @@
   <data name="CompletionStatusPlanned" xml:space="preserve">
     <value>Planeado</value>
   </data>
+  <data name="Container" xml:space="preserve">
+    <value>Contenedor</value>
+  </data>
   <data name="Continuous" xml:space="preserve">
     <value>Continuo</value>
   </data>
@@ -317,6 +341,12 @@
   </data>
   <data name="DebugModeWarning" xml:space="preserve">
     <value>Activar el modo de depuración puede hacer que la aplicación sea inestable. ¿Desea continuar?</value>
+  </data>
+  <data name="DecodeMode" xml:space="preserve">
+    <value>Modo de decodificación</value>
+  </data>
+  <data name="Decoder" xml:space="preserve">
+    <value>Decodificador</value>
   </data>
   <data name="Default" xml:space="preserve">
     <value>Por defecto</value>
@@ -364,6 +394,9 @@ $files</value>
   </data>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>Descargar complementos desde GitHub</value>
+  </data>
+  <data name="DroppedFrames" xml:space="preserve">
+    <value>Fotogramas descartados</value>
   </data>
   <data name="Duration" xml:space="preserve">
     <value>Duración</value>
@@ -513,6 +546,9 @@ La evaluación se realizará en el siguiente orden:
   <data name="Folders" xml:space="preserve">
     <value>Carpetas</value>
   </data>
+  <data name="FrameRate" xml:space="preserve">
+    <value>Frecuencia de fotogramas</value>
+  </data>
   <data name="FunctionAverage" xml:space="preserve">
     <value>Promedio</value>
   </data>
@@ -542,6 +578,9 @@ La evaluación se realizará en el siguiente orden:
   </data>
   <data name="Group" xml:space="preserve">
     <value>Agrupamiento</value>
+  </data>
+  <data name="Hardware" xml:space="preserve">
+    <value>Hardware</value>
   </data>
   <data name="Help" xml:space="preserve">
     <value>Ayuda</value>
@@ -625,6 +664,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="LastVisitTime" xml:space="preserve">
     <value>Última visita</value>
   </data>
+  <data name="Library" xml:space="preserve">
+    <value>Biblioteca</value>
+  </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>No hay resultados con la configuración de filtro actual. Prueba con </value>
   </data>
@@ -633,9 +675,6 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="LibraryEmptyPart3.Text" xml:space="preserve">
     <value>.</value>
-  </data>
-  <data name="LibraryHeader.Text" xml:space="preserve">
-    <value>Biblioteca</value>
   </data>
   <data name="License" xml:space="preserve">
     <value>Licencia</value>
@@ -648,6 +687,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="Links" xml:space="preserve">
     <value>Campo de golf</value>
+  </data>
+  <data name="Media" xml:space="preserve">
+    <value>Multimedia</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>Si seleccionas «añadir a la lista de exclusión», estos archivos multimedia no se volverán a importar la próxima vez que se actualice la biblioteca.</value>
@@ -790,8 +832,14 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="PauseOnLeaveTab" xml:space="preserve">
     <value>Pausar al salir de la pestaña del reproductor</value>
   </data>
+  <data name="PictureLag" xml:space="preserve">
+    <value>Retraso de imagen</value>
+  </data>
   <data name="Pin" xml:space="preserve">
     <value>Fijar</value>
+  </data>
+  <data name="PixelFormat" xml:space="preserve">
+    <value>Formato de píxel</value>
   </data>
   <data name="Play" xml:space="preserve">
     <value>Reproducir</value>
@@ -804,6 +852,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>Tu cola de reproducción aparecerá aquí</value>
+  </data>
+  <data name="Playback" xml:space="preserve">
+    <value>Reproducción</value>
   </data>
   <data name="PlaybackInformation" xml:space="preserve">
     <value>Información de reproducción</value>
@@ -828,6 +879,12 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>Complementos</value>
+  </data>
+  <data name="Position" xml:space="preserve">
+    <value>Posición</value>
+  </data>
+  <data name="PresentedFrames" xml:space="preserve">
+    <value>Fotogramas mostrados</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>Pulsar una combinación de teclas</value>
@@ -883,6 +940,9 @@ $plugins</value>
   <data name="RemoveUnreachableItems" xml:space="preserve">
     <value>Eliminar automáticamente los elementos inaccesibles</value>
   </data>
+  <data name="Renderer" xml:space="preserve">
+    <value>Renderizador</value>
+  </data>
   <data name="RepeatAll" xml:space="preserve">
     <value>Repetir: Todo</value>
   </data>
@@ -907,6 +967,9 @@ $plugins</value>
   <data name="ResetPlayerSettings" xml:space="preserve">
     <value>Restablecer los ajustes del reproductor</value>
   </data>
+  <data name="Resolution" xml:space="preserve">
+    <value>Resolución</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Restaurar</value>
   </data>
@@ -925,6 +988,12 @@ $plugins</value>
   <data name="SafeModeMessage" xml:space="preserve">
     <value>La aplicación no se cerró correctamente la última vez.
 ¿Iniciar en modo seguro?</value>
+  </data>
+  <data name="SampleFormat" xml:space="preserve">
+    <value>Formato de muestra</value>
+  </data>
+  <data name="SampleRate" xml:space="preserve">
+    <value>Frecuencia de muestreo</value>
   </data>
   <data name="Save" xml:space="preserve">
     <value>Ahorrar</value>
@@ -1004,11 +1073,17 @@ $plugins</value>
   <data name="ShuffleStable" xml:space="preserve">
     <value>Aleatorio (estable)</value>
   </data>
+  <data name="Software" xml:space="preserve">
+    <value>Software</value>
+  </data>
   <data name="Sort" xml:space="preserve">
     <value>Clasificación</value>
   </data>
   <data name="SortingFunction" xml:space="preserve">
     <value>Función de clasificación</value>
+  </data>
+  <data name="State" xml:space="preserve">
+    <value>Estado</value>
   </data>
   <data name="Statistics" xml:space="preserve">
     <value>Estadística</value>
@@ -1097,6 +1172,15 @@ $info</value>
   </data>
   <data name="Vertical" xml:space="preserve">
     <value>Vertical</value>
+  </data>
+  <data name="Video" xml:space="preserve">
+    <value>Vídeo</value>
+  </data>
+  <data name="VideoDecodeTime" xml:space="preserve">
+    <value>Tiempo de decodificación de vídeo</value>
+  </data>
+  <data name="VideoRenderTime" xml:space="preserve">
+    <value>Tiempo de renderizado de vídeo</value>
   </data>
   <data name="ViewType" xml:space="preserve">
     <value>Vista</value>

@@ -426,6 +426,7 @@ public class PlaybackPipelineTests
 
         private sealed class GatedDecoder(IVideoDecoder inner, GatedVideoDecoderFactory owner) : IVideoDecoder
         {
+            public string Name => inner.Name;
             public MediaStreamInfo Stream => inner.Stream;
 
             public bool IsHardwareAccelerated => inner.IsHardwareAccelerated;
@@ -471,6 +472,7 @@ public class PlaybackPipelineTests
         {
             private int _pending = 1;
 
+            public string Name => inner.Name;
             public MediaStreamInfo Stream => inner.Stream;
 
             public bool IsHardwareAccelerated => inner.IsHardwareAccelerated;
@@ -3473,6 +3475,7 @@ public class PlaybackPipelineTests
 
         private sealed class Decoder(IVideoDecoder inner, bool hardware) : IVideoDecoder
         {
+            public string Name => inner.Name;
             public MediaStreamInfo Stream => inner.Stream;
 
             public bool IsHardwareAccelerated => hardware;
@@ -3862,6 +3865,28 @@ public class PlaybackPipelineTests
                 Assert.That(filter.Disposed, Is.False, "removing a filter hands it back to its owner");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
             }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The underrun figure is the device's own answer, passed through rather than guessed at: what the pipeline
+    /// reports is what the device counted.
+    /// </summary>
+    [Test]
+    public void ReportsTheUnderrunsTheDeviceCounts()
+    {
+        string path = CreateWaveFile();
+        try
+        {
+            FakeAudioRenderer renderer = new() { UnderrunCount = 3 };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), renderer);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+
+            Assert.That(pipeline.AudioUnderruns, Is.EqualTo(3));
         }
         finally
         {
@@ -4351,6 +4376,7 @@ public class PlaybackPipelineTests
 
         private sealed class BrokenDrainAudioDecoder(IAudioDecoder inner) : IAudioDecoder
         {
+            public string Name => inner.Name;
             public MediaStreamInfo Stream => inner.Stream;
 
             public bool IsHardwareAccelerated => inner.IsHardwareAccelerated;
@@ -4397,6 +4423,7 @@ public class PlaybackPipelineTests
 
         private sealed class BrokenDrainVideoDecoder(IVideoDecoder inner, bool returnsNothing) : IVideoDecoder
         {
+            public string Name => inner.Name;
             public MediaStreamInfo Stream => inner.Stream;
 
             public bool IsHardwareAccelerated => inner.IsHardwareAccelerated;
@@ -4458,6 +4485,7 @@ public class PlaybackPipelineTests
                 _inner = inner;
             }
 
+            public string Name => _inner.Name;
             public MediaStreamInfo Stream => _inner.Stream;
 
             public bool IsHardwareAccelerated => _inner.IsHardwareAccelerated;
@@ -4589,6 +4617,7 @@ public class PlaybackPipelineTests
 
         private sealed class PacedAudioDecoder(IAudioDecoder inner, PacedAudioDecoderFactory owner, int decodeMilliseconds) : IAudioDecoder
         {
+            public string Name => inner.Name;
             public MediaStreamInfo Stream => inner.Stream;
 
             public bool IsHardwareAccelerated => inner.IsHardwareAccelerated;
@@ -4650,6 +4679,7 @@ public class PlaybackPipelineTests
                 _packetsBeforeThrow = packetsBeforeThrow;
             }
 
+            public string Name => _inner.Name;
             public MediaStreamInfo Stream => _inner.Stream;
 
             public bool IsHardwareAccelerated => _inner.IsHardwareAccelerated;
@@ -4698,6 +4728,7 @@ public class PlaybackPipelineTests
 
         private sealed class SilentVideoDecoder(VideoStreamInfo stream) : IVideoDecoder
         {
+            public string Name => "silent";
             public MediaStreamInfo Stream => stream;
 
             public bool IsHardwareAccelerated => false;
@@ -4756,6 +4787,7 @@ public class PlaybackPipelineTests
                 _packetsBeforeFailure = packetsBeforeFailure;
             }
 
+            public string Name => _inner.Name;
             public MediaStreamInfo Stream => _inner.Stream;
 
             public bool IsHardwareAccelerated => _inner.IsHardwareAccelerated;
@@ -4828,6 +4860,7 @@ public class PlaybackPipelineTests
                 _fastPackets = fastPackets;
             }
 
+            public string Name => _inner.Name;
             public MediaStreamInfo Stream => _inner.Stream;
 
             public bool IsHardwareAccelerated => _inner.IsHardwareAccelerated;
@@ -5425,6 +5458,9 @@ public class PlaybackPipelineTests
         private volatile bool _noRoom;
 
         public string Name { get; init; } = "fake";
+
+        /// <summary>What the device says it lost between blocks; a test that cares about the figure sets it.</summary>
+        public long UnderrunCount { get; set; }
 
         public bool CanConfigure { get; init; } = true;
 

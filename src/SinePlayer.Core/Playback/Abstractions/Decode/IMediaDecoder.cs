@@ -7,6 +7,8 @@ namespace SinePlayer.Core.Playback.Abstractions.Decode;
 
 public interface IMediaDecoder : IDisposable
 {
+    string Name { get; }
+
     MediaStreamInfo Stream { get; }
 
     bool IsHardwareAccelerated { get; }

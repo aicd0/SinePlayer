@@ -192,6 +192,12 @@
   <data name="Ascending" xml:space="preserve">
     <value>Ascendant</value>
   </data>
+  <data name="Audio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="AudioUnderruns" xml:space="preserve">
+    <value>Sous-alimentations audio</value>
+  </data>
   <data name="Auto" xml:space="preserve">
     <value>Auto</value>
   </data>
@@ -222,6 +228,12 @@
   <data name="BackgroundImage" xml:space="preserve">
     <value>Image d’arrière-plan</value>
   </data>
+  <data name="BitDepth" xml:space="preserve">
+    <value>Profondeur de bits</value>
+  </data>
+  <data name="BitRate" xml:space="preserve">
+    <value>Débit binaire</value>
+  </data>
   <data name="Calculating" xml:space="preserve">
     <value>Calculateur...</value>
   </data>
@@ -230,6 +242,12 @@
   </data>
   <data name="Category" xml:space="preserve">
     <value>Catégorie</value>
+  </data>
+  <data name="ChannelLayout" xml:space="preserve">
+    <value>Disposition des canaux</value>
+  </data>
+  <data name="Channels" xml:space="preserve">
+    <value>Canaux</value>
   </data>
   <data name="CheckForUpdates" xml:space="preserve">
     <value>Rechercher des mises à jour</value>
@@ -257,6 +275,9 @@
   </data>
   <data name="CloseWindow" xml:space="preserve">
     <value>Fermer la fenêtre</value>
+  </data>
+  <data name="Codec" xml:space="preserve">
+    <value>Codec</value>
   </data>
   <data name="CollapseAll" xml:space="preserve">
     <value>Réduire tout</value>
@@ -288,6 +309,9 @@
   <data name="CompletionStatusPlanned" xml:space="preserve">
     <value>Prévu</value>
   </data>
+  <data name="Container" xml:space="preserve">
+    <value>Conteneur</value>
+  </data>
   <data name="Continuous" xml:space="preserve">
     <value>Continu</value>
   </data>
@@ -317,6 +341,12 @@
   </data>
   <data name="DebugModeWarning" xml:space="preserve">
     <value>L'activation du mode débogage peut rendre l'application instable, continuer ?</value>
+  </data>
+  <data name="DecodeMode" xml:space="preserve">
+    <value>Mode de décodage</value>
+  </data>
+  <data name="Decoder" xml:space="preserve">
+    <value>Décodeur</value>
   </data>
   <data name="Default" xml:space="preserve">
     <value>Défaut</value>
@@ -364,6 +394,9 @@ $files</value>
   </data>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>Télécharger des extensions depuis GitHub</value>
+  </data>
+  <data name="DroppedFrames" xml:space="preserve">
+    <value>Images perdues</value>
   </data>
   <data name="Duration" xml:space="preserve">
     <value>Durée</value>
@@ -513,6 +546,9 @@ L'évaluation s'effectuera dans l'ordre suivant :
   <data name="Folders" xml:space="preserve">
     <value>Dossiers</value>
   </data>
+  <data name="FrameRate" xml:space="preserve">
+    <value>Fréquence d’images</value>
+  </data>
   <data name="FunctionAverage" xml:space="preserve">
     <value>Moyenne</value>
   </data>
@@ -542,6 +578,9 @@ L'évaluation s'effectuera dans l'ordre suivant :
   </data>
   <data name="Group" xml:space="preserve">
     <value>Regroupement</value>
+  </data>
+  <data name="Hardware" xml:space="preserve">
+    <value>Matériel</value>
   </data>
   <data name="Help" xml:space="preserve">
     <value>Aide</value>
@@ -625,6 +664,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="LastVisitTime" xml:space="preserve">
     <value>Dernière visite</value>
   </data>
+  <data name="Library" xml:space="preserve">
+    <value>Bibliothèque</value>
+  </data>
   <data name="LibraryEmptyPart1.Text" xml:space="preserve">
     <value>Aucun résultat avec les paramètres de filtre actuels. Essayez </value>
   </data>
@@ -633,9 +675,6 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="LibraryEmptyPart3.Text" xml:space="preserve">
     <value>.</value>
-  </data>
-  <data name="LibraryHeader.Text" xml:space="preserve">
-    <value>Bibliothèque</value>
   </data>
   <data name="License" xml:space="preserve">
     <value>Licence</value>
@@ -648,6 +687,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="Links" xml:space="preserve">
     <value>Links</value>
+  </data>
+  <data name="Media" xml:space="preserve">
+    <value>Médias</value>
   </data>
   <data name="MediaExclusionExplaination" xml:space="preserve">
     <value>En sélectionnant « ajouter à la liste d’exclusion », ces fichiers multimédias ne seront pas importés à nouveau lors de la prochaine mise à jour de la bibliothèque.</value>
@@ -790,8 +832,14 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="PauseOnLeaveTab" xml:space="preserve">
     <value>Mettre en pause en quittant l’onglet du lecteur</value>
   </data>
+  <data name="PictureLag" xml:space="preserve">
+    <value>Retard de l’image</value>
+  </data>
   <data name="Pin" xml:space="preserve">
     <value>Épingler</value>
+  </data>
+  <data name="PixelFormat" xml:space="preserve">
+    <value>Format de pixel</value>
   </data>
   <data name="Play" xml:space="preserve">
     <value>Lire</value>
@@ -804,6 +852,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="PlayQueueEmpty" xml:space="preserve">
     <value>Votre file d’attente de lecture apparaîtra ici</value>
+  </data>
+  <data name="Playback" xml:space="preserve">
+    <value>Lecture</value>
   </data>
   <data name="PlaybackInformation" xml:space="preserve">
     <value>Informations de lecture</value>
@@ -828,6 +879,12 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="Plugins" xml:space="preserve">
     <value>Extensions</value>
+  </data>
+  <data name="Position" xml:space="preserve">
+    <value>Position</value>
+  </data>
+  <data name="PresentedFrames" xml:space="preserve">
+    <value>Images affichées</value>
   </data>
   <data name="PressKeyCombination" xml:space="preserve">
     <value>Appuyez sur une combinaison de touches</value>
@@ -883,6 +940,9 @@ $plugins</value>
   <data name="RemoveUnreachableItems" xml:space="preserve">
     <value>Supprimer automatiquement les éléments inaccessibles</value>
   </data>
+  <data name="Renderer" xml:space="preserve">
+    <value>Moteur de rendu</value>
+  </data>
   <data name="RepeatAll" xml:space="preserve">
     <value>Répétition : Tout</value>
   </data>
@@ -907,6 +967,9 @@ $plugins</value>
   <data name="ResetPlayerSettings" xml:space="preserve">
     <value>Réinitialiser les paramètres du lecteur</value>
   </data>
+  <data name="Resolution" xml:space="preserve">
+    <value>Résolution</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Restaurer</value>
   </data>
@@ -925,6 +988,12 @@ $plugins</value>
   <data name="SafeModeMessage" xml:space="preserve">
     <value>L’application ne s’est pas fermée correctement la dernière fois.
 Démarrer en mode sans échec ?</value>
+  </data>
+  <data name="SampleFormat" xml:space="preserve">
+    <value>Format d’échantillon</value>
+  </data>
+  <data name="SampleRate" xml:space="preserve">
+    <value>Fréquence d’échantillonnage</value>
   </data>
   <data name="Save" xml:space="preserve">
     <value>Sauvegarder</value>
@@ -1004,11 +1073,17 @@ Démarrer en mode sans échec ?</value>
   <data name="ShuffleStable" xml:space="preserve">
     <value>Aléatoire (stable)</value>
   </data>
+  <data name="Software" xml:space="preserve">
+    <value>Logiciel</value>
+  </data>
   <data name="Sort" xml:space="preserve">
     <value>Tri</value>
   </data>
   <data name="SortingFunction" xml:space="preserve">
     <value>Fonction de tri</value>
+  </data>
+  <data name="State" xml:space="preserve">
+    <value>État</value>
   </data>
   <data name="Statistics" xml:space="preserve">
     <value>Statistiques</value>
@@ -1097,6 +1172,15 @@ $info</value>
   </data>
   <data name="Vertical" xml:space="preserve">
     <value>Verticale</value>
+  </data>
+  <data name="Video" xml:space="preserve">
+    <value>Vidéo</value>
+  </data>
+  <data name="VideoDecodeTime" xml:space="preserve">
+    <value>Temps de décodage vidéo</value>
+  </data>
+  <data name="VideoRenderTime" xml:space="preserve">
+    <value>Temps de rendu vidéo</value>
   </data>
   <data name="ViewType" xml:space="preserve">
     <value>Voir</value>

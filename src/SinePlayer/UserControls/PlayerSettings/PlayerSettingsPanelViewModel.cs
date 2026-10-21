@@ -15,25 +15,25 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
     private readonly MutableLiveData<bool> _settingsChangedLiveData = new();
     public readonly MutableLiveDataWithDelay<bool> SettingsChangedLiveData;
 
-    private string _generalTabTitle = string.Empty;
-    public string GeneralTabTitle
+    private string _videoTabTitle = string.Empty;
+    public string VideoTabTitle
     {
-        get => _generalTabTitle;
+        get => _videoTabTitle;
         set
         {
-            _generalTabTitle = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GeneralTabTitle)));
+            _videoTabTitle = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VideoTabTitle)));
         }
     }
 
-    private string _secondTabTitle = string.Empty;
-    public string SecondTabTitle
+    private string _audioTabTitle = string.Empty;
+    public string AudioTabTitle
     {
-        get => _secondTabTitle;
+        get => _audioTabTitle;
         set
         {
-            _secondTabTitle = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondTabTitle)));
+            _audioTabTitle = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AudioTabTitle)));
         }
     }
 

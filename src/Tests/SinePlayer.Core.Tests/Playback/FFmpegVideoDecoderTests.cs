@@ -484,14 +484,14 @@ public class FFmpegVideoDecoderTests
                 error);
 
             using FFmpegVideoDecoder owned = decoder!;
-            Assert.That(owned.DecoderName, Is.EqualTo("av1"), "the first candidate is what gets opened");
+            Assert.That(owned.Name, Is.EqualTo("av1"), "the first candidate is what gets opened");
 
             List<RawVideoFrame> frames = DecodeAll(source, owned);
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(frames, Is.Not.Empty, "the fallback has to produce the stream the first decoder could not");
-                Assert.That(owned.DecoderName, Is.EqualTo("libdav1d"), "the decoder that failed has to be the one that was replaced");
+                Assert.That(owned.Name, Is.EqualTo("libdav1d"), "the decoder that failed has to be the one that was replaced");
             }
 
             DisposeFrames(frames);
@@ -547,7 +547,7 @@ public class FFmpegVideoDecoderTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(failed.IsSuccessful, Is.False, "a packet from another backend has to be refused");
-                Assert.That(owned.DecoderName, Is.EqualTo("h264"), "a decoder that already produced a frame is not replaced");
+                Assert.That(owned.Name, Is.EqualTo("h264"), "a decoder that already produced a frame is not replaced");
             }
         }
         finally
@@ -577,7 +577,7 @@ public class FFmpegVideoDecoderTests
             using FFmpegVideoDecoder owned = decoder!;
             List<RawVideoFrame> frames = DecodeAll(source, owned);
             bool accelerated = owned.IsHardwareAccelerated;
-            string name = owned.DecoderName;
+            string name = owned.Name;
             DisposeFrames(frames);
 
             Assert.That(frames, Is.Not.Empty);

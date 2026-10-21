@@ -18,23 +18,23 @@
             <SelectorBarItem
                 x:Name="SelectorBarItem1"
                 Padding="12,0,12,4"
-                Text="{x:Bind ViewModel.GeneralTabTitle, Mode=OneWay}" />
+                Text="{x:Bind ViewModel.VideoTabTitle, Mode=OneWay}" />
             <SelectorBarItem
                 x:Name="SelectorBarItem2"
                 Padding="12,0,12,4"
-                Text="{x:Bind ViewModel.SecondTabTitle, Mode=OneWay}" />
+                Text="{x:Bind ViewModel.AudioTabTitle, Mode=OneWay}" />
         </SelectorBar>
         <Rectangle Height="1" Fill="{ThemeResource MediaInfoSeparatorForeground}" />
 
-        <!--  General settings tab (settings to be added)  -->
+        <!--  Video tab  -->
         <StackPanel
-            x:Name="GeneralSettingsGrid"
+            x:Name="VideoSettingsGrid"
             MinWidth="360"
             Orientation="Vertical" />
 
-        <!--  Second settings tab (settings to be added)  -->
+        <!--  Audio tab  -->
         <StackPanel
-            x:Name="SecondSettingsGrid"
+            x:Name="AudioSettingsGrid"
             MinWidth="360"
             Orientation="Vertical"
             Visibility="Collapsed" />
