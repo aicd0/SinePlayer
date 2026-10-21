@@ -3,11 +3,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.Playback.Surface;
@@ -20,6 +22,7 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
+using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Backends.Wasapi;
 using SinePlayer.Core.Playback.Pipeline;
@@ -57,6 +60,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private readonly CreatedComponents _components = new();
     private PlaybackPipeline? _pipeline;
+    private GainAudioFilter? _gain;
     private SwapChainPanelRenderTarget? _renderTarget;
     private DispatcherQueueTimer? _statusTimer;
     private string _description = string.Empty;
@@ -90,6 +94,16 @@ internal sealed partial class PlaybackLabPage : BasePage
         }
 
         OpenMedia(file.Path);
+    }
+
+    private void VolumeSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        ApplyLevel();
+    }
+
+    private void MuteToggle_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyLevel();
     }
 
     private void PlayButton_Click(object sender, RoutedEventArgs e)
@@ -202,6 +216,12 @@ internal sealed partial class PlaybackLabPage : BasePage
         pipeline.StateChanged += Pipeline_StateChanged;
         pipeline.WarningRaised += Pipeline_WarningRaised;
 
+        // The level is the host's now: this page makes the filter, adds it to the chain and sets it — which is
+        // the whole of the volume API, and the reason no renderer below has to provide one.
+        GainAudioFilter gain = new();
+        gain.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
+        pipeline.AudioFilters.Add(gain);
+
         // Awaited rather than blocked: setup attaches the presentation surface from the playback thread,
         // and the panel can only be touched from this one.
         PlaybackOperationResult opened = await pipeline.Open(MediaLocator.Parse(path), _renderTarget);
@@ -210,11 +230,13 @@ internal sealed partial class PlaybackLabPage : BasePage
             pipeline.StateChanged -= Pipeline_StateChanged;
             pipeline.WarningRaised -= Pipeline_WarningRaised;
             pipeline.Dispose();
+            gain.Dispose();
             Report($"Opening the file failed. {opened.Message}");
             return;
         }
 
         _pipeline = pipeline;
+        _gain = gain;
         _description = Describe(pipeline);
 
         StartStatusTimer();
@@ -234,10 +256,21 @@ internal sealed partial class PlaybackLabPage : BasePage
             pipeline.Dispose();
         }
 
+        // The filter belongs to this page rather than to the pipeline, so letting go of the pipeline does not
+        // end it: it is disposed here, once nothing is playing through it.
+        GainAudioFilter? gain = _gain;
+        _gain = null;
+        gain?.Dispose();
+
         // The panel gives the surface back before the swap chain it is showing goes away.
         _renderTarget?.DetachSurface();
         _description = string.Empty;
         _warning = null;
+    }
+
+    private void ApplyLevel()
+    {
+        _gain?.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
     }
 
     private async void SeekBy(double seconds)
@@ -442,7 +475,10 @@ internal sealed partial class PlaybackLabPage : BasePage
         string decoding = pipeline.IsVideoHardwareAccelerated ? "on the GPU" : "on the CPU";
         string renderer = pipeline.VideoRendererName ?? "no renderer";
         string sound = pipeline.AudioRendererName is null ? string.Empty : $", sound by {pipeline.AudioRendererName}";
-        string pace = $" decode {pipeline.AverageDecodeMilliseconds:0.0} ms {decoding}, render {pipeline.AverageRenderMilliseconds:0.0} ms by {renderer}{sound}.";
+        string chain = pipeline.AudioFilters.Count == 0
+            ? "no audio filters"
+            : $"filters {string.Join(", ", pipeline.AudioFilters.Filters.Select(filter => filter.Name))}";
+        string pace = $" decode {pipeline.AverageDecodeMilliseconds:0.0} ms {decoding}, render {pipeline.AverageRenderMilliseconds:0.0} ms by {renderer}{sound}, {chain}.";
 
         Report($"{pipeline.State}: {_description}. {pipeline.Position:mm\\:ss\\.fff} / {pipeline.Duration:mm\\:ss\\.fff}."
             + $" {presented} frame(s).{health}{compositor}{pace}{surface}{error}{warning}");

@@ -46,7 +46,6 @@ GetWindowRect
 IAudioClient
 IAudioClock
 IAudioRenderClient
-IAudioStreamVolume
 ID3D11Device
 ID3D11DeviceContext
 ID3D11PixelShader

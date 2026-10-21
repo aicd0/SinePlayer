@@ -39,6 +39,18 @@
                 x:Name="SeekForwardButton"
                 Click="SeekForwardButton_Click"
                 Content="+30s" />
+            <Slider
+                x:Name="VolumeSlider"
+                Width="200"
+                Maximum="100"
+                Minimum="0"
+                ValueChanged="VolumeSlider_ValueChanged"
+                Value="100" />
+            <ToggleButton
+                x:Name="MuteToggle"
+                VerticalAlignment="Bottom"
+                Click="MuteToggle_Click"
+                Content="Mute" />
         </StackPanel>
 
         <StackPanel

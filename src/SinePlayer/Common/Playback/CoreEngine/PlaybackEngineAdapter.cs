@@ -17,34 +17,24 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
+using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Wasapi;
 using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Common.Playback.CoreEngine;
 
-/// <summary>
-/// Presents <see cref="PlaybackPipeline"/> through the port the player page has always used. The page goes
-/// on talking about states, events and a video surface, and everything the engine does differently — a swap
-/// chain instead of an element, a pipeline instead of a player, threads of its own — stays on this side of
-/// the port. This is the only file that knows both, which is what keeps replacing the engine from reaching
-/// into the page.
-/// </summary>
-internal sealed class PlaybackEngineAdapter : IMediaEngine
+internal sealed partial class PlaybackEngineAdapter : IMediaEngine
 {
-    /// <summary>How often the position is reported while playing. The page throttles its own updates.</summary>
-    private const int PositionIntervalMilliseconds = 250;
-
     private const string TAG = nameof(PlaybackEngineAdapter);
+
+    private const int PositionIntervalMilliseconds = 250;
 
     private readonly D3D11VideoRendererFactory _videoRendererFactory = new();
     private readonly WasapiAudioRendererFactory _audioRendererFactory = new();
 
-    /// <summary>
-    /// What the host asked for, kept here because the renderer they apply to belongs to a pipeline and is
-    /// made when a file is opened: a volume set before anything is playing still has to reach the device.
-    /// </summary>
     private double _volume = 1.0;
     private bool _muted;
+    private GainAudioFilter? _gain;
 
     private SwapChainPanel? _videoPanel;
     private SwapChainPanelRenderTarget? _renderTarget;
@@ -65,7 +55,6 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
 
     public bool IsMuted => _muted;
 
-    /// <summary>The rate the engine plays at, which is the one rate it can honestly report.</summary>
     public double PlaybackRate => 1.0;
 
     public IPlaybackInfoProvider PlaybackInfoProvider => _playbackInfo;
@@ -92,6 +81,15 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
             PlaybackPipeline pipeline = CreatePipeline();
             _pipeline = pipeline;
             _playbackInfo.Attach(pipeline);
+            _playbackInfo.ReportLevel(_volume, _muted);
+
+            // The level of the sound is a filter, and the engine is the host of the pipeline, so it is the one
+            // that makes the filter and holds it: a new pipeline gets a new one, set to what the player has
+            // already asked for before anything plays.
+            GainAudioFilter gain = new();
+            gain.SetLevel(_volume, _muted);
+            pipeline.AudioFilters.Add(gain);
+            _gain = gain;
 
             // Warnings are heard as they happen — during the open for something left out of it, and later for
             // a device that stops moving. They were only ever looked at once, at load, before.
@@ -205,25 +203,18 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
     public void SetVolume(double volume)
     {
         _volume = Math.Clamp(volume, 0.0, 1.0);
+        _playbackInfo.ReportLevel(_volume, _muted);
 
-        // The pipeline is the one that owns the device, so it is asked rather than reached past: when there
-        // is no pipeline yet, the value waits here and is applied to the device the next open creates.
-        PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is not null)
-        {
-            pipeline.Volume = _volume;
-        }
+        // The filter is where the level lives now, and it is this engine's own: setting it is all it takes, and
+        // it applies to the next block rather than to what has already been handed to the device.
+        _gain?.SetLevel(_volume, _muted);
     }
 
     public void SetMuted(bool muted)
     {
         _muted = muted;
-
-        PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is not null)
-        {
-            pipeline.IsMuted = muted;
-        }
+        _playbackInfo.ReportLevel(_volume, _muted);
+        _gain?.SetLevel(_volume, _muted);
     }
 
     /// <summary>
@@ -294,6 +285,12 @@ internal sealed class PlaybackEngineAdapter : IMediaEngine
             pipeline.WarningRaised -= OnPipelineWarningRaised;
             pipeline.Dispose();
         }
+
+        // The filter belongs to this engine rather than to the pipeline, so letting go of the pipeline does not
+        // end it: it is disposed here, once nothing is playing through it.
+        GainAudioFilter? gain = _gain;
+        _gain = null;
+        gain?.Dispose();
 
         // The panel gives the surface back before the swap chain it is showing goes away.
         _renderTarget?.DetachSurface();

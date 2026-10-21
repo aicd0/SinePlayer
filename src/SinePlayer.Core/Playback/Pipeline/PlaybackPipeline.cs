@@ -50,8 +50,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     private AudioStreamInfo? _audioStreamInfo;
     private long _audioMinimumSamples;
     private long _audioWakeSamples;
-    private double _volume = 1.0;
-    private bool _muted;
 
     private IVideoRenderTarget? _videoTarget;
     private IMediaSource? _source;
@@ -119,6 +117,8 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public ComponentResolver Components { get; set; } = new();
 
+    public AudioFilterChain AudioFilters { get; } = new();
+
     public ISourceProviderFactory? SourceFactory { get; set; }
 
     public ISynchronizer Synchronizer { get; set; } = new DefaultSynchronizer();
@@ -159,28 +159,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     }
 
     public string? StarvedFor => _videoStarved ? "video" : _audioStarved ? "audio" : null;
-
-    public double Volume
-    {
-        get => Volatile.Read(ref _volume);
-        set
-        {
-            Volatile.Write(ref _volume, Math.Clamp(value, 0.0, 1.0));
-            IAudioRenderer? renderer = _audioRenderer?.Component;
-            renderer?.Volume = Volatile.Read(ref _volume);
-        }
-    }
-
-    public bool IsMuted
-    {
-        get => Volatile.Read(ref _muted);
-        set
-        {
-            Volatile.Write(ref _muted, value);
-            IAudioRenderer? renderer = _audioRenderer?.Component;
-            renderer?.IsMuted = value;
-        }
-    }
 
     internal TimeSpan LastPresentedTimestamp
     {
@@ -808,6 +786,8 @@ public sealed partial class PlaybackPipeline : IDisposable
 
                 if (audioStream is not null)
                 {
+                    AudioFilters.Configure(audioStream);
+
                     string? audioFailure = null;
 
                     ComponentSlot<IAudioRenderer>? runningAudioRenderer = _pendingAudioRenderer ?? _audioRenderer;
@@ -825,12 +805,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     {
                         IAudioRenderer audioRenderer = audioRendererSlot.Component;
                         PlaybackOperationResult configured = audioRenderer.Configure(audioStream);
-                        if (configured.IsSuccessful)
-                        {
-                            audioRenderer.Volume = Volatile.Read(ref _volume);
-                            audioRenderer.IsMuted = Volatile.Read(ref _muted);
-                        }
-                        else
+                        if (!configured.IsSuccessful)
                         {
                             audioFailure = configured.Message;
                         }
@@ -2056,6 +2031,8 @@ public sealed partial class PlaybackPipeline : IDisposable
 
                 StartOrPauseClock(epoch, state);
             }
+
+            buffer = AudioFilters.Apply(buffer);
 
             if (deviceAvailable && renderer is not null)
             {
