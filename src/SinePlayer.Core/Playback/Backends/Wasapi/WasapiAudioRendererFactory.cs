@@ -16,9 +16,9 @@ namespace SinePlayer.Core.Playback.Backends.Wasapi;
 /// stream, and two pipelines sharing one would share its clock too.
 /// </para>
 /// <para>
-/// What two renderers do share is the process's audio *session*: the endpoint volume and mute belong to the
-/// session, so per-pipeline volume would need <c>IAudioStreamVolume</c> or a session GUID per renderer. Until
-/// then the pipeline's volume is the session's volume.
+/// What two renderers do share is the process's audio *session*, which is why nothing here touches the endpoint's
+/// volume or mute: the level of the sound belongs to the pipeline's filter chain, where it is the same on every
+/// renderer and cannot be lost by swapping one.
 /// </para>
 /// </summary>
 public sealed class WasapiAudioRendererFactory : IAudioRendererFactory

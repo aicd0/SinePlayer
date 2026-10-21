@@ -57,12 +57,9 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
 
     private IAudioClient? _client;
     private IAudioRenderClient? _renderClient;
-    private WasapiVolumeControl? _volume;
     private WasapiAudioClock? _clock;
     private WasapiAudioFormat.Descriptor _format;
     private int _bufferFrameCount;
-    private double _volumeLevel = 1.0;
-    private bool _muted;
     private bool _disposed;
     private int _submittedBlocks;
     private long _underrunCount;
@@ -88,35 +85,6 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
     internal int BufferFrameCount => _bufferFrameCount;
 
     public string Name => _endpointName is null ? "wasapi" : $"wasapi ({_endpointName})";
-
-    /// <summary>
-    /// The sound's level, 0 to 1, for <em>this renderer only</em>. It is the stream's volume rather than the
-    /// process session's, which is what lets two players play at two levels at once.
-    /// </summary>
-    public double Volume
-    {
-        get => _volumeLevel;
-        set
-        {
-            _volumeLevel = Math.Clamp(value, 0.0, 1.0);
-            ApplyVolume();
-        }
-    }
-
-    /// <summary>
-    /// Whether this renderer's sound is muted. WASAPI has no per-stream mute, so this is the level going to zero
-    /// while the level the user set is kept: that is what lets unmuting restore it, and it keeps the control
-    /// per-stream rather than falling back to the session's mute, which would silence every player at once.
-    /// </summary>
-    public bool IsMuted
-    {
-        get => _muted;
-        set
-        {
-            _muted = value;
-            ApplyVolume();
-        }
-    }
 
     public IPlaybackClock Clock => _clock ?? throw new InvalidOperationException("The audio renderer has not been configured.");
 
@@ -200,29 +168,6 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
             var audioClock = (IAudioClock)clockService;
             audioClock.GetFrequency(out ulong frequency);
 
-            // Volume control is a convenience: a device that refuses the service still plays.
-            try
-            {
-                // The stream's own volume, not the session's: a session belongs to the process, so two players
-                // sharing one would share one slider. This service is what makes each player independent.
-                client.GetService(typeof(IAudioStreamVolume).GUID, out object volumeService);
-                if (volumeService is IAudioStreamVolume streamVolume)
-                {
-                    _volume = WasapiVolumeControl.Create(streamVolume);
-                }
-                else
-                {
-                    Logger.W(TAG, "The audio device offers no per-stream volume, so volume and mute are not applied.");
-                }
-            }
-            catch (Exception exception)
-            {
-                // Per-player volume is a convenience; playback does not depend on it. The exception is written
-                // out whole so that "this endpoint has no stream volume" is distinguishable from anything else
-                // that went wrong here — and nothing is claimed about the device.
-                Logger.W(TAG, $"Unable to take the audio stream's volume control: {exception}");
-            }
-
             _client = client;
             _renderClient = (IAudioRenderClient)renderService;
             _clock = new WasapiAudioClock(client, audioClock, frequency);
@@ -233,9 +178,6 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
             // nothing about this one.
             _submittedBlocks = 0;
             Interlocked.Exchange(ref _underrunCount, 0);
-
-            // The device starts at full volume, so what the host asked for is applied to the new stream here.
-            ApplyVolume();
 
             // The endpoint and the enumerator hold no state we need: the client keeps its own reference.
             return PlaybackOperationResult.Success;
@@ -489,23 +431,6 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
         _submittedBlocks++;
     }
 
-    /// <summary>
-    /// Hands this stream its level. A failure is logged whole and never latched as a device loss: the volume is a
-    /// convenience, and a volume call that failed says nothing about whether audio can still be handed over —
-    /// claiming otherwise would put this exception in front of the real one.
-    /// </summary>
-    private void ApplyVolume()
-    {
-        try
-        {
-            _volume?.Apply((float)_volumeLevel, _muted);
-        }
-        catch (Exception exception)
-        {
-            Logger.W(TAG, $"Unable to set the audio volume: {exception}");
-        }
-    }
-
     private void Release()
     {
         // The clock is let go of before the device is: nothing outside the renderer reads it any more, and a reader
@@ -513,7 +438,6 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
         _clock?.OnDeviceReleased();
         _clock = null;
         _renderClient = null;
-        _volume = null;
         _client = null;
         _bufferFrameCount = 0;
     }

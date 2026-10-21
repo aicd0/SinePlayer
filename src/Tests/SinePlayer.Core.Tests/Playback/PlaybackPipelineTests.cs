@@ -2,16 +2,19 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
+using SinePlayer.Core.Playback.Abstractions.Filter;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
+using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Core.Playback.Registry;
 using SinePlayer.Core.Playback.Selection;
@@ -3019,7 +3022,6 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, first);
 
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
-            pipeline.Volume = 0.25;
             Await(pipeline.Play());
             WaitFor(() => first.SubmitsStarted > 0, "the pipeline to be handing the device audio");
             Assert.That(pipeline.AudioRendererName, Is.EqualTo("first"));
@@ -3033,7 +3035,6 @@ public class PlaybackPipelineTests
             {
                 Assert.That(pipeline.AudioRendererName, Is.EqualTo("second"));
                 Assert.That(first.DisposeCount, Is.EqualTo(1), "the device that was replaced has to be released");
-                Assert.That(second.Volume, Is.EqualTo(0.25), "the level is the pipeline's, so the new device gets it");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "changing the device is not a pause");
                 Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position - TimeSpan.FromSeconds(1)), "the stream has to pick up where it was");
                 Assert.That(second.FlushCount, Is.EqualTo(1), "the stream is started again where it stands, which is a flush of the device now in use");
@@ -3762,11 +3763,118 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
-    /// The host may set the volume before there is a device to set it on. The value is the pipeline's, so it
-    /// survives the renderer being created per open and reaches the device the next open makes.
+    /// A filter the host added is part of the audio chain: it is configured for the stream before the sound starts
+    /// and every block handed to the device has been through it.
     /// </summary>
     [Test]
-    public void AppliesTheVolumeSetBeforeAnythingIsOpen()
+    public void RunsTheAudioFiltersTheHostAdded()
+    {
+        string path = CreateWaveFile();
+        try
+        {
+            RecordingAudioFilter filter = new("record");
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
+            pipeline.AudioFilters.Add(filter);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => filter.AppliedBlocks > 0, "the chain to see the sound");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(filter.ConfiguredStream, Is.Not.Null, "a filter is configured for the stream before a block reaches it");
+                Assert.That(pipeline.AudioFilters.Filters, Is.EqualTo(new IAudioFilter[] { filter }));
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Editing the chain is immediate: the chain already knows the stream, so the filter takes part in the next
+    /// block without a reconcile.
+    /// </summary>
+    [Test]
+    public void TakesAFilterAddedWhilePlayingAtOnce()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 5);
+        try
+        {
+            FakeAudioRenderer renderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), renderer);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
+
+            RecordingAudioFilter late = new("late");
+            pipeline.AudioFilters.Add(late);
+
+            WaitFor(() => late.AppliedBlocks > 0, "the new filter to take part without a reconcile");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(late.ConfiguredStream, Is.Not.Null, "the stream the chain already knew is what it was prepared for");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "adding a filter is not a restart");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A filter belongs to whoever added it, so taking it out of the chain hands it back rather than ending it —
+    /// and the sound carries on without it, from the next block.
+    /// </summary>
+    [Test]
+    public void StopsUsingARemovedFilterWithoutDisposingIt()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 5);
+        try
+        {
+            FakeAudioRenderer renderer = new();
+            RecordingAudioFilter filter = new("record");
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), renderer);
+            pipeline.AudioFilters.Add(filter);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => filter.AppliedBlocks > 0, "the chain to see the sound");
+
+            Assert.That(pipeline.AudioFilters.Remove(filter), Is.True);
+
+            // A block already on its way may still carry the filter, so the count is taken once the device has
+            // taken a block that was queued after the removal.
+            int submitted = renderer.SubmittedBuffers;
+            WaitFor(() => renderer.SubmittedBuffers > submitted, "the sound to carry on after the removal");
+            int applied = filter.AppliedBlocks;
+
+            submitted = renderer.SubmittedBuffers;
+            WaitFor(() => renderer.SubmittedBuffers > submitted, "a second block after the removal");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(filter.AppliedBlocks, Is.EqualTo(applied), "a filter that was taken out is not run");
+                Assert.That(filter.Disposed, Is.False, "removing a filter hands it back to its owner");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The level belongs to a filter the host added, so a filter added before anything is open is prepared for the
+    /// stream the open brings, and the very first block the device is handed has already been through it.
+    /// </summary>
+    [Test]
+    public void AppliesTheLevelOfAFilterAddedBeforeAnythingIsOpen()
     {
         string path = CreateWaveFile();
         try
@@ -3774,25 +3882,100 @@ public class PlaybackPipelineTests
             CreatingAudioRendererFactory factory = new();
             using PlaybackPipeline pipeline = CreatePipeline(factory);
 
-            pipeline.Volume = 0.25;
-            pipeline.IsMuted = true;
+            GainAudioFilter gain = new();
+            gain.SetLevel(0.25, false);
+            pipeline.AudioFilters.Add(gain);
 
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
-            Assert.That(factory.Created, Has.Count.EqualTo(1));
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => factory.Created.Count == 1 && factory.Created[0].LastSamples is not null, "the device to be handed a block");
+
+            short[] samples = factory.Created[0].LastSamples!;
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(factory.Created[0].Volume, Is.EqualTo(0.25), "what the host asked for is what the device gets");
-                Assert.That(factory.Created[0].IsMuted, Is.True);
-
-                // And after the device exists, the same property reaches it.
-                pipeline.Volume = 0.5;
-                Assert.That(factory.Created[0].Volume, Is.EqualTo(0.5));
+                Assert.That(samples.Any(sample => sample != 0), Is.True, "the block is the file's own sound, not silence");
+                Assert.That(samples.Max(Math.Abs), Is.LessThanOrEqualTo(1992), "the loudest sample of the file is 7967, and a quarter of it is 1992");
             }
         }
         finally
         {
             File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The level survives a device swap, which is the point of moving it out of the renderer: the filter chain is
+    /// not rebuilt when only the device changes, so what the host set keeps applying to what the new device is
+    /// handed.
+    /// </summary>
+    [Test]
+    public void KeepsTheLevelWhenTheAudioRendererIsSwapped()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 5);
+        try
+        {
+            FakeAudioRenderer first = new() { Name = "first", QueuedSampleCount = SampleRate };
+            FakeAudioRenderer second = new() { Name = "second", QueuedSampleCount = SampleRate };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), first);
+
+            GainAudioFilter gain = new();
+            gain.SetLevel(0.5, false);
+            pipeline.AudioFilters.Add(gain);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => first.LastSamples is not null, "the first device to be handed a block");
+
+            SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(second));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            WaitFor(() => second.LastSamples is not null, "the new device to be handed a block");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(first.LastSamples!.Max(Math.Abs), Is.LessThanOrEqualTo(3984), "the level was applied before the swap");
+                Assert.That(second.LastSamples!.Max(Math.Abs), Is.LessThanOrEqualTo(3984), "and it still is after it");
+                Assert.That(second.LastSamples!.Any(sample => sample != 0), Is.True, "a level is not a silence");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A filter that records what the chain asked of it. It is added by the test itself, which is how a real host
+    /// uses the chain — and which is why the pipeline never sees the type.
+    /// </summary>
+    private sealed class RecordingAudioFilter(string name) : IAudioFilter
+    {
+        private int _appliedBlocks;
+
+        public string Name => name;
+
+        public AudioStreamInfo? ConfiguredStream { get; private set; }
+
+        public int AppliedBlocks => Volatile.Read(ref _appliedBlocks);
+
+        public bool Disposed { get; private set; }
+
+        public PlaybackOperationResult Configure(AudioStreamInfo stream)
+        {
+            ConfiguredStream = stream;
+            return PlaybackOperationResult.Success;
+        }
+
+        public PlaybackOperationResult Apply(RawAudioBuffer input, out RawAudioBuffer output)
+        {
+            Interlocked.Increment(ref _appliedBlocks);
+            output = input;
+            return PlaybackOperationResult.Success;
+        }
+
+        public void Dispose()
+        {
+            Disposed = true;
         }
     }
 
@@ -5243,11 +5426,6 @@ public class PlaybackPipelineTests
 
         public string Name { get; init; } = "fake";
 
-        /// <summary>One signature per instance: a second stand-in device is a different device, to a caller.</summary>
-        public double Volume { get; set; } = 1.0;
-
-        public bool IsMuted { get; set; }
-
         public bool CanConfigure { get; init; } = true;
 
         public string RefusalReason { get; init; } = string.Empty;
@@ -5341,11 +5519,26 @@ public class PlaybackPipelineTests
         /// <summary>Takes a block into the device, which the draining clock then plays at real time.</summary>
         internal void OnBlockTaken(RawAudioBuffer buffer)
         {
+            if (buffer.Buffer is IPlanarAudioBuffer planar && buffer.SampleFormat == AudioSampleFormat.Int16)
+            {
+                // Copied because the pipeline disposes the block as soon as the device has taken it.
+                int byteCount = planar.GetPlaneByteCount(0);
+                byte[] bytes = new byte[byteCount];
+                Marshal.Copy(planar.GetPlanePointer(0), bytes, 0, byteCount);
+
+                short[] samples = new short[byteCount / sizeof(short)];
+                Buffer.BlockCopy(bytes, 0, samples, 0, byteCount);
+                LastSamples = samples;
+            }
+
             if (PlaysWhatItIsGiven)
             {
                 PlayingDevice.Submit(buffer.Duration);
             }
         }
+
+        /// <summary>The samples of the last block this device was handed, in the stream's own format.</summary>
+        internal short[]? LastSamples { get; private set; }
 
         /// <summary>
         /// Run on whichever thread is asking the device how much it holds, just before the answer is given.

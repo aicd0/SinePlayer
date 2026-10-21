@@ -11,10 +11,6 @@ public interface IAudioRenderer : IDisposable
 {
     string Name { get; }
 
-    double Volume { get; set; }
-
-    bool IsMuted { get; set; }
-
     IPlaybackClock Clock { get; }
 
     long QueuedSampleCount { get; }

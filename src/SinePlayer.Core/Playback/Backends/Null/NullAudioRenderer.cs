@@ -29,22 +29,8 @@ public sealed class NullAudioRenderer : IAudioRenderer
     private readonly IPlaybackClock _clock = new StopwatchClock();
 
     private long _submittedSampleCount;
-    private double _volume = 1.0;
-    private bool _muted;
 
     public string Name => "null";
-
-    public double Volume
-    {
-        get => Volatile.Read(ref _volume);
-        set => Volatile.Write(ref _volume, value);
-    }
-
-    public bool IsMuted
-    {
-        get => Volatile.Read(ref _muted);
-        set => Volatile.Write(ref _muted, value);
-    }
 
     /// <summary>A stopwatch, because there is no playback for a device clock to describe.</summary>
     public IPlaybackClock Clock => _clock;
