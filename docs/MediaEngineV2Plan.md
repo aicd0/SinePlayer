@@ -67,20 +67,3 @@ settled would freeze whatever it happened to look like.
 
 **What v1 leaves in place.** The registry is `internal` in v1 and is not exposed through any `IPluginContext`,
 but registering a factory is one call, so exposing it later is purely additive.
-
-## 5. Fallback policy
-
-**Why not v1.** v1 has nothing to fall back *to*: the legacy `Windows.Media.*` engine is removed, so there is no
-platform path behind the registry.
-
-**What v1 leaves in place.** Component resolution always goes through a selectable policy object, and v1 ships
-exactly one policy (registry-only). A fallback strategy is a later addition, not a change to how components are
-chosen.
-
-**Not to be confused with** the hardware → software fallback *inside* the registry, which v1 does have: a
-hardware decoder that cannot open, or that opens and produces nothing, is passed over for the next candidate
-(S13). That is a capability question about one stream, not a policy about the platform.
-
-## 6. X86 support
-
-## 7. FFmpeg multi-threading

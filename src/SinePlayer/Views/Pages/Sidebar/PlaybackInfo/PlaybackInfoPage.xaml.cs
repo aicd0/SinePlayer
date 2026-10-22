@@ -11,7 +11,7 @@ using Microsoft.UI.Xaml.Controls;
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.Constants;
 using SinePlayer.Common.ErrorHandling;
-using SinePlayer.Common.Playback;
+using SinePlayer.Common.Playback.Core;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Views.Pages.Sidebar.MediaInfo;
@@ -27,7 +27,7 @@ internal sealed partial class PlaybackInfoPage : BasePage
     private readonly List<TextBlock?> _valueCells = [];
     private readonly List<string> _keys = [];
 
-    private IPlaybackInfoProvider? _provider;
+    private PlaybackInfoHandle? _playbackInfo;
     private DispatcherQueueTimer? _timer;
 
     public PlaybackInfoPage()
@@ -41,7 +41,7 @@ internal sealed partial class PlaybackInfoPage : BasePage
 
         GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaChanged).ObserveSticky(this, args =>
         {
-            _provider = args.PlaybackInfoProvider;
+            _playbackInfo = args.PlaybackInfo;
             Refresh();
         });
 
@@ -77,7 +77,7 @@ internal sealed partial class PlaybackInfoPage : BasePage
             _timer = null;
         }
 
-        _provider = null;
+        _playbackInfo = null;
     }
 
     private void Timer_Tick(DispatcherQueueTimer sender, object args)
@@ -93,7 +93,7 @@ internal sealed partial class PlaybackInfoPage : BasePage
 
     private void Refresh()
     {
-        ViewModel.Update(_provider);
+        ViewModel.Update(_playbackInfo);
 
         IReadOnlyList<PlaybackInfoRow> rows = ViewModel.Rows;
         if (!HasSameStructure(rows))

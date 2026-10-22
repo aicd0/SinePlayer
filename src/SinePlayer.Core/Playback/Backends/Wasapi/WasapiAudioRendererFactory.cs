@@ -25,15 +25,17 @@ public sealed class WasapiAudioRendererFactory : IAudioRendererFactory
 {
     private readonly string? _endpointId;
     private readonly string? _endpointName;
+    private readonly bool _endpointIsDefault;
 
     public WasapiAudioRendererFactory()
     {
     }
 
-    private WasapiAudioRendererFactory(string endpointId, string endpointName)
+    private WasapiAudioRendererFactory(string endpointId, string endpointName, bool endpointIsDefault)
     {
         _endpointId = endpointId;
         _endpointName = endpointName;
+        _endpointIsDefault = endpointIsDefault;
     }
 
     /// <summary>
@@ -43,12 +45,12 @@ public sealed class WasapiAudioRendererFactory : IAudioRendererFactory
     public static WasapiAudioRendererFactory For(WasapiAudioEndpoint endpoint)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
-        return new WasapiAudioRendererFactory(endpoint.Id, endpoint.Name);
+        return new WasapiAudioRendererFactory(endpoint.Id, endpoint.Name, endpoint.IsDefault);
     }
 
     public PlaybackOperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
     {
-        creator = new Creator(_endpointId, _endpointName);
+        creator = new Creator(_endpointId, _endpointName, _endpointIsDefault);
         return PlaybackOperationResult.Success;
     }
 
@@ -56,14 +58,14 @@ public sealed class WasapiAudioRendererFactory : IAudioRendererFactory
     /// Opens the device on demand. Nothing here is opened by being offered, which is what lets a reconcile that
     /// changes nothing leave the device playing alone.
     /// </summary>
-    private sealed class Creator(string? endpointId, string? endpointName) : IComponentCreator<IAudioRenderer>
+    private sealed class Creator(string? endpointId, string? endpointName, bool endpointIsDefault) : IComponentCreator<IAudioRenderer>
     {
         /// <summary>The device this would open. Must match what the renderer reports for itself.</summary>
         public string Signature => endpointId is null ? "wasapi" : $"wasapi:{endpointId}";
 
         public PlaybackOperationResult Create(out IAudioRenderer? component)
         {
-            component = new WasapiAudioRenderer(endpointId, endpointName);
+            component = new WasapiAudioRenderer(endpointId, endpointName, endpointIsDefault);
             return PlaybackOperationResult.Success;
         }
     }

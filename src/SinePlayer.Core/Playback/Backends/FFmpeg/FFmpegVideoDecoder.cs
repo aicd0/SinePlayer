@@ -83,7 +83,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
 
     public PixelFormat OutputFormat => _outputFormat;
 
-    public string Name => _decoderName;
+    public string Name => $"FFmpeg {_decoderName}";
 
     /// <summary>
     /// The thread setting the decoder was opened with: zero means "as many as the machine has", which is

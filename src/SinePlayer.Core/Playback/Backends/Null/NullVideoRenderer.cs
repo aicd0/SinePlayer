@@ -17,11 +17,11 @@ namespace SinePlayer.Core.Playback.Backends.Null;
 /// replacement the new instance starts from zero and the old one stops counting.
 /// </para>
 /// </summary>
-public sealed class NullVideoRenderer : IVideoRenderer
+public sealed partial class NullVideoRenderer : IVideoRenderer
 {
     private long _renderedFrameCount;
 
-    public string Name => "null";
+    public string Name => "Null";
 
     /// <summary>Nothing to draw with: a null renderer presents nothing, so no decoder needs to decode onto it.</summary>
     public IGpuDevice? GpuDevice => null;

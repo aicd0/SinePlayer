@@ -83,7 +83,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         _frameTransform = D3D11Interop.CreateConstantBuffer(device.Device);
     }
 
-    public string Name => "d3d11";
+    public string Name => "Direct3D 11";
 
     /// <summary>
     /// The renderer is the device: it owns the Direct3D device and the lock that guards its context, so what it

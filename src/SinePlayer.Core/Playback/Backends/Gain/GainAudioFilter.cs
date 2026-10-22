@@ -33,7 +33,7 @@ public sealed class GainAudioFilter : IAudioFilter
     private long _gain = BitConverter.DoubleToInt64Bits(1.0);
     private bool _disposed;
 
-    public string Name => "gain";
+    public string Name => "Gain";
 
     public void SetLevel(double volume, bool muted)
     {
@@ -147,78 +147,78 @@ public sealed class GainAudioFilter : IAudioFilter
         switch (format)
         {
             case AudioSampleFormat.UInt8:
-            {
-                for (int index = 0; index < valueCount; index++)
                 {
-                    start[index] = (byte)Math.Clamp(Rounded(128 + ((start[index] - 128) * gain)), 0, 255);
-                }
-
-                break;
-            }
-
-            case AudioSampleFormat.Int16:
-            {
-                short* values = (short*)pointer;
-                for (int index = 0; index < valueCount; index++)
-                {
-                    values[index] = (short)Math.Clamp(Rounded(values[index] * gain), short.MinValue, short.MaxValue);
-                }
-
-                break;
-            }
-
-            case AudioSampleFormat.Int24:
-            {
-                for (int index = 0; index < valueCount; index++)
-                {
-                    byte* value = start + (index * 3);
-                    int sample = value[0] | (value[1] << 8) | (value[2] << 16);
-                    if ((sample & 0x800000) != 0)
+                    for (int index = 0; index < valueCount; index++)
                     {
-                        sample |= ~0xFFFFFF;
+                        start[index] = (byte)Math.Clamp(Rounded(128 + ((start[index] - 128) * gain)), 0, 255);
                     }
 
-                    int scaled = Math.Clamp(Rounded(sample * gain), Int24Minimum, Int24Maximum);
-                    value[0] = (byte)scaled;
-                    value[1] = (byte)(scaled >> 8);
-                    value[2] = (byte)(scaled >> 16);
+                    break;
                 }
 
-                break;
-            }
+            case AudioSampleFormat.Int16:
+                {
+                    short* values = (short*)pointer;
+                    for (int index = 0; index < valueCount; index++)
+                    {
+                        values[index] = (short)Math.Clamp(Rounded(values[index] * gain), short.MinValue, short.MaxValue);
+                    }
+
+                    break;
+                }
+
+            case AudioSampleFormat.Int24:
+                {
+                    for (int index = 0; index < valueCount; index++)
+                    {
+                        byte* value = start + (index * 3);
+                        int sample = value[0] | (value[1] << 8) | (value[2] << 16);
+                        if ((sample & 0x800000) != 0)
+                        {
+                            sample |= ~0xFFFFFF;
+                        }
+
+                        int scaled = Math.Clamp(Rounded(sample * gain), Int24Minimum, Int24Maximum);
+                        value[0] = (byte)scaled;
+                        value[1] = (byte)(scaled >> 8);
+                        value[2] = (byte)(scaled >> 16);
+                    }
+
+                    break;
+                }
 
             case AudioSampleFormat.Int32:
-            {
-                int* values = (int*)pointer;
-                for (int index = 0; index < valueCount; index++)
                 {
-                    values[index] = (int)Math.Clamp(Rounded(values[index] * gain), int.MinValue, int.MaxValue);
-                }
+                    int* values = (int*)pointer;
+                    for (int index = 0; index < valueCount; index++)
+                    {
+                        values[index] = (int)Math.Clamp(Rounded(values[index] * gain), int.MinValue, int.MaxValue);
+                    }
 
-                break;
-            }
+                    break;
+                }
 
             case AudioSampleFormat.Float32:
-            {
-                float* values = (float*)pointer;
-                for (int index = 0; index < valueCount; index++)
                 {
-                    values[index] = (float)(values[index] * gain);
-                }
+                    float* values = (float*)pointer;
+                    for (int index = 0; index < valueCount; index++)
+                    {
+                        values[index] = (float)(values[index] * gain);
+                    }
 
-                break;
-            }
+                    break;
+                }
 
             case AudioSampleFormat.Float64:
-            {
-                double* values = (double*)pointer;
-                for (int index = 0; index < valueCount; index++)
                 {
-                    values[index] *= gain;
-                }
+                    double* values = (double*)pointer;
+                    for (int index = 0; index < valueCount; index++)
+                    {
+                        values[index] *= gain;
+                    }
 
-                break;
-            }
+                    break;
+                }
         }
     }
 

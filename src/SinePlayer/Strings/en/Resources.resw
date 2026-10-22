@@ -886,6 +886,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Position" xml:space="preserve">
     <value>Position</value>
   </data>
+  <data name="PreferHardwareDecoding" xml:space="preserve">
+    <value>Prefer hardware decoding</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>Presented frames</value>
   </data>
@@ -1140,6 +1143,9 @@ Category2: Tag4, Tag5</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Two-page mode</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Unavailable</value>
   </data>
   <data name="Unfavorite" xml:space="preserve">
     <value>Unfavorite</value>

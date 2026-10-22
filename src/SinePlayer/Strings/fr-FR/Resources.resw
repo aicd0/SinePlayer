@@ -886,6 +886,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="Position" xml:space="preserve">
     <value>Position</value>
   </data>
+  <data name="PreferHardwareDecoding" xml:space="preserve">
+    <value>Préférer le décodage matériel</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>Images affichées</value>
   </data>
@@ -1140,6 +1143,9 @@ Catégorie 2 : Étiquette 4, Étiquette 5</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Mode double page</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Indisponible</value>
   </data>
   <data name="Unfavorite" xml:space="preserve">
     <value>Défavori</value>

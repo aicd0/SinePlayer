@@ -37,7 +37,7 @@ namespace SinePlayer.Core.Playback.Backends.Wasapi;
 /// the hold is already decided by the time the block reaches it.
 /// </para>
 /// </summary>
-public sealed class WasapiAudioRenderer : IAudioRenderer
+public sealed partial class WasapiAudioRenderer : IAudioRenderer
 {
     private const ushort WaveFormatPcm = 1;
     private const ushort WaveFormatIeeeFloat = 3;
@@ -49,11 +49,9 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
     private static readonly Guid SubTypePcm = new("00000001-0000-0010-8000-00AA00389B71");
     private static readonly Guid SubTypeIeeeFloat = new("00000003-0000-0010-8000-00AA00389B71");
 
-    /// <summary>The endpoint to open, or null for the one Windows would pick.</summary>
     private readonly string? _endpointId;
-
-    /// <summary>What the endpoint is called, for the reports that say which device is playing.</summary>
     private readonly string? _endpointName;
+    private readonly bool _endpointIsDefault;
 
     private IAudioClient? _client;
     private IAudioRenderClient? _renderClient;
@@ -64,12 +62,11 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
     private int _submittedBlocks;
     private long _underrunCount;
 
-    /// <param name="endpointId">The output device to open, or null for the one Windows would pick.</param>
-    /// <param name="endpointName">What that device is called, for the reports that say which one is playing.</param>
-    public WasapiAudioRenderer(string? endpointId = null, string? endpointName = null)
+    public WasapiAudioRenderer(string? endpointId = null, string? endpointName = null, bool endpointIsDefault = false)
     {
         _endpointId = endpointId;
         _endpointName = endpointName;
+        _endpointIsDefault = endpointIsDefault;
     }
 
     /// <summary>
@@ -84,7 +81,9 @@ public sealed class WasapiAudioRenderer : IAudioRenderer
     /// </summary>
     internal int BufferFrameCount => _bufferFrameCount;
 
-    public string Name => _endpointName is null ? "wasapi" : $"wasapi ({_endpointName})";
+    public string Name => _endpointName is null
+        ? "WASAPI"
+        : _endpointIsDefault ? $"WASAPI [{_endpointName}] (default)" : $"WASAPI [{_endpointName}]";
 
     public IPlaybackClock Clock => _clock ?? throw new InvalidOperationException("The audio renderer has not been configured.");
 

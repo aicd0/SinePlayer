@@ -886,6 +886,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="Position" xml:space="preserve">
     <value>Позиция</value>
   </data>
+  <data name="PreferHardwareDecoding" xml:space="preserve">
+    <value>Предпочитать аппаратное декодирование</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>Отображено кадров</value>
   </data>
@@ -1140,6 +1143,9 @@ $plugins</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Режим разворота</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Недоступно</value>
   </data>
   <data name="Unfavorite" xml:space="preserve">
     <value>Удалить из избранного</value>

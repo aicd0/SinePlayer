@@ -6,50 +6,42 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading.Tasks;
 
-using Microsoft.UI.Xaml;
-
 using SinePlayer.Common.Actions;
 using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Localization;
-using SinePlayer.Common.Misc;
-using SinePlayer.Common.Playback;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
-using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
-using SinePlayer.Data.Tables;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
 
 namespace SinePlayer.Views.Pages.Player;
 
 internal partial class PlayerPageViewModel : INotifyPropertyChanged
 {
-    private const long POSITION_SAVE_INTERVAL = 5000;
-    private const int VOLUME_SAVE_DELAY_MS = 500;
-    private const long POSITION_UI_INTERVAL = 200;
+    #region Constructor
+
     private const long ALMOST_ENDED_THRESHOLD_MS = 5000;
+    private const long POSITION_SAVE_INTERVAL = 5000;
+    private const long POSITION_UI_INTERVAL = 200;
+    private const int VOLUME_SAVE_DELAY_MS = 500;
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
-    private bool _volumeSaveScheduled;
-    private bool _playbackPendingOnActivate;
-    private bool _restoredFromLastSession = false;
 
-    // Media status
     private MediaModel? _media;
-    private LoadMediaArgs? _pendingMedia;
-    private bool _isLoading = false;
     private bool? _isFavorite = null;
-    private bool _isInitialized = false;
-    private IMediaEngine? _engine;
-    private long _pendingStartPositionMs = -1;
-    private long _lastPositionSaveTicks = 0;
-    private long _lastPositionUiTicks = 0;
-    private bool _isPageActive = false;
-    private bool _isKeepScreenOnActive = false;
+    private long _positionMs;
+    private long _durationMs;
+    private long _lastPositionUiTicks;
+    private long _lastPositionSaveTicks;
+    private bool _volumeSaveScheduled;
 
     public PlayerPageViewModel() { }
+
+    #endregion
+
+    #region Bindings
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -184,108 +176,97 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         }
     }
 
+    #endregion
+
+    #region Public API
+
     public PlayQueueModel PlayQueue { get; private set; } = PlayQueueModel.CreateEmpty();
     public PlaybackModel Playback { get; } = new();
     public PlayerStatusEnum PlayerStatus => PlayerStatusLiveData.Value.Status;
     public MediaModel? Media => _media;
-    public long DurationMs { get; private set; } = 0;
+    public long DurationMs { get; set; } = 0;
+    public bool IsLoading => _isLoading;
 
-    public void Initialize(ActionHandler actionHandler)
+    public void Initialize(ActionHandler actionHandler, OpenMediaHandler openHandler)
     {
         _actionHandler = actionHandler;
-        if (_isInitialized)
-        {
-            return;
-        }
-
-        _isInitialized = true;
+        _openHandler = openHandler;
         Playback.PlaybackStateChanged += Playback_PlaybackStateChanged;
     }
 
     public void Destory()
     {
         Playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
-
-        SaveCurrentPosition();
-        UpdateKeepScreenOn();
-
-        IMediaEngine? engine = _engine;
-        _engine = null;
-        if (engine is not null)
-        {
-            engine.StateChanged -= Engine_StateChanged;
-            engine.PositionChanged -= Engine_PositionChanged;
-            engine.MediaOpened -= Engine_MediaOpened;
-            engine.MediaEnded -= Engine_MediaEnded;
-            engine.ErrorOccurred -= Engine_ErrorOccurred;
-            engine.Dispose();
-        }
-
-        _isInitialized = false;
-        _pendingMedia = null;
-        _isPageActive = false;
+        _media = null;
     }
 
-    public void LoadPlayQueue(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs, bool restoredFromLastSession)
+    public void LoadPlayQueue(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
     {
-        _restoredFromLastSession = restoredFromLastSession;
         PlayQueue = playQueue;
         Playback.LoadState(playQueue, serializedPlayback, initialPositionMs);
     }
 
-    public UIElement GetVideoSurface()
+    public void Next()
     {
-        return EnsureEngine().CreateVideoSurface();
+        Playback.Next();
     }
 
-    public IPlaybackInfoProvider? GetPlaybackInfo()
+    public void Previous()
     {
-        return _engine?.PlaybackInfoProvider;
+        Playback.Previous(false);
     }
 
-    public void Pause()
+    /// <summary>The duration the engine probed, kept on the media when it was not known before.</summary>
+    public void SetDuration(long durationMs)
     {
-        if (AppSettingsModel.PauseOnLeaveTab)
+        _positionMs = 0;
+        _durationMs = durationMs;
+
+        MediaModel? media = _media;
+        if (durationMs > 0 && media is not null && media.DurationMs <= 0 && !media.IsExternal)
         {
-            _engine?.Pause();
+            CoroutineUtils.Run(async () => await media.SetDuration(durationMs));
         }
 
-        SaveCurrentPosition();
+        DurationMs = durationMs;
     }
 
-    public void SetPageActive(bool isPageActive)
+    /// <summary>
+    /// Where playback has got to, as the engine reports it. The view keeps a position it can show and the media
+    /// keeps a mark every few seconds; both cadences and the write are here, so the page only reads the engine.
+    /// </summary>
+    public void SetPosition(long positionMs, long durationMs)
     {
-        _isPageActive = isPageActive;
-        UpdateKeepScreenOn();
+        _positionMs = positionMs;
+        _durationMs = durationMs;
 
-        if (isPageActive && _playbackPendingOnActivate)
+        long now = Environment.TickCount64;
+        if (now - _lastPositionUiTicks >= POSITION_UI_INTERVAL)
         {
-            _playbackPendingOnActivate = false;
-            _engine?.Play();
+            _lastPositionUiTicks = now;
+            PositionLiveData.Emit(positionMs);
         }
-    }
 
-    public void RefreshKeepScreenOn()
-    {
-        UpdateKeepScreenOn();
-    }
-
-    public void TogglePlayPause()
-    {
-        IMediaEngine? engine = _engine;
-        if (engine is null)
+        if (now - _lastPositionSaveTicks < POSITION_SAVE_INTERVAL)
         {
             return;
         }
 
-        if (engine.State == MediaEngineState.Playing)
-        {
-            engine.Pause();
-        }
-        else
-        {
-            engine.Play();
-        }
+        SavePosition();
+    }
+
+    /// <summary>The level the engine was set to, kept where the player remembers it.</summary>
+    public void SetVolume(int volume)
+    {
+        VolumeLiveData.Emit(Math.Clamp(volume, 0, 100));
+        SaveVolumeAndMute();
+    }
+
+    /// <summary>Whether the sound is muted, kept where the player remembers it.</summary>
+    public void SetMute(bool isMuted)
+    {
+        MuteLiveData.Emit(isMuted);
+        SaveVolumeAndMute();
     }
 
     public void CycleRepeatMode()
@@ -303,66 +284,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         Playback.IsShuffle = !Playback.IsShuffle;
     }
 
-    public void Next()
-    {
-        Playback.Next();
-    }
-
-    public void Previous()
-    {
-        Playback.Previous(false);
-    }
-
-    public void SeekTo(long positionMs)
-    {
-        _engine?.Seek(TimeSpan.FromMilliseconds(positionMs));
-    }
-
-    public void SeekBy(long deltaMs)
-    {
-        IMediaEngine? engine = _engine;
-        if (engine is null)
-        {
-            return;
-        }
-
-        long positionMs = engine.Position.Ticks / TimeSpan.TicksPerMillisecond;
-        SeekTo(Math.Max(positionMs + deltaMs, 0));
-    }
-
-    public void SetVolume(int volume)
-    {
-        IMediaEngine? engine = _engine;
-        if (engine is null)
-        {
-            return;
-        }
-
-        int clampedVolume = Math.Clamp(volume, 0, 100);
-        engine.SetVolume(clampedVolume / 100.0);
-        VolumeLiveData.Emit(clampedVolume);
-        SaveVolumeAndMute();
-    }
-
-    public void AdjustVolume(int delta)
-    {
-        SetVolume(VolumeLiveData.Value + delta);
-    }
-
-    public void SetMuted(bool isMuted)
-    {
-        IMediaEngine? engine = _engine;
-        if (engine is null)
-        {
-            return;
-        }
-
-        engine.SetMuted(isMuted);
-        MuteLiveData.Emit(isMuted);
-        SaveVolumeAndMute();
-    }
-
-    public void SetIsFavorite(bool isFavorite, bool writeDatabase)
+    public void SetFavorite(bool isFavorite, bool writeDatabase)
     {
         if (_isFavorite == isFavorite)
         {
@@ -436,6 +358,24 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         BackgroundImageUri = media.GetExt(MediaExt.BACKGROUND_IMAGE);
     }
 
+    /// <summary>
+    /// Keeps where playback was left on the media it was left in. Reads the engine's last reported position, so a
+    /// caller that is about to replace the media saves first, and one that has just paused saves as it is.
+    /// </summary>
+    public void SavePosition()
+    {
+        _lastPositionSaveTicks = Environment.TickCount64;
+
+        MediaModel? media = _media;
+        if (media is null || media.IsExternal)
+        {
+            return;
+        }
+
+        int progress = _durationMs > 0 ? (int)Math.Clamp(_positionMs * 100 / _durationMs, 0, 100) : -1;
+        CoroutineUtils.Run(async () => await media.SetProgress(progress, _positionMs));
+    }
+
     public async Task<IReadOnlyList<BaseMenuFlyoutItemModel>> CreateMediaContextMenuItems()
     {
         MediaModel? media = Media;
@@ -451,301 +391,17 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             playback: Playback.ToBuilder());
     }
 
-    //
-    // Load
-    //
+    #endregion
 
-    private void LoadMedia(LoadMediaArgs args)
-    {
-        CoroutineUtils.Run(async () =>
-        {
-            if (_isLoading)
-            {
-                _pendingMedia = args;
-                return;
-            }
+    #region Load
 
-            _isLoading = true;
-            try
-            {
-                LoadMediaArgs? loadingMedia = args;
-                while (loadingMedia != null)
-                {
-                    await LoadMediaInternal(loadingMedia);
-                    loadingMedia = _pendingMedia;
-                    _pendingMedia = null;
-                }
-            }
-            finally
-            {
-                _isLoading = false;
-            }
-        });
-    }
+    /// <summary>Opens a file, wherever the engine that does it lives. The page supplies this; the view model owns
+    /// the rest of loading — which file, where in it, and what the status says while it happens.</summary>
+    public delegate Task<ErrorResult> OpenMediaHandler(MediaModel media, long startPositionMs);
+    private OpenMediaHandler? _openHandler;
 
-    private async Task LoadMediaInternal(LoadMediaArgs args)
-    {
-        // Save the position of the previous media
-        SaveCurrentPosition();
-
-        MediaModel? media = args.Media;
-        _media = null;
-        BackgroundImageUri = null;
-
-        if (media is null)
-        {
-            PlayerStatusLiveData.Emit(new()
-            {
-                Status = PlayerStatusEnum.Error,
-                Description = "No media is selected.",
-            });
-            return;
-        }
-
-        _media = media;
-        UpdateMediaMetadata();
-
-        // Save to history
-        if (!media.IsExternal)
-        {
-            await media.SetAsVisited();
-            if (AppSettingsModel.SaveBrowsingHistory)
-            {
-                await MediaHistoryItemModel.AddAsync(media.Id, media.Title1);
-            }
-        }
-
-        IsExternalMediaLiveData.Emit(media.IsExternal);
-        UpdateFavoriteStatusInternal(media);
-
-        _pendingStartPositionMs = ResolveStartPositionMs(media, args.PlaybackArgs);
-        DurationMs = 0;
-        PositionLiveData.Emit(0);
-        PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
-
-        IMediaEngine engine = EnsureEngine();
-        ErrorResult err = await engine.Load(media.Location);
-        if (!err.IsSuccessful)
-        {
-            PlayerStatusLiveData.Emit(new()
-            {
-                Status = PlayerStatusEnum.Error,
-                Description = err.DetailedErrorMessage,
-            });
-        }
-    }
-
-    private static long ResolveStartPositionMs(MediaModel media, PlaybackStateChangedEventArgs args)
-    {
-        long overridePositionMs = args.InitialPositionMs;
-        if (overridePositionMs >= 0)
-        {
-            return overridePositionMs;
-        }
-
-        switch (args.Reason)
-        {
-            case PlaybackStateChangeReason.Next:
-            case PlaybackStateChangeReason.Previous:
-            case PlaybackStateChangeReason.PreviousByOverScroll:
-                return 0;
-
-            default:
-                {
-                    if (!AppSettingsModel.RestoreLastPlaybackPosition)
-                    {
-                        return 0;
-                    }
-
-                    long positionMs = media.LastPositionMs;
-                    long remainingMs = media.DurationMs - positionMs;
-                    return remainingMs >= 0 && remainingMs < ALMOST_ENDED_THRESHOLD_MS ? 0 : positionMs;
-                }
-        }
-    }
-
-    //
-    // Engine
-    //
-
-    private IMediaEngine EnsureEngine()
-    {
-        if (_engine is not null)
-        {
-            return _engine;
-        }
-
-        IMediaEngine engine = MediaEngineService.CreateEngine();
-        engine.SetVolume(Math.Clamp(AppSettingsModel.PlayerVolume, 0.0, 1.0));
-        engine.SetMuted(AppSettingsModel.PlayerMuted);
-        engine.StateChanged += Engine_StateChanged;
-        engine.PositionChanged += Engine_PositionChanged;
-        engine.MediaOpened += Engine_MediaOpened;
-        engine.MediaEnded += Engine_MediaEnded;
-        engine.ErrorOccurred += Engine_ErrorOccurred;
-        _engine = engine;
-        VolumeLiveData.Emit((int)Math.Round(engine.Volume * 100.0));
-        MuteLiveData.Emit(engine.IsMuted);
-        return engine;
-    }
-
-    private void Engine_StateChanged(MediaEngineState state)
-    {
-        IsPlayingLiveData.Emit(state == MediaEngineState.Playing);
-
-        switch (state)
-        {
-            case MediaEngineState.Playing:
-                IsPlaying = true;
-                break;
-            case MediaEngineState.None:
-            case MediaEngineState.Paused:
-            case MediaEngineState.Ended:
-            case MediaEngineState.Error:
-                IsPlaying = false;
-                break;
-            default:
-                break;
-        }
-
-        UpdateKeepScreenOn();
-    }
-
-    private void Engine_PositionChanged()
-    {
-        long now = Environment.TickCount64;
-
-        if (now - _lastPositionUiTicks >= POSITION_UI_INTERVAL)
-        {
-            _lastPositionUiTicks = now;
-            IMediaEngine? engine = _engine;
-            if (engine is not null)
-            {
-                PositionLiveData.Emit(engine.Position.Ticks / TimeSpan.TicksPerMillisecond);
-            }
-        }
-
-        if (now - _lastPositionSaveTicks < POSITION_SAVE_INTERVAL)
-        {
-            return;
-        }
-
-        _lastPositionSaveTicks = now;
-        SaveCurrentPosition();
-    }
-
-    private void Engine_MediaOpened()
-    {
-        MediaModel? media = _media;
-        IMediaEngine? engine = _engine;
-        if (media is null || engine is null)
-        {
-            return;
-        }
-
-        // Persist the duration probed by the engine when it is still unknown
-        long durationMs = engine.Duration.Ticks / TimeSpan.TicksPerMillisecond;
-        if (durationMs > 0 && media.DurationMs <= 0 && !media.IsExternal)
-        {
-            CoroutineUtils.Run(async () => await media.SetDuration(durationMs));
-        }
-
-        DurationMs = durationMs;
-
-        long startPositionMs = _pendingStartPositionMs;
-        _pendingStartPositionMs = -1;
-        if (startPositionMs > 0)
-        {
-            engine.Seek(TimeSpan.FromMilliseconds(startPositionMs));
-        }
-
-        PositionLiveData.Emit(startPositionMs > 0 ? startPositionMs : 0);
-        PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Working });
-
-        bool restoredFromLastSession = _restoredFromLastSession;
-        _restoredFromLastSession = false;
-
-        if (AppSettingsModel.AutoPlayOnOpen && !(restoredFromLastSession && AppSettingsModel.AutoPlayOnOpenExceptAppLaunch))
-        {
-            if (_isPageActive)
-            {
-                engine.Play();
-            }
-            else
-            {
-                _playbackPendingOnActivate = true;
-            }
-        }
-    }
-
-    private void Engine_MediaEnded()
-    {
-        MediaModel? media = _media;
-        if (media is not null && !media.IsExternal)
-        {
-            CoroutineUtils.Run(async () => await media.SetProgress(100, 0));
-        }
-
-        if (Playback.RepeatMode == RepeatMode.One)
-        {
-            _engine?.Play();
-            return;
-        }
-
-        if (AppSettingsModel.AutoPlayNext)
-        {
-            Playback.Next();
-        }
-    }
-
-    private void Engine_ErrorOccurred(string message)
-    {
-        PlayerStatusLiveData.Emit(new()
-        {
-            Status = PlayerStatusEnum.Error,
-            Description = message,
-        });
-    }
-
-    //
-    // Screen on
-    //
-
-    private void UpdateKeepScreenOn()
-    {
-        bool shouldKeepScreenOn = _isPageActive && ShouldKeepScreenOn();
-        if (_isKeepScreenOnActive == shouldKeepScreenOn)
-        {
-            return;
-        }
-
-        _isKeepScreenOnActive = shouldKeepScreenOn;
-        if (shouldKeepScreenOn)
-        {
-            DisplayRequestManager.IncrememtKeepScreenOn();
-        }
-        else
-        {
-            DisplayRequestManager.DecrememtKeepScreenOn();
-        }
-    }
-
-    private bool ShouldKeepScreenOn()
-    {
-        MediaModel? media = _media;
-        return AppSettingsModel.KeepScreenOnBehavior switch
-        {
-            AppSettingsModel.KeepScreenOnBehaviorEnum.Never => false,
-            AppSettingsModel.KeepScreenOnBehaviorEnum.Always => true,
-            AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlaying => IsPlaying,
-            AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos => IsPlaying && media is not null && media.Type == MediaType.Video,
-            _ => false,
-        };
-    }
-
-    //
-    // Misc
-    //
+    private LoadMediaArgs? _pendingMedia;
+    private bool _isLoading;
 
     private void Playback_PlaybackStateChanged(PlaybackStateChangedEventArgs args)
     {
@@ -778,20 +434,142 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         PlaybackChangeLiveData.Emit(true);
     }
 
-    private void SaveCurrentPosition()
+    private void LoadMedia(LoadMediaArgs args)
     {
-        MediaModel? media = _media;
-        IMediaEngine? engine = _engine;
-        if (media is null || engine is null || media.IsExternal)
+        CoroutineUtils.Run(async () =>
+        {
+            if (_isLoading)
+            {
+                _pendingMedia = args;
+                return;
+            }
+
+            _isLoading = true;
+            try
+            {
+                LoadMediaArgs? loadingMedia = args;
+                while (loadingMedia != null)
+                {
+                    await LoadMediaInternal(loadingMedia);
+                    loadingMedia = _pendingMedia;
+                    _pendingMedia = null;
+                }
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        });
+    }
+
+    private async Task LoadMediaInternal(LoadMediaArgs args)
+    {
+        MediaModel? media = args.Media;
+        PositionLiveData.Emit(0);
+
+        await SetMedia(media);
+        if (media is null)
         {
             return;
         }
 
-        long positionMs = engine.Position.Ticks / TimeSpan.TicksPerMillisecond;
-        long durationMs = engine.Duration.Ticks / TimeSpan.TicksPerMillisecond;
-        int progress = durationMs > 0 ? (int)Math.Clamp(positionMs * 100 / durationMs, 0, 100) : -1;
-        CoroutineUtils.Run(async () => await media.SetProgress(progress, positionMs));
+        long startPositionMs = ResolveStartPositionMs(media, args.PlaybackArgs);
+        PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
+
+        OpenMediaHandler? openHandler = _openHandler;
+        if (openHandler is null)
+        {
+            return;
+        }
+
+        // The file itself is opened by whoever owns the engine; what it is, where in it to start and what the
+        // status says around it is decided here.
+        ErrorResult err = await openHandler(media, startPositionMs);
+        if (!err.IsSuccessful)
+        {
+            PlayerStatusLiveData.Emit(new()
+            {
+                Status = PlayerStatusEnum.Error,
+                Description = err.DetailedErrorMessage,
+            });
+        }
     }
+
+    /// <summary>
+    /// The media the page is opening: what the panel and the title show, the history write and the favorite
+    /// status. Opening the file itself is the page's, since it is the one that owns the engine.
+    /// </summary>
+    private async Task SetMedia(MediaModel? media)
+    {
+        _media = null;
+        BackgroundImageUri = null;
+        DurationMs = 0;
+
+        if (media is null)
+        {
+            PlayerStatusLiveData.Emit(new()
+            {
+                Status = PlayerStatusEnum.Error,
+                Description = "No media is selected.",
+            });
+            return;
+        }
+
+        _media = media;
+        UpdateMediaMetadata();
+
+        // Save to history
+        if (!media.IsExternal)
+        {
+            await media.SetAsVisited();
+            if (AppSettingsModel.SaveBrowsingHistory)
+            {
+                await MediaHistoryItemModel.AddAsync(media.Id, media.Title1);
+            }
+        }
+
+        IsExternalMediaLiveData.Emit(media.IsExternal);
+        UpdateFavoriteStatusInternal(media);
+    }
+
+    private static long ResolveStartPositionMs(MediaModel media, PlaybackStateChangedEventArgs args)
+    {
+        long overridePositionMs = args.InitialPositionMs;
+        if (overridePositionMs >= 0)
+        {
+            return overridePositionMs;
+        }
+
+        switch (args.Reason)
+        {
+            case PlaybackStateChangeReason.Next:
+            case PlaybackStateChangeReason.Previous:
+            case PlaybackStateChangeReason.PreviousByOverScroll:
+                return 0;
+
+            default:
+                {
+                    if (!AppSettingsModel.RestoreLastPlaybackPosition)
+                    {
+                        return 0;
+                    }
+
+                    long positionMs = media.LastPositionMs;
+                    long remainingMs = media.DurationMs - positionMs;
+                    return remainingMs >= 0 && remainingMs < ALMOST_ENDED_THRESHOLD_MS ? 0 : positionMs;
+                }
+        }
+    }
+
+    private void UpdateFavoriteStatusInternal(MediaModel media)
+    {
+        bool isFavorite = !media.IsExternal && FavoriteModel.Instance.FromId(media.Id) != null;
+        SetFavorite(isFavorite, false);
+    }
+
+    #endregion
+
+    #region Media state
 
     private void SaveVolumeAndMute()
     {
@@ -806,26 +584,24 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             await Task.Delay(VOLUME_SAVE_DELAY_MS);
             _volumeSaveScheduled = false;
 
-            IMediaEngine? engine = _engine;
-            if (engine is null)
-            {
-                return;
-            }
-
-            AppSettingsModel.PlayerVolume = engine.Volume;
-            AppSettingsModel.PlayerMuted = engine.IsMuted;
+            AppSettingsModel.PlayerVolume = VolumeLiveData.Value / 100.0;
+            AppSettingsModel.PlayerMuted = MuteLiveData.Value;
         });
     }
 
-    private void UpdateFavoriteStatusInternal(MediaModel media)
+    /// <summary>The item just ended, so the media keeps the mark that it was played to the end.</summary>
+    public void CompleteMedia()
     {
-        bool isFavorite = !media.IsExternal && FavoriteModel.Instance.FromId(media.Id) != null;
-        SetIsFavorite(isFavorite, false);
+        MediaModel? media = _media;
+        if (media is not null && !media.IsExternal)
+        {
+            CoroutineUtils.Run(async () => await media.SetProgress(100, 0));
+        }
     }
 
-    //
-    // Types
-    //
+    #endregion
+
+    #region Types
 
     public enum PlayerStatusEnum
     {
@@ -846,4 +622,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         public required MediaModel? Media { get; init; }
         public required PlaybackStateChangedEventArgs PlaybackArgs { get; init; }
     }
+
+    #endregion
 }
