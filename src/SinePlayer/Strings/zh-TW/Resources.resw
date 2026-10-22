@@ -162,6 +162,9 @@
   <data name="AllPages" xml:space="preserve">
     <value>所有頁面</value>
   </data>
+  <data name="AllowPerMediaConfiguration" xml:space="preserve">
+    <value>允許單一媒體設定</value>
+  </data>
   <data name="Always" xml:space="preserve">
     <value>始終</value>
   </data>
