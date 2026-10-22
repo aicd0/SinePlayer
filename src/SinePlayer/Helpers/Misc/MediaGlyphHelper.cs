@@ -10,7 +10,7 @@ internal static class MediaGlyphHelper
 {
     public const string AudioGlyph = "\uE8D6";
     public const string VideoGlyph = "\uE714";
-    public const string UnknownGlyph = "\uEA69";
+    public const string MediaGlyph = "\uEA69";
 
     public static string GetMediaGlyph(MediaModel? media)
     {
@@ -18,7 +18,7 @@ internal static class MediaGlyphHelper
         {
             MediaType.Audio => AudioGlyph,
             MediaType.Video => VideoGlyph,
-            _ => UnknownGlyph,
+            _ => MediaGlyph,
         };
     }
 }

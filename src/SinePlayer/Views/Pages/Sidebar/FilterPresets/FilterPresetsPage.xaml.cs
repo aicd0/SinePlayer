@@ -92,7 +92,7 @@ internal sealed partial class FilterPresetsPage : BasePage
         }
 
         List<MediaModel> snapshot = ViewModel.GetMediaSnapshot();
-        List<BaseMenuFlyoutItemModel> menuItems = await MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
+        List<BaseMenuFlyoutItemModel> menuItems = await MediaMenuCreator.CreateMediaGroupMenuItems(
             PageActionHandler, snapshot, ViewModel.ExpandAllGroups, ViewModel.CollapseAllGroups);
         if (menuItems.Count == 0)
         {
@@ -122,10 +122,10 @@ internal sealed partial class FilterPresetsPage : BasePage
             bool handled = true;
             switch (source)
             {
-                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
+                case MediaMenuCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
                     switch (name)
                     {
-                        case MenuFlyoutItemsCreator.CUSTOM_ACTION_NAME_SELECT:
+                        case MediaMenuCreator.CUSTOM_ACTION_NAME_SELECT:
                             viewModel.SelectionMode = !viewModel.SelectionMode;
                             break;
                         default:

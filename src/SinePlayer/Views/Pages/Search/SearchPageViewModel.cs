@@ -173,7 +173,7 @@ internal partial class SearchPageViewModel : INotifyPropertyChanged
                     OnRequestContextFlyoutAsync = model =>
                     {
                         IEnumerable<MediaModel>? selection = MediaSelection.IsSelectMode ? MediaSelection.GetSelectedMedia() : null;
-                        return MenuFlyoutItemsCreator.CreateMediaMenuItems(
+                        return MediaMenuCreator.CreateMediaMenuItems(
                             _actionHandler,
                             media,
                             playQueue: playQueue,

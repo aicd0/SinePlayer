@@ -50,6 +50,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         };
     }
 
+    public PlayerSettingsModel Settings => _mediaSettings;
+
     public void Initialize(IMainWindowAbility windowAbility)
     {
         _windowAbility = windowAbility;
@@ -66,6 +68,14 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         LoadSettings();
         UpdateUI();
         DispatchDataChangeEvent();
+    }
+
+    public void Apply(Action<PlayerSettingsModel> change)
+    {
+        change(_mediaSettings);
+        SaveSettings();
+        DispatchDataChangeEvent();
+        UpdateUI();
     }
 
     protected override void OnResume()
@@ -149,16 +159,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        bool preferHardwareDecoding = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.VideoPreferHardwareDecoding == preferHardwareDecoding)
+        bool value = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.VideoPreferHardwareDecoding != value)
         {
-            return;
+            Apply(settings => settings.VideoPreferHardwareDecoding = value);
         }
-
-        _mediaSettings.VideoPreferHardwareDecoding = preferHardwareDecoding;
-        SaveSettings();
-        DispatchDataChangeEvent();
-        UpdateUI();
     }
 
     private void VideoFlipHorizontalToggleSwitch_Toggled(object sender, RoutedEventArgs e)
@@ -168,16 +173,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        bool flip = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.VideoFlipHorizontal == flip)
+        bool value = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.VideoFlipHorizontal != value)
         {
-            return;
+            Apply(settings => settings.VideoFlipHorizontal = value);
         }
-
-        _mediaSettings.VideoFlipHorizontal = flip;
-        SaveSettings();
-        DispatchDataChangeEvent();
-        UpdateUI();
     }
 
     private void VideoFlipVerticalToggleSwitch_Toggled(object sender, RoutedEventArgs e)
@@ -187,16 +187,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        bool flip = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.VideoFlipVertical == flip)
+        bool value = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.VideoFlipVertical != value)
         {
-            return;
+            Apply(settings => settings.VideoFlipVertical = value);
         }
-
-        _mediaSettings.VideoFlipVertical = flip;
-        SaveSettings();
-        DispatchDataChangeEvent();
-        UpdateUI();
     }
 
     private void LoadSettings()
@@ -343,17 +338,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoDecoder(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetVideoDecoderOptions()];
-        PlaybackComponentOption choice = EnsureChoice(options, settings.VideoDecoder);
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoDecoder);
         VideoDecoderDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
-            if (settings.VideoDecoder == key)
+            if (settings.VideoDecoder != key)
             {
-                return;
+                Apply(target => target.VideoDecoder = key);
             }
-
-            settings.VideoDecoder = key;
-            SaveSettings();
-            DispatchDataChangeEvent();
         });
         VideoDecoderDropDownButton.Content = choice.Label;
     }
@@ -365,38 +356,30 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateVideoStretchMode(PlayerSettingsModel settings)
     {
-        List<PlaybackComponentOption> options = GetStretchModeOptions();
-        PlaybackComponentOption choice = EnsureChoice(options, settings.VideoResizeMode.ToString());
+        List<PlaybackComponentOption> options = PlayerMenuCreator.GetStretchModeOptions();
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoResizeMode.ToString());
         VideoStretchModeDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
             VideoResizeMode mode = Enum.Parse<VideoResizeMode>(key);
-            if (settings.VideoResizeMode == mode)
+            if (settings.VideoResizeMode != mode)
             {
-                return;
+                Apply(target => target.VideoResizeMode = mode);
             }
-
-            settings.VideoResizeMode = mode;
-            SaveSettings();
-            DispatchDataChangeEvent();
         });
         VideoStretchModeDropDownButton.Content = choice.Label;
     }
 
     private void UpdateVideoRotation(PlayerSettingsModel settings)
     {
-        List<PlaybackComponentOption> options = GetRotationOptions();
-        PlaybackComponentOption choice = EnsureChoice(options, settings.VideoRotationDegrees.ToString(CultureInfo.InvariantCulture));
+        List<PlaybackComponentOption> options = PlayerMenuCreator.GetRotationOptions();
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoRotationDegrees.ToString(CultureInfo.InvariantCulture));
         VideoRotationDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
             int degrees = int.Parse(key, CultureInfo.InvariantCulture);
-            if (settings.VideoRotationDegrees == degrees)
+            if (settings.VideoRotationDegrees != degrees)
             {
-                return;
+                Apply(target => target.VideoRotationDegrees = degrees);
             }
-
-            settings.VideoRotationDegrees = degrees;
-            SaveSettings();
-            DispatchDataChangeEvent();
         });
         VideoRotationDropDownButton.Content = choice.Label;
     }
@@ -411,42 +394,16 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         VideoFlipVerticalToggleSwitch.IsOn = settings.VideoFlipVertical;
     }
 
-    private static List<PlaybackComponentOption> GetStretchModeOptions()
-    {
-        return
-        [
-            new(nameof(VideoResizeMode.Fit), StringResourceProvider.Instance.Fit),
-            new(nameof(VideoResizeMode.Stretch), StringResourceProvider.Instance.Stretch),
-            new(nameof(VideoResizeMode.Fill), StringResourceProvider.Instance.Fill),
-            new(nameof(VideoResizeMode.OriginalSize), StringResourceProvider.Instance.OriginalSize),
-        ];
-    }
-
-    private static List<PlaybackComponentOption> GetRotationOptions()
-    {
-        return
-        [
-            new("0", StringResourceProvider.Instance.None),
-            new("90", "90°"),
-            new("180", "180°"),
-            new("270", "270°"),
-        ];
-    }
-
     private void UpdateAudioDecoder(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetAudioDecoderOptions()];
-        PlaybackComponentOption choice = EnsureChoice(options, settings.AudioDecoder);
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.AudioDecoder);
         AudioDecoderDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
-            if (settings.AudioDecoder == key)
+            if (settings.AudioDecoder != key)
             {
-                return;
+                Apply(target => target.AudioDecoder = key);
             }
-
-            settings.AudioDecoder = key;
-            SaveSettings();
-            DispatchDataChangeEvent();
         });
         AudioDecoderDropDownButton.Content = choice.Label;
     }
@@ -454,17 +411,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoRenderer(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetVideoRendererOptions()];
-        PlaybackComponentOption choice = EnsureChoice(options, settings.VideoRenderer);
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoRenderer);
         VideoRendererDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
-            if (settings.VideoRenderer == key)
+            if (settings.VideoRenderer != key)
             {
-                return;
+                Apply(target => target.VideoRenderer = key);
             }
-
-            settings.VideoRenderer = key;
-            SaveSettings();
-            DispatchDataChangeEvent();
         });
         VideoRendererDropDownButton.Content = choice.Label;
     }
@@ -472,61 +425,26 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateAudioRenderer(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetAudioRendererOptions()];
-        PlaybackComponentOption choice = EnsureChoice(options, settings.AudioRenderer);
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.AudioRenderer);
         AudioRendererDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
-            if (settings.AudioRenderer == key)
+            if (settings.AudioRenderer != key)
             {
-                return;
+                Apply(target => target.AudioRenderer = key);
             }
-
-            settings.AudioRenderer = key;
-            SaveSettings();
-            DispatchDataChangeEvent();
         });
         AudioRendererDropDownButton.Content = choice.Label;
     }
 
     private MenuFlyout CreateChoiceMenu(IReadOnlyList<PlaybackComponentOption> options, string? selectedKey, Action<string> select)
     {
-        List<BaseMenuFlyoutItemModel> items = [];
-        foreach (PlaybackComponentOption option in options)
-        {
-            string key = option.Key;
-            items.Add(new ToggleMenuFlyoutItemModel()
-            {
-                Text = option.Label,
-                IsChecked = selectedKey == key,
-                Click = () =>
-                {
-                    select(key);
-                    UpdateUI();
-                },
-            });
-        }
-
         var flyout = new MenuFlyout();
-        foreach (BaseMenuFlyoutItemModel item in items)
+        foreach (BaseMenuFlyoutItemModel item in PlayerMenuCreator.CreateChoiceItems(options, selectedKey, select))
         {
             flyout.Items.Add(item.CreateMenuFlyoutItem());
         }
 
         return flyout;
-    }
-
-    private static PlaybackComponentOption EnsureChoice(List<PlaybackComponentOption> options, string key)
-    {
-        foreach (PlaybackComponentOption option in options)
-        {
-            if (option.Key == key)
-            {
-                return option;
-            }
-        }
-
-        PlaybackComponentOption unavailable = new(key, $"{key} ({StringResourceProvider.Instance.Unavailable})");
-        options.Add(unavailable);
-        return unavailable;
     }
 
     private MenuFlyout CreatePresetContextMenu(PlayerSettingsModel mediaSettings)

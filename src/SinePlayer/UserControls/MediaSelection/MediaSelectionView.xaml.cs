@@ -251,7 +251,7 @@ internal sealed partial class MediaSelectionView : BaseUserControl
         }
 
         IReadOnlyList<MediaModel> mediaItems = viewModel.GetSelectedMedia();
-        List<BaseMenuFlyoutItemModel> menuItems = MenuFlyoutItemsCreator.CreateCompletionStatusMenuItems(mediaItems);
+        List<BaseMenuFlyoutItemModel> menuItems = MediaMenuCreator.CreateCompletionStatusMenuItems(mediaItems);
 
         var flyout = new MenuFlyout();
         foreach (BaseMenuFlyoutItemModel item in menuItems)

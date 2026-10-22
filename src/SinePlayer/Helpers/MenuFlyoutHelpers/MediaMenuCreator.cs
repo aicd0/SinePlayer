@@ -32,7 +32,7 @@ using SinePlayer.Views.Dialogs.EditMediaInfo;
 
 namespace SinePlayer.Helpers.MenuFlyoutHelpers;
 
-internal static class MenuFlyoutItemsCreator
+internal static class MediaMenuCreator
 {
     public const string CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU = "MediaItemMenu";
     public const string CUSTOM_ACTION_NAME_SELECT = "Select";

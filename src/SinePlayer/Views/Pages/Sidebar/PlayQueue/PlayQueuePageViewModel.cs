@@ -115,7 +115,7 @@ internal partial class PlayQueuePageViewModel : INotifyPropertyChanged
                 Progress = GetProgressText(playQueueItem.Media),
                 RequestContextMenuItemsAsync = item =>
                 {
-                    return MenuFlyoutItemsCreator.CreateMediaMenuItems(
+                    return MediaMenuCreator.CreateMediaMenuItems(
                         _actionHandler,
                         playQueueItem.Media,
                         playQueue: playQueue,

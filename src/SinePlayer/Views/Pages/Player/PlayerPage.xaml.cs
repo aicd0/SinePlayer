@@ -34,6 +34,7 @@ using SinePlayer.Helpers.MenuFlyoutHelpers;
 using SinePlayer.Helpers.Misc;
 using SinePlayer.Helpers.Navigation;
 using SinePlayer.SDK.Models;
+using SinePlayer.UserControls.PlayerSettings;
 using SinePlayer.Views.Pages.Main.Sidebar;
 using SinePlayer.Views.Pages.Sidebar.MediaInfo;
 
@@ -385,10 +386,23 @@ internal sealed partial class PlayerPage : BasePage
 
         CoroutineUtils.Run(async () =>
         {
-            IReadOnlyList<BaseMenuFlyoutItemModel> menuItems = await ViewModel.CreateMediaContextMenuItems();
+            PlayerSettingsPanel? settingsPanel = _navigationBar?.PlayerSettingsPanel;
+            MediaModel? media = ViewModel.Media;
+            if (settingsPanel is null || media is null)
+            {
+                return;
+            }
+
+            List<BaseMenuFlyoutItemModel> items = await PlayerMenuCreator.CreateVideoHostMenuItems(
+                PageActionHandler,
+                media,
+                settingsPanel.Settings,
+                settingsPanel.Apply,
+                ViewModel.PlayQueue.ToBuilder(),
+                ViewModel.Playback.ToBuilder());
 
             MenuFlyout flyout = new();
-            foreach (BaseMenuFlyoutItemModel item in menuItems)
+            foreach (BaseMenuFlyoutItemModel item in items)
             {
                 flyout.Items.Add(item.CreateMenuFlyoutItem());
             }

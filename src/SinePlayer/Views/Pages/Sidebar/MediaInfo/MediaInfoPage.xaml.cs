@@ -116,7 +116,7 @@ internal sealed partial class MediaInfoPage : BasePage
             return;
         }
 
-        List<BaseMenuFlyoutItemModel> menuItems = MenuFlyoutItemsCreator.CreateCompletionStatusMenuItems([media]);
+        List<BaseMenuFlyoutItemModel> menuItems = MediaMenuCreator.CreateCompletionStatusMenuItems([media]);
 
         var flyout = new MenuFlyout();
         foreach (BaseMenuFlyoutItemModel item in menuItems)
@@ -142,7 +142,7 @@ internal sealed partial class MediaInfoPage : BasePage
                 return;
             }
 
-            List<BaseMenuFlyoutItemModel> menuItems = await MenuFlyoutItemsCreator.CreateMediaMenuItems(
+            List<BaseMenuFlyoutItemModel> menuItems = await MediaMenuCreator.CreateMediaMenuItems(
                 PageActionHandler,
                 media,
                 playQueue: ViewModel.PlayQueue.ToBuilder(),

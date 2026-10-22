@@ -544,7 +544,7 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
                 OnRequestContextFlyoutAsync = model =>
                 {
                     IReadOnlyList<MediaModel>? selectedMedia = MediaSelection.IsSelectMode ? MediaSelection.GetSelectedMedia() : null;
-                    return MenuFlyoutItemsCreator.CreateMediaMenuItems(
+                    return MediaMenuCreator.CreateMediaMenuItems(
                         _actionHandler,
                         media,
                         playQueue: playQueue,

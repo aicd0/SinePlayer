@@ -237,7 +237,7 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
                         IEnumerable<MediaModel>? selectedMedia = !_selectionMode ? null : selection
                             .Where(x => x.DataContext is MediaModel)
                             .Select(x => (MediaModel)x.DataContext!);
-                        return MenuFlyoutItemsCreator.CreateMediaMenuItems(
+                        return MediaMenuCreator.CreateMediaMenuItems(
                             _actionHandler,
                             media,
                             playQueue: playQueue,
@@ -310,7 +310,7 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
     private Task<List<BaseMenuFlyoutItemModel>> CreateGroupMenuItems(SimpleTreeViewNodeModel node)
     {
         List<MediaModel> mediaItems = [.. node.CollectDataContext<MediaModel>()];
-        return MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
+        return MediaMenuCreator.CreateMediaGroupMenuItems(
             _actionHandler, mediaItems,
             node.ExpandAll, node.CollapseAll);
     }
