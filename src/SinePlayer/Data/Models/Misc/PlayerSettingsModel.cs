@@ -44,6 +44,7 @@ internal class PlayerSettingsModel
         {
             PresetKey = key,
             PresetName = model.PresetName ?? fallbackModel.PresetName,
+            AllowPerMediaConfiguration = model.AllowPerMediaConfiguration ?? fallbackModel.AllowPerMediaConfiguration,
             VideoDecoder = model.VideoDecoder ?? fallbackModel.VideoDecoder,
             AudioDecoder = model.AudioDecoder ?? fallbackModel.AudioDecoder,
             VideoRenderer = model.VideoRenderer ?? fallbackModel.VideoRenderer,
@@ -96,16 +97,19 @@ internal class PlayerSettingsModel
         }
 
         JsonModel? jsonModel = null;
-        string? customSettingsJson = media.GetExt(MediaExt.CUSTOM_PLAYER_SETTINGS);
-        if (!string.IsNullOrEmpty(customSettingsJson))
+        if (presetModel is null || presetModel.AllowPerMediaConfiguration)
         {
-            try
+            string? customSettingsJson = media.GetExt(MediaExt.CUSTOM_PLAYER_SETTINGS);
+            if (!string.IsNullOrEmpty(customSettingsJson))
             {
-                jsonModel = JsonSerializer.Deserialize<JsonModel>(customSettingsJson);
-            }
-            catch (JsonException ex)
-            {
-                Logger.E(TAG, ex);
+                try
+                {
+                    jsonModel = JsonSerializer.Deserialize<JsonModel>(customSettingsJson);
+                }
+                catch (JsonException ex)
+                {
+                    Logger.E(TAG, ex);
+                }
             }
         }
 
@@ -146,7 +150,7 @@ internal class PlayerSettingsModel
 
     public string PresetKey { get; set; } = string.Empty;
     public string PresetName { get; set; } = "?";
-
+    public bool AllowPerMediaConfiguration { get; set; } = true;
     public string VideoDecoder { get; set; } = PlaybackComponents.AUTO;
     public string AudioDecoder { get; set; } = PlaybackComponents.AUTO;
     public string VideoRenderer { get; set; } = PlaybackComponents.AUTO;
@@ -170,6 +174,7 @@ internal class PlayerSettingsModel
         return new()
         {
             PresetName = PresetName,
+            AllowPerMediaConfiguration = AllowPerMediaConfiguration,
             VideoDecoder = VideoDecoder,
             AudioDecoder = AudioDecoder,
             VideoRenderer = VideoRenderer,
@@ -180,18 +185,34 @@ internal class PlayerSettingsModel
 
     public void SaveToMedia(MediaModel media)
     {
-        JsonModel? jsonModel = ToJsonModel();
+        media.SetExt(MediaExt.PLAYER_SETTING_PRESET_KEY, PresetKey);
 
-        PlayerSettingsModel? diffModel = LoadFromPreset(PresetKey);
-        if (diffModel is not null)
+        PlayerSettingsModel? presetModel = LoadFromPreset(PresetKey);
+        if (presetModel is null || presetModel.AllowPerMediaConfiguration)
         {
-            var diffJsonModel = diffModel.ToJsonModel();
-            jsonModel = NullOutMatchingFields(jsonModel, diffJsonModel);
+            JsonModel? jsonModel = ToJsonModel();
+            if (presetModel is not null)
+            {
+                var diffJsonModel = presetModel.ToJsonModel();
+                jsonModel = NullOutMatchingFields(jsonModel, diffJsonModel);
+            }
+
+            string customSettingsJson = JsonSerializer.Serialize(jsonModel);
+            media.SetExt(MediaExt.CUSTOM_PLAYER_SETTINGS, customSettingsJson);
+        }
+        else
+        {
+            PlayerSettingsModel updated = Clone();
+            updated.PresetName = presetModel.PresetName;
+            updated.AllowPerMediaConfiguration = presetModel.AllowPerMediaConfiguration;
+
+            Dictionary<string, PlayerSettingsModel> presets = AppSettingsModel.PlayerSettingPresets;
+            presets[PresetKey] = updated;
+            AppSettingsModel.PlayerSettingPresets = presets;
+
+            media.SetExt(MediaExt.CUSTOM_PLAYER_SETTINGS, null);
         }
 
-        string customSettingsJson = JsonSerializer.Serialize(jsonModel);
-        media.SetExt(MediaExt.PLAYER_SETTING_PRESET_KEY, PresetKey);
-        media.SetExt(MediaExt.CUSTOM_PLAYER_SETTINGS, customSettingsJson);
         CoroutineUtils.Run(media.FlushExt);
     }
 
@@ -281,6 +302,9 @@ internal class PlayerSettingsModel
     {
         [JsonPropertyName("PresetName")]
         public string? PresetName { get; set; }
+
+        [JsonPropertyName("AllowPerMediaConfiguration")]
+        public bool? AllowPerMediaConfiguration { get; set; }
 
         [JsonPropertyName("VideoDecoder")]
         public string? VideoDecoder { get; set; }

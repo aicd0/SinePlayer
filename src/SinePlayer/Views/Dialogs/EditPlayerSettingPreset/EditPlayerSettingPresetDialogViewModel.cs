@@ -48,6 +48,17 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
         }
     }
 
+    private bool _allowPerMediaConfiguration = true;
+    public bool AllowPerMediaConfiguration
+    {
+        get => _allowPerMediaConfiguration;
+        set
+        {
+            _allowPerMediaConfiguration = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AllowPerMediaConfiguration)));
+        }
+    }
+
     private bool _saveEnabled = false;
     public bool SaveEnabled
     {
@@ -92,6 +103,7 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
         Title = StringResourceProvider.Instance.EditPreset;
         Name = _presetModel.PresetName;
         SetAsDefault = _presetModel.PresetKey == AppSettingsModel.DefaultPlayerSettingPresetKey;
+        AllowPerMediaConfiguration = _presetModel.AllowPerMediaConfiguration;
         UpdateUI();
     }
 
@@ -122,6 +134,7 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
         }
 
         _presetModel.PresetName = name;
+        _presetModel.AllowPerMediaConfiguration = _allowPerMediaConfiguration;
         Dictionary<string, PlayerSettingsModel> presets = AppSettingsModel.PlayerSettingPresets;
         presets[_presetModel.PresetKey] = _presetModel;
         AppSettingsModel.PlayerSettingPresets = presets;
@@ -147,6 +160,7 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
 
         _presetModel.PresetKey = Guid.NewGuid().ToString();
         _presetModel.PresetName = name;
+        _presetModel.AllowPerMediaConfiguration = _allowPerMediaConfiguration;
         Dictionary<string, PlayerSettingsModel> presets = AppSettingsModel.PlayerSettingPresets;
         presets[_presetModel.PresetKey] = _presetModel;
         AppSettingsModel.PlayerSettingPresets = presets;
@@ -171,6 +185,11 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
     public void UpdateSetAsDefault(bool isDefault)
     {
         _setAsDefault = isDefault;
+    }
+
+    public void UpdateAllowPerMediaConfiguration(bool allow)
+    {
+        _allowPerMediaConfiguration = allow;
     }
 
     private void UpdateUI()

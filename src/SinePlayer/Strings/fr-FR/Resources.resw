@@ -162,6 +162,9 @@
   <data name="AllPages" xml:space="preserve">
     <value>Toutes les pages</value>
   </data>
+  <data name="AllowPerMediaConfiguration" xml:space="preserve">
+    <value>Autoriser la configuration par média</value>
+  </data>
   <data name="Always" xml:space="preserve">
     <value>Toujours</value>
   </data>

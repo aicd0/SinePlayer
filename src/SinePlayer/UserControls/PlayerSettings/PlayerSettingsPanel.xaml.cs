@@ -183,6 +183,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         _mediaSettings.SaveToMedia(_media);
+        _presetSettings = PlayerSettingsModel.LoadFromPreset(_mediaSettings.PresetKey);
     }
 
     private void UpdateUI()

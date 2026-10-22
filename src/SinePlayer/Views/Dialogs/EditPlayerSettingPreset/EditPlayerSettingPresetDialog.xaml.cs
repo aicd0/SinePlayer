@@ -57,4 +57,10 @@ internal sealed partial class EditPlayerSettingPresetDialog : BaseContentDialog
         var checkBox = (CheckBox)sender;
         ViewModel.UpdateSetAsDefault(checkBox.IsChecked ?? false);
     }
+
+    private void AllowPerMediaConfigurationCheckBox_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        var checkBox = (CheckBox)sender;
+        ViewModel.UpdateAllowPerMediaConfiguration(checkBox.IsChecked ?? false);
+    }
 }

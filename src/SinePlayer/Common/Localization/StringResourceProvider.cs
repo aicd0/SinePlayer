@@ -25,6 +25,7 @@ public class StringResourceProvider
     public string AllItems => GetResourceString("AllItems");
     public string AllMatchedResults => GetResourceString("AllMatchedResults");
     public string AllPages => GetResourceString("AllPages");
+    public string AllowPerMediaConfiguration => GetResourceString("AllowPerMediaConfiguration");
     public string Always => GetResourceString("Always");
     public string AntiAliasingFilter => GetResourceString("AntiAliasingFilter");
     public string AppDescription => GetResourceString("AppDescription");
