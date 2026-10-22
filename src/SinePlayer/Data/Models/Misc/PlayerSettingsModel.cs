@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -11,6 +12,7 @@ using SinePlayer.Common.Localization;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Data.Models.Media;
 
 namespace SinePlayer.Data.Models.Misc;
@@ -50,6 +52,10 @@ internal class PlayerSettingsModel
             VideoRenderer = model.VideoRenderer ?? fallbackModel.VideoRenderer,
             AudioRenderer = model.AudioRenderer ?? fallbackModel.AudioRenderer,
             VideoPreferHardwareDecoding = model.VideoPreferHardwareDecoding ?? fallbackModel.VideoPreferHardwareDecoding,
+            VideoResizeMode = ParseResizeMode(model.VideoResizeMode, fallbackModel.VideoResizeMode),
+            VideoRotationDegrees = ParseRotationDegrees(model.VideoRotationDegrees, fallbackModel.VideoRotationDegrees),
+            VideoFlipHorizontal = model.VideoFlipHorizontal ?? fallbackModel.VideoFlipHorizontal,
+            VideoFlipVertical = model.VideoFlipVertical ?? fallbackModel.VideoFlipVertical,
         };
     }
 
@@ -148,6 +154,21 @@ internal class PlayerSettingsModel
         return presetModel;
     }
 
+    private static VideoResizeMode ParseResizeMode(string? value, VideoResizeMode fallback)
+    {
+        if (!string.IsNullOrEmpty(value) && Enum.TryParse(value, ignoreCase: true, out VideoResizeMode mode) && Enum.IsDefined(mode))
+        {
+            return mode;
+        }
+
+        return fallback;
+    }
+
+    private static int ParseRotationDegrees(int? value, int fallback)
+    {
+        return value is 0 or 90 or 180 or 270 ? value.Value : fallback;
+    }
+
     public string PresetKey { get; set; } = string.Empty;
     public string PresetName { get; set; } = "?";
     public bool AllowPerMediaConfiguration { get; set; } = true;
@@ -156,17 +177,16 @@ internal class PlayerSettingsModel
     public string VideoRenderer { get; set; } = PlaybackComponents.AUTO;
     public string AudioRenderer { get; set; } = PlaybackComponents.AUTO;
     public bool VideoPreferHardwareDecoding { get; set; } = true;
+    public VideoResizeMode VideoResizeMode { get; set; } = VideoResizeMode.Fit;
+    public int VideoRotationDegrees { get; set; } = 0;
+    public bool VideoFlipHorizontal { get; set; }
+    public bool VideoFlipVertical { get; set; }
 
     private PlayerSettingsModel() { }
 
     public PlayerSettingsModel Clone()
     {
         return (PlayerSettingsModel)MemberwiseClone();
-    }
-
-    public PlaybackComponents ToComponents()
-    {
-        return new(VideoDecoder, AudioDecoder, VideoRenderer, AudioRenderer, VideoPreferHardwareDecoding);
     }
 
     public JsonModel ToJsonModel()
@@ -180,7 +200,28 @@ internal class PlayerSettingsModel
             VideoRenderer = VideoRenderer,
             AudioRenderer = AudioRenderer,
             VideoPreferHardwareDecoding = VideoPreferHardwareDecoding,
+            VideoResizeMode = VideoResizeMode.ToString(),
+            VideoRotationDegrees = VideoRotationDegrees,
+            VideoFlipHorizontal = VideoFlipHorizontal,
+            VideoFlipVertical = VideoFlipVertical,
         };
+    }
+
+    public PlaybackComponents ToComponents()
+    {
+        return new(VideoDecoder, AudioDecoder, VideoRenderer, AudioRenderer, VideoPreferHardwareDecoding);
+    }
+
+    public VideoTransform ToVideoTransform()
+    {
+        int quarterTurns = (int)Math.Round(VideoRotationDegrees / 90.0);
+
+        return new VideoTransform(
+            VideoOrientation.FromDegrees(quarterTurns * 90, VideoFlipHorizontal, VideoFlipVertical),
+            VideoResizeMode,
+            1.0,
+            0.0,
+            0.0);
     }
 
     public void SaveToMedia(MediaModel media)
@@ -216,7 +257,7 @@ internal class PlayerSettingsModel
         CoroutineUtils.Run(media.FlushExt);
     }
 
-    public static T? NullOutMatchingFields<T>(T? first, T? second) where T : class
+    private static T? NullOutMatchingFields<T>(T? first, T? second) where T : class
     {
         bool Diff(JsonNode? first, JsonNode? second)
         {
@@ -320,5 +361,17 @@ internal class PlayerSettingsModel
 
         [JsonPropertyName("VideoPreferHardwareDecoding")]
         public bool? VideoPreferHardwareDecoding { get; set; }
+
+        [JsonPropertyName("VideoResizeMode")]
+        public string? VideoResizeMode { get; set; }
+
+        [JsonPropertyName("VideoRotationDegrees")]
+        public int? VideoRotationDegrees { get; set; }
+
+        [JsonPropertyName("VideoFlipHorizontal")]
+        public bool? VideoFlipHorizontal { get; set; }
+
+        [JsonPropertyName("VideoFlipVertical")]
+        public bool? VideoFlipVertical { get; set; }
     }
 }

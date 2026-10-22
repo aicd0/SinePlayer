@@ -84,6 +84,13 @@ public enum VideoResizeMode
 
     /// <summary>The surface filled outright, whatever that does to the picture's shape.</summary>
     Stretch,
+
+    /// <summary>
+    /// One source pixel per surface pixel, centred: the picture is neither enlarged nor shrunk, and whatever runs
+    /// past the surface is cropped. The surface is measured in physical pixels, so the host's display scale does
+    /// not change what "one pixel" means.
+    /// </summary>
+    OriginalSize,
 }
 
 /// <summary>
@@ -133,6 +140,7 @@ public readonly record struct VideoTransform(
         {
             VideoResizeMode.Fill => (pictureWidth * Math.Max(scaleX, scaleY), pictureHeight * Math.Max(scaleX, scaleY)),
             VideoResizeMode.Stretch => (surfaceWidth, surfaceHeight),
+            VideoResizeMode.OriginalSize => (pictureWidth, pictureHeight),
             _ => (pictureWidth * Math.Min(scaleX, scaleY), pictureHeight * Math.Min(scaleX, scaleY)),
         };
 

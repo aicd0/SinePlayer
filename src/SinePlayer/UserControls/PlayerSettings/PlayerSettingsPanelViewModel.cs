@@ -70,6 +70,50 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _videoStretchModeLabel = string.Empty;
+    public string VideoStretchModeLabel
+    {
+        get => _videoStretchModeLabel;
+        set
+        {
+            _videoStretchModeLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VideoStretchModeLabel)));
+        }
+    }
+
+    private string _videoRotationLabel = string.Empty;
+    public string VideoRotationLabel
+    {
+        get => _videoRotationLabel;
+        set
+        {
+            _videoRotationLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VideoRotationLabel)));
+        }
+    }
+
+    private string _videoFlipHorizontalLabel = string.Empty;
+    public string VideoFlipHorizontalLabel
+    {
+        get => _videoFlipHorizontalLabel;
+        set
+        {
+            _videoFlipHorizontalLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VideoFlipHorizontalLabel)));
+        }
+    }
+
+    private string _videoFlipVerticalLabel = string.Empty;
+    public string VideoFlipVerticalLabel
+    {
+        get => _videoFlipVerticalLabel;
+        set
+        {
+            _videoFlipVerticalLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VideoFlipVerticalLabel)));
+        }
+    }
+
     private string _audioDecoderLabel = string.Empty;
     public string AudioDecoderLabel
     {

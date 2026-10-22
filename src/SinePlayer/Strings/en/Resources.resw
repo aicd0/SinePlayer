@@ -534,6 +534,9 @@ The expression will be evaluated in the following order:
   <data name="FileOperations" xml:space="preserve">
     <value>File operations</value>
   </data>
+  <data name="Fill" xml:space="preserve">
+    <value>Fill</value>
+  </data>
   <data name="FilterPresets" xml:space="preserve">
     <value>Filter presets</value>
   </data>
@@ -546,8 +549,17 @@ The expression will be evaluated in the following order:
   <data name="FinishPercentage" xml:space="preserve">
     <value>$percentage% Completed</value>
   </data>
+  <data name="Fit" xml:space="preserve">
+    <value>Fit</value>
+  </data>
+  <data name="FlipHorizontally" xml:space="preserve">
+    <value>Flip horizontally</value>
+  </data>
   <data name="FlipImage" xml:space="preserve">
     <value>Flip</value>
+  </data>
+  <data name="FlipVertically" xml:space="preserve">
+    <value>Flip vertically</value>
   </data>
   <data name="Folders" xml:space="preserve">
     <value>Folders</value>
@@ -829,6 +841,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="OpenUserDataFolder" xml:space="preserve">
     <value>Open user data folder</value>
   </data>
+  <data name="OriginalSize" xml:space="preserve">
+    <value>Original size</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>This operation will overwrite existing entries.</value>
   </data>
@@ -1019,6 +1034,9 @@ Start in Safe Mode?</value>
   <data name="SaveViewSettings" xml:space="preserve">
     <value>Save view settings</value>
   </data>
+  <data name="Scaling" xml:space="preserve">
+    <value>Scaling</value>
+  </data>
   <data name="ScanOnLaunch" xml:space="preserve">
     <value>Scan on launch</value>
   </data>
@@ -1096,6 +1114,9 @@ Start in Safe Mode?</value>
   </data>
   <data name="Statistics" xml:space="preserve">
     <value>Statistics</value>
+  </data>
+  <data name="Stretch" xml:space="preserve">
+    <value>Stretch</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>Tag</value>

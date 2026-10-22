@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -14,6 +15,7 @@ using SinePlayer.Common.Localization;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
@@ -159,6 +161,44 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         UpdateUI();
     }
 
+    private void VideoFlipHorizontalToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool flip = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.VideoFlipHorizontal == flip)
+        {
+            return;
+        }
+
+        _mediaSettings.VideoFlipHorizontal = flip;
+        SaveSettings();
+        DispatchDataChangeEvent();
+        UpdateUI();
+    }
+
+    private void VideoFlipVerticalToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool flip = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.VideoFlipVertical == flip)
+        {
+            return;
+        }
+
+        _mediaSettings.VideoFlipVertical = flip;
+        SaveSettings();
+        DispatchDataChangeEvent();
+        UpdateUI();
+    }
+
     private void LoadSettings()
     {
         if (_media is null)
@@ -240,6 +280,34 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 ViewModel.VideoPreferHardwareDecodingLabel = GetLabel(StringResource.PreferHardwareDecoding, modified);
             }
 
+            {
+                bool modified = settings.VideoResizeMode != presetSettings.VideoResizeMode;
+                tabModified = tabModified || modified;
+                UpdateVideoStretchMode(settings);
+                ViewModel.VideoStretchModeLabel = GetLabel(StringResource.Scaling, modified);
+            }
+
+            {
+                bool modified = settings.VideoRotationDegrees != presetSettings.VideoRotationDegrees;
+                tabModified = tabModified || modified;
+                UpdateVideoRotation(settings);
+                ViewModel.VideoRotationLabel = GetLabel(StringResource.Rotation, modified);
+            }
+
+            {
+                bool modified = settings.VideoFlipHorizontal != presetSettings.VideoFlipHorizontal;
+                tabModified = tabModified || modified;
+                UpdateVideoFlipHorizontal(settings);
+                ViewModel.VideoFlipHorizontalLabel = GetLabel(StringResource.FlipHorizontally, modified);
+            }
+
+            {
+                bool modified = settings.VideoFlipVertical != presetSettings.VideoFlipVertical;
+                tabModified = tabModified || modified;
+                UpdateVideoFlipVertical(settings);
+                ViewModel.VideoFlipVerticalLabel = GetLabel(StringResource.FlipVertically, modified);
+            }
+
             settingsModified = settingsModified || tabModified;
             ViewModel.VideoTabTitle = GetLabel(StringResource.Video, tabModified);
         }
@@ -293,6 +361,76 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoPreferHardwareDecoding(PlayerSettingsModel settings)
     {
         VideoPreferHardwareDecodingToggleSwitch.IsOn = settings.VideoPreferHardwareDecoding;
+    }
+
+    private void UpdateVideoStretchMode(PlayerSettingsModel settings)
+    {
+        List<PlaybackComponentOption> options = GetStretchModeOptions();
+        PlaybackComponentOption choice = EnsureChoice(options, settings.VideoResizeMode.ToString());
+        VideoStretchModeDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            VideoResizeMode mode = Enum.Parse<VideoResizeMode>(key);
+            if (settings.VideoResizeMode == mode)
+            {
+                return;
+            }
+
+            settings.VideoResizeMode = mode;
+            SaveSettings();
+            DispatchDataChangeEvent();
+        });
+        VideoStretchModeDropDownButton.Content = choice.Label;
+    }
+
+    private void UpdateVideoRotation(PlayerSettingsModel settings)
+    {
+        List<PlaybackComponentOption> options = GetRotationOptions();
+        PlaybackComponentOption choice = EnsureChoice(options, settings.VideoRotationDegrees.ToString(CultureInfo.InvariantCulture));
+        VideoRotationDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            int degrees = int.Parse(key, CultureInfo.InvariantCulture);
+            if (settings.VideoRotationDegrees == degrees)
+            {
+                return;
+            }
+
+            settings.VideoRotationDegrees = degrees;
+            SaveSettings();
+            DispatchDataChangeEvent();
+        });
+        VideoRotationDropDownButton.Content = choice.Label;
+    }
+
+    private void UpdateVideoFlipHorizontal(PlayerSettingsModel settings)
+    {
+        VideoFlipHorizontalToggleSwitch.IsOn = settings.VideoFlipHorizontal;
+    }
+
+    private void UpdateVideoFlipVertical(PlayerSettingsModel settings)
+    {
+        VideoFlipVerticalToggleSwitch.IsOn = settings.VideoFlipVertical;
+    }
+
+    private static List<PlaybackComponentOption> GetStretchModeOptions()
+    {
+        return
+        [
+            new(nameof(VideoResizeMode.Fit), StringResourceProvider.Instance.Fit),
+            new(nameof(VideoResizeMode.Stretch), StringResourceProvider.Instance.Stretch),
+            new(nameof(VideoResizeMode.Fill), StringResourceProvider.Instance.Fill),
+            new(nameof(VideoResizeMode.OriginalSize), StringResourceProvider.Instance.OriginalSize),
+        ];
+    }
+
+    private static List<PlaybackComponentOption> GetRotationOptions()
+    {
+        return
+        [
+            new("0", StringResourceProvider.Instance.None),
+            new("90", "90°"),
+            new("180", "180°"),
+            new("270", "270°"),
+        ];
     }
 
     private void UpdateAudioDecoder(PlayerSettingsModel settings)

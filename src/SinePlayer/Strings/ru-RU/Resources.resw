@@ -534,6 +534,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="FileOperations" xml:space="preserve">
     <value>Операции с файлами</value>
   </data>
+  <data name="Fill" xml:space="preserve">
+    <value>Заполнить</value>
+  </data>
   <data name="FilterPresets" xml:space="preserve">
     <value>Предустановки фильтров</value>
   </data>
@@ -546,8 +549,17 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="FinishPercentage" xml:space="preserve">
     <value>$percentage% Завершено</value>
   </data>
+  <data name="Fit" xml:space="preserve">
+    <value>Вписать</value>
+  </data>
+  <data name="FlipHorizontally" xml:space="preserve">
+    <value>Отразить по горизонтали</value>
+  </data>
   <data name="FlipImage" xml:space="preserve">
     <value>Отразить</value>
+  </data>
+  <data name="FlipVertically" xml:space="preserve">
+    <value>Отразить по вертикали</value>
   </data>
   <data name="Folders" xml:space="preserve">
     <value>Папки</value>
@@ -829,6 +841,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="OpenUserDataFolder" xml:space="preserve">
     <value>Открыть папку с данными пользователя</value>
   </data>
+  <data name="OriginalSize" xml:space="preserve">
+    <value>Исходный размер</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Эта операция перезапишет существующие записи.</value>
   </data>
@@ -1019,6 +1034,9 @@ $plugins</value>
   <data name="SaveViewSettings" xml:space="preserve">
     <value>Сохранить настройки отображения</value>
   </data>
+  <data name="Scaling" xml:space="preserve">
+    <value>Масштабирование</value>
+  </data>
   <data name="ScanOnLaunch" xml:space="preserve">
     <value>Сканировать при запуске</value>
   </data>
@@ -1096,6 +1114,9 @@ $plugins</value>
   </data>
   <data name="Statistics" xml:space="preserve">
     <value>Статистика</value>
+  </data>
+  <data name="Stretch" xml:space="preserve">
+    <value>Растянуть</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>Ярлык</value>
