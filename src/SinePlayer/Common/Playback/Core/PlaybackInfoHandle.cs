@@ -6,9 +6,9 @@ using System;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Pipeline;
 
-namespace SinePlayer.Common.Playback.CoreEngine;
+namespace SinePlayer.Common.Playback.Core;
 
-internal sealed class PlaybackInfoHandle : IPlaybackInfoProvider
+internal sealed class PlaybackInfoHandle
 {
     private volatile PlaybackPipeline? _pipeline;
 

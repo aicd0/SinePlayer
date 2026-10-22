@@ -408,7 +408,7 @@ internal sealed partial class PlaybackLabPage : BasePage
                     IAudioRendererFactory device = WasapiAudioRendererFactory.For(endpoint);
                     allAudioRenderers.Add(device);
                     audioRenderers.Add(new ComponentChoice(
-                        endpoint.IsDefault ? $"{endpoint.Name} (default)" : endpoint.Name,
+                        endpoint.IsDefault ? $"WASAPI [{endpoint.Name}] (default)" : $"WASAPI {endpoint.Name}",
                         [device]));
                 }
             }

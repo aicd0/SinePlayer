@@ -42,7 +42,7 @@ public sealed partial class FFmpegAudioDecoder : IAudioDecoder
         _outputFormat = stream.SampleFormat;
     }
 
-    public string Name => _decoderName;
+    public string Name => $"FFmpeg {_decoderName}";
 
     public MediaStreamInfo Stream => _stream;
 

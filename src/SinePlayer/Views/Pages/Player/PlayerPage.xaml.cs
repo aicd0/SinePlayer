@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Input;
@@ -16,13 +17,18 @@ using Microsoft.UI.Xaml.Input;
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Constants;
+using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.HotKey;
+using SinePlayer.Common.Misc;
+using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
+using SinePlayer.Data.Tables;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
 using SinePlayer.Helpers.Misc;
 using SinePlayer.Helpers.Navigation;
@@ -34,32 +40,32 @@ namespace SinePlayer.Views.Pages.Player;
 
 internal sealed partial class PlayerPage : BasePage
 {
+    #region Constructor
+
     private const long SEEK_STEP_MS = 5000;
     private const int VOLUME_STEP = 5;
     private const int SINGLE_TAP_DELAY_MS = 100;
     private const int HIDE_OVERLAY_DELAY_MS = 0;
+    private const long ALMOST_ENDED_THRESHOLD_MS = 5000;
 
-    // Can only be accessed by UI thread
+    // Can only be accessed on UI thread
     public static IReadOnlyList<Tuple<int, string>> ActiveTabs { get; private set; } = [];
 
     private readonly PlayerPageViewModel ViewModel = new();
 
     private PlayerNavigationBar? _navigationBar = null;
 
-    //
-    // Constructor
-    //
-
     public PlayerPage()
     {
         InitializeComponent();
-
         _gestureRecognizer.Tapped += GestureRecognizer_Tapped;
     }
 
-    //
-    // Lifecycle
-    //
+    #endregion
+
+    #region Lifecycle
+
+    private bool _restoredFromLastSession;
 
     protected override void OnStart(PageBundle bundle)
     {
@@ -70,7 +76,7 @@ internal sealed partial class PlayerPage : BasePage
         InitializeTransportBar();
         InitializePinState();
 
-        ViewModel.Initialize(PageActionHandler);
+        ViewModel.Initialize(PageActionHandler, OpenMedia);
         ObserveData();
         UpdateKeyboardAccelerators();
 
@@ -84,13 +90,15 @@ internal sealed partial class PlayerPage : BasePage
             long.TryParse(positionString, CultureInfo.InvariantCulture, out initialPositionMs);
         }
 
+        _restoredFromLastSession = restored;
+
         VideoHost.Children.Clear();
-        VideoHost.Children.Add(ViewModel.GetVideoSurface());
+        VideoHost.Children.Add(EnsureEngine().CreateVideoSurface());
 
         CoroutineUtils.Run(async () =>
         {
             PlayQueueModel playQueue = await GetPlayQueue(playQueueId);
-            ViewModel.LoadPlayQueue(playQueue, serializedPlayback, initialPositionMs, restored);
+            ViewModel.LoadPlayQueue(playQueue, serializedPlayback, initialPositionMs);
         });
     }
 
@@ -99,7 +107,7 @@ internal sealed partial class PlayerPage : BasePage
         base.OnResume();
         AddToActiveTabs();
         UpdateOverlayState();
-        ViewModel.SetPageActive(true);
+        UpdatePageState();
         SyncCurrentMedia();
         FocusPlayer();
     }
@@ -107,14 +115,17 @@ internal sealed partial class PlayerPage : BasePage
     protected override void OnPause()
     {
         base.OnPause();
-        ViewModel.Pause();
-        ViewModel.SetPageActive(false);
+        UpdatePageState();
     }
 
     protected override void OnStop()
     {
         base.OnStop();
+
+        ViewModel.SavePosition();
+        DisposeEngine();
         ViewModel.Destory();
+
         _navigationBar = null;
         GetMainPageAbility().SetCustomCenteredNavigationBar(null);
         RemoveFromActiveTabs();
@@ -124,24 +135,25 @@ internal sealed partial class PlayerPage : BasePage
     {
         var bar = new PlayerNavigationBar();
         bar.Initialize(GetMainWindowAbility());
-        bar.FavoriteChanged += isFavorite => ViewModel.SetIsFavorite(isFavorite, true);
+        bar.FavoriteChanged += isFavorite => ViewModel.SetFavorite(isFavorite, true);
         bar.MediaInfoRequested += OpenMediaInfoPane;
         bar.PlaybackInfoRequested += ShowPlaybackInfo;
+        bar.PlayerSettingsChanged += ApplyPlayerSettings;
         GetMainPageAbility().SetCustomCenteredNavigationBar(bar);
         _navigationBar = bar;
     }
 
     private void InitializeTransportBar()
     {
-        TransportBar.PlayPauseRequested += ViewModel.TogglePlayPause;
+        TransportBar.PlayPauseRequested += TogglePlayPause;
         TransportBar.PreviousRequested += ViewModel.Previous;
         TransportBar.NextRequested += ViewModel.Next;
         TransportBar.PlayQueueRequested += OpenPlayQueuePane;
         TransportBar.RepeatRequested += ViewModel.CycleRepeatMode;
         TransportBar.ShuffleRequested += ViewModel.ToggleShuffle;
-        TransportBar.SeekRequested += ViewModel.SeekTo;
-        TransportBar.VolumeChanged += ViewModel.SetVolume;
-        TransportBar.MuteChanged += ViewModel.SetMuted;
+        TransportBar.SeekRequested += SeekTo;
+        TransportBar.VolumeChanged += SetVolume;
+        TransportBar.MuteChanged += SetMuted;
         TransportBar.PinRequested += TogglePin;
         TransportBar.FullscreenRequested += ToggleFullscreen;
         TransportBar.SizeChanged += TransportBar_SizeChanged;
@@ -157,9 +169,22 @@ internal sealed partial class PlayerPage : BasePage
 
     private void ObserveData()
     {
-        AppSettingsModel.KeepScreenOnBehaviorChangedLiveData.Observe(this, _ => ViewModel.RefreshKeepScreenOn());
+        GlobalEvent.Instance.FavoriteUpdated.Observe(this, _ => ViewModel.UpdateFavoriteStatus());
+
+        GlobalEvent.Instance.MediaUpdated.Observe(this, ids =>
+        {
+            MediaModel? media = ViewModel.Media;
+            if (media is null || !ids.Contains(media.Id))
+            {
+                return;
+            }
+
+            ViewModel.UpdateMediaMetadata();
+        });
 
         KeyboardShortcutManager.ShortcutsChangedLiveData.Observe(this, _ => UpdateKeyboardAccelerators());
+
+        AppSettingsModel.KeepScreenOnBehaviorChangedLiveData.Observe(this, _ => UpdateKeepScreenOn());
 
         GetWindowEventBus().With<double>(EventId.TopOverlayHeight).ObserveSticky(this, h =>
         {
@@ -344,9 +369,9 @@ internal sealed partial class PlayerPage : BasePage
         return playQueue;
     }
 
-    //
-    // Events
-    //
+    #endregion
+
+    #region Common events
 
     private void VideoHost_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
     {
@@ -393,9 +418,175 @@ internal sealed partial class PlayerPage : BasePage
         }
     }
 
-    //
-    // Gesture
-    //
+    #endregion
+
+    #region Engine
+
+    private CoreEngine? _engine;
+    private PlaybackComponents _components = PlaybackComponents.Default;
+    private long _pendingStartPositionMs = -1;
+
+    private CoreEngine EnsureEngine()
+    {
+        if (_engine is not null)
+        {
+            return _engine;
+        }
+
+        CoreEngine engine = new();
+        engine.SetVolume(Math.Clamp(AppSettingsModel.PlayerVolume, 0.0, 1.0));
+        engine.SetMuted(AppSettingsModel.PlayerMuted);
+        engine.StateChanged += Engine_StateChanged;
+        engine.PositionChanged += Engine_PositionChanged;
+        engine.MediaOpened += Engine_MediaOpened;
+        engine.MediaEnded += Engine_MediaEnded;
+        engine.ErrorOccurred += Engine_ErrorOccurred;
+        _engine = engine;
+        ViewModel.VolumeLiveData.Emit((int)Math.Round(engine.Volume * 100.0));
+        ViewModel.MuteLiveData.Emit(engine.IsMuted);
+        return engine;
+    }
+
+    private void DisposeEngine()
+    {
+        CoreEngine? engine = _engine;
+        _engine = null;
+        if (engine is null)
+        {
+            return;
+        }
+
+        engine.StateChanged -= Engine_StateChanged;
+        engine.PositionChanged -= Engine_PositionChanged;
+        engine.MediaOpened -= Engine_MediaOpened;
+        engine.MediaEnded -= Engine_MediaEnded;
+        engine.ErrorOccurred -= Engine_ErrorOccurred;
+        engine.Dispose();
+    }
+
+    private void Engine_StateChanged(MediaEngineState state)
+    {
+        ViewModel.IsPlayingLiveData.Emit(state == MediaEngineState.Playing);
+
+        switch (state)
+        {
+            case MediaEngineState.Playing:
+                ViewModel.IsPlaying = true;
+                break;
+            case MediaEngineState.None:
+            case MediaEngineState.Paused:
+            case MediaEngineState.Ended:
+            case MediaEngineState.Error:
+                ViewModel.IsPlaying = false;
+                break;
+            default:
+                break;
+        }
+
+        UpdateKeepScreenOn();
+    }
+
+    private void Engine_PositionChanged()
+    {
+        CoreEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        ViewModel.SetPosition(
+            engine.Position.Ticks / TimeSpan.TicksPerMillisecond,
+            engine.Duration.Ticks / TimeSpan.TicksPerMillisecond);
+    }
+
+    private void Engine_MediaOpened()
+    {
+        CoreEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        ViewModel.SetDuration(engine.Duration.Ticks / TimeSpan.TicksPerMillisecond);
+
+        long startPositionMs = _pendingStartPositionMs;
+        _pendingStartPositionMs = -1;
+        if (startPositionMs > 0)
+        {
+            engine.Seek(TimeSpan.FromMilliseconds(startPositionMs));
+        }
+
+        ViewModel.PositionLiveData.Emit(startPositionMs > 0 ? startPositionMs : 0);
+        ViewModel.PlayerStatusLiveData.Emit(new() { Status = PlayerPageViewModel.PlayerStatusEnum.Working });
+
+        bool restoredFromLastSession = _restoredFromLastSession;
+        _restoredFromLastSession = false;
+
+        if (AppSettingsModel.AutoPlayOnOpen && !(restoredFromLastSession && AppSettingsModel.AutoPlayOnOpenExceptAppLaunch))
+        {
+            if (IsResumed)
+            {
+                engine.Play();
+            }
+            else
+            {
+                _playbackPendingOnActivate = true;
+            }
+        }
+    }
+
+    private void Engine_MediaEnded()
+    {
+        ViewModel.CompleteMedia();
+
+        if (ViewModel.Playback.RepeatMode == RepeatMode.One)
+        {
+            _engine?.Play();
+            return;
+        }
+
+        if (AppSettingsModel.AutoPlayNext)
+        {
+            ViewModel.Next();
+        }
+    }
+
+    private void Engine_ErrorOccurred(string message)
+    {
+        ViewModel.PlayerStatusLiveData.Emit(new()
+        {
+            Status = PlayerPageViewModel.PlayerStatusEnum.Error,
+            Description = message,
+        });
+    }
+
+    /// <summary>
+    /// Opens a file through the engine the page owns. Which file, and where in it to start, are the view model's
+    /// decision; this is the engine half: let go of what is open, be told what to play through, open the file.
+    /// </summary>
+    private async Task<ErrorResult> OpenMedia(MediaModel media, long startPositionMs)
+    {
+        CoreEngine engine = EnsureEngine();
+
+        // Where the file that is about to be replaced was left: the view model keeps that mark, and it still knows
+        // the previous media is the one playing.
+        ViewModel.SavePosition();
+
+        _pendingStartPositionMs = startPositionMs;
+
+        // What the media was last played through, which is what its settings were saved with.
+        _components = PlayerSettingsModel.LoadFromMedia(media).ToComponents();
+
+        // Components are only read when the file is opened, so the engine lets go of what it has before it is
+        // told what to use, and then opens the new file with it.
+        await engine.Stop();
+        engine.SetComponents(_components);
+        return await engine.Load(media.Location);
+    }
+
+    #endregion
+
+    #region Gesture
 
     private readonly PlayerGestureRecognizer _gestureRecognizer = new();
     private bool _tapPending = false;
@@ -452,7 +643,7 @@ internal sealed partial class PlayerPage : BasePage
         else if (e.TapCount == 2)
         {
             _tapCancelled = true;
-            ViewModel.TogglePlayPause();
+            TogglePlayPause();
         }
     }
 
@@ -468,9 +659,9 @@ internal sealed partial class PlayerPage : BasePage
         UpdateOverlayState();
     }
 
-    //
-    // Overlay
-    //
+    #endregion
+
+    #region Overlay
 
     private bool _shouldOverlayVisible = false;
     private bool _isPointerInsideRootElement = true;
@@ -614,9 +805,165 @@ internal sealed partial class PlayerPage : BasePage
         }
     }
 
-    //
-    // Misc
-    //
+    #endregion
+
+    #region Playback control
+
+    private void TogglePlayPause()
+    {
+        CoreEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        if (engine.State == MediaEngineState.Playing)
+        {
+            engine.Pause();
+        }
+        else
+        {
+            engine.Play();
+        }
+    }
+
+    private void SeekBy(long deltaMs)
+    {
+        CoreEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        long positionMs = engine.Position.Ticks / TimeSpan.TicksPerMillisecond;
+        SeekTo(Math.Max(positionMs + deltaMs, 0));
+    }
+
+    private void SeekTo(long positionMs)
+    {
+        _engine?.Seek(TimeSpan.FromMilliseconds(positionMs));
+    }
+
+    private void SetVolume(int volume)
+    {
+        CoreEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        int clampedVolume = Math.Clamp(volume, 0, 100);
+        engine.SetVolume(clampedVolume / 100.0);
+        ViewModel.SetVolume(clampedVolume);
+    }
+
+    private void AdjustVolume(int delta)
+    {
+        SetVolume(ViewModel.VolumeLiveData.Value + delta);
+    }
+
+    private void SetMuted(bool isMuted)
+    {
+        CoreEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        engine.SetMuted(isMuted);
+        ViewModel.SetMute(isMuted);
+    }
+
+    private void ApplyPlayerSettings(PlayerSettingsModel settings)
+    {
+        PlaybackComponents components = settings.ToComponents();
+        if (components == _components)
+        {
+            return;
+        }
+
+        _components = components;
+
+        // A file that is being opened reads the choice as it opens, so the engine is told only once it is not
+        // mid-open.
+        if (ViewModel.IsLoading)
+        {
+            return;
+        }
+
+        // A component change is not a reason to open the file again: the pipeline swaps the chains the choice
+        // affects and keeps playing where it was, as the playback lab does.
+        _engine?.SetComponents(components);
+    }
+
+    #endregion
+
+    #region Page state
+
+    private bool _isKeepScreenOnActive;
+    private bool _playbackPendingOnActivate;
+
+    private void UpdatePageState()
+    {
+        UpdateKeepScreenOn();
+
+        if (!IsResumed)
+        {
+            if (AppSettingsModel.PauseOnLeaveTab)
+            {
+                _engine?.Pause();
+            }
+
+            ViewModel.SavePosition();
+        }
+
+        if (IsResumed && _playbackPendingOnActivate)
+        {
+            _playbackPendingOnActivate = false;
+            _engine?.Play();
+        }
+    }
+
+    private void UpdateKeepScreenOn()
+    {
+        bool shouldKeepScreenOn = IsResumed && ShouldKeepScreenOn();
+        if (_isKeepScreenOnActive == shouldKeepScreenOn)
+        {
+            return;
+        }
+
+        _isKeepScreenOnActive = shouldKeepScreenOn;
+        if (shouldKeepScreenOn)
+        {
+            DisplayRequestManager.IncrememtKeepScreenOn();
+        }
+        else
+        {
+            DisplayRequestManager.DecrememtKeepScreenOn();
+        }
+    }
+
+    private bool ShouldKeepScreenOn()
+    {
+        MediaModel? media = ViewModel.Media;
+        return AppSettingsModel.KeepScreenOnBehavior switch
+        {
+            AppSettingsModel.KeepScreenOnBehaviorEnum.Never => false,
+            AppSettingsModel.KeepScreenOnBehaviorEnum.Always => true,
+            AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlaying => _engine?.State == MediaEngineState.Playing,
+            AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos => _engine?.State == MediaEngineState.Playing && media is not null && media.Type == MediaType.Video,
+            _ => false,
+        };
+    }
+
+    #endregion
+
+    #region Misc
+
+    private void FocusPlayer()
+    {
+        Focus(FocusState.Programmatic);
+    }
 
     private void TogglePin()
     {
@@ -651,7 +998,7 @@ internal sealed partial class PlayerPage : BasePage
             Media = ViewModel.Media,
             PlayQueue = ViewModel.PlayQueue,
             ImageDescriptions = [],
-            PlaybackInfoProvider = ViewModel.GetPlaybackInfo(),
+            PlaybackInfo = _engine?.PlaybackInfo,
         });
     }
 
@@ -680,23 +1027,18 @@ internal sealed partial class PlayerPage : BasePage
 
         KeyboardAccelerators.Clear();
 
-        AddKeyboardAccelerators(KeyboardShortcutActions.PlayPause, (_, _) => ViewModel.TogglePlayPause());
-        AddKeyboardAccelerators(KeyboardShortcutActions.SeekBackward, (_, _) => ViewModel.SeekBy(-SEEK_STEP_MS));
-        AddKeyboardAccelerators(KeyboardShortcutActions.SeekForward, (_, _) => ViewModel.SeekBy(SEEK_STEP_MS));
-        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeDown, (_, _) => ViewModel.AdjustVolume(-VOLUME_STEP));
-        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeUp, (_, _) => ViewModel.AdjustVolume(VOLUME_STEP));
+        AddKeyboardAccelerators(KeyboardShortcutActions.PlayPause, (_, _) => TogglePlayPause());
+        AddKeyboardAccelerators(KeyboardShortcutActions.SeekBackward, (_, _) => SeekBy(-SEEK_STEP_MS));
+        AddKeyboardAccelerators(KeyboardShortcutActions.SeekForward, (_, _) => SeekBy(SEEK_STEP_MS));
+        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeDown, (_, _) => AdjustVolume(-VOLUME_STEP));
+        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeUp, (_, _) => AdjustVolume(VOLUME_STEP));
         AddKeyboardAccelerators(KeyboardShortcutActions.OpenNextItem, (_, _) => ViewModel.Next());
         AddKeyboardAccelerators(KeyboardShortcutActions.OpenPreviousItem, (_, _) => ViewModel.Previous());
     }
 
-    //
-    // Utilities
-    //
+    #endregion
 
-    private void FocusPlayer()
-    {
-        Focus(FocusState.Programmatic);
-    }
+    #region Utilities
 
     private IMainPageAbilityForTab GetMainPageAbility()
     {
@@ -763,4 +1105,6 @@ internal sealed partial class PlayerPage : BasePage
 
         ActiveTabs = copy;
     }
+
+    #endregion
 }

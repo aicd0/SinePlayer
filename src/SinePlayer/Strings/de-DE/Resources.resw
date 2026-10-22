@@ -886,6 +886,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Position" xml:space="preserve">
     <value>Position</value>
   </data>
+  <data name="PreferHardwareDecoding" xml:space="preserve">
+    <value>Hardwaredekodierung bevorzugen</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>Ausgegebene Frames</value>
   </data>
@@ -1140,6 +1143,9 @@ Kategorie 2: Tag 4, Tag 5</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Doppelseitenmodus</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Nicht verfügbar</value>
   </data>
   <data name="Unfavorite" xml:space="preserve">
     <value>Aus Favoriten entfernen</value>

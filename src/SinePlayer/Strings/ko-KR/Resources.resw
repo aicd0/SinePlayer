@@ -886,6 +886,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="Position" xml:space="preserve">
     <value>재생 위치</value>
   </data>
+  <data name="PreferHardwareDecoding" xml:space="preserve">
+    <value>하드웨어 디코딩 우선</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>표시된 프레임 수</value>
   </data>
@@ -1140,6 +1143,9 @@ $plugins</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>양면 모드</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>사용할 수 없음</value>
   </data>
   <data name="Unfavorite" xml:space="preserve">
     <value>즐겨찾기에서 제거</value>

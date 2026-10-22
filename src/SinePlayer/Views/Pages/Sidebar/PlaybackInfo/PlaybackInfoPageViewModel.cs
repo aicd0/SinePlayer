@@ -8,7 +8,7 @@ using System.Globalization;
 using System.Linq;
 
 using SinePlayer.Common.BaseUI;
-using SinePlayer.Common.Playback;
+using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Playback.Abstractions.Info;
 
 namespace SinePlayer.Views.Pages.Sidebar.PlaybackInfo;
@@ -37,7 +37,7 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
     public bool HasContent => !_isEmpty;
     public IReadOnlyList<PlaybackInfoRow> Rows { get; private set; } = [];
 
-    public void Update(IPlaybackInfoProvider? info)
+    public void Update(PlaybackInfoHandle? info)
     {
         if (info?.Media is not { } media)
         {

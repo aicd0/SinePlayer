@@ -3,7 +3,7 @@
 
 using System.Collections.Generic;
 
-using SinePlayer.Common.Playback;
+using SinePlayer.Common.Playback.Core;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 
@@ -14,5 +14,5 @@ internal class MediaChangedEventArgs
     public required MediaModel? Media { get; init; }
     public required PlayQueueModel PlayQueue { get; init; }
     public required IReadOnlyList<string> ImageDescriptions { get; init; }
-    public IPlaybackInfoProvider? PlaybackInfoProvider { get; init; }
+    public PlaybackInfoHandle? PlaybackInfo { get; init; }
 }

@@ -11,6 +11,7 @@ using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Constants;
 using SinePlayer.Common.Localization;
+using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Database;
@@ -32,6 +33,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private IMainWindowAbility? _windowAbility;
     private MediaModel? _media;
     private PlayerSettingsModel _mediaSettings = PlayerSettingsModel.FromDefault();
+    private PlayerSettingsModel? _presetSettings;
     private bool _updatingUI = false;
 
     public PlayerSettingsPanel()
@@ -138,6 +140,25 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         NotifySettingsChanged();
     }
 
+    private void VideoPreferHardwareDecodingToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool preferHardwareDecoding = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.VideoPreferHardwareDecoding == preferHardwareDecoding)
+        {
+            return;
+        }
+
+        _mediaSettings.VideoPreferHardwareDecoding = preferHardwareDecoding;
+        SaveSettings();
+        DispatchDataChangeEvent();
+        UpdateUI();
+    }
+
     private void LoadSettings()
     {
         if (_media is null)
@@ -146,6 +167,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         _mediaSettings = PlayerSettingsModel.LoadFromMedia(_media);
+        _presetSettings = PlayerSettingsModel.LoadFromPreset(_mediaSettings.PresetKey);
     }
 
     private void NotifySettingsChanged()
@@ -183,12 +205,189 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateUIInternal()
     {
-        ViewModel.VideoTabTitle = StringResource.Video;
-        ViewModel.AudioTabTitle = StringResource.Audio;
+        string GetLabel(string name, bool modified)
+        {
+            return modified ? name + " *" : name;
+        }
+
+        PlayerSettingsModel settings = _mediaSettings;
+        PlayerSettingsModel presetSettings = _presetSettings ?? settings;
+
+        bool settingsModified = false;
+
+        {
+            bool tabModified = false;
+
+            {
+                bool modified = settings.VideoDecoder != presetSettings.VideoDecoder;
+                tabModified = tabModified || modified;
+                UpdateVideoDecoder(settings);
+                ViewModel.VideoDecoderLabel = GetLabel(StringResource.Decoder, modified);
+            }
+
+            {
+                bool modified = settings.VideoRenderer != presetSettings.VideoRenderer;
+                tabModified = tabModified || modified;
+                UpdateVideoRenderer(settings);
+                ViewModel.VideoRendererLabel = GetLabel(StringResource.Renderer, modified);
+            }
+
+            {
+                bool modified = settings.VideoPreferHardwareDecoding != presetSettings.VideoPreferHardwareDecoding;
+                tabModified = tabModified || modified;
+                UpdateVideoPreferHardwareDecoding(settings);
+                ViewModel.VideoPreferHardwareDecodingLabel = GetLabel(StringResource.PreferHardwareDecoding, modified);
+            }
+
+            settingsModified = settingsModified || tabModified;
+            ViewModel.VideoTabTitle = GetLabel(StringResource.Video, tabModified);
+        }
+
+        {
+            bool tabModified = false;
+
+            {
+                bool modified = settings.AudioDecoder != presetSettings.AudioDecoder;
+                tabModified = tabModified || modified;
+                UpdateAudioDecoder(settings);
+                ViewModel.AudioDecoderLabel = GetLabel(StringResource.Decoder, modified);
+            }
+
+            {
+                bool modified = settings.AudioRenderer != presetSettings.AudioRenderer;
+                tabModified = tabModified || modified;
+                UpdateAudioRenderer(settings);
+                ViewModel.AudioRendererLabel = GetLabel(StringResource.Renderer, modified);
+            }
+
+            settingsModified = settingsModified || tabModified;
+            ViewModel.AudioTabTitle = GetLabel(StringResource.Audio, tabModified);
+        }
 
         PresetDropDownButton.Flyout = CreatePresetContextMenu(_mediaSettings);
-        PresetDropDownButton.Content = _mediaSettings.PresetKey == PlayerSettingsModel.PRESET_KEY_CUSTOM ?
-            StringResourceProvider.Instance.Custom : _mediaSettings.PresetName;
+        PresetDropDownButton.Content = GetLabel(
+            _mediaSettings.PresetKey == PlayerSettingsModel.PRESET_KEY_CUSTOM ?
+                StringResourceProvider.Instance.Custom : _mediaSettings.PresetName,
+            settingsModified);
+    }
+
+    private void UpdateVideoDecoder(PlayerSettingsModel settings)
+    {
+        List<PlaybackComponentOption> options = [.. PlaybackComponents.GetVideoDecoderOptions()];
+        PlaybackComponentOption choice = EnsureChoice(options, settings.VideoDecoder);
+        VideoDecoderDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            if (settings.VideoDecoder == key)
+            {
+                return;
+            }
+
+            settings.VideoDecoder = key;
+            SaveSettings();
+            DispatchDataChangeEvent();
+        });
+        VideoDecoderDropDownButton.Content = choice.Label;
+    }
+
+    private void UpdateVideoPreferHardwareDecoding(PlayerSettingsModel settings)
+    {
+        VideoPreferHardwareDecodingToggleSwitch.IsOn = settings.VideoPreferHardwareDecoding;
+    }
+
+    private void UpdateAudioDecoder(PlayerSettingsModel settings)
+    {
+        List<PlaybackComponentOption> options = [.. PlaybackComponents.GetAudioDecoderOptions()];
+        PlaybackComponentOption choice = EnsureChoice(options, settings.AudioDecoder);
+        AudioDecoderDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            if (settings.AudioDecoder == key)
+            {
+                return;
+            }
+
+            settings.AudioDecoder = key;
+            SaveSettings();
+            DispatchDataChangeEvent();
+        });
+        AudioDecoderDropDownButton.Content = choice.Label;
+    }
+
+    private void UpdateVideoRenderer(PlayerSettingsModel settings)
+    {
+        List<PlaybackComponentOption> options = [.. PlaybackComponents.GetVideoRendererOptions()];
+        PlaybackComponentOption choice = EnsureChoice(options, settings.VideoRenderer);
+        VideoRendererDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            if (settings.VideoRenderer == key)
+            {
+                return;
+            }
+
+            settings.VideoRenderer = key;
+            SaveSettings();
+            DispatchDataChangeEvent();
+        });
+        VideoRendererDropDownButton.Content = choice.Label;
+    }
+
+    private void UpdateAudioRenderer(PlayerSettingsModel settings)
+    {
+        List<PlaybackComponentOption> options = [.. PlaybackComponents.GetAudioRendererOptions()];
+        PlaybackComponentOption choice = EnsureChoice(options, settings.AudioRenderer);
+        AudioRendererDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            if (settings.AudioRenderer == key)
+            {
+                return;
+            }
+
+            settings.AudioRenderer = key;
+            SaveSettings();
+            DispatchDataChangeEvent();
+        });
+        AudioRendererDropDownButton.Content = choice.Label;
+    }
+
+    private MenuFlyout CreateChoiceMenu(IReadOnlyList<PlaybackComponentOption> options, string? selectedKey, Action<string> select)
+    {
+        List<BaseMenuFlyoutItemModel> items = [];
+        foreach (PlaybackComponentOption option in options)
+        {
+            string key = option.Key;
+            items.Add(new ToggleMenuFlyoutItemModel()
+            {
+                Text = option.Label,
+                IsChecked = selectedKey == key,
+                Click = () =>
+                {
+                    select(key);
+                    UpdateUI();
+                },
+            });
+        }
+
+        var flyout = new MenuFlyout();
+        foreach (BaseMenuFlyoutItemModel item in items)
+        {
+            flyout.Items.Add(item.CreateMenuFlyoutItem());
+        }
+
+        return flyout;
+    }
+
+    private static PlaybackComponentOption EnsureChoice(List<PlaybackComponentOption> options, string key)
+    {
+        foreach (PlaybackComponentOption option in options)
+        {
+            if (option.Key == key)
+            {
+                return option;
+            }
+        }
+
+        PlaybackComponentOption unavailable = new(key, $"{key} ({StringResourceProvider.Instance.Unavailable})");
+        options.Add(unavailable);
+        return unavailable;
     }
 
     private MenuFlyout CreatePresetContextMenu(PlayerSettingsModel mediaSettings)
@@ -220,18 +419,21 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                     var newSettings = PlayerSettingsModel.LoadFromPreset(presetKey);
                     if (newSettings is not null)
                     {
+                        _presetSettings = newSettings;
                         _mediaSettings = newSettings.Clone();
                         SaveSettings();
                         DispatchDataChangeEvent();
                     }
                     else if (presetKey == PlayerSettingsModel.PRESET_KEY_CUSTOM)
                     {
+                        _presetSettings = null;
                         _mediaSettings.PresetKey = presetKey;
                         SaveSettings();
                     }
                     else
                     {
                         newSettings = PlayerSettingsModel.FromDefault();
+                        _presetSettings = newSettings;
                         _mediaSettings = newSettings.Clone();
                         SaveSettings();
                         DispatchDataChangeEvent();

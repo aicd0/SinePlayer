@@ -884,6 +884,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="Position" xml:space="preserve">
     <value>播放位置</value>
   </data>
+  <data name="PreferHardwareDecoding" xml:space="preserve">
+    <value>優先使用硬體解碼</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>已顯示影格數</value>
   </data>
@@ -1138,6 +1141,9 @@ $plugins</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>雙頁模式</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>無法使用</value>
   </data>
   <data name="Unfavorite" xml:space="preserve">
     <value>取消收藏</value>

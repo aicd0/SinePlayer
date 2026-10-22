@@ -49,7 +49,7 @@ public class WasapiAudioRendererTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(renderer.Name, Is.EqualTo("wasapi"));
+            Assert.That(renderer.Name, Is.EqualTo("WASAPI"));
             Assert.That(renderer.QueuedSampleCount, Is.EqualTo(0));
             Assert.That(renderer.Clock.IsRunning, Is.False);
             Assert.That(renderer.Clock.Position, Is.EqualTo(TimeSpan.Zero));
@@ -102,6 +102,22 @@ public class WasapiAudioRendererTests
         }
 
         Assert.That(renderer.Flush().IsSuccessful, Is.True);
+    }
+
+    [Test]
+    public void NamesTheDeviceItPlaysThrough()
+    {
+        using WasapiAudioRenderer auto = new();
+        using WasapiAudioRenderer named = new("id", "Speakers");
+        using WasapiAudioRenderer namedDefault = new("id", "Speakers", true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            // The device is named the way a person picks it, and the default one says so.
+            Assert.That(auto.Name, Is.EqualTo("WASAPI"));
+            Assert.That(named.Name, Is.EqualTo("WASAPI [Speakers]"));
+            Assert.That(namedDefault.Name, Is.EqualTo("WASAPI [Speakers] (default)"));
+        }
     }
 
     [Test]

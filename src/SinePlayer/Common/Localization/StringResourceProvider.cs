@@ -226,6 +226,7 @@ public class StringResourceProvider
     public string PluginSettingsDescription => GetResourceString("PluginSettingsDescription");
     public string Plugins => GetResourceString("Plugins");
     public string Position => GetResourceString("Position");
+    public string PreferHardwareDecoding => GetResourceString("PreferHardwareDecoding");
     public string PresentedFrames => GetResourceString("PresentedFrames");
     public string PressKeyCombination => GetResourceString("PressKeyCombination");
     public string Previous => GetResourceString("Previous");
@@ -301,6 +302,7 @@ public class StringResourceProvider
     public string ToggleFullscreen => GetResourceString("ToggleFullscreen");
     public string TotalMedia => GetResourceString("TotalMedia");
     public string TwoPageMode => GetResourceString("TwoPageMode");
+    public string Unavailable => GetResourceString("Unavailable");
     public string Unfavorite => GetResourceString("Unfavorite");
     public string Ungrouped => GetResourceString("Ungrouped");
     public string UnhandledExceptionContent => GetResourceString("UnhandledExceptionContent");

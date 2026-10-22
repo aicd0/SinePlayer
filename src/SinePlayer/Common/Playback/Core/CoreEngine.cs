@@ -15,26 +15,17 @@ using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Source;
-using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
-using SinePlayer.Core.Playback.Backends.Wasapi;
 using SinePlayer.Core.Playback.Pipeline;
 
-namespace SinePlayer.Common.Playback.CoreEngine;
+namespace SinePlayer.Common.Playback.Core;
 
-internal sealed partial class PlaybackEngineAdapter : IMediaEngine
+internal sealed partial class CoreEngine : IDisposable
 {
-    private const string TAG = nameof(PlaybackEngineAdapter);
+    private const string TAG = nameof(CoreEngine);
 
     private const int PositionIntervalMilliseconds = 250;
-
-    private readonly D3D11VideoRendererFactory _videoRendererFactory = new();
-    private readonly WasapiAudioRendererFactory _audioRendererFactory = new();
-
-    private double _volume = 1.0;
-    private bool _muted;
-    private GainAudioFilter? _gain;
 
     private SwapChainPanel? _videoPanel;
     private SwapChainPanelRenderTarget? _renderTarget;
@@ -43,7 +34,18 @@ internal sealed partial class PlaybackEngineAdapter : IMediaEngine
 
     private readonly PlaybackInfoHandle _playbackInfo = new();
     private MediaEngineState _state = MediaEngineState.None;
-    private bool _isDisposed;
+    private bool _disposed;
+    private double _volume = 1.0;
+    private bool _muted;
+    private GainAudioFilter? _gainFilter;
+
+    private PlaybackComponents _components = PlaybackComponents.Default;
+
+    public event Action<MediaEngineState>? StateChanged;
+    public event Action? PositionChanged;
+    public event Action? MediaOpened;
+    public event Action? MediaEnded;
+    public event Action<string>? ErrorOccurred;
 
     public MediaEngineState State => _state;
 
@@ -57,13 +59,45 @@ internal sealed partial class PlaybackEngineAdapter : IMediaEngine
 
     public double PlaybackRate => 1.0;
 
-    public IPlaybackInfoProvider PlaybackInfoProvider => _playbackInfo;
+    public PlaybackInfoHandle PlaybackInfo => _playbackInfo;
 
-    public event Action<MediaEngineState>? StateChanged;
-    public event Action? PositionChanged;
-    public event Action? MediaOpened;
-    public event Action? MediaEnded;
-    public event Action<string>? ErrorOccurred;
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        StopPositionTimer();
+
+        PlaybackPipeline? pipeline = _pipeline;
+        _pipeline = null;
+
+        // Before the pipeline is disposed: a pane that is still open reads on its own timer, and the handle must
+        // answer "nothing" from here on without reaching this object at all.
+        _playbackInfo.Detach();
+
+        if (pipeline is not null)
+        {
+            pipeline.StateChanged -= OnPipelineStateChanged;
+            pipeline.WarningRaised -= OnPipelineWarningRaised;
+            pipeline.Dispose();
+        }
+
+        // The filter belongs to this engine rather than to the pipeline, so letting go of the pipeline does not
+        // end it: it is disposed here, once nothing is playing through it.
+        GainAudioFilter? gainFilter = _gainFilter;
+        _gainFilter = null;
+        gainFilter?.Dispose();
+
+        // The panel gives the surface back before the swap chain it is showing goes away.
+        _renderTarget?.DetachSurface();
+        _renderTarget?.Dispose();
+        _renderTarget = null;
+        _videoPanel = null;
+    }
 
     public async Task<ErrorResult> Load(string filePath)
     {
@@ -73,33 +107,18 @@ internal sealed partial class PlaybackEngineAdapter : IMediaEngine
             return err.Error($"Media file not found: '{filePath}'.");
         }
 
-        Close();
-
         SetState(MediaEngineState.Opening);
         try
         {
-            PlaybackPipeline pipeline = CreatePipeline();
-            _pipeline = pipeline;
-            _playbackInfo.Attach(pipeline);
+            // The pipeline outlives the file. Opening another one stops what was playing through it and builds
+            // the chains again, from the components it was last told to use.
+            PlaybackPipeline pipeline = EnsurePipeline();
 
-            // The level of the sound is a filter, and the engine is the host of the pipeline, so it is the one
-            // that makes the filter and holds it: a new pipeline gets a new one, set to what the player has
-            // already asked for before anything plays.
-            GainAudioFilter gain = new();
-            gain.SetLevel(_volume, _muted);
-            pipeline.AudioFilters.Add(gain);
-            _gain = gain;
-
-            // Warnings are heard as they happen — during the open for something left out of it, and later for
-            // a device that stops moving. They were only ever looked at once, at load, before.
-            pipeline.WarningRaised += OnPipelineWarningRaised;
-
-            // Awaited rather than blocked: setup attaches the presentation surface from the playback
-            // thread, and the panel can only be touched from this one.
+            // Awaited rather than blocked: setup attaches the presentation surface from the playback thread,
+            // and the panel can only be touched from this one.
             PlaybackOperationResult opened = await pipeline.Open(MediaLocator.Parse(filePath), EnsureRenderTarget());
             if (!opened.IsSuccessful)
             {
-                Close();
                 SetState(MediaEngineState.Error);
                 return err.Error($"Unable to open media file '{filePath}': {opened.Message}");
             }
@@ -111,10 +130,52 @@ internal sealed partial class PlaybackEngineAdapter : IMediaEngine
         catch (Exception ex)
         {
             Logger.E(TAG, $"Unable to load media file '{filePath}'", ex);
-            Close();
+
+            // A failure inside the open can leave the pipeline mid-teardown; stopping is what puts it back into a
+            // state the next file can be opened in.
+            await Stop();
             SetState(MediaEngineState.Error);
             return err.Error(ex);
         }
+    }
+
+    /// <summary>
+    /// The components to play through. While a file is open the pipeline builds the chains the choice actually
+    /// changes and keeps playing where it was — the same thing the playback lab does when a picker changes — so a
+    /// component is never a reason to open the file again. With nothing open the choice is only recorded, and the
+    /// next file is opened with it.
+    /// </summary>
+    public void SetComponents(PlaybackComponents components)
+    {
+        ArgumentNullException.ThrowIfNull(components);
+
+        if (_components == components)
+        {
+            return;
+        }
+
+        _components = components;
+
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            return;
+        }
+
+        components.Apply(pipeline);
+
+        CoroutineUtils.Run(async () =>
+        {
+            PlaybackOperationResult reconciled = await pipeline.Reconcile();
+            if (!reconciled.IsSuccessful)
+            {
+                // What is playing keeps playing on what it was already built with; the page is told why the
+                // change did not happen rather than being left with a box that disagrees with the sound.
+                string message = $"The components could not be changed. {reconciled.Message}";
+                Logger.W(TAG, message);
+                CoroutineUtils.RunInMainThread(() => ErrorOccurred?.Invoke(message));
+            }
+        });
     }
 
     public void Play()
@@ -140,11 +201,18 @@ internal sealed partial class PlaybackEngineAdapter : IMediaEngine
         _pipeline?.Pause();
     }
 
-    /// <summary>Pauses and returns to the beginning, leaving the file open, as the page has always expected.</summary>
-    public void Stop()
+    /// <summary>
+    /// Lets go of the file and of everything that was opened for it, keeping the pipeline itself — which is what
+    /// makes it possible to be told about different components before the next file is opened. The position timer
+    /// stays: it reads the state, so it says nothing while nothing is open.
+    /// </summary>
+    public async Task Stop()
     {
-        _pipeline?.Pause();
-        _pipeline?.Seek(TimeSpan.Zero);
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is not null)
+        {
+            await pipeline.Stop();
+        }
     }
 
     public void Seek(TimeSpan position)
@@ -205,13 +273,13 @@ internal sealed partial class PlaybackEngineAdapter : IMediaEngine
 
         // The filter is where the level lives now, and it is this engine's own: setting it is all it takes, and
         // it applies to the next block rather than to what has already been handed to the device.
-        _gain?.SetLevel(_volume, _muted);
+        _gainFilter?.SetLevel(_volume, _muted);
     }
 
     public void SetMuted(bool muted)
     {
         _muted = muted;
-        _gain?.SetLevel(_volume, _muted);
+        _gainFilter?.SetLevel(_volume, _muted);
     }
 
     /// <summary>
@@ -229,68 +297,42 @@ internal sealed partial class PlaybackEngineAdapter : IMediaEngine
         return _videoPanel;
     }
 
-    public void Dispose()
+    /// <summary>
+    /// The one pipeline this engine plays everything through, made the first time a file is opened. The components
+    /// are chosen here rather than inside the pipeline, which is what lets the whole backend be replaced without
+    /// the pipeline noticing; what was chosen is the key the player settings wrote, and PlaybackComponents is what
+    /// turns the four keys into the factories to register.
+    /// </summary>
+    private PlaybackPipeline EnsurePipeline()
     {
-        if (_isDisposed)
+        PlaybackPipeline? existing = _pipeline;
+        if (existing is not null)
         {
-            return;
+            return existing;
         }
 
-        _isDisposed = true;
-
-        // Close detaches the handle before it disposes the pipeline, so a pane that is still open reads "nothing"
-        // from here on without reaching this object at all.
-        Close();
-        _renderTarget?.Dispose();
-        _renderTarget = null;
-        _videoPanel = null;
-    }
-
-    private PlaybackPipeline CreatePipeline()
-    {
-        // The components are chosen here rather than inside the pipeline, which is what lets the whole
-        // backend be replaced without the pipeline noticing.
         PlaybackPipeline pipeline = new()
         {
             SourceFactory = new FFmpegSourceProviderFactory(),
         };
 
-        pipeline.Components.Register(new FFmpegVideoDecoderFactory());
-        pipeline.Components.Register(new FFmpegAudioDecoderFactory());
-        pipeline.Components.Register(_videoRendererFactory);
-        pipeline.Components.Register(_audioRendererFactory);
-
+        _components.Apply(pipeline);
         pipeline.StateChanged += OnPipelineStateChanged;
+
+        // The level of the sound is a filter, and the engine is the host of the pipeline, so it is the one that
+        // makes the filter and holds it, set to what the player has already asked for before anything plays.
+        GainAudioFilter gainFilter = new();
+        gainFilter.SetLevel(_volume, _muted);
+        pipeline.AudioFilters.Add(gainFilter);
+        _gainFilter = gainFilter;
+
+        // Warnings are heard as they happen — during the open for something left out of it, and later for a
+        // device that stops moving. They were only ever looked at once, at load, before.
+        pipeline.WarningRaised += OnPipelineWarningRaised;
+
+        _playbackInfo.Attach(pipeline);
+        _pipeline = pipeline;
         return pipeline;
-    }
-
-    /// <summary>Lets go of the file and the surface, leaving the engine ready to load another.</summary>
-    private void Close()
-    {
-        StopPositionTimer();
-
-        PlaybackPipeline? pipeline = _pipeline;
-        _pipeline = null;
-
-        // Before the pipeline is disposed: a pane that is still open reads on its own timer, and the handle must
-        // answer "nothing" from here on without reaching the pipeline at all.
-        _playbackInfo.Detach();
-
-        if (pipeline is not null)
-        {
-            pipeline.StateChanged -= OnPipelineStateChanged;
-            pipeline.WarningRaised -= OnPipelineWarningRaised;
-            pipeline.Dispose();
-        }
-
-        // The filter belongs to this engine rather than to the pipeline, so letting go of the pipeline does not
-        // end it: it is disposed here, once nothing is playing through it.
-        GainAudioFilter? gain = _gain;
-        _gain = null;
-        gain?.Dispose();
-
-        // The panel gives the surface back before the swap chain it is showing goes away.
-        _renderTarget?.DetachSurface();
     }
 
     private SwapChainPanelRenderTarget EnsureRenderTarget()

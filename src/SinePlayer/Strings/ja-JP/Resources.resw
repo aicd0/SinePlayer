@@ -886,6 +886,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="Position" xml:space="preserve">
     <value>再生位置</value>
   </data>
+  <data name="PreferHardwareDecoding" xml:space="preserve">
+    <value>ハードウェアデコードを優先</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>表示済みフレーム数</value>
   </data>
@@ -1140,6 +1143,9 @@ $plugins</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>見開きモード</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>利用不可</value>
   </data>
   <data name="Unfavorite" xml:space="preserve">
     <value>お気に入りから削除</value>
