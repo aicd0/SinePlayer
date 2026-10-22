@@ -534,6 +534,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="FileOperations" xml:space="preserve">
     <value>파일 작업</value>
   </data>
+  <data name="Fill" xml:space="preserve">
+    <value>채우기</value>
+  </data>
   <data name="FilterPresets" xml:space="preserve">
     <value>필터 프리셋</value>
   </data>
@@ -546,8 +549,17 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="FinishPercentage" xml:space="preserve">
     <value>$percentage% 완료됨</value>
   </data>
+  <data name="Fit" xml:space="preserve">
+    <value>맞춤</value>
+  </data>
+  <data name="FlipHorizontally" xml:space="preserve">
+    <value>좌우 반전</value>
+  </data>
   <data name="FlipImage" xml:space="preserve">
     <value>뒤집기</value>
+  </data>
+  <data name="FlipVertically" xml:space="preserve">
+    <value>상하 반전</value>
   </data>
   <data name="Folders" xml:space="preserve">
     <value>폴더</value>
@@ -829,6 +841,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="OpenUserDataFolder" xml:space="preserve">
     <value>사용자 데이터 폴더 열기</value>
   </data>
+  <data name="OriginalSize" xml:space="preserve">
+    <value>원본 크기</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>이 작업을 수행하면 기존 항목이 덮어쓰여집니다.</value>
   </data>
@@ -1019,6 +1034,9 @@ $plugins</value>
   <data name="SaveViewSettings" xml:space="preserve">
     <value>보기 설정 저장</value>
   </data>
+  <data name="Scaling" xml:space="preserve">
+    <value>크기 조정</value>
+  </data>
   <data name="ScanOnLaunch" xml:space="preserve">
     <value>시작 시 스캔</value>
   </data>
@@ -1096,6 +1114,9 @@ $plugins</value>
   </data>
   <data name="Statistics" xml:space="preserve">
     <value>통계</value>
+  </data>
+  <data name="Stretch" xml:space="preserve">
+    <value>늘이기</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>꼬리표</value>

@@ -14,6 +14,7 @@ using SinePlayer.Common.Playback.Surface;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
@@ -27,19 +28,19 @@ internal sealed partial class CoreEngine : IDisposable
 
     private const int PositionIntervalMilliseconds = 250;
 
+    private bool _disposed;
     private SwapChainPanel? _videoPanel;
     private SwapChainPanelRenderTarget? _renderTarget;
     private PlaybackPipeline? _pipeline;
+    private GainAudioFilter? _gainFilter;
     private DispatcherQueueTimer? _positionTimer;
 
     private readonly PlaybackInfoHandle _playbackInfo = new();
+    private PlaybackComponents _components = PlaybackComponents.Default;
     private MediaEngineState _state = MediaEngineState.None;
-    private bool _disposed;
+    private VideoTransform _videoTransform = VideoTransform.Identity;
     private double _volume = 1.0;
     private bool _muted;
-    private GainAudioFilter? _gainFilter;
-
-    private PlaybackComponents _components = PlaybackComponents.Default;
 
     public event Action<MediaEngineState>? StateChanged;
     public event Action? PositionChanged;
@@ -176,6 +177,21 @@ internal sealed partial class CoreEngine : IDisposable
                 CoroutineUtils.RunInMainThread(() => ErrorOccurred?.Invoke(message));
             }
         });
+    }
+
+    /// <summary>
+    /// Where the picture is placed: fitted by the chosen mode, turned and mirrored. It outlives the file being
+    /// replaced, so it is held here and handed to the pipeline when one is made, the way the components are.
+    /// </summary>
+    public void SetVideoTransform(VideoTransform transform)
+    {
+        if (_videoTransform == transform)
+        {
+            return;
+        }
+
+        _videoTransform = transform;
+        _pipeline?.VideoTransform = transform;
     }
 
     public void Play()
@@ -317,6 +333,7 @@ internal sealed partial class CoreEngine : IDisposable
         };
 
         _components.Apply(pipeline);
+        pipeline.VideoTransform = _videoTransform;
         pipeline.StateChanged += OnPipelineStateChanged;
 
         // The level of the sound is a filter, and the engine is the host of the pipeline, so it is the one that

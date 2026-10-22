@@ -126,11 +126,15 @@ public class StringResourceProvider
     public string Feedback => GetResourceString("Feedback");
     public string FeedbackIntroduction => GetResourceString("FeedbackIntroduction");
     public string FileOperations => GetResourceString("FileOperations");
+    public string Fill => GetResourceString("Fill");
     public string FilterPresets => GetResourceString("FilterPresets");
     public string FilterSettings => GetResourceString("FilterSettings");
     public string FilteredBy => GetResourceString("FilteredBy");
     public string FinishPercentage => GetResourceString("FinishPercentage");
+    public string Fit => GetResourceString("Fit");
+    public string FlipHorizontally => GetResourceString("FlipHorizontally");
     public string FlipImage => GetResourceString("FlipImage");
+    public string FlipVertically => GetResourceString("FlipVertically");
     public string Folders => GetResourceString("Folders");
     public string FrameRate => GetResourceString("FrameRate");
     public string FunctionAverage => GetResourceString("FunctionAverage");
@@ -209,6 +213,7 @@ public class StringResourceProvider
     public string OpenPreviousItem => GetResourceString("OpenPreviousItem");
     public string OpenSidebar => GetResourceString("OpenSidebar");
     public string OpenUserDataFolder => GetResourceString("OpenUserDataFolder");
+    public string OriginalSize => GetResourceString("OriginalSize");
     public string OverwriteExistingEntries => GetResourceString("OverwriteExistingEntries");
     public string Pause => GetResourceString("Pause");
     public string PauseOnLeaveTab => GetResourceString("PauseOnLeaveTab");
@@ -267,6 +272,7 @@ public class StringResourceProvider
     public string SaveBrowsingHistory => GetResourceString("SaveBrowsingHistory");
     public string SaveSortingAndGroupingSettings => GetResourceString("SaveSortingAndGroupingSettings");
     public string SaveViewSettings => GetResourceString("SaveViewSettings");
+    public string Scaling => GetResourceString("Scaling");
     public string ScanOnLaunch => GetResourceString("ScanOnLaunch");
     public string Search => GetResourceString("Search");
     public string SearchResults => GetResourceString("SearchResults");
@@ -292,6 +298,7 @@ public class StringResourceProvider
     public string SortingFunction => GetResourceString("SortingFunction");
     public string State => GetResourceString("State");
     public string Statistics => GetResourceString("Statistics");
+    public string Stretch => GetResourceString("Stretch");
     public string Tag => GetResourceString("Tag");
     public string TagLinkTip => GetResourceString("TagLinkTip");
     public string Tags => GetResourceString("Tags");

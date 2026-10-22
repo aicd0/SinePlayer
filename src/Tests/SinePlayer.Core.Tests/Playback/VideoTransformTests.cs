@@ -178,6 +178,54 @@ public class VideoTransformTests
     }
 
     [Test]
+    public void KeepsThePictureAtItsOwnSizeAndCropsWhatDoesNotFit()
+    {
+        VideoTransform original = VideoTransform.Identity with { ResizeMode = VideoResizeMode.OriginalSize };
+
+        // Two source pixels become two surface pixels, centred: a small picture on a large surface stays small.
+        (double x, double y, double width, double height) = Box(original, 2, 2, 8, 8);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(width, Is.EqualTo(2).Within(0.01), "a source pixel is a surface pixel");
+            Assert.That(height, Is.EqualTo(2).Within(0.01));
+            Assert.That(x, Is.EqualTo(3).Within(0.01), "and the picture is centred");
+            Assert.That(y, Is.EqualTo(3).Within(0.01));
+        }
+
+        // A picture larger than the surface runs past it on every side, which is where the cropping happens.
+        (x, y, width, height) = Box(original, 1920, 1080, 1600, 1200);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(width, Is.EqualTo(1920).Within(0.01));
+            Assert.That(height, Is.EqualTo(1080).Within(0.01));
+            Assert.That(x, Is.EqualTo(-160).Within(0.01));
+            Assert.That(y, Is.EqualTo(60).Within(0.01));
+        }
+    }
+
+    [Test]
+    public void OriginalSizeTurnsWithThePictureAndStillCountsSourcePixels()
+    {
+        VideoTransform original = VideoTransform.Identity with
+        {
+            ResizeMode = VideoResizeMode.OriginalSize,
+            Orientation = new VideoOrientation(1, false),
+        };
+
+        (double x, double y, double width, double height) = Box(original, 1920, 1080, 800, 600);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(width, Is.EqualTo(1080).Within(0.01), "a quarter turn trades the picture's sides");
+            Assert.That(height, Is.EqualTo(1920).Within(0.01));
+            Assert.That(x, Is.EqualTo(-140).Within(0.01), "and it is cropped evenly, being larger than the surface");
+            Assert.That(y, Is.EqualTo(-660).Within(0.01));
+        }
+    }
+
+    [Test]
     public void ZoomsAboutTheCentre()
     {
         VideoTransform zoomed = VideoTransform.Identity with { Zoom = 2.0 };

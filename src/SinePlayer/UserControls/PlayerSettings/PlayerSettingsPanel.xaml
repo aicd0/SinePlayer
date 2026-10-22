@@ -102,6 +102,82 @@
                     Style="{StaticResource CompatToggleSwitchStyle}"
                     Toggled="VideoPreferHardwareDecodingToggleSwitch_Toggled" />
             </Grid>
+            <Rectangle
+                Height="1"
+                Margin="0,8"
+                Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+            <Grid Style="{StaticResource TallSettingRowStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Column="0"
+                    Margin="0,0,0,2"
+                    VerticalAlignment="Center"
+                    Text="{x:Bind ViewModel.VideoStretchModeLabel, Mode=OneWay}" />
+                <DropDownButton
+                    x:Name="VideoStretchModeDropDownButton"
+                    Grid.Column="3"
+                    HorizontalAlignment="Right" />
+            </Grid>
+            <Grid Style="{StaticResource TallSettingRowStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Column="0"
+                    Margin="0,0,0,2"
+                    VerticalAlignment="Center"
+                    Text="{x:Bind ViewModel.VideoRotationLabel, Mode=OneWay}" />
+                <DropDownButton
+                    x:Name="VideoRotationDropDownButton"
+                    Grid.Column="3"
+                    HorizontalAlignment="Right" />
+            </Grid>
+            <Grid Style="{StaticResource CommonSettingRowStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Column="0"
+                    Margin="0,0,0,2"
+                    VerticalAlignment="Center"
+                    Text="{x:Bind ViewModel.VideoFlipHorizontalLabel, Mode=OneWay}" />
+                <ToggleSwitch
+                    x:Name="VideoFlipHorizontalToggleSwitch"
+                    Grid.Column="3"
+                    HorizontalAlignment="Right"
+                    Style="{StaticResource CompatToggleSwitchStyle}"
+                    Toggled="VideoFlipHorizontalToggleSwitch_Toggled" />
+            </Grid>
+            <Grid Style="{StaticResource CommonSettingRowStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Column="0"
+                    Margin="0,0,0,2"
+                    VerticalAlignment="Center"
+                    Text="{x:Bind ViewModel.VideoFlipVerticalLabel, Mode=OneWay}" />
+                <ToggleSwitch
+                    x:Name="VideoFlipVerticalToggleSwitch"
+                    Grid.Column="3"
+                    HorizontalAlignment="Right"
+                    Style="{StaticResource CompatToggleSwitchStyle}"
+                    Toggled="VideoFlipVerticalToggleSwitch_Toggled" />
+            </Grid>
         </StackPanel>
 
         <StackPanel

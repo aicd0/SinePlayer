@@ -23,6 +23,7 @@ using SinePlayer.Common.Misc;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
@@ -424,6 +425,7 @@ internal sealed partial class PlayerPage : BasePage
 
     private CoreEngine? _engine;
     private PlaybackComponents _components = PlaybackComponents.Default;
+    private VideoTransform _videoTransform = VideoTransform.Identity;
     private long _pendingStartPositionMs = -1;
 
     private CoreEngine EnsureEngine()
@@ -575,12 +577,15 @@ internal sealed partial class PlayerPage : BasePage
         _pendingStartPositionMs = startPositionMs;
 
         // What the media was last played through, which is what its settings were saved with.
-        _components = PlayerSettingsModel.LoadFromMedia(media).ToComponents();
+        var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
+        _components = mediaSettings.ToComponents();
+        _videoTransform = mediaSettings.ToVideoTransform();
 
         // Components are only read when the file is opened, so the engine lets go of what it has before it is
         // told what to use, and then opens the new file with it.
         await engine.Stop();
         engine.SetComponents(_components);
+        engine.SetVideoTransform(_videoTransform);
         return await engine.Load(media.Location);
     }
 
@@ -876,6 +881,8 @@ internal sealed partial class PlayerPage : BasePage
 
     private void ApplyPlayerSettings(PlayerSettingsModel settings)
     {
+        ApplyVideoTransform(settings);
+
         PlaybackComponents components = settings.ToComponents();
         if (components == _components)
         {
@@ -894,6 +901,22 @@ internal sealed partial class PlayerPage : BasePage
         // A component change is not a reason to open the file again: the pipeline swaps the chains the choice
         // affects and keeps playing where it was, as the playback lab does.
         _engine?.SetComponents(components);
+    }
+
+    /// <summary>
+    /// Where the picture goes is not a component: nothing is rebuilt and no frame is waited for, the picture that
+    /// is already there is drawn again — so this is applied whatever the engine is doing, including mid-open.
+    /// </summary>
+    private void ApplyVideoTransform(PlayerSettingsModel settings)
+    {
+        var transform = settings.ToVideoTransform();
+        if (transform == _videoTransform)
+        {
+            return;
+        }
+
+        _videoTransform = transform;
+        _engine?.SetVideoTransform(transform);
     }
 
     #endregion

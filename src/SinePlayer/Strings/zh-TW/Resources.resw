@@ -532,6 +532,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="FileOperations" xml:space="preserve">
     <value>檔案操作</value>
   </data>
+  <data name="Fill" xml:space="preserve">
+    <value>填滿</value>
+  </data>
   <data name="FilterPresets" xml:space="preserve">
     <value>過濾器預設</value>
   </data>
@@ -544,8 +547,17 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="FinishPercentage" xml:space="preserve">
     <value>已讀$percentage%</value>
   </data>
+  <data name="Fit" xml:space="preserve">
+    <value>符合</value>
+  </data>
+  <data name="FlipHorizontally" xml:space="preserve">
+    <value>水平翻轉</value>
+  </data>
   <data name="FlipImage" xml:space="preserve">
     <value>翻轉</value>
+  </data>
+  <data name="FlipVertically" xml:space="preserve">
+    <value>垂直翻轉</value>
   </data>
   <data name="Folders" xml:space="preserve">
     <value>資料夾</value>
@@ -827,6 +839,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="OpenUserDataFolder" xml:space="preserve">
     <value>開啟用戶資料資料夾</value>
   </data>
+  <data name="OriginalSize" xml:space="preserve">
+    <value>原始大小</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>此操作將覆蓋現有條目。</value>
   </data>
@@ -1017,6 +1032,9 @@ $plugins</value>
   <data name="SaveViewSettings" xml:space="preserve">
     <value>儲存檢視設定</value>
   </data>
+  <data name="Scaling" xml:space="preserve">
+    <value>縮放</value>
+  </data>
   <data name="ScanOnLaunch" xml:space="preserve">
     <value>啟動時掃描</value>
   </data>
@@ -1094,6 +1112,9 @@ $plugins</value>
   </data>
   <data name="Statistics" xml:space="preserve">
     <value>統計資訊</value>
+  </data>
+  <data name="Stretch" xml:space="preserve">
+    <value>延展</value>
   </data>
   <data name="Tag" xml:space="preserve">
     <value>標籤</value>
