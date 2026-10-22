@@ -1,5 +1,5 @@
 // Copyright (c) aicd0. All rights reserved.
-// Licensed under the MIT License.
+// Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
@@ -11,7 +11,7 @@ namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 /// the decoder wrote, so keeping the frame alive is what keeps the picture alive, and releasing it is what
 /// gives the texture back to the decoder's pool.
 /// </summary>
-internal sealed class FFmpegGpuVideoFrameBuffer : IGpuVideoBuffer
+internal sealed partial class FFmpegGpuVideoFrameBuffer : IGpuVideoBuffer
 {
     private nint _frame;
 

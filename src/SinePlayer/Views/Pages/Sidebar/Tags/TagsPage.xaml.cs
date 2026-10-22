@@ -84,10 +84,10 @@ internal sealed partial class TagsPage : BasePage
             bool handled = true;
             switch (source)
             {
-                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
+                case MediaMenuCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
                     switch (name)
                     {
-                        case MenuFlyoutItemsCreator.CUSTOM_ACTION_NAME_SELECT:
+                        case MediaMenuCreator.CUSTOM_ACTION_NAME_SELECT:
                             viewModel.SelectionMode = !viewModel.SelectionMode;
                             break;
                         default:

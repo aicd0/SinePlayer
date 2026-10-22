@@ -252,7 +252,7 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
                     IEnumerable<MediaModel>? selectedMedia = !_selectionMode ? null : selection
                         .Where(x => x.DataContext is MediaModel)
                         .Select(x => (MediaModel)x.DataContext!);
-                    return MenuFlyoutItemsCreator.CreateMediaMenuItems(
+                    return MediaMenuCreator.CreateMediaMenuItems(
                         _actionHandler,
                         media,
                         playQueue: playQueue,
@@ -371,7 +371,7 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
         });
 
         List<MediaModel> mediaItems = [.. primary.CollectDataContext<MediaModel>()];
-        return await MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
+        return await MediaMenuCreator.CreateMediaGroupMenuItems(
             _actionHandler, mediaItems,
             primary.ExpandAll, primary.CollapseAll, customItems: items);
     }
@@ -395,7 +395,7 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
         {
             Text = StringResourceProvider.Instance.Links,
             Icon = new FontIconSource() { Glyph = "\uE71B" },
-            Items = await MenuFlyoutItemsCreator.CreateTagLinkMenuItems(primaryTag.CategoryName, primaryTag.Name, _actionHandler),
+            Items = await MediaMenuCreator.CreateTagLinkMenuItems(primaryTag.CategoryName, primaryTag.Name, _actionHandler),
         });
 
         items.Add(new SimpleMenuFlyoutItemModel()
@@ -422,7 +422,7 @@ internal partial class TagsPageViewModel : INotifyPropertyChanged
         });
 
         List<MediaModel> mediaItems = [.. primary.CollectDataContext<MediaModel>()];
-        return await MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
+        return await MediaMenuCreator.CreateMediaGroupMenuItems(
             _actionHandler, mediaItems,
             primary.ExpandAll, primary.CollapseAll, customItems: items);
     }

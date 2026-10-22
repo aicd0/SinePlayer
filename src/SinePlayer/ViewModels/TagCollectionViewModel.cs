@@ -126,7 +126,7 @@ internal partial class TagCollectionViewModel(string name) : BaseViewModel, INot
         {
             Text = StringResourceProvider.Instance.Links,
             Icon = new FontIconSource() { Glyph = "\uE71B" },
-            Items = await MenuFlyoutItemsCreator.CreateTagLinkMenuItems(tagCategory, tag, actionHandler),
+            Items = await MediaMenuCreator.CreateTagLinkMenuItems(tagCategory, tag, actionHandler),
         });
 
         items.Add(new SimpleMenuFlyoutItemModel()

@@ -163,7 +163,7 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
                     IEnumerable<MediaModel>? selectedMedia = !_selectionMode ? null : selection
                         .Where(x => x.DataContext is MediaModel)
                         .Select(x => (MediaModel)x.DataContext!);
-                    return MenuFlyoutItemsCreator.CreateMediaMenuItems(
+                    return MediaMenuCreator.CreateMediaMenuItems(
                         _actionHandler,
                         media,
                         playQueue: playQueue,
@@ -222,7 +222,7 @@ internal partial class FoldersPageViewModel : INotifyPropertyChanged
     private async Task<List<BaseMenuFlyoutItemModel>> CreateFolderMenuItems(SimpleTreeViewNodeModel primary, IEnumerable<SimpleTreeViewNodeModel> selection)
     {
         List<MediaModel> mediaItems = [.. primary.CollectDataContext<MediaModel>()];
-        return await MenuFlyoutItemsCreator.CreateMediaGroupMenuItems(
+        return await MediaMenuCreator.CreateMediaGroupMenuItems(
             _actionHandler, mediaItems,
             primary.ExpandAll, primary.CollapseAll);
     }

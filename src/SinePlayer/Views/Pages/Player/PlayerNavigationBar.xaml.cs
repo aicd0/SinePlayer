@@ -10,6 +10,7 @@ using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Localization;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
+using SinePlayer.UserControls.PlayerSettings;
 
 namespace SinePlayer.Views.Pages.Player;
 
@@ -35,6 +36,8 @@ internal sealed partial class PlayerNavigationBar : BaseUserControl
     {
         InitializeComponent();
     }
+
+    public PlayerSettingsPanel PlayerSettingsPanel => MainPlayerSettingPanel;
 
     public void Initialize(IMainWindowAbility windowAbility)
     {

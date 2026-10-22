@@ -151,7 +151,7 @@ internal sealed partial class CollectionPage : BasePage
                 return;
             }
 
-            List<BaseMenuFlyoutItemModel> menuItems = await MenuFlyoutItemsCreator.CreateMediaMenuItems(
+            List<BaseMenuFlyoutItemModel> menuItems = await MediaMenuCreator.CreateMediaMenuItems(
                 PageActionHandler,
                 collection);
             if (menuItems.Count == 0)
@@ -262,10 +262,10 @@ internal sealed partial class CollectionPage : BasePage
             bool handled = true;
             switch (source)
             {
-                case MenuFlyoutItemsCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
+                case MediaMenuCreator.CUSTOM_ACTION_SOURCE_MEDIA_ITEM_MENU:
                     switch (name)
                     {
-                        case MenuFlyoutItemsCreator.CUSTOM_ACTION_NAME_SELECT:
+                        case MediaMenuCreator.CUSTOM_ACTION_NAME_SELECT:
                             viewModel.MediaSelection.SetSelectMode(!viewModel.MediaSelection.IsSelectMode);
                             break;
                         default:

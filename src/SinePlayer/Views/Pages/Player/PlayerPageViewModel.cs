@@ -2,7 +2,6 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading.Tasks;
 
@@ -14,7 +13,6 @@ using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
-using SinePlayer.Helpers.MenuFlyoutHelpers;
 
 namespace SinePlayer.Views.Pages.Player;
 
@@ -374,21 +372,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
         int progress = _durationMs > 0 ? (int)Math.Clamp(_positionMs * 100 / _durationMs, 0, 100) : -1;
         CoroutineUtils.Run(async () => await media.SetProgress(progress, _positionMs));
-    }
-
-    public async Task<IReadOnlyList<BaseMenuFlyoutItemModel>> CreateMediaContextMenuItems()
-    {
-        MediaModel? media = Media;
-        if (media is null)
-        {
-            return [];
-        }
-
-        return await MenuFlyoutItemsCreator.CreateMediaMenuItems(
-            _actionHandler,
-            media,
-            playQueue: PlayQueue.ToBuilder(),
-            playback: Playback.ToBuilder());
     }
 
     #endregion
