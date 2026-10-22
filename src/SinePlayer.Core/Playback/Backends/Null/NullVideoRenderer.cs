@@ -35,14 +35,14 @@ public sealed partial class NullVideoRenderer : IVideoRenderer
         return PlaybackOperationResult.Success;
     }
 
-    public PlaybackOperationResult Render(RawVideoFrame frame)
+    public PlaybackOperationResult Render(RawVideoFrame frame, VideoTransform transform)
     {
         ArgumentNullException.ThrowIfNull(frame);
         Interlocked.Increment(ref _renderedFrameCount);
         return PlaybackOperationResult.Success;
     }
 
-    public PlaybackOperationResult RefreshSurface()
+    public PlaybackOperationResult RefreshSurface(VideoTransform transform)
     {
         return PlaybackOperationResult.Success;
     }

@@ -44,6 +44,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private readonly ITaskDispatcher _playbackQueue = TaskDispatcher.Factory.NewQueue("Pipeline - Playback");
     private readonly Lock _componentLock = new();
+    private readonly SeqLock<VideoTransform> _videoTransform = new(VideoTransform.Identity);
 
     private MediaInfo? _info;
     private VideoStreamInfo? _videoStreamInfo;
@@ -122,6 +123,21 @@ public sealed partial class PlaybackPipeline : IDisposable
     public ISourceProviderFactory? SourceFactory { get; set; }
 
     public ISynchronizer Synchronizer { get; set; } = new DefaultSynchronizer();
+
+    public VideoTransform VideoTransform
+    {
+        get => _videoTransform.Read();
+        set
+        {
+            if (_videoTransform.Read() == value)
+            {
+                return;
+            }
+
+            _videoTransform.Change(_ => value);
+            _videoRenderNode.Wake();
+        }
+    }
 
     public MediaEngineState State => _state;
 
@@ -1554,7 +1570,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void VideoRenderCore()
     {
-        bool deviceFailed = false;
+        bool deviceAvailable = false;
         long workingEpoch = -1;
         long componentVersion = -1;
         long firstFrameEpoch = -1;
@@ -1584,7 +1600,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             if (SwapVideoRenderer() is ComponentSlot<IVideoRenderer> pendingRenderer)
             {
                 componentVersion = pendingRenderer.Version;
-                deviceFailed = false;
+                deviceAvailable = true;
                 continue;
             }
 
@@ -1598,12 +1614,14 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
 
             IVideoRenderer? renderer = _videoRenderer?.Component;
-            if (!deviceFailed && renderer is not null && state is MediaEngineState.Paused or MediaEngineState.Ended)
+            VideoTransform transform = VideoTransform;
+
+            if (deviceAvailable && renderer is not null && state is MediaEngineState.Paused or MediaEngineState.Ended)
             {
                 PlaybackOperationResult refreshed;
                 try
                 {
-                    refreshed = renderer.RefreshSurface();
+                    refreshed = renderer.RefreshSurface(transform);
                 }
                 catch (Exception ex)
                 {
@@ -1613,7 +1631,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 if (!refreshed.IsSuccessful)
                 {
                     PostWarning(refreshed.Message);
-                    deviceFailed = true;
+                    deviceAvailable = false;
                 }
             }
 
@@ -1709,13 +1727,13 @@ public sealed partial class PlaybackPipeline : IDisposable
                     continue;
                 }
 
-                if (!deviceFailed)
+                if (deviceAvailable && renderer is not null)
                 {
-                    PlaybackOperationResult shown = RenderVideoFrame(frame);
+                    PlaybackOperationResult shown = RenderVideoFrame(renderer, frame, transform);
                     if (!shown.IsSuccessful)
                     {
                         PostWarning(shown.Message);
-                        deviceFailed = true;
+                        deviceAvailable = false;
                     }
                 }
 
@@ -1750,19 +1768,13 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
-    private PlaybackOperationResult RenderVideoFrame(RawVideoFrame frame)
+    private PlaybackOperationResult RenderVideoFrame(IVideoRenderer renderer, RawVideoFrame frame, VideoTransform transform)
     {
-        IVideoRenderer? renderer = _videoRenderer?.Component;
-        if (renderer is null)
-        {
-            return PlaybackOperationResult.Failure("The video renderer is not available.");
-        }
-
         long startTicks = Stopwatch.GetTimestamp();
         PlaybackOperationResult rendered;
         try
         {
-            rendered = renderer.Render(frame);
+            rendered = renderer.Render(frame, transform);
         }
         catch (Exception ex)
         {

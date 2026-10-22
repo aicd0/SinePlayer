@@ -11,6 +11,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -76,13 +77,76 @@
                 SelectionChanged="AudioRendererPicker_SelectionChanged" />
         </StackPanel>
 
-        <Grid Grid.Row="2" Background="Black">
+        <StackPanel
+            Grid.Row="2"
+            Margin="12,0,12,12"
+            Orientation="Horizontal"
+            Spacing="8">
+            <ComboBox x:Name="RotationPicker" SelectionChanged="TransformChoice_SelectionChanged" />
+            <ToggleButton
+                x:Name="FlipHorizontalToggle"
+                VerticalAlignment="Bottom"
+                Click="TransformToggle_Click"
+                Content="Flip horizontal" />
+            <ToggleButton
+                x:Name="FlipVerticalToggle"
+                VerticalAlignment="Bottom"
+                Click="TransformToggle_Click"
+                Content="Flip vertical" />
+            <ComboBox x:Name="FittingPicker" SelectionChanged="TransformChoice_SelectionChanged" />
+            <StackPanel
+                VerticalAlignment="Bottom"
+                Orientation="Horizontal"
+                Spacing="6">
+                <TextBlock VerticalAlignment="Center" Text="Zoom" />
+                <Slider
+                    x:Name="ZoomSlider"
+                    Width="110"
+                    Maximum="400"
+                    Minimum="50"
+                    ValueChanged="TransformSlider_ValueChanged"
+                    Value="100" />
+            </StackPanel>
+            <StackPanel
+                VerticalAlignment="Bottom"
+                Orientation="Horizontal"
+                Spacing="6">
+                <TextBlock VerticalAlignment="Center" Text="Pan X" />
+                <Slider
+                    x:Name="PanXSlider"
+                    Width="110"
+                    Maximum="100"
+                    Minimum="-100"
+                    ValueChanged="TransformSlider_ValueChanged"
+                    Value="0" />
+            </StackPanel>
+            <StackPanel
+                VerticalAlignment="Bottom"
+                Orientation="Horizontal"
+                Spacing="6">
+                <TextBlock VerticalAlignment="Center" Text="Pan Y" />
+                <Slider
+                    x:Name="PanYSlider"
+                    Width="110"
+                    Maximum="100"
+                    Minimum="-100"
+                    ValueChanged="TransformSlider_ValueChanged"
+                    Value="0" />
+            </StackPanel>
+            <Button
+                x:Name="ResetTransformButton"
+                VerticalAlignment="Bottom"
+                Click="ResetTransformButton_Click"
+                Content="Reset transform" />
+        </StackPanel>
+
+        <Grid Grid.Row="3" Background="Black">
             <SwapChainPanel x:Name="VideoPanel" />
         </Grid>
 
         <TextBlock
             x:Name="StatusText"
-            Grid.Row="3"
+            Grid.Row="4"
             Margin="12"
             IsTextSelectionEnabled="True"
             Text="Pick a file to play it through the engine: FFmpeg decodes, Direct3D 11 presents and WASAPI plays the sound."

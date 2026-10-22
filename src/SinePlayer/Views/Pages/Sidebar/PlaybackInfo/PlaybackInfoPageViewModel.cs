@@ -83,11 +83,6 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
                 Add("video.bitdepth", StringResource.BitDepth, video.BitDepth.ToString(CultureInfo.InvariantCulture));
             }
 
-            if (video.RotationDegrees != 0)
-            {
-                Add("video.rotation", StringResource.Rotation, video.RotationDegrees.ToString(CultureInfo.InvariantCulture) + "°");
-            }
-
             if (video.Bitrate > 0)
             {
                 Add("video.bitrate", StringResource.BitRate, FormatBitrate(video.Bitrate));

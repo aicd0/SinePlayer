@@ -1,6 +1,7 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -43,6 +44,12 @@ internal static class D3D11Interop
         return sampler;
     }
 
+    internal static ID3D11RasterizerState CreateRasterizerState(ID3D11Device device, in D3D11_RASTERIZER_DESC description)
+    {
+        Graphics_Direct3D11_ID3D11Device_Extensions.CreateRasterizerState(device, in description, out ID3D11RasterizerState state);
+        return state;
+    }
+
     internal static D3D11_TEXTURE2D_DESC GetDescription(ID3D11Texture2D texture)
     {
         unsafe
@@ -55,13 +62,13 @@ internal static class D3D11Interop
 
     /// <summary>
     /// A constant buffer holding one transform. Small and updated per frame, which is what a default-usage
-    /// buffer is for — and sixteen bytes, because that is the smallest size Direct3D accepts.
+    /// buffer is for — and two vectors for the shader's own use plus the two rows that place the picture.
     /// </summary>
     internal static ID3D11Buffer CreateConstantBuffer(ID3D11Device device)
     {
         D3D11_BUFFER_DESC description = new()
         {
-            ByteWidth = 16,
+            ByteWidth = 48,
             Usage = D3D11_USAGE.D3D11_USAGE_DEFAULT,
             BindFlags = D3D11_BIND_FLAG.D3D11_BIND_CONSTANT_BUFFER,
         };
@@ -71,16 +78,25 @@ internal static class D3D11Interop
     }
 
     /// <summary>
-    /// Writes the texture coordinates a picture occupies inside its texture: one where the two are the same
-    /// size, less than one where a hardware decoder padded the texture.
+    /// Writes what the vertex shader needs to put a frame where it belongs: the texture coordinates the picture
+    /// occupies inside its texture — one where the two are the same size, less than one where a hardware decoder
+    /// padded the texture — and the two rows that place the unit square on the surface.
     /// </summary>
-    internal static unsafe void SetTexCoordScale(ID3D11DeviceContext context, ID3D11Buffer buffer, float x, float y)
+    internal static unsafe void SetFrameTransform(ID3D11DeviceContext context, ID3D11Buffer buffer, float scaleX, float scaleY, Matrix3x2 placement)
     {
-        float* values = stackalloc float[4];
-        values[0] = x;
-        values[1] = y;
+        float* values = stackalloc float[12];
+        values[0] = scaleX;
+        values[1] = scaleY;
         values[2] = 0.0f;
         values[3] = 0.0f;
+        values[4] = placement.M11;
+        values[5] = placement.M21;
+        values[6] = placement.M31;
+        values[7] = 0.0f;
+        values[8] = placement.M12;
+        values[9] = placement.M22;
+        values[10] = placement.M32;
+        values[11] = 0.0f;
 
         Graphics_Direct3D11_ID3D11DeviceContext_Extensions.UpdateSubresource(context, buffer, 0, null, values, 0, 0);
     }
@@ -134,6 +150,11 @@ internal static class D3D11Interop
     {
         Graphics_Direct3D11_ID3D11DeviceContext_Extensions.VSSetShader(context, vertexShader, null);
         Graphics_Direct3D11_ID3D11DeviceContext_Extensions.PSSetShader(context, pixelShader, null);
+    }
+
+    internal static void SetRasterizerState(ID3D11DeviceContext context, ID3D11RasterizerState state)
+    {
+        context.RSSetState(state);
     }
 
     internal static void SetTextures(ID3D11DeviceContext context, uint startSlot, ID3D11ShaderResourceView[] views, ID3D11SamplerState sampler)

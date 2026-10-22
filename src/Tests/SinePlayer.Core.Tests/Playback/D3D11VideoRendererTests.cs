@@ -55,7 +55,7 @@ public class D3D11VideoRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
 
         _renderer.SetOutput(target.View, width, height);
-        PlaybackOperationResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame, VideoTransform.Identity);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         byte[] pixels = target.ReadPixels(_device);
@@ -86,7 +86,7 @@ public class D3D11VideoRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
 
         _renderer.SetOutput(target.View, width, height);
-        PlaybackOperationResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame, VideoTransform.Identity);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         byte[] pixels = target.ReadPixels(_device);
@@ -101,6 +101,131 @@ public class D3D11VideoRendererTests
             Assert.That(pixels[bottomRow], Is.EqualTo(0x40), "bottom row must come from the last source row");
             Assert.That(pixels[bottomRow + 2], Is.EqualTo(0x60), "bottom row must come from the last source row");
         }
+    }
+
+    [Test]
+    public void TurnsThePictureAQuarterClockwise()
+    {
+        const int width = 4;
+        const int height = 2;
+        const byte leftRed = 0x10;
+        const byte rightRed = 0x40;
+
+        // The source's first column is one colour and the rest another, so which way the picture was turned is
+        // visible in the pixels rather than inferred from the geometry.
+        using FrameBuffer buffer = new(width, height, (x, _) => x < width / 2 ? (leftRed, (byte)0x20, (byte)0x30, (byte)0xFF) : (rightRed, (byte)0x50, (byte)0x60, (byte)0xFF));
+        using RawVideoFrame frame = CreateFrame(width, height, buffer);
+
+        // A turned 4x2 picture is 2x4, so the surface is given that shape and the picture fills it exactly.
+        using var target = D3D11RenderTarget.CreateOffscreen(_device, height, width);
+        _renderer.SetOutput(target.View, height, width);
+
+        VideoTransform turned = VideoTransform.Identity with { Orientation = new VideoOrientation(1, false) };
+        PlaybackOperationResult result = _renderer.Render(frame, turned);
+        Assert.That(result.IsSuccessful, Is.True, result.Message);
+
+        byte[] pixels = target.ReadPixels(_device);
+        int firstRow = 0;
+        int thirdRow = 2 * height * 4;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(pixels[firstRow], Is.EqualTo(leftRed), "a quarter clockwise puts the source's first column along the top");
+            Assert.That(pixels[thirdRow], Is.EqualTo(rightRed), "and its last column along the bottom");
+        }
+    }
+
+    [Test]
+    public void MirrorsThePictureLeftToRight()
+    {
+        const int width = 4;
+        const int height = 2;
+        const byte leftRed = 0x10;
+        const byte rightRed = 0x40;
+
+        using FrameBuffer buffer = new(width, height, (x, _) => x < width / 2 ? (leftRed, (byte)0x20, (byte)0x30, (byte)0xFF) : (rightRed, (byte)0x50, (byte)0x60, (byte)0xFF));
+        using RawVideoFrame frame = CreateFrame(width, height, buffer);
+        using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
+
+        _renderer.SetOutput(target.View, width, height);
+
+        VideoTransform mirrored = VideoTransform.Identity with { Orientation = new VideoOrientation(0, true) };
+        PlaybackOperationResult result = _renderer.Render(frame, mirrored);
+        Assert.That(result.IsSuccessful, Is.True, result.Message);
+
+        byte[] pixels = target.ReadPixels(_device);
+        int firstColumn = 0;
+        int thirdColumn = 2 * 4;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(pixels[firstColumn], Is.EqualTo(rightRed), "the source's last column is drawn on the left");
+            Assert.That(pixels[thirdColumn], Is.EqualTo(leftRed), "and its first column on the right");
+        }
+    }
+
+    [Test]
+    public void LeavesTheBarsAroundThePictureUntouched()
+    {
+        const int width = 2;
+        const int height = 2;
+        const byte red = 0x10;
+
+        using FrameBuffer buffer = new(width, height, (_, _) => (red, (byte)0x20, (byte)0x30, (byte)0xFF));
+        using RawVideoFrame frame = CreateFrame(width, height, buffer);
+
+        // A 2x2 picture in a 4x2 surface is centred, so the picture is between two bars. Nothing outside it is
+        // drawn: a picture that hung past its own edge would repeat its last column there, and in the chroma
+        // plane of a YUV frame that reads as a band of the wrong colour rather than as a repeat.
+        using (var wide = D3D11RenderTarget.CreateOffscreen(_device, 4, 2))
+        {
+            _renderer.SetOutput(wide.View, 4, 2);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+
+            byte[] pixels = wide.ReadPixels(_device);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pixels[0], Is.Zero, "the left bar is the cleared surface, not the picture");
+                Assert.That(pixels[3 * 4], Is.Zero, "and so is the right bar");
+                Assert.That(pixels[1 * 4], Is.EqualTo(red), "the picture sits between them");
+            }
+        }
+
+        // The same picture in a 2x4 surface, which leaves bars above and below.
+        using (var tall = D3D11RenderTarget.CreateOffscreen(_device, 2, 4))
+        {
+            _renderer.SetOutput(tall.View, 2, 4);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+
+            byte[] pixels = tall.ReadPixels(_device);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pixels[0], Is.Zero, "the top bar is the cleared surface as well");
+                Assert.That(pixels[3 * 8], Is.Zero, "and so is the bottom bar");
+                Assert.That(pixels[1 * 8], Is.EqualTo(red), "the picture sits between them");
+            }
+        }
+    }
+
+    [Test]
+    public void RedrawsAPausedPictureWithTheTransformItIsGiven()
+    {
+        const int width = 4;
+        const int height = 2;
+
+        using FrameBuffer buffer = new(width, height, (x, _) => x < width / 2 ? ((byte)0x10, (byte)0x20, (byte)0x30, (byte)0xFF) : ((byte)0x40, (byte)0x50, (byte)0x60, (byte)0xFF));
+        using RawVideoFrame frame = CreateFrame(width, height, buffer);
+        using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
+
+        _renderer.SetOutput(target.View, width, height);
+        Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+        Assert.That(target.ReadPixels(_device)[0], Is.EqualTo(0x10), "the picture starts unmirrored");
+
+        // No new frame arrives: the redraw is what turns the picture that is already there.
+        VideoTransform mirrored = VideoTransform.Identity with { Orientation = new VideoOrientation(0, true) };
+        PlaybackOperationResult refreshed = _renderer.RefreshSurface(mirrored);
+        Assert.That(refreshed.IsSuccessful, Is.True, refreshed.Message);
+        Assert.That(target.ReadPixels(_device)[0], Is.EqualTo(0x40), "the same picture is drawn the other way round");
     }
 
     [Test]
@@ -132,7 +257,7 @@ public class D3D11VideoRendererTests
 
         using FrameBuffer buffer = new(8, 4, (_, _) => (0x11, 0x22, 0x33, 0xFF));
         using RawVideoFrame frame = CreateFrame(8, 4, buffer);
-        PlaybackOperationResult renderResult = _renderer.Render(frame);
+        PlaybackOperationResult renderResult = _renderer.Render(frame, VideoTransform.Identity);
         Assert.That(renderResult.IsSuccessful, Is.True, renderResult.Message);
 
         byte[] pixels = ownedSwapChain.ReadPixels();
@@ -161,7 +286,7 @@ public class D3D11VideoRendererTests
         };
 
         _renderer.SetOutput(null, 0, 0);
-        PlaybackOperationResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame, VideoTransform.Identity);
 
         Assert.That(result.IsSuccessful, Is.False);
     }
@@ -197,7 +322,7 @@ public class D3D11VideoRendererTests
         using (FrameBuffer buffer = new(200, 100, (_, _) => (0x10, 0x20, 0x30, 0xFF)))
         using (RawVideoFrame frame = CreateFrame(200, 100, buffer))
         {
-            Assert.That(_renderer.Render(frame).IsSuccessful, Is.True);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
         }
 
         Assert.That(_renderer.TryGetCompositionTransform(out double before, out double _), Is.True);
@@ -212,7 +337,7 @@ public class D3D11VideoRendererTests
         using (FrameBuffer buffer = new(200, 100, (_, _) => (0x10, 0x20, 0x30, 0xFF)))
         using (RawVideoFrame frame = CreateFrame(200, 100, buffer))
         {
-            Assert.That(_renderer.Render(frame).IsSuccessful, Is.True);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
         }
 
         using (Assert.EnterMultipleScope())
@@ -235,7 +360,7 @@ public class D3D11VideoRendererTests
         using (FrameBuffer buffer = new(100, 50, (_, _) => (0x11, 0x22, 0x33, 0xFF)))
         using (RawVideoFrame frame = CreateFrame(100, 50, buffer))
         {
-            Assert.That(_renderer.Render(frame).IsSuccessful, Is.True);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
         }
 
         // Playback is paused, so nothing is presented: only the host's report of a new surface arrives.
@@ -244,7 +369,7 @@ public class D3D11VideoRendererTests
         target.RasterizationScale = 2.0;
         target.RaiseSizeChanged();
 
-        PlaybackOperationResult refreshed = _renderer.RefreshSurface();
+        PlaybackOperationResult refreshed = _renderer.RefreshSurface(VideoTransform.Identity);
 
         using (Assert.EnterMultipleScope())
         {
@@ -273,13 +398,13 @@ public class D3D11VideoRendererTests
         using (FrameBuffer buffer = new(width, height, (_, _) => (blue, green, red, 0xFF)))
         using (RawVideoFrame frame = CreateFrame(width, height, buffer))
         {
-            Assert.That(_renderer.Render(frame).IsSuccessful, Is.True);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
         }
 
         _device.Context.ClearRenderTargetView(target.View, [0.0f, 0.0f, 0.0f, 1.0f]);
         Assert.That(target.ReadPixels(_device)[0], Is.Zero, "the surface is emptied first, so what follows is drawn rather than left behind");
 
-        Assert.That(_renderer.RefreshSurface().IsSuccessful, Is.True);
+        Assert.That(_renderer.RefreshSurface(VideoTransform.Identity).IsSuccessful, Is.True);
 
         byte[] pixels = target.ReadPixels(_device);
         using (Assert.EnterMultipleScope())
@@ -303,7 +428,7 @@ public class D3D11VideoRendererTests
         target.SurfaceHeight = 16;
         target.RaiseSizeChanged();
 
-        PlaybackOperationResult refreshed = _renderer.RefreshSurface();
+        PlaybackOperationResult refreshed = _renderer.RefreshSurface(VideoTransform.Identity);
 
         using (Assert.EnterMultipleScope())
         {
@@ -320,7 +445,7 @@ public class D3D11VideoRendererTests
         using RawVideoFrame frame = CreateFrame(4, 4, buffer);
 
         _renderer.SetOutput(null, 0, 0);
-        PlaybackOperationResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame, VideoTransform.Identity);
 
         Assert.That(result.IsSuccessful, Is.False);
     }

@@ -18,6 +18,7 @@ using SinePlayer.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -111,6 +112,34 @@ internal sealed partial class PlaybackLabPage : BasePage
     private void MuteToggle_Click(object sender, RoutedEventArgs e)
     {
         ApplyLevel();
+    }
+
+    private void TransformChoice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ApplyTransform();
+    }
+
+    private void TransformToggle_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyTransform();
+    }
+
+    private void TransformSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        ApplyTransform();
+    }
+
+    private void ResetTransformButton_Click(object sender, RoutedEventArgs e)
+    {
+        RotationPicker.SelectedIndex = 0;
+        FlipHorizontalToggle.IsChecked = false;
+        FlipVerticalToggle.IsChecked = false;
+        FittingPicker.SelectedIndex = 0;
+        ZoomSlider.Value = 100;
+        PanXSlider.Value = 0;
+        PanYSlider.Value = 0;
+
+        ApplyTransform();
     }
 
     private void PlayButton_Click(object sender, RoutedEventArgs e)
@@ -220,6 +249,10 @@ internal sealed partial class PlaybackLabPage : BasePage
         ApplyComponentSelection<IVideoRendererFactory>(pipeline, VideoRendererPicker.SelectedItem as ComponentChoice);
         ApplyComponentSelection<IAudioRendererFactory>(pipeline, AudioRendererPicker.SelectedItem as ComponentChoice);
 
+        // What the transform controls say is what the file is opened with, so a picture that is turned stays
+        // turned across files rather than snapping back on every open.
+        pipeline.VideoTransform = CreateTransform();
+
         pipeline.StateChanged += Pipeline_StateChanged;
         pipeline.WarningRaised += Pipeline_WarningRaised;
 
@@ -278,6 +311,41 @@ internal sealed partial class PlaybackLabPage : BasePage
     private void ApplyLevel()
     {
         _gain?.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
+    }
+
+    /// <summary>
+    /// What the transform controls say, as the one value the pipeline is given. Every control writes to this,
+    /// so the value is always the whole of what the panel shows rather than a field-by-field patch.
+    /// </summary>
+    private VideoTransform CreateTransform()
+    {
+        var orientation = VideoOrientation.FromDegrees(
+            Math.Max(0, RotationPicker.SelectedIndex) * 90,
+            FlipHorizontalToggle.IsChecked == true,
+            FlipVerticalToggle.IsChecked == true);
+
+        VideoResizeMode resizeMode = FittingPicker.SelectedItem is VideoResizeMode mode ? mode : VideoResizeMode.Fit;
+
+        return new VideoTransform(
+            orientation,
+            resizeMode,
+            ZoomSlider.Value / 100.0,
+            PanXSlider.Value / 100.0,
+            PanYSlider.Value / 100.0);
+    }
+
+    private void ApplyTransform()
+    {
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            return;
+        }
+
+        // No reconcile and no new frame: the picture that is already there is drawn again through the new
+        // transform, which is the whole of what turning it costs.
+        pipeline.VideoTransform = CreateTransform();
+        RefreshStatus();
     }
 
     private async void SeekBy(double seconds)
@@ -430,6 +498,11 @@ internal sealed partial class PlaybackLabPage : BasePage
             audioRenderers.Insert(0, new ComponentChoice("Auto", allAudioRenderers));
             AudioRendererPicker.ItemsSource = audioRenderers;
 
+            RotationPicker.ItemsSource = new[] { "0°", "90°", "180°", "270°" };
+            RotationPicker.SelectedIndex = 0;
+            FittingPicker.ItemsSource = Enum.GetValues<VideoResizeMode>();
+            FittingPicker.SelectedIndex = 0;
+
             VideoDecoderPicker.SelectedIndex = 0;
             AudioDecoderPicker.SelectedIndex = 0;
             VideoRendererPicker.SelectedIndex = 0;
@@ -486,9 +559,23 @@ internal sealed partial class PlaybackLabPage : BasePage
             ? "no audio filters"
             : $"filters {string.Join(", ", pipeline.AudioFilters.Filters.Select(filter => filter.Name))}";
         string pace = $" decode {pipeline.AverageVideoDecodeMilliseconds:0.0} ms {decoding}, render {pipeline.AverageVideoRenderMilliseconds:0.0} ms by {renderer}{sound}, {chain}.";
+        string transform = DescribeTransform(pipeline.VideoTransform);
 
         Report($"{pipeline.State}: {_description}. {pipeline.Position:mm\\:ss\\.fff} / {pipeline.Duration:mm\\:ss\\.fff}."
-            + $" {presented} frame(s).{health}{compositor}{pace}{surface}{error}{warning}");
+            + $" {presented} frame(s).{health}{compositor}{pace}{transform}{surface}{error}{warning}");
+    }
+
+    /// <summary>
+    /// What the picture is being placed through, so a transform that looks wrong can be read off the line
+    /// instead of guessed at from the picture.
+    /// </summary>
+    private static string DescribeTransform(VideoTransform transform)
+    {
+        string orientation = transform.Orientation.IsIdentity
+            ? "upright"
+            : $"{transform.Orientation.RotationDegrees}°{(transform.Orientation.Mirrored ? " mirrored" : string.Empty)}";
+
+        return $" transform {orientation}, {transform.ResizeMode}, zoom {transform.Zoom:0.##}x, pan {transform.PanX:0.##}/{transform.PanY:0.##}.";
     }
 
     private static string Describe(PlaybackPipeline pipeline)

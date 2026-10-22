@@ -7,6 +7,7 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -434,7 +435,7 @@ public class FFmpegVideoDecoderTests
     {
         renderer.SetOutput(target.View, frame.Width, frame.Height);
 
-        PlaybackOperationResult result = renderer.Render(frame);
+        PlaybackOperationResult result = renderer.Render(frame, VideoTransform.Identity);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         return target.ReadPixels(device);
@@ -484,14 +485,14 @@ public class FFmpegVideoDecoderTests
                 error);
 
             using FFmpegVideoDecoder owned = decoder!;
-            Assert.That(owned.Name, Is.EqualTo("av1"), "the first candidate is what gets opened");
+            Assert.That(owned.Name, Is.EqualTo("FFmpeg av1"), "the first candidate is what gets opened");
 
             List<RawVideoFrame> frames = DecodeAll(source, owned);
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(frames, Is.Not.Empty, "the fallback has to produce the stream the first decoder could not");
-                Assert.That(owned.Name, Is.EqualTo("libdav1d"), "the decoder that failed has to be the one that was replaced");
+                Assert.That(owned.Name, Is.EqualTo("FFmpeg libdav1d"), "the decoder that failed has to be the one that was replaced");
             }
 
             DisposeFrames(frames);
@@ -547,7 +548,7 @@ public class FFmpegVideoDecoderTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(failed.IsSuccessful, Is.False, "a packet from another backend has to be refused");
-                Assert.That(owned.Name, Is.EqualTo("h264"), "a decoder that already produced a frame is not replaced");
+                Assert.That(owned.Name, Is.EqualTo("FFmpeg h264"), "a decoder that already produced a frame is not replaced");
             }
         }
         finally
@@ -587,7 +588,7 @@ public class FFmpegVideoDecoderTests
                 Assert.Ignore("This machine has no AV1 hardware decoder, so the stream decoded in software.");
             }
 
-            Assert.That(name, Is.EqualTo("av1"), "the hardware path is libavcodec's own AV1 decoder");
+            Assert.That(name, Is.EqualTo("FFmpeg av1"), "the hardware path is libavcodec's own AV1 decoder");
         }
         finally
         {

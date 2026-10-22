@@ -14,9 +14,9 @@ public interface IVideoRenderer : IDisposable
 
     PlaybackOperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target);
 
-    PlaybackOperationResult Render(RawVideoFrame frame);
+    PlaybackOperationResult Render(RawVideoFrame frame, VideoTransform transform);
 
-    PlaybackOperationResult RefreshSurface();
+    PlaybackOperationResult RefreshSurface(VideoTransform transform);
 
     bool TryGetDisplayedFrameCount(out long count);
 }
