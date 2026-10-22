@@ -138,7 +138,7 @@ internal sealed partial class MainPage : BasePage
 
         // Restore sidebar state
         {
-            SidebarView.SidebarStateJsonModel? sidebarState = jsonModel?.SidebarState ?? new();
+            SidebarStateModel sidebarState = jsonModel?.SidebarState ?? SidebarStateModel.LoadDefaults();
 
             SidebarSplitView.OpenPaneLength = Math.Max(360, sidebarState.Width);
             MainSidebarView.RestoreState(sidebarState);
@@ -166,7 +166,8 @@ internal sealed partial class MainPage : BasePage
                     targetTabId: string.Empty,
                     selectTab: i == jsonModel.SelectedIndex,
                     newTabId: tab.Id,
-                    oldTabId: tab.OldTabId ?? string.Empty);
+                    oldTabId: tab.OldTabId ?? string.Empty,
+                    fromWindowRestore: true);
             }
         }
 
@@ -436,9 +437,10 @@ internal sealed partial class MainPage : BasePage
         string initiateTabId = "",
         string newTabId = "",
         string oldTabId = "",
-        bool selectTab = true)
+        bool selectTab = true,
+        bool fromWindowRestore = false)
     {
-        PageNavigationBundle? bundle = AppRouter.Process(route);
+        PageNavigationBundle? bundle = AppRouter.Process(route, fromWindowRestore);
         if (bundle is null)
         {
             Logger.F(TAG, $"Failed to process route: {route.Url}");
@@ -447,9 +449,10 @@ internal sealed partial class MainPage : BasePage
 
         if (!bundle.PageTrait.AllowMultiplePages)
         {
+            string identity = AppRouter.GetPageIdentity(bundle.Url);
             foreach (TabInfo tab in _tabs)
             {
-                if (tab.CurrentBundle.Url == bundle.Url)
+                if (AppRouter.GetPageIdentity(tab.CurrentBundle.Url) == identity)
                 {
                     if (selectTab)
                     {
@@ -1119,7 +1122,7 @@ internal sealed partial class MainPage : BasePage
 
         _sidebarWidth = newWidth;
         DispatchRightOverlayWidthChangeEvent();
-        App.Instance.WindowManager.ScheduleSavingWindowState();
+        ScheduleSavingSidebarState();
     }
 
     private void SetSidebarOpenState(bool isOpen, bool force)
@@ -1160,18 +1163,24 @@ internal sealed partial class MainPage : BasePage
 
         if (!initialSync)
         {
-            App.Instance.WindowManager.ScheduleSavingWindowState();
+            ScheduleSavingSidebarState();
         }
 
         DispatchRightOverlayWidthChangeEvent();
     }
 
-    private SidebarView.SidebarStateJsonModel GetSidebarState()
+    private SidebarStateModel GetSidebarState()
     {
-        SidebarView.SidebarStateJsonModel sidebarState = MainSidebarView.GetState();
+        SidebarStateModel sidebarState = MainSidebarView.GetState();
         sidebarState.Width = SidebarSplitView.OpenPaneLength;
         sidebarState.IsOpen = _isSidebarOpen;
         return sidebarState;
+    }
+
+    private void ScheduleSavingSidebarState()
+    {
+        SidebarStateModel.SaveDefaults(GetSidebarState());
+        App.Instance.WindowManager.ScheduleSavingWindowState();
     }
 
     //
@@ -1615,7 +1624,7 @@ internal sealed partial class MainPage : BasePage
 
         public void OnStateChanged()
         {
-            App.Instance.WindowManager.ScheduleSavingWindowState();
+            page.ScheduleSavingSidebarState();
         }
     }
 
@@ -1646,7 +1655,7 @@ internal sealed partial class MainPage : BasePage
         public List<TabJsonModel?>? Tabs { get; set; }
 
         [JsonPropertyName("SidebarState")]
-        public SidebarView.SidebarStateJsonModel? SidebarState { get; set; }
+        public SidebarStateModel? SidebarState { get; set; }
     }
 
     public class TabJsonModel

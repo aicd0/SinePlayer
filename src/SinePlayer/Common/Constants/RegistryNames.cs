@@ -26,7 +26,11 @@ internal static class RegistryNames
         public const string PLAYER_OVERLAY_PINNED = "PlayerOverlayPinned";
         public const string SELECTED_PLAYER_SETTINGS_TAB = "SelectedPlayerSettingsTab";
         public const string SHOW_INSTALL_PLUGIN_WARNING = "ShowInstallPluginWarning";
-        public const string SIDE_PANE_LAST_FILTER_PRESET = "SidePaneLastFilterPreset";
+        public const string SIDEBAR_OPEN = "SidebarOpen";
+        public const string SIDEBAR_PINNED = "SidebarPinned";
+        public const string SIDEBAR_SELECTED_ITEM = "SidebarSelectedItem";
+        public const string SIDEBAR_WIDTH = "SidebarWidth";
+        public const string SIDEBAR_LAST_FILTER_PRESET = "SidebarLastFilterPreset";
         public const string WINDOW_STATUS = "WindowStatus";
     }
 

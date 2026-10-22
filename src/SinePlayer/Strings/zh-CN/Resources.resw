@@ -438,6 +438,9 @@ $files</value>
   <data name="ErrorCommonDescription" xml:space="preserve">
     <value>由于以下原因，操作失败：</value>
   </data>
+  <data name="ExceptAppLaunch" xml:space="preserve">
+    <value>应用启动时除外</value>
+  </data>
   <data name="Exit" xml:space="preserve">
     <value>退出</value>
   </data>

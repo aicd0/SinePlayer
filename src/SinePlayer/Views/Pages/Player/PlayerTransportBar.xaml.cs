@@ -50,13 +50,16 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
     public event FullscreenRequestedEventHandler? FullscreenRequested;
 
     private long _durationMs = 0;
-    private bool _isSeekDragging = false;
-    private bool _isUpdatingSeekSlider = false;
-    private bool _isUpdatingVolumeSlider = false;
     private bool _isMuted = false;
-    private int _volume = 100;
     private bool _isPinned = false;
     private RepeatMode _repeatMode = RepeatMode.Off;
+
+    private bool _isUpdatingVolumeSlider = false;
+    private int _volume = 100;
+
+    private bool _isUpdatingSeekSlider = false;
+    private bool _isSeekDragging = false;
+    private long _seekValueAtPressMs = -1;
 
     public PlayerTransportBar()
     {
@@ -268,6 +271,7 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
 
     private void OnSeekSliderPointerPressed(object sender, PointerRoutedEventArgs e)
     {
+        _seekValueAtPressMs = (long)Math.Round(SeekSlider.Value * 1000.0);
         _isSeekDragging = true;
     }
 
@@ -289,7 +293,12 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
         }
 
         _isSeekDragging = false;
-        SeekRequested?.Invoke((long)Math.Round(SeekSlider.Value * 1000.0));
+
+        long positionMs = (long)Math.Round(SeekSlider.Value * 1000.0);
+        if (positionMs != _seekValueAtPressMs)
+        {
+            SeekRequested?.Invoke(positionMs);
+        }
     }
 
     private void UpdatePositionText(long positionMs)

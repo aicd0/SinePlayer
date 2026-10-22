@@ -34,6 +34,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     private ActionHandler _actionHandler = ActionHandler.Dummy;
     private bool _volumeSaveScheduled;
     private bool _playbackPendingOnActivate;
+    private bool _restoredFromLastSession = false;
 
     // Media status
     private MediaModel? _media;
@@ -222,12 +223,12 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
         _isInitialized = false;
         _pendingMedia = null;
-        _pendingStartPositionMs = -1;
         _isPageActive = false;
     }
 
-    public void LoadPlayQueue(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
+    public void LoadPlayQueue(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs, bool restoredFromLastSession)
     {
+        _restoredFromLastSession = restoredFromLastSession;
         PlayQueue = playQueue;
         Playback.LoadState(playQueue, serializedPlayback, initialPositionMs);
     }
@@ -661,7 +662,10 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         PositionLiveData.Emit(startPositionMs > 0 ? startPositionMs : 0);
         PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Working });
 
-        if (AppSettingsModel.AutoPlayOnOpen)
+        bool restoredFromLastSession = _restoredFromLastSession;
+        _restoredFromLastSession = false;
+
+        if (AppSettingsModel.AutoPlayOnOpen && !(restoredFromLastSession && AppSettingsModel.AutoPlayOnOpenExceptAppLaunch))
         {
             if (_isPageActive)
             {

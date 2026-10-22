@@ -61,6 +61,15 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
+    private void AutoPlayOnOpenExceptAppLaunchCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        bool? isChecked = ((CheckBox)sender).IsChecked;
+        if (isChecked.HasValue)
+        {
+            AppSettingsModel.AutoPlayOnOpenExceptAppLaunch = isChecked.Value;
+        }
+    }
+
     private void PauseOnLeaveTabCheckBox_Click(object sender, RoutedEventArgs e)
     {
         bool? isChecked = ((CheckBox)sender).IsChecked;

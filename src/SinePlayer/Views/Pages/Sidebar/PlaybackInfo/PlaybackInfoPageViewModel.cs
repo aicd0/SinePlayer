@@ -35,34 +35,27 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
     }
 
     public bool HasContent => !_isEmpty;
-    public int StructureVersion => _structureVersion;
     public IReadOnlyList<PlaybackInfoRow> Rows { get; private set; } = [];
-
-    private int _structureVersion;
-    private readonly List<string> _keys = [];
 
     public void Update(IPlaybackInfoProvider? info)
     {
         if (info?.Media is not { } media)
         {
             IsEmpty = true;
-            Apply([], []);
+            Rows = [];
             return;
         }
 
         IsEmpty = false;
 
         List<PlaybackInfoRow> rows = [];
-        List<string> keys = [];
         void Add(string key, string name, string value)
         {
-            keys.Add(key);
             rows.Add(PlaybackInfoRow.Property(key, name, value));
         }
 
         void Group(string key, string name)
         {
-            keys.Add(key);
             rows.Add(PlaybackInfoRow.Group(key, name));
         }
 
@@ -78,7 +71,7 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
         {
             Group("group.video", StringResource.Video);
             Add("video.codec", StringResource.Codec, FormatCodec(video));
-            Add("video.resolution", StringResource.Resolution, video.Width + "×" + video.Height);
+            Add("video.resolution", StringResource.Resolution, video.Width + " x " + video.Height);
             if (video.FrameRate > 0)
             {
                 Add("video.framerate", StringResource.FrameRate, video.FrameRate.ToString("0.###", CultureInfo.InvariantCulture) + " fps");
@@ -134,7 +127,7 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
         Add("playback.render.video", StringResource.VideoRenderTime, FormatMilliseconds(info.AverageVideoRenderMilliseconds));
         Add("playback.underruns", StringResource.AudioUnderruns, info.AudioUnderruns.ToString(CultureInfo.InvariantCulture));
 
-        Apply(rows, keys);
+        Rows = rows;
     }
 
     public string BuildCopyText()
@@ -143,36 +136,6 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             .Where(row => !row.IsGroup)
             .OrderBy(row => row.Key, StringComparer.Ordinal)
             .Select(row => $"{row.Key}: {row.Value}"));
-    }
-
-    private void Apply(List<PlaybackInfoRow> rows, List<string> keys)
-    {
-        if (!SameKeys(keys))
-        {
-            _keys.Clear();
-            _keys.AddRange(keys);
-            _structureVersion++;
-        }
-
-        Rows = rows;
-    }
-
-    private bool SameKeys(List<string> keys)
-    {
-        if (keys.Count != _keys.Count)
-        {
-            return false;
-        }
-
-        for (int index = 0; index < keys.Count; index++)
-        {
-            if (keys[index] != _keys[index])
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private static string FormatCodec(MediaStreamInfo stream)

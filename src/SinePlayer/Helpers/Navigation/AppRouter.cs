@@ -16,8 +16,14 @@ internal static class AppRouter
         _openPageInterceptor,
     ];
 
-    public static PageNavigationBundle? Process(Route route)
+    public static PageNavigationBundle? Process(Route route, bool fromWindowRestore = false)
     {
+        Normalize(route);
+        if (fromWindowRestore)
+        {
+            route.WithParam(RouterConstants.ARG_RESTORED, "1");
+        }
+
         foreach (IRouterInterceptor interceptor in sInterceptors)
         {
             if (interceptor.Intercept(route, out PageNavigationBundle? bundle))
@@ -32,5 +38,15 @@ internal static class AppRouter
     public static void RegisterPage(string host, Type pageType)
     {
         _openPageInterceptor.RegisterPage(host, new DefaultPageTrait(pageType));
+    }
+
+    public static string GetPageIdentity(string url)
+    {
+        return Normalize(Route.Create(url)).Url;
+    }
+
+    private static Route Normalize(Route route)
+    {
+        return route.WithParam(RouterConstants.ARG_RESTORED, null);
     }
 }

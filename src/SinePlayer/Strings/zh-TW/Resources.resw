@@ -436,6 +436,9 @@
   <data name="ErrorCommonDescription" xml:space="preserve">
     <value>由於以下原因，操作失敗：</value>
   </data>
+  <data name="ExceptAppLaunch" xml:space="preserve">
+    <value>應用程式啟動時除外</value>
+  </data>
   <data name="Exit" xml:space="preserve">
     <value>退出</value>
   </data>

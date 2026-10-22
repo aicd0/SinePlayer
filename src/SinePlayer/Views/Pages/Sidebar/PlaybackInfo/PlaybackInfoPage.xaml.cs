@@ -25,11 +25,10 @@ internal sealed partial class PlaybackInfoPage : BasePage
     private readonly PlaybackInfoPageViewModel ViewModel = new();
 
     private readonly List<TextBlock?> _valueCells = [];
+    private readonly List<string> _keys = [];
 
     private IPlaybackInfoProvider? _provider;
     private DispatcherQueueTimer? _timer;
-
-    private int _builtStructureVersion = -1;
 
     public PlaybackInfoPage()
     {
@@ -96,26 +95,45 @@ internal sealed partial class PlaybackInfoPage : BasePage
     {
         ViewModel.Update(_provider);
 
-        if (_builtStructureVersion != ViewModel.StructureVersion)
+        IReadOnlyList<PlaybackInfoRow> rows = ViewModel.Rows;
+        if (!HasSameStructure(rows))
         {
-            _builtStructureVersion = ViewModel.StructureVersion;
-            BuildTable();
+            BuildTable(rows);
             return;
         }
 
-        WriteValues();
+        WriteChangedValues(rows);
     }
 
-    private void BuildTable()
+    private bool HasSameStructure(IReadOnlyList<PlaybackInfoRow> rows)
+    {
+        if (rows.Count != _keys.Count)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < rows.Count; index++)
+        {
+            if (rows[index].Key != _keys[index])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void BuildTable(IReadOnlyList<PlaybackInfoRow> rows)
     {
         TableGrid.Children.Clear();
         TableGrid.RowDefinitions.Clear();
         _valueCells.Clear();
+        _keys.Clear();
 
-        IReadOnlyList<PlaybackInfoRow> rows = ViewModel.Rows;
         for (int index = 0; index < rows.Count; index++)
         {
             PlaybackInfoRow row = rows[index];
+            _keys.Add(row.Key);
             TableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             if (row.IsGroup)
@@ -142,14 +160,13 @@ internal sealed partial class PlaybackInfoPage : BasePage
         }
     }
 
-    private void WriteValues()
+    private void WriteChangedValues(IReadOnlyList<PlaybackInfoRow> rows)
     {
-        IReadOnlyList<PlaybackInfoRow> rows = ViewModel.Rows;
         for (int index = 0; index < rows.Count && index < _valueCells.Count; index++)
         {
-            if (_valueCells[index] is TextBlock value)
+            if (_valueCells[index] is TextBlock cell && cell.Text != rows[index].Value)
             {
-                value.Text = rows[index].Value;
+                cell.Text = rows[index].Value;
             }
         }
     }
