@@ -9,9 +9,9 @@ using Windows.Win32.Graphics.Direct3D11;
 namespace SinePlayer.Core.Playback.Backends.Direct3D11;
 
 /// <summary>
-/// The shader programme that puts a decoded frame on the screen: a vertex shader that generates a
-/// full-screen triangle without any vertex buffer, and one pixel shader per frame layout that samples
-/// the frame textures and produces RGBA.
+/// The shader programme that puts a decoded frame on the screen: a vertex shader that generates a rectangle
+/// without any vertex buffer and places it where the picture belongs, and one pixel shader per frame layout
+/// that samples the frame textures and produces RGBA.
 /// </summary>
 internal sealed class D3D11VideoShaders : IDisposable
 {
@@ -20,13 +20,19 @@ internal sealed class D3D11VideoShaders : IDisposable
     /// belong to the frame once the engine carries them, and become a shader variant at that point.
     /// </summary>
     private const string ShaderSource = """
-        // The part of the texture the picture occupies. A hardware decoder pads the texture it decodes into,
-        // so the picture is smaller than the texture it lies in, and sampling all of it would put the padded
-        // rows — which nothing wrote — along the bottom of the picture.
+        // Everything about where the picture goes. TexCoordScale is the part of the texture the picture occupies:
+        // a hardware decoder pads the texture it decodes into, so the picture is smaller than the texture it lies
+        // in, and sampling all of it would put the padded rows — which nothing wrote — along the bottom.
+        //
+        // QuadRow0 and QuadRow1 place the unit square this shader starts from on the surface, in surface
+        // coordinates: turning, mirroring, fitting and zooming are all inside them, so the vertex shader neither
+        // knows nor needs to know which of those it is applying.
         cbuffer FrameTransform : register(b0)
         {
             float2 TexCoordScale;
             float2 Unused;
+            float4 QuadRow0;
+            float4 QuadRow1;
         };
 
         struct VSOutput
@@ -38,8 +44,16 @@ internal sealed class D3D11VideoShaders : IDisposable
         VSOutput VSMain(uint vertexId : SV_VertexID)
         {
             VSOutput output;
-            float2 uv = float2((vertexId << 1) & 2, vertexId & 2);
-            output.Position = float4(uv * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
+
+            // Four corners of the picture, drawn as a strip. A single oversized triangle was cheaper, but the
+            // part of it that hung beyond the picture used to be clipped away by a viewport shaped like the
+            // picture; with the picture placed by the transform instead, that part would be drawn into the
+            // bars — sampling past the edge of the texture, which shows as the last column repeated or as the
+            // green of unwritten chroma. A quad draws exactly the picture and nothing else.
+            float2 uv = float2((float)(vertexId & 1), (float)(vertexId >> 1));
+            float3 corner = float3(uv, 1.0);
+            float2 placed = float2(dot(corner, QuadRow0.xyz), dot(corner, QuadRow1.xyz));
+            output.Position = float4(placed.x * 2.0 - 1.0, 1.0 - placed.y * 2.0, 0.0, 1.0);
             output.TexCoord = uv * TexCoordScale;
             return output;
         }
@@ -98,17 +112,25 @@ internal sealed class D3D11VideoShaders : IDisposable
 
     private ID3D11VertexShader? _vertexShader;
     private ID3D11SamplerState? _sampler;
+    private ID3D11RasterizerState? _rasterizer;
     private bool _disposed;
 
-    private D3D11VideoShaders(ID3D11VertexShader vertexShader, ID3D11SamplerState sampler)
+    private D3D11VideoShaders(ID3D11VertexShader vertexShader, ID3D11SamplerState sampler, ID3D11RasterizerState rasterizer)
     {
         _vertexShader = vertexShader;
         _sampler = sampler;
+        _rasterizer = rasterizer;
     }
 
     internal ID3D11VertexShader VertexShader => _vertexShader ?? throw new ObjectDisposedException(nameof(D3D11VideoShaders));
 
     internal ID3D11SamplerState Sampler => _sampler ?? throw new ObjectDisposedException(nameof(D3D11VideoShaders));
+
+    /// <summary>
+    /// Nothing is culled. The picture is one quad, and mirroring turns it inside out — culling the back faces
+    /// of a rectangle whose only face is the one being looked at would make a mirrored picture disappear.
+    /// </summary>
+    internal ID3D11RasterizerState Rasterizer => _rasterizer ?? throw new ObjectDisposedException(nameof(D3D11VideoShaders));
 
     internal static bool TryCreate(D3D11Device device, out D3D11VideoShaders? shaders, out string error)
     {
@@ -132,9 +154,16 @@ internal sealed class D3D11VideoShaders : IDisposable
             return false;
         }
 
+        D3D11_RASTERIZER_DESC rasterizerDescription = new()
+        {
+            FillMode = D3D11_FILL_MODE.D3D11_FILL_SOLID,
+            CullMode = D3D11_CULL_MODE.D3D11_CULL_NONE,
+        };
+
         D3D11VideoShaders created = new(
             D3D11Interop.CreateVertexShader(device.Device, vertexBytecode!),
-            D3D11Interop.CreateSamplerState(device.Device, samplerDescription));
+            D3D11Interop.CreateSamplerState(device.Device, samplerDescription),
+            D3D11Interop.CreateRasterizerState(device.Device, rasterizerDescription));
 
         try
         {
@@ -209,6 +238,8 @@ internal sealed class D3D11VideoShaders : IDisposable
         _arrayPixelShaders.Clear();
         D3D11Interop.Release(_sampler);
         _sampler = null;
+        D3D11Interop.Release(_rasterizer);
+        _rasterizer = null;
         D3D11Interop.Release(_vertexShader);
         _vertexShader = null;
     }

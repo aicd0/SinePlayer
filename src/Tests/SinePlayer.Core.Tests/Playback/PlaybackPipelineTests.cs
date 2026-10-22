@@ -981,6 +981,74 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// Turning a picture is not a new frame, so a paused video has to be drawn again for the change to show:
+    /// the host sets the transform, the presentation thread takes it up, and nothing is presented on the way.
+    /// </summary>
+    [Test]
+    public void TurnsThePictureWhilePausedWithoutWaitingForAFrame()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { SubmitDelayMilliseconds = 30 });
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            pipeline.Play();
+            WaitForPresentedFrames(pipeline, 2);
+            pipeline.Pause();
+            WaitFor(() => pipeline.State == MediaEngineState.Paused, "the pipeline is paused");
+
+            VideoTransform turned = VideoTransform.Identity with { Orientation = new VideoOrientation(1, false) };
+            long presented = videoRenderer.RenderedFrames;
+            pipeline.VideoTransform = turned;
+
+            WaitFor(() => videoRenderer.LastRefreshedTransform == turned, "the turned picture is offered to the renderer");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(videoRenderer.RenderedFrames, Is.EqualTo(presented), "turning the picture presents no frame");
+                Assert.That(pipeline.VideoTransform, Is.EqualTo(turned), "the pipeline keeps what the host set");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// While frames are arriving, the transform travels with each one rather than being remembered by the
+    /// renderer: a renderer replaced mid-playback must not be able to keep a picture turned the way the old one
+    /// had it.
+    /// </summary>
+    [Test]
+    public void RendersEveryFrameThroughTheTransformTheHostSet()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(videoRenderer.LastRenderedTransform, Is.EqualTo(VideoTransform.Identity), "nothing is turned until the host says so");
+
+            VideoTransform mirrored = VideoTransform.Identity with { Orientation = new VideoOrientation(0, true) };
+            pipeline.VideoTransform = mirrored;
+            pipeline.Play();
+
+            WaitForPresentedFrames(pipeline, 2);
+
+            Assert.That(videoRenderer.LastRenderedTransform, Is.EqualTo(mirrored));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
     /// A thread with nothing to do waits rather than polls, so the host's word is what has to reach it: each
     /// surface change arriving while paused has to be taken up as it arrives, not at the next time the
     /// sleeping thread happens to look. The test counts the offers while several changes arrive in quick
@@ -4914,12 +4982,12 @@ public class PlaybackPipelineTests
             return PlaybackOperationResult.Success;
         }
 
-        public PlaybackOperationResult Render(RawVideoFrame frame)
+        public PlaybackOperationResult Render(RawVideoFrame frame, VideoTransform transform)
         {
             return PlaybackOperationResult.Success;
         }
 
-        public PlaybackOperationResult RefreshSurface()
+        public PlaybackOperationResult RefreshSurface(VideoTransform transform)
         {
             return PlaybackOperationResult.Success;
         }
@@ -5318,7 +5386,7 @@ public class PlaybackPipelineTests
             return PlaybackOperationResult.Success;
         }
 
-        public PlaybackOperationResult Render(RawVideoFrame frame)
+        public PlaybackOperationResult Render(RawVideoFrame frame, VideoTransform transform)
         {
             if (RenderFailure is string failure)
             {
@@ -5330,9 +5398,16 @@ public class PlaybackPipelineTests
                 Thread.Sleep(RenderDelayMilliseconds);
             }
 
+            LastRenderedTransform = transform;
             RenderedFrames++;
             return PlaybackOperationResult.Success;
         }
+
+        /// <summary>Where the last frame was told to go, which is how a test reads the transform the pipeline held.</summary>
+        public VideoTransform LastRenderedTransform { get; private set; } = VideoTransform.Identity;
+
+        /// <summary>Where the last redraw was told to go, for a transform that changes while nothing is presented.</summary>
+        public VideoTransform LastRefreshedTransform { get; private set; } = VideoTransform.Identity;
 
         /// <summary>
         /// Counts the times the pipeline offered the renderer a surface change while nothing was being
@@ -5343,9 +5418,10 @@ public class PlaybackPipelineTests
         /// <summary>How many times the pipeline let this renderer go, which is what a swap has to do to the one it replaces.</summary>
         public int DisposeCount { get; private set; }
 
-        public PlaybackOperationResult RefreshSurface()
+        public PlaybackOperationResult RefreshSurface(VideoTransform transform)
         {
             RefreshedSurfaces++;
+            LastRefreshedTransform = transform;
             return PlaybackOperationResult.Success;
         }
 

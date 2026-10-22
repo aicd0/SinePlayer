@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Numerics;
 using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Playback.Abstractions;
@@ -192,7 +193,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         return PlaybackOperationResult.Success;
     }
 
-    public PlaybackOperationResult Render(RawVideoFrame frame)
+    public PlaybackOperationResult Render(RawVideoFrame frame, VideoTransform transform)
     {
         ArgumentNullException.ThrowIfNull(frame);
 
@@ -232,7 +233,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
                     return bound;
                 }
 
-                return Draw(arrayShader!, _gpuViews, GpuTextureSlot, _gpuTexCoordScale);
+                return Draw(arrayShader!, _gpuViews, GpuTextureSlot, _gpuTexCoordScale, transform);
             }
 
             if (frame.Buffer is not IPlanarVideoBuffer buffer)
@@ -251,11 +252,11 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
                 return upload;
             }
 
-            return Draw(pixelShader!, _planeViews, 0, (1.0f, 1.0f));
+            return Draw(pixelShader!, _planeViews, 0, (1.0f, 1.0f), transform);
         }
     }
 
-    public PlaybackOperationResult RefreshSurface()
+    public PlaybackOperationResult RefreshSurface(VideoTransform transform)
     {
         if (_disposed)
         {
@@ -280,7 +281,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
                 return PlaybackOperationResult.Success;
             }
 
-            return Draw(_lastPixelShader, _lastViews, _lastSlot, _lastTexCoordScale);
+            return Draw(_lastPixelShader, _lastViews, _lastSlot, _lastTexCoordScale, transform);
         }
     }
 
@@ -326,7 +327,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
     /// from <see cref="Render"/> because the planes outlive the frame: they are what makes it possible to
     /// show the same picture again after the surface changed.
     /// </summary>
-    private PlaybackOperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, (float X, float Y) texCoordScale)
+    private PlaybackOperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, (float X, float Y) texCoordScale, VideoTransform transform)
     {
         ID3D11DeviceContext context = _device.Context;
         context.OMSetRenderTargets(1, [_outputView], null);
@@ -335,22 +336,25 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         // shows through: the surface is a window, not the video.
         context.ClearRenderTargetView(_outputView, [0.0f, 0.0f, 0.0f, 1.0f]);
 
-        // Drawn into the part of the surface the frame's shape calls for rather than the whole of it, so
-        // a picture whose shape differs from the window's is letterboxed instead of stretched.
-        (int fittedX, int fittedY, int fittedWidth, int fittedHeight) = VideoFit.Fit(_frameWidth, _frameHeight, _outputWidth, _outputHeight);
-        D3D11Interop.SetViewport(context, fittedX, fittedY, fittedWidth, fittedHeight);
-        context.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        // The whole surface is the viewport and the picture is placed inside it by the transform, which is what
+        // lets fitting, turning and zooming be one thing: the picture is drawn where it belongs rather than into
+        // a viewport shaped like it, and the bars are simply what the picture does not reach.
+        D3D11Interop.SetViewport(context, 0, 0, _outputWidth, _outputHeight);
+        D3D11Interop.SetRasterizerState(context, _shaders.Rasterizer);
+        context.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
         D3D11Interop.SetShaders(context, _shaders.VertexShader, pixelShader);
 
         // Where the picture lies inside the texture it is drawn from: all of it for an uploaded frame, less
-        // for one a hardware decoder padded.
-        D3D11Interop.SetTexCoordScale(context, _frameTransform, texCoordScale.X, texCoordScale.Y);
+        // for one a hardware decoder padded. Where it lies on the surface is the placement beside it.
+        Matrix3x2 placement = transform.GetPlacement(_frameWidth, _frameHeight, _outputWidth, _outputHeight);
+        D3D11Interop.SetFrameTransform(context, _frameTransform, texCoordScale.X, texCoordScale.Y, placement);
         D3D11Interop.SetVertexConstantBuffer(context, 0, _frameTransform);
 
         D3D11Interop.SetTextures(context, textureSlot, views, _shaders.Sampler);
 
-        // A single triangle covers the whole target, so no vertex or index buffer is needed.
-        context.Draw(3, 0);
+        // Four corners, placed by the transform: no vertex or index buffer is needed, and nothing outside the
+        // picture is ever drawn.
+        context.Draw(4, 0);
 
         _lastPixelShader = pixelShader;
         _lastViews = views;

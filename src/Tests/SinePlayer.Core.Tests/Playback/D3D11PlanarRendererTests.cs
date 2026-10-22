@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 
 namespace SinePlayer.Core.Tests.Playback;
@@ -107,7 +108,7 @@ public class D3D11PlanarRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
         _renderer.SetOutput(target.View, Width, Height);
 
-        PlaybackOperationResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame, VideoTransform.Identity);
 
         Assert.That(result.IsSuccessful, Is.False);
     }
@@ -131,7 +132,7 @@ public class D3D11PlanarRendererTests
         Monitor.Enter(deviceLock);
         try
         {
-            draw = Task.Run(() => _renderer.Render(frame));
+            draw = Task.Run(() => _renderer.Render(frame, VideoTransform.Identity));
             blocked = !draw.Wait(TimeSpan.FromMilliseconds(250));
         }
         finally
@@ -150,7 +151,7 @@ public class D3D11PlanarRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
 
         _renderer.SetOutput(target.View, Width, Height);
-        PlaybackOperationResult result = _renderer.Render(frame);
+        PlaybackOperationResult result = _renderer.Render(frame, VideoTransform.Identity);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         return target.ReadPixels(_device);
