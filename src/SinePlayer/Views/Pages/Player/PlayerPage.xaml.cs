@@ -74,6 +74,7 @@ internal sealed partial class PlayerPage : BasePage
         ObserveData();
         UpdateKeyboardAccelerators();
 
+        bool restored = bundle.GetString(RouterConstants.ARG_RESTORED) == "1";
         string playQueueId = bundle.GetString(RouterConstants.ARG_PLAY_QUEUE_ID) ?? string.Empty;
         string serializedPlayback = bundle.GetString(RouterConstants.ARG_PLAYBACK) ?? string.Empty;
         long initialPositionMs = -1;
@@ -89,7 +90,7 @@ internal sealed partial class PlayerPage : BasePage
         CoroutineUtils.Run(async () =>
         {
             PlayQueueModel playQueue = await GetPlayQueue(playQueueId);
-            ViewModel.LoadPlayQueue(playQueue, serializedPlayback, initialPositionMs);
+            ViewModel.LoadPlayQueue(playQueue, serializedPlayback, initialPositionMs, restored);
         });
     }
 
@@ -244,6 +245,10 @@ internal sealed partial class PlayerPage : BasePage
                 GetMainPageAbility().SetIcon(new FontIconSource { Glyph = MediaGlyphHelper.GetMediaGlyph(media) });
                 _navigationBar?.SetPlayerSettings(media);
             }
+
+            Route route = Route.Create(GetMainPageAbility().Url)
+                .WithParam(RouterConstants.ARG_PLAYBACK, ViewModel.Playback.ToSerializedString());
+            GetMainPageAbility().SetUrl(route.Url);
 
             SyncCurrentMedia();
         }, new ObserveOptions()

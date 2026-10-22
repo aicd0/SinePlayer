@@ -2,13 +2,13 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
 
 using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.Plugins;
 using SinePlayer.Converters;
+using SinePlayer.Data.Models.Misc;
 using SinePlayer.Helpers.Navigation;
 using SinePlayer.SDK.Plugins.UI;
 
@@ -125,7 +125,7 @@ internal sealed partial class SidebarView : BaseUserControl
         }
     }
 
-    public SidebarStateJsonModel GetState()
+    public SidebarStateModel GetState()
     {
         return new()
         {
@@ -140,7 +140,7 @@ internal sealed partial class SidebarView : BaseUserControl
         UpdatePage();
     }
 
-    public void RestoreState(SidebarStateJsonModel state)
+    public void RestoreState(SidebarStateModel state)
     {
         _initialPageTag = state.SelectedItem ?? string.Empty;
         SetPinState(state.IsPinned);
@@ -299,20 +299,5 @@ internal sealed partial class SidebarView : BaseUserControl
         public required string Name { get; init; }
         public required Route PageRoute { get; init; }
         public required IconSource Icon { get; init; }
-    }
-
-    public class SidebarStateJsonModel
-    {
-        [JsonPropertyName("IsOpen")]
-        public bool IsOpen { get; set; }
-
-        [JsonPropertyName("IsPinned")]
-        public bool IsPinned { get; set; }
-
-        [JsonPropertyName("Width")]
-        public double Width { get; set; }
-
-        [JsonPropertyName("SelectedItem")]
-        public string? SelectedItem { get; set; }
     }
 }

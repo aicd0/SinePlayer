@@ -438,6 +438,9 @@ Kategorie:: Tag1, Tag2    - Überschreibe „Kategorie“ mit „Tag1“ und „
   <data name="ErrorCommonDescription" xml:space="preserve">
     <value>Der Vorgang ist aus folgendem Grund fehlgeschlagen:</value>
   </data>
+  <data name="ExceptAppLaunch" xml:space="preserve">
+    <value>Außer beim Starten der App</value>
+  </data>
   <data name="Exit" xml:space="preserve">
     <value>Beenden</value>
   </data>

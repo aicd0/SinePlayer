@@ -69,6 +69,17 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private bool _autoPlayOnOpenExceptAppLaunch;
+    public bool AutoPlayOnOpenExceptAppLaunch
+    {
+        get => _autoPlayOnOpenExceptAppLaunch;
+        set
+        {
+            _autoPlayOnOpenExceptAppLaunch = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AutoPlayOnOpenExceptAppLaunch)));
+        }
+    }
+
     private bool _pauseOnLeaveTab;
     public bool PauseOnLeaveTab
     {
@@ -122,6 +133,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             AutoToggleOverlaysOnCursor = AppSettingsModel.AutoToggleOverlaysOnCursor;
             AutoPlayNext = AppSettingsModel.AutoPlayNext;
             AutoPlayOnOpen = AppSettingsModel.AutoPlayOnOpen;
+            AutoPlayOnOpenExceptAppLaunch = AppSettingsModel.AutoPlayOnOpenExceptAppLaunch;
             PauseOnLeaveTab = AppSettingsModel.PauseOnLeaveTab;
         });
     }

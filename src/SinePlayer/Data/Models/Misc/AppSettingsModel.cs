@@ -116,6 +116,19 @@ internal static class AppSettingsModel
         }
     }
 
+    public static bool AutoPlayOnOpenExceptAppLaunch
+    {
+        get
+        {
+            return _db.Read(model => model.AutoPlayOnOpenExceptAppLaunch ?? true);
+        }
+        set
+        {
+            _db.Write(model => model.AutoPlayOnOpenExceptAppLaunch = value);
+            _db.Save();
+        }
+    }
+
     public static bool PauseOnLeaveTab
     {
         get
@@ -800,6 +813,9 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("AutoPlayOnOpen")]
         public bool? AutoPlayOnOpen { get; set; }
+
+        [JsonPropertyName("AutoPlayOnOpenExceptAppLaunch")]
+        public bool? AutoPlayOnOpenExceptAppLaunch { get; set; }
 
         [JsonPropertyName("PauseOnLeaveTab")]
         public bool? PauseOnLeaveTab { get; set; }

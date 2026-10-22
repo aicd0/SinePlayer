@@ -109,6 +109,7 @@ public class StringResourceProvider
     public string EnterNewTagsHint => GetResourceString("EnterNewTagsHint");
     public string Error => GetResourceString("Error");
     public string ErrorCommonDescription => GetResourceString("ErrorCommonDescription");
+    public string ExceptAppLaunch => GetResourceString("ExceptAppLaunch");
     public string Exit => GetResourceString("Exit");
     public string ExitFullscreen => GetResourceString("ExitFullscreen");
     public string ExpandAll => GetResourceString("ExpandAll");

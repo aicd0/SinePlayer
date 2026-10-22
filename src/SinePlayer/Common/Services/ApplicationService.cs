@@ -8,6 +8,7 @@ using System.Text;
 using SinePlayer.Common.InitTask;
 using SinePlayer.Core.Common.AppEnvironment;
 using SinePlayer.Core.Common.ServiceManagement.Services;
+using SinePlayer.Data.Models.Misc;
 
 using Windows.Storage;
 
@@ -76,6 +77,7 @@ internal class ApplicationService : IApplicationService
         _launching = false;
         _exiting = true;
         App.Instance.WindowManager.LockWindowState();
+        SidebarStateModel.Flush();
     }
 
     private static string GetDeploymentPath()

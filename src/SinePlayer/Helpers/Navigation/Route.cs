@@ -64,7 +64,7 @@ public class Route
         Fragment = fragment;
     }
 
-    public Route WithParam(string key, string value)
+    public Route WithParam(string key, string? value)
     {
         if (string.IsNullOrWhiteSpace(key))
         {
@@ -72,7 +72,7 @@ public class Route
             return this;
         }
 
-        if (value == null)
+        if (value is null)
         {
             if (Queries.Remove(key))
             {

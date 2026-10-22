@@ -35,6 +35,11 @@
             Content="{x:Bind StringResource.AutoPlayOnOpen}"
             IsChecked="{x:Bind ViewModel.AutoPlayOnOpen, Mode=TwoWay}" />
         <CheckBox
+            Margin="16,0,0,0"
+            Click="AutoPlayOnOpenExceptAppLaunchCheckBox_Click"
+            Content="{x:Bind StringResource.ExceptAppLaunch}"
+            IsChecked="{x:Bind ViewModel.AutoPlayOnOpenExceptAppLaunch, Mode=TwoWay}" />
+        <CheckBox
             Click="PauseOnLeaveTabCheckBox_Click"
             Content="{x:Bind StringResource.PauseOnLeaveTab}"
             IsChecked="{x:Bind ViewModel.PauseOnLeaveTab, Mode=TwoWay}" />

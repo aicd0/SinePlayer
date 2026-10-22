@@ -31,4 +31,5 @@ internal static class RouterConstants
     public const string ARG_PLAYBACK = "playback";
     public const string ARG_PLAY_QUEUE_ID = "play_queue_id";
     public const string ARG_POSITION = "position";
+    public const string ARG_RESTORED = "restored";
 }
