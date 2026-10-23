@@ -904,6 +904,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Position" xml:space="preserve">
     <value>Position</value>
   </data>
+  <data name="PreciseSeeking" xml:space="preserve">
+    <value>Präzises Spulen verwenden</value>
+  </data>
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>Hardwaredekodierung bevorzugen</value>
   </data>

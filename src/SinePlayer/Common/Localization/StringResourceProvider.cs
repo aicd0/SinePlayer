@@ -232,6 +232,7 @@ public class StringResourceProvider
     public string PluginSettingsDescription => GetResourceString("PluginSettingsDescription");
     public string Plugins => GetResourceString("Plugins");
     public string Position => GetResourceString("Position");
+    public string PreciseSeeking => GetResourceString("PreciseSeeking");
     public string PreferHardwareDecoding => GetResourceString("PreferHardwareDecoding");
     public string PresentedFrames => GetResourceString("PresentedFrames");
     public string PressKeyCombination => GetResourceString("PressKeyCombination");

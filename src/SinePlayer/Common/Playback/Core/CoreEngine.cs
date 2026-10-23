@@ -187,7 +187,7 @@ internal sealed partial class CoreEngine : IDisposable
         }
     }
 
-    public void Seek(TimeSpan position)
+    public void Seek(TimeSpan position, SeekMode mode)
     {
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is null)
@@ -218,10 +218,10 @@ internal sealed partial class CoreEngine : IDisposable
             // asked for, so a pause the user pressed while the seek was in flight is not overruled by this.
             bool wasPlaying = pipeline.State == MediaEngineState.Playing;
 
-            PlaybackOperationResult seeked = await pipeline.Seek(position);
+            PlaybackOperationResult seeked = await pipeline.Seek(position, mode);
             if (!seeked.IsSuccessful)
             {
-                Logger.W(TAG, $"Seek to {position:g} was refused: {seeked.Message}");
+                Logger.W(TAG, $"Seek to {position:g} ({mode}) was refused: {seeked.Message}");
             }
             else if (wasPlaying)
             {

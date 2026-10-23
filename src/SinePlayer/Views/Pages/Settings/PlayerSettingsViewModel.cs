@@ -91,6 +91,17 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private bool _preciseSeeking;
+    public bool PreciseSeeking
+    {
+        get => _preciseSeeking;
+        set
+        {
+            _preciseSeeking = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PreciseSeeking)));
+        }
+    }
+
     private List<KeepScreenOnBehaviorEntry> _keepScreenOnBehaviors = [];
     public List<KeepScreenOnBehaviorEntry> KeepScreenOnBehaviors
     {
@@ -135,6 +146,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             AutoPlayOnOpen = AppSettingsModel.AutoPlayOnOpen;
             AutoPlayOnOpenExceptAppLaunch = AppSettingsModel.AutoPlayOnOpenExceptAppLaunch;
             PauseOnLeaveTab = AppSettingsModel.PauseOnLeaveTab;
+            PreciseSeeking = AppSettingsModel.PreciseSeeking;
         });
     }
 

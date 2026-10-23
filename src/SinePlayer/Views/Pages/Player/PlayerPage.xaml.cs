@@ -24,6 +24,7 @@ using SinePlayer.Common.Misc;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Database;
@@ -547,7 +548,8 @@ internal sealed partial class PlayerPage : BasePage
         _pendingStartPositionMs = -1;
         if (startPositionMs > 0)
         {
-            engine.Seek(TimeSpan.FromMilliseconds(startPositionMs));
+            SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
+            engine.Seek(TimeSpan.FromMilliseconds(startPositionMs), mode);
         }
 
         ViewModel.PositionLiveData.Emit(startPositionMs > 0 ? startPositionMs : 0);
@@ -844,7 +846,8 @@ internal sealed partial class PlayerPage : BasePage
 
     private void SeekTo(long positionMs)
     {
-        _engine?.Seek(TimeSpan.FromMilliseconds(positionMs));
+        SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
+        _engine?.Seek(TimeSpan.FromMilliseconds(positionMs), mode);
     }
 
     private void SetVolume(int volume)

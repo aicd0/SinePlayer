@@ -904,6 +904,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Position" xml:space="preserve">
     <value>Position</value>
   </data>
+  <data name="PreciseSeeking" xml:space="preserve">
+    <value>Use precise seeking</value>
+  </data>
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>Prefer hardware decoding</value>
   </data>
