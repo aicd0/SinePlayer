@@ -4,7 +4,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 
-using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
@@ -668,7 +667,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private PlaybackOperationResult Fail(string message, Exception? exception = null)
     {
-        Logger.E(TAG, message, exception);
+        PlaybackLogger.E(TAG, message, exception);
         SetState(MediaEngineState.Error, message);
         WakeAll();
         return PlaybackOperationResult.Failure(message, exception);
@@ -690,6 +689,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void RaiseWarning(string warning)
     {
+        PlaybackLogger.W(TAG, warning);
         WarningRaised?.Invoke(warning);
     }
 
@@ -2099,7 +2099,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.E(TAG, ex);
+            PlaybackLogger.E(TAG, ex);
             return;
         }
 

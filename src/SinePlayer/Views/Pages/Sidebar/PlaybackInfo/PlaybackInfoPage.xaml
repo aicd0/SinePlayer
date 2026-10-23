@@ -69,12 +69,15 @@
                     </Grid.ColumnDefinitions>
                 </Grid>
 
-                <Button
+                <StackPanel
                     Grid.Row="1"
                     Margin="0,16,0,16"
                     HorizontalAlignment="Left"
-                    Click="CopyButton_Click"
-                    Content="{x:Bind StringResource.Copy}" />
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <Button Click="CopyButton_Click" Content="{x:Bind StringResource.Copy}" />
+                    <Button Click="ShowLogsButton_Click" Content="{x:Bind StringResource.ShowLogs}" />
+                </StackPanel>
             </Grid>
         </ScrollViewer>
     </Grid>

@@ -50,7 +50,7 @@ internal sealed partial class MainWindow : Window
 
     public static void Open()
     {
-        MainWindow window = new(null, restorePlacement: false);
+        MainWindow window = new(null, restorePlacement: false, fromWindowRestore: false);
         window.Activate();
     }
 
@@ -69,13 +69,14 @@ internal sealed partial class MainWindow : Window
                 Tabs = [tab],
             },
         };
-        MainWindow window = new(windowState, restorePlacement);
+
+        MainWindow window = new(windowState, restorePlacement, fromWindowRestore: false);
         window.Activate();
     }
 
     public static void Open(WindowStateModel windowState)
     {
-        MainWindow window = new(windowState, restorePlacement: true);
+        MainWindow window = new(windowState, restorePlacement: true, fromWindowRestore: true);
         window.Activate();
     }
 
@@ -91,6 +92,7 @@ internal sealed partial class MainWindow : Window
     private WindowMembers Members => _members!;
 
     private readonly bool _requestRestorePlacement = false;
+    private readonly bool _fromWindowRestore = false;
     private bool _isMinimized = false;
 
     //
@@ -107,7 +109,7 @@ internal sealed partial class MainWindow : Window
     // Constructors
     //
 
-    private MainWindow(WindowStateModel? windowState, bool restorePlacement)
+    private MainWindow(WindowStateModel? windowState, bool restorePlacement, bool fromWindowRestore)
     {
         InitializeComponent();
 
@@ -117,6 +119,7 @@ internal sealed partial class MainWindow : Window
         _members = new(this);
         Members._requestedWindowState = windowState;
         _requestRestorePlacement = restorePlacement;
+        _fromWindowRestore = fromWindowRestore;
 
         Title = StringResourceProvider.Instance.AppDisplayName;
         ExtendsContentIntoTitleBar = true;
@@ -340,7 +343,7 @@ internal sealed partial class MainWindow : Window
         }
 
         // Load initial tabs
-        Members._mainPage.RestoreState(windowState?.TabStatus);
+        Members._mainPage.LoadState(windowState?.TabStatus, _fromWindowRestore);
 
         if (sIsFirstWindow)
         {

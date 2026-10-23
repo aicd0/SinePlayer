@@ -116,6 +116,26 @@ public class ObservableRingCollectionTests
     }
 
     [Test]
+    public void ReplaceAllRaisesSingleReset()
+    {
+        ObservableRingCollection<int> collection = [1, 2, 3];
+        List<string> propertyNames = [];
+        List<NotifyCollectionChangedEventArgs> changes = [];
+        collection.PropertyChanged += (_, args) => propertyNames.Add(args.PropertyName ?? string.Empty);
+        collection.CollectionChanged += (_, args) => changes.Add(args);
+
+        collection.ReplaceAll([4, 5]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(collection, Is.EqualTo(new[] { 4, 5 }));
+            Assert.That(propertyNames, Is.EqualTo(new[] { "Count", "Item[]" }));
+            Assert.That(changes, Has.Count.EqualTo(1));
+            Assert.That(changes[0].Action, Is.EqualTo(NotifyCollectionChangedAction.Reset));
+        }
+    }
+
+    [Test]
     public void RemovingFromFrontKeepsOrder()
     {
         ObservableRingCollection<int> collection = [];

@@ -134,7 +134,7 @@ internal sealed partial class SettingsPage : BasePage
 
     private void LicenseHyperlink_Click(Hyperlink sender, HyperlinkClickEventArgs args)
     {
-        ThirdPartyLauncher.StartTemporaryTextFile("License.txt", StaticStringResources.LICENSE);
+        ThirdPartyLauncher.OpenTemporaryTextFile("License.txt", StaticStringResources.LICENSE);
     }
 
     private void GithubHyperlink_Click(Hyperlink sender, HyperlinkClickEventArgs args)

@@ -13,6 +13,7 @@ using SinePlayer.Common.Constants;
 using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Common.Utils;
+using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Views.Pages.Sidebar.MediaInfo;
 
@@ -88,7 +89,19 @@ internal sealed partial class PlaybackInfoPage : BasePage
     private void CopyButton_Click(object sender, RoutedEventArgs e)
     {
         ErrorResult copied = ClipboardUtils.SetText(ViewModel.BuildCopyText());
-        copied.DisplayErrorMessage(PageActionHandler);
+        copied.ShowErrorMessage(PageActionHandler);
+    }
+
+    private void ShowLogsButton_Click(object sender, RoutedEventArgs e)
+    {
+        string[] filePaths = Logger.GetLogTreeFilePaths("PlaybackLogger");
+        if (filePaths.Length == 0)
+        {
+            ErrorLogger.Run(nameof(ShowLogsButton_Click), err => err.Error("No log files found.")).ShowErrorMessage(PageActionHandler);
+            return;
+        }
+
+        ThirdPartyLauncher.OpenFile(filePaths[^1]).ShowErrorMessage(PageActionHandler);
     }
 
     private void Refresh()

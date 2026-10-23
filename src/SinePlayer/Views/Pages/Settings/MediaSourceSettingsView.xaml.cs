@@ -101,7 +101,7 @@ internal sealed partial class MediaSourceSettingsView : BaseUserControl
         CoroutineUtils.Run(async () =>
         {
             ErrorResult err = await MediaImportExclusionModel.Instance.EditWithNotepad();
-            err.DisplayErrorMessage(ViewModel.Shared.ActionHandler);
+            err.ShowErrorMessage(ViewModel.Shared.ActionHandler);
         });
 
     }

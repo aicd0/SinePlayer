@@ -5,11 +5,11 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Common.Actions;
@@ -35,6 +35,7 @@ internal sealed partial class DevToolsPage : BasePage
 {
     private const string TAG = nameof(DevToolsPage);
     private const int MAX_LOG_ITEM_COUNT = 10000;
+    private const int LOG_FILTER_DELAY_MILLISECONDS = 500;
     private const int COUNTER_UPDATE_INTERVAL = 500;
 
     public DevToolsPage()
@@ -42,6 +43,11 @@ internal sealed partial class DevToolsPage : BasePage
         InitializeComponent();
 
         _logListener = new LogListener(this);
+
+        _logFilterTimer = DispatcherQueue.CreateTimer();
+        _logFilterTimer.Interval = TimeSpan.FromMilliseconds(LOG_FILTER_DELAY_MILLISECONDS);
+        _logFilterTimer.IsRepeating = false;
+        _logFilterTimer.Tick += LogFilterTimer_Tick;
     }
 
     //
@@ -75,6 +81,13 @@ internal sealed partial class DevToolsPage : BasePage
         base.OnStop();
 
         Logger.RemoveListener(_logListener);
+
+        if (_logFilterTimer is not null)
+        {
+            _logFilterTimer.Stop();
+            _logFilterTimer.Tick -= LogFilterTimer_Tick;
+            _logFilterTimer = null;
+        }
     }
 
     //
@@ -203,10 +216,13 @@ internal sealed partial class DevToolsPage : BasePage
     //
 
     private readonly LogListener _logListener;
+    private DispatcherQueueTimer? _logFilterTimer;
     private bool _logStarted = false;
     private bool _logStickToLatest = true;
+    private string[] _logFilters = [];
     private readonly ObservableRingCollection<LogItemViewModel> _logItems = [];
-    private readonly ConcurrentQueue<string> _pendingLogMessages = new();
+    private readonly Queue<LogEntry> _logEntries = new();
+    private readonly ConcurrentQueue<LogEntry> _pendingLogs = new();
     private int _logFlushScheduled = 0;
 
     public ObservableRingCollection<LogItemViewModel> LogItems => _logItems;
@@ -223,6 +239,64 @@ internal sealed partial class DevToolsPage : BasePage
         {
             ScrollToLatestLog();
         }
+    }
+
+    private void LogFilterTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _logFilters = LogFilterTextBox.Text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+
+        if (_logFilterTimer is not null)
+        {
+            _logFilterTimer.Stop();
+            _logFilterTimer.Start();
+        }
+    }
+
+    private void LogFilterTimer_Tick(DispatcherQueueTimer sender, object args)
+    {
+        ApplyLogFilter();
+    }
+
+    private void ApplyLogFilter()
+    {
+        List<LogItemViewModel> items = [];
+        foreach (LogEntry entry in _logEntries)
+        {
+            if (IsLogAccepted(entry))
+            {
+                items.Add(entry.Item);
+            }
+        }
+
+        _logItems.ReplaceAll(items);
+
+        if (_logStickToLatest)
+        {
+            ScrollToLatestLog();
+        }
+    }
+
+    private bool IsLogAccepted(LogEntry entry)
+    {
+        if (entry.Level > 4)
+        {
+            return true;
+        }
+
+        string[] filters = _logFilters;
+        if (filters.Length == 0)
+        {
+            return true;
+        }
+
+        foreach (string filter in filters)
+        {
+            if (Logger.IsTagMatch(filter, entry.Tag))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void StartOrStopLogger(bool started)
@@ -262,9 +336,9 @@ internal sealed partial class DevToolsPage : BasePage
         LogListView.ScrollIntoView(_logItems[^1]);
     }
 
-    private void AppendLog(string message)
+    private void AppendLog(LogEntry entry)
     {
-        _pendingLogMessages.Enqueue(message);
+        _pendingLogs.Enqueue(entry);
 
         if (Interlocked.Exchange(ref _logFlushScheduled, 1) == 0)
         {
@@ -277,13 +351,19 @@ internal sealed partial class DevToolsPage : BasePage
         Interlocked.Exchange(ref _logFlushScheduled, 0);
 
         LogItemViewModel? lastItem = null;
-        while (_pendingLogMessages.TryDequeue(out string? message))
+        while (_pendingLogs.TryDequeue(out LogEntry entry))
         {
-            lastItem = new LogItemViewModel()
+            _logEntries.Enqueue(entry);
+            if (IsLogAccepted(entry))
             {
-                Text = message,
-            };
-            _logItems.Add(lastItem);
+                _logItems.Add(entry.Item);
+                lastItem = entry.Item;
+            }
+        }
+
+        while (_logEntries.Count > MAX_LOG_ITEM_COUNT)
+        {
+            _logEntries.Dequeue();
         }
 
         while (_logItems.Count > MAX_LOG_ITEM_COUNT)
@@ -309,18 +389,11 @@ internal sealed partial class DevToolsPage : BasePage
                 return;
             }
 
-            if (item.Level <= 4)
-            {
-                List<LogTag?> consoleWhitelist = DebugModel.ConsoleWhitelist;
-                if (!consoleWhitelist.Any(t => t is null || t.ContainsAny(item.Tag)))
-                {
-                    return;
-                }
-            }
-
-            page.AppendLog(item.DisplayMessage);
+            page.AppendLog(new LogEntry(item.Level, item.Tag, new LogItemViewModel { Text = item.DisplayMessage }));
         }
     }
+
+    private readonly record struct LogEntry(int Level, string Tag, LogItemViewModel Item);
 
     //
     // Counters

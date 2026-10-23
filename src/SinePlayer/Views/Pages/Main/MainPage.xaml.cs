@@ -132,7 +132,7 @@ internal sealed partial class MainPage : BasePage
         return jsonModel;
     }
 
-    public void RestoreState(MainPageStateJsonModel? jsonModel)
+    public void LoadState(MainPageStateJsonModel? jsonModel, bool fromWindowRestore)
     {
         MainThreadUtils.AssertOnMainThread();
 
@@ -167,7 +167,7 @@ internal sealed partial class MainPage : BasePage
                     selectTab: i == jsonModel.SelectedIndex,
                     newTabId: tab.Id,
                     oldTabId: tab.OldTabId ?? string.Empty,
-                    fromWindowRestore: true);
+                    fromWindowRestore: fromWindowRestore);
             }
         }
 

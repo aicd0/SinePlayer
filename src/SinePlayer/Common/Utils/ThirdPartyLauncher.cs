@@ -9,7 +9,6 @@ using System.Text;
 using System.Threading.Tasks;
 
 using SinePlayer.Common.ErrorHandling;
-using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Storage;
 
 using Windows.Storage;
@@ -58,27 +57,44 @@ internal static class ThirdPartyLauncher
         return err.Success();
     }
 
-    public static void StartTemporaryTextFile(string filename, string text)
+    public static ErrorResult<string> OpenTemporaryTextFile(string filename, string text)
     {
+        var err = ErrorLogger<string>.Create(TAG);
+
         ErrorResult<string> writeErr = WriteTemporaryTextFile(filename, text);
         if (!writeErr.IsSuccessful)
         {
-            return;
+            return err.Error(writeErr);
         }
+
+        ErrorResult openErr = OpenFile(writeErr.Result);
+        if (!openErr.IsSuccessful)
+        {
+            return err.Error(openErr);
+        }
+
+        return err.Success(writeErr.Result);
+    }
+
+    public static ErrorResult OpenFile(string path)
+    {
+        var err = ErrorLogger.Create(TAG);
 
         try
         {
             var psi = new ProcessStartInfo
             {
-                FileName = writeErr.Result,
+                FileName = path,
                 UseShellExecute = true
             };
             Process.Start(psi);
         }
         catch (Exception ex)
         {
-            Logger.F(TAG, nameof(StartTemporaryTextFile), ex);
+            return err.Error(ex);
         }
+
+        return err.Success();
     }
 
     public static async Task<ErrorResult<string>> EditTemporaryTextFileAsync(string filename, IEnumerable<string> lines)

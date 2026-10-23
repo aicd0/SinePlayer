@@ -1091,6 +1091,9 @@ $plugins</value>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>エクスプローラーで表示</value>
   </data>
+  <data name="ShowLogs" xml:space="preserve">
+    <value>ログを表示</value>
+  </data>
   <data name="ShowTagId" xml:space="preserve">
     <value>タグIDを表示</value>
   </data>

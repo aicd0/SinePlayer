@@ -1091,6 +1091,9 @@ Im abgesicherten Modus starten?</value>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>Im Datei-Explorer anzeigen</value>
   </data>
+  <data name="ShowLogs" xml:space="preserve">
+    <value>Protokolle anzeigen</value>
+  </data>
   <data name="ShowTagId" xml:space="preserve">
     <value>Tag-ID anzeigen</value>
   </data>

@@ -1091,6 +1091,9 @@ Start in Safe Mode?</value>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>Show in File Explorer</value>
   </data>
+  <data name="ShowLogs" xml:space="preserve">
+    <value>Show logs</value>
+  </data>
   <data name="ShowTagId" xml:space="preserve">
     <value>Show tag ID</value>
   </data>

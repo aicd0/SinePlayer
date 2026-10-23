@@ -1089,6 +1089,9 @@ $plugins</value>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>在檔案總管中顯示</value>
   </data>
+  <data name="ShowLogs" xml:space="preserve">
+    <value>顯示日誌</value>
+  </data>
   <data name="ShowTagId" xml:space="preserve">
     <value>顯示標籤ID</value>
   </data>

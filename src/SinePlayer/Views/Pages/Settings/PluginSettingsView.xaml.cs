@@ -83,7 +83,7 @@ internal sealed partial class PluginSettingsView : BaseUserControl
                 return err.Success();
             });
 
-            err.DisplayErrorMessage(ViewModel.Shared.ActionHandler);
+            err.ShowErrorMessage(ViewModel.Shared.ActionHandler);
         });
     }
 
@@ -136,7 +136,7 @@ internal sealed partial class PluginSettingsView : BaseUserControl
                 ViewModel.ApplyOnNextLaunchVisible = true;
             }
 
-            err.DisplayErrorMessage(ViewModel.Shared.ActionHandler);
+            err.ShowErrorMessage(ViewModel.Shared.ActionHandler);
         });
     }
 

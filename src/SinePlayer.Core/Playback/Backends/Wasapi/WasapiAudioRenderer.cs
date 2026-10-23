@@ -4,12 +4,12 @@
 using System.Buffers;
 using System.Runtime.InteropServices;
 
-using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Timing;
+using SinePlayer.Core.Playback.Utils;
 
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -319,7 +319,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         {
             // The device may already be gone; there is nothing left to stop in that case, and a dispose that
             // threw would fault the teardown. The exception is written out whole all the same.
-            Logger.W(TAG, $"Unable to stop the audio device: {exception}");
+            PlaybackLogger.W(TAG, $"Unable to stop the audio device: {exception}");
         }
 
         Release();
@@ -385,7 +385,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         }
         catch (Exception exception)
         {
-            Logger.W(TAG, $"Unable to open the audio device with a buffer of {bufferDuration / 10_000} ms: {exception.Message}");
+            PlaybackLogger.W(TAG, $"Unable to open the audio device with a buffer of {bufferDuration / 10_000} ms: {exception.Message}");
             return false;
         }
     }

@@ -16,6 +16,8 @@ namespace SinePlayer.Data.Models.Media;
 
 internal partial class FileMediaHandle(MediaType type) : MediaHandle(type)
 {
+    private const string TAG = nameof(FileMediaHandle);
+
     public static MediaHandle FromExternal(string filePath)
     {
         MediaType type = AppInfoProvider.IsSupportedAudioExtension(Path.GetExtension(filePath))
@@ -71,7 +73,7 @@ internal partial class FileMediaHandle(MediaType type) : MediaHandle(type)
                 }
                 catch (Exception ex)
                 {
-                    Logger.E($"Unable to create target parent directory '{targetParent}'", ex);
+                    Logger.E(TAG, $"Unable to create target parent directory '{targetParent}'", ex);
                     return false;
                 }
             }
@@ -82,7 +84,7 @@ internal partial class FileMediaHandle(MediaType type) : MediaHandle(type)
             }
             catch (Exception ex)
             {
-                Logger.E($"Unable to move file", ex);
+                Logger.E(TAG, "Unable to move file", ex);
                 return false;
             }
 
