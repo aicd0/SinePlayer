@@ -550,6 +550,26 @@ In order, on the queue's side:
    clears have moved — tells the threads.
 6. Answer the caller with the result of the request — accepted, or the predictable refusal from step 1.
 
+### Seek modes
+
+What a position is *taken as* is part of the request, and it travels with the position in the same change:
+
+| Mode | The position is | What plays first |
+|---|---|---|
+| `Fast` (the default) | a wish | the keyframe at or before it; that media anchors the clock, so playback resumes *earlier* than asked (§5) |
+| `Precise` | a floor | the first frame at or after it and the first sound block at or after it; nothing earlier is shown or played, and the clock is anchored by that media, so it never stands before the request |
+
+A precise seek still lets the source land on the keyframe at or before the position: the media between the
+two is needed — the frames after it refer to it — so the decoder produces it as usual. Giving up on it belongs
+to the stages that play it, not to the decoder (§4.2) or the reader (§4.1): the picture drops frames that
+begin before the floor, and the sound gives up on blocks that begin before it, both *before* their media can
+claim the clock. It is the same class of loss as the media of a position playback has left (I6), and it is the
+reason the anchor rule needs no special case: what claims the clock is already at or after the request.
+
+The boundary is read from the position the epoch publishes, so a component rebuild (`Reconcile`) publishes
+the position playback is at and the mode in effect keeps applying to it — precision is a property of the
+position, not of one call.
+
 Then, on the reader's side, where the cursor lives:
 
 1. Notice the epoch has moved past the one this thread has carried out, and take the position published
@@ -1085,6 +1105,12 @@ The Playback Lab shows all of the above in one line, which is the intended way t
    tell a device that is late from one that is broken, and a line that guessed wrong turned out to be worse than no
    line at all. What is left to the host is the shape of the freeze itself: `Position` stopped while the state is
    `Playing` and `StarvedFor` is null, which is the only combination that means "the device" rather than "a stage".
+12. **A precise seek resumes at the first media *at or after* the request, not at the request itself.** Video
+   resumes at the first frame at or after it and sound at the first whole block at or after it, so up to one
+   frame interval and one audio block (tens of milliseconds) are skipped rather than trimmed; sample-accurate
+   sound would need a buffer that can be sliced. A source that accepts a seek and then refuses it leaves the
+   position published without moving the media: a refused *forward* precise seek therefore skips ahead to the
+   position instead of standing still, which is the one behaviour a fast seek does not have.
 
 ## Appendix A — the checklist for any change to this pipeline
 
