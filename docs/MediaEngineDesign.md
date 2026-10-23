@@ -149,7 +149,7 @@ it grows. It covers transport, selection, component configuration, query, and su
 
 | Member group | Examples |
 |---|---|
-| Lifecycle / transport | `Load(source)`, `Play/Pause/Stop`, `Seek(position)`, `Volume`, `Muted`, `PlaybackRate` |
+| Lifecycle / transport | `Load(source)`, `Play/Pause/Stop`, `Seek(position, mode)`, `Volume`, `Muted`, `PlaybackRate` |
 | State / events | `State`, `Position`, `Duration`, `StateChanged`, `MediaOpened`, `MediaEnded`, `ErrorOccurred` |
 | Track selection | `GetTracks()`, `SelectedVideoTrack`, `SelectedAudioTrack`, `SelectedSubtitleTrack`, `SelectTrack(...)` |
 | Component control | `ApplyProfile(PlaybackProfile)`, `GetActiveComponents()` |

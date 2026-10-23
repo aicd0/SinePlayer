@@ -2189,6 +2189,159 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// A precise seek is a floor rather than a wish. The media between the keyframe the source lands on and the
+    /// position asked for is still decoded — the frames after it refer to it — but it may not be shown: the
+    /// still of the new position, the frames that follow and the clock all start at or after the position.
+    /// </summary>
+    [Test]
+    public void PreciseSeekResumesAtThePositionRatherThanAtTheKeyframeBeforeIt()
+    {
+        string path = VideoFixtureFile.CreateAv1(gopSize: VideoFixtureFile.FrameCount);
+        try
+        {
+            FFmpegSourceProviderFactory sourceFactory = new();
+            Assert.That(sourceFactory.TryOpen(MediaLocator.Parse(path), out IMediaSource? opened).IsSuccessful, Is.True);
+
+            TimeSpan target;
+            if (opened is null)
+            {
+                Assert.Fail("The fixture has to open.");
+                return;
+            }
+
+            using (IMediaSource source = opened)
+            {
+                target = FindASeekThatMisses(source);
+            }
+
+            if (target == TimeSpan.Zero)
+            {
+                Assert.Ignore("The fixture resumes wherever it is asked to, so a seek that misses it cannot be tested.");
+            }
+
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            pipeline.Play();
+            WaitForPresentedFrames(pipeline, 2);
+
+            SeekAndWait(pipeline, target, SeekMode.Precise);
+
+            // The still of the new position is the first frame at or after it, not the keyframe behind it.
+            WaitFor(() => pipeline.LastPresentedTimestamp >= target,
+                $"a precise seek offered the still of {pipeline.LastPresentedTimestamp:g}, before the position it asked for ({target:g})");
+
+            int marker = videoRenderer.RenderedTimestamps.Count;
+
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitForPresentedFrames(pipeline, pipeline.PresentedFrameCount + 2);
+
+            IReadOnlyList<TimeSpan> rendered = videoRenderer.RenderedTimestamps;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(rendered.Count, Is.GreaterThan(marker), "the picture has to carry on after a precise seek");
+                Assert.That(rendered.Skip(marker).All(timestamp => timestamp >= target), Is.True,
+                    "a precise seek showed a frame from before the position it asked for");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(target),
+                    "the clock may not stand at a position before the one a precise seek asked for");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The sound has no still and no drop rule of its own: the sink is where a block of a position playback has
+    /// left gets given up on, and it has to be given up on before it can anchor the clock.
+    /// </summary>
+    [Test]
+    public void PreciseSeekPlaysNoSoundFromBeforeThePosition()
+    {
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 90);
+        try
+        {
+            FFmpegSourceProviderFactory sourceFactory = new();
+            Assert.That(sourceFactory.TryOpen(MediaLocator.Parse(path), out IMediaSource? opened).IsSuccessful, Is.True);
+
+            TimeSpan target;
+            if (opened is null)
+            {
+                Assert.Fail("The fixture has to open.");
+                return;
+            }
+
+            using (IMediaSource source = opened)
+            {
+                target = FindASeekThatLandsJustBefore(source);
+            }
+
+            if (target == TimeSpan.Zero)
+            {
+                Assert.Ignore("Every position the fixture is asked for is one it can land on exactly.");
+            }
+
+            FakeAudioRenderer audioRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            pipeline.Play();
+            WaitFor(() => audioRenderer.SubmittedBuffers > 5, "the device has to have taken some audio first");
+
+            int flushed = audioRenderer.FlushCount;
+            SeekAndWait(pipeline, target, SeekMode.Precise);
+
+            // The device is let go of what the old position gave it before anything of the new one is offered,
+            // so from here on the list holds the new position's sound alone.
+            WaitFor(() => audioRenderer.FlushCount > flushed, "the device was never let go of the position playback left");
+
+            int marker = audioRenderer.SubmittedTimestamps.Count;
+
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => audioRenderer.SubmittedTimestamps.Count > marker + 2, "the sound has to carry on after a precise seek");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(audioRenderer.SubmittedTimestamps.Skip(marker).All(timestamp => timestamp >= target), Is.True,
+                    "a precise seek played sound from before the position it asked for");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(target),
+                    "the clock may not stand at a position before the one a precise seek asked for");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Looks for a position the file can only land *before*: past a packet boundary but inside the block the
+    /// source resumes on. A seek to it therefore has a block of the position playback left in front of it, which
+    /// is what a precise seek has to give up on before the clock is allowed to start.
+    /// </summary>
+    private static TimeSpan FindASeekThatLandsJustBefore(IMediaSource source)
+    {
+        for (var target = TimeSpan.FromMilliseconds(400); target <= TimeSpan.FromSeconds(2); target += TimeSpan.FromMilliseconds(5))
+        {
+            Assert.That(source.Seek(target).IsSuccessful, Is.True);
+            Assert.That(source.TryReadPacket(out MediaPacket? packet).IsSuccessful, Is.True);
+            Assert.That(packet, Is.Not.Null, "the fixture has to hold something at every position tried");
+
+            using (packet)
+            {
+                if (packet is not null && packet.Timestamp < target)
+                {
+                    return target;
+                }
+            }
+        }
+
+        return TimeSpan.Zero;
+    }
+
+    /// <summary>
     /// Looks for a position the file cannot resume at, well past a keyframe but before the next one, and
     /// hands back that position. Reading the packet after the seek is what says where the file went, since
     /// no demuxer promises to land exactly where it was pointed.
@@ -3160,9 +3313,13 @@ public class PlaybackPipelineTests
     /// <summary>
     /// The audio decoder is rebuilt too, on the thread that decodes audio — the reader. It is the last slot to
     /// get the treatment the video decoder has had since S13, and the reason it is worth having: without it,
-    /// "which audio decoder" could only ever be answered at open. Nothing else moves for it: the device is not
-    /// flushed and the clock is not re-anchored, because neither the bitstream still to come nor the sound
-    /// already decoded was ever paired with the decoder that made it.
+    /// "which audio decoder" could only ever be answered at open.
+    /// <para>
+    /// A rebuilt chain restarts the stream where playback stands (the reconcile publishes the clock's position
+    /// as the position to re-read from), so the device is flushed and fed again from there. What this test is
+    /// about is that the decoder really was replaced and that nothing else moved: playback keeps playing, the
+    /// sound keeps coming, and the position does not go backwards.
+    /// </para>
     /// </summary>
     [Test]
     public void ReplacesTheAudioDecoderWithoutLeavingPlayback()
@@ -3192,25 +3349,27 @@ public class PlaybackPipelineTests
             int flushed = audioRenderer.FlushCount;
             TimeSpan position = pipeline.Position;
 
+            NamedAudioDecoderFactory second = new("audio-second");
             pipeline.Components.Clear<IAudioDecoderFactory>();
-            pipeline.Components.Register(new NamedAudioDecoderFactory("audio-second"));
+            pipeline.Components.Register(second);
 
             PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+            Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
-                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "replacing an audio decoder is not a pause");
-            }
-
+            // Each wait is on the thing that is asserted below, and in the order the pipeline does them: the
+            // device is let go of what it holds, the new decoder is the one decoding, and only then does the
+            // sound it produces arrive. Waiting on the submissions first would let the count be raised by media
+            // the device still had from the decoder that was replaced, and the flush read before it happened.
+            WaitFor(() => audioRenderer.FlushCount > flushed, "the device to be restarted at the position playback has reached");
+            WaitFor(() => second.Offers > 0, "the pipeline to ask the new decoder factory for a decoder");
             WaitFor(() => audioRenderer.SubmittedBuffers > before, $"the new decoder to keep the sound coming ({before} before, {audioRenderer.SubmittedBuffers} now, {pipeline.State}, starved {pipeline.StarvedFor ?? "nothing"})");
 
             using (Assert.EnterMultipleScope())
             {
-                // A rebuilt chain restarts the stream at the position playback has reached, and restarting it is a flush
-                // of the device: what it held belonged to the chains that were replaced.
-                Assert.That(audioRenderer.FlushCount, Is.EqualTo(flushed + 1), "the stream is started again where it stands");
-                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position), "the clock is not re-anchored");
+                Assert.That(second.Offers, Is.EqualTo(1), "the decoder the host asked for is the one that was made");
+                Assert.That(audioRenderer.FlushCount, Is.EqualTo(flushed + 1), "the stream is started again where it stands, once");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "replacing an audio decoder is not a pause");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position), "the clock is not moved backwards");
             }
         }
         finally
@@ -5128,9 +5287,9 @@ public class PlaybackPipelineTests
     /// Seeks and waits for the answer: what a test is about — where the clock ended up, whether playback went
     /// on — is only settled once the queue item has run, and a seek the source refuses says so in the result.
     /// </summary>
-    private static void SeekAndWait(PlaybackPipeline pipeline, TimeSpan position)
+    private static void SeekAndWait(PlaybackPipeline pipeline, TimeSpan position, SeekMode mode = SeekMode.Fast)
     {
-        PlaybackOperationResult seeked = Await(pipeline.Seek(position));
+        PlaybackOperationResult seeked = Await(pipeline.Seek(position, mode));
         Assert.That(seeked.IsSuccessful, Is.True, seeked.Message);
     }
 
@@ -5370,6 +5529,23 @@ public class PlaybackPipelineTests
 
         public int RenderedFrames { get; private set; }
 
+        private readonly List<TimeSpan> _renderedTimestamps = [];
+
+        /// <summary>
+        /// The timestamp of every frame the pipeline handed over, in the order it did: what a test reads when
+        /// the question is *which* frames were shown rather than how many.
+        /// </summary>
+        public IReadOnlyList<TimeSpan> RenderedTimestamps
+        {
+            get
+            {
+                lock (_renderedTimestamps)
+                {
+                    return [.. _renderedTimestamps];
+                }
+            }
+        }
+
         /// <summary>Stands in for a renderer that needs longer to show a frame than the file gives it.</summary>
         public int RenderDelayMilliseconds { get; init; }
 
@@ -5400,6 +5576,11 @@ public class PlaybackPipelineTests
 
             LastRenderedTransform = transform;
             RenderedFrames++;
+            lock (_renderedTimestamps)
+            {
+                _renderedTimestamps.Add(frame.Timestamp);
+            }
+
             return PlaybackOperationResult.Success;
         }
 
@@ -5472,14 +5653,23 @@ public class PlaybackPipelineTests
     {
         private readonly FFmpegAudioDecoderFactory _inner = new();
         private readonly string _signature;
+        private int _offers;
 
         internal NamedAudioDecoderFactory(string signature)
         {
             _signature = signature;
         }
 
+        /// <summary>
+        /// How many times the pipeline asked this factory for a decoder. The decoder it makes is the same
+        /// implementation the first factory made, so its name says nothing; this is what a test reads to know
+        /// the replacement it asked for is the one that happened.
+        /// </summary>
+        internal int Offers => Volatile.Read(ref _offers);
+
         public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
         {
+            Interlocked.Increment(ref _offers);
             PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
             creator = offered.IsSuccessful && inner is not null ? new SignatureCreator(inner, _signature) : null;
             return creator is null ? offered : PlaybackOperationResult.Success;
@@ -5702,7 +5892,29 @@ public class PlaybackPipelineTests
         public IAudioSubmit Submit(RawAudioBuffer buffer)
         {
             SubmitsStarted++;
+            lock (_submittedTimestamps)
+            {
+                _submittedTimestamps.Add(buffer.Timestamp);
+            }
+
             return new FakeAudioSubmit(this, buffer);
+        }
+
+        private readonly List<TimeSpan> _submittedTimestamps = [];
+
+        /// <summary>
+        /// The timestamp of every block the pipeline handed to the device, in the order it did — including the
+        /// ones the device later let go of, because what a seek is asked about is what was offered at all.
+        /// </summary>
+        public IReadOnlyList<TimeSpan> SubmittedTimestamps
+        {
+            get
+            {
+                lock (_submittedTimestamps)
+                {
+                    return [.. _submittedTimestamps];
+                }
+            }
         }
 
         public PlaybackOperationResult Flush()
