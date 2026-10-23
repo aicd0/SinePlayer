@@ -47,6 +47,7 @@ public static class Logger
 
         Thread logThread = new(LogThreadMain)
         {
+            Name = "Logger",
             IsBackground = true,
             Priority = ThreadPriority.Lowest,
         };
