@@ -168,6 +168,19 @@ internal static class AppSettingsModel
         }
     }
 
+    public static bool PreciseSeeking
+    {
+        get
+        {
+            return _db.Read(model => model.PreciseSeeking ?? false);
+        }
+        set
+        {
+            _db.Write(model => model.PreciseSeeking = value);
+            _db.Save();
+        }
+    }
+
     public static CloseLastTabBehaviorEnum CloseLastTabBehavior
     {
         get
@@ -867,6 +880,9 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("PlayerVolume")]
         public double? PlayerVolume { get; set; }
+
+        [JsonPropertyName("PreciseSeeking")]
+        public bool? PreciseSeeking { get; set; }
 
         [JsonPropertyName("PromptBeforeRemovingMedia")]
         public bool? PromptBeforeRemovingMedia { get; set; }

@@ -79,6 +79,15 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
+    private void PreciseSeekingCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        bool? isChecked = ((CheckBox)sender).IsChecked;
+        if (isChecked.HasValue)
+        {
+            AppSettingsModel.PreciseSeeking = isChecked.Value;
+        }
+    }
+
     private void KeepScreenOnBehaviorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         int index = ((ComboBox)sender).SelectedIndex;

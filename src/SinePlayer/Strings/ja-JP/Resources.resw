@@ -904,6 +904,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="Position" xml:space="preserve">
     <value>再生位置</value>
   </data>
+  <data name="PreciseSeeking" xml:space="preserve">
+    <value>正確なシークを使用</value>
+  </data>
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>ハードウェアデコードを優先</value>
   </data>

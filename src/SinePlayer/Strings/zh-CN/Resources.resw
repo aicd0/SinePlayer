@@ -904,6 +904,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="Position" xml:space="preserve">
     <value>播放位置</value>
   </data>
+  <data name="PreciseSeeking" xml:space="preserve">
+    <value>使用精确跳转</value>
+  </data>
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>优先使用硬件解码</value>
   </data>

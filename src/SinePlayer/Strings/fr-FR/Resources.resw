@@ -904,6 +904,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="Position" xml:space="preserve">
     <value>Position</value>
   </data>
+  <data name="PreciseSeeking" xml:space="preserve">
+    <value>Utiliser la recherche précise</value>
+  </data>
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>Préférer le décodage matériel</value>
   </data>

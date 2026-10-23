@@ -43,6 +43,10 @@
             Click="PauseOnLeaveTabCheckBox_Click"
             Content="{x:Bind StringResource.PauseOnLeaveTab}"
             IsChecked="{x:Bind ViewModel.PauseOnLeaveTab, Mode=TwoWay}" />
+        <CheckBox
+            Click="PreciseSeekingCheckBox_Click"
+            Content="{x:Bind StringResource.PreciseSeeking}"
+            IsChecked="{x:Bind ViewModel.PreciseSeeking, Mode=TwoWay}" />
         <Grid Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />

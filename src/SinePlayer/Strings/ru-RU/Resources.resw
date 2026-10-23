@@ -904,6 +904,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="Position" xml:space="preserve">
     <value>Позиция</value>
   </data>
+  <data name="PreciseSeeking" xml:space="preserve">
+    <value>Использовать точную перемотку</value>
+  </data>
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>Предпочитать аппаратное декодирование</value>
   </data>
