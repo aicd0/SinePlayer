@@ -121,7 +121,7 @@ internal static class MediaMenuCreator
                     CoroutineUtils.Run(async () =>
                     {
                         ErrorResult err = await primaryItem.ShowInFileExplorer();
-                        err.DisplayErrorMessage(actionHandler);
+                        err.ShowErrorMessage(actionHandler);
                     });
                 },
             });

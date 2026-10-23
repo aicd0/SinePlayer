@@ -60,7 +60,7 @@ internal abstract partial class BaseErrorResult(bool isSuccessful) : IErrorLogge
         }
     }
 
-    public void DisplayErrorMessage(ActionHandler actionHandler)
+    public void ShowErrorMessage(ActionHandler actionHandler)
     {
         if (IsSuccessful)
         {

@@ -198,7 +198,7 @@ internal sealed partial class MediaInfoPage : BasePage
                 return err.Success();
             });
 
-            err.DisplayErrorMessage(PageActionHandler);
+            err.ShowErrorMessage(PageActionHandler);
         });
     }
 
@@ -259,7 +259,7 @@ internal sealed partial class MediaInfoPage : BasePage
 
     private void NewTagTipButton_Click(object sender, RoutedEventArgs e)
     {
-        ThirdPartyLauncher.StartTemporaryTextFile("NewTagsHelp.txt", StringResourceProvider.Instance.EnterNewTagsHint);
+        ThirdPartyLauncher.OpenTemporaryTextFile("NewTagsHelp.txt", StringResourceProvider.Instance.EnterNewTagsHint);
     }
 
     private List<string> SearchTagHistory(string query)

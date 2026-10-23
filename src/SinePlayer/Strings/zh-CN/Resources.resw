@@ -1091,6 +1091,9 @@ $plugins</value>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>在文件资源管理器中显示</value>
   </data>
+  <data name="ShowLogs" xml:space="preserve">
+    <value>显示日志</value>
+  </data>
   <data name="ShowTagId" xml:space="preserve">
     <value>显示标签ID</value>
   </data>

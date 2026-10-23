@@ -290,6 +290,7 @@ public class StringResourceProvider
     public string Settings => GetResourceString("Settings");
     public string ShowHiddenItems => GetResourceString("ShowHiddenItems");
     public string ShowInFileExplorer => GetResourceString("ShowInFileExplorer");
+    public string ShowLogs => GetResourceString("ShowLogs");
     public string ShowTagId => GetResourceString("ShowTagId");
     public string Shuffle => GetResourceString("Shuffle");
     public string ShuffleStable => GetResourceString("ShuffleStable");

@@ -20,6 +20,7 @@ public static class Logger
     private const int LEVEL_FATAL = 5;
     private const int FLUSH_INTERVAL = 5000;
     private const int BUFFER_SIZE = 1000;
+    private const string EMPTY_TAG = "Empty";
 
     private static int sNextLogId = 0;
     private static int sPostDispatch = 0;
@@ -92,73 +93,68 @@ public static class Logger
         FlushToFile();
     }
 
-    public static void D(string? tag, string? message)
+    public static bool IsTagMatch(string filter, string tag)
     {
-        Log(LEVEL_DEBUG, LogTag.N(tag), message, null);
+        if (tag.Equals(filter, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return tag.Length > filter.Length
+            && tag[filter.Length] == '/'
+            && tag.StartsWith(filter, StringComparison.Ordinal);
     }
 
-    public static void D(LogTag? tag, string? message)
+    public static string[] GetLogTreeFilePaths(string? tag)
+    {
+        if (!Initialized)
+        {
+            return [];
+        }
+
+        tag ??= EMPTY_TAG;
+        string folderPath = Path.Combine(GetLogTreeFolder(), tag.Replace('/', '\\'));
+        if (!Directory.Exists(folderPath))
+        {
+            return [];
+        }
+
+        string[] filePaths = Directory.GetFiles(folderPath, "log_*.txt");
+        Array.Sort(filePaths, StringComparer.Ordinal);
+        return filePaths;
+    }
+
+    public static void D(string? tag, string? message)
     {
         Log(LEVEL_DEBUG, tag, message, null);
     }
 
     public static void I(string? tag, string? message)
     {
-        Log(LEVEL_INFO, LogTag.N(tag), message, null);
-    }
-
-    public static void I(LogTag? tag, string? message)
-    {
         Log(LEVEL_INFO, tag, message, null);
     }
 
     public static void W(string? tag, string? message)
-    {
-        Log(LEVEL_WARN, LogTag.N(tag), message, null);
-    }
-
-    public static void W(LogTag? tag, string? message)
     {
         Log(LEVEL_WARN, tag, message, null);
     }
 
     public static void E(string? tag, string? message)
     {
-        Log(LEVEL_ERROR, LogTag.N(tag), message, null);
-    }
-
-    public static void E(LogTag? tag, string? message)
-    {
         Log(LEVEL_ERROR, tag, message, null);
     }
 
     public static void E(string? tag, Exception? exception)
-    {
-        Log(LEVEL_ERROR, LogTag.N(tag), null, exception);
-    }
-
-    public static void E(LogTag? tag, Exception? exception)
     {
         Log(LEVEL_ERROR, tag, null, exception);
     }
 
     public static void E(string? tag, string? message, Exception? exception)
     {
-        Log(LEVEL_ERROR, LogTag.N(tag), message, exception);
-    }
-
-    public static void E(LogTag? tag, string? message, Exception? exception)
-    {
         Log(LEVEL_ERROR, tag, message, exception);
     }
 
     public static void F(string? tag, string? message)
-    {
-        AssertException exceptionNotNull = new(message);
-        Log(LEVEL_FATAL, LogTag.N(tag), message, exceptionNotNull);
-    }
-
-    public static void F(LogTag? tag, string? message)
     {
         AssertException exceptionNotNull = new(message);
         Log(LEVEL_FATAL, tag, message, exceptionNotNull);
@@ -167,22 +163,10 @@ public static class Logger
     public static void F(string? tag, Exception? exception)
     {
         AssertException exceptionNotNull = new(null, exception);
-        Log(LEVEL_FATAL, LogTag.N(tag), null, exceptionNotNull);
-    }
-
-    public static void F(LogTag? tag, Exception? exception)
-    {
-        AssertException exceptionNotNull = new(null, exception);
         Log(LEVEL_FATAL, tag, null, exceptionNotNull);
     }
 
     public static void F(string? tag, string? message, Exception? exception)
-    {
-        AssertException exceptionNotNull = new(message, exception);
-        Log(LEVEL_FATAL, LogTag.N(tag), message, exceptionNotNull);
-    }
-
-    public static void F(LogTag? tag, string? message, Exception? exception)
     {
         AssertException exceptionNotNull = new(message, exception);
         Log(LEVEL_FATAL, tag, message, exceptionNotNull);
@@ -206,12 +190,12 @@ public static class Logger
     private static void AssertNotReachHereInternal(string? message, Exception? exception)
     {
         AssertException exceptionNotNull = new(message, exception);
-        Log(LEVEL_FATAL, LogTag.N("Assert"), message, exceptionNotNull);
+        Log(LEVEL_FATAL, "Assert", message, exceptionNotNull);
     }
 
     private static void Console(string message)
     {
-        Log(LEVEL_CONSOLE, LogTag.N(TAG), message, null);
+        Log(LEVEL_CONSOLE, TAG, message, null);
     }
 
     private static void LogThreadMain()
@@ -225,9 +209,9 @@ public static class Logger
         }
     }
 
-    private static void Log(int level, LogTag? tag, string? message, Exception? exception)
+    private static void Log(int level, string? tag, string? message, Exception? exception)
     {
-        tag ??= LogTag.Empty;
+        tag ??= EMPTY_TAG;
         var item = new LogItem
         {
             Id = Interlocked.Increment(ref sNextLogId) - 1,
@@ -328,11 +312,7 @@ public static class Logger
         }
 
         FlushToLogFile(logs);
-
-        if (DebugModel.LogTreeEnabled)
-        {
-            FlushToLogTree(logs);
-        }
+        FlushToLogTree(logs);
     }
 
     private static void FlushToLogFile(List<LogItem> logs)
@@ -366,32 +346,33 @@ public static class Logger
         Dictionary<string, List<LogItem>> fileLogs = [];
         foreach (LogItem item in logs)
         {
-            string[] tags = item.Tag.ToString().Split(',');
-            foreach (string tag in tags)
+            if (!DebugModel.IsLogTreeWhitelisted(item.Tag))
             {
-                string[] categories = tag.Split('/');
-                bool divider = false;
-                StringBuilder sb = new();
-                foreach (string category in categories)
+                continue;
+            }
+
+            string[] categories = item.Tag.Split('/');
+            bool divider = false;
+            StringBuilder sb = new();
+            foreach (string category in categories)
+            {
+                if (divider)
                 {
-                    if (divider)
-                    {
-                        sb.Append('\\');
-                    }
-                    divider = true;
-                    sb.Append(category);
-                    string path = sb.ToString();
-                    if (!fileLogs.TryGetValue(path, out List<LogItem>? logItems))
-                    {
-                        logItems = [];
-                        fileLogs[path] = logItems;
-                    }
-                    logItems.Add(item);
+                    sb.Append('\\');
                 }
+                divider = true;
+                sb.Append(category);
+                string path = sb.ToString();
+                if (!fileLogs.TryGetValue(path, out List<LogItem>? logItems))
+                {
+                    logItems = [];
+                    fileLogs[path] = logItems;
+                }
+                logItems.Add(item);
             }
         }
 
-        string cacheFolder = sLogFolderPath + "tree\\";
+        string cacheFolder = GetLogTreeFolder();
         string fileName = "log_" + DateTime.Now.ToString("yyyyMMdd") + ".txt";
 
         foreach (KeyValuePair<string, List<LogItem>> pair in fileLogs)
@@ -441,6 +422,11 @@ public static class Logger
         }
     }
 
+    private static string GetLogTreeFolder()
+    {
+        return sLogFolderPath + "Tree\\";
+    }
+
     private static long GetTick()
     {
         return Environment.TickCount64;
@@ -452,11 +438,7 @@ public static class Logger
         {
             if (DebugModel.ConsoleEnabled)
             {
-                List<LogTag?> consoleWhitelist = DebugModel.ConsoleWhitelist;
-                if (consoleWhitelist.Any(t => t is null || t.ContainsAny(item.Tag)))
-                {
-                    LogToConsole(item.DisplayMessage);
-                }
+                LogToConsole(item.DisplayMessage);
             }
 
             if (DebugUtils.DebugMode && item.Level >= LEVEL_INFO)
@@ -471,7 +453,7 @@ public static class Logger
         public required int Id { init; get; }
         public required DateTimeOffset Time { init; get; }
         public required int Level { init; get; }
-        public required LogTag Tag { init; get; }
+        public required string Tag { init; get; }
         public required string? Message { init; get; }
         public required Exception? Exception { init; get; }
 

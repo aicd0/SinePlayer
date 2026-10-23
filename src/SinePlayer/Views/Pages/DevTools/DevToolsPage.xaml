@@ -84,16 +84,19 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <StackPanel
-                Margin="16,12"
-                Orientation="Horizontal"
-                Spacing="12">
-                <Button x:Name="LogToggleButton" Click="LogToggleButton_Click" />
-                <ToggleButton
-                    x:Name="LogStickButton"
-                    Click="LogStickButton_Click"
-                    Content="Stick to latest"
-                    IsChecked="True" />
+            <StackPanel Margin="16,12,16,8" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button x:Name="LogToggleButton" Click="LogToggleButton_Click" />
+                    <ToggleButton
+                        x:Name="LogStickButton"
+                        Click="LogStickButton_Click"
+                        Content="Stick to latest"
+                        IsChecked="True" />
+                </StackPanel>
+                <TextBox
+                    x:Name="LogFilterTextBox"
+                    PlaceholderText="Filters, space separated: e.g. SomeTag/InnerTag SomeTag2"
+                    TextChanged="LogFilterTextBox_TextChanged" />
             </StackPanel>
             <ListView
                 x:Name="LogListView"

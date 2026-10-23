@@ -1091,6 +1091,9 @@ $plugins</value>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>Показать в проводнике</value>
   </data>
+  <data name="ShowLogs" xml:space="preserve">
+    <value>Показать журналы</value>
+  </data>
   <data name="ShowTagId" xml:space="preserve">
     <value>Показать идентификатор тега</value>
   </data>

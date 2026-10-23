@@ -1091,6 +1091,9 @@ Démarrer en mode sans échec ?</value>
   <data name="ShowInFileExplorer" xml:space="preserve">
     <value>Afficher dans l’Explorateur de fichiers</value>
   </data>
+  <data name="ShowLogs" xml:space="preserve">
+    <value>Afficher les journaux</value>
+  </data>
   <data name="ShowTagId" xml:space="preserve">
     <value>Afficher l'ID de la balise</value>
   </data>

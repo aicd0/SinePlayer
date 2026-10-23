@@ -109,7 +109,7 @@ internal sealed partial class AdvancedSettingsView : BaseUserControl
             return err.Success();
         });
 
-        err.DisplayErrorMessage(ViewModel.Shared.ActionHandler);
+        err.ShowErrorMessage(ViewModel.Shared.ActionHandler);
     }
 
     private void ResetAllSettingsButton_Click(object sender, RoutedEventArgs e)

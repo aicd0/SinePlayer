@@ -1,11 +1,11 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Filter;
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
@@ -202,7 +202,7 @@ public sealed class AudioFilterChain
                 continue;
             }
 
-            Logger.W(TAG, $"{filter.Name} was left out of the audio chain: {applied.Message}");
+            PlaybackLogger.W(TAG, $"{filter.Name} was left out of the audio chain: {applied.Message}");
             DropFromRunning(filter);
         }
 
@@ -224,12 +224,12 @@ public sealed class AudioFilterChain
                 return true;
             }
 
-            Logger.W(TAG, $"{filter.Name} was left out of the audio chain: {configured.Message}");
+            PlaybackLogger.W(TAG, $"{filter.Name} was left out of the audio chain: {configured.Message}");
             return false;
         }
         catch (Exception exception)
         {
-            Logger.W(TAG, $"{filter.Name} was left out of the audio chain: {exception.Message}");
+            PlaybackLogger.W(TAG, $"{filter.Name} was left out of the audio chain: {exception.Message}");
             return false;
         }
     }
