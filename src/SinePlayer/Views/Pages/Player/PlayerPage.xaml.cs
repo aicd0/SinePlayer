@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -123,11 +124,10 @@ internal sealed partial class PlayerPage : BasePage
     protected override void OnStop()
     {
         base.OnStop();
-
         ViewModel.SavePosition();
-        DisposeEngine();
         ViewModel.Destory();
-
+        DisposeEngine();
+        StopPromptTimer();
         _navigationBar = null;
         GetMainPageAbility().SetCustomCenteredNavigationBar(null);
         RemoveFromActiveTabs();
@@ -196,6 +196,7 @@ internal sealed partial class PlayerPage : BasePage
             }
 
             _topOverlayHeight = h;
+            UpdatePromptMargin();
 
             if (ViewModel.IsPinned)
             {
@@ -285,26 +286,9 @@ internal sealed partial class PlayerPage : BasePage
 
         ViewModel.PlayerStatusLiveData.Observe(this, status =>
         {
-            switch (status.Status)
-            {
-                case PlayerPageViewModel.PlayerStatusEnum.Working:
-                    StatusPanel.Visibility = Visibility.Collapsed;
-                    StatusText.Text = string.Empty;
-                    break;
-                case PlayerPageViewModel.PlayerStatusEnum.Loading:
-                    StatusPanel.Visibility = Visibility.Visible;
-                    StatusText.Text = StringResource.PlayerStatusLoading;
-                    break;
-                case PlayerPageViewModel.PlayerStatusEnum.Error:
-                    StatusPanel.Visibility = Visibility.Visible;
-                    StatusText.Text = status.Description;
-                    break;
-                default:
-                    break;
-            }
-
             if (status.Status == PlayerPageViewModel.PlayerStatusEnum.Error)
             {
+                PromptError(status.Description);
                 ShowOverlay();
             }
         });
@@ -442,6 +426,34 @@ internal sealed partial class PlayerPage : BasePage
     private VideoTransform _videoTransform = VideoTransform.Identity;
     private long _pendingStartPositionMs = -1;
 
+    /// <summary>
+    /// Opens a file through the engine the page owns. Which file, and where in it to start, are the view model's
+    /// decision; this is the engine half: let go of what is open, be told what to play through, open the file.
+    /// </summary>
+    private async Task<ErrorResult> OpenMedia(MediaModel media, long startPositionMs)
+    {
+        CoreEngine engine = EnsureEngine();
+
+        // Where the file that is about to be replaced was left: the view model keeps that mark, and it still knows
+        // the previous media is the one playing.
+        ViewModel.SavePosition();
+
+        _pendingStartPositionMs = startPositionMs;
+
+        // What the media was last played through, which is what its settings were saved with.
+        var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
+        _components = mediaSettings.ToComponents();
+        _videoTransform = mediaSettings.ToVideoTransform();
+
+        // Components are only read when the file is opened, so the engine lets go of what it has before it is
+        // told what to use, and then opens the new file with it. A component that cannot be applied is reported by
+        // the open itself, which has nothing to build its chains from.
+        await engine.Stop();
+        await engine.SetComponents(_components);
+        engine.SetVideoTransform(_videoTransform);
+        return await engine.Load(media.Location);
+    }
+
     private CoreEngine EnsureEngine()
     {
         if (_engine is not null)
@@ -455,8 +467,6 @@ internal sealed partial class PlayerPage : BasePage
         engine.StateChanged += Engine_StateChanged;
         engine.PositionChanged += Engine_PositionChanged;
         engine.MediaOpened += Engine_MediaOpened;
-        engine.MediaEnded += Engine_MediaEnded;
-        engine.ErrorOccurred += Engine_ErrorOccurred;
         _engine = engine;
         ViewModel.VolumeLiveData.Emit((int)Math.Round(engine.Volume * 100.0));
         ViewModel.MuteLiveData.Emit(engine.IsMuted);
@@ -475,12 +485,10 @@ internal sealed partial class PlayerPage : BasePage
         engine.StateChanged -= Engine_StateChanged;
         engine.PositionChanged -= Engine_PositionChanged;
         engine.MediaOpened -= Engine_MediaOpened;
-        engine.MediaEnded -= Engine_MediaEnded;
-        engine.ErrorOccurred -= Engine_ErrorOccurred;
         engine.Dispose();
     }
 
-    private void Engine_StateChanged(MediaEngineState state)
+    private void Engine_StateChanged(MediaEngineState state, string? message)
     {
         ViewModel.IsPlayingLiveData.Emit(state == MediaEngineState.Playing);
 
@@ -491,9 +499,19 @@ internal sealed partial class PlayerPage : BasePage
                 break;
             case MediaEngineState.None:
             case MediaEngineState.Paused:
+                ViewModel.IsPlaying = false;
+                break;
             case MediaEngineState.Ended:
+                ViewModel.IsPlaying = false;
+                HandleMediaEnded();
+                break;
             case MediaEngineState.Error:
                 ViewModel.IsPlaying = false;
+                ViewModel.PlayerStatusLiveData.Emit(new()
+                {
+                    Status = PlayerPageViewModel.PlayerStatusEnum.Error,
+                    Description = message ?? "Unknown error",
+                });
                 break;
             default:
                 break;
@@ -551,7 +569,7 @@ internal sealed partial class PlayerPage : BasePage
         }
     }
 
-    private void Engine_MediaEnded()
+    private void HandleMediaEnded()
     {
         ViewModel.CompleteMedia();
 
@@ -565,42 +583,6 @@ internal sealed partial class PlayerPage : BasePage
         {
             ViewModel.Next();
         }
-    }
-
-    private void Engine_ErrorOccurred(string message)
-    {
-        ViewModel.PlayerStatusLiveData.Emit(new()
-        {
-            Status = PlayerPageViewModel.PlayerStatusEnum.Error,
-            Description = message,
-        });
-    }
-
-    /// <summary>
-    /// Opens a file through the engine the page owns. Which file, and where in it to start, are the view model's
-    /// decision; this is the engine half: let go of what is open, be told what to play through, open the file.
-    /// </summary>
-    private async Task<ErrorResult> OpenMedia(MediaModel media, long startPositionMs)
-    {
-        CoreEngine engine = EnsureEngine();
-
-        // Where the file that is about to be replaced was left: the view model keeps that mark, and it still knows
-        // the previous media is the one playing.
-        ViewModel.SavePosition();
-
-        _pendingStartPositionMs = startPositionMs;
-
-        // What the media was last played through, which is what its settings were saved with.
-        var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
-        _components = mediaSettings.ToComponents();
-        _videoTransform = mediaSettings.ToVideoTransform();
-
-        // Components are only read when the file is opened, so the engine lets go of what it has before it is
-        // told what to use, and then opens the new file with it.
-        await engine.Stop();
-        engine.SetComponents(_components);
-        engine.SetVideoTransform(_videoTransform);
-        return await engine.Load(media.Location);
     }
 
     #endregion
@@ -780,6 +762,7 @@ internal sealed partial class PlayerPage : BasePage
         }
 
         _isOverlayVisible = true;
+        UpdatePromptMargin();
         GetMainPageAbility().SetOverlayVisibility(true);
     }
 
@@ -794,6 +777,7 @@ internal sealed partial class PlayerPage : BasePage
 
         _isOverlayVisible = false;
         _isOverlayHold = false;
+        UpdatePromptMargin();
         GetMainPageAbility().SetOverlayVisibility(false);
     }
 
@@ -893,7 +877,7 @@ internal sealed partial class PlayerPage : BasePage
         ViewModel.SetMute(isMuted);
     }
 
-    private void ApplyPlayerSettings(PlayerSettingsModel settings)
+    private async void ApplyPlayerSettings(PlayerSettingsModel settings)
     {
         ApplyVideoTransform(settings);
 
@@ -905,22 +889,24 @@ internal sealed partial class PlayerPage : BasePage
 
         _components = components;
 
-        // A file that is being opened reads the choice as it opens, so the engine is told only once it is not
-        // mid-open.
         if (ViewModel.IsLoading)
         {
             return;
         }
 
-        // A component change is not a reason to open the file again: the pipeline swaps the chains the choice
-        // affects and keeps playing where it was, as the playback lab does.
-        _engine?.SetComponents(components);
+        CoreEngine? engine = _engine;
+        if (engine is null)
+        {
+            return;
+        }
+
+        ErrorResult err = await engine.SetComponents(components);
+        if (!err.IsSuccessful)
+        {
+            PromptInfo(err.Message);
+        }
     }
 
-    /// <summary>
-    /// Where the picture goes is not a component: nothing is rebuilt and no frame is waited for, the picture that
-    /// is already there is drawn again — so this is applied whatever the engine is doing, including mid-open.
-    /// </summary>
     private void ApplyVideoTransform(PlayerSettingsModel settings)
     {
         var transform = settings.ToVideoTransform();
@@ -931,6 +917,72 @@ internal sealed partial class PlayerPage : BasePage
 
         _videoTransform = transform;
         _engine?.SetVideoTransform(transform);
+    }
+
+    #endregion
+
+    #region Player prompt
+
+    private const int PromptDurationMilliseconds = 3000;
+
+    private DispatcherQueueTimer? _promptTimer;
+
+    private void PromptInfo(string message)
+    {
+        ShowPrompt(message, autoHide: true);
+    }
+
+    private void PromptError(string message)
+    {
+        ShowPrompt(message, autoHide: false);
+    }
+
+    private void ShowPrompt(string message, bool autoHide)
+    {
+        StopPromptTimer();
+
+        UpdatePromptMargin();
+        PromptText.Text = message;
+        PromptText.Visibility = Visibility.Visible;
+
+        if (!autoHide)
+        {
+            return;
+        }
+
+        DispatcherQueueTimer timer = DispatcherQueue.CreateTimer();
+        timer.Interval = TimeSpan.FromMilliseconds(PromptDurationMilliseconds);
+        timer.IsRepeating = false;
+        timer.Tick += PromptTimer_Tick;
+        timer.Start();
+        _promptTimer = timer;
+    }
+
+    private void PromptTimer_Tick(DispatcherQueueTimer sender, object args)
+    {
+        StopPromptTimer();
+
+        PromptText.Visibility = Visibility.Collapsed;
+        PromptText.Text = string.Empty;
+    }
+
+    private void StopPromptTimer()
+    {
+        DispatcherQueueTimer? timer = _promptTimer;
+        _promptTimer = null;
+        if (timer is null)
+        {
+            return;
+        }
+
+        timer.Stop();
+        timer.Tick -= PromptTimer_Tick;
+    }
+
+    private void UpdatePromptMargin()
+    {
+        double top = 12.0 + (_isOverlayVisible ? _topOverlayHeight : 0.0);
+        PromptText.Margin = new Thickness(16.0, top, 16.0, 0);
     }
 
     #endregion

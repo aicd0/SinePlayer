@@ -44,7 +44,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public readonly MutableLiveData<bool> PlaybackChangeLiveData = new();
-    public readonly MutableLiveData<PlayerStatusInfo> PlayerStatusLiveData = new(new() { Status = PlayerStatusEnum.Loading });
+    public readonly MutableLiveData<PlayerStatusInfo> PlayerStatusLiveData = new(new() { Status = PlayerStatusEnum.Idle });
     public readonly MutableLiveData<bool> IsExternalMediaLiveData = new(true);
     public readonly MutableLiveData<bool> IsFavoriteLiveData = new();
     public readonly MutableLiveData<bool> IsPlayingLiveData = new();
@@ -394,19 +394,16 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         PlayQueueModel.PlayQueueItem? playQueueItem = Playback.CurrentItem;
         if (playQueueItem is null)
         {
-            PlayerStatusLiveData.Emit(new()
+            PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
+            LoadMedia(new()
             {
-                Status = PlayerStatusEnum.Error,
-                Description = "The play queue is empty.",
+                Media = null,
+                PlaybackArgs = args,
             });
         }
         else if (playQueueItem.Media != _media || args.Reason == PlaybackStateChangeReason.Refresh)
         {
-            PlayerStatusLiveData.Emit(new()
-            {
-                Status = PlayerStatusEnum.Loading,
-            });
-
+            PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
             LoadMedia(new()
             {
                 Media = playQueueItem.Media,
@@ -473,7 +470,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             PlayerStatusLiveData.Emit(new()
             {
                 Status = PlayerStatusEnum.Error,
-                Description = err.DetailedErrorMessage,
+                Description = err.Message,
             });
         }
     }
@@ -490,11 +487,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
         if (media is null)
         {
-            PlayerStatusLiveData.Emit(new()
-            {
-                Status = PlayerStatusEnum.Error,
-                Description = "No media is selected.",
-            });
+            PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Idle });
             return;
         }
 
@@ -588,6 +581,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     public enum PlayerStatusEnum
     {
+        Idle,
         Loading,
         Error,
         Working,

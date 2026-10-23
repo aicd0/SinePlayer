@@ -21,18 +21,17 @@
             PointerMoved="VideoHost_PointerMoved"
             PointerPressed="VideoHost_PointerPressed"
             PointerReleased="VideoHost_PointerReleased" />
-        <StackPanel
-            x:Name="StatusPanel"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center">
-            <TextBlock
-                x:Name="StatusText"
-                MaxWidth="480"
-                Foreground="{ThemeResource ForegroundGrey2}"
-                TextAlignment="Center"
-                TextWrapping="Wrap" />
-        </StackPanel>
         <player:PlayerTransportBar x:Name="TransportBar" VerticalAlignment="Bottom" />
+        <TextBlock
+            x:Name="PromptText"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            FontSize="16"
+            FontWeight="Bold"
+            Foreground="Yellow"
+            IsHitTestVisible="False"
+            TextWrapping="Wrap"
+            Visibility="Collapsed" />
     </Grid>
 
 </base:BasePage>
