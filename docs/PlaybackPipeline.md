@@ -290,12 +290,26 @@ in `PipelineVersion` (`Source`, `AudioDecoder`, `AudioRenderer`, `VideoDecoder`,
 - A node compares the source and its own chain's numbers (`CompareVideo` / `CompareAudio`): a picture package says
   nothing about the sound, so the sound's numbers are not its business.
 
-| Package against the node's own snapshot | Verdict |
-|---|---|
-| equal, or zero (not visited) | **accept**, then stamp the package with `Max(package, self)` |
-| newer than the node | **block**: leave the package where it is and wait — its replacement has already been published, so the next turn installs it |
-| older than the node, in a component **before** it | **drop**: the package was produced by a component this one has left |
-| older than the node, in the node's **own** component | **accept**: a package has never seen this node's component, so its number for it cannot make the package stale (rule 6B drops only for a version before the node) |
+For a node B between its upstream components A and whatever consumes it, in this order:
+
+| # | Test | Verdict |
+|---|---|---|
+| 1 | `package.B > self.B` | **block**: the package expects a newer B. Its replacement has already been published, so the next turn installs it and the package is taken then |
+| 2 | any upstream A with `package.A < self.A` | **drop**: the package was produced by a generation this node has left |
+| 3 | otherwise | **accept**, and the package is stamped `Max(package, self)` when this node hands it on |
+
+Order matters: blocking wins over dropping, because waiting costs nothing while giving a package up is lossy.
+Two directions are deliberately *not* verdicts: a package naming an **older B** is accepted — a node's own number
+only travels in its own pair's packages, and a pair is published together, so an older number there means the
+package is from a generation this node has left, which rule 2 reports through the partner's number. And a package
+from a **newer A** is accepted — the pair that produced it carries that generation for B as well, which is where
+rule 1 fires.
+
+**There is no wildcard.** A rule with `0`-means-not-visited would have to be written for every field, so the
+model instead requires that **every package carries the whole snapshot of the component that produced it** —
+including the end-of-stream markers, which are packages like any other. A producer therefore always stamps its own
+chain's numbers, and the only zero any node can meet is its own field on a package it has not produced yet, which
+rule 1 (a `>` test) can never turn into a drop.
 
 The block is safe because a version number can only come from a publication, and a publication is complete before
 anybody is woken: it puts the component in the role's slot, and only then does `WakeAll` run — so a node that finds

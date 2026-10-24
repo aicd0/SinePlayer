@@ -63,23 +63,25 @@ public class PipelineVersionTests
     }
 
     [Test]
-    public void TheDecodeNodeComparesTheSourceAndItsOwnDecoderOnly()
+    public void TheDecodeNodeComparesItsOwnDecoderOnly()
     {
         using (Assert.EnterMultipleScope())
         {
-            // A packet has met the source and nothing else.
+            // A packet has met the source and nothing else; the decoder's own number is zero and an older number
+            // for it is not a reason to give the packet up (the rule drops only for a component *before* the node).
             Assert.That(PipelineVersion.CompareVideoDecoder(Source(1), Video(1, 5, 5)), Is.EqualTo(VersionVerdict.Accept));
             Assert.That(PipelineVersion.CompareAudioDecoder(Source(1), Audio(1, 5, 5)), Is.EqualTo(VersionVerdict.Accept));
 
             // The renderer comes after the decoder, so its number is not the decode node's business.
             Assert.That(PipelineVersion.CompareVideoDecoder(Video(1, 5, 9), Video(1, 5, 2)), Is.EqualTo(VersionVerdict.Accept));
 
-            // Its own decoder: newer blocks, older is not a reason to drop (rule 6B).
+            // Its own decoder: a newer one is expected, so the packet waits; the replacement is already published.
             Assert.That(PipelineVersion.CompareVideoDecoder(Video(1, 6, 0), Video(1, 5, 5)), Is.EqualTo(VersionVerdict.Block));
             Assert.That(PipelineVersion.CompareVideoDecoder(Video(1, 4, 0), Video(1, 5, 5)), Is.EqualTo(VersionVerdict.Accept));
 
-            // The source, in both directions.
-            Assert.That(PipelineVersion.CompareVideoDecoder(Source(2), Video(1, 5, 5)), Is.EqualTo(VersionVerdict.Block));
+            // The source is before the decoder: a newer one is not compatibility's business (freshness is the
+            // epoch's), an older one is a package from a source this decoder has left.
+            Assert.That(PipelineVersion.CompareVideoDecoder(Source(2), Video(1, 5, 5)), Is.EqualTo(VersionVerdict.Accept));
             Assert.That(PipelineVersion.CompareVideoDecoder(Source(1), Video(2, 5, 5)), Is.EqualTo(VersionVerdict.Drop));
         }
     }
@@ -88,44 +90,71 @@ public class PipelineVersionTests
     public void AcceptsAPackageFromTheSameGeneration()
     {
         Assert.That(PipelineVersion.CompareVideoRenderer(Video(1, 2, 2), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
+        Assert.That(PipelineVersion.CompareAudioRenderer(Audio(1, 2, 2), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
     }
 
     [Test]
-    public void AcceptsAComponentThePackageHasNotReached()
+    public void AProducersPackageAlwaysNamesItsOwnChain()
     {
-        // A packet the source has just produced has met the source and nothing else.
-        Assert.That(PipelineVersion.CompareVideoRenderer(Source(1), Video(1, 5, 5)), Is.EqualTo(VersionVerdict.Accept));
-        Assert.That(PipelineVersion.CompareVideoRenderer(Video(1, 2, 0), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept), "a frame leaving the decoder has not passed the renderer yet");
+        // The rule has no wildcard: a package from a component whose chain is not in it would read as "older" in
+        // the first field this node checks. What makes that safe is the producer stamping its whole snapshot, so a
+        // package that reaches a renderer always carries the pair's number, never a zero.
+        var frame = PipelineVersion.Max(Source(1), Video(1, 5, 5));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(frame.VideoDecoder, Is.EqualTo(5));
+            Assert.That(frame.VideoRenderer, Is.EqualTo(5));
+            Assert.That(PipelineVersion.CompareVideoRenderer(frame, Video(1, 5, 5)), Is.EqualTo(VersionVerdict.Accept));
+        }
     }
 
     [Test]
-    public void BlocksAPackageFromANewerSource()
+    public void AcceptsAPacketThatHasNotReachedTheDecoder()
     {
-        // The source is a node of its own: a decoder built for source 1 must not be handed source 2's packets.
-        Assert.That(PipelineVersion.CompareVideoRenderer(Source(2), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Block));
-        Assert.That(PipelineVersion.CompareAudioRenderer(Source(2), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Block));
+        // A packet's own field is zero — the decoder has not produced it — and an own number is only ever a reason
+        // to hold a package back, never to give it up.
+        Assert.That(PipelineVersion.CompareVideoDecoder(Source(1), Video(1, 5, 5)), Is.EqualTo(VersionVerdict.Accept));
+        Assert.That(PipelineVersion.CompareAudioDecoder(Source(1), Audio(1, 5, 5)), Is.EqualTo(VersionVerdict.Accept));
+    }
+
+    [Test]
+    public void AcceptsAPackageFromANewerSource()
+    {
+        // A newer source says nothing about compatibility: whether a package is current is the epoch's question.
+        Assert.That(PipelineVersion.CompareVideoDecoder(Source(2), Video(1, 5, 5)), Is.EqualTo(VersionVerdict.Accept));
+        Assert.That(PipelineVersion.CompareAudioDecoder(Source(2), Audio(1, 5, 5)), Is.EqualTo(VersionVerdict.Accept));
     }
 
     [Test]
     public void DropsAPackageFromAnOlderSource()
     {
-        Assert.That(PipelineVersion.CompareVideoRenderer(Source(1), Video(2, 2, 2)), Is.EqualTo(VersionVerdict.Drop));
-        Assert.That(PipelineVersion.CompareAudioRenderer(Source(1), Audio(2, 2, 2)), Is.EqualTo(VersionVerdict.Drop));
+        // The source is before both decoders, so a packet from a source a decoder has left is stale.
+        Assert.That(PipelineVersion.CompareVideoDecoder(Source(1), Video(2, 5, 5)), Is.EqualTo(VersionVerdict.Drop));
+        Assert.That(PipelineVersion.CompareAudioDecoder(Source(1), Audio(2, 5, 5)), Is.EqualTo(VersionVerdict.Drop));
     }
 
     [Test]
-    public void BlocksAPackageFromANewerComponent()
+    public void BlocksAPackageThatExpectsANewerNode()
     {
         // The replacement has been published and this node installs it on its next turn, so waiting is waiting
         // for something that is already on its way.
         Assert.That(PipelineVersion.CompareVideoRenderer(Video(1, 3, 3), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Block));
-        Assert.That(PipelineVersion.CompareVideoRenderer(Video(1, 3, 3), Video(1, 2, 3)), Is.EqualTo(VersionVerdict.Block), "only the component that is behind has to change");
+        Assert.That(PipelineVersion.CompareAudioRenderer(Audio(1, 3, 3), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Block));
     }
 
     [Test]
-    public void DropsAPackageWhoseUpstreamComponentHasBeenUpgraded()
+    public void BlocksEvenWhenAnUpstreamComponentIsOlder()
     {
-        // The decoder is before the renderer, so a frame from a decoder this renderer has left is stale.
+        // Rule 1 comes before rule 2: waiting costs nothing, giving a package up does.
+        Assert.That(PipelineVersion.CompareVideoRenderer(Video(1, 1, 3), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Block));
+    }
+
+    [Test]
+    public void DropsAPackageFromAnOlderUpstreamComponent()
+    {
+        // The decoder is before the renderer, so a frame from a decoder this renderer has left is stale — the rule
+        // 6B case, reported through the upstream number.
         Assert.That(PipelineVersion.CompareVideoRenderer(Video(1, 1, 1), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Drop));
         Assert.That(PipelineVersion.CompareAudioRenderer(Audio(1, 1, 1), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Drop));
     }
@@ -133,29 +162,31 @@ public class PipelineVersionTests
     [Test]
     public void AcceptsAPackageThatIsOlderThanTheNodesOwnComponent()
     {
-        // Rule 6B drops only for a version *before* the node: a package has never seen the node's own component,
-        // so its number for it says nothing about whether the package is stale.
+        // A node's own number is not a reason to drop: the package may simply predate this node, and it is the
+        // upstream numbers that say whether the package is stale.
         Assert.That(PipelineVersion.CompareVideoRenderer(Video(1, 2, 1), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
         Assert.That(PipelineVersion.CompareAudioRenderer(Audio(1, 2, 1), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
     }
 
     [Test]
-    public void BlocksWhenAComponentIsNewerWhateverTheOthersSay()
+    public void AcceptsAPackageFromANewerUpstreamComponent()
     {
-        // Waiting is not a loss and the replacement is already published, so a newer number wins over an older
-        // one rather than the package being given up.
-        Assert.That(PipelineVersion.CompareVideoRenderer(Video(1, 3, 1), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Block));
+        // A newer upstream is not this check's business: its pair would carry that number for the node itself,
+        // which is where the hold-back comes from.
+        Assert.That(PipelineVersion.CompareVideoRenderer(Video(1, 3, 1), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
     }
 
     [Test]
     public void IgnoresTheSoundWhenComparingThePicture()
     {
         Assert.That(PipelineVersion.CompareVideoRenderer(new PipelineVersion(1, 9, 9, 2, 2), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
+        Assert.That(PipelineVersion.CompareVideoDecoder(new PipelineVersion(1, 9, 9, 2, 2), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
     }
 
     [Test]
     public void IgnoresThePictureWhenComparingTheSound()
     {
         Assert.That(PipelineVersion.CompareAudioRenderer(new PipelineVersion(1, 2, 2, 9, 9), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
+        Assert.That(PipelineVersion.CompareAudioDecoder(new PipelineVersion(1, 2, 2, 9, 9), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
     }
 }

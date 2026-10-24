@@ -18,36 +18,31 @@ internal readonly record struct PipelineVersion(
         Math.Max(x.VideoRenderer, y.VideoRenderer));
 
     public static VersionVerdict CompareVideoDecoder(PipelineVersion package, PipelineVersion self) => CombineVerdict(
-        CompareUpstream(package.Source, self.Source),
-        CompareOwn(package.VideoDecoder, self.VideoDecoder));
+        CompareOwn(package.VideoDecoder, self.VideoDecoder),
+        CompareUpstream(package.Source, self.Source));
 
     public static VersionVerdict CompareVideoRenderer(PipelineVersion package, PipelineVersion self) => CombineVerdict(
+        CompareOwn(package.VideoRenderer, self.VideoRenderer),
         CompareUpstream(package.Source, self.Source),
-        CompareUpstream(package.VideoDecoder, self.VideoDecoder),
-        CompareOwn(package.VideoRenderer, self.VideoRenderer));
+        CompareUpstream(package.VideoDecoder, self.VideoDecoder));
 
     public static VersionVerdict CompareAudioDecoder(PipelineVersion package, PipelineVersion self) => CombineVerdict(
-        CompareUpstream(package.Source, self.Source),
-        CompareOwn(package.AudioDecoder, self.AudioDecoder));
+        CompareOwn(package.AudioDecoder, self.AudioDecoder),
+        CompareUpstream(package.Source, self.Source));
 
     public static VersionVerdict CompareAudioRenderer(PipelineVersion package, PipelineVersion self) => CombineVerdict(
+        CompareOwn(package.AudioRenderer, self.AudioRenderer),
         CompareUpstream(package.Source, self.Source),
-        CompareUpstream(package.AudioDecoder, self.AudioDecoder),
-        CompareOwn(package.AudioRenderer, self.AudioRenderer));
-
-    private static VersionVerdict CompareUpstream(long package, long self)
-    {
-        if (package == 0 || package == self)
-        {
-            return VersionVerdict.Accept;
-        }
-
-        return package > self ? VersionVerdict.Block : VersionVerdict.Drop;
-    }
+        CompareUpstream(package.AudioDecoder, self.AudioDecoder));
 
     private static VersionVerdict CompareOwn(long package, long self)
     {
         return package > self ? VersionVerdict.Block : VersionVerdict.Accept;
+    }
+
+    private static VersionVerdict CompareUpstream(long package, long self)
+    {
+        return package < self ? VersionVerdict.Drop : VersionVerdict.Accept;
     }
 
     private static VersionVerdict CombineVerdict(VersionVerdict first, VersionVerdict second)
@@ -57,13 +52,13 @@ internal readonly record struct PipelineVersion(
 
     private static VersionVerdict CombineVerdict(VersionVerdict first, VersionVerdict second, VersionVerdict third)
     {
-        if (first == VersionVerdict.Drop || second == VersionVerdict.Drop || third == VersionVerdict.Drop)
+        if (first == VersionVerdict.Block || second == VersionVerdict.Block || third == VersionVerdict.Block)
         {
-            return VersionVerdict.Drop;
+            return VersionVerdict.Block;
         }
 
-        return first == VersionVerdict.Block || second == VersionVerdict.Block || third == VersionVerdict.Block
-            ? VersionVerdict.Block
+        return first == VersionVerdict.Drop || second == VersionVerdict.Drop || third == VersionVerdict.Drop
+            ? VersionVerdict.Drop
             : VersionVerdict.Accept;
     }
 
