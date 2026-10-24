@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Filter;
@@ -46,7 +47,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { CanConfigure = false };
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
 
-            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
 
             using (Assert.EnterMultipleScope())
             {
@@ -131,7 +132,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { SubmitDelayMilliseconds = 20 };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            PlaybackOperationResult opened = Open(pipeline, path);
+            OperationResult opened = Open(pipeline, path);
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
 
             pipeline.Play();
@@ -166,7 +167,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
 
             pipeline.Play();
@@ -418,9 +419,9 @@ public class PlaybackPipelineTests
         /// <summary>Waits for the decoder to be inside a decode, which is when the gate holds it.</summary>
         internal bool WaitUntilDecoding() => _decoding.Wait(TimeSpan.FromSeconds(5));
 
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
             return TestCreators.Wrap(offered, inner, component => new GatedDecoder(component, this), out creator);
         }
 
@@ -433,16 +434,16 @@ public class PlaybackPipelineTests
 
             public PixelFormat OutputFormat => inner.OutputFormat;
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
             {
                 owner._decoding.Set();
                 owner._gate.Wait(TimeSpan.FromSeconds(5));
                 return inner.TryDecode(packet, out frames);
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames) => inner.Drain(out frames);
+            public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames) => inner.Drain(out frames);
 
-            public PlaybackOperationResult Flush() => inner.Flush();
+            public OperationResult Flush() => inner.Flush();
 
             public void Dispose() => inner.Dispose();
         }
@@ -462,9 +463,9 @@ public class PlaybackPipelineTests
         /// <summary>How long each packet after the first takes, for a decoder that is slow at the start and
         /// then merely behind.</summary>
         internal int SubsequentDecodeMilliseconds { get; init; }
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
             return TestCreators.Wrap(offered, inner, component => new SlowFirstDecoder(component, FirstDecodeMilliseconds, SubsequentDecodeMilliseconds), out creator);
         }
 
@@ -479,7 +480,7 @@ public class PlaybackPipelineTests
 
             public PixelFormat OutputFormat => inner.OutputFormat;
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
             {
                 bool first = Interlocked.Exchange(ref _pending, 0) == 1;
                 int delay = first ? firstDecodeMilliseconds : subsequentDecodeMilliseconds;
@@ -491,11 +492,11 @@ public class PlaybackPipelineTests
                 return inner.TryDecode(packet, out frames);
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames) => inner.Drain(out frames);
+            public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames) => inner.Drain(out frames);
 
-            public PlaybackOperationResult Flush()
+            public OperationResult Flush()
             {
-                PlaybackOperationResult flushed = inner.Flush();
+                OperationResult flushed = inner.Flush();
                 Interlocked.Exchange(ref _pending, 1);
                 return flushed;
             }
@@ -515,7 +516,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
             WarningLog warnings = new(pipeline);
 
-            PlaybackOperationResult opened = Open(pipeline, path);
+            OperationResult opened = Open(pipeline, path);
 
             using (Assert.EnterMultipleScope())
             {
@@ -653,7 +654,7 @@ public class PlaybackPipelineTests
                 audioRenderer,
                 new ThrottledVideoDecoderFactory { DecodeMilliseconds = 80 });
 
-            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             pipeline.Play();
 
@@ -718,7 +719,7 @@ public class PlaybackPipelineTests
                 new ThrottledVideoDecoderFactory { DecodeMilliseconds = 1500, FastPackets = 1 },
                 audioDecoders: new PacedAudioDecoderFactory { DecodeMilliseconds = 150 });
 
-            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, 1);
@@ -907,7 +908,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { SubmitDelayMilliseconds = 30 };
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
 
-            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             pipeline.Play();
 
@@ -1132,7 +1133,7 @@ public class PlaybackPipelineTests
 
             // Pausing what is already paused names a state the pipeline is not in, so it is refused like any
             // other command that cannot be carried out — and nothing about playback changes with it.
-            PlaybackOperationResult pausedAgain = Await(pipeline.Pause());
+            OperationResult pausedAgain = Await(pipeline.Pause());
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(pausedAgain.IsSuccessful, Is.False);
@@ -1680,7 +1681,7 @@ public class PlaybackPipelineTests
             audioRenderer.NoRoom = true;
 
             var askedAt = Stopwatch.StartNew();
-            PlaybackOperationResult seeked = Await(pipeline.Seek(TimeSpan.FromSeconds(1)));
+            OperationResult seeked = Await(pipeline.Seek(TimeSpan.FromSeconds(1)));
             askedAt.Stop();
 
             using (Assert.EnterMultipleScope())
@@ -1792,7 +1793,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -1839,7 +1840,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            PlaybackOperationResult opened = Open(pipeline, SyntheticPath(), new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, SyntheticPath(), new FakeRenderTarget());
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -1891,7 +1892,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            PlaybackOperationResult opened = Open(pipeline, SyntheticPath(), new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, SyntheticPath(), new FakeRenderTarget());
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -2000,7 +2001,7 @@ public class PlaybackPipelineTests
 
             // The sound is asking the device whether it has played out, and the user pauses before the answer
             // comes back. The answer is then "yes, it has" — and that is the ending, with the file paused.
-            PlaybackOperationResult? paused = null;
+            OperationResult? paused = null;
             audioRenderer.BeforeReadingQueuedSampleCount = () =>
             {
                 paused = Await(pipeline.Pause());
@@ -2378,7 +2379,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
             WarningLog warnings = new(pipeline);
 
-            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
 
             using (Assert.EnterMultipleScope())
             {
@@ -2419,7 +2420,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { CanConfigure = false, RefusalReason = "no device here" };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            PlaybackOperationResult opened = Open(pipeline, path);
+            OperationResult opened = Open(pipeline, path);
 
             // There is nothing to fall back on: a file with no video and no sound is a file with nothing to
             // play, so the open fails with the reason rather than reporting success over an empty pipeline.
@@ -2444,7 +2445,7 @@ public class PlaybackPipelineTests
         {
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
 
-            PlaybackOperationResult opened = Open(pipeline, path);
+            OperationResult opened = Open(pipeline, path);
 
             using (Assert.EnterMultipleScope())
             {
@@ -2518,7 +2519,7 @@ public class PlaybackPipelineTests
     {
         using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
 
-        PlaybackOperationResult opened = Open(pipeline, Path.Combine(Path.GetTempPath(), "sineplayer-missing-file.mp4"));
+        OperationResult opened = Open(pipeline, Path.Combine(Path.GetTempPath(), "sineplayer-missing-file.mp4"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -2560,7 +2561,7 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPlaybackToFinish(pipeline);
 
-            PlaybackOperationResult played = Await(pipeline.Play());
+            OperationResult played = Await(pipeline.Play());
 
             using (Assert.EnterMultipleScope())
             {
@@ -2609,7 +2610,7 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForState(pipeline, MediaEngineState.Playing);
 
-            PlaybackOperationResult seeked = Await(pipeline.Seek(TimeSpan.FromSeconds(5)));
+            OperationResult seeked = Await(pipeline.Seek(TimeSpan.FromSeconds(5)));
 
             MediaEngineState expected = refusesInAdvance ? MediaEngineState.Playing : MediaEngineState.Paused;
             using (Assert.EnterMultipleScope())
@@ -2791,7 +2792,7 @@ public class PlaybackPipelineTests
     {
         using PlaybackPipeline pipeline = new();
 
-        PlaybackOperationResult opened = Open(pipeline, CreateBitmapFile());
+        OperationResult opened = Open(pipeline, CreateBitmapFile());
 
         using (Assert.EnterMultipleScope())
         {
@@ -2821,7 +2822,7 @@ public class PlaybackPipelineTests
                 components.Register(new FFmpegAudioDecoderFactory());
             });
 
-            PlaybackOperationResult opened = Open(pipeline, path);
+            OperationResult opened = Open(pipeline, path);
 
             using (Assert.EnterMultipleScope())
             {
@@ -2854,7 +2855,7 @@ public class PlaybackPipelineTests
                 components.Register(new FFmpegAudioDecoderFactory());
             });
 
-            PlaybackOperationResult opened = Open(pipeline, path);
+            OperationResult opened = Open(pipeline, path);
 
             using (Assert.EnterMultipleScope())
             {
@@ -2884,7 +2885,7 @@ public class PlaybackPipelineTests
                 components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
             });
 
-            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
 
             using (Assert.EnterMultipleScope())
             {
@@ -2910,7 +2911,7 @@ public class PlaybackPipelineTests
 
             using PlaybackPipeline pipeline = CreatePipeline(registry, new FakeVideoRenderer(), new FakeAudioRenderer());
 
-            PlaybackOperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
 
             Assert.That(opened.IsSuccessful, Is.False);
             Assert.That(opened.Message, Does.Contain("refuses the stream"));
@@ -2944,7 +2945,7 @@ public class PlaybackPipelineTests
 
             // The host says what it wants by changing the registry, then tells the pipeline to look again.
             pipeline.Components.Preferences = pipeline.Components.Preferences with { PreferHardwareDecoding = false };
-            PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+            OperationResult reconciled = Await(pipeline.Reconcile());
 
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
 
@@ -3167,7 +3168,7 @@ public class PlaybackPipelineTests
             pipeline.Components.Register(new FailingVideoRendererFactory("broken"));
             pipeline.Components.Register(new FakeVideoRendererFactory(second));
 
-            PlaybackOperationResult swapped = Await(pipeline.Reconcile());
+            OperationResult swapped = Await(pipeline.Reconcile());
 
             Assert.That(swapped.IsSuccessful, Is.True, swapped.Message);
 
@@ -3206,7 +3207,7 @@ public class PlaybackPipelineTests
             // it cannot build: the reconcile has to say so and leave the running renderer alone.
             SwapVideoRenderer(pipeline, new FailingVideoRendererFactory("broken"));
 
-            PlaybackOperationResult swapped = Await(pipeline.Reconcile());
+            OperationResult swapped = Await(pipeline.Reconcile());
 
             using (Assert.EnterMultipleScope())
             {
@@ -3292,7 +3293,7 @@ public class PlaybackPipelineTests
             TimeSpan position = pipeline.Position;
             FakeAudioRenderer refuses = new() { CanConfigure = false, RefusalReason = "This device refuses the stream." };
             SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(refuses));
-            PlaybackOperationResult swapped = Await(pipeline.Reconcile());
+            OperationResult swapped = Await(pipeline.Reconcile());
 
             using (Assert.EnterMultipleScope())
             {
@@ -3338,7 +3339,7 @@ public class PlaybackPipelineTests
                 components.Register(new PacedAudioDecoderFactory());
             });
 
-            PlaybackOperationResult opened = Open(pipeline, path);
+            OperationResult opened = Open(pipeline, path);
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Await(pipeline.Play());
             WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
@@ -3353,7 +3354,7 @@ public class PlaybackPipelineTests
             pipeline.Components.Clear<IAudioDecoderFactory>();
             pipeline.Components.Register(second);
 
-            PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+            OperationResult reconciled = Await(pipeline.Reconcile());
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
 
             // Each wait is on the thing that is asserted below, and in the order the pipeline does them: the
@@ -3404,7 +3405,7 @@ public class PlaybackPipelineTests
             SwapVideoRenderer(pipeline, new FakeVideoRendererFactory(secondVideo));
             SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(secondAudio));
 
-            PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+            OperationResult reconciled = Await(pipeline.Reconcile());
 
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
 
@@ -3437,7 +3438,7 @@ public class PlaybackPipelineTests
 
             // Asking for what is already in force is not a change: the resolver is asked again, and because the
             // answer is the decoder that is running, nothing is built.
-            PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+            OperationResult reconciled = Await(pipeline.Reconcile());
 
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
 
@@ -3475,7 +3476,7 @@ public class PlaybackPipelineTests
             pipeline.Components.Clear<IVideoDecoderFactory>();
             pipeline.Components.Register(new RefusingVideoDecoderFactory());
 
-            PlaybackOperationResult reconciled = Await(pipeline.Reconcile());
+            OperationResult reconciled = Await(pipeline.Reconcile());
 
             using (Assert.EnterMultipleScope())
             {
@@ -3614,20 +3615,20 @@ public class PlaybackPipelineTests
     /// </summary>
     private sealed class RefusingVideoDecoderFactory : IVideoDecoderFactory
     {
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
             creator = new Creator();
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         private sealed class Creator : IComponentCreator<IVideoDecoder>
         {
             public string Signature => "refusing:video";
 
-            public PlaybackOperationResult Create(out IVideoDecoder? component)
+            public OperationResult Create(out IVideoDecoder? component)
             {
                 component = null;
-                return PlaybackOperationResult.Failure("This decoder refuses the stream.");
+                return OperationResult.Failure("This decoder refuses the stream.");
             }
         }
     }
@@ -3657,7 +3658,7 @@ public class PlaybackPipelineTests
             }
         }
 
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
             lock (_requests)
             {
@@ -3681,20 +3682,20 @@ public class PlaybackPipelineTests
     {
         private readonly FFmpegVideoDecoderFactory _inner = new();
 
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
             creator = offered.IsSuccessful && inner is not null ? new Creator(inner, hardware, signature) : null;
-            return creator is null ? offered : PlaybackOperationResult.Success;
+            return creator is null ? offered : OperationResult.Success();
         }
 
         private sealed class Creator(IComponentCreator<IVideoDecoder> inner, bool hardware, string signature) : IComponentCreator<IVideoDecoder>
         {
             public string Signature => signature;
 
-            public PlaybackOperationResult Create(out IVideoDecoder? component)
+            public OperationResult Create(out IVideoDecoder? component)
             {
-                PlaybackOperationResult created = inner.Create(out IVideoDecoder? made);
+                OperationResult created = inner.Create(out IVideoDecoder? made);
                 component = created.IsSuccessful && made is not null ? new Decoder(made, hardware) : null;
                 return created;
             }
@@ -3709,17 +3710,17 @@ public class PlaybackPipelineTests
 
             public PixelFormat OutputFormat => inner.OutputFormat;
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> buffers)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> buffers)
             {
                 return inner.TryDecode(packet, out buffers);
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> buffers)
+            public OperationResult Drain(out IReadOnlyList<RawVideoFrame> buffers)
             {
                 return inner.Drain(out buffers);
             }
 
-            public PlaybackOperationResult Flush()
+            public OperationResult Flush()
             {
                 return inner.Flush();
             }
@@ -3746,10 +3747,10 @@ public class PlaybackPipelineTests
             _renderer = renderer;
         }
 
-        public PlaybackOperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+        public OperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
         {
             creator = new FixedCreator<IAudioRenderer>(_signature, () => _renderer);
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 
@@ -4212,17 +4213,17 @@ public class PlaybackPipelineTests
 
         public bool Disposed { get; private set; }
 
-        public PlaybackOperationResult Configure(AudioStreamInfo stream)
+        public OperationResult Configure(AudioStreamInfo stream)
         {
             ConfiguredStream = stream;
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
-        public PlaybackOperationResult Apply(RawAudioBuffer input, out RawAudioBuffer output)
+        public OperationResult Apply(RawAudioBuffer input, out RawAudioBuffer output)
         {
             Interlocked.Increment(ref _appliedBlocks);
             output = input;
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         public void Dispose()
@@ -4242,7 +4243,7 @@ public class PlaybackPipelineTests
 
         public List<FakeAudioRenderer> Created { get; } = [];
 
-        public PlaybackOperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+        public OperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
         {
             FakeAudioRenderer renderer = new();
             lock (_lock)
@@ -4251,7 +4252,7 @@ public class PlaybackPipelineTests
             }
 
             creator = new FixedCreator<IAudioRenderer>(_signature, () => renderer);
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 
@@ -4383,7 +4384,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { NoRoom = true };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer, audioDecoders: decoders);
 
-            PlaybackOperationResult opened = Open(pipeline, path);
+            OperationResult opened = Open(pipeline, path);
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -4595,9 +4596,9 @@ public class PlaybackPipelineTests
     {
         private readonly FFmpegAudioDecoderFactory _inner = new();
 
-        public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
         {
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
             return TestCreators.Wrap(offered, inner, component => new BrokenDrainAudioDecoder(component), out creator);
         }
 
@@ -4610,18 +4611,18 @@ public class PlaybackPipelineTests
 
             public AudioSampleFormat OutputFormat => inner.OutputFormat;
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
             {
                 return inner.TryDecode(packet, out buffers);
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
+            public OperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
             {
                 buffers = [];
-                return PlaybackOperationResult.Failure("The decoder could not flush its tail.");
+                return OperationResult.Failure("The decoder could not flush its tail.");
             }
 
-            public PlaybackOperationResult Flush()
+            public OperationResult Flush()
             {
                 return inner.Flush();
             }
@@ -4642,9 +4643,9 @@ public class PlaybackPipelineTests
     {
         private readonly FFmpegVideoDecoderFactory _inner = new();
 
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
             return TestCreators.Wrap(offered, inner, component => new BrokenDrainVideoDecoder(component, returnsNothing), out creator);
         }
 
@@ -4657,24 +4658,24 @@ public class PlaybackPipelineTests
 
             public PixelFormat OutputFormat => inner.OutputFormat;
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
             {
                 return inner.TryDecode(packet, out frames);
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
             {
                 if (returnsNothing)
                 {
                     frames = null!;
-                    return PlaybackOperationResult.Success;
+                    return OperationResult.Success();
                 }
 
                 frames = [];
-                return PlaybackOperationResult.Failure("The decoder could not flush its tail.");
+                return OperationResult.Failure("The decoder could not flush its tail.");
             }
 
-            public PlaybackOperationResult Flush()
+            public OperationResult Flush()
             {
                 return inner.Flush();
             }
@@ -4696,9 +4697,9 @@ public class PlaybackPipelineTests
     private sealed class DelayedVideoDecoderFactory : IVideoDecoderFactory
     {
         private readonly FFmpegVideoDecoderFactory _inner = new();
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
             return TestCreators.Wrap(offered, inner, component => new DelayedVideoDecoder(component), out creator);
         }
 
@@ -4719,9 +4720,9 @@ public class PlaybackPipelineTests
 
             public PixelFormat OutputFormat => _inner.OutputFormat;
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
             {
-                PlaybackOperationResult decoded = _inner.TryDecode(packet, out IReadOnlyList<RawVideoFrame> produced);
+                OperationResult decoded = _inner.TryDecode(packet, out IReadOnlyList<RawVideoFrame> produced);
                 if (decoded.IsSuccessful)
                 {
                     _held.AddRange(produced);
@@ -4731,9 +4732,9 @@ public class PlaybackPipelineTests
                 return decoded;
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
             {
-                PlaybackOperationResult drained = _inner.Drain(out IReadOnlyList<RawVideoFrame> tail);
+                OperationResult drained = _inner.Drain(out IReadOnlyList<RawVideoFrame> tail);
                 if (!drained.IsSuccessful)
                 {
                     frames = tail;
@@ -4743,10 +4744,10 @@ public class PlaybackPipelineTests
                 _held.AddRange(tail);
                 frames = _held.ToArray();
                 _held.Clear();
-                return PlaybackOperationResult.Success;
+                return OperationResult.Success();
             }
 
-            public PlaybackOperationResult Flush()
+            public OperationResult Flush()
             {
                 ReleaseHeld();
                 return _inner.Flush();
@@ -4778,9 +4779,9 @@ public class PlaybackPipelineTests
     private sealed class LiveRefusingSourceFactory(bool refusesInAdvance) : ISourceProviderFactory
     {
         private readonly FFmpegSourceProviderFactory _inner = new();
-        public PlaybackOperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
+        public OperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
         {
-            PlaybackOperationResult opened = _inner.TryOpen(locator, out IMediaSource? inner);
+            OperationResult opened = _inner.TryOpen(locator, out IMediaSource? inner);
             source = opened.IsSuccessful && inner is not null ? new LiveRefusingSource(inner, refusesInAdvance) : inner;
             return opened;
         }
@@ -4791,14 +4792,14 @@ public class PlaybackPipelineTests
 
             public bool CanSeek => !refusesInAdvance;
 
-            public PlaybackOperationResult Seek(TimeSpan position)
+            public OperationResult Seek(TimeSpan position)
             {
-                return PlaybackOperationResult.Failure("This source refuses to move.");
+                return OperationResult.Failure("This source refuses to move.");
             }
 
-            public PlaybackOperationResult TryReadPacket(out MediaPacket? packet)
+            public OperationResult TryReadPacket(out MediaPacket? packet)
             {
-                PlaybackOperationResult read = inner.TryReadPacket(out packet);
+                OperationResult read = inner.TryReadPacket(out packet);
                 if (read.IsSuccessful && packet is null)
                 {
                     // The stream loops rather than ends, which is what a live one does.
@@ -4836,9 +4837,9 @@ public class PlaybackPipelineTests
         internal int DecodeMilliseconds { get; init; } = DecodePaceMilliseconds;
 
         public int Decodes => Volatile.Read(ref _decodes);
-        public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
         {
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
             return TestCreators.Wrap(offered, inner, component => new PacedAudioDecoder(component, this, DecodeMilliseconds), out creator);
         }
 
@@ -4851,19 +4852,19 @@ public class PlaybackPipelineTests
 
             public AudioSampleFormat OutputFormat => inner.OutputFormat;
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
             {
                 Interlocked.Increment(ref owner._decodes);
                 Thread.Sleep(decodeMilliseconds);
                 return inner.TryDecode(packet, out buffers);
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
+            public OperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
             {
                 return inner.Drain(out buffers);
             }
 
-            public PlaybackOperationResult Flush()
+            public OperationResult Flush()
             {
                 return inner.Flush();
             }
@@ -4888,9 +4889,9 @@ public class PlaybackPipelineTests
 
         /// <summary>How many packets decode cleanly before the decoder throws.</summary>
         internal int PacketsBeforeThrow { get; init; } = 1;
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
             return TestCreators.Wrap(offered, inner, component => new ThrowingVideoDecoder(component, PacketsBeforeThrow), out creator);
         }
 
@@ -4913,7 +4914,7 @@ public class PlaybackPipelineTests
 
             public PixelFormat OutputFormat => _inner.OutputFormat;
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
             {
                 if (_decoded++ >= _packetsBeforeThrow)
                 {
@@ -4923,12 +4924,12 @@ public class PlaybackPipelineTests
                 return _inner.TryDecode(packet, out frames);
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
             {
                 return _inner.Drain(out frames);
             }
 
-            public PlaybackOperationResult Flush()
+            public OperationResult Flush()
             {
                 return _inner.Flush();
             }
@@ -4947,10 +4948,10 @@ public class PlaybackPipelineTests
     /// </summary>
     private sealed class SilentVideoDecoderFactory : IVideoDecoderFactory
     {
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
             creator = new FixedCreator<IVideoDecoder>("silent:video", () => new SilentVideoDecoder(stream));
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         private sealed class SilentVideoDecoder(VideoStreamInfo stream) : IVideoDecoder
@@ -4962,21 +4963,21 @@ public class PlaybackPipelineTests
 
             public PixelFormat OutputFormat => PixelFormat.Yuv420P;
 
-            public PlaybackOperationResult Flush()
+            public OperationResult Flush()
             {
-                return PlaybackOperationResult.Success;
+                return OperationResult.Success();
             }
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
             {
                 frames = [];
-                return PlaybackOperationResult.Success;
+                return OperationResult.Success();
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
             {
                 frames = [];
-                return PlaybackOperationResult.Success;
+                return OperationResult.Success();
             }
 
             public void Dispose()
@@ -4996,9 +4997,9 @@ public class PlaybackPipelineTests
 
         /// <summary>How many packets decode cleanly before the decoder gives up.</summary>
         internal int PacketsBeforeFailure { get; init; } = 1;
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
             return TestCreators.Wrap(offered, inner, component => new FailingVideoDecoder(component, PacketsBeforeFailure), out creator);
         }
 
@@ -5021,23 +5022,23 @@ public class PlaybackPipelineTests
 
             public PixelFormat OutputFormat => _inner.OutputFormat;
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
             {
                 if (_decoded++ >= _packetsBeforeFailure)
                 {
                     frames = [];
-                    return PlaybackOperationResult.Failure("The decoder cannot decode this stream.");
+                    return OperationResult.Failure("The decoder cannot decode this stream.");
                 }
 
                 return _inner.TryDecode(packet, out frames);
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
             {
                 return _inner.Drain(out frames);
             }
 
-            public PlaybackOperationResult Flush()
+            public OperationResult Flush()
             {
                 return _inner.Flush();
             }
@@ -5067,9 +5068,9 @@ public class PlaybackPipelineTests
         /// like, and it is the arrangement in which the picture's verdict has nothing to wake it.
         /// </summary>
         internal int FastPackets { get; init; }
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
             return TestCreators.Wrap(offered, inner, component => new ThrottledVideoDecoder(component, DecodeMilliseconds, FastPackets), out creator);
         }
 
@@ -5094,7 +5095,7 @@ public class PlaybackPipelineTests
 
             public PixelFormat OutputFormat => _inner.OutputFormat;
 
-            public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
             {
                 if (Interlocked.Increment(ref _decoded) > _fastPackets)
                 {
@@ -5104,12 +5105,12 @@ public class PlaybackPipelineTests
                 return _inner.TryDecode(packet, out frames);
             }
 
-            public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+            public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
             {
                 return _inner.Drain(out frames);
             }
 
-            public PlaybackOperationResult Flush()
+            public OperationResult Flush()
             {
                 return _inner.Flush();
             }
@@ -5136,19 +5137,19 @@ public class PlaybackPipelineTests
 
         public object DeviceLock { get; } = new();
 
-        public PlaybackOperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
+        public OperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
-        public PlaybackOperationResult Render(RawVideoFrame frame, VideoTransform transform)
+        public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
-        public PlaybackOperationResult RefreshSurface(VideoTransform transform)
+        public OperationResult RefreshSurface(VideoTransform transform)
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         public bool TryGetDisplayedFrameCount(out long count)
@@ -5171,7 +5172,7 @@ public class PlaybackPipelineTests
         private readonly SilentVideoDecoderFactory _inner = new();
 
         internal DecoderOptions? Options { get; private set; }
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
             Options = options;
             return _inner.TryCreate(source, stream, options, out creator);
@@ -5192,17 +5193,17 @@ public class PlaybackPipelineTests
             _renderer = renderer;
         }
 
-        public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+        public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
         {
             creator = new FixedCreator<IVideoRenderer>(_signature, () => _renderer);
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 
     /// <summary>
     /// Opens a file and waits for the answer, because whoever opens a file has to know whether it opened.
     /// </summary>
-    private static PlaybackOperationResult Open(PlaybackPipeline pipeline, string path, IVideoRenderTarget? target = null)
+    private static OperationResult Open(PlaybackPipeline pipeline, string path, IVideoRenderTarget? target = null)
     {
         return pipeline.Open(MediaLocator.Parse(path), target).GetAwaiter().GetResult();
     }
@@ -5211,7 +5212,7 @@ public class PlaybackPipelineTests
     /// Waits for a command's own answer, which every call into the pipeline hands back: the job is queued, so
     /// waiting for the task is waiting for the command to have happened.
     /// </summary>
-    private static PlaybackOperationResult Await(Task<PlaybackOperationResult> command)
+    private static OperationResult Await(Task<OperationResult> command)
     {
         Assert.That(command.Wait(5000), Is.True, "the command was never carried out");
         return command.Result;
@@ -5289,7 +5290,7 @@ public class PlaybackPipelineTests
     /// </summary>
     private static void SeekAndWait(PlaybackPipeline pipeline, TimeSpan position, SeekMode mode = SeekMode.Fast)
     {
-        PlaybackOperationResult seeked = Await(pipeline.Seek(position, mode));
+        OperationResult seeked = Await(pipeline.Seek(position, mode));
         Assert.That(seeked.IsSuccessful, Is.True, seeked.Message);
     }
 
@@ -5299,7 +5300,7 @@ public class PlaybackPipelineTests
     /// </summary>
     private static void SeekFromAnotherThread(PlaybackPipeline pipeline, TimeSpan position)
     {
-        Task<PlaybackOperationResult>? seek = null;
+        Task<OperationResult>? seek = null;
         var seeker = new Thread(() => seek = pipeline.Seek(position))
         {
             IsBackground = true,
@@ -5555,18 +5556,18 @@ public class PlaybackPipelineTests
         /// </summary>
         public string? RenderFailure { get; init; }
 
-        public PlaybackOperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
+        public OperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
         {
             ConfiguredStream = stream;
             Target = target;
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
-        public PlaybackOperationResult Render(RawVideoFrame frame, VideoTransform transform)
+        public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
         {
             if (RenderFailure is string failure)
             {
-                return PlaybackOperationResult.Failure(failure);
+                return OperationResult.Failure(failure);
             }
 
             if (RenderDelayMilliseconds > 0)
@@ -5581,7 +5582,7 @@ public class PlaybackPipelineTests
                 _renderedTimestamps.Add(frame.Timestamp);
             }
 
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         /// <summary>Where the last frame was told to go, which is how a test reads the transform the pipeline held.</summary>
@@ -5599,11 +5600,11 @@ public class PlaybackPipelineTests
         /// <summary>How many times the pipeline let this renderer go, which is what a swap has to do to the one it replaces.</summary>
         public int DisposeCount { get; private set; }
 
-        public PlaybackOperationResult RefreshSurface(VideoTransform transform)
+        public OperationResult RefreshSurface(VideoTransform transform)
         {
             RefreshedSurfaces++;
             LastRefreshedTransform = transform;
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         /// <summary>
@@ -5628,20 +5629,20 @@ public class PlaybackPipelineTests
     /// that cannot be presented into.</summary>
     private sealed class RefusingAudioRendererFactory : IAudioRendererFactory
     {
-        public PlaybackOperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+        public OperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
         {
             creator = null;
-            return PlaybackOperationResult.Failure("This audio device refuses to be opened.");
+            return OperationResult.Failure("This audio device refuses to be opened.");
         }
     }
 
     /// <summary>A factory that refuses every stream, the same way a decoder with no path for a codec does.</summary>
     private sealed class RefusingAudioDecoderFactory : IAudioDecoderFactory
     {
-        public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
         {
             creator = null;
-            return PlaybackOperationResult.Failure("This audio decoder refuses the stream.");
+            return OperationResult.Failure("This audio decoder refuses the stream.");
         }
     }
 
@@ -5667,12 +5668,12 @@ public class PlaybackPipelineTests
         /// </summary>
         internal int Offers => Volatile.Read(ref _offers);
 
-        public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
         {
             Interlocked.Increment(ref _offers);
-            PlaybackOperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
+            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
             creator = offered.IsSuccessful && inner is not null ? new SignatureCreator(inner, _signature) : null;
-            return creator is null ? offered : PlaybackOperationResult.Success;
+            return creator is null ? offered : OperationResult.Success();
         }
 
         /// <summary>Passes everything through but the signature, which is the only thing that makes this a change.</summary>
@@ -5680,7 +5681,7 @@ public class PlaybackPipelineTests
         {
             public string Signature => signature;
 
-            public PlaybackOperationResult Create(out IAudioDecoder? component)
+            public OperationResult Create(out IAudioDecoder? component)
             {
                 return inner.Create(out component);
             }
@@ -5689,30 +5690,30 @@ public class PlaybackPipelineTests
 
     private sealed class RefusingVideoRendererFactory : IVideoRendererFactory
     {
-        public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+        public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
         {
             creator = null;
-            return PlaybackOperationResult.Failure("This renderer refuses to be made.");
+            return OperationResult.Failure("This renderer refuses to be made.");
         }
     }
 
     /// <summary>Offers a renderer and then cannot build it, which is an offer that has to be passed over.</summary>
     private sealed class FailingVideoRendererFactory(string signature) : IVideoRendererFactory
     {
-        public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+        public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
         {
             creator = new Creator(signature);
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         private sealed class Creator(string signature) : IComponentCreator<IVideoRenderer>
         {
             public string Signature => signature;
 
-            public PlaybackOperationResult Create(out IVideoRenderer? component)
+            public OperationResult Create(out IVideoRenderer? component)
             {
                 component = null;
-                return PlaybackOperationResult.Failure("This renderer refuses to be made.");
+                return OperationResult.Failure("This renderer refuses to be made.");
             }
         }
     }
@@ -5873,15 +5874,15 @@ public class PlaybackPipelineTests
 
             set => _queuedSampleCount = value;
         }
-        public PlaybackOperationResult Configure(AudioStreamInfo stream)
+        public OperationResult Configure(AudioStreamInfo stream)
         {
             if (!CanConfigure)
             {
-                return PlaybackOperationResult.Failure(RefusalReason);
+                return OperationResult.Failure(RefusalReason);
             }
 
             ConfiguredStream = stream;
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         /// <summary>
@@ -5917,7 +5918,7 @@ public class PlaybackPipelineTests
             }
         }
 
-        public PlaybackOperationResult Flush()
+        public OperationResult Flush()
         {
             FlushCount++;
 
@@ -5937,7 +5938,7 @@ public class PlaybackPipelineTests
                 _clock.SetPosition(position);
             }
 
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         /// <summary>How many times the pipeline has let go of this device — once per open it was made for.</summary>
@@ -5968,7 +5969,7 @@ public class PlaybackPipelineTests
 
             public AudioSubmitYield Current { get; private set; }
 
-            public PlaybackOperationResult Result { get; private set; } = PlaybackOperationResult.Success;
+            public OperationResult Result { get; private set; } = OperationResult.Success();
 
             public bool MoveNext()
             {
@@ -5996,7 +5997,7 @@ public class PlaybackPipelineTests
 
                 if (_renderer.SubmitFailure is Exception failure)
                 {
-                    Result = PlaybackOperationResult.Failure($"Unable to queue audio: {failure.Message}", failure);
+                    Result = OperationResult.Failure($"Unable to queue audio: {failure.Message}", failure);
                     return false;
                 }
 

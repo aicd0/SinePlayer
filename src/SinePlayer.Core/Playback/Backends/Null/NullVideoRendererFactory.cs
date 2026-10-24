@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 
@@ -21,20 +21,20 @@ public sealed class NullVideoRendererFactory : IVideoRendererFactory
         _signature = signature;
     }
 
-    public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+    public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
     {
         creator = new Creator(_signature);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     private sealed class Creator(string signature) : IComponentCreator<IVideoRenderer>
     {
         public string Signature => signature;
 
-        public PlaybackOperationResult Create(out IVideoRenderer? component)
+        public OperationResult Create(out IVideoRenderer? component)
         {
             component = new NullVideoRenderer();
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 }

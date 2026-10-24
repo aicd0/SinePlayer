@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Timing;
@@ -17,9 +18,9 @@ public interface IAudioRenderer : IDisposable
 
     long QueuedSampleCount { get; }
 
-    PlaybackOperationResult Configure(AudioStreamInfo stream);
+    OperationResult Configure(AudioStreamInfo stream);
 
     IAudioSubmit Submit(RawAudioBuffer buffer);
 
-    PlaybackOperationResult Flush();
+    OperationResult Flush();
 }

@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -299,9 +300,9 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         return hardwareDecoding ? [codecId, "libdav1d"] : ["libdav1d", codecId];
     }
 
-    public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+    public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
     {
-        PlaybackOperationResult result = TryDecodeCore(packet, out frames);
+        OperationResult result = TryDecodeCore(packet, out frames);
         if (result.IsSuccessful)
         {
             return result;
@@ -318,19 +319,19 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         return TryDecodeCore(packet, out frames);
     }
 
-    private PlaybackOperationResult TryDecodeCore(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+    private OperationResult TryDecodeCore(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
     {
         List<RawVideoFrame> decoded = [];
         frames = decoded;
 
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The decoder has already been disposed.");
+            return OperationResult.Failure("The decoder has already been disposed.");
         }
 
         if (packet.Buffer is not FFmpegPacketBuffer packetBuffer)
         {
-            return PlaybackOperationResult.Failure("The packet was not produced by the FFmpeg backend.");
+            return OperationResult.Failure("The packet was not produced by the FFmpeg backend.");
         }
 
         _lastPacketTimestamp = packet.Timestamp.Ticks;
@@ -341,7 +342,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
             // The decoder wants its pending output collected before it accepts more input. The packet
             // is still ours at this point, so drain and try once more.
             int pending = decoded.Count;
-            PlaybackOperationResult drainResult = ReceiveFrames(decoded);
+            OperationResult drainResult = ReceiveFrames(decoded);
             if (!drainResult.IsSuccessful)
             {
                 return drainResult;
@@ -349,7 +350,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
 
             if (decoded.Count == pending)
             {
-                return PlaybackOperationResult.Failure("The decoder is not accepting input.");
+                return OperationResult.Failure("The decoder is not accepting input.");
             }
 
             sendResult = FFmpegNative.avcodec_send_packet(_context, packetBuffer.Packet);
@@ -357,7 +358,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
 
         if (sendResult < 0 && sendResult != FFmpegConstants.ErrorEndOfStream)
         {
-            return PlaybackOperationResult.Failure($"Unable to submit a packet to the decoder: {FFmpegInterop.GetErrorMessage(sendResult)}");
+            return OperationResult.Failure($"Unable to submit a packet to the decoder: {FFmpegInterop.GetErrorMessage(sendResult)}");
         }
 
         return ReceiveFrames(decoded);
@@ -377,36 +378,36 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         return TryOpenNextCandidate(out _);
     }
 
-    public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+    public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
     {
         List<RawVideoFrame> decoded = [];
         frames = decoded;
 
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The decoder has already been disposed.");
+            return OperationResult.Failure("The decoder has already been disposed.");
         }
 
         // A null packet puts the decoder into draining mode.
         int result = FFmpegNative.avcodec_send_packet(_context, 0);
         if (result < 0 && result != FFmpegConstants.ErrorEndOfStream)
         {
-            return PlaybackOperationResult.Failure($"Unable to drain the decoder: {FFmpegInterop.GetErrorMessage(result)}");
+            return OperationResult.Failure($"Unable to drain the decoder: {FFmpegInterop.GetErrorMessage(result)}");
         }
 
         return ReceiveFrames(decoded);
     }
 
-    public PlaybackOperationResult Flush()
+    public OperationResult Flush()
     {
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The decoder has already been disposed.");
+            return OperationResult.Failure("The decoder has already been disposed.");
         }
 
         FFmpegNative.avcodec_flush_buffers(_context);
         FFmpegNative.av_frame_unref(_receiveFrame);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     public void Dispose()
@@ -451,24 +452,24 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         FFmpegHardware.FreeLockHandle(lockHandle);
     }
 
-    private PlaybackOperationResult ReceiveFrames(List<RawVideoFrame> frames)
+    private OperationResult ReceiveFrames(List<RawVideoFrame> frames)
     {
         while (true)
         {
             int result = FFmpegNative.avcodec_receive_frame(_context, _receiveFrame);
             if (result == FFmpegConstants.ErrorAgain || result == FFmpegConstants.ErrorEndOfStream)
             {
-                return PlaybackOperationResult.Success;
+                return OperationResult.Success();
             }
 
             if (result < 0)
             {
-                return PlaybackOperationResult.Failure($"Unable to receive a decoded frame: {FFmpegInterop.GetErrorMessage(result)}");
+                return OperationResult.Failure($"Unable to receive a decoded frame: {FFmpegInterop.GetErrorMessage(result)}");
             }
 
             if (!TryTakeFrame(out RawVideoFrame? frame, out string frameError) || frame is null)
             {
-                return PlaybackOperationResult.Failure(frameError);
+                return OperationResult.Failure(frameError);
             }
 
             frames.Add(frame);

@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 
 namespace SinePlayer.Core.Tests.Playback;
@@ -22,7 +22,7 @@ internal static class TestCreators
     /// inner one's, because a wrapper is the same decoder as the one it wraps: it changes the timing or the
     /// contents, not what is running.
     /// </summary>
-    internal static PlaybackOperationResult Wrap<TComponent>(PlaybackOperationResult offered, IComponentCreator<TComponent>? inner, Func<TComponent, TComponent> decorate, out IComponentCreator<TComponent>? creator)
+    internal static OperationResult Wrap<TComponent>(OperationResult offered, IComponentCreator<TComponent>? inner, Func<TComponent, TComponent> decorate, out IComponentCreator<TComponent>? creator)
         where TComponent : class
     {
         if (!offered.IsSuccessful || inner is null)
@@ -32,7 +32,7 @@ internal static class TestCreators
         }
 
         creator = new DecoratingCreator<TComponent>(inner, decorate);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     private sealed class DecoratingCreator<TComponent>(IComponentCreator<TComponent> inner, Func<TComponent, TComponent> decorate) : IComponentCreator<TComponent>
@@ -40,9 +40,9 @@ internal static class TestCreators
     {
         public string Signature => inner.Signature;
 
-        public PlaybackOperationResult Create(out TComponent? component)
+        public OperationResult Create(out TComponent? component)
         {
-            PlaybackOperationResult created = inner.Create(out TComponent? made);
+            OperationResult created = inner.Create(out TComponent? made);
             component = created.IsSuccessful && made is not null ? decorate(made) : null;
             return created;
         }
@@ -58,11 +58,11 @@ internal sealed class FixedCreator<TComponent>(string signature, Func<TComponent
 {
     public string Signature => signature;
 
-    public PlaybackOperationResult Create(out TComponent? component)
+    public OperationResult Create(out TComponent? component)
     {
         component = make();
         return component is null
-            ? PlaybackOperationResult.Failure($"{Signature} could not produce a component.")
-            : PlaybackOperationResult.Success;
+            ? OperationResult.Failure($"{Signature} could not produce a component.")
+            : OperationResult.Success();
     }
 }

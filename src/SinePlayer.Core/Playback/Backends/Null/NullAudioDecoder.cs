@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -25,7 +26,7 @@ public sealed partial class NullAudioDecoder : IAudioDecoder
 
     public AudioSampleFormat OutputFormat => _stream.SampleFormat;
 
-    public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
+    public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
     {
         ArgumentNullException.ThrowIfNull(packet);
 
@@ -33,7 +34,7 @@ public sealed partial class NullAudioDecoder : IAudioDecoder
         {
             // Nothing to produce, and saying so is better than a block every consumer would have to guess about.
             buffers = [];
-            return PlaybackOperationResult.Failure($"A null audio decoder has no samples for the {_stream.SampleFormat} format.");
+            return OperationResult.Failure($"A null audio decoder has no samples for the {_stream.SampleFormat} format.");
         }
 
         int sampleCount = _stream.SampleRate > 0 ? (int)Math.Round(packet.Duration.TotalSeconds * _stream.SampleRate) : 0;
@@ -42,7 +43,7 @@ public sealed partial class NullAudioDecoder : IAudioDecoder
             // A packet with no duration describes no sound, and the chain is better off with nothing than with a
             // block of no samples that every consumer would have to special-case.
             buffers = [];
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         buffers =
@@ -59,18 +60,18 @@ public sealed partial class NullAudioDecoder : IAudioDecoder
             },
         ];
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    public PlaybackOperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
+    public OperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
     {
         buffers = [];
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    public PlaybackOperationResult Flush()
+    public OperationResult Flush()
     {
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     public void Dispose()

@@ -5,4 +5,7 @@ using SinePlayer.Core.Playback.Abstractions.Decode;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal readonly record struct AudioEntry(RawAudioBuffer? Buffer, long Epoch);
+internal readonly record struct AudioEntry(
+    RawAudioBuffer? Buffer,
+    PipelineVersion Versions,
+    long Epoch);

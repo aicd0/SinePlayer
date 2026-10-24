@@ -3,6 +3,7 @@
 
 using System.Runtime.InteropServices;
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -134,7 +135,7 @@ public class FFmpegAudioDecoderTests
             Buffer = new ForeignBuffer(),
         };
 
-        PlaybackOperationResult result = decoder.TryDecode(packet, out IReadOnlyList<RawAudioBuffer> buffers);
+        OperationResult result = decoder.TryDecode(packet, out IReadOnlyList<RawAudioBuffer> buffers);
 
         using (Assert.EnterMultipleScope())
         {
@@ -154,7 +155,7 @@ public class FFmpegAudioDecoderTests
     private FFmpegSource OpenWaveFile()
     {
         FFmpegSourceProviderFactory factory = new();
-        PlaybackOperationResult result = factory.TryOpen(MediaLocator.Parse(_wavePath), out IMediaSource? source);
+        OperationResult result = factory.TryOpen(MediaLocator.Parse(_wavePath), out IMediaSource? source);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
         Assert.That(source, Is.InstanceOf<FFmpegSource>());
 
@@ -167,12 +168,12 @@ public class FFmpegAudioDecoderTests
         AudioStreamInfo stream = source.Info.AudioStreams[0];
 
         FFmpegAudioDecoderFactory factory = new();
-        PlaybackOperationResult result = factory.TryCreate(source, stream, DecoderOptions.Default, out IComponentCreator<IAudioDecoder>? creator);
+        OperationResult result = factory.TryCreate(source, stream, DecoderOptions.Default, out IComponentCreator<IAudioDecoder>? creator);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
         Assert.That(creator, Is.Not.Null);
 
-        PlaybackOperationResult created = creator!.Create(out IAudioDecoder? decoder);
+        OperationResult created = creator!.Create(out IAudioDecoder? decoder);
         Assert.That(created.IsSuccessful, Is.True, created.Message);
         Assert.That(decoder, Is.Not.Null);
 
@@ -184,7 +185,7 @@ public class FFmpegAudioDecoderTests
         List<RawAudioBuffer> buffers = [];
         while (true)
         {
-            PlaybackOperationResult readResult = source.TryReadPacket(out MediaPacket? packet);
+            OperationResult readResult = source.TryReadPacket(out MediaPacket? packet);
             Assert.That(readResult.IsSuccessful, Is.True, readResult.Message);
             if (packet is null)
             {
@@ -198,13 +199,13 @@ public class FFmpegAudioDecoderTests
                     continue;
                 }
 
-                PlaybackOperationResult decodeResult = decoder.TryDecode(packet, out IReadOnlyList<RawAudioBuffer> decoded);
+                OperationResult decodeResult = decoder.TryDecode(packet, out IReadOnlyList<RawAudioBuffer> decoded);
                 Assert.That(decodeResult.IsSuccessful, Is.True, decodeResult.Message);
                 buffers.AddRange(decoded);
             }
         }
 
-        PlaybackOperationResult drainResult = decoder.Drain(out IReadOnlyList<RawAudioBuffer> remaining);
+        OperationResult drainResult = decoder.Drain(out IReadOnlyList<RawAudioBuffer> remaining);
         Assert.That(drainResult.IsSuccessful, Is.True, drainResult.Message);
         buffers.AddRange(remaining);
 

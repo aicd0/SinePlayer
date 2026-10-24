@@ -12,6 +12,7 @@ using Microsoft.UI.Xaml.Controls;
 using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Playback.Surface;
 using SinePlayer.Core.Common.DebugTools;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -104,7 +105,7 @@ internal sealed partial class CoreEngine : IDisposable
 
         PlaybackPipeline pipeline = EnsurePipeline();
 
-        PlaybackOperationResult opened = await pipeline.Open(MediaLocator.Parse(filePath), EnsureRenderTarget());
+        OperationResult opened = await pipeline.Open(MediaLocator.Parse(filePath), EnsureRenderTarget());
         if (!opened.IsSuccessful)
         {
             return err.Error($"Unable to open media file '{filePath}': {opened.Message}");
@@ -135,7 +136,7 @@ internal sealed partial class CoreEngine : IDisposable
 
         components.Apply(pipeline);
 
-        PlaybackOperationResult reconciled = await pipeline.Reconcile();
+        OperationResult reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
             // What is playing keeps playing on what it was already built with; the caller is told why the change
@@ -218,7 +219,7 @@ internal sealed partial class CoreEngine : IDisposable
             // asked for, so a pause the user pressed while the seek was in flight is not overruled by this.
             bool wasPlaying = pipeline.State == MediaEngineState.Playing;
 
-            PlaybackOperationResult seeked = await pipeline.Seek(position, mode);
+            OperationResult seeked = await pipeline.Seek(position, mode);
             if (!seeked.IsSuccessful)
             {
                 Logger.W(TAG, $"Seek to {position:g} ({mode}) was refused: {seeked.Message}");

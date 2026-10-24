@@ -17,6 +17,11 @@ internal sealed class AudioQueue
 
     internal bool IsEmpty => _entries.IsEmpty;
 
+    internal bool TryPeek(out AudioEntry entry)
+    {
+        return _entries.TryPeek(out entry);
+    }
+
     internal void Enqueue(AudioEntry entry)
     {
         if (entry.Buffer is not null)

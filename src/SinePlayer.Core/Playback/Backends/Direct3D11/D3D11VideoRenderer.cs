@@ -4,6 +4,7 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -140,14 +141,14 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         return _swapChain is not null && _swapChain.TryGetCompositionTransform(out scaleX, out scaleY);
     }
 
-    public PlaybackOperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
+    public OperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(target);
 
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
+            return OperationResult.Failure("The renderer has already been disposed.");
         }
 
         if (!ReferenceEquals(_target, target))
@@ -167,10 +168,10 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         {
             if (!D3D11SwapChain.TryCreate(_device, width, height, scale, out D3D11SwapChain? created, out string error))
             {
-                return PlaybackOperationResult.Failure(error);
+                return OperationResult.Failure(error);
             }
 
-            PlaybackOperationResult attach = created!.AttachTo(target);
+            OperationResult attach = created!.AttachTo(target);
             if (!attach.IsSuccessful)
             {
                 created.Dispose();
@@ -181,7 +182,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         }
         else
         {
-            PlaybackOperationResult resize = _swapChain.Resize(width, height, scale);
+            OperationResult resize = _swapChain.Resize(width, height, scale);
             if (!resize.IsSuccessful)
             {
                 return resize;
@@ -190,16 +191,16 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 
         _needsResize = false;
         SetOutput(_swapChain.View, _swapChain.Width, _swapChain.Height);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    public PlaybackOperationResult Render(RawVideoFrame frame, VideoTransform transform)
+    public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
     {
         ArgumentNullException.ThrowIfNull(frame);
 
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
+            return OperationResult.Failure("The renderer has already been disposed.");
         }
 
         // A decoder sharing this device calls into the same immediate context from its own thread, and
@@ -208,7 +209,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         {
             if (_swapChain is not null && _needsResize)
             {
-                PlaybackOperationResult resize = ApplyPendingResize();
+                OperationResult resize = ApplyPendingResize();
                 if (!resize.IsSuccessful)
                 {
                     return resize;
@@ -217,17 +218,17 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 
             if (_outputView is null || _outputWidth <= 0 || _outputHeight <= 0)
             {
-                return PlaybackOperationResult.Failure("The renderer has no output surface.");
+                return OperationResult.Failure("The renderer has no output surface.");
             }
 
             if (frame.Buffer is IGpuVideoBuffer gpuBuffer)
             {
                 if (!_shaders.TryGetArrayPixelShader(frame.Format, out ID3D11PixelShader? arrayShader))
                 {
-                    return PlaybackOperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames that are still on the GPU.");
+                    return OperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames that are still on the GPU.");
                 }
 
-                PlaybackOperationResult bound = BindGpuFrame(frame, gpuBuffer);
+                OperationResult bound = BindGpuFrame(frame, gpuBuffer);
                 if (!bound.IsSuccessful)
                 {
                     return bound;
@@ -238,15 +239,15 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 
             if (frame.Buffer is not IPlanarVideoBuffer buffer)
             {
-                return PlaybackOperationResult.Failure("The frame does not expose readable planes.");
+                return OperationResult.Failure("The frame does not expose readable planes.");
             }
 
             if (!_shaders.TryGetPixelShader(frame.Format, out ID3D11PixelShader? pixelShader))
             {
-                return PlaybackOperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames.");
+                return OperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames.");
             }
 
-            PlaybackOperationResult upload = Upload(frame, buffer);
+            OperationResult upload = Upload(frame, buffer);
             if (!upload.IsSuccessful)
             {
                 return upload;
@@ -256,18 +257,18 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         }
     }
 
-    public PlaybackOperationResult RefreshSurface(VideoTransform transform)
+    public OperationResult RefreshSurface(VideoTransform transform)
     {
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
+            return OperationResult.Failure("The renderer has already been disposed.");
         }
 
         lock (_deviceLock)
         {
             if (_swapChain is not null && _needsResize)
             {
-                PlaybackOperationResult resize = ApplyPendingResize();
+                OperationResult resize = ApplyPendingResize();
                 if (!resize.IsSuccessful)
                 {
                     return resize;
@@ -278,7 +279,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
             {
                 // Nothing has been drawn yet, or there is no surface of our own to resize: what would be
                 // drawn again is the last frame, and there is none.
-                return PlaybackOperationResult.Success;
+                return OperationResult.Success();
             }
 
             return Draw(_lastPixelShader, _lastViews, _lastSlot, _lastTexCoordScale, transform);
@@ -327,7 +328,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
     /// from <see cref="Render"/> because the planes outlive the frame: they are what makes it possible to
     /// show the same picture again after the surface changed.
     /// </summary>
-    private PlaybackOperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, (float X, float Y) texCoordScale, VideoTransform transform)
+    private OperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, (float X, float Y) texCoordScale, VideoTransform transform)
     {
         ID3D11DeviceContext context = _device.Context;
         context.OMSetRenderTargets(1, [_outputView], null);
@@ -361,7 +362,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         _lastSlot = textureSlot;
         _lastTexCoordScale = texCoordScale;
 
-        return _swapChain is null ? PlaybackOperationResult.Success : _swapChain.Present();
+        return _swapChain is null ? OperationResult.Success() : _swapChain.Present();
     }
 
     /// <summary>
@@ -369,16 +370,16 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
     /// are views cast out of the texture the decoder wrote, over the slice the frame lives in. The frame is
     /// retained because those views outlive the call — a redraw after the surface changed uses them again.
     /// </summary>
-    private PlaybackOperationResult BindGpuFrame(RawVideoFrame frame, IGpuVideoBuffer buffer)
+    private OperationResult BindGpuFrame(RawVideoFrame frame, IGpuVideoBuffer buffer)
     {
         if (frame.Format != PixelFormat.Nv12)
         {
-            return PlaybackOperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} hardware frames.");
+            return OperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} hardware frames.");
         }
 
         if (_gpuViews.Length == 2 && _gpuTexture == buffer.NativeTexture && _gpuSlice == buffer.SubresourceIndex && _frameFormat == frame.Format && _frameWidth == frame.Width && _frameHeight == frame.Height)
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         var texture = (ID3D11Resource)Marshal.GetObjectForIUnknown(buffer.NativeTexture);
@@ -391,7 +392,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
             {
                 D3D11Interop.Release(luma);
                 D3D11Interop.Release(chroma);
-                return PlaybackOperationResult.Failure("The device does not offer a shader view of the decoded texture.");
+                return OperationResult.Failure("The device does not offer a shader view of the decoded texture.");
             }
 
             ReleaseFrameTextures();
@@ -404,7 +405,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
             _frameHeight = frame.Height;
             _frameFormat = frame.Format;
             _gpuTexCoordScale = GetTexCoordScale(texture, frame);
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
         finally
         {
@@ -511,15 +512,15 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         _needsResize = true;
     }
 
-    private PlaybackOperationResult ApplyPendingResize()
+    private OperationResult ApplyPendingResize()
     {
         if (_swapChain is null || _target is null)
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         (int width, int height, double scale) = GetSurfaceSize(_target);
-        PlaybackOperationResult resize = _swapChain.Resize(width, height, scale);
+        OperationResult resize = _swapChain.Resize(width, height, scale);
         if (!resize.IsSuccessful)
         {
             return resize;
@@ -527,20 +528,20 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 
         _needsResize = false;
         SetOutput(_swapChain.View, _swapChain.Width, _swapChain.Height);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    private PlaybackOperationResult Upload(RawVideoFrame frame, IPlanarVideoBuffer buffer)
+    private OperationResult Upload(RawVideoFrame frame, IPlanarVideoBuffer buffer)
     {
         (DXGI_FORMAT Format, int Width, int Height)[] layout = GetPlaneLayout(frame.Format, frame.Width, frame.Height);
         if (layout.Length == 0)
         {
-            return PlaybackOperationResult.Failure($"The Direct3D renderer cannot upload {frame.Format} frames.");
+            return OperationResult.Failure($"The Direct3D renderer cannot upload {frame.Format} frames.");
         }
 
         if (buffer.PlaneCount < layout.Length)
         {
-            return PlaybackOperationResult.Failure($"The frame has {buffer.PlaneCount} planes but {frame.Format} needs {layout.Length}.");
+            return OperationResult.Failure($"The frame has {buffer.PlaneCount} planes but {frame.Format} needs {layout.Length}.");
         }
 
         if (_planeTextures.Length != layout.Length || _frameWidth != frame.Width || _frameHeight != frame.Height || _frameFormat != frame.Format)
@@ -558,14 +559,14 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
             int stride = buffer.GetPlaneStride(plane);
             if (pixels == 0 || stride <= 0)
             {
-                return PlaybackOperationResult.Failure($"Plane {plane} of the frame is not readable.");
+                return OperationResult.Failure($"Plane {plane} of the frame is not readable.");
             }
 
             // The box is expressed in texels, so the source row pitch stays whatever the decoder used.
             D3D11Interop.UploadTexture(_device.Context, _planeTextures[plane], layout[plane].Width, layout[plane].Height, pixels, stride);
         }
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     private void CreateFrameTextures((DXGI_FORMAT Format, int Width, int Height)[] layout)

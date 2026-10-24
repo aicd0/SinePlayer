@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
@@ -68,7 +69,7 @@ public class FFmpegSourceTests
         int packetCount = 0;
         while (true)
         {
-            PlaybackOperationResult result = source.TryReadPacket(out MediaPacket? packet);
+            OperationResult result = source.TryReadPacket(out MediaPacket? packet);
             Assert.That(result.IsSuccessful, Is.True, result.Message);
             if (packet is null)
             {
@@ -94,7 +95,7 @@ public class FFmpegSourceTests
     {
         using FFmpegSource source = OpenWaveFile();
 
-        PlaybackOperationResult result = source.Seek(TimeSpan.FromSeconds(DurationSeconds / 2));
+        OperationResult result = source.Seek(TimeSpan.FromSeconds(DurationSeconds / 2));
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         result = source.TryReadPacket(out MediaPacket? packet);
@@ -114,7 +115,7 @@ public class FFmpegSourceTests
         FFmpegSourceProviderFactory factory = new();
         string path = Path.Combine(Path.GetTempPath(), $"sineplayer-missing-{Guid.NewGuid():N}.mkv");
 
-        PlaybackOperationResult result = factory.TryOpen(MediaLocator.Parse(path), out IMediaSource? source);
+        OperationResult result = factory.TryOpen(MediaLocator.Parse(path), out IMediaSource? source);
 
         using (Assert.EnterMultipleScope())
         {
@@ -127,7 +128,7 @@ public class FFmpegSourceTests
     private FFmpegSource OpenWaveFile()
     {
         FFmpegSourceProviderFactory factory = new();
-        PlaybackOperationResult result = factory.TryOpen(MediaLocator.Parse(_wavePath), out IMediaSource? source);
+        OperationResult result = factory.TryOpen(MediaLocator.Parse(_wavePath), out IMediaSource? source);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
         Assert.That(source, Is.InstanceOf<FFmpegSource>());
 
