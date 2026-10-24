@@ -1172,8 +1172,8 @@ public sealed partial class PlaybackPipeline : IDisposable
                     PostWarning(drained.Message);
                 }
 
-                _packetQueue.Enqueue(new PacketEntry(null, default, epoch));
-                _audioQueue.Enqueue(new AudioEntry(null, default, epoch));
+                _packetQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch));
+                _audioQueue.Enqueue(new AudioEntry(null, audioBufferVersions, epoch));
                 TryWakeVideoDecode();
                 TryWakeAudioRender();
 
@@ -1448,7 +1448,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                         PostWarning(drained.Message);
                     }
 
-                    _frameQueue.Enqueue(new FrameEntry(null, default, epoch));
+                    _frameQueue.Enqueue(new FrameEntry(null, videoFrameVersions, epoch));
                     TryWakeVideoRender();
                     _videoDecodeNode.Wait(stamp);
                     continue;
