@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Source;
 
@@ -14,17 +14,17 @@ namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 /// </summary>
 public sealed class FFmpegSourceProviderFactory : ISourceProviderFactory
 {
-    public PlaybackOperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
+    public OperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
     {
         ArgumentNullException.ThrowIfNull(locator);
 
         if (!FFmpegSource.TryOpen(locator, out FFmpegSource? ffmpegSource, out string error))
         {
             source = null;
-            return PlaybackOperationResult.Failure(error);
+            return OperationResult.Failure(error);
         }
 
         source = ffmpegSource;
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 }

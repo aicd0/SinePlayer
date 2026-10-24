@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -29,22 +30,22 @@ public sealed partial class NullVideoRenderer : IVideoRenderer
     /// <summary>How many frames this renderer has been handed since it was created.</summary>
     public long RenderedFrameCount => Interlocked.Read(ref _renderedFrameCount);
 
-    public PlaybackOperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
+    public OperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
     {
         ArgumentNullException.ThrowIfNull(stream);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    public PlaybackOperationResult Render(RawVideoFrame frame, VideoTransform transform)
+    public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
     {
         ArgumentNullException.ThrowIfNull(frame);
         Interlocked.Increment(ref _renderedFrameCount);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    public PlaybackOperationResult RefreshSurface(VideoTransform transform)
+    public OperationResult RefreshSurface(VideoTransform transform)
     {
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     public bool TryGetDisplayedFrameCount(out long count)

@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -26,10 +26,10 @@ public sealed partial class NullAudioRenderer : IAudioRenderer
 
     public long SubmittedSampleCount => Interlocked.Read(ref _submittedSampleCount);
 
-    public PlaybackOperationResult Configure(AudioStreamInfo stream)
+    public OperationResult Configure(AudioStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     public IAudioSubmit Submit(RawAudioBuffer buffer)
@@ -40,9 +40,9 @@ public sealed partial class NullAudioRenderer : IAudioRenderer
         return AcceptedSubmit.Instance;
     }
 
-    public PlaybackOperationResult Flush()
+    public OperationResult Flush()
     {
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     public void Dispose()
@@ -60,7 +60,7 @@ public sealed partial class NullAudioRenderer : IAudioRenderer
 
         public AudioSubmitYield Current => throw new InvalidOperationException("A null renderer's hand-off never suspends.");
 
-        public PlaybackOperationResult Result => PlaybackOperationResult.Success;
+        public OperationResult Result => OperationResult.Success();
 
         public void Dispose()
         {

@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 
@@ -29,10 +29,10 @@ public sealed class D3D11VideoRendererFactory : IVideoRendererFactory
         _signature = signature;
     }
 
-    public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+    public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
     {
         creator = new Creator(_signature);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     /// <summary>
@@ -43,13 +43,13 @@ public sealed class D3D11VideoRendererFactory : IVideoRendererFactory
     {
         public string Signature => signature;
 
-        public PlaybackOperationResult Create(out IVideoRenderer? component)
+        public OperationResult Create(out IVideoRenderer? component)
         {
             component = null;
 
             if (!D3D11Device.TryCreate(out D3D11Device? device, out string deviceError) || device is null)
             {
-                return PlaybackOperationResult.Failure(
+                return OperationResult.Failure(
                     string.IsNullOrEmpty(deviceError) ? "No Direct3D device was created." : deviceError);
             }
 
@@ -57,11 +57,11 @@ public sealed class D3D11VideoRendererFactory : IVideoRendererFactory
             {
                 // The renderer would have been the device's owner, so nothing else can release it.
                 device.Dispose();
-                return PlaybackOperationResult.Failure(rendererError);
+                return OperationResult.Failure(rendererError);
             }
 
             component = created;
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 }

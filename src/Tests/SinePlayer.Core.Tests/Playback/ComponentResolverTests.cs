@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
@@ -195,20 +195,20 @@ public class ComponentResolverTests
             return name;
         }
 
-        public PlaybackOperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+        public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
         {
             creator = null;
-            return PlaybackOperationResult.Failure($"{name} cannot serve this machine.");
+            return OperationResult.Failure($"{name} cannot serve this machine.");
         }
     }
 
     /// <summary>A factory that offers a creator for each way it is asked, so a sequence shows what was asked of it.</summary>
     private sealed class RecordingVideoDecoderFactory : IVideoDecoderFactory
     {
-        public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
         {
             creator = new FixedCreator<IVideoDecoder>(options.HardwareDecoding ? "hardware:decoder" : "software:decoder", () => null);
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 }

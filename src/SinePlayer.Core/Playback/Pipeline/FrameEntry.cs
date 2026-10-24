@@ -5,4 +5,7 @@ using SinePlayer.Core.Playback.Abstractions.Decode;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal readonly record struct FrameEntry(RawVideoFrame? Frame, long Epoch, long ComponentVersion);
+internal readonly record struct FrameEntry(
+    RawVideoFrame? Frame,
+    PipelineVersion Versions,
+    long Epoch);

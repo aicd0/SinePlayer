@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
@@ -27,14 +27,14 @@ public class D3D11VideoRendererFactoryTests
     {
         D3D11VideoRendererFactory factory = new();
 
-        PlaybackOperationResult offered = factory.TryCreate(out IComponentCreator<IVideoRenderer>? creator);
+        OperationResult offered = factory.TryCreate(out IComponentCreator<IVideoRenderer>? creator);
         if (!offered.IsSuccessful || creator is null)
         {
             Assert.Ignore($"This machine offers no Direct3D device: {offered.Message}");
             return;
         }
 
-        PlaybackOperationResult first = creator.Create(out IVideoRenderer? renderer);
+        OperationResult first = creator.Create(out IVideoRenderer? renderer);
         if (!first.IsSuccessful || renderer is null)
         {
             Assert.Ignore($"This machine offers no Direct3D device: {first.Message}");
@@ -43,11 +43,11 @@ public class D3D11VideoRendererFactoryTests
 
         renderer.Dispose();
 
-        PlaybackOperationResult offeredAgain = factory.TryCreate(out IComponentCreator<IVideoRenderer>? nextCreator);
+        OperationResult offeredAgain = factory.TryCreate(out IComponentCreator<IVideoRenderer>? nextCreator);
         Assert.That(offeredAgain.IsSuccessful, Is.True, offeredAgain.Message);
         Assert.That(nextCreator, Is.Not.Null);
 
-        PlaybackOperationResult second = nextCreator!.Create(out IVideoRenderer? next);
+        OperationResult second = nextCreator!.Create(out IVideoRenderer? next);
         try
         {
             Assert.That(second.IsSuccessful, Is.True, second.Message);

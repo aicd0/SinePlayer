@@ -262,6 +262,66 @@ device is full rather than waiting inside the renderer (I20), so the sleep that 
 thread's own node, and a pause, a seek and a stop all end it. A wait inside the renderer would end only when
 the device changed its mind — which is exactly the case where it never does.
 
+### 2.4 What a package is compatible with
+
+The epoch says *what a package is a package of* — the position it belongs to, and what the cursor must do about it. It
+deliberately does not say *which component may consume it*: that is a different question, and answering it with the
+epoch would rebuild a decoder on every seek. Component identity is carried separately, as one number per component
+in `PipelineVersion` (`Source`, `AudioDecoder`, `AudioRenderer`, `VideoDecoder`, `VideoRenderer`):
+
+| Who publishes | When | What it does |
+|---|---|---|
+| the queue thread | a file is opened | publishes the source under the first number; it is never republished, because a file's source is opened once |
+| the queue thread | a chain is (re)built | raises the two halves of that chain to `highest in use + 1` when both are new, and gives each new slot the snapshot of every number in use; a lone replacement joins the generation already running, so a repair does not make the frames in flight belong to nobody |
+
+- **No counter is kept for the next number.** "The highest in use" is derived from the components themselves — the
+  source and both values of each of the four role slots — so there is no field beside them that could disagree
+  (§15).
+- The two halves of a chain are **one generation**: a renderer exists to draw the frames of the decoder published
+  with it, and the device exists to play what its decoder produced. That is why they are raised together.
+- **The source and a decoder are two nodes.** A packet leaves the reader stamped with the source it came from, and
+  both the audio decoder (which reads the cursor itself) and the video decoder check that stamp before decoding —
+  the same comparison a renderer makes, against a node one step further back. A source that is replaced can
+  therefore never feed a decoder that was built for the one before it.
+- **A package is stamped with `Max(package, self)`** when a node hands it on: it keeps what it has met and gains
+  this node's numbers. A member neither side carries stays zero, so a frame leaving the decoder says nothing about
+  the renderer, and a decoder's numbers say nothing about a device they have not reached.
+- **Zero means "not visited"**, never "version zero".
+- A node compares the source and its own chain's numbers (`CompareVideo` / `CompareAudio`): a picture package says
+  nothing about the sound, so the sound's numbers are not its business.
+
+| Package against the node's own snapshot | Verdict |
+|---|---|
+| equal, or zero (not visited) | **accept**, then stamp the package with `Max(package, self)` |
+| newer than the node | **block**: leave the package where it is and wait — its replacement has already been published, so the next turn installs it |
+| older than the node, in a component **before** it | **drop**: the package was produced by a component this one has left |
+| older than the node, in the node's **own** component | **accept**: a package has never seen this node's component, so its number for it cannot make the package stale (rule 6B drops only for a version before the node) |
+
+The block is safe because a version number can only come from a publication, and a publication is complete before
+anybody is woken: it puts the component in the role's slot, and only then does `WakeAll` run — so a node that finds
+itself behind is never waiting for something that is not already on its way. The epoch is checked first, because it
+also carries the obligation to move the cursor; the versions are checked second, because they only say whether this
+stage may touch the package at all. A node that has no component of its own yet (`default` snapshot) compares
+nothing, which is why the first publication happens before the threads are started.
+
+**How a component reaches its thread: one slot per role, `Publish` and `Update`.** There is no "current" field with
+a "pending" field beside it — one `ComponentSlot<T>` per role, alive for the pipeline's whole life, holds both:
+
+| Call | Who | What it does |
+|---|---|---|
+| `Publish(component, signature, versions)` | the queue thread | makes `component` the one the owner adopts next; a component published earlier and never adopted is released here, because the queue built it for a change the owner never got to |
+| `Update(out newComponent, out oldComponent)` | the thread that owns the role | adopts the published component and hands back both what the owner now holds and the one it replaced, which the caller releases — it is the thread that was using it. With nothing published, `newComponent` is what the owner already holds and nothing changes |
+
+The four worker threads keep the component they adopted in a local of their loop (`decoder`, `renderer`, `source`,
+`audioDecoder`) and never read `Current`: what they decode, flush, render and submit is the component *they* took
+up, not one the queue has published behind their back. `Current` is for the queue thread and the host — a name to
+report, a device to flush at a stop — where "the component in effect" is exactly the right question.
+
+A slot answers two different questions on purpose: `Component`/`Signature`/`Versions` are about the component **in
+effect** — the one just published, or the one the owner still holds until it adopts the new one — which is what the
+queue and the host ask about; `Current` is what the owner has actually adopted. The worker threads use neither: they
+hold `newComponent` from their own `Update`. `Reset()` releases both, and is called only while no thread is running.
+
 ## 3. The three hand-offs
 
 There are exactly three queues, and each has a different policy because each is there for a different reason.
@@ -930,7 +990,7 @@ A change is safe exactly when it leaves all of these true. "Pinned by" names the
 | I3 | The video decoder waits only for frame-queue room, and drops nothing | A decoder that drops hides its own slowness; a decoder waiting on anything else adds a cycle edge | frame-queue test: the producer waits for the picture rather than losing a frame |
 | I4 | The presentation thread never displays early and never waits for one particular frame | Both are the failure modes called "frozen" and "out of sync" | `StartsWhereTheFileResumesRatherThanWhereTheSeekAsked`, `DropsOnlyTheFramesWhoseMomentHasGone`. The one frame it does wait for is the still of a paused position, and that wait has no clock behind it: the frame arriving is the wake (§4.3) |
 | I5 | Nothing waits for a queue that no longer exists, and no wait holds on to a position playback has left: a seek is a request the cursor's owner carries out rather than a lock the seek takes, and it *clears* the queues so the threads parked on them are released | Bounded liveness: the decoder's wait for room ends with the picture taking a frame, with the clear a seek performs, or with the close a stop performs — never with a state check that a pause would make false | the seek tests, delivered as "the seek never returned" assertions, `SeeksWhilePausedAndMovesTheReaderAndDecoder` (a paused seek with both producers parked), and every test that disposes a pipeline with a full frame queue |
-| I6 | Media carries the epoch it was produced for, and is dropped rather than replayed when the epoch has moved — checked by the producer before it hands work over and by the consumer before it uses what it took, never by the queue in between | A seek that half-works is worse than one that visibly restarts; and a queue that filtered would be a queue that decides, which is how the epoch gets back into a place with no business knowing it | `SeeksWhilePlayingAndLeavesItPaused`, `SeeksWhileTheNextFrameIsStillWaiting`, and `MediaQueueTests` for the tag travelling untouched |
+| I6 | Media carries the epoch it was produced for **and the component versions that produced it**, and is dropped rather than replayed when either has moved on — checked by the producer before it hands work over and by the consumer before it uses what it took, never by the queue in between | A seek that half-works is worse than one that visibly restarts; and a queue that filtered would be a queue that decides, which is how the epoch gets back into a place with no business knowing it. The version half is what stops a new decoder's packets reaching the decoder it replaced, and an old decoder's frames reaching the renderer that replaced it (§2.4) | `SeeksWhilePlayingAndLeavesItPaused`, `SeeksWhileTheNextFrameIsStillWaiting`, `MediaQueueTests` for the tag travelling untouched, and `ComponentVersionTests` for the comparison itself |
 | I7 | An empty queue is a wait, and only an empty queue *after the end of the stream* is played out: the end arrives as an entry behind the media it follows, and the ending is *earned* — the queue ends playback when the picture and the sound have each said their stream is over, for the position the file ran out at; a pause does not hold it open, and a failure is never talked over by it | A timeout in the queue is two faults at once — it blocks the queue every command is posted to, and it ends a file whose sound has not been heard; and inferring the end from an empty queue makes "the decoder is behind" and "the decoder is done" the same observation, which is a question about a position the asker is not holding. Gating the decision on the state instead needs a second place to ask it again, which is what left a paused-at-the-end file open for good | `PlaysAnAudioFileThroughTheRenderer`, `PlaysAVideoOnlyFileToTheEnd`, `ProducesTheTailOfAFileWhenItsPacketStreamEnds` (a decoder that only releases its tail when drained), `PlaysAgainAfterTheEndOfTheFile`, `AnswersACommandWhileTheSoundHasNotPlayedOut` (fails if the wait comes back), `EndsWhenTheDeviceHasPlayedOutTheSound`, `EndsWhilePausedWhenTheFileHasPlayedOut` (fails if the ending waits for a resume) |
 | I8 | Losing media happens in exactly one place, and it is counted | A media pipeline that loses frames silently cannot be diagnosed | `DroppedFrameCount` assertions in the drop and device tests |
 | I9 | Every wait ends; a stalled device is a wait that ends when the device does, and nothing in the pipeline names it | Nudging, timing out or failing a device that has stopped turns a wait the user can see into a fault they cannot; and naming it needs a judgement the pipeline cannot make — a late device and a broken one report the same frozen position, so the line would be a guess with a threshold behind it (§9) | `WaitsForADeviceThatNeverTakesAudio` (a device with no room parks and resumes without losing the block) |

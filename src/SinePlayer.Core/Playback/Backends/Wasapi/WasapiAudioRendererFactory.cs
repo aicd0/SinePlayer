@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 
@@ -48,10 +48,10 @@ public sealed class WasapiAudioRendererFactory : IAudioRendererFactory
         return new WasapiAudioRendererFactory(endpoint.Id, endpoint.Name, endpoint.IsDefault);
     }
 
-    public PlaybackOperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+    public OperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
     {
         creator = new Creator(_endpointId, _endpointName, _endpointIsDefault);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     /// <summary>
@@ -63,10 +63,10 @@ public sealed class WasapiAudioRendererFactory : IAudioRendererFactory
         /// <summary>The device this would open. Must match what the renderer reports for itself.</summary>
         public string Signature => endpointId is null ? "wasapi" : $"wasapi:{endpointId}";
 
-        public PlaybackOperationResult Create(out IAudioRenderer? component)
+        public OperationResult Create(out IAudioRenderer? component)
         {
             component = new WasapiAudioRenderer(endpointId, endpointName, endpointIsDefault);
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 }

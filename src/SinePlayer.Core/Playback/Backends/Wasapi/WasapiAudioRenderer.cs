@@ -4,7 +4,7 @@
 using System.Buffers;
 using System.Runtime.InteropServices;
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -113,18 +113,18 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         }
     }
 
-    public PlaybackOperationResult Configure(AudioStreamInfo stream)
+    public OperationResult Configure(AudioStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
+            return OperationResult.Failure("The renderer has already been disposed.");
         }
 
         if (!WasapiAudioFormat.TryDescribe(stream, out WasapiAudioFormat.Descriptor format, out string descriptionError))
         {
-            return PlaybackOperationResult.Failure(descriptionError);
+            return OperationResult.Failure(descriptionError);
         }
 
         Release();
@@ -141,7 +141,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
             HRESULT created = PInvoke.CoCreateInstance(WasapiAudioEndpoints.MMDeviceEnumeratorClassId, null, CLSCTX.CLSCTX_ALL, out IMMDeviceEnumerator enumerator);
             if (created.Value < 0)
             {
-                return PlaybackOperationResult.Failure($"Unable to reach the audio endpoint enumerator ({created.Value}).");
+                return OperationResult.Failure($"Unable to reach the audio endpoint enumerator ({created.Value}).");
             }
 
             // The device the caller chose, or the one Windows would choose: the only difference between the two
@@ -179,12 +179,12 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
             Interlocked.Exchange(ref _underrunCount, 0);
 
             // The endpoint and the enumerator hold no state we need: the client keeps its own reference.
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
         catch (Exception exception)
         {
             Release();
-            return PlaybackOperationResult.Failure($"Unable to open the audio device: {exception.Message}");
+            return OperationResult.Failure($"Unable to open the audio device: {exception.Message}");
         }
     }
 
@@ -195,13 +195,13 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
 
         if (_disposed)
         {
-            return new FinishedAudioSubmit(PlaybackOperationResult.Failure("The renderer has already been disposed."));
+            return new FinishedAudioSubmit(OperationResult.Failure("The renderer has already been disposed."));
         }
 
         IAudioRenderClient? renderClient = _renderClient;
         if (renderClient is null)
         {
-            return new FinishedAudioSubmit(PlaybackOperationResult.Failure("The audio renderer has not been configured."));
+            return new FinishedAudioSubmit(OperationResult.Failure("The audio renderer has not been configured."));
         }
 
         if (_clock is WasapiAudioClock lost && lost.DeviceLost)
@@ -215,7 +215,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         int frames = buffer.SampleCount;
         if (frames <= 0)
         {
-            return new FinishedAudioSubmit(PlaybackOperationResult.Success);
+            return new FinishedAudioSubmit(OperationResult.Success());
         }
 
         int required = _format.BlockAlign * frames;
@@ -234,13 +234,13 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         if (!AudioInterleaver.TryInterleave(buffer, staging, out int byteCount, out string error))
         {
             ArrayPool<byte>.Shared.Return(staging);
-            return new FinishedAudioSubmit(PlaybackOperationResult.Failure(error));
+            return new FinishedAudioSubmit(OperationResult.Failure(error));
         }
 
         if (byteCount != required)
         {
             ArrayPool<byte>.Shared.Return(staging);
-            return new FinishedAudioSubmit(PlaybackOperationResult.Failure($"The audio block produced {byteCount} byte(s) where {required} were expected."));
+            return new FinishedAudioSubmit(OperationResult.Failure($"The audio block produced {byteCount} byte(s) where {required} were expected."));
         }
 
         // A stopped stream is written into rather than started: it keeps what it is given, plays it from the
@@ -250,18 +250,18 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         return new WasapiAudioSubmit(this, renderClient, staging, byteCount);
     }
 
-    public PlaybackOperationResult Flush()
+    public OperationResult Flush()
     {
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The renderer has already been disposed.");
+            return OperationResult.Failure("The renderer has already been disposed.");
         }
 
         IAudioClient? client = _client;
         WasapiAudioClock? clock = _clock;
         if (client is null || clock is null)
         {
-            return PlaybackOperationResult.Failure("The audio renderer has not been configured.");
+            return OperationResult.Failure("The audio renderer has not been configured.");
         }
 
         if (clock.DeviceLost)
@@ -291,14 +291,14 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
                 clock.Start();
             }
 
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
         catch (Exception exception)
         {
             // A reset that fails is recorded as well as reported, so the next hand-off refuses rather than
             // trying again — and the exception itself is what is reported.
             clock.ReportDeviceLost(exception);
-            return PlaybackOperationResult.Failure($"Unable to flush audio: {exception.Message}", exception);
+            return OperationResult.Failure($"Unable to flush audio: {exception.Message}", exception);
         }
     }
 
@@ -394,12 +394,12 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
     /// A failure to use a device that has already refused once. The context says what was being attempted and
     /// the exception is carried whole, because only its own message and stack can say what actually happened.
     /// </summary>
-    private static PlaybackOperationResult DeviceFailure(WasapiAudioClock clock, string context)
+    private static OperationResult DeviceFailure(WasapiAudioClock clock, string context)
     {
         Exception? cause = clock.Cause;
         return cause is null
-            ? PlaybackOperationResult.Failure($"{context}: the audio device cannot be used.")
-            : PlaybackOperationResult.Failure($"{context}: {cause.Message}", cause);
+            ? OperationResult.Failure($"{context}: the audio device cannot be used.")
+            : OperationResult.Failure($"{context}: {cause.Message}", cause);
     }
 
     private uint GetFreeFrameCount()
@@ -455,7 +455,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         private readonly int _byteCount;
         private int _offset;
         private bool _finished;
-        private PlaybackOperationResult _result = PlaybackOperationResult.Success;
+        private OperationResult _result = OperationResult.Success();
         private AudioSubmitYield _current;
 
         internal WasapiAudioSubmit(WasapiAudioRenderer owner, IAudioRenderClient renderClient, byte[] staging, int byteCount)
@@ -468,7 +468,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
 
         public AudioSubmitYield Current => _current;
 
-        public PlaybackOperationResult Result => _result;
+        public OperationResult Result => _result;
 
         public bool MoveNext()
         {
@@ -487,7 +487,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
             {
                 if (_offset >= _byteCount)
                 {
-                    Finish(PlaybackOperationResult.Success);
+                    Finish(OperationResult.Success());
                     return false;
                 }
 
@@ -512,7 +512,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
                 int chunkFrames = Math.Min((int)free, (_byteCount - _offset) / _owner._format.BlockAlign);
                 if (chunkFrames <= 0)
                 {
-                    Finish(PlaybackOperationResult.Failure($"The audio block left {_byteCount - _offset} byte(s) that no whole frame can be made of."));
+                    Finish(OperationResult.Failure($"The audio block left {_byteCount - _offset} byte(s) that no whole frame can be made of."));
                     return false;
                 }
 
@@ -529,7 +529,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
                 catch (Exception exception)
                 {
                     _owner._clock?.ReportDeviceLost(exception);
-                    Finish(PlaybackOperationResult.Failure($"Unable to queue audio: {exception.Message}", exception));
+                    Finish(OperationResult.Failure($"Unable to queue audio: {exception.Message}", exception));
                     return false;
                 }
 
@@ -548,7 +548,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
             _finished = true;
         }
 
-        private void Finish(PlaybackOperationResult result)
+        private void Finish(OperationResult result)
         {
             _result = result;
             _finished = true;
@@ -558,16 +558,16 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
     /// <summary>A hand-off that was over before it began: nothing to write, or something that went wrong.</summary>
     private sealed class FinishedAudioSubmit : IAudioSubmit
     {
-        private readonly PlaybackOperationResult _result;
+        private readonly OperationResult _result;
 
-        internal FinishedAudioSubmit(PlaybackOperationResult result)
+        internal FinishedAudioSubmit(OperationResult result)
         {
             _result = result;
         }
 
         public AudioSubmitYield Current => AudioSubmitYield.NoRoom;
 
-        public PlaybackOperationResult Result => _result;
+        public OperationResult Result => _result;
 
         public bool MoveNext()
         {

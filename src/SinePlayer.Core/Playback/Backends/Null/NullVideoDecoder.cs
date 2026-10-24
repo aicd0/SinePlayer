@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -25,7 +26,7 @@ public sealed partial class NullVideoDecoder : IVideoDecoder
 
     public PixelFormat OutputFormat => PixelFormat.Yuv420P;
 
-    public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+    public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
     {
         ArgumentNullException.ThrowIfNull(packet);
 
@@ -42,18 +43,18 @@ public sealed partial class NullVideoDecoder : IVideoDecoder
             },
         ];
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+    public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
     {
         frames = [];
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    public PlaybackOperationResult Flush()
+    public OperationResult Flush()
     {
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     public void Dispose()

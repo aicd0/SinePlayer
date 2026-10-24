@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -54,11 +55,11 @@ internal sealed class SyntheticSourceProviderFactory : ISourceProviderFactory
         _script = script;
     }
 
-    public PlaybackOperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
+    public OperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
     {
         _opened = new SyntheticMediaSource(_script);
         source = _opened;
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     /// <summary>
@@ -133,22 +134,22 @@ internal sealed class SyntheticMediaSource : IMediaSource
 
     public bool CanSeek => false;
 
-    public PlaybackOperationResult Seek(TimeSpan position)
+    public OperationResult Seek(TimeSpan position)
     {
         // Nothing here is seekable, and no test that uses it seeks: the reader's first look asks for zero, which is
         // where the timeline already is.
         _next = 0;
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    public PlaybackOperationResult TryReadPacket(out MediaPacket? packet)
+    public OperationResult TryReadPacket(out MediaPacket? packet)
     {
         while (true)
         {
             if (_closed.IsSet)
             {
                 packet = null;
-                return PlaybackOperationResult.Success;
+                return OperationResult.Success();
             }
 
             if (_next >= _timeline.Count)
@@ -156,7 +157,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
                 if (_script.ReportsTheEndOfTheFile)
                 {
                     packet = null;
-                    return PlaybackOperationResult.Success;
+                    return OperationResult.Success();
                 }
 
                 // A live source has no end to report: it waits for what comes next.
@@ -179,7 +180,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
                 Buffer = new SyntheticMediaBuffer(),
             };
 
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 
@@ -209,10 +210,10 @@ internal sealed class SyntheticMediaBuffer : IMediaBuffer
 
 internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
 {
-    public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+    public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
     {
         creator = new FixedCreator<IVideoDecoder>(Signature, () => new Decoder(stream));
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>
@@ -229,7 +230,7 @@ internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
 
         public PixelFormat OutputFormat => PixelFormat.Yuv420P;
 
-        public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
+        public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
         {
             frames =
             [
@@ -244,18 +245,18 @@ internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
                 },
             ];
 
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
-        public PlaybackOperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
+        public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
         {
             frames = [];
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
-        public PlaybackOperationResult Flush()
+        public OperationResult Flush()
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         public void Dispose()
@@ -266,10 +267,10 @@ internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
 
 internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
 {
-    public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+    public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
     {
         creator = new FixedCreator<IAudioDecoder>(Signature, () => new Decoder(stream));
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>
@@ -286,7 +287,7 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
 
         public AudioSampleFormat OutputFormat => AudioSampleFormat.Int16;
 
-        public PlaybackOperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
+        public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
         {
             buffers =
             [
@@ -302,18 +303,18 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
                 },
             ];
 
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
-        public PlaybackOperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
+        public OperationResult Drain(out IReadOnlyList<RawAudioBuffer> buffers)
         {
             buffers = [];
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
-        public PlaybackOperationResult Flush()
+        public OperationResult Flush()
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         public void Dispose()

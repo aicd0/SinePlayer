@@ -4,6 +4,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
@@ -52,17 +53,11 @@ public sealed partial class PlaybackPipeline : IDisposable
     private long _audioWakeSamples;
 
     private IVideoRenderTarget? _videoTarget;
-    private IMediaSource? _source;
-    private volatile ComponentSlot<IVideoDecoder>? _videoDecoder;
-    private volatile ComponentSlot<IAudioDecoder>? _audioDecoder;
-    private volatile ComponentSlot<IVideoRenderer>? _videoRenderer;
-    private volatile ComponentSlot<IAudioRenderer>? _audioRenderer;
-    private volatile ComponentSlot<IVideoRenderer>? _pendingVideoRenderer;
-    private volatile ComponentSlot<IAudioRenderer>? _pendingAudioRenderer;
-    private volatile ComponentSlot<IVideoDecoder>? _pendingVideoDecoder;
-    private volatile ComponentSlot<IAudioDecoder>? _pendingAudioDecoder;
-    private volatile bool _hasAudioChain;
-    private volatile bool _hasVideoChain;
+    private readonly ComponentSlot<IMediaSource> _source = new();
+    private readonly ComponentSlot<IVideoDecoder> _videoDecoder = new();
+    private readonly ComponentSlot<IAudioDecoder> _audioDecoder = new();
+    private readonly ComponentSlot<IVideoRenderer> _videoRenderer = new();
+    private readonly ComponentSlot<IAudioRenderer> _audioRenderer = new();
 
     private readonly AudioQueue _audioQueue = new();
     private readonly ConcurrentQueue<PacketEntry> _packetQueue = new();
@@ -154,17 +149,17 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public bool HasAudio => _audioStreamInfo is not null;
 
-    public string? VideoDecoderName => _videoDecoder?.Component.Name;
+    public string? VideoDecoderName => _videoDecoder.CurrentComponent?.Name;
 
-    public string? AudioDecoderName => _audioDecoder?.Component.Name;
+    public string? AudioDecoderName => _audioDecoder.CurrentComponent?.Name;
 
-    public string? VideoRendererName => _videoRenderer?.Component.Name;
+    public string? VideoRendererName => _videoRenderer.CurrentComponent?.Name;
 
-    public string? AudioRendererName => _audioRenderer?.Component.Name;
+    public string? AudioRendererName => _audioRenderer.CurrentComponent?.Name;
 
-    public bool IsVideoHardwareAccelerated => _videoDecoder?.Component.IsHardwareAccelerated ?? false;
+    public bool IsVideoHardwareAccelerated => _videoDecoder.CurrentComponent?.IsHardwareAccelerated ?? false;
 
-    public bool IsAudioHardwareAccelerated => _audioDecoder?.Component.IsHardwareAccelerated ?? false;
+    public bool IsAudioHardwareAccelerated => _audioDecoder.CurrentComponent?.IsHardwareAccelerated ?? false;
 
     public TimeSpan Duration => _info?.Duration ?? TimeSpan.Zero;
 
@@ -212,7 +207,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
-    public long AudioUnderruns => _audioRenderer?.Component.UnderrunCount ?? 0;
+    public long AudioUnderruns => _audioRenderer.CurrentComponent?.UnderrunCount ?? 0;
 
     public TimeSpan PictureLag
     {
@@ -231,11 +226,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public void Dispose()
     {
-        Task<PlaybackOperationResult> teardown = Submit(() =>
+        Task<OperationResult> teardown = Submit(() =>
         {
             if (_disposed)
             {
-                return PlaybackOperationResult.Success;
+                return OperationResult.Success();
             }
 
             _disposed = true;
@@ -245,33 +240,33 @@ public sealed partial class PlaybackPipeline : IDisposable
         teardown.Wait();
     }
 
-    public Task<PlaybackOperationResult> Open(MediaLocator locator, IVideoRenderTarget? videoTarget = null)
+    public Task<OperationResult> Open(MediaLocator locator, IVideoRenderTarget? videoTarget = null)
     {
         ArgumentNullException.ThrowIfNull(locator);
         return Submit(() => OpenCore(locator, videoTarget));
     }
 
-    public Task<PlaybackOperationResult> Play()
+    public Task<OperationResult> Play()
     {
         return Submit(PlayCore);
     }
 
-    public Task<PlaybackOperationResult> Pause()
+    public Task<OperationResult> Pause()
     {
         return Submit(PauseCore);
     }
 
-    public Task<PlaybackOperationResult> Seek(TimeSpan position, SeekMode mode = SeekMode.Fast)
+    public Task<OperationResult> Seek(TimeSpan position, SeekMode mode = SeekMode.Fast)
     {
         return Submit(() => SeekCore(position, mode));
     }
 
-    public Task<PlaybackOperationResult> Reconcile()
+    public Task<OperationResult> Reconcile()
     {
         return Submit(ReconcileCore);
     }
 
-    public Task<PlaybackOperationResult> Stop()
+    public Task<OperationResult> Stop()
     {
         return Submit(StopCore);
     }
@@ -280,23 +275,23 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     #region Playback
 
-    private PlaybackOperationResult OpenCore(MediaLocator locator, IVideoRenderTarget? videoTarget)
+    private OperationResult OpenCore(MediaLocator locator, IVideoRenderTarget? videoTarget)
     {
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The pipeline has already been disposed.");
+            return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
         ISourceProviderFactory? sourceFactory = SourceFactory;
         if (sourceFactory is null)
         {
-            return PlaybackOperationResult.Failure("No source provider factory was registered.");
+            return OperationResult.Failure("No source provider factory was registered.");
         }
 
         StopCore();
         SetState(MediaEngineState.Opening);
 
-        PlaybackOperationResult result = PreparePlayback(locator, sourceFactory, videoTarget);
+        OperationResult result = PreparePlayback(locator, sourceFactory, videoTarget);
         if (!result.IsSuccessful)
         {
             StopCore();
@@ -311,12 +306,12 @@ public sealed partial class PlaybackPipeline : IDisposable
         StartVideoRenderThread();
         StartAudioRenderThread();
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    private PlaybackOperationResult PreparePlayback(MediaLocator locator, ISourceProviderFactory sourceFactory, IVideoRenderTarget? videoTarget)
+    private OperationResult PreparePlayback(MediaLocator locator, ISourceProviderFactory sourceFactory, IVideoRenderTarget? videoTarget)
     {
-        PlaybackOperationResult opened = sourceFactory.TryOpen(locator, out IMediaSource? source);
+        OperationResult opened = sourceFactory.TryOpen(locator, out IMediaSource? source);
         if (!opened.IsSuccessful)
         {
             return opened;
@@ -324,20 +319,21 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         if (source is null)
         {
-            return PlaybackOperationResult.Failure("The source opened nothing to play.");
+            return OperationResult.Failure("The source opened nothing to play.");
         }
 
-        _source = source;
-        _info = source.Info;
         VideoStreamInfo? videoStreamInfo = source.Info.VideoStreams.Count > 0 ? source.Info.VideoStreams[0] : null;
         AudioStreamInfo? audioStreamInfo = source.Info.AudioStreams.Count > 0 ? source.Info.AudioStreams[0] : null;
-        _videoStreamInfo = videoStreamInfo;
-        _audioStreamInfo = audioStreamInfo;
 
         if (videoStreamInfo is null && audioStreamInfo is null)
         {
-            return PlaybackOperationResult.Failure("The file holds neither video nor audio.");
+            return OperationResult.Failure("The file holds neither video nor audio.");
         }
+
+        _source.Publish(new(source, "source"), default(PipelineVersion).WithSource(1));
+        _info = source.Info;
+        _videoStreamInfo = videoStreamInfo;
+        _audioStreamInfo = audioStreamInfo;
 
         if (videoStreamInfo is null)
         {
@@ -351,7 +347,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             _videoTarget?.SurfaceSizeChanged += VideoTarget_SurfaceSizeChanged;
         }
 
-        PlaybackOperationResult built = BuildChains(out _);
+        OperationResult built = BuildChains(out _);
         if (!built.IsSuccessful)
         {
             return built;
@@ -370,7 +366,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             SeekMode = SeekMode.Fast,
         });
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     private void StartReaderThread()
@@ -433,76 +429,76 @@ public sealed partial class PlaybackPipeline : IDisposable
         _audioRenderThread.Start();
     }
 
-    private PlaybackOperationResult PlayCore()
+    private OperationResult PlayCore()
     {
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The pipeline has already been disposed.");
+            return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
-        if (_source is null)
+        if (!_source.HasComponent)
         {
-            return PlaybackOperationResult.Failure("Nothing is open.");
+            return OperationResult.Failure("Nothing is open.");
         }
 
         if (!CheckState(out MediaEngineState state, MediaEngineState.Paused))
         {
-            return PlaybackOperationResult.Failure($"Cannot play when the state is {state}.");
+            return OperationResult.Failure($"Cannot play when the state is {state}.");
         }
 
         SetState(MediaEngineState.Playing);
         WakeAll();
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    private PlaybackOperationResult PauseCore()
+    private OperationResult PauseCore()
     {
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The pipeline has already been disposed.");
+            return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
-        if (_source is null)
+        if (!_source.HasComponent)
         {
-            return PlaybackOperationResult.Failure("Nothing is open.");
+            return OperationResult.Failure("Nothing is open.");
         }
 
         if (!CheckState(out MediaEngineState state, MediaEngineState.Playing))
         {
-            return PlaybackOperationResult.Failure($"Cannot pause when the state is {state}.");
+            return OperationResult.Failure($"Cannot pause when the state is {state}.");
         }
 
         SetState(MediaEngineState.Paused);
         WakeAll();
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    private PlaybackOperationResult SeekCore(TimeSpan position, SeekMode mode)
+    private OperationResult SeekCore(TimeSpan position, SeekMode mode)
     {
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The pipeline has already been disposed.");
+            return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
         if (mode is not (SeekMode.Fast or SeekMode.Precise))
         {
-            return PlaybackOperationResult.Failure($"The seek mode {mode} is unknown.");
+            return OperationResult.Failure($"The seek mode {mode} is unknown.");
         }
 
-        IMediaSource? source = _source;
+        IMediaSource? source = _source.Latest?.Component;
         if (source is null)
         {
-            return PlaybackOperationResult.Failure("Nothing is open.");
+            return OperationResult.Failure("Nothing is open.");
         }
 
         if (!source.CanSeek)
         {
-            return PlaybackOperationResult.Failure("The source cannot be seeked.");
+            return OperationResult.Failure("The source cannot be seeked.");
         }
 
         if (!CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
         {
-            return PlaybackOperationResult.Failure($"Cannot seek when the state is {state}.");
+            return OperationResult.Failure($"Cannot seek when the state is {state}.");
         }
 
         SetState(MediaEngineState.Paused);
@@ -523,27 +519,27 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
 
         WakeAll();
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    private PlaybackOperationResult ReconcileCore()
+    private OperationResult ReconcileCore()
     {
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The pipeline has already been disposed.");
+            return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
-        if (_source is null || (_videoStreamInfo is null && _audioStreamInfo is null))
+        if (!_source.HasComponent)
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         if (!CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
         {
-            return PlaybackOperationResult.Failure($"Cannot change the pipeline's components when the state is {state}.");
+            return OperationResult.Failure($"Cannot change the pipeline's components when the state is {state}.");
         }
 
-        PlaybackOperationResult built = BuildChains(out ChainChanges changes);
+        OperationResult built = BuildChains(out ChainChanges changes);
         if (!built.IsSuccessful)
         {
             return built;
@@ -563,10 +559,10 @@ public sealed partial class PlaybackPipeline : IDisposable
             WakeAll();
         }
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    private PlaybackOperationResult StopCore()
+    private OperationResult StopCore()
     {
         _stopRequested = true;
         WakeAll();
@@ -594,32 +590,16 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         lock (_componentLock)
         {
-            _videoDecoder?.Dispose();
-            _videoDecoder = null;
-            _audioDecoder?.Dispose();
-            _audioDecoder = null;
-            _videoRenderer?.Dispose();
-            _videoRenderer = null;
-            _audioRenderer?.Component.Flush();
-            _audioRenderer?.Dispose();
-            _audioRenderer = null;
-            _pendingVideoDecoder?.Dispose();
-            _pendingVideoDecoder = null;
-            _pendingAudioDecoder?.Dispose();
-            _pendingAudioDecoder = null;
-            _pendingVideoRenderer?.Dispose();
-            _pendingVideoRenderer = null;
-            _pendingAudioRenderer?.Dispose();
-            _pendingAudioRenderer = null;
-            _hasAudioChain = false;
-            _hasVideoChain = false;
+            _source.Reset();
+            _videoDecoder.Reset();
+            _audioDecoder.Reset();
+            _videoRenderer.Reset();
+            _audioRenderer.CurrentComponent?.Flush();
+            _audioRenderer.Reset();
         }
 
         _videoTarget?.SurfaceSizeChanged -= VideoTarget_SurfaceSizeChanged;
         _videoTarget = null;
-
-        _source?.Dispose();
-        _source = null;
 
         lock (_clockLock)
         {
@@ -652,7 +632,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         _epochGate.Write(x => new EpochGate() { Epoch = x.Epoch + 1 });
 
         SetState(MediaEngineState.None, null);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     private void NotifySourceEnded(long epoch)
@@ -699,12 +679,12 @@ public sealed partial class PlaybackPipeline : IDisposable
         WakeAll();
     }
 
-    private PlaybackOperationResult Fail(string message, Exception? exception = null)
+    private OperationResult Fail(string message, Exception? exception = null)
     {
         PlaybackLogger.E(TAG, message, exception);
         SetState(MediaEngineState.Error, message);
         WakeAll();
-        return PlaybackOperationResult.Failure(message, exception);
+        return OperationResult.Failure(message, exception);
     }
 
     private void SetState(MediaEngineState state, string? error = null)
@@ -741,144 +721,131 @@ public sealed partial class PlaybackPipeline : IDisposable
         AudioDecoder = 8,
     }
 
-    private PlaybackOperationResult BuildChains(out ChainChanges changes)
+    private OperationResult BuildChains(out ChainChanges changes)
     {
         changes = ChainChanges.None;
 
-        IMediaSource? source = _source;
+        IMediaSource? source = _source.Latest?.Component;
         if (source is null)
         {
-            return PlaybackOperationResult.Failure("Nothing is open to build a chain for.");
+            return OperationResult.Failure("Nothing is open to build a chain for.");
         }
 
         ComponentResolver resolver = Components.Clone();
-        VideoStreamInfo? videoStream = _videoStreamInfo;
-        AudioStreamInfo? audioStream = _audioStreamInfo;
 
-        lock (_componentLock)
+        PipelineComponent<IVideoRenderer>? newRenderer = null;
+        PipelineComponent<IVideoDecoder>? newDecoder = null;
+        PipelineComponent<IAudioRenderer>? newAudioRenderer = null;
+        PipelineComponent<IAudioDecoder>? newAudioDecoder = null;
+
+        try
         {
-            ComponentSlot<IVideoRenderer>? videoRendererSlot = null;
-            ComponentSlot<IVideoDecoder>? videoDecoderSlot = null;
-            ComponentSlot<IAudioRenderer>? audioRendererSlot = null;
-            ComponentSlot<IAudioDecoder>? audioDecoderSlot = null;
-
-            try
+            lock (_componentLock)
             {
+                ChainChanges pendingChanges = ChainChanges.None;
+
+                VideoStreamInfo? videoStream = _videoStreamInfo;
                 if (videoStream is not null)
                 {
                     IVideoRenderTarget? videoTarget = _videoTarget;
                     if (videoTarget is null)
                     {
-                        return PlaybackOperationResult.Failure("The file has video but no presentation surface was supplied.");
+                        return OperationResult.Failure("The file has video but no presentation surface was supplied.");
                     }
 
-                    ComponentSlot<IVideoRenderer>? runningRenderer = _pendingVideoRenderer ?? _videoRenderer;
-
-                    long videoVersion = runningRenderer?.Version ?? 0;
-                    PlaybackOperationResult resolvedRenderer = ResolveComponent(
+                    // Resolve video renderer
+                    PipelineComponent<IVideoRenderer>? latestRenderer = _videoRenderer.Latest;
+                    OperationResult<PipelineComponent<IVideoRenderer>?> rendererResolved = ResolveComponent(
                         resolver.ResolveVideoRenderers(),
-                        runningRenderer?.Signature,
-                        "video renderer",
-                        videoVersion,
-                        out videoRendererSlot);
-                    if (!resolvedRenderer.IsSuccessful)
+                        latestRenderer?.Signature,
+                        "video renderer");
+                    if (!rendererResolved.IsSuccessful)
                     {
-                        return resolvedRenderer;
+                        return OperationResult.Failure(rendererResolved);
                     }
 
-                    IVideoRenderer? videoRenderer = videoRendererSlot?.Component;
-                    if (videoRenderer is not null)
+                    newRenderer = rendererResolved.Result;
+                    if (newRenderer is not null)
                     {
-                        PlaybackOperationResult configured = videoRenderer.Configure(videoStream, videoTarget);
+                        OperationResult configured = newRenderer.Component.Configure(videoStream, videoTarget);
                         if (!configured.IsSuccessful)
                         {
                             return configured;
                         }
+
+                        pendingChanges |= ChainChanges.VideoRenderer;
                     }
 
-                    IGpuDevice? gpuDevice = (videoRenderer ?? runningRenderer?.Component)?.GpuDevice;
-
-                    // A decoder is bound to the device it decodes on, and a renderer that is being replaced is a device
-                    // that is being replaced — so whatever the signature says, the decoder that is running is not the
-                    // decoder this renderer can take frames from.
-                    ComponentSlot<IVideoDecoder>? runningVideoDecoder = videoRendererSlot is not null
-                        ? null
-                        : (_pendingVideoDecoder ?? _videoDecoder);
-
-                    PlaybackOperationResult resolvedDecoder = ResolveComponent(
+                    // Resolve video decoder
+                    PipelineComponent<IVideoDecoder>? latestDecoder = _videoDecoder.Latest;
+                    IGpuDevice? gpuDevice = (newRenderer ?? latestRenderer)?.Component?.GpuDevice;
+                    OperationResult<PipelineComponent<IVideoDecoder>?> decoderResolved = ResolveComponent(
                         resolver.ResolveVideoDecoders(source, videoStream, gpuDevice, DecoderBufferedFrames),
-                        runningVideoDecoder?.Signature,
-                        "video decoder",
-                        videoVersion,
-                        out videoDecoderSlot);
-                    if (!resolvedDecoder.IsSuccessful)
+                        newRenderer is null ? latestDecoder?.Signature : null,
+                        "video decoder");
+                    if (!decoderResolved.IsSuccessful)
                     {
-                        return resolvedDecoder;
+                        return OperationResult.Failure(decoderResolved);
                     }
 
-                    if (videoDecoderSlot is not null && videoRendererSlot is not null)
+                    newDecoder = decoderResolved.Result;
+                    if (newDecoder is not null)
                     {
-                        long version = videoVersion + 1;
-                        videoDecoderSlot.Version = version;
-                        videoRendererSlot.Version = version;
-                    }
-
-                    if (videoDecoderSlot is not null)
-                    {
-                        _pendingVideoDecoder?.Dispose();
-                        _pendingVideoDecoder = videoDecoderSlot;
-                        videoDecoderSlot = null;
-                        changes |= ChainChanges.VideoDecoder;
-                    }
-
-                    if (videoRendererSlot is not null)
-                    {
-                        _pendingVideoRenderer?.Dispose();
-                        _pendingVideoRenderer = videoRendererSlot;
-                        videoRendererSlot = null;
-                        changes |= ChainChanges.VideoRenderer;
+                        pendingChanges |= ChainChanges.VideoDecoder;
                     }
                 }
 
+                AudioStreamInfo? audioStream = _audioStreamInfo;
                 if (audioStream is not null)
                 {
                     AudioFilters.Configure(audioStream);
 
-                    string? audioFailure = null;
+                    BaseOperationResult? audioFailure = null;
 
-                    ComponentSlot<IAudioRenderer>? runningAudioRenderer = _pendingAudioRenderer ?? _audioRenderer;
-                    PlaybackOperationResult resolvedRenderer = ResolveComponent(
+                    // Resolve audio renderer
+                    PipelineComponent<IAudioRenderer>? latestRenderer = _audioRenderer.Latest;
+                    OperationResult<PipelineComponent<IAudioRenderer>?> rendererResolved = ResolveComponent(
                         resolver.ResolveAudioRenderers(),
-                        runningAudioRenderer?.Signature,
-                        "audio renderer",
-                        0,
-                        out audioRendererSlot);
-                    if (!resolvedRenderer.IsSuccessful)
+                        latestRenderer?.Signature,
+                        "audio renderer");
+                    if (rendererResolved.IsSuccessful)
                     {
-                        audioFailure = resolvedRenderer.Message;
-                    }
-                    else if (audioRendererSlot is not null)
-                    {
-                        IAudioRenderer audioRenderer = audioRendererSlot.Component;
-                        PlaybackOperationResult configured = audioRenderer.Configure(audioStream);
-                        if (!configured.IsSuccessful)
+                        newAudioRenderer = rendererResolved.Result;
+                        if (newAudioRenderer is not null)
                         {
-                            audioFailure = configured.Message;
+                            OperationResult configured = newAudioRenderer.Component.Configure(audioStream);
+                            if (configured.IsSuccessful)
+                            {
+                                pendingChanges |= ChainChanges.AudioRenderer;
+                            }
+                            else
+                            {
+                                audioFailure = configured;
+                            }
                         }
+                    }
+                    else
+                    {
+                        audioFailure = rendererResolved;
                     }
 
                     if (audioFailure is null)
                     {
-                        ComponentSlot<IAudioDecoder>? runningAudioDecoder = _pendingAudioDecoder ?? _audioDecoder;
-                        PlaybackOperationResult resolvedDecoder = ResolveComponent(
+                        // Resolve audio decoder
+                        PipelineComponent<IAudioDecoder>? latestDecoder = _audioDecoder.Latest;
+                        OperationResult<PipelineComponent<IAudioDecoder>?> decoderResolved = ResolveComponent(
                             resolver.ResolveAudioDecoders(source, audioStream),
-                            runningAudioDecoder?.Signature,
-                            "audio decoder",
-                            0,
-                            out audioDecoderSlot);
-                        if (!resolvedDecoder.IsSuccessful)
+                            latestDecoder?.Signature,
+                            "audio decoder");
+                        if (!decoderResolved.IsSuccessful)
                         {
-                            audioFailure = resolvedDecoder.Message;
+                            audioFailure = decoderResolved;
+                        }
+
+                        newAudioDecoder = decoderResolved.Result;
+                        if (newAudioDecoder is not null)
+                        {
+                            pendingChanges |= ChainChanges.AudioDecoder;
                         }
                     }
 
@@ -886,93 +853,109 @@ public sealed partial class PlaybackPipeline : IDisposable
                     {
                         if (videoStream is null)
                         {
-                            return PlaybackOperationResult.Failure(audioFailure);
+                            return OperationResult.Failure(audioFailure);
                         }
 
-                        RaiseWarning(runningAudioRenderer is not null
-                            ? $"The audio output could not be changed: {audioFailure}"
-                            : $"Audio is not playing: {audioFailure}");
+                        RaiseWarning(_audioRenderer.HasComponent
+                            ? $"The audio output could not be changed: {audioFailure.Message}"
+                            : $"Audio is not playing: {audioFailure.Message}");
                     }
-                    else
-                    {
-                        if (audioDecoderSlot is not null)
-                        {
-                            _pendingAudioDecoder?.Dispose();
-                            _pendingAudioDecoder = audioDecoderSlot;
-                            audioDecoderSlot = null;
-                            changes |= ChainChanges.AudioDecoder;
-                        }
+                }
 
-                        if (audioRendererSlot is not null)
-                        {
-                            _pendingAudioRenderer?.Dispose();
-                            _pendingAudioRenderer = audioRendererSlot;
-                            audioRendererSlot = null;
-                            changes |= ChainChanges.AudioRenderer;
-                        }
+                if (pendingChanges.HasFlag(ChainChanges.VideoDecoder) || pendingChanges.HasFlag(ChainChanges.VideoRenderer))
+                {
+                    PipelineVersion versions = CurrentVersions();
+                    if (pendingChanges.HasFlag(ChainChanges.VideoDecoder) && pendingChanges.HasFlag(ChainChanges.VideoRenderer))
+                    {
+                        versions = versions.WithVideo(versions.Next);
+                    }
+
+                    if (pendingChanges.HasFlag(ChainChanges.VideoDecoder))
+                    {
+                        _videoDecoder.Publish(newDecoder, versions);
+                        newDecoder = null;
+                        changes |= ChainChanges.VideoDecoder;
+                    }
+
+                    if (pendingChanges.HasFlag(ChainChanges.VideoRenderer))
+                    {
+                        _videoRenderer.Publish(newRenderer, versions);
+                        newRenderer = null;
+                        changes |= ChainChanges.VideoRenderer;
+                    }
+                }
+
+                if (pendingChanges.HasFlag(ChainChanges.AudioDecoder) || pendingChanges.HasFlag(ChainChanges.AudioRenderer))
+                {
+                    PipelineVersion versions = CurrentVersions();
+                    if (pendingChanges.HasFlag(ChainChanges.AudioDecoder) && pendingChanges.HasFlag(ChainChanges.AudioRenderer))
+                    {
+                        versions = versions.WithAudio(versions.Next);
+                    }
+
+                    if (pendingChanges.HasFlag(ChainChanges.AudioDecoder))
+                    {
+                        _audioDecoder.Publish(newAudioDecoder, versions);
+                        newAudioDecoder = null;
+                        changes |= ChainChanges.AudioDecoder;
+                    }
+
+                    if (pendingChanges.HasFlag(ChainChanges.AudioRenderer))
+                    {
+                        _audioRenderer.Publish(newAudioRenderer, versions);
+                        newAudioRenderer = null;
+                        changes |= ChainChanges.AudioRenderer;
                     }
                 }
             }
-            finally
-            {
-                videoRendererSlot?.Dispose();
-                videoDecoderSlot?.Dispose();
-                audioRendererSlot?.Dispose();
-                audioDecoderSlot?.Dispose();
-
-                _hasAudioChain = _audioDecoder is not null || _pendingAudioDecoder is not null;
-                _hasVideoChain = _videoDecoder is not null || _pendingVideoDecoder is not null;
-            }
+        }
+        finally
+        {
+            newRenderer?.Dispose();
+            newDecoder?.Dispose();
+            newAudioRenderer?.Dispose();
+            newAudioDecoder?.Dispose();
         }
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    private static PlaybackOperationResult ResolveComponent<TComponent>(
-        IEnumerable<IComponentCreator<TComponent>> creators,
+    private static OperationResult<PipelineComponent<T>?> ResolveComponent<T>(
+        IEnumerable<IComponentCreator<T>> creators,
         string? runningSignature,
-        string role,
-        long version,
-        out ComponentSlot<TComponent>? slot) where TComponent : class, IDisposable
+        string role) where T : class, IDisposable
     {
+        OperationResultCreator<PipelineComponent<T>?> result = new();
         string error = $"No {role} could be offered.";
-        slot = null;
 
-        foreach (IComponentCreator<TComponent> creator in creators)
+        foreach (IComponentCreator<T> creator in creators)
         {
             if (creator.Signature == runningSignature)
             {
-                return PlaybackOperationResult.Success;
+                return result.Success(null);
             }
 
-            PlaybackOperationResult created = creator.Create(out TComponent? component);
-            if (created.IsSuccessful && component is not null)
+            OperationResult created = creator.Create(out T? made);
+            if (created.IsSuccessful && made is not null)
             {
-                slot = new()
-                {
-                    Component = component,
-                    Signature = creator.Signature,
-                    Version = version,
-                };
-                return PlaybackOperationResult.Success;
+                return result.Success(new(made, creator.Signature));
             }
 
             error = created.IsSuccessful ? $"{creator.Signature} made no {role}." : created.Message;
         }
 
-        return PlaybackOperationResult.Failure(error);
+        return result.Failure(error);
     }
 
-    private sealed partial class ComponentSlot<TComponent> : IDisposable where TComponent : IDisposable
+    private PipelineVersion CurrentVersions()
     {
-        internal required TComponent Component { get; init; }
-        internal required string Signature { get; init; }
-        internal long Version { get; set; }
-
-        public void Dispose()
-        {
-            Component.Dispose();
-        }
+        PipelineVersion versions = default;
+        versions = PipelineVersion.Max(versions, _source.HighestVersions);
+        versions = PipelineVersion.Max(versions, _videoDecoder.HighestVersions);
+        versions = PipelineVersion.Max(versions, _audioDecoder.HighestVersions);
+        versions = PipelineVersion.Max(versions, _videoRenderer.HighestVersions);
+        versions = PipelineVersion.Max(versions, _audioRenderer.HighestVersions);
+        return versions;
     }
 
     #endregion
@@ -989,22 +972,21 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void ReaderCore()
     {
-        IMediaSource? source = _source;
-        if (source is null)
-        {
-            return;
-        }
-
+        ComponentSlot<IMediaSource> sourceSlot = _source;
+        ComponentSlot<IAudioDecoder> audioDecoderSlot = _audioDecoder;
+        bool pendingEpochChange = false;
+        bool buffering = false;
         long workingEpoch = -1;
         long endingEpoch = -1;
-        bool buffering = false;
+
+        MediaPacket? packet = null;
 
         while (true)
         {
             long stamp = _readerNode.Stamp;
             if (_stopRequested)
             {
-                return;
+                break;
             }
 
             if (!CheckState(out _, MediaEngineState.Playing, MediaEngineState.Paused))
@@ -1013,27 +995,49 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
-            SwapAudioDecoder();
+            // Install source
+            if (sourceSlot.Update(out IMediaSource? oldSource))
+            {
+                oldSource?.Dispose();
+                pendingEpochChange = true;
+            }
 
+            IMediaSource? source = sourceSlot.CurrentComponent;
+            if (source is null)
+            {
+                _readerNode.Wait(stamp);
+                continue;
+            }
+
+            // Install audio decoder
+            if (audioDecoderSlot.Update(out IAudioDecoder? oldAudioDecoder))
+            {
+                oldAudioDecoder?.Dispose();
+            }
+
+            IAudioDecoder? audioDecoder = audioDecoderSlot.CurrentComponent;
+
+            // Bump epoch
             EpochGate epochGate = _epochGate.Read();
             long epoch = epochGate.Epoch;
             if (epoch != workingEpoch)
             {
                 workingEpoch = epoch;
-                TimeSpan seekPosition = epochGate.SeekPosition;
+                pendingEpochChange = false;
 
                 Volatile.Write(ref _readerTailEpoch, epoch);
                 Interlocked.Exchange(ref _readerTailVideoTicks, -1);
                 Interlocked.Exchange(ref _readerTailAudioTicks, -1);
 
-                PlaybackOperationResult seeked;
+                TimeSpan seekPosition = epochGate.SeekPosition;
+                OperationResult seeked;
                 try
                 {
                     seeked = source.Seek(seekPosition);
                 }
                 catch (Exception ex)
                 {
-                    seeked = PlaybackOperationResult.Failure(ex);
+                    seeked = OperationResult.Failure(ex);
                 }
 
                 if (seeked.IsSuccessful)
@@ -1042,7 +1046,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
                     try
                     {
-                        _audioDecoder?.Component.Flush();
+                        audioDecoder?.Flush();
                     }
                     catch (Exception ex)
                     {
@@ -1057,12 +1061,13 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
-            if (endingEpoch == workingEpoch)
+            if (pendingEpochChange || endingEpoch == epoch)
             {
                 _readerNode.Wait(stamp);
                 continue;
             }
 
+            // Buffering
             if (!buffering)
             {
                 if (!NeedsBuffering())
@@ -1079,31 +1084,68 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
-            MediaPacket? packet = null;
-            PlaybackOperationResult read;
-            try
+            if (packet is null)
             {
-                read = source.TryReadPacket(out packet);
-            }
-            catch (Exception ex)
-            {
-                read = PlaybackOperationResult.Failure(ex.Message);
+                OperationResult read;
+                try
+                {
+                    read = source.TryReadPacket(out packet);
+                }
+                catch (Exception ex)
+                {
+                    read = OperationResult.Failure(ex.Message);
+                }
+
+                if (!read.IsSuccessful)
+                {
+                    PostFailure(read);
+                    break;
+                }
             }
 
-            PlaybackOperationResult routed = PlaybackOperationResult.Success;
+            // Route package
+            PipelineVersion sourceVersions = sourceSlot.CurrentVersions;
+            PipelineVersion audioDecoderVersions = audioDecoderSlot.CurrentVersions;
+            var audioBufferVersions = PipelineVersion.Max(sourceVersions, audioDecoderVersions);
+            var routed = OperationResult.Success();
             bool ending = false;
             bool handedOn = false;
-            if (!read.IsSuccessful)
-            {
-                routed = read;
-            }
-            else if (packet is null)
+            if (packet is null)
             {
                 ending = true;
             }
             else
             {
-                routed = RoutePacket(packet, workingEpoch, out handedOn);
+                AudioStreamInfo? audioStreamInfo = _audioStreamInfo;
+                VideoStreamInfo? videoStreamInfo = _videoStreamInfo;
+                if (audioStreamInfo is not null && packet.StreamIndex == audioStreamInfo.Index)
+                {
+                    if (audioDecoder is not null)
+                    {
+                        VersionVerdict verdict = PipelineVersion.CompareAudioDecoder(sourceVersions, audioDecoderVersions);
+                        switch (verdict)
+                        {
+                            case VersionVerdict.Accept:
+                                AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailAudioTicks);
+                                routed = DecodeAudio(audioDecoder, packet, audioBufferVersions, epoch);
+                                break;
+                            case VersionVerdict.Block:
+                                _readerNode.Wait(stamp);
+                                continue;
+                            case VersionVerdict.Drop:
+                                break;
+                            default:
+                                throw new InvalidOperationException($"Unknown verdict '{verdict}'.");
+                        }
+                    }
+                }
+                else if (videoStreamInfo is not null && packet.StreamIndex == videoStreamInfo.Index)
+                {
+                    AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailVideoTicks);
+                    _packetQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch));
+                    handedOn = true;
+                    TryWakeVideoDecode();
+                }
             }
 
             if (!handedOn)
@@ -1111,93 +1153,42 @@ public sealed partial class PlaybackPipeline : IDisposable
                 packet?.Dispose();
             }
 
+            packet = null;
+
             if (!routed.IsSuccessful)
             {
                 PostFailure(routed);
-                return;
+                break;
             }
 
+            // Ending
             if (ending)
             {
-                endingEpoch = workingEpoch;
+                endingEpoch = epoch;
 
-                PlaybackOperationResult drained = DrainAudioDecoder(workingEpoch);
+                OperationResult drained = DrainAudioDecoder(audioDecoder, audioBufferVersions, epoch);
                 if (!drained.IsSuccessful)
                 {
                     PostWarning(drained.Message);
                 }
 
-                _packetQueue.Enqueue(new PacketEntry(null, workingEpoch));
-                _audioQueue.Enqueue(new AudioEntry(null, workingEpoch));
+                _packetQueue.Enqueue(new PacketEntry(null, default, epoch));
+                _audioQueue.Enqueue(new AudioEntry(null, default, epoch));
                 TryWakeVideoDecode();
                 TryWakeAudioRender();
 
-                long epochCopy = workingEpoch;
+                long epochCopy = epoch;
                 Submit(() => NotifySourceEnded(epochCopy));
             }
         }
+
+        // Cleanup
+        packet?.Dispose();
     }
 
-    private void SwapAudioDecoder()
+    private OperationResult DecodeAudio(IAudioDecoder audioDecoder, MediaPacket packet, PipelineVersion versions, long epoch)
     {
-        if (_pendingAudioDecoder is null)
-        {
-            return;
-        }
-
-        lock (_componentLock)
-        {
-            ComponentSlot<IAudioDecoder>? pending = _pendingAudioDecoder;
-            if (pending is null)
-            {
-                return;
-            }
-
-            _pendingAudioDecoder = null;
-            _audioDecoder?.Dispose();
-            _audioDecoder = pending;
-        }
-    }
-
-    private PlaybackOperationResult RoutePacket(MediaPacket packet, long epoch, out bool handedOn)
-    {
-        handedOn = false;
-
-        IAudioDecoder? audioDecoder = _audioDecoder?.Component;
-        if (audioDecoder is not null)
-        {
-            AudioStreamInfo? audioStreamInfo = _audioStreamInfo;
-            if (audioStreamInfo is null)
-            {
-                return PlaybackOperationResult.Failure("The audio stream info is not available.");
-            }
-
-            if (packet.StreamIndex == audioStreamInfo.Index)
-            {
-                AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailAudioTicks);
-                return DecodeAudio(audioDecoder, packet, epoch);
-            }
-        }
-
-        VideoStreamInfo? videoStreamInfo = _videoStreamInfo;
-        if (videoStreamInfo is not null && packet.StreamIndex == videoStreamInfo.Index)
-        {
-            AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailVideoTicks);
-
-            _packetQueue.Enqueue(new PacketEntry(packet, epoch));
-            handedOn = true;
-            TryWakeVideoDecode();
-
-            return PlaybackOperationResult.Success;
-        }
-
-        // Streams nobody selected, such as a second audio track, are simply skipped.
-        return PlaybackOperationResult.Success;
-    }
-
-    private PlaybackOperationResult DecodeAudio(IAudioDecoder audioDecoder, MediaPacket packet, long epoch)
-    {
-        PlaybackOperationResult decoded;
+        OperationResult decoded;
         IReadOnlyList<RawAudioBuffer> buffers;
         try
         {
@@ -1205,7 +1196,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
         catch (Exception ex)
         {
-            return PlaybackOperationResult.Failure(ex.Message);
+            return OperationResult.Failure(ex.Message);
         }
 
         if (!decoded.IsSuccessful)
@@ -1215,12 +1206,12 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         if (buffers is null)
         {
-            return PlaybackOperationResult.Failure("The audio decoder returned no buffers.");
+            return OperationResult.Failure("The audio decoder returned no buffers.");
         }
 
         foreach (RawAudioBuffer buffer in buffers)
         {
-            _audioQueue.Enqueue(new AudioEntry(buffer, epoch));
+            _audioQueue.Enqueue(new AudioEntry(buffer, versions, epoch));
         }
 
         if (buffers.Count > 0)
@@ -1228,18 +1219,18 @@ public sealed partial class PlaybackPipeline : IDisposable
             TryWakeAudioRender();
         }
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     private bool IsBuffered()
     {
-        if (_hasAudioChain && _audioQueue.Samples < _audioMinimumSamples)
+        if (_audioDecoder.HasComponent && _audioQueue.Samples < _audioMinimumSamples)
         {
             return false;
         }
 
         ConcurrentQueue<PacketEntry> packets = _packetQueue;
-        if (_hasVideoChain && packets.Count < VideoPacketMinimum)
+        if (_videoDecoder.HasComponent && packets.Count < VideoPacketMinimum)
         {
             return false;
         }
@@ -1249,13 +1240,13 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private bool NeedsBuffering()
     {
-        if (_hasAudioChain && _audioQueue.Samples < _audioWakeSamples)
+        if (_audioDecoder.HasComponent && _audioQueue.Samples < _audioWakeSamples)
         {
             return true;
         }
 
         ConcurrentQueue<PacketEntry> packets = _packetQueue;
-        if (_hasVideoChain && packets.Count < VideoPacketWake)
+        if (_videoDecoder.HasComponent && packets.Count < VideoPacketWake)
         {
             return true;
         }
@@ -1263,15 +1254,14 @@ public sealed partial class PlaybackPipeline : IDisposable
         return false;
     }
 
-    private PlaybackOperationResult DrainAudioDecoder(long epoch)
+    private OperationResult DrainAudioDecoder(IAudioDecoder? decoder, PipelineVersion versions, long epoch)
     {
-        IAudioDecoder? decoder = _audioDecoder?.Component;
         if (decoder is null)
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
-        PlaybackOperationResult drained;
+        OperationResult drained;
         IReadOnlyList<RawAudioBuffer> buffers;
         try
         {
@@ -1279,7 +1269,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
         catch (Exception ex)
         {
-            return PlaybackOperationResult.Failure(ex.Message);
+            return OperationResult.Failure(ex.Message);
         }
 
         if (!drained.IsSuccessful)
@@ -1289,13 +1279,13 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         if (buffers is null)
         {
-            return PlaybackOperationResult.Failure("The audio decoder returned no buffers.");
+            return OperationResult.Failure("The audio decoder returned no buffers.");
         }
 
         bool handedOver = false;
         foreach (RawAudioBuffer buffer in buffers)
         {
-            _audioQueue.Enqueue(new AudioEntry(buffer, epoch));
+            _audioQueue.Enqueue(new AudioEntry(buffer, versions, epoch));
             handedOver = true;
         }
 
@@ -1304,7 +1294,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             TryWakeAudioRender();
         }
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     private void AdvanceReaderTail(long epoch, TimeSpan timestamp, ref long oldTicks)
@@ -1364,10 +1354,10 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void VideoDecodeCore()
     {
-        long componentVersion = -1;
-        long workingEpoch = -1;
-        bool awaitingKeyFrame = false;
         ConcurrentQueue<PacketEntry> queue = _packetQueue;
+        ComponentSlot<IVideoDecoder> videoDecoderSlot = _videoDecoder;
+        bool awaitingKeyFrame = false;
+        long workingEpoch = -1;
 
         while (true)
         {
@@ -1377,16 +1367,21 @@ public sealed partial class PlaybackPipeline : IDisposable
                 return;
             }
 
-            if (SwapVideoDecoder() is ComponentSlot<IVideoDecoder> pendingDecoder)
+            // Install video decoder
+            if (videoDecoderSlot.Update(out IVideoDecoder? oldVideoDecoder))
             {
-                componentVersion = pendingDecoder.Version;
-
-                // A decoder that has just been opened has no reference picture: what is queued was decoded against
-                // a stream the new one has not seen, so it starts at the next frame the encoder made self-contained.
+                oldVideoDecoder?.Dispose();
                 awaitingKeyFrame = true;
+            }
+
+            IVideoDecoder? videoDecoder = videoDecoderSlot.CurrentComponent;
+            if (videoDecoder is null)
+            {
+                _videoDecodeNode.Wait(stamp);
                 continue;
             }
 
+            // Bump epoch
             long epoch = _epochGate.Read().Epoch;
             if (workingEpoch != epoch)
             {
@@ -1394,7 +1389,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
                 try
                 {
-                    _videoDecoder?.Component.Flush();
+                    videoDecoder.Flush();
                 }
                 catch (Exception exception)
                 {
@@ -1405,13 +1400,28 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
+            // Dequeue
             if (!HasRoomForVideoFrame())
             {
                 _videoDecodeNode.Wait(stamp);
                 continue;
             }
 
-            if (!queue.TryDequeue(out PacketEntry entry))
+            if (!queue.TryPeek(out PacketEntry entry))
+            {
+                _videoDecodeNode.Wait(stamp);
+                continue;
+            }
+
+            PipelineVersion videoDecoderVersions = videoDecoderSlot.CurrentVersions;
+            VersionVerdict verdict = PipelineVersion.CompareVideoDecoder(entry.Versions, videoDecoderVersions);
+            if (verdict == VersionVerdict.Block)
+            {
+                _videoDecodeNode.Wait(stamp);
+                continue;
+            }
+
+            if (!queue.TryDequeue(out _))
             {
                 _videoDecodeNode.Wait(stamp);
                 continue;
@@ -1419,25 +1429,26 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             TryWakeReader();
 
+            // Decode
             MediaPacket? packet = entry.Packet;
             long packetEpoch = entry.Epoch;
-
             using (packet)
             {
-                if (workingEpoch != packetEpoch)
+                if (verdict == VersionVerdict.Drop || epoch != packetEpoch)
                 {
                     continue;
                 }
 
+                var videoFrameVersions = PipelineVersion.Max(entry.Versions, videoDecoderVersions);
                 if (packet is null)
                 {
-                    PlaybackOperationResult drained = DrainVideoDecoder(packetEpoch, componentVersion);
+                    OperationResult drained = DrainVideoDecoder(videoDecoder, videoFrameVersions, packetEpoch);
                     if (!drained.IsSuccessful)
                     {
                         PostWarning(drained.Message);
                     }
 
-                    _frameQueue.Enqueue(new FrameEntry(null, epoch, componentVersion));
+                    _frameQueue.Enqueue(new FrameEntry(null, default, epoch));
                     TryWakeVideoRender();
                     _videoDecodeNode.Wait(stamp);
                     continue;
@@ -1453,12 +1464,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     awaitingKeyFrame = false;
                 }
 
-                if (_videoDecoder is null)
-                {
-                    continue;
-                }
-
-                PlaybackOperationResult decoded = DecodeVideo(packet, out IReadOnlyList<RawVideoFrame>? frames);
+                OperationResult decoded = DecodeVideo(videoDecoder, packet, out IReadOnlyList<RawVideoFrame>? frames);
                 if (!decoded.IsSuccessful)
                 {
                     PostFailure(decoded);
@@ -1471,45 +1477,17 @@ public sealed partial class PlaybackPipeline : IDisposable
                     return;
                 }
 
-                QueueFrames(frames, packetEpoch, componentVersion);
+                QueueFrames(frames, videoFrameVersions, epoch);
             }
         }
     }
 
-    private ComponentSlot<IVideoDecoder>? SwapVideoDecoder()
-    {
-        if (_pendingVideoDecoder is null)
-        {
-            return null;
-        }
-
-        lock (_componentLock)
-        {
-            ComponentSlot<IVideoDecoder>? pending = _pendingVideoDecoder;
-            if (pending is null)
-            {
-                return null;
-            }
-
-            _pendingVideoDecoder = null;
-            _videoDecoder?.Dispose();
-            _videoDecoder = pending;
-            return pending;
-        }
-    }
-
-    private PlaybackOperationResult DecodeVideo(MediaPacket packet, out IReadOnlyList<RawVideoFrame>? frames)
+    private OperationResult DecodeVideo(IVideoDecoder videoDecoder, MediaPacket packet, out IReadOnlyList<RawVideoFrame>? frames)
     {
         frames = null;
 
-        IVideoDecoder? videoDecoder = _videoDecoder?.Component;
-        if (videoDecoder is null)
-        {
-            return PlaybackOperationResult.Success;
-        }
-
         long startTicks = Stopwatch.GetTimestamp();
-        PlaybackOperationResult decoded;
+        OperationResult decoded;
         IReadOnlyList<RawVideoFrame>? produced = null;
         try
         {
@@ -1517,7 +1495,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
         catch (Exception ex)
         {
-            decoded = PlaybackOperationResult.Failure(ex);
+            decoded = OperationResult.Failure(ex);
         }
 
         Interlocked.Add(ref _decodeTicks, Stopwatch.GetTimestamp() - startTicks);
@@ -1529,18 +1507,12 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         frames = produced;
         Interlocked.Add(ref _decodedFrameCount, produced.Count);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
-    private PlaybackOperationResult DrainVideoDecoder(long epoch, long componentVersion)
+    private OperationResult DrainVideoDecoder(IVideoDecoder decoder, PipelineVersion versions, long epoch)
     {
-        IVideoDecoder? decoder = _videoDecoder?.Component;
-        if (decoder is null)
-        {
-            return PlaybackOperationResult.Success;
-        }
-
-        PlaybackOperationResult drained;
+        OperationResult drained;
         IReadOnlyList<RawVideoFrame> frames;
         try
         {
@@ -1548,7 +1520,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
         catch (Exception ex)
         {
-            return PlaybackOperationResult.Failure(ex.Message);
+            return OperationResult.Failure(ex.Message);
         }
 
         if (!drained.IsSuccessful)
@@ -1558,14 +1530,14 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         if (frames is null)
         {
-            return PlaybackOperationResult.Failure("The video decoder returned no frames.");
+            return OperationResult.Failure("The video decoder returned no frames.");
         }
 
-        QueueFrames(frames, epoch, componentVersion);
-        return PlaybackOperationResult.Success;
+        QueueFrames(frames, versions, epoch);
+        return OperationResult.Success();
     }
 
-    private void QueueFrames(IReadOnlyList<RawVideoFrame> frames, long epoch, long componentVersion)
+    private void QueueFrames(IReadOnlyList<RawVideoFrame> frames, PipelineVersion versions, long epoch)
     {
         bool fastExit = false;
 
@@ -1578,7 +1550,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
-            _frameQueue.Enqueue(new FrameEntry(frame, epoch, componentVersion));
+            _frameQueue.Enqueue(new FrameEntry(frame, versions, epoch));
         }
 
         if (!fastExit)
@@ -1606,13 +1578,13 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void VideoRenderCore()
     {
+        ConcurrentQueue<FrameEntry> queue = _frameQueue;
+        ComponentSlot<IVideoRenderer> videoRendererSlot = _videoRenderer;
         bool deviceAvailable = false;
-        long componentVersion = -1;
         long workingEpoch = -1;
         long endingEpoch = -1;
         TimeSpan? startTime = null;
         TimeSpan? firstFrameTime = null;
-        ConcurrentQueue<FrameEntry> queue = _frameQueue;
 
         void DequeueAndDispose()
         {
@@ -1633,17 +1605,19 @@ public sealed partial class PlaybackPipeline : IDisposable
                 return;
             }
 
-            if (SwapVideoRenderer() is ComponentSlot<IVideoRenderer> pendingRenderer)
+            // Install video renderer
+            if (videoRendererSlot.Update(out IVideoRenderer? oldVideoRenderer))
             {
-                componentVersion = pendingRenderer.Version;
-                deviceAvailable = true;
+                oldVideoRenderer?.Dispose();
+                deviceAvailable = videoRendererSlot.CurrentComponent is not null;
                 continue;
             }
 
+            IVideoRenderer? videoRenderer = videoRendererSlot.CurrentComponent;
+
+            // Bump epoch
             EpochGate epochGate = _epochGate.Read();
             long epoch = epochGate.Epoch;
-            bool playing = CheckState(out MediaEngineState state, MediaEngineState.Playing);
-
             if (workingEpoch != epoch)
             {
                 workingEpoch = epoch;
@@ -1652,19 +1626,20 @@ public sealed partial class PlaybackPipeline : IDisposable
                 Interlocked.Exchange(ref _pictureTicks, -1);
             }
 
-            IVideoRenderer? renderer = _videoRenderer?.Component;
+            // Refresh surface
+            bool playing = CheckState(out MediaEngineState state, MediaEngineState.Playing);
             VideoTransform transform = VideoTransform;
 
-            if (deviceAvailable && renderer is not null && state is MediaEngineState.Paused or MediaEngineState.Ended)
+            if (deviceAvailable && videoRenderer is not null && state is MediaEngineState.Paused or MediaEngineState.Ended)
             {
-                PlaybackOperationResult refreshed;
+                OperationResult refreshed;
                 try
                 {
-                    refreshed = renderer.RefreshSurface(transform);
+                    refreshed = videoRenderer.RefreshSurface(transform);
                 }
                 catch (Exception ex)
                 {
-                    refreshed = PlaybackOperationResult.Failure(ex);
+                    refreshed = OperationResult.Failure(ex);
                 }
 
                 if (!refreshed.IsSuccessful)
@@ -1674,11 +1649,12 @@ public sealed partial class PlaybackPipeline : IDisposable
                 }
             }
 
+            // Pause the clock on pause or starvation
             FrameEntry? entry = queue.TryPeek(out FrameEntry head) ? head : null;
             TimeSpan position = _clock.Position;
             bool offeringTheStill = state == MediaEngineState.Paused && !firstFrameTime.HasValue && endingEpoch != epoch;
 
-            bool starved = _videoDecoder is not null && endingEpoch != epoch && entry is null;
+            bool starved = _videoDecoder.HasComponent && endingEpoch != epoch && entry is null;
             starved = starved && !IsStreamSpent(epoch, position, ref _readerTailVideoTicks);
             starved = starved && (!firstFrameTime.HasValue || IsVideoStarved(position));
 
@@ -1688,6 +1664,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 StartOrPauseClock(epoch, state);
             }
 
+            // Idle on pause or starvation
             if (!playing && !offeringTheStill)
             {
                 _videoRenderNode.Wait(stamp);
@@ -1700,14 +1677,27 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
-            if (entry.Value.Epoch != epoch || entry.Value.ComponentVersion != componentVersion)
+            // Probe the entry
+            if (entry.Value.Epoch != epoch)
+            {
+                DequeueAndDispose();
+                continue;
+            }
+
+            VersionVerdict verdict = PipelineVersion.CompareVideoRenderer(entry.Value.Versions, videoRendererSlot.CurrentVersions);
+            if (verdict == VersionVerdict.Block)
+            {
+                _videoRenderNode.Wait(stamp);
+                continue;
+            }
+
+            if (verdict == VersionVerdict.Drop)
             {
                 DequeueAndDispose();
                 continue;
             }
 
             RawVideoFrame? frame = entry.Value.Frame;
-
             if (frame is null)
             {
                 if (endingEpoch != entry.Value.Epoch)
@@ -1728,9 +1718,10 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
+            // Ready to present
             FrameSyncAction syncAction = Synchronizer.Evaluate(frame.Timestamp, position);
 
-            if (playing && _audioDecoder is null)
+            if (playing && !_audioDecoder.HasComponent)
             {
                 TimeSpan anchor = firstFrameTime ?? frame.Timestamp;
 
@@ -1753,6 +1744,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
+            // Present
             if (!queue.TryDequeue(out _))
             {
                 continue;
@@ -1772,9 +1764,9 @@ public sealed partial class PlaybackPipeline : IDisposable
                     continue;
                 }
 
-                if (deviceAvailable && renderer is not null)
+                if (deviceAvailable && videoRenderer is not null)
                 {
-                    PlaybackOperationResult shown = RenderVideoFrame(renderer, frame, transform);
+                    OperationResult shown = RenderVideoFrame(videoRenderer, frame, transform);
                     if (!shown.IsSuccessful)
                     {
                         PostWarning(shown.Message);
@@ -1790,39 +1782,17 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
-    private ComponentSlot<IVideoRenderer>? SwapVideoRenderer()
-    {
-        if (_pendingVideoRenderer is null)
-        {
-            return null;
-        }
-
-        lock (_componentLock)
-        {
-            ComponentSlot<IVideoRenderer>? pending = _pendingVideoRenderer;
-            if (pending is null)
-            {
-                return null;
-            }
-
-            _pendingVideoRenderer = null;
-            _videoRenderer?.Dispose();
-            _videoRenderer = pending;
-            return pending;
-        }
-    }
-
-    private PlaybackOperationResult RenderVideoFrame(IVideoRenderer renderer, RawVideoFrame frame, VideoTransform transform)
+    private OperationResult RenderVideoFrame(IVideoRenderer renderer, RawVideoFrame frame, VideoTransform transform)
     {
         long startTicks = Stopwatch.GetTimestamp();
-        PlaybackOperationResult rendered;
+        OperationResult rendered;
         try
         {
             rendered = renderer.Render(frame, transform);
         }
         catch (Exception ex)
         {
-            rendered = PlaybackOperationResult.Failure(ex.Message);
+            rendered = OperationResult.Failure(ex.Message);
         }
 
         Interlocked.Add(ref _renderTicks, Stopwatch.GetTimestamp() - startTicks);
@@ -1840,7 +1810,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             Interlocked.Exchange(ref _displayedFrameCount, displayed);
         }
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     private bool IsVideoStarved(TimeSpan position)
@@ -1871,6 +1841,8 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void AudioRenderCore()
     {
+        AudioQueue queue = _audioQueue;
+        ComponentSlot<IAudioRenderer> audioRendererSlot = _audioRenderer;
         bool deviceAvailable = false;
         bool reportedRunningAhead = false;
         long workingEpoch = -1;
@@ -1879,8 +1851,6 @@ public sealed partial class PlaybackPipeline : IDisposable
         TimeSpan? clockOffset = null;
         TimeSpan? startTime = null;
         TimeSpan? tailBufferPosition = null;
-        AudioQueue queue = _audioQueue;
-        IAudioRenderer? renderer = _audioRenderer?.Component;
 
         IAudioSubmit? inFlightSubmit = null;
         RawAudioBuffer? inFlightBuffer = null;
@@ -1898,27 +1868,27 @@ public sealed partial class PlaybackPipeline : IDisposable
             long stamp = _audioRenderNode.Stamp;
             if (_stopRequested)
             {
-                goto CleanUp;
+                break;
             }
 
-            if (SwapAudioRenderer() is ComponentSlot<IAudioRenderer> pendingRenderer)
+            // Install audio renderer
+            if (audioRendererSlot.Update(out IAudioRenderer? oldAudioRenderer))
             {
-                IAudioRenderer? replaced = renderer;
-                renderer = pendingRenderer.Component;
-                deviceAvailable = true;
+                ReleaseInFlightAudio();
+                oldAudioRenderer?.Flush();
+                oldAudioRenderer?.Dispose();
+
+                deviceAvailable = audioRendererSlot.CurrentComponent is not null;
                 reportedRunningAhead = false;
                 clockOffset = null;
-
-                ReleaseInFlightAudio();
-                replaced?.Flush();
-                replaced?.Dispose();
-
                 continue;
             }
 
+            IAudioRenderer? audioRenderer = audioRendererSlot.CurrentComponent;
+
+            // Bump epoch
             EpochGate epochGate = _epochGate.Read();
             long epoch = epochGate.Epoch;
-            bool playing = CheckState(out MediaEngineState state, MediaEngineState.Playing);
             bool epochChanged = workingEpoch != epoch;
 
             if (epochChanged)
@@ -1927,7 +1897,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 startTime = epochGate.SeekMode == SeekMode.Precise ? epochGate.SeekPosition : null;
                 tailBufferPosition = null;
                 reportedRunningAhead = false;
-                renderer?.Flush();
+                audioRenderer?.Flush();
             }
 
             if (epochChanged || !deviceAvailable)
@@ -1936,6 +1906,8 @@ public sealed partial class PlaybackPipeline : IDisposable
                 ReleaseInFlightAudio();
             }
 
+            // Pause the clock on pause or starvation
+            bool playing = CheckState(out MediaEngineState state, MediaEngineState.Playing);
             lock (_clockLock)
             {
                 if (epochChanged)
@@ -1945,9 +1917,9 @@ public sealed partial class PlaybackPipeline : IDisposable
 
                 StartOrPauseClock(epoch, state);
 
-                if (deviceAvailable && renderer is not null)
+                if (deviceAvailable && audioRenderer is not null)
                 {
-                    IPlaybackClock deviceClock = renderer.Clock;
+                    IPlaybackClock deviceClock = audioRenderer.Clock;
                     bool clockRunning = _clock.IsRunning;
                     if (clockRunning != deviceClock.IsRunning)
                     {
@@ -1972,15 +1944,15 @@ public sealed partial class PlaybackPipeline : IDisposable
                 }
             }
 
+            // Idle on pause
             if (!playing)
             {
                 _audioRenderNode.Wait(stamp);
                 continue;
             }
 
-            bool hasDeviceAudio = deviceAvailable && renderer is not null && renderer.QueuedSampleCount > 0;
+            // Idle on leeway device
             TimeSpan position = _clock.Position;
-
             if (deviceAvailable && tailBufferPosition is TimeSpan consumed
                 && consumed - position > TimeSpan.FromMilliseconds(AudioDeviceLeewayMilliseconds))
             {
@@ -2000,9 +1972,11 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
-            if (deviceAvailable && renderer is not null)
+            // Continue in-flight audio
+            bool hasDeviceAudio = deviceAvailable && audioRenderer is not null && audioRenderer.QueuedSampleCount > 0;
+            if (deviceAvailable && audioRenderer is not null)
             {
-                IPlaybackClock deviceClock = renderer.Clock;
+                IPlaybackClock deviceClock = audioRenderer.Clock;
 
                 if (hasDeviceAudio && clockOffset is TimeSpan offset)
                 {
@@ -2013,7 +1987,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 {
                     if (!inFlightSubmit.MoveNext())
                     {
-                        PlaybackOperationResult submitted = inFlightSubmit.Result;
+                        OperationResult submitted = inFlightSubmit.Result;
                         ReleaseInFlightAudio();
 
                         if (!submitted.IsSuccessful)
@@ -2030,11 +2004,11 @@ public sealed partial class PlaybackPipeline : IDisposable
                 }
             }
 
+            // Empty queue: starvation or ending
             if (queue.IsEmpty)
             {
                 bool ending = endingEpoch == epoch;
                 bool starved = deviceAvailable && !hasDeviceAudio && !ending && !IsStreamSpent(epoch, position, ref _readerTailAudioTicks);
-
                 lock (_clockLock)
                 {
                     _audioStarved = starved;
@@ -2053,14 +2027,27 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
+            // Idle on failing device if the clock is behind, since the device clock is no longer reliable
             if (!deviceAvailable && tailBufferPosition.HasValue && position < tailBufferPosition.Value)
             {
-                // Audio position must not run ahead of the clock position.
                 _audioRenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
                 continue;
             }
 
-            if (!queue.TryDequeue(out AudioEntry entry))
+            // Probe the entry
+            if (!queue.TryPeek(out AudioEntry entry))
+            {
+                continue;
+            }
+
+            VersionVerdict verdict = PipelineVersion.CompareAudioRenderer(entry.Versions, audioRendererSlot.CurrentVersions);
+            if (verdict == VersionVerdict.Block)
+            {
+                _audioRenderNode.Wait(stamp);
+                continue;
+            }
+
+            if (!queue.TryDequeue(out _))
             {
                 continue;
             }
@@ -2069,6 +2056,12 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             RawAudioBuffer? buffer = entry.Buffer;
             long bufferEpoch = entry.Epoch;
+
+            if (verdict == VersionVerdict.Drop)
+            {
+                buffer?.Dispose();
+                continue;
+            }
 
             if (epoch != bufferEpoch)
             {
@@ -2088,6 +2081,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
+            // Ready to submit
             tailBufferPosition = buffer.Timestamp + buffer.Duration;
 
             lock (_clockLock)
@@ -2095,9 +2089,9 @@ public sealed partial class PlaybackPipeline : IDisposable
                 _audioStarved = false;
 
                 bool clockChanged = AnchorClock(epoch, buffer.Timestamp);
-                if (deviceAvailable && renderer is not null && (clockChanged || clockOffset is null))
+                if (deviceAvailable && audioRenderer is not null && (clockChanged || clockOffset is null))
                 {
-                    clockOffset = renderer.Clock.Position - buffer.Timestamp;
+                    clockOffset = audioRenderer.Clock.Position - buffer.Timestamp;
                 }
 
                 StartOrPauseClock(epoch, state);
@@ -2105,9 +2099,9 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             buffer = AudioFilters.Apply(buffer);
 
-            if (deviceAvailable && renderer is not null)
+            if (deviceAvailable && audioRenderer is not null)
             {
-                inFlightSubmit = renderer.Submit(buffer);
+                inFlightSubmit = audioRenderer.Submit(buffer);
                 inFlightBuffer = buffer;
             }
             else
@@ -2116,29 +2110,8 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
         }
 
-    CleanUp:
+        // Cleanup
         ReleaseInFlightAudio();
-    }
-
-    private ComponentSlot<IAudioRenderer>? SwapAudioRenderer()
-    {
-        if (_pendingAudioRenderer is null)
-        {
-            return null;
-        }
-
-        lock (_componentLock)
-        {
-            ComponentSlot<IAudioRenderer>? pending = _pendingAudioRenderer;
-            if (pending is null)
-            {
-                return null;
-            }
-
-            _pendingAudioRenderer = null;
-            _audioRenderer = pending;
-            return pending;
-        }
     }
 
     private void SyncClock(IPlaybackClock clock, IPlaybackClock deviceClock, TimeSpan offset)
@@ -2197,11 +2170,6 @@ public sealed partial class PlaybackPipeline : IDisposable
         return false;
     }
 
-    private bool IsEnding(long epoch)
-    {
-        return Interlocked.Read(ref _endingEpoch) == epoch;
-    }
-
     private void StartOrPauseClock(long epoch, MediaEngineState state)
     {
         bool start = state == MediaEngineState.Playing && !_videoStarved && !_audioStarved;
@@ -2255,7 +2223,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         Submit(() => Fail(message, exception));
     }
 
-    private void PostFailure(PlaybackOperationResult result)
+    private void PostFailure(OperationResult result)
     {
         PostFailure(result.Message, result.Exception);
     }

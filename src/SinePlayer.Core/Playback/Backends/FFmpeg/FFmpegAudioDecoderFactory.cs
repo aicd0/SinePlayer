@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
@@ -16,13 +16,13 @@ namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 /// </summary>
 public sealed class FFmpegAudioDecoderFactory : IAudioDecoderFactory
 {
-    public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+    public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
         creator = new Creator(source, stream);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says nothing more than which backend it is.</summary>
@@ -30,17 +30,17 @@ public sealed class FFmpegAudioDecoderFactory : IAudioDecoderFactory
     {
         public string Signature => "ffmpeg:audio";
 
-        public PlaybackOperationResult Create(out IAudioDecoder? component)
+        public OperationResult Create(out IAudioDecoder? component)
         {
             component = null;
 
             if (!FFmpegAudioDecoder.TryCreate(source, stream, out FFmpegAudioDecoder? ffmpegDecoder, out string error))
             {
-                return PlaybackOperationResult.Failure(error);
+                return OperationResult.Failure(error);
             }
 
             component = ffmpegDecoder;
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 }

@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Filter;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -180,7 +180,7 @@ public sealed class AudioFilterChain
         foreach (IAudioFilter filter in running)
         {
             RawAudioBuffer produced = current;
-            PlaybackOperationResult applied;
+            OperationResult applied;
 
             try
             {
@@ -188,7 +188,7 @@ public sealed class AudioFilterChain
             }
             catch (Exception exception)
             {
-                applied = PlaybackOperationResult.Failure(exception);
+                applied = OperationResult.Failure(exception);
             }
 
             if (applied.IsSuccessful)
@@ -218,7 +218,7 @@ public sealed class AudioFilterChain
     {
         try
         {
-            PlaybackOperationResult configured = filter.Configure(stream);
+            OperationResult configured = filter.Configure(stream);
             if (configured.IsSuccessful)
             {
                 return true;

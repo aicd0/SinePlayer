@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Filter;
@@ -299,16 +300,16 @@ public class AudioFilterChainTests
 
         public bool Disposed { get; private set; }
 
-        public PlaybackOperationResult Configure(AudioStreamInfo stream)
+        public OperationResult Configure(AudioStreamInfo stream)
         {
             ConfiguredStream = stream;
 
             return RefuseConfigure
-                ? PlaybackOperationResult.Failure($"{Name} refuses this stream.")
-                : PlaybackOperationResult.Success;
+                ? OperationResult.Failure($"{Name} refuses this stream.")
+                : OperationResult.Success();
         }
 
-        public PlaybackOperationResult Apply(RawAudioBuffer input, out RawAudioBuffer output)
+        public OperationResult Apply(RawAudioBuffer input, out RawAudioBuffer output)
         {
             Interlocked.Increment(ref _appliedBlocks);
             _order?.Add(Name);
@@ -316,7 +317,7 @@ public class AudioFilterChainTests
 
             if (FailApply)
             {
-                return PlaybackOperationResult.Failure($"{Name} cannot transform this block.");
+                return OperationResult.Failure($"{Name} cannot transform this block.");
             }
 
             if (Replace is not null)
@@ -324,7 +325,7 @@ public class AudioFilterChainTests
                 output = Replace(input);
             }
 
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         public void Dispose()

@@ -15,7 +15,7 @@ using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Playback.Surface;
 using SinePlayer.Common.Utils;
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -264,7 +264,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         // Awaited rather than blocked: setup attaches the presentation surface from the playback thread,
         // and the panel can only be touched from this one.
-        PlaybackOperationResult opened = await pipeline.Open(MediaLocator.Parse(path), _renderTarget);
+        OperationResult opened = await pipeline.Open(MediaLocator.Parse(path), _renderTarget);
         if (!opened.IsSuccessful)
         {
             pipeline.StateChanged -= Pipeline_StateChanged;
@@ -376,7 +376,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         // before the seek is posted, because the answer is about what playback was doing when it was asked.
         bool wasPlaying = pipeline.State == MediaEngineState.Playing;
 
-        PlaybackOperationResult seeked = await pipeline.Seek(target);
+        OperationResult seeked = await pipeline.Seek(target);
         if (!seeked.IsSuccessful)
         {
             Report($"The seek was refused. {seeked.Message}");
@@ -602,7 +602,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private async Task ReconcileAndReport(PlaybackPipeline pipeline, string what)
     {
-        PlaybackOperationResult reconciled = await pipeline.Reconcile();
+        OperationResult reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
             Report($"{what} could not be changed. {reconciled.Message}");

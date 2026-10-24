@@ -3,6 +3,7 @@
 
 using System.Runtime.InteropServices;
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -41,7 +42,7 @@ public class WasapiAudioRendererTests
             SampleFormat = AudioSampleFormat.Int16,
         };
 
-        PlaybackOperationResult configured = renderer.Configure(stream);
+        OperationResult configured = renderer.Configure(stream);
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine offers no audio endpoint to test against: {configured.Message}");
@@ -125,7 +126,7 @@ public class WasapiAudioRendererTests
     {
         using WasapiAudioRenderer renderer = new();
 
-        PlaybackOperationResult configured = renderer.Configure(CreateStream());
+        OperationResult configured = renderer.Configure(CreateStream());
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine offers no audio endpoint to test against: {configured.Message}");
@@ -144,7 +145,7 @@ public class WasapiAudioRendererTests
     {
         using WasapiAudioRenderer renderer = new();
 
-        PlaybackOperationResult configured = renderer.Configure(CreateStream());
+        OperationResult configured = renderer.Configure(CreateStream());
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine offers no audio endpoint to test against: {configured.Message}");
@@ -209,7 +210,7 @@ public class WasapiAudioRendererTests
             SampleFormat = AudioSampleFormat.Int24,
         };
 
-        PlaybackOperationResult configured = renderer.Configure(stream);
+        OperationResult configured = renderer.Configure(stream);
 
         using (Assert.EnterMultipleScope())
         {

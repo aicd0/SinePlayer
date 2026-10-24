@@ -1,6 +1,8 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
+
 namespace SinePlayer.Core.Playback.Abstractions.Render;
 
 /// <summary>
@@ -57,5 +59,5 @@ public interface IAudioSubmit : IDisposable
     AudioSubmitYield Current { get; }
 
     /// <summary>The outcome of the whole hand-off. Only meaningful after <see cref="MoveNext"/> returned false.</summary>
-    PlaybackOperationResult Result { get; }
+    OperationResult Result { get; }
 }

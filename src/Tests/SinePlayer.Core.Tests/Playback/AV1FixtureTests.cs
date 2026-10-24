@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
@@ -37,7 +37,7 @@ public class AV1FixtureTests
         TestContext.Progress.WriteLine($"fixture: {path} ({new FileInfo(path).Length} bytes)");
 
         FFmpegSourceProviderFactory sourceFactory = new();
-        PlaybackOperationResult openResult = sourceFactory.TryOpen(MediaLocator.Parse(path), out IMediaSource? source);
+        OperationResult openResult = sourceFactory.TryOpen(MediaLocator.Parse(path), out IMediaSource? source);
         Assert.That(openResult.IsSuccessful, Is.True, openResult.Message);
 
         using IMediaSource mediaSource = source!;
@@ -48,10 +48,10 @@ public class AV1FixtureTests
         Assert.That(stream.Height, Is.EqualTo(VideoFixtureFile.Height));
 
         FFmpegVideoDecoderFactory decoderFactory = new();
-        PlaybackOperationResult decoderResult = decoderFactory.TryCreate(mediaSource, stream, DecoderOptions.Default, out IComponentCreator<IVideoDecoder>? creator);
+        OperationResult decoderResult = decoderFactory.TryCreate(mediaSource, stream, DecoderOptions.Default, out IComponentCreator<IVideoDecoder>? creator);
         Assert.That(decoderResult.IsSuccessful, Is.True, decoderResult.Message);
 
-        PlaybackOperationResult createdResult = creator!.Create(out IVideoDecoder? decoder);
+        OperationResult createdResult = creator!.Create(out IVideoDecoder? decoder);
         Assert.That(createdResult.IsSuccessful, Is.True, createdResult.Message);
 
         using IVideoDecoder videoDecoder = decoder!;
@@ -59,7 +59,7 @@ public class AV1FixtureTests
         TimeSpan lastTimestamp = TimeSpan.Zero;
         while (true)
         {
-            PlaybackOperationResult readResult = mediaSource.TryReadPacket(out MediaPacket? packet);
+            OperationResult readResult = mediaSource.TryReadPacket(out MediaPacket? packet);
             Assert.That(readResult.IsSuccessful, Is.True, readResult.Message);
             if (packet is null)
             {
@@ -73,7 +73,7 @@ public class AV1FixtureTests
                     continue;
                 }
 
-                PlaybackOperationResult decodeResult = videoDecoder.TryDecode(packet, out IReadOnlyList<RawVideoFrame> frames);
+                OperationResult decodeResult = videoDecoder.TryDecode(packet, out IReadOnlyList<RawVideoFrame> frames);
                 Assert.That(decodeResult.IsSuccessful, Is.True, decodeResult.Message);
 
                 foreach (RawVideoFrame frame in frames)
@@ -96,7 +96,7 @@ public class AV1FixtureTests
             }
         }
 
-        PlaybackOperationResult drainResult = videoDecoder.Drain(out IReadOnlyList<RawVideoFrame> tail);
+        OperationResult drainResult = videoDecoder.Drain(out IReadOnlyList<RawVideoFrame> tail);
         Assert.That(drainResult.IsSuccessful, Is.True, drainResult.Message);
         foreach (RawVideoFrame frame in tail)
         {

@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
@@ -21,13 +21,13 @@ namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 /// </summary>
 public sealed class FFmpegVideoDecoderFactory : IVideoDecoderFactory
 {
-    public PlaybackOperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+    public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
         creator = new Creator(source, stream, options);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     /// <summary>
@@ -38,7 +38,7 @@ public sealed class FFmpegVideoDecoderFactory : IVideoDecoderFactory
     {
         public string Signature => options.HardwareDecoding ? "ffmpeg:video:hw" : "ffmpeg:video:sw";
 
-        public PlaybackOperationResult Create(out IVideoDecoder? component)
+        public OperationResult Create(out IVideoDecoder? component)
         {
             component = null;
 
@@ -47,11 +47,11 @@ public sealed class FFmpegVideoDecoderFactory : IVideoDecoderFactory
             bool gpuFrames = options.GpuDevice is not null;
             if (!FFmpegVideoDecoder.TryCreate(source, stream, options.HardwareDecoding, gpuFrames, options.GpuDevice, options.BufferedFrames, out FFmpegVideoDecoder? ffmpegDecoder, out string error))
             {
-                return PlaybackOperationResult.Failure(error);
+                return OperationResult.Failure(error);
             }
 
             component = ffmpegDecoder;
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 }

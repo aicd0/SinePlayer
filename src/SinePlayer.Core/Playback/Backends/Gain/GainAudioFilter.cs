@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Filter;
@@ -51,45 +52,45 @@ public sealed class GainAudioFilter : IAudioFilter
         Interlocked.Exchange(ref _gain, BitConverter.DoubleToInt64Bits(gain));
     }
 
-    public PlaybackOperationResult Configure(AudioStreamInfo stream)
+    public OperationResult Configure(AudioStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
         return Volatile.Read(ref _disposed)
-            ? PlaybackOperationResult.Failure("The filter has already been disposed.")
-            : PlaybackOperationResult.Success;
+            ? OperationResult.Failure("The filter has already been disposed.")
+            : OperationResult.Success();
     }
 
-    public PlaybackOperationResult Apply(RawAudioBuffer input, out RawAudioBuffer output)
+    public OperationResult Apply(RawAudioBuffer input, out RawAudioBuffer output)
     {
         ArgumentNullException.ThrowIfNull(input);
         output = input;
 
         if (Volatile.Read(ref _disposed))
         {
-            return PlaybackOperationResult.Failure("The filter has already been disposed.");
+            return OperationResult.Failure("The filter has already been disposed.");
         }
 
         double gain = BitConverter.Int64BitsToDouble(Interlocked.Read(ref _gain));
         if (gain == 1.0)
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         if (input.Buffer is not IPlanarAudioBuffer planar)
         {
-            return PlaybackOperationResult.Failure("The audio buffer does not expose its planes.");
+            return OperationResult.Failure("The audio buffer does not expose its planes.");
         }
 
         if (!TryGetBytesPerSample(input.SampleFormat, out int bytesPerSample))
         {
-            return PlaybackOperationResult.Failure($"The sample format '{input.SampleFormat}' has no sample size.");
+            return OperationResult.Failure($"The sample format '{input.SampleFormat}' has no sample size.");
         }
 
         int planeCount = planar.PlaneCount;
         if (planeCount <= 0)
         {
-            return PlaybackOperationResult.Failure("The audio buffer holds no planes.");
+            return OperationResult.Failure("The audio buffer holds no planes.");
         }
 
         // Checked before anything is written: a filter that cannot finish leaves the block as it found it.
@@ -97,7 +98,7 @@ public sealed class GainAudioFilter : IAudioFilter
         {
             if (planar.GetPlaneByteCount(plane) > 0 && planar.GetPlanePointer(plane) == 0)
             {
-                return PlaybackOperationResult.Failure($"Plane {plane} of the audio buffer has no memory.");
+                return OperationResult.Failure($"Plane {plane} of the audio buffer has no memory.");
             }
         }
 
@@ -112,7 +113,7 @@ public sealed class GainAudioFilter : IAudioFilter
             Scale(planar.GetPlanePointer(plane), byteCount / bytesPerSample, input.SampleFormat, gain);
         }
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     public void Dispose()

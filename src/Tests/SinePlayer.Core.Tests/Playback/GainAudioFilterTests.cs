@@ -3,6 +3,7 @@
 
 using System.Runtime.InteropServices;
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Backends.Gain;
@@ -35,7 +36,7 @@ public class GainAudioFilterTests
         using (TestPlanarBuffer planar = new([Write(format, samples), Write(format, other)]))
         using (RawAudioBuffer buffer = CreateBuffer(format, planar, samples.Length, channelCount: 2))
         {
-            PlaybackOperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
+            OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
 
             using (Assert.EnterMultipleScope())
             {
@@ -60,7 +61,7 @@ public class GainAudioFilterTests
         using (TestPlanarBuffer planar = new([Write(format, interleaved)]))
         using (RawAudioBuffer buffer = CreateBuffer(format, planar, samples.Length, channelCount: 2))
         {
-            PlaybackOperationResult result = filter.Apply(buffer, out _);
+            OperationResult result = filter.Apply(buffer, out _);
 
             using (Assert.EnterMultipleScope())
             {
@@ -118,7 +119,7 @@ public class GainAudioFilterTests
         using TestPlanarBuffer planar = new([original]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Int16, planar, samples.Length, channelCount: 1);
 
-        PlaybackOperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
+        OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
 
         using (Assert.EnterMultipleScope())
         {
@@ -145,7 +146,7 @@ public class GainAudioFilterTests
             Buffer = new OpaqueBuffer(16),
         };
 
-        PlaybackOperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
+        OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
 
         using (Assert.EnterMultipleScope())
         {

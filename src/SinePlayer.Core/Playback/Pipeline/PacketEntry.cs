@@ -5,4 +5,7 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal readonly record struct PacketEntry(MediaPacket? Packet, long Epoch);
+internal readonly record struct PacketEntry(
+    MediaPacket? Packet,
+    PipelineVersion Versions,
+    long Epoch);

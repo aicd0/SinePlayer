@@ -1,7 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
@@ -23,24 +23,24 @@ public sealed class NullAudioDecoderFactory : IAudioDecoderFactory
         _signature = signature;
     }
 
-    public PlaybackOperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+    public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
         creator = new Creator(stream, _signature);
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     private sealed class Creator(AudioStreamInfo stream, string signature) : IComponentCreator<IAudioDecoder>
     {
         public string Signature => signature;
 
-        public PlaybackOperationResult Create(out IAudioDecoder? component)
+        public OperationResult Create(out IAudioDecoder? component)
         {
             component = new NullAudioDecoder(stream);
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
     }
 }

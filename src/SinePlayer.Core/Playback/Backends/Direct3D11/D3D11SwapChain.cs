@@ -3,7 +3,7 @@
 
 using System.Runtime.InteropServices;
 
-using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Render;
 
 using Windows.Win32;
@@ -125,13 +125,13 @@ internal sealed class D3D11SwapChain : IDisposable
     }
 
     /// <summary>Hands the swap chain to the host, which binds it to its own presentation element.</summary>
-    internal PlaybackOperationResult AttachTo(IVideoRenderTarget target)
+    internal OperationResult AttachTo(IVideoRenderTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);
 
         if (_disposed || _swapChain is null)
         {
-            return PlaybackOperationResult.Failure("The swap chain has already been disposed.");
+            return OperationResult.Failure("The swap chain has already been disposed.");
         }
 
         nint handle = Marshal.GetIUnknownForObject(_swapChain);
@@ -141,7 +141,7 @@ internal sealed class D3D11SwapChain : IDisposable
         }
         catch (Exception exception)
         {
-            return PlaybackOperationResult.Failure($"Unable to attach the presentation surface: {exception.Message}");
+            return OperationResult.Failure($"Unable to attach the presentation surface: {exception.Message}");
         }
         finally
         {
@@ -149,7 +149,7 @@ internal sealed class D3D11SwapChain : IDisposable
             Marshal.Release(handle);
         }
 
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     /// <summary>Reads the current back buffer into system memory, for capture and verification.</summary>
@@ -162,11 +162,11 @@ internal sealed class D3D11SwapChain : IDisposable
     /// Sizes the buffers and re-applies the composition scale transform, which <c>ResizeBuffers</c>
     /// throws away.
     /// </summary>
-    internal PlaybackOperationResult Resize(int width, int height, double compositionScale)
+    internal OperationResult Resize(int width, int height, double compositionScale)
     {
         if (_disposed)
         {
-            return PlaybackOperationResult.Failure("The swap chain has already been disposed.");
+            return OperationResult.Failure("The swap chain has already been disposed.");
         }
 
         width = Math.Max(1, width);
@@ -175,7 +175,7 @@ internal sealed class D3D11SwapChain : IDisposable
 
         if (width == Width && height == Height && compositionScale == CompositionScale)
         {
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
 
         try
@@ -188,7 +188,7 @@ internal sealed class D3D11SwapChain : IDisposable
 
             if (!TrySetCompositionScale(_swapChain, compositionScale, out string error))
             {
-                return PlaybackOperationResult.Failure(error);
+                return OperationResult.Failure(error);
             }
 
             _backBuffer = GetBackBuffer(_swapChain);
@@ -196,11 +196,11 @@ internal sealed class D3D11SwapChain : IDisposable
             Width = width;
             Height = height;
             CompositionScale = compositionScale;
-            return PlaybackOperationResult.Success;
+            return OperationResult.Success();
         }
         catch (Exception exception)
         {
-            return PlaybackOperationResult.Failure($"Unable to resize the swap chain: {exception.Message}");
+            return OperationResult.Failure($"Unable to resize the swap chain: {exception.Message}");
         }
     }
 
@@ -293,23 +293,23 @@ internal sealed class D3D11SwapChain : IDisposable
     /// exists to make visible.
     /// </para>
     /// </summary>
-    internal PlaybackOperationResult Present()
+    internal OperationResult Present()
     {
         if (_disposed || _swapChain is null)
         {
-            return PlaybackOperationResult.Failure("The swap chain has already been disposed.");
+            return OperationResult.Failure("The swap chain has already been disposed.");
         }
 
         HRESULT result = _swapChain.Present(0, default);
         if (result.Value < 0)
         {
-            return PlaybackOperationResult.Failure($"Unable to present a frame: {result}");
+            return OperationResult.Failure($"Unable to present a frame: {result}");
         }
 
         // The count of hand-overs is the pipeline's (it is the same number and it survives a renderer swap);
         // what is kept here is only what the system said about them.
         SampleDisplayedFrameCount();
-        return PlaybackOperationResult.Success;
+        return OperationResult.Success();
     }
 
     /// <summary>
