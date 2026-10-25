@@ -22,6 +22,7 @@ using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.HotKey;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Playback.Core;
+using SinePlayer.Common.Plugins;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
@@ -1191,6 +1192,8 @@ internal sealed partial class PlayerPage : BasePage
 
     private void SyncCurrentMedia()
     {
+        MediaModel? media = ViewModel.Media;
+
         GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaChanged).Emit(new()
         {
             Media = ViewModel.Media,
@@ -1198,6 +1201,14 @@ internal sealed partial class PlayerPage : BasePage
             ImageDescriptions = [],
             PlaybackInfo = _engine?.PlaybackInfo,
         });
+
+        if (media is not null)
+        {
+            foreach (PluginContext plugin in PluginManager.Instance.GetActivePlugins())
+            {
+                plugin.SetForegroundMedia(GetMainWindowAbility().PluginWindowContext, media);
+            }
+        }
     }
 
     private void ToggleFullscreen()

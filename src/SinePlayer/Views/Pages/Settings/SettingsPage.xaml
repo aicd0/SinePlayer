@@ -127,7 +127,8 @@
                         Detail="{x:Bind StringResource.PluginSettingsDescription}"
                         Glyph="&#xE74C;"
                         Header="{x:Bind StringResource.Plugins}"
-                        IsExpanded="False">
+                        IsExpanded="False"
+                        Visibility="{x:Bind ViewModel.Shared.DeveloperMode, Mode=OneWay}">
                         <settings:SettingExpander.InnerContent>
                             <settings:PluginSettingsView x:Name="PluginSettingsSection" />
                         </settings:SettingExpander.InnerContent>
