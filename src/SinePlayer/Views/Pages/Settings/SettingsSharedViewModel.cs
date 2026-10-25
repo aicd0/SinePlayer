@@ -25,6 +25,17 @@ internal partial class SettingsSharedViewModel : INotifyPropertyChanged
         }
     }
 
+    private bool _developerMode;
+    public bool DeveloperMode
+    {
+        get => _developerMode;
+        set
+        {
+            _developerMode = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DeveloperMode)));
+        }
+    }
+
     public int WindowId { get; set; }
     public ActionHandler ActionHandler { get; set; } = ActionHandler.Dummy;
 

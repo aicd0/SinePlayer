@@ -55,17 +55,6 @@ internal partial class AdvancedSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _developerMode;
-    public bool DeveloperMode
-    {
-        get => _developerMode;
-        set
-        {
-            _developerMode = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DeveloperMode)));
-        }
-    }
-
     private bool _sendUsageData;
     public bool SendUsageData
     {
@@ -111,7 +100,6 @@ internal partial class AdvancedSettingsViewModel : INotifyPropertyChanged
 
     private void UpdateBasicSettings()
     {
-        DeveloperMode = DebugUtils.DeveloperMode;
         SendUsageData = AppSettingsModel.SendUsageData;
     }
 

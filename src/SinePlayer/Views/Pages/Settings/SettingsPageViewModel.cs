@@ -200,6 +200,7 @@ internal partial class SettingsPageViewModel : INotifyPropertyChanged
     private void UpdateSharedSettings()
     {
         Shared.DebugMode = DebugUtils.DebugMode;
+        Shared.DeveloperMode = DebugUtils.DeveloperMode;
     }
 
     //

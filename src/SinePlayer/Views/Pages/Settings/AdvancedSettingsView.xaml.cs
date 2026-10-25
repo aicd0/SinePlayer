@@ -66,12 +66,12 @@ internal sealed partial class AdvancedSettingsView : BaseUserControl
     private void DeveloperModeToggleSwitch_Toggled(object sender, RoutedEventArgs e)
     {
         bool developerMode = ((ToggleSwitch)sender).IsOn;
-        if (ViewModel.DeveloperMode == developerMode)
+        if (ViewModel.Shared.DeveloperMode == developerMode)
         {
             return;
         }
 
-        ViewModel.DeveloperMode = developerMode;
+        ViewModel.Shared.DeveloperMode = developerMode;
         DebugUtils.DeveloperMode = developerMode;
     }
 
