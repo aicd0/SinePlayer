@@ -229,6 +229,48 @@ public class D3D11VideoRendererTests
         Assert.That(target.ReadPixels(_device)[0], Is.EqualTo(0x40), "the same picture is drawn the other way round");
     }
 
+    /// <summary>
+    /// A surface the picture is taken off has to be emptied, not left with the last frame in it: it belongs to the
+    /// host, and a renderer that is let go of cannot paint over it again. Emptying also forgets the frame a redraw
+    /// would use, or a resize or a pause would put it back.
+    /// </summary>
+    [Test]
+    public void EmptiesTheSurfaceAndForgetsTheFrameItWasShowing()
+    {
+        const int width = 4;
+        const int height = 4;
+        const byte red = 0x80;
+
+        using FrameBuffer buffer = new(width, height, (_, _) => ((byte)0x20, (byte)0x40, red, (byte)0xFF));
+        using RawVideoFrame frame = CreateFrame(width, height, buffer);
+        using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
+
+        _renderer.SetOutput(target.View, width, height);
+        Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+        Assert.That(target.ReadPixels(_device)[2], Is.EqualTo(red), "the picture is on the surface");
+
+        OperationResult cleared = _renderer.ClearSurface();
+        Assert.That(cleared.IsSuccessful, Is.True, cleared.Message);
+        Assert.That(BlackChannels(target), Has.All.Zero, "the surface is empty");
+
+        // The frame the redraw would draw is gone with it: a refresh after the clear has nothing to show.
+        OperationResult refreshed = _renderer.RefreshSurface(VideoTransform.Identity);
+        Assert.That(refreshed.IsSuccessful, Is.True, refreshed.Message);
+        Assert.That(BlackChannels(target), Has.All.Zero, "what was cleared does not come back on a redraw");
+    }
+
+    /// <summary>The colour of every pixel, with the alpha the clear writes left out of the question.</summary>
+    private IEnumerable<byte> BlackChannels(D3D11RenderTarget target)
+    {
+        byte[] pixels = target.ReadPixels(_device);
+        for (int index = 0; index < pixels.Length; index += 4)
+        {
+            yield return pixels[index];
+            yield return pixels[index + 1];
+            yield return pixels[index + 2];
+        }
+    }
+
     [Test]
     public void ConfiguresSwapChainAndAttachesItToTheTarget()
     {

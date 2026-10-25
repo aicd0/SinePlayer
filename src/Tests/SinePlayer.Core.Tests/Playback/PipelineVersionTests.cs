@@ -12,7 +12,8 @@ namespace SinePlayer.Core.Tests.Playback;
 [TestFixture]
 public class PipelineVersionTests
 {
-    private static PipelineVersion Source(long source) => default(PipelineVersion).WithSource(source);
+    /// <summary>A version in which only the source has a number: the stamp a packet carries when it leaves the reader.</summary>
+    private static PipelineVersion Source(long source) => new(source, 0, 0, 0, 0);
 
     private static PipelineVersion Video(long source, long decoder, long renderer) => new(source, 0, 0, decoder, renderer);
 
@@ -21,17 +22,29 @@ public class PipelineVersionTests
     [Test]
     public void PublishesAPairUnderOneNumberAboveTheHighestInUse()
     {
-        var published = new PipelineVersion(1, 3, 3, 2, 2);
+        // What is in use, and the number a publication takes: one above everything, so no two generations can share one.
+        var inUse = new PipelineVersion(1, 3, 3, 2, 2);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(published.Highest, Is.EqualTo(3));
-            Assert.That(published.Next, Is.EqualTo(4));
-            Assert.That(published.WithVideo(published.Next).VideoDecoder, Is.EqualTo(4));
-            Assert.That(published.WithVideo(published.Next).VideoRenderer, Is.EqualTo(4), "a decoder and the renderer that draws its frames are one generation");
-            Assert.That(published.WithAudio(published.Next).AudioDecoder, Is.EqualTo(4));
-            Assert.That(published.WithAudio(published.Next).AudioRenderer, Is.EqualTo(4));
+            Assert.That(inUse.Highest, Is.EqualTo(3));
+            Assert.That(inUse.Next, Is.EqualTo(4));
         }
+
+        // What the pipeline publishes for a switch of the picture: one number read into both of that kind's roles, and
+        // every role it does not touch left as it was. (BuildChains writes this as an initializer over one
+        // nextVersion, so the pair sharing it is structural; what is asserted here is the arithmetic it must produce.)
+        var published = new PipelineVersion(inUse.Source, inUse.AudioDecoder, inUse.AudioRenderer, inUse.Next, inUse.Next);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(published.VideoDecoder, Is.EqualTo(4));
+            Assert.That(published.VideoRenderer, Is.EqualTo(4), "a decoder and the renderer that draws its frames are one generation");
+            Assert.That(published.AudioDecoder, Is.EqualTo(3), "the sound is not part of this publication");
+            Assert.That(published.AudioRenderer, Is.EqualTo(3));
+        }
+
+        Assert.That(published.Next, Is.EqualTo(5), "the next publication takes a number above the one this pair took");
     }
 
     [Test]

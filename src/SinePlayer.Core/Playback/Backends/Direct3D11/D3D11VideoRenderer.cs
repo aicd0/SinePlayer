@@ -286,10 +286,40 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
         }
     }
 
-    /// <summary>
-    /// How many frames the display took, when the swap chain can say. The offscreen output a test uses has no
-    /// swap chain at all, so there it says nothing — which is the truth about an offscreen target.
-    /// </summary>
+    public OperationResult ClearSurface()
+    {
+        if (_disposed)
+        {
+            return OperationResult.Failure("The renderer has already been disposed.");
+        }
+
+        lock (_deviceLock)
+        {
+            if (_swapChain is not null && _needsResize)
+            {
+                OperationResult resize = ApplyPendingResize();
+                if (!resize.IsSuccessful)
+                {
+                    return resize;
+                }
+            }
+
+            _lastPixelShader = null;
+            _lastViews = [];
+            _lastSlot = 0;
+
+            if (_outputView is null)
+            {
+                return OperationResult.Success();
+            }
+
+            _device.Context.OMSetRenderTargets(1, [_outputView], null);
+            _device.Context.ClearRenderTargetView(_outputView, [0.0f, 0.0f, 0.0f, 1.0f]);
+
+            return _swapChain is null ? OperationResult.Success() : _swapChain.Present();
+        }
+    }
+
     public bool TryGetDisplayedFrameCount(out long count)
     {
         count = 0;

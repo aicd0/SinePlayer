@@ -86,7 +86,6 @@ src/SinePlayer.Core/Playback/
 │  ├─ Filter/    IMediaFilter, IVideoFilter, IAudioFilter
 │  ├─ Render/    IVideoRenderTarget, IVideoRenderer, IAudioRenderer, ISubtitleRenderer
 │  ├─ Timing/    IPlaybackClock, ISynchronizer, FrameSyncAction
-│  ├─ Tracks/    ITrackController
 │  └─ Registry/  IComponentRegistry, IComponentFactory, IComponentCreator,
 │                ISourceProviderFactory, IVideoDecoderFactory, IAudioDecoderFactory,
 │                ISubtitleDecoderFactory, PlaybackPreferences
@@ -296,7 +295,6 @@ implementations, nothing wired into the app:
 | `Abstractions/Filter/` | `IMediaFilter`, `IVideoFilter`, `IAudioFilter` |
 | `Abstractions/Render/` | `IVideoRenderTarget`, `IVideoRenderer`, `IAudioRenderer`, `ISubtitleRenderer` |
 | `Abstractions/Timing/` | `IPlaybackClock`, `ISynchronizer`, `FrameSyncAction` |
-| `Abstractions/Tracks/` | `ITrackController` |
 
 Refinements made while writing the contracts, and why:
 
@@ -318,7 +316,10 @@ Refinements made while writing the contracts, and why:
    is chosen. `DecoderOptions` is the only capability hint here, and it expresses a preference rather
    than performing a lookup.
 6. **Track selection is a stage, not a façade detail** (`ITrackController`), so it can be exercised
-   without a live pipeline.
+   without a live pipeline. *Amended in v2:* the contract was removed. It promised decoupling it could not
+   deliver — a switch reads the live source, the media info and the clock, so there is nothing to exercise
+   without a pipeline — and with one sealed implementer and no consumer written against it, the interface only
+   added a second name for `MediaInfo`. `SelectStream` is a member of the pipeline, as `Seek` is.
 7. **Subtitle contracts are empty slots.** `ISubtitleDecoder`/`ISubtitleRenderer` exist, carry no
    implementation, and the pipeline is expected to tolerate their absence — which is what keeps the
    deferred subtitle work additive.
@@ -776,7 +777,11 @@ Decisions worth reviewing:
    real bitmap and a real wave file end to end through the real FFmpeg source and decoders.
 3. **Audio that will not open is a warning, not a failure.** A file whose audio the device rejects
    still plays, with the reason kept in `Warning` rather than `Error` so the state machine stays
-   usable. Failing the whole open, or silently dropping the audio, would both have been worse.
+   usable. Failing the whole open, or silently dropping the audio, would both have been worse. *Amended in v2:* the
+   pipeline no longer decides this. Choosing a track and building its chain is one command, and a chain that cannot be
+   built fails it — the pipeline cannot know whether the host would rather have the picture alone. `CoreEngine` asks
+   for each kind in turn and plays what works, which is the same outcome with the decision where it belongs; what was
+   removed is the half-published selection the warning left behind.
 4. **The host supplies the presentation surface**, because only the host knows what element the video
    is shown in; `Open` takes an `IVideoRenderTarget` and refuses a video file without one.
 5. **The clock starts before the worker, and `Ended` waits for the device.** The first frame is then
@@ -1289,9 +1294,13 @@ came out of it — four of them fixed here, and the doc now states the rules (§
    it, a stage anchors it, and the host reads its position. Deleted, and the wall-clock fallback
    (`StopwatchClock`) was made safe for that, which is what the device clock already was: it locks, and it says
    so. The field comment now carries the contract instead of a lock that only looked like one.
-6. **`_audioMinimumSamples` / `_audioWakeSamples` looked like live shared state** but are set before the reader
-   starts and never written again — now said out loud, together with the audio decoder they pace (which a seek
-   flushes under the media lock).
+6. **`_audioMinimumSamples` / `_audioWakeSamples` looked like live shared state** but were set before the reader
+   started and never written again — now said out loud, together with the audio decoder they pace (which a seek
+   flushes under the media lock). *Amended in v2:* they are written again, because a track can be switched and the
+   read-ahead is measured in the playing stream's own samples. The write is the queue thread's, inside the one place a
+   selection becomes the one in effect, and it happens before the wake that follows any publication — so a reader sees
+   the new number from the next wake and, at worst, acts on the previous one for a single turn if its own backstop
+   woke it first.
 7. **The invariant that justifies seventeen unlocked fields was written nowhere**: *open state is written on
    the queue only while the media threads are stopped — before they start or after they are joined*. The
    declarations are grouped by owner now (fixed / queue-owned / open state / stage-shared / device watch /
@@ -2165,7 +2174,12 @@ and ARM64 clean; the new test passes in ~0.4 s and was run repeatedly.
 teardown that looks tidy and costs three things), Appendix A item 26 (do-nothing is the default), and the two
 test comments that now name the play-versus-failure race.
 
-**S9z — A seek pauses, the host resumes; and the clock is told only what changed.** *Done, from a report: "1.
+**S9z — A seek pauses, the host resumes; and the clock is told only what changed.** *Amended in v2: the pause
+was removed. A seek now leaves the state as it found it — a file that was playing goes on playing from the new
+position, and a paused one stays paused — so there is nothing for a host to resume, and a pause the user pressed
+while the seek was in flight is not overruled. `SeeksWhilePlayingAndLeavesItPaused` is now
+`SeeksWhilePlayingAndGoesOnPlaying`, and the rejected shape is "pause and then resume", which is what the
+§11 entry in [PlaybackPipeline.md](./PlaybackPipeline.md) argues against.* *Done, from a report: "1.
 I've changed the seek behavior: after a seek, the playback state will always be Paused. The host needs to call
 Play if it wants to resume the playback; 2. StartOrStopClock has no internal dedup, same method can be called
 multiple times in a row."*
@@ -3751,7 +3765,7 @@ the only way to change what is playing.*
 | **S14d-16** (awaiting review) | The sound stops moving the file too. `DiscardInFlightAndReseek` is gone: with the picture on its own chain, the two remaining callers were both audio, and neither had a reason to raise the epoch. The reader installs a new audio decoder at the top of its loop instead of inside the epoch branch — what is still to come is the same bitstream and what was decoded is sound any device can take, so neither was ever paired with the decoder that made it. A new audio device re-states one thing only: where its clock stands relative to the pipeline's (`deviceClock.Position - _clock.Position`), because it has played nothing yet. The epoch is now advanced by exactly two things — a seek and a stop — which is what it always meant; a change to any component is a change of chain, not a change of position. |
 | **S14d-17** (awaiting review) | An entry says what it is for, not just what it holds. `MediaItem<T>` becomes three types — `PacketItem`, `AudioItem` and `FrameItem` — and `MediaQueue<TItem>` takes the item type, so each queue carries exactly the tags its stage has to compare: a packet and a block of sound were made for a position (`SourceEpoch`), and a picture was also made by a particular decoder (`DecoderEpoch`). The token that used to do that job, `_videoChain`, is gone, and so is the drop it needed: nothing is purged, and a renderer that has just taken over walks past the pictures made for the device it replaced instead of the queue being emptied under it. `DecoderEpoch` advances only when a decoder and the renderer it decodes for are replaced together, because that is the only change that makes what is already decoded unusable — a decoder replaced on its own keeps its generation, so the frames already queued keep being drawn while the new decoder waits for a picture it can start from, which is a better picture than the stall it used to cost. `Clear()` is still there and still used by a seek: with the tags in place a seek would only pay for draining stale entries, so it is a latency choice rather than a correctness one. *(The bespoke queue itself is superseded by S14d-18.)* |
 | **S14d-18** (awaiting review) | The queues are the framework's. `MediaItem` and `MediaQueue` are deleted: an entry is a `readonly record struct` declared where it is used (`PacketEntry`, `AudioEntry`, `FrameEntry` — the last carrying the decoder generation as well as the position), and the queue is `ConcurrentQueue<T>`. Two facts make a lock-free queue sufficient where a bespoke one was needed: each queue has exactly one consumer and nothing else removes an entry, so a look is what a take returns and a picture can be judged before it is owned; and a stale entry is skipped by the consumer rather than purged, so a seek and a decoder swap no longer empty anything. What the queue used to supply and no longer has: `Clear` (a seek only advances the position — the tags make the queued entries recognisable as old), close-plus-dispose (a stop joins the threads and then drains what nobody took), and a weight (the sound queue keeps a sample count alongside, which is what the reader paces itself by). `MediaQueueTests` goes with the class: what it pinned — order, the end-of-stream entry, release on close — is now the framework's behaviour or the pipeline's, and the pipeline tests cover it. |
-| **S14d-19** (awaiting review) | A swap is one step, and a generation lives on the component that has it. `ComponentSlot<T>` gains a `Version`, and what used to be a pipeline field (`_decoderEpoch`) becomes two properties of the slots: a decoder and the renderer it was built for carry the same version, a decoder replaced on its own keeps the version the drawing renderer has, and a picture records the version of the decoder that made it (`FrameEntry.ComponentVersion`) so a renderer can skip the ones that are not its own. Nothing is compared against a counter in the pipeline any more — the question "is this frame mine?" is answered by the two components that were handed over together. Around that, `_componentLock`: `BuildChains` decides and publishes under it, and each of the four threads takes its half under it, so a reconcile can never read what is waiting while a swap is moving it, and a swap can never land between a reconcile's question and its answer. What the lock does not cover is releasing a replaced component — a codec that is closing or a device that is being flushed is disposed after the lock is let go, so a slow release cannot hold up a reconcile. |
+| **S14d-19** (awaiting review) | A swap is one step, and a generation lives on the component that has it. `ComponentSlot<T>` gains a `Version`, and what used to be a pipeline field (`_decoderEpoch`) becomes two properties of the slots: a decoder and the renderer it was built for carry the same version, a decoder replaced on its own keeps the version the drawing renderer has, and a picture records the version of the decoder that made it (`FrameEntry.ComponentVersion`) so a renderer can skip the ones that are not its own. Nothing is compared against a counter in the pipeline any more — the question "is this frame mine?" is answered by the two components that were handed over together. Around that, `_componentLock`: `BuildChains` decides and publishes under it, and each of the four threads takes its half under it, so a reconcile can never read what is waiting while a swap is moving it, and a swap can never land between a reconcile's question and its answer. What the lock does not cover is releasing a replaced component — a codec that is closing or a device that is being flushed is disposed after the lock is let go, so a slow release cannot hold up a reconcile. *Amended in v2:* the four threads stopped taking the lock when adoption moved into `ComponentSlot` (`Publish`/`Update`), which left the publisher and the stop as its only entrants — both commands on the playback queue. The lock was then removed: it excluded the queue thread from itself, and its stated job (keeping a half-published generation away from the threads) was never something it could do for threads that do not enter it. |
 
 *Verified for S14d-1.* Eleven tests. `RefusesTwoComponentsWithTheSameName` pins identity; `ReplacesAComponentInPlace`
 

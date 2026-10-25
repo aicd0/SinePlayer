@@ -1,6 +1,8 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Diagnostics;
+
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
@@ -38,6 +40,23 @@ internal sealed class SyntheticMediaScript
     /// </summary>
     internal bool ReportsTheEndOfTheFile { get; init; } = true;
 
+    /// <summary>
+    /// How long the picture's stream declares itself to be, when it is shorter than the file it is in. Unset means
+    /// the file's own length, which is the ordinary case of two streams of the same size.
+    /// </summary>
+    internal TimeSpan? VideoDuration { get; init; }
+
+    /// <summary>How long the sound's stream declares itself to be. Unset means the file's own length.</summary>
+    internal TimeSpan? AudioDuration { get; init; }
+
+    /// <summary>
+    /// Whether a seek lands on the keyframe at or before the request rather than on the first packet at or after it,
+    /// which is what a demuxer does — and it lands by the picture's keyframes, since they are the only ones a
+    /// container has. So a picture that ends before the request leaves the landing at its last keyframe, however far
+    /// behind that is.
+    /// </summary>
+    internal bool LandsOnTheKeyframeBefore { get; init; }
+
     internal int FrameRate { get; init; } = 30;
 
     internal int SampleRate { get; init; } = 44100;
@@ -62,6 +81,9 @@ internal sealed class SyntheticSourceProviderFactory : ISourceProviderFactory
         return OperationResult.Success();
     }
 
+    /// <summary>The source this factory handed out, for a test that wants to see what the pipeline asked of it.</summary>
+    internal SyntheticMediaSource? Source => _opened;
+
     /// <summary>
     /// Lets a source that is waiting for a live stream stop waiting. The reader's wait inside the file is the one
     /// wait the pipeline does not own — it ends when the file does — so a test that stops a live source before the
@@ -80,6 +102,9 @@ internal sealed class SyntheticMediaSource : IMediaSource
     private readonly List<ScriptedPacket> _timeline = [];
 
     private int _next;
+    private readonly Stopwatch _since = Stopwatch.StartNew();
+
+    private static readonly TimeSpan LivePollMilliseconds = TimeSpan.FromMilliseconds(5);
 
     internal SyntheticMediaSource(SyntheticMediaScript script)
     {
@@ -93,6 +118,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
             Height = 180,
             FrameRate = script.FrameRate,
             PixelFormat = PixelFormat.Yuv420P,
+            Duration = script.VideoDuration ?? script.Duration,
         };
 
         AudioStreamInfo audio = new()
@@ -103,6 +129,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
             ChannelCount = 2,
             ChannelLayout = ChannelLayout.Stereo,
             SampleFormat = AudioSampleFormat.Int16,
+            Duration = script.AudioDuration ?? script.Duration,
         };
 
         Info = new MediaInfo
@@ -132,14 +159,75 @@ internal sealed class SyntheticMediaSource : IMediaSource
 
     public MediaInfo Info { get; }
 
-    public bool CanSeek => false;
+    /// <summary>
+    /// Readable again from the beginning, because a track chosen after the file is open restarts the read: the reader
+    /// re-reads a position whenever the epoch moves, and a source that could not be re-read would lose everything the
+    /// read-ahead had already taken (§2.5). The timeline is fixed, so a position is realised by starting over rather
+    /// than by skipping — no test here seeks anywhere but the beginning.
+    /// </summary>
+    public bool CanSeek => true;
 
-    public OperationResult Seek(TimeSpan position)
+    public OperationResult Seek(TimeSpan position, int streamIndex)
     {
-        // Nothing here is seekable, and no test that uses it seeks: the reader's first look asks for zero, which is
-        // where the timeline already is.
-        _next = 0;
+        LastSeekPosition = position;
+        LastSeekStreamIndex = streamIndex;
+
+        // The timeline is fixed and ordered, so a position is realised by starting at a packet rather than by
+        // decoding and skipping.
+        int next = _script.LandsOnTheKeyframeBefore ? LandOnTheKeyframeBefore(position, streamIndex) : FirstPacketAtOrAfter(position);
+        _next = next < 0 ? _timeline.Count : next;
         return OperationResult.Success();
+    }
+
+    /// <summary>Where the pipeline last asked the cursor to go, and what it asked the landing to be measured by.</summary>
+    internal TimeSpan? LastSeekPosition { get; private set; }
+
+    /// <summary>The stream index the last seek was asked to land by, or -1 when the pipeline left it to this source.</summary>
+    internal int LastSeekStreamIndex { get; private set; } = -1;
+
+    private int FirstPacketAtOrAfter(TimeSpan position)
+    {
+        return _timeline.FindIndex(packet => packet.Timestamp >= position);
+    }
+
+    /// <summary>
+    /// The last packet at or before the position of the stream the landing was asked to be measured by — every
+    /// synthetic packet is a keyframe, so the last one is the keyframe a demuxer would fall back to. A position past
+    /// the end of that stream lands on its last packet, however far behind that is: which stream it is decides
+    /// everything the landing can be wrong by. Without a stream the picture is used, because a container's keyframes
+    /// are the picture's.
+    /// </summary>
+    private int LandOnTheKeyframeBefore(TimeSpan position, int streamIndex)
+    {
+        bool? byVideo = streamIndex switch
+        {
+            0 => true,
+            1 => false,
+            _ => null,
+        };
+
+        int landing = -1;
+        for (int index = 0; index < _timeline.Count; index++)
+        {
+            ScriptedPacket packet = _timeline[index];
+            if (packet.Timestamp > position)
+            {
+                break;
+            }
+
+            // A packet this source withholds is not part of the file it declares: the landing cannot be on one.
+            if (packet.Video && packet.Timestamp >= _script.VideoStopsAt)
+            {
+                continue;
+            }
+
+            if (byVideo is null ? packet.Video : packet.Video == byVideo.Value)
+            {
+                landing = index;
+            }
+        }
+
+        return landing >= 0 ? landing : FirstPacketAtOrAfter(position);
     }
 
     public OperationResult TryReadPacket(out MediaPacket? packet)
@@ -162,6 +250,17 @@ internal sealed class SyntheticMediaSource : IMediaSource
 
                 // A live source has no end to report: it waits for what comes next.
                 _closed.Wait(20);
+                continue;
+            }
+
+            // A live source hands over a packet when its moment comes rather than all at once, which is what makes it
+            // live: the reader can be given media for as long as the test runs, and — because every wait here is short
+            // and returns — a selection published in the meantime is taken up on the next packet rather than being
+            // stuck behind a read that never returns.
+            if (!_script.ReportsTheEndOfTheFile && _timeline[_next].Timestamp > _since.Elapsed)
+            {
+                TimeSpan due = _timeline[_next].Timestamp - _since.Elapsed;
+                _closed.Wait(due < LivePollMilliseconds ? due : LivePollMilliseconds);
                 continue;
             }
 

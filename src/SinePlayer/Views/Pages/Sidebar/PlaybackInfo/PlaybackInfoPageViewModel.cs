@@ -67,7 +67,7 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             Add("media.bitrate", StringResource.BitRate, FormatBitrate(media.Bitrate));
         }
 
-        foreach (VideoStreamInfo video in media.VideoStreams)
+        if (info.SelectedVideoStream is { } video)
         {
             Group("group.video", StringResource.Video);
             Add("video.codec", StringResource.Codec, FormatCodec(video));
@@ -93,7 +93,7 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             Add("video.renderer", StringResource.Renderer, info.VideoRendererName ?? StringResource.None);
         }
 
-        foreach (AudioStreamInfo audio in media.AudioStreams)
+        if (info.SelectedAudioStream is { } audio)
         {
             Group("group.audio", StringResource.Audio);
             Add("audio.codec", StringResource.Codec, FormatCodec(audio));

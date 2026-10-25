@@ -15,6 +15,7 @@ using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -116,6 +117,26 @@ internal sealed partial class CoreEngine : IDisposable
         return err.Success();
     }
 
+    public async Task<ErrorResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)
+    {
+        var err = ErrorLogger.Create(TAG);
+
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            return err.Error("There is nothing open to change a track of.");
+        }
+
+        OperationResult selected = await pipeline.SelectStream(kind, stream);
+        if (!selected.IsSuccessful)
+        {
+            string wanted = stream is null ? "no track" : $"track #{stream.Index}";
+            return err.Error($"The {kind.ToString().ToLowerInvariant()} could not be changed to {wanted}. {selected.Message}");
+        }
+
+        return err.Success();
+    }
+
     public async Task<ErrorResult> SetComponents(PlaybackComponents components)
     {
         var err = ErrorLogger.Create(TAG);
@@ -139,8 +160,6 @@ internal sealed partial class CoreEngine : IDisposable
         OperationResult reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
-            // What is playing keeps playing on what it was already built with; the caller is told why the change
-            // did not happen rather than being left with a box that disagrees with the sound.
             return err.Error($"The components could not be changed. {reconciled.Message}");
         }
 
@@ -213,24 +232,10 @@ internal sealed partial class CoreEngine : IDisposable
         // when the seek is over, which is when a resumed playback has to start.
         CoroutineUtils.Run(async () =>
         {
-            // The pipeline leaves a seek paused: what it reports is a fact about the file, not a wish to keep
-            // playing. "A jump while playing goes on playing" is the page's expectation, and restoring it is
-            // this layer's business — it is the host. Read as the seek is carried out rather than as it was
-            // asked for, so a pause the user pressed while the seek was in flight is not overruled by this.
-            bool wasPlaying = pipeline.State == MediaEngineState.Playing;
-
             OperationResult seeked = await pipeline.Seek(position, mode);
             if (!seeked.IsSuccessful)
             {
                 Logger.W(TAG, $"Seek to {position:g} ({mode}) was refused: {seeked.Message}");
-            }
-            else if (wasPlaying)
-            {
-                // Refused or not, a source that will not be moved only means the position stayed: the sound
-                // and the picture carry on where they were, which is what the user expects of a jump that
-                // could not be made. Awaited, so the position the page re-reads below is the one playback
-                // resumed at.
-                await pipeline.Play();
             }
 
             if (ReferenceEquals(_pipeline, pipeline))

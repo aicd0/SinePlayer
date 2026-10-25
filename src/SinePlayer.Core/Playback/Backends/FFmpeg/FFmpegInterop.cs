@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Playback.Abstractions;
@@ -152,6 +153,53 @@ internal static class FFmpegInterop
         }
 
         return value.Numerator / (double)value.Denominator;
+    }
+
+    /// <summary>
+    /// Reads a length written as <c>HH:MM:SS.nnnnnnnnn</c>, which is how Matroska spells a track's own length in its
+    /// <c>DURATION</c> tag — the field a demuxer leaves empty for that container. Anything else is no answer at all,
+    /// because a length that cannot be read is not a length.
+    /// </summary>
+    internal static TimeSpan? ParseDurationTag(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string[] parts = value.Split(':');
+        if (parts.Length != 3)
+        {
+            return null;
+        }
+
+        if (!int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out int hours)
+            || !int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out int minutes))
+        {
+            return null;
+        }
+
+        string[] seconds = parts[2].Split('.');
+        if (!int.TryParse(seconds[0], NumberStyles.None, CultureInfo.InvariantCulture, out int whole))
+        {
+            return null;
+        }
+
+        // A TimeSpan counts seven digits of a second and the tag writes nine: the rest is below anything this
+        // pipeline can schedule, so it is cut rather than rounded.
+        int fraction = 0;
+        if (seconds.Length > 1)
+        {
+            string digits = seconds[1];
+            digits = digits.Length > 7 ? digits[..7] : digits.PadRight(7, '0');
+            if (!int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out fraction))
+            {
+                return null;
+            }
+        }
+
+        long ticks = ((hours * 3600L + minutes * 60L + whole) * TimeSpan.TicksPerSecond) + fraction;
+        return TimeSpan.FromTicks(ticks);
     }
 
     internal static string? GetMetadata(nint dictionary, string key)

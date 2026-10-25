@@ -805,6 +805,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="OK" xml:space="preserve">
     <value>D'ACCORD</value>
   </data>
+  <data name="Off" xml:space="preserve">
+    <value>Désactivé</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>Ouvrir</value>
   </data>
@@ -1063,6 +1066,12 @@ Démarrer en mode sans échec ?</value>
   </data>
   <data name="SelectAllAppBarButton.Label" xml:space="preserve">
     <value>Tout sélectionner</value>
+  </data>
+  <data name="SelectAudioTrack" xml:space="preserve">
+    <value>Sélectionner la piste audio</value>
+  </data>
+  <data name="SelectVideoTrack" xml:space="preserve">
+    <value>Sélectionner la piste vidéo</value>
   </data>
   <data name="SendFeedback" xml:space="preserve">
     <value>Envoyer des commentaires</value>

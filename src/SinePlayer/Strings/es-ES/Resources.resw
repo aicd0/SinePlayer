@@ -805,6 +805,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="OK" xml:space="preserve">
     <value>DE ACUERDO</value>
   </data>
+  <data name="Off" xml:space="preserve">
+    <value>Desactivado</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>Abrir</value>
   </data>
@@ -1063,6 +1066,12 @@ $plugins</value>
   </data>
   <data name="SelectAllAppBarButton.Label" xml:space="preserve">
     <value>Seleccionar todo</value>
+  </data>
+  <data name="SelectAudioTrack" xml:space="preserve">
+    <value>Seleccionar pista de audio</value>
+  </data>
+  <data name="SelectVideoTrack" xml:space="preserve">
+    <value>Seleccionar pista de vídeo</value>
   </data>
   <data name="SendFeedback" xml:space="preserve">
     <value>Enviar comentarios</value>

@@ -805,6 +805,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="OK" xml:space="preserve">
     <value>わかりました</value>
   </data>
+  <data name="Off" xml:space="preserve">
+    <value>オフ</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>開く</value>
   </data>
@@ -1063,6 +1066,12 @@ $plugins</value>
   </data>
   <data name="SelectAllAppBarButton.Label" xml:space="preserve">
     <value>すべて選択</value>
+  </data>
+  <data name="SelectAudioTrack" xml:space="preserve">
+    <value>オーディオトラックを選択</value>
+  </data>
+  <data name="SelectVideoTrack" xml:space="preserve">
+    <value>ビデオトラックを選択</value>
   </data>
   <data name="SendFeedback" xml:space="preserve">
     <value>フィードバックを送信</value>

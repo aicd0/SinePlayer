@@ -332,7 +332,6 @@ public class PlaybackPipelineTests
             WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(500), "playback has to get past the position the seek goes back to");
 
             SeekAndWait(pipeline, TimeSpan.FromMilliseconds(100));
-            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             // The new position's first decode takes four hundred milliseconds, and nothing may run in the
             // meantime — the old tail is not a fact about this position.
@@ -379,7 +378,6 @@ public class PlaybackPipelineTests
             Assert.That(videoDecoders.WaitUntilDecoding(), Is.True, "the decoder has to be inside a decode");
 
             SeekAndWait(pipeline, TimeSpan.FromMilliseconds(100));
-            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitFor(() => pipeline.StarvedFor == "video", "a position that has produced nothing holds the clock", 300);
             WaitFor(() => !audioRenderer.ClockIsRunning, "the old position's tail is not a fact about this one");
@@ -620,10 +618,10 @@ public class PlaybackPipelineTests
             SeekAndWait(pipeline, TimeSpan.FromSeconds(0.5));
             WaitFor(() => audioRenderer.AbandonedSubmits > 0, "the seek has to reach the hand-off that is waiting for room");
 
-            // And the sound carries on from where the seek went.
+            // And the sound carries on from where the seek went — the seek did not pause, so nothing has to be
+            // resumed first.
             audioRenderer.QueuedSampleCount = 0;
             audioRenderer.NoRoom = false;
-            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPlaybackToFinish(pipeline);
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
         }
@@ -737,9 +735,11 @@ public class PlaybackPipelineTests
                 "the hold is what keeps the clock from running away from a picture that has nothing to show");
 
             // A held clock is a clock that does not move: the sound waits for the picture rather than leaving
-            // it further behind, which is what reporting the verdict is for.
+            // it further behind, which is what reporting the verdict is for. It may still be corrected to the
+            // device by the sync tolerance, which is a step of milliseconds rather than the clock running on.
             Thread.Sleep(300);
-            Assert.That(pipeline.Position, Is.EqualTo(held), "a held clock does not move");
+            Assert.That(pipeline.Position, Is.EqualTo(held).Within(TimeSpan.FromMilliseconds(20)),
+                "a held clock does not move");
         }
         finally
         {
@@ -791,7 +791,7 @@ public class PlaybackPipelineTests
                 "the hold is what keeps the clock from running away from a picture that has nothing to show");
 
             Thread.Sleep(300);
-            Assert.That(pipeline.Position, Is.EqualTo(held), "a held clock does not move");
+            Assert.That(pipeline.Position, Is.EqualTo(held).Within(TimeSpan.FromMilliseconds(20)), "a held clock does not move, beyond the correction it is allowed to make to the device");
         }
         finally
         {
@@ -1033,13 +1033,22 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+
+            // The paused picture is drawn by the presentation thread, so the first one is waited for rather than
+            // assumed: what is asserted here is how it was drawn, not whether the thread has had its turn yet.
+            WaitFor(() => videoRenderer.RenderedFrames > 0, "the paused picture to be drawn once");
             Assert.That(videoRenderer.LastRenderedTransform, Is.EqualTo(VideoTransform.Identity), "nothing is turned until the host says so");
 
             VideoTransform mirrored = VideoTransform.Identity with { Orientation = new VideoOrientation(0, true) };
             pipeline.VideoTransform = mirrored;
+
+            // Frames drawn from here on must carry it: the count is taken so that the picture the paused position
+            // already showed cannot answer for the playing one.
+            long drawn = videoRenderer.RenderedFrames;
             pipeline.Play();
 
             WaitForPresentedFrames(pipeline, 2);
+            WaitFor(() => videoRenderer.RenderedFrames > drawn, "the playing picture to be drawn");
 
             Assert.That(videoRenderer.LastRenderedTransform, Is.EqualTo(mirrored));
         }
@@ -1156,7 +1165,7 @@ public class PlaybackPipelineTests
     }
 
     [Test]
-    public void SeeksWhilePlayingAndLeavesItPaused()
+    public void SeeksWhilePlayingAndGoesOnPlaying()
     {
         string path = CreateWaveFile(SampleRate);
         try
@@ -1171,10 +1180,9 @@ public class PlaybackPipelineTests
             var target = TimeSpan.FromSeconds(0.5);
             SeekAndWait(pipeline, target);
 
-            // The seek is carried out before the pipeline says so, so everything about it can be read here:
-            // playback is paused whatever it was doing before — a seek is a state change of its own, and
-            // whether the new position goes on playing is the host's call.
-            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a seek leaves playback paused, whatever it was");
+            // The seek is carried out before the pipeline says so, so everything about it can be read here: a file
+            // that was playing goes on playing, because a jump is not a pause — pausing is its own command.
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a seek leaves the state as it found it");
 
             // Where the clock is, though, is not the seek's to say: the clock belongs to the render threads,
             // and the one that wakes first places it at the position that was asked for — a moment after the
@@ -1182,9 +1190,6 @@ public class PlaybackPipelineTests
             WaitFor(
                 () => pipeline.Position >= target - TimeSpan.FromMilliseconds(50),
                 $"The clock is at {pipeline.Position:mm\\:ss\\.fff} where the seek asked for {target:mm\\:ss\\.fff}.");
-
-            // And the host's call is one command: play, and the file runs on from there.
-            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitForPlaybackToFinish(pipeline);
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
@@ -1565,9 +1570,8 @@ public class PlaybackPipelineTests
             // Where the clock ends up is where the file resumed rather than where the seek asked to go: this
             // fixture holds a frame every two seconds, so a seek to 20 s resumes at 18 s and the clock follows
             // it once the first frame of the new position arrives. Both are far ahead of the two seconds
-            // playback was at. The seek leaves playback paused, which is its own state change and not a
-            // failure of the same thing.
-            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a seek leaves playback paused, whatever it was");
+            // playback was at. The seek does not change the state — a file that was playing is still playing.
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a seek leaves the state as it found it");
 
             // Where the clock is, though, is not the seek's to say: the clock belongs to the render threads,
             // and the one that wakes first places it at the position that was asked for — a moment after the
@@ -1689,7 +1693,7 @@ public class PlaybackPipelineTests
                 Assert.That(seeked.IsSuccessful, Is.True, seeked.Message);
                 Assert.That(askedAt.ElapsedMilliseconds, Is.LessThan(1000),
                     "a command must not wait for the end of the file to play out");
-                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "the seek is answered at once and leaves playback paused, rather than being the end of a file");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the seek is answered at once and leaves playback playing, rather than being the end of a file");
                 Assert.That(pipeline.Error, Is.Null);
             }
         }
@@ -1725,11 +1729,10 @@ public class PlaybackPipelineTests
             audioRenderer.NoRoom = true;
             Assert.That(Await(pipeline.Seek(TimeSpan.FromSeconds(1.8))).IsSuccessful, Is.True);
             Thread.Sleep(200);
-            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a sound that has not played out is not an ending");
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a sound that has not played out is not an ending");
 
-            // The seek left playback paused — that is what a seek does — so putting it back on the road to
-            // the end is the host's call, and only then can the ending be earned.
-            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            // The seek did not pause, so playback is already on the road to the end: the ending is earned once the
+            // device has played the last of the sound out.
 
             // The device takes audio again, so the last of the sound is played and the ending is earned.
             audioRenderer.QueuedSampleCount = 0;
@@ -1909,7 +1912,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(pipeline.Position, Is.EqualTo(held), "a held clock does not move");
+                Assert.That(pipeline.Position, Is.EqualTo(held).Within(TimeSpan.FromMilliseconds(20)), "a held clock does not move, beyond the correction it is allowed to make to the device");
                 Assert.That(pipeline.StarvedFor, Is.Not.Null, "both stages have nothing, and neither has data ahead of the clock");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "waiting is not a state change");
             }
@@ -1955,6 +1958,39 @@ public class PlaybackPipelineTests
                 Assert.That(played.ElapsedMilliseconds, Is.GreaterThan(1500),
                     "the picture after the sound is played at its own rate, not flushed through at once");
             }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A file whose sound has no chain at all — no decoder offered, so no device either — still ends. The ending
+    /// asks the file whether it has sound, and then waits for the sound's *stage* to say it is over: the stage that
+    /// would have played it exists regardless (the audio render loop runs for every open), and it walks its queue to
+    /// the end marker even with nothing to play through, so "the file has sound" and "something will report the
+    /// sound's end" are the same answer here. A predicate taken from the components instead would have hung: there
+    /// is no audio component to ask.
+    /// </summary>
+    [Test]
+    public void EndsWhenTheSoundHasNoChainToPlayItThrough()
+    {
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 30);
+        try
+        {
+            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            {
+                components.Register(new FFmpegVideoDecoderFactory());
+                components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+
+                // The file has sound, and nothing registered here can decode or play it.
+            });
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitForState(pipeline, MediaEngineState.Ended);
         }
         finally
         {
@@ -2109,9 +2145,7 @@ public class PlaybackPipelineTests
             long presented = pipeline.PresentedFrameCount;
             SeekAndWait(pipeline, target);
 
-            // The seek left playback paused, so the frames that have to follow from where the file resumed
-            // are a decision the host makes: one play, and the picture carries on from there.
-            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            // The seek did not pause, so the picture carries on from where the file resumed by itself.
 
             // The picture has to carry on from where the file resumed, and the frames counted from here are
             // all frames of the new position: if the clock stayed at the position that was asked for, every
@@ -2172,7 +2206,6 @@ public class PlaybackPipelineTests
             WaitForPresentedFrames(pipeline, 2);
 
             SeekAndWait(pipeline, target);
-            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             // The media takes the clock over where the file actually resumes, which is behind the request:
             // that arriving is what says the claim has been made and what must not be placed over again.
@@ -2235,7 +2268,6 @@ public class PlaybackPipelineTests
 
             int marker = videoRenderer.RenderedTimestamps.Count;
 
-            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, pipeline.PresentedFrameCount + 2);
 
             IReadOnlyList<TimeSpan> rendered = videoRenderer.RenderedTimestamps;
@@ -2300,7 +2332,6 @@ public class PlaybackPipelineTests
 
             int marker = audioRenderer.SubmittedTimestamps.Count;
 
-            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => audioRenderer.SubmittedTimestamps.Count > marker + 2, "the sound has to carry on after a precise seek");
 
             using (Assert.EnterMultipleScope())
@@ -2326,7 +2357,7 @@ public class PlaybackPipelineTests
     {
         for (var target = TimeSpan.FromMilliseconds(400); target <= TimeSpan.FromSeconds(2); target += TimeSpan.FromMilliseconds(5))
         {
-            Assert.That(source.Seek(target).IsSuccessful, Is.True);
+            Assert.That(source.Seek(target, -1).IsSuccessful, Is.True);
             Assert.That(source.TryReadPacket(out MediaPacket? packet).IsSuccessful, Is.True);
             Assert.That(packet, Is.Not.Null, "the fixture has to hold something at every position tried");
 
@@ -2352,7 +2383,7 @@ public class PlaybackPipelineTests
         var margin = TimeSpan.FromMilliseconds(300);
         for (var target = TimeSpan.FromMilliseconds(300); target <= TimeSpan.FromSeconds(2.6); target += TimeSpan.FromMilliseconds(20))
         {
-            Assert.That(source.Seek(target).IsSuccessful, Is.True);
+            Assert.That(source.Seek(target, -1).IsSuccessful, Is.True);
             Assert.That(source.TryReadPacket(out MediaPacket? packet).IsSuccessful, Is.True);
             Assert.That(packet, Is.Not.Null, "the fixture has to hold something at every position tried");
 
@@ -2368,8 +2399,13 @@ public class PlaybackPipelineTests
         return TimeSpan.Zero;
     }
 
+    /// <summary>
+    /// A sound nothing can play is the selection's answer to give, not a reason to leave the file unopened: the picture
+    /// is still worth watching, so this host plays it and hands the reason for the silence to whoever asked. Which of
+    /// the two it would rather have is the host's call now that a failed kind is a failed command.
+    /// </summary>
     [Test]
-    public void KeepsPlayingVideoWhenAudioCannotBeOpened()
+    public void PlaysThePictureWhenTheSoundCannotBeOpened()
     {
         string path = RawAudioVideoFixtureFile.Create(frameCount: 12);
         try
@@ -2377,25 +2413,27 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { CanConfigure = false, RefusalReason = "no device here" };
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
-            WarningLog warnings = new(pipeline);
 
             OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
 
             using (Assert.EnterMultipleScope())
             {
-                // A file whose audio will not play is still worth playing: the reason is reported, but
-                // it is a warning rather than a failure.
                 Assert.That(opened.IsSuccessful, Is.True, opened.Message);
-                Assert.That(warnings.Latest, Does.Contain("no device here"));
                 Assert.That(pipeline.State, Is.Not.EqualTo(MediaEngineState.Error));
-
-                // The stream is still part of the file; what is missing is a chain to play it, and one may be built
-                // later. So the sound is reported as present and unplayed, rather than pretended away.
                 Assert.That(pipeline.HasAudio, Is.True, "the file's audio stream does not stop existing because no device would take it");
+                Assert.That(pipeline.SelectedVideoStream, Is.Not.Null, "the picture is what is playing");
+                Assert.That(pipeline.AudioDecoderName, Is.Null, "and the sound has no chain");
             }
 
-            // The end still has to arrive: the sound can never be played out, so the audio thread has to report the
-            // end of the sound itself, or the pipeline waits for a device that is not there and never ends.
+            // The refusal is the answer to the choice, and it names the device.
+            OperationResult audio = Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0]));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(audio.IsSuccessful, Is.False);
+                Assert.That(audio.Message, Does.Contain("no device here"));
+                Assert.That(pipeline.AudioDecoderName, Is.Null, "a refused choice publishes nothing");
+            }
+
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPlaybackToFinish(pipeline);
 
@@ -2420,15 +2458,16 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { CanConfigure = false, RefusalReason = "no device here" };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            OperationResult opened = Open(pipeline, path);
+            // Opening is not choosing: the file opens, and the choice is refused — there is nothing to fall back
+            // on in a file with no video, so what is left is an open file with nothing playing.
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.False);
 
-            // There is nothing to fall back on: a file with no video and no sound is a file with nothing to
-            // play, so the open fails with the reason rather than reporting success over an empty pipeline.
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(opened.IsSuccessful, Is.False);
-                Assert.That(opened.Message, Does.Contain("no device here"));
-                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.None));
+                Assert.That(pipeline.SelectedAudioStream, Is.Null, "a refused track is not the selected one");
+                Assert.That(pipeline.AudioRendererName, Is.Null, "nothing was published for it");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "the file is still open, and nothing is playing");
+                Assert.That(Await(pipeline.Play()).IsSuccessful, Is.False, "there is no track to play");
             }
         }
         finally
@@ -2445,16 +2484,22 @@ public class PlaybackPipelineTests
         {
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
 
-            OperationResult opened = Open(pipeline, path);
+            // The surface is a fact about the host, and it is what a picture is drawn through: the file opens
+            // without one, and choosing a video track is what cannot happen.
+            OperationResult opened = pipeline.Open(MediaLocator.Parse(path)).GetAwaiter().GetResult();
+            OperationResult selected = SelectDefaultStreams(pipeline);
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(opened.IsSuccessful, Is.False);
-                Assert.That(opened.Message, Does.Contain("presentation surface"));
+                Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+                Assert.That(selected.IsSuccessful, Is.False);
+                Assert.That(selected.Message, Does.Contain("presentation surface"));
 
-                // A file that will not open leaves nothing open rather than an error state: the caller that
-                // asked is the one holding the reason.
-                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.None));
+                // A refused choice leaves nothing published rather than an error state: the caller that asked is
+                // the one holding the reason.
+                Assert.That(pipeline.SelectedVideoStream, Is.Null);
+                Assert.That(pipeline.VideoRendererName, Is.Null);
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused));
             }
         }
         finally
@@ -2612,17 +2657,14 @@ public class PlaybackPipelineTests
 
             OperationResult seeked = Await(pipeline.Seek(TimeSpan.FromSeconds(5)));
 
-            MediaEngineState expected = refusesInAdvance ? MediaEngineState.Playing : MediaEngineState.Paused;
             using (Assert.EnterMultipleScope())
             {
                 // A source that refuses in advance is refused without the reader ever being involved.
                 Assert.That(seeked.IsSuccessful, Is.EqualTo(!refusesInAdvance), seeked.Message);
 
-                // A source that will not be moved is not playback failing, either way:
-                Assert.That(pipeline.State, Is.EqualTo(expected),
-                    refusesInAdvance
-                        ? "a command that could not be carried out changes nothing"
-                        : "the move is what paused playback; the source's refusal only means the position did not change");
+                // A source that will not be moved is not playback failing, either way — and a seek changes no state,
+                // so what a refusal leaves behind is a line rather than a paused file:
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a seek leaves the state as it found it");
                 Assert.That(pipeline.Error, Is.Null);
             }
 
@@ -2632,10 +2674,10 @@ public class PlaybackPipelineTests
                 WaitForWarning(warnings, "refused to seek");
             }
 
-            // A moment later the state is the one the case implies, rather than half way through a seek that
-            // never happened — and the second case is the one the host can put back on the road with a play.
+            // A moment later the state is still the one playback was in, rather than half way through a seek that
+            // never happened.
             Thread.Sleep(100);
-            Assert.That(pipeline.State, Is.EqualTo(expected), pipeline.Error);
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), pipeline.Error);
         }
         finally
         {
@@ -2938,7 +2980,7 @@ public class PlaybackPipelineTests
 
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
             Await(pipeline.Play());
-            WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way");
+            WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way", 5000);
 
             long rendered = videoRenderer.RenderedFrames;
             TimeSpan position = pipeline.Position;
@@ -2993,7 +3035,7 @@ public class PlaybackPipelineTests
             WaitFor(() => pipeline.IsVideoHardwareAccelerated, "the decoder that says it runs on hardware");
 
             Await(pipeline.Play());
-            WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way");
+            WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way", 5000);
 
             long rendered = videoRenderer.RenderedFrames;
             pipeline.Components.Clear<IVideoDecoderFactory>();
@@ -3053,7 +3095,7 @@ public class PlaybackPipelineTests
 
             // The choice outlives the file, like the decoder's: the next one is drawn by the same factory.
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
-            Assert.That(pipeline.VideoRendererName, Is.EqualTo("second"), "the next file opens with the chosen renderer");
+            WaitFor(() => pipeline.VideoRendererName == "second", "the next file to be taken up by the chosen renderer");
         }
         finally
         {
@@ -3467,7 +3509,7 @@ public class PlaybackPipelineTests
 
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
             Await(pipeline.Play());
-            WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way");
+            WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way", 5000);
 
             long rendered = videoRenderer.RenderedFrames;
 
@@ -4410,6 +4452,844 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// A track switch is not a pause and not a seek to anywhere else: the pipeline keeps playing from where it is,
+    /// and only the chain of the kind that was switched is rebuilt — the picture is not restarted for a change of
+    /// sound.
+    /// </summary>
+    [Test]
+    public void SelectsTheSecondAudioTrackWithoutLeavingPlayback()
+    {
+        string path = RawAudioVideoFixtureFile.CreateMultiTrack();
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
+
+            AudioStreamInfo second = pipeline.MediaInfo!.AudioStreams[1];
+            TimeSpan position = pipeline.Position;
+            int submitted = audioRenderer.SubmittedBuffers;
+            int flushed = audioRenderer.FlushCount;
+            int frames = videoRenderer.RenderedFrames;
+
+            OperationResult selected = Await(pipeline.SelectStream(MediaStreamKind.Audio, second));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(selected.IsSuccessful, Is.True, selected.Message);
+                Assert.That(pipeline.SelectedAudioStream?.Index, Is.EqualTo(second.Index));
+                Assert.That(audioRenderer.ConfiguredStream?.SampleRate, Is.EqualTo(second.SampleRate), "the device is configured for the stream that was asked for");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "changing a track is not a pause");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position - TrackSwitchSlack), "the switch resumes where playback stands, not at the start of the file");
+            }
+
+            WaitFor(() => audioRenderer.SubmittedBuffers > submitted, "the new track to be handed sound");
+            WaitFor(() => audioRenderer.FlushCount > flushed, "the device to be restarted for the new track");
+
+            // The picture is another chain: it is neither rebuilt nor restarted. Its frames arrive on their own
+            // cadence, so this is waited for rather than asked once — the claim is that the picture keeps moving,
+            // not that it has already moved by the time the sound did.
+            int rendered = videoRenderer.RenderedFrames;
+            WaitFor(() => videoRenderer.RenderedFrames > rendered, "the picture to keep moving while the sound changes track");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>The same for the picture: the sound is not touched, and the frames that follow are the new stream's.</summary>
+    [Test]
+    public void SelectsTheSecondVideoTrackAndKeepsThePictureMoving()
+    {
+        string path = RawAudioVideoFixtureFile.CreateMultiTrack();
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { PlaysWhatItIsGiven = true });
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitForPresentedFrames(pipeline, 2);
+
+            VideoStreamInfo second = pipeline.MediaInfo!.VideoStreams[1];
+            TimeSpan position = pipeline.Position;
+            Assert.That(second.Width, Is.EqualTo(RawAudioVideoFixtureFile.SecondWidth), "the fixture's second picture is the smaller one");
+
+            OperationResult selected = Await(pipeline.SelectStream(MediaStreamKind.Video, second));
+            Assert.That(selected.IsSuccessful, Is.True, selected.Message);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.SelectedVideoStream?.Index, Is.EqualTo(second.Index));
+                Assert.That(videoRenderer.ConfiguredStream?.Width, Is.EqualTo(second.Width), "the renderer is configured for the stream that was asked for");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position - TrackSwitchSlack), "the switch resumes where playback stands, not at the start of the file");
+            }
+
+            int marker = videoRenderer.RenderedWidths.Count;
+            WaitForPresentedFrames(pipeline, pipeline.PresentedFrameCount + 2);
+
+            IReadOnlyList<int> widths = videoRenderer.RenderedWidths;
+            Assert.That(widths.Skip(marker), Is.Not.Empty.And.All.EqualTo(second.Width), "the frames after the switch are the new stream's, and the old stream's are not shown");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>Asking for the track that is already playing is not a change: nothing is rebuilt, nothing restarts.</summary>
+    [Test]
+    public void SelectingTheTrackThatIsPlayingChangesNothing()
+    {
+        string path = RawAudioVideoFixtureFile.CreateMultiTrack();
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
+
+            int flushed = audioRenderer.FlushCount;
+            AudioStreamInfo playing = pipeline.SelectedAudioStream!;
+
+            OperationResult selected = Await(pipeline.SelectStream(MediaStreamKind.Audio, playing));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(selected.IsSuccessful, Is.True, selected.Message);
+                Assert.That(audioRenderer.FlushCount, Is.EqualTo(flushed), "nothing is restarted for the track that is already playing");
+                Assert.That(pipeline.SelectedAudioStream?.Index, Is.EqualTo(playing.Index));
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>What cannot be selected is refused before anything moves, and playback keeps the track it had.</summary>
+    [Test]
+    public void RefusesATrackItCannotPlay()
+    {
+        string path = RawAudioVideoFixtureFile.CreateMultiTrack();
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
+
+            int flushed = audioRenderer.FlushCount;
+            AudioStreamInfo playing = pipeline.SelectedAudioStream!;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Subtitle, new SubtitleStreamInfo { Index = 0, CodecId = "subrip" })).Message, Does.Contain("Subtitle"));
+                Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, new VideoStreamInfo { Index = 99, CodecId = "h264", Width = 1, Height = 1, FrameRate = 25.0, PixelFormat = PixelFormat.Yuv420P })).Message, Does.Contain("not part of"));
+                Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, playing)).Message, Does.Contain("not a Video stream"), "a stream of the other kind is not this kind''s");
+
+                Assert.That(pipeline.SelectedAudioStream?.Index, Is.EqualTo(playing.Index), "a refusal leaves the track that was playing");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
+                Assert.That(audioRenderer.FlushCount, Is.EqualTo(flushed), "a refusal restarts nothing");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>A track no decoder can take is refused, and the one playing keeps playing.</summary>
+    [Test]
+    public void KeepsThePlayingTrackWhenTheNewOneCannotBeDecoded()
+    {
+        string path = RawAudioVideoFixtureFile.CreateMultiTrack();
+        try
+        {
+            RefusingIndexVideoDecoderFactory refusing = new();
+            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            {
+                components.Register(refusing);
+                components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                components.Register(new FFmpegAudioDecoderFactory());
+                components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer { PlaysWhatItIsGiven = true }));
+            });
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitForPresentedFrames(pipeline, 2);
+
+            VideoStreamInfo? playing = pipeline.SelectedVideoStream;
+            VideoStreamInfo second = pipeline.MediaInfo!.VideoStreams[1];
+            refusing.RefusedIndex = second.Index;   // the index the container gave it, not the position in the list
+            long presented = pipeline.PresentedFrameCount;
+
+            OperationResult selected = Await(pipeline.SelectStream(MediaStreamKind.Video, second));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(selected.IsSuccessful, Is.False, "a stream no decoder can take is the caller's failure to see");
+                Assert.That(selected.Message, Does.Contain("No video decoder"), "the refusal says why nothing could serve the stream");
+                Assert.That(pipeline.SelectedVideoStream?.Index, Is.EqualTo(playing?.Index), "the track that was playing is untouched");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
+            }
+
+            WaitForPresentedFrames(pipeline, presented + 2);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Opening a file builds nothing and reads nothing: no decoder, no device, no pre-roll. Which tracks to play is the
+    /// host's choice, and it is made from what the file holds — so the work that used to happen on open waits for the
+    /// choice, and a file opened onto a track menu costs nothing but the container.
+    /// </summary>
+    [Test]
+    public void OpeningAFileBuildsNothingUntilATrackIsChosen()
+    {
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 30);
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { PlaysWhatItIsGiven = true });
+
+            Assert.That(pipeline.Open(MediaLocator.Parse(path), new FakeRenderTarget()).GetAwaiter().GetResult().IsSuccessful, Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.MediaInfo?.VideoStreams, Is.Not.Empty, "the file can be read, which is how a host chooses");
+                Assert.That(pipeline.SelectedVideoStream, Is.Null, "nothing is chosen for the host");
+                Assert.That(pipeline.SelectedAudioStream, Is.Null);
+                Assert.That(pipeline.VideoDecoderName, Is.Null, "no decoder was created");
+                Assert.That(pipeline.AudioDecoderName, Is.Null);
+                Assert.That(pipeline.VideoRendererName, Is.Null, "no device was opened");
+                Assert.That(pipeline.AudioRendererName, Is.Null);
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused));
+            }
+
+            Thread.Sleep(150);
+            Assert.That(pipeline.PresentedFrameCount, Is.Zero, "nothing was decoded, so nothing was shown");
+            Assert.That(videoRenderer.RenderedFrames, Is.Zero);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Play before a choice is refused rather than played into an empty pipeline: with nothing chosen the clock would
+    /// run, the position would advance and no stage would ever say a word.
+    /// </summary>
+    [Test]
+    public void PlaysTheFileOnlyOnceATrackIsChosen()
+    {
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 30);
+        try
+        {
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer { PlaysWhatItIsGiven = true });
+            Assert.That(pipeline.Open(MediaLocator.Parse(path), new FakeRenderTarget()).GetAwaiter().GetResult().IsSuccessful, Is.True);
+
+            OperationResult refused = Await(pipeline.Play());
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(refused.IsSuccessful, Is.False);
+                Assert.That(refused.Message, Does.Contain("track"));
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "a refused play is not a state change");
+                Assert.That(pipeline.Position, Is.EqualTo(TimeSpan.Zero));
+            }
+
+            Assert.That(SelectDefaultStreams(pipeline).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(200), "playback to be under way");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The point of choosing before playing: a file whose second track is the one wanted is never read or decoded for
+    /// its first. The picture that reaches the renderer is the chosen stream's, and the shape of that stream says so.
+    /// </summary>
+    [Test]
+    public void PlaysTheTrackThatWasChosenRatherThanTheFirstOne()
+    {
+        string path = RawAudioVideoFixtureFile.CreateMultiTrack();
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { PlaysWhatItIsGiven = true });
+
+            Assert.That(pipeline.Open(MediaLocator.Parse(path), new FakeRenderTarget()).GetAwaiter().GetResult().IsSuccessful, Is.True);
+
+            VideoStreamInfo second = pipeline.MediaInfo!.VideoStreams[1];
+            AudioStreamInfo audio = pipeline.MediaInfo.AudioStreams[0];
+            Assert.That(second.Width, Is.EqualTo(RawAudioVideoFixtureFile.SecondWidth), "the second picture is the smaller one");
+
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, second)).IsSuccessful, Is.True);
+            OperationResult chosen = Await(pipeline.SelectStream(MediaStreamKind.Audio, audio));
+            Assert.That(chosen.IsSuccessful, Is.True, chosen.Message);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitForPresentedFrames(pipeline, 2);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.SelectedVideoStream?.Index, Is.EqualTo(second.Index));
+                Assert.That(videoRenderer.ConfiguredStream?.Width, Is.EqualTo(second.Width), "the renderer was configured for the chosen stream");
+                Assert.That(videoRenderer.RenderedWidths, Is.Not.Empty.And.All.EqualTo(second.Width), "every frame shown is the chosen stream's");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A kind can be turned off, and only that kind moves: the picture's chain is let go of, its device closed, and the
+    /// sound carries on playing — the selection is one thing per kind, so leaving one out leaves the other untouched.
+    /// </summary>
+    [Test]
+    public void TurningOneKindOffKeepsTheOtherPlaying()
+    {
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 300);
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitForPresentedFrames(pipeline, 2);
+            WaitFor(() => audioRenderer.SubmittedBuffers > 2, "the sound to be playing");
+
+            int submitted = audioRenderer.SubmittedBuffers;
+            int rendered = videoRenderer.RenderedFrames;
+            OperationResult turnedOff = Await(pipeline.SelectStream(MediaStreamKind.Video, null));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(turnedOff.IsSuccessful, Is.True, turnedOff.Message);
+                Assert.That(pipeline.SelectedVideoStream, Is.Null, "the kind is off");
+                Assert.That(pipeline.SelectedAudioStream, Is.Not.Null, "the other kind is untouched");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "turning a kind off is not a pause while one is left");
+            }
+
+            WaitFor(() => pipeline.VideoRendererName is null, "the video chain to be let go of", 5000);
+            WaitFor(() => audioRenderer.SubmittedBuffers > submitted, "the sound to keep playing without the picture");
+
+            // The surface belongs to the host, so a renderer that is let go of empties it: the last frame standing
+            // there for ever, with nothing behind it, is a picture of a file that is not playing any more.
+            WaitFor(() => videoRenderer.ClearedSurfaces > 0, "the last frame to be given back", 5000);
+            Thread.Sleep(200);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(videoRenderer.ClearedSurfaces, Is.EqualTo(1), "the surface is emptied once, not per iteration");
+                Assert.That(videoRenderer.RenderedFrames, Is.EqualTo(rendered), "and no frame is drawn after the picture is off");
+                Assert.That(videoRenderer.DisposeCount, Is.EqualTo(1), "the renderer is still let go of after it has cleared");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The surface is handed back only when the renderer is: one that is replaced is drawn over by its successor, and
+    /// emptying it first would be a black flash between two pictures of the same film. The same goes for choosing
+    /// another track, which is a new chain rather than the end of the picture.
+    /// </summary>
+    [Test]
+    public void KeepsTheSurfaceWhenThePictureIsReplacedRatherThanTurnedOff()
+    {
+        string path = CreateY4mFile(frameCount: 60, frameRate: "30:1");
+        try
+        {
+            FakeVideoRenderer first = new() { Name = "first" };
+            FakeVideoRenderer second = new() { Name = "second" };
+            using PlaybackPipeline pipeline = CreatePipeline(first, new FakeAudioRenderer());
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Await(pipeline.Play());
+            WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
+
+            SwapVideoRenderer(pipeline, new FakeVideoRendererFactory(second));
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            WaitFor(() => second.RenderedFrames > 0, "the new renderer to be drawing");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(first.ClearedSurfaces, Is.Zero, "the frame is drawn over rather than emptied away");
+                Assert.That(second.ClearedSurfaces, Is.Zero);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Choosing another video track is not the picture ending: the new chain draws, so the surface is not emptied
+    /// between the two — the same reason a replaced renderer is not cleared.
+    /// </summary>
+    [Test]
+    public void KeepsTheSurfaceWhenAnotherVideoTrackIsChosen()
+    {
+        string path = RawAudioVideoFixtureFile.CreateMultiTrack();
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { PlaysWhatItIsGiven = true });
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, pipeline.MediaInfo!.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way", 5000);
+
+            VideoStreamInfo second = pipeline.MediaInfo.VideoStreams[1];
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, second)).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.SelectedVideoStream?.Index == second.Index, "the other track to be playing", 5000);
+
+            Assert.That(videoRenderer.ClearedSurfaces, Is.Zero, "a new track draws over the last frame rather than emptying it");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Turning every kind off leaves what an opened file is: open, paused, with nothing to play. The clock stops because
+    /// nothing would advance it, and choosing a track again carries on from where playback stood rather than restarting
+    /// the file.
+    /// </summary>
+    [Test]
+    public void TurningEveryKindOffPausesTheFileAndChoosingAgainCarriesOn()
+    {
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 300);
+        try
+        {
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer { PlaysWhatItIsGiven = true });
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(300), "playback to be under way");
+
+            TimeSpan position = pipeline.Position;
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, null)).IsSuccessful, Is.True);
+            OperationResult turnedOff = Await(pipeline.SelectStream(MediaStreamKind.Audio, null));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(turnedOff.IsSuccessful, Is.True, turnedOff.Message);
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "nothing is left to play, so nothing is playing");
+                Assert.That(Await(pipeline.Play()).IsSuccessful, Is.False, "a file with nothing chosen does not play");
+            }
+
+            VideoStreamInfo video = pipeline.MediaInfo!.VideoStreams[0];
+            AudioStreamInfo audio = pipeline.MediaInfo.AudioStreams[0];
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, video)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, audio)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            // Everything already read was for the selection that was turned off, so the read restarts — from the
+            // position playback stands at, not from the beginning of the file.
+            WaitFor(() => pipeline.Position > position, "playback to carry on from where it stood");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>Turning off a kind that is already off is not a change: nothing is published and nothing restarts.</summary>
+    [Test]
+    public void TurningOffAKindThatIsAlreadyOffChangesNothing()
+    {
+        // Ten seconds of media: what is asserted is that the sound keeps coming and nothing restarts, so the file
+        // must not be able to run out in the middle of the test on a loaded machine.
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 300);
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
+
+            int flushedBefore = audioRenderer.FlushCount;
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, null)).IsSuccessful, Is.True);
+
+            // The device is let go of the position playback left as the epoch moves, which is a moment after the
+            // answer; from there on nothing may flush it again.
+            WaitFor(() => audioRenderer.FlushCount > flushedBefore, "the device to be let go of the position playback left");
+            int flushed = audioRenderer.FlushCount;
+            int submitted = audioRenderer.SubmittedBuffers;
+
+            OperationResult again = Await(pipeline.SelectStream(MediaStreamKind.Video, null));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(again.IsSuccessful, Is.True, again.Message);
+                Assert.That(pipeline.SelectedVideoStream, Is.Null);
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
+            }
+
+            WaitFor(() => audioRenderer.SubmittedBuffers > submitted, "the sound to be playing still");
+            Assert.That(audioRenderer.FlushCount, Is.EqualTo(flushed), "a second turn-off restarts nothing");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>Choosing both kinds in one step is one publication and one answer — the shape a host uses to say what to play.</summary>
+    [Test]
+    public void ChoosesBothKindsInOneStep()
+    {
+        string path = RawAudioVideoFixtureFile.CreateMultiTrack(frameCount: 30);
+        try
+        {
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer { PlaysWhatItIsGiven = true });
+            Assert.That(pipeline.Open(MediaLocator.Parse(path), new FakeRenderTarget()).GetAwaiter().GetResult().IsSuccessful, Is.True);
+
+            VideoStreamInfo video = pipeline.MediaInfo!.VideoStreams[1];
+            AudioStreamInfo audio = pipeline.MediaInfo.AudioStreams[1];
+
+            OperationResult chosen = Await(pipeline.SelectStream(MediaStreamKind.Video, video));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(chosen.IsSuccessful, Is.True, chosen.Message);
+                Assert.That(pipeline.SelectedVideoStream?.Index, Is.EqualTo(video.Index));
+            }
+
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, audio)).IsSuccessful, Is.True);
+            Assert.That(pipeline.SelectedAudioStream?.Index, Is.EqualTo(audio.Index));
+
+            // The owners adopt what was published, which is a moment after the answer.
+            WaitFor(() => pipeline.VideoDecoderName is not null, "both chains were built");
+            WaitFor(() => pipeline.AudioDecoderName is not null, "both chains were built");
+
+            // Naming nothing at all is how both kinds are switched off, and it leaves the file open with nothing to
+            // play — the state an opened file is in.
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, null)).IsSuccessful, Is.True);
+            OperationResult nothing = Await(pipeline.SelectStream(MediaStreamKind.Audio, null));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(nothing.IsSuccessful, Is.True, nothing.Message);
+                Assert.That(pipeline.SelectedVideoStream, Is.Null);
+                Assert.That(pipeline.SelectedAudioStream, Is.Null);
+                Assert.That(Await(pipeline.Play()).IsSuccessful, Is.False, "there is nothing to play");
+            }
+
+            // The chains are let go of by the threads that held them, so this is waited for as well.
+            WaitFor(() => pipeline.VideoDecoderName is null, "the video chain to be let go of");
+            WaitFor(() => pipeline.AudioDecoderName is null, "the audio chain to be let go of");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A precise seek whose first picture is *ahead* of the position it asked for — the ordinary case, since frames are
+    /// not at every millisecond — has to start the clock. The frame that claims a position is not early: its moment is
+    /// when the position becomes a fact. Without that rule the frame waits for a moment only the clock could bring and
+    /// the clock waits for a claim only that frame could make, which is playback standing still with nothing to report
+    /// (state `Playing`, no picture, no starvation). The sound here has nothing left after one second, so nothing else
+    /// can claim the position.
+    /// </summary>
+    [Test]
+    public void StartsPlaybackWhenTheFirstPictureOfAPositionIsAheadOfIt()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            AudioStopsAt = TimeSpan.FromSeconds(1),
+        };
+
+        FakeVideoRenderer videoRenderer = new();
+        SyntheticSourceProviderFactory sources = new(script);
+        PlaybackPipeline pipeline = CreatePipeline(
+            videoRenderer,
+            new FakeAudioRenderer { PlaysWhatItIsGiven = true },
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.5), "playback to be under way");
+
+            // Between two frames at thirty a second: the next one is twenty-three milliseconds past the request.
+            var target = TimeSpan.FromMilliseconds(1510);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.Precise)).IsSuccessful, Is.True);
+
+            long shown = pipeline.PresentedFrameCount;
+            WaitFor(() => pipeline.Position > target, "a position whose first frame is ahead of it still has to run", 4000);
+            WaitFor(() => pipeline.PresentedFrameCount > shown, "the picture carries on from where it was moved to");
+            Assert.That(pipeline.StarvedFor, Is.Null, "nothing is behind: the picture simply had to claim the position");
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A request past the end of the file as well: neither stream has anything at it, and the landing goes to the one
+    /// that ends later — the sound here — because that is the closest anything can get to where the seek asked. The
+    /// picture's last keyframe would be its end, sixteen seconds further back in a file whose picture stops early.
+    /// </summary>
+    [Test]
+    public void LandsByWhicheverStreamEndsLaterWhenNeitherReachesThePosition()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            VideoStopsAt = TimeSpan.FromSeconds(1),
+            VideoDuration = TimeSpan.FromSeconds(1),
+            LandsOnTheKeyframeBefore = true,
+        };
+
+        FakeVideoRenderer videoRenderer = new();
+        SyntheticSourceProviderFactory sources = new(script);
+        PlaybackPipeline pipeline = CreatePipeline(
+            videoRenderer,
+            new FakeAudioRenderer { PlaysWhatItIsGiven = true },
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, pipeline.MediaInfo!.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.3), "playback to be under way", 5000);
+
+            var target = TimeSpan.FromSeconds(3.5);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.Fast)).IsSuccessful, Is.True);
+            WaitFor(() => sources.Source?.LastSeekPosition == target, "the cursor to be asked to move", 5000);
+
+            Assert.That(sources.Source!.LastSeekStreamIndex, Is.EqualTo(pipeline.MediaInfo.AudioStreams[0].Index),
+                "the sound ends later, so it is what the landing is measured by");
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A container that says nothing about the picture's length is not a container that says the picture has ended.
+    /// The picture keeps the landing then, because landing by the sound when the picture still has keyframes would
+    /// cost the decoder its lead-in and leave the picture waiting for the next keyframe — a gap on every seek, for a
+    /// length nobody claimed.
+    /// </summary>
+    [Test]
+    public void KeepsThePictureLandingWhenItsLengthIsNotDeclared()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            VideoDuration = TimeSpan.Zero,
+            LandsOnTheKeyframeBefore = true,
+        };
+
+        FakeVideoRenderer videoRenderer = new();
+        SyntheticSourceProviderFactory sources = new(script);
+        PlaybackPipeline pipeline = CreatePipeline(
+            videoRenderer,
+            new FakeAudioRenderer { PlaysWhatItIsGiven = true },
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, pipeline.MediaInfo!.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.3), "playback to be under way", 5000);
+
+            var target = TimeSpan.FromSeconds(2);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.Fast)).IsSuccessful, Is.True);
+            WaitFor(() => sources.Source?.LastSeekPosition == target, "the cursor to be asked to move", 5000);
+
+            Assert.That(sources.Source!.LastSeekStreamIndex, Is.EqualTo(pipeline.MediaInfo.VideoStreams[0].Index),
+                "an undeclared length is not an end, so the picture still lands the seek");
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// The other half of the rule above: while the picture still has media at the request it is what the landing is
+    /// measured by, because its keyframes are the only ones there are and the media a fast seek lands on is the
+    /// lead-in the decoder needs. Nothing about a seek changes for the ordinary case.
+    /// </summary>
+    [Test]
+    public void LandsByThePictureWhileItStillHasSomethingThere()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            LandsOnTheKeyframeBefore = true,
+        };
+
+        FakeVideoRenderer videoRenderer = new();
+        SyntheticSourceProviderFactory sources = new(script);
+        PlaybackPipeline pipeline = CreatePipeline(
+            videoRenderer,
+            new FakeAudioRenderer { PlaysWhatItIsGiven = true },
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, pipeline.MediaInfo!.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.3), "playback to be under way", 5000);
+
+            var target = TimeSpan.FromSeconds(1.5);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.Fast)).IsSuccessful, Is.True);
+            WaitFor(() => sources.Source?.LastSeekPosition == target, "the cursor to be asked to move", 5000);
+
+            Assert.That(sources.Source!.LastSeekStreamIndex, Is.EqualTo(pipeline.MediaInfo.VideoStreams[0].Index));
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A seek to a position only the sound reaches — the picture ended first — has to arrive there, and has to do it
+    /// without being read from the picture's last frame. A keyframe belongs to the picture, so a landing measured by
+    /// it falls back to its last one when the request is past it — one second in here — and everything after that
+    /// would be read and thrown away to arrive at the request, with the picture's last frame shown as the position.
+    /// The landing is measured by the sound instead, which has no keyframes and lands within a packet of the request,
+    /// and a fast seek is still a fast seek: it resumes at that landing.
+    /// </summary>
+    [Test]
+    public void SeeksToAPositionOnlyTheSoundReaches()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            VideoStopsAt = TimeSpan.FromSeconds(1),
+            VideoDuration = TimeSpan.FromSeconds(1),
+            LandsOnTheKeyframeBefore = true,
+        };
+
+        FakeVideoRenderer videoRenderer = new();
+        FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+        SyntheticSourceProviderFactory sources = new(script);
+        PlaybackPipeline pipeline = CreatePipeline(
+            videoRenderer,
+            audioRenderer,
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, pipeline.MediaInfo!.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.3), "playback to be under way", 5000);
+
+            // Paused, so that what the picture does about the new position is the only thing that moves: a still is
+            // offered there, and it is the still of the landing — the picture's last frame — rather than of nothing.
+            Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.State == MediaEngineState.Paused, "the pipeline to stop");
+            int pictures = videoRenderer.RenderedTimestamps.Count;
+
+            var target = TimeSpan.FromSeconds(2);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.Fast)).IsSuccessful, Is.True);
+
+            // Nothing to wait for when the answer is right, so the answer is given a moment to be wrong in.
+            Thread.Sleep(300);
+
+            int soundIndex = pipeline.MediaInfo.AudioStreams[0].Index;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(videoRenderer.RenderedTimestamps.Count, Is.EqualTo(pictures),
+                    "the picture has nothing at the position, so there is no still of it to show");
+                Assert.That(sources.Source?.LastSeekStreamIndex, Is.EqualTo(soundIndex),
+                    "the landing is measured by the sound: by the picture it would fall back to its last keyframe, one second in");
+            }
+
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position >= target, "playback to stand where the seek asked, not where the picture ended", 3000);
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>A video decoder factory that refuses one stream index, which is a codec nothing on this machine can take.</summary>
+    private sealed class RefusingIndexVideoDecoderFactory : IVideoDecoderFactory
+    {
+        private readonly FFmpegVideoDecoderFactory _inner = new();
+
+        /// <summary>The container index this factory refuses. Set after the file is open, which is when it is known.</summary>
+        internal int RefusedIndex { get; set; } = -1;
+
+        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        {
+            if (stream.Index == RefusedIndex)
+            {
+                creator = null;
+                return OperationResult.Failure($"Stream {stream.Index} cannot be decoded.");
+            }
+
+            return _inner.TryCreate(source, stream, options, out creator);
+        }
+    }
+
+    /// <summary>
     /// A device can arrive after playback has begun — one that was plugged in, or one that replaced a failed. The
     /// sound has to still be there when it does. That depends on the read-ahead being bounded while no chain is
     /// decoding: a target the sound queue can never reach lets the reader take the whole file at once, and a device
@@ -4429,11 +5309,15 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(300), "playback to be under way");
 
+            // The device arriving is the host asking for the sound again, so the answer is a selection: what the file
+            // still holds is read for it, from the position playback stands at.
             SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(late));
-            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            OperationResult chosen = Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0]));
+            Assert.That(chosen.IsSuccessful, Is.True, chosen.Message);
 
             WaitFor(() => late.SubmittedBuffers > 0, "the device that arrived to be given sound");
             Assert.That(pipeline.AudioRendererName, Is.EqualTo("late"));
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the picture never stopped");
         }
         finally
         {
@@ -4461,8 +5345,11 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(300), "playback to be under way");
 
+            // The device arriving is the host asking for the sound again: one selection, and the position it restarts
+            // at is the one playback has reached.
             SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(late));
-            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            OperationResult chosen = Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0]));
+            Assert.That(chosen.IsSuccessful, Is.True, chosen.Message);
             WaitFor(() => late.SubmittedBuffers > 0, "the device that arrived to be given sound");
 
             // A device that holds sound is what makes the pipeline correct its clock, and this one runs at three times
@@ -4541,9 +5428,8 @@ public class PlaybackPipelineTests
 
             SeekAndWait(pipeline, TimeSpan.FromSeconds(1));
 
-            // A seek leaves playback paused, so this is the caller resuming it: the position is new and the device is
-            // still dead, which is exactly the state the spend path has to be able to carry on from.
-            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            // The seek did not pause: the position is new and the device is still dead, which is exactly the state
+            // the spend path has to be able to carry on from.
 
             // Two seconds of sound are left, and the sound is what paces them now: the clock has to be armed for the
             // new position and started, or nothing is ever spent again.
@@ -4792,7 +5678,7 @@ public class PlaybackPipelineTests
 
             public bool CanSeek => !refusesInAdvance;
 
-            public OperationResult Seek(TimeSpan position)
+            public OperationResult Seek(TimeSpan position, int streamIndex)
             {
                 return OperationResult.Failure("This source refuses to move.");
             }
@@ -4803,7 +5689,7 @@ public class PlaybackPipelineTests
                 if (read.IsSuccessful && packet is null)
                 {
                     // The stream loops rather than ends, which is what a live one does.
-                    inner.Seek(TimeSpan.Zero);
+                    inner.Seek(TimeSpan.Zero, -1);
                     read = inner.TryReadPacket(out packet);
                 }
 
@@ -5152,6 +6038,11 @@ public class PlaybackPipelineTests
             return OperationResult.Success();
         }
 
+        public OperationResult ClearSurface()
+        {
+            return OperationResult.Success();
+        }
+
         public bool TryGetDisplayedFrameCount(out long count)
         {
             count = 0;
@@ -5205,7 +6096,45 @@ public class PlaybackPipelineTests
     /// </summary>
     private static OperationResult Open(PlaybackPipeline pipeline, string path, IVideoRenderTarget? target = null)
     {
-        return pipeline.Open(MediaLocator.Parse(path), target).GetAwaiter().GetResult();
+        OperationResult opened = pipeline.Open(MediaLocator.Parse(path), target).GetAwaiter().GetResult();
+        if (!opened.IsSuccessful)
+        {
+            return opened;
+        }
+
+        // Opening does not choose tracks — the host does, once it can see what the file holds. Every test that is not
+        // about selection itself wants the file's own defaults, which is what this asks for.
+        return SelectDefaultStreams(pipeline);
+    }
+
+    private static OperationResult SelectDefaultStreams(PlaybackPipeline pipeline)
+    {
+        MediaInfo? info = pipeline.MediaInfo;
+        if (info is null)
+        {
+            return OperationResult.Success();
+        }
+
+        // One kind at a time, and a kind that cannot be played does not fail the file if the other one can: that is the
+        // host's decision to make, and this is the host choosing to play what works.
+        bool any = false;
+        OperationResult? failure = null;
+
+        if (info.VideoStreams.Count > 0)
+        {
+            OperationResult video = pipeline.SelectStream(MediaStreamKind.Video, info.VideoStreams[0]).GetAwaiter().GetResult();
+            any |= video.IsSuccessful;
+            failure = video.IsSuccessful ? failure : video;
+        }
+
+        if (info.AudioStreams.Count > 0)
+        {
+            OperationResult audio = pipeline.SelectStream(MediaStreamKind.Audio, info.AudioStreams[0]).GetAwaiter().GetResult();
+            any |= audio.IsSuccessful;
+            failure = audio.IsSuccessful ? failure : audio;
+        }
+
+        return any ? OperationResult.Success() : (failure ?? OperationResult.Success());
     }
 
     /// <summary>
@@ -5231,6 +6160,13 @@ public class PlaybackPipelineTests
     /// Waits for a condition with a budget of its own, for a test whose subject is *when* something happened:
     /// what the ordinary budget would let pass is exactly what such a test is about.
     /// </summary>
+    /// <summary>
+    /// How far the position may read short of where it stood before a switch. The clock is corrected to the device
+    /// while the device plays, so it can step back by the sync tolerance, and a switch moves it once more when it
+    /// republishes the position: a few tens of milliseconds is that arithmetic, not a jump the test should fail on.
+    /// </summary>
+    private static readonly TimeSpan TrackSwitchSlack = TimeSpan.FromMilliseconds(100);
+
     private static void WaitFor(Func<bool> condition, string what, int milliseconds)
     {
         for (int attempt = 0; attempt < milliseconds / 10; attempt++)
@@ -5531,6 +6467,19 @@ public class PlaybackPipelineTests
         public int RenderedFrames { get; private set; }
 
         private readonly List<TimeSpan> _renderedTimestamps = [];
+        private readonly List<int> _renderedWidths = [];
+
+        /// <summary>The width of every frame handed over, in the order it was: which stream a frame came from.</summary>
+        public IReadOnlyList<int> RenderedWidths
+        {
+            get
+            {
+                lock (_renderedWidths)
+                {
+                    return [.. _renderedWidths];
+                }
+            }
+        }
 
         /// <summary>
         /// The timestamp of every frame the pipeline handed over, in the order it did: what a test reads when
@@ -5577,6 +6526,10 @@ public class PlaybackPipelineTests
 
             LastRenderedTransform = transform;
             RenderedFrames++;
+            lock (_renderedWidths)
+            {
+                _renderedWidths.Add(frame.Width);
+            }
             lock (_renderedTimestamps)
             {
                 _renderedTimestamps.Add(frame.Timestamp);
@@ -5606,6 +6559,21 @@ public class PlaybackPipelineTests
             LastRefreshedTransform = transform;
             return OperationResult.Success();
         }
+
+        /// <summary>
+        /// How many times the pipeline told this renderer to empty the surface, which is what it does when the picture
+        /// is turned off and nothing will draw again.
+        /// </summary>
+        public int ClearedSurfaces { get; private set; }
+
+        public OperationResult ClearSurface()
+        {
+            ClearedSurfaces++;
+            return ClearFailure is string failure ? OperationResult.Failure(failure) : OperationResult.Success();
+        }
+
+        /// <summary>Stands in for a surface that cannot be emptied, so the pipeline's answer to that can be seen.</summary>
+        public string? ClearFailure { get; init; }
 
         /// <summary>
         /// What the display took, for the test that asks: a stand-in has no display, so it says nothing until
@@ -6240,4 +7208,3 @@ public class PlaybackPipelineTests
         }
     }
 }
-

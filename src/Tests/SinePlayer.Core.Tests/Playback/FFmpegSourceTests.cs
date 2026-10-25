@@ -95,7 +95,7 @@ public class FFmpegSourceTests
     {
         using FFmpegSource source = OpenWaveFile();
 
-        OperationResult result = source.Seek(TimeSpan.FromSeconds(DurationSeconds / 2));
+        OperationResult result = source.Seek(TimeSpan.FromSeconds(DurationSeconds / 2), -1);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         result = source.TryReadPacket(out MediaPacket? packet);
