@@ -805,6 +805,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OK" xml:space="preserve">
     <value>OK</value>
   </data>
+  <data name="Off" xml:space="preserve">
+    <value>Aus</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>Öffnen</value>
   </data>
@@ -1063,6 +1066,12 @@ Im abgesicherten Modus starten?</value>
   </data>
   <data name="SelectAllAppBarButton.Label" xml:space="preserve">
     <value>Alles auswählen</value>
+  </data>
+  <data name="SelectAudioTrack" xml:space="preserve">
+    <value>Audiospur auswählen</value>
+  </data>
+  <data name="SelectVideoTrack" xml:space="preserve">
+    <value>Videospur auswählen</value>
   </data>
   <data name="SendFeedback" xml:space="preserve">
     <value>Feedback senden</value>

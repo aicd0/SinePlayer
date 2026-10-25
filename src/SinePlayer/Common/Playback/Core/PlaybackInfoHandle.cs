@@ -14,6 +14,10 @@ internal sealed class PlaybackInfoHandle
 
     public MediaInfo? Media => _pipeline?.MediaInfo;
 
+    public VideoStreamInfo? SelectedVideoStream => _pipeline?.SelectedVideoStream;
+
+    public AudioStreamInfo? SelectedAudioStream => _pipeline?.SelectedAudioStream;
+
     public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
 
     public string? Error => _pipeline?.Error;

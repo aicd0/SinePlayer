@@ -132,15 +132,31 @@ public sealed class FFmpegSource : IMediaSource
         return true;
     }
 
-    public OperationResult Seek(TimeSpan position)
+    public OperationResult Seek(TimeSpan position, int streamIndex)
     {
         if (_disposed)
         {
             return OperationResult.Failure("The media source has already been disposed.");
         }
 
-        long timestamp = (long)(position.TotalSeconds * FFmpegConstants.TimeBase);
-        int result = FFmpegNative.av_seek_frame(_context, -1, timestamp, FFmpegConstants.SeekFlagBackward);
+        // A landing by a chosen stream is expressed in that stream's own time base; only this source's own choice is
+        // in the flat one. The choice matters because a keyframe belongs to a stream: by the picture, a position past
+        // its end lands on its last keyframe, while by the sound — which has no keyframes — it lands within a packet.
+        bool byStream = streamIndex >= 0 && streamIndex < _timeBases.Length;
+        long timestamp;
+        if (byStream)
+        {
+            AVRational timeBase = _timeBases[streamIndex];
+            timestamp = timeBase.Numerator > 0
+                ? (long)(position.TotalSeconds * timeBase.Denominator / timeBase.Numerator)
+                : 0;
+        }
+        else
+        {
+            timestamp = (long)(position.TotalSeconds * FFmpegConstants.TimeBase);
+        }
+
+        int result = FFmpegNative.av_seek_frame(_context, byStream ? streamIndex : -1, timestamp, FFmpegConstants.SeekFlagBackward);
         if (result < 0)
         {
             return OperationResult.Failure($"Unable to seek to {position}: {FFmpegInterop.GetErrorMessage(result)}");
@@ -270,6 +286,13 @@ public sealed class FFmpegSource : IMediaSource
         MediaStreamKind kind = FFmpegInterop.ToStreamKind(parameters->CodecType);
         string codecId = FFmpegInterop.GetCodecId(parameters->CodecId);
 
+        // A stream's own length, which is not the file's: tracks routinely end at different moments, and the
+        // container is the only thing that says where. Matroska leaves the field empty and writes the length down as
+        // a tag instead, so both are read.
+        TimeSpan duration = stream->Duration > 0
+            ? FFmpegInterop.ToTimeSpan(stream->Duration, stream->TimeBase)
+            : FFmpegInterop.ParseDurationTag(FFmpegInterop.GetMetadata(stream->Metadata, "DURATION")) ?? TimeSpan.Zero;
+
         return kind switch
         {
             MediaStreamKind.Video => new VideoStreamInfo
@@ -281,6 +304,7 @@ public sealed class FFmpegSource : IMediaSource
                 Title = FFmpegInterop.GetMetadata(stream->Metadata, "title"),
                 Bitrate = parameters->BitRate,
                 IsDefault = (stream->Disposition & DispositionDefault) != 0,
+                Duration = duration,
                 Width = parameters->Width,
                 Height = parameters->Height,
                 FrameRate = ResolveFrameRate(stream, parameters),
@@ -296,6 +320,7 @@ public sealed class FFmpegSource : IMediaSource
                 Title = FFmpegInterop.GetMetadata(stream->Metadata, "title"),
                 Bitrate = parameters->BitRate,
                 IsDefault = (stream->Disposition & DispositionDefault) != 0,
+                Duration = duration,
                 SampleRate = parameters->SampleRate,
                 ChannelCount = parameters->ChannelLayout.ChannelCount,
                 ChannelLayout = FFmpegInterop.ToChannelLayout(parameters->ChannelLayout.ChannelCount),
@@ -310,6 +335,7 @@ public sealed class FFmpegSource : IMediaSource
                 Title = FFmpegInterop.GetMetadata(stream->Metadata, "title"),
                 Bitrate = parameters->BitRate,
                 IsDefault = (stream->Disposition & DispositionDefault) != 0,
+                Duration = duration,
                 IsForced = (stream->Disposition & DispositionForced) != 0,
                 IsBitmap = IsBitmapSubtitle(codecId),
             },

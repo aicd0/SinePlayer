@@ -805,6 +805,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="OK" xml:space="preserve">
     <value>好的</value>
   </data>
+  <data name="Off" xml:space="preserve">
+    <value>关闭</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>打开</value>
   </data>
@@ -1063,6 +1066,12 @@ $plugins</value>
   </data>
   <data name="SelectAllAppBarButton.Label" xml:space="preserve">
     <value>全选</value>
+  </data>
+  <data name="SelectAudioTrack" xml:space="preserve">
+    <value>选择音频轨道</value>
+  </data>
+  <data name="SelectVideoTrack" xml:space="preserve">
+    <value>选择视频轨道</value>
   </data>
   <data name="SendFeedback" xml:space="preserve">
     <value>发送反馈</value>

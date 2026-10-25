@@ -805,6 +805,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="OK" xml:space="preserve">
     <value>OK</value>
   </data>
+  <data name="Off" xml:space="preserve">
+    <value>Off</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>Open</value>
   </data>
@@ -1063,6 +1066,12 @@ Start in Safe Mode?</value>
   </data>
   <data name="SelectAllAppBarButton.Label" xml:space="preserve">
     <value>Select all</value>
+  </data>
+  <data name="SelectAudioTrack" xml:space="preserve">
+    <value>Select audio track</value>
+  </data>
+  <data name="SelectVideoTrack" xml:space="preserve">
+    <value>Select video track</value>
   </data>
   <data name="SendFeedback" xml:space="preserve">
     <value>Send feedback</value>

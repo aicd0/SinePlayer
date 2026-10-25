@@ -151,7 +151,7 @@ it grows. It covers transport, selection, component configuration, query, and su
 |---|---|
 | Lifecycle / transport | `Load(source)`, `Play/Pause/Stop`, `Seek(position, mode)`, `Volume`, `Muted`, `PlaybackRate` |
 | State / events | `State`, `Position`, `Duration`, `StateChanged`, `MediaOpened`, `MediaEnded`, `ErrorOccurred` |
-| Track selection | `GetTracks()`, `SelectedVideoTrack`, `SelectedAudioTrack`, `SelectedSubtitleTrack`, `SelectTrack(...)` |
+| Track selection | `MediaInfo`, `SelectedVideoStream`, `SelectedAudioStream`, `SelectedSubtitleStream`, `SelectStream(stream)` |
 | Component control | `ApplyProfile(PlaybackProfile)`, `GetActiveComponents()` |
 | Query | `GetMediaInfo()`, `GetCapabilities()` |
 | Presentation | `CreatePresentationHost()` → a UI-agnostic host the renderer attaches to |
@@ -243,13 +243,34 @@ happens to be active — which is exactly what makes renderer switching safe.
 
 ### 5.8 Track selection
 
-| Contract | Responsibility |
+| Member | Responsibility |
 |---|---|
-| `ITrackSelector` | Enumerate selectable tracks; change the active video/audio/subtitle stream |
-| `MediaTrackInfo` | Kind, id, language, title, default/forced flags, plus kind-specific descriptor |
+| `MediaInfo`, and its stream records `VideoStreamInfo` / `AudioStreamInfo` / `SubtitleStreamInfo` | Enumerate the selectable streams: kind, container index, codec and kind-specific descriptor |
+| `SelectedVideoStream`, `SelectedAudioStream`, `SelectedSubtitleStream` | Name the active ones |
+| `SelectStream(kind, stream)` | Choose one kind, or turn it off by naming no stream: its chain is let go of and the other kind is untouched. A chain that cannot be built fails the command rather than being reported as a warning. Answered as a task like every other operation |
 
-Selection is separated from demuxing so a track change can reuse the existing demuxer and only
-re-point the affected decoder chain.
+**Opening a file chooses nothing.** `Open` opens the source and enumerates its streams; it builds no decoder, opens
+no device and reads nothing, because the streams to choose from are only known once the file is open — a pipeline
+that picked "the first of each kind" would build, configure and decode exactly the tracks a host is about to replace,
+and a video switch rebuilds the renderer and its graphics device too. `Play` is refused while nothing is selected, so
+the two-step start is explicit rather than a silent no-op, and a host that wants the file's defaults asks for them
+with one `SelectStream` per kind before playing. A kind is turned off the same way it is chosen — no stream named —
+which publishes a holder without that stream and empties that kind's two roles; turning every kind off leaves the
+file open and paused, which is what a freshly opened one is. Each kind is chosen and answered on its own, so a kind
+that cannot be played is the host's to weigh: play what works, or refuse the file.
+
+These are members of `PlaybackPipeline` rather than a separate stage contract: the pipeline is sealed, so there
+is nothing a contract could be written against that the type does not already offer, and a switch needs the live
+source, media info and clock anyway. A contract belongs where a backend can implement it and something else is
+written against it — `IMediaDecoder`, with four implementations and factories producing them, is that; track
+selection is one orchestration step of one implementation.
+
+Selection is separated from demuxing so a track change reuses the open source and only re-points
+the affected decoder chain. It is also kept **with** the source rather than beside it: the pipeline
+publishes the `IMediaSource` and the two selected streams as one component, so "which file" and
+"which tracks of it" cannot disagree, and a switch publishes that component and the rebuilt chain
+under a single version. The chain of the other kind is not rebuilt, not restarted and not told
+anything — it accepts the newer source and carries on.
 
 ### 5.9 Playback info and capability query
 

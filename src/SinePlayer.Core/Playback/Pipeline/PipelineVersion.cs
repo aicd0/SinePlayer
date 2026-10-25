@@ -65,12 +65,6 @@ internal readonly record struct PipelineVersion(
     public long Highest => Math.Max(Source, Math.Max(AudioDecoder, Math.Max(AudioRenderer, Math.Max(VideoDecoder, VideoRenderer))));
 
     public long Next => Highest + 1;
-
-    public PipelineVersion WithSource(long source) => this with { Source = source };
-
-    public PipelineVersion WithAudio(long version) => this with { AudioDecoder = version, AudioRenderer = version };
-
-    public PipelineVersion WithVideo(long version) => this with { VideoDecoder = version, VideoRenderer = version };
 }
 
 internal enum VersionVerdict

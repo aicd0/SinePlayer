@@ -111,14 +111,16 @@ whole class of questions:
   quietly absorbed where it does not apply, because "pausing was not needed" and "pausing was refused" are
   different answers, and only the caller knows which one it asked for.
 - **The state says what playback is doing, never what the caller wants it to do.** A seek is the sharpest case
-  and the rule is flat: it leaves playback `Paused`, whatever it found. Whether the new position goes on
-  playing is the *host's* decision, made with one `Play` — which is also the only way the host can tell the
-  pipeline "the user paused while the seek was in flight". The adapter is where the app's expectation ("a jump
-  while playing keeps playing") is restored (§11).
+  and the rule is flat: it leaves the state as it found it. A file that was playing goes on playing from the new
+  position, and a paused one stays paused — a jump is not a pause, because pausing is its own command and a seek
+  that paused would overrule a user who pressed pause while it was in flight. The one state that moves is `Ended`:
+  a seek from the end takes the file back into itself as `Paused`, since there is nothing to play from the end
+  until it is told to. Nothing runs ahead of the media for it — a position with nothing yet to show is a position
+  the render threads hold the clock for (§8).
 - **What playback did is announced, and the events are the shared account.** A state change carries the state
   and the error (`StateChanged`), and something that did not stop playback is one line (`WarningRaised`). A
   command's own outcome is the one thing that is *not* an event: it belongs to the caller that asked, which is
-  also why a seek — a command with no state change to announce — needs no event of its own.
+  also why a seek needs no event of its own: the only state it can change is a file taken back from `Ended`.
 - **`Dispose` is the one call that waits.** A disposed pipeline must not still hold the file open — whoever
   opens it next would not be able to — so teardown is posted and waited for, with a bound
   (`TeardownWaitMilliseconds`) because a teardown that cannot finish is a broken pipeline, not a slow one.
@@ -244,6 +246,13 @@ and neither is derived from the clock's state — a cadence computed from
 whether the clock is running, claimed or at a particular rate would be a prediction whose subject belongs to
 another thread, and a prediction that turns out wrong is a hold that never arrives.
 
+**A data wake says "there may be work", never "something was asked of you".** Everything on the control rows reaches
+every thread through one `WakeAll`, which is why no `TryWake*` looks at the stop flag: a stop, a seek, a resume and an
+ending are announced once, by the queue thread, after the fact they announce has been written. The order matters and is
+the queue's to keep — set the flag, then wake — because a thread that sees the wake and then reads a flag still set to
+`false` would go back to sleep having been told to stop. A data wake during a stop is therefore neither needed nor
+harmful; skipping one costs nothing, and one that happens costs a thread that is leaving one last iteration.
+
 Two rules make the table sufficient, and both are checklist items (§Appendix A):
 
 1. **Read your node's stamp before you look at anything.** A wake that lands between the read and the wait is
@@ -271,7 +280,8 @@ in `PipelineVersion` (`Source`, `AudioDecoder`, `AudioRenderer`, `VideoDecoder`,
 
 | Who publishes | When | What it does |
 |---|---|---|
-| the queue thread | a file is opened | publishes the source under the first number; it is never republished, because a file's source is opened once |
+| the queue thread | a file is opened | publishes the source, with the two streams it will be read for, under the first number |
+| the queue thread | a track is switched | republishes that holder with the new selection, under the same new number as the chain it rebuilt (§2.5) |
 | the queue thread | a chain is (re)built | raises the two halves of that chain to `highest in use + 1` when both are new, and gives each new slot the snapshot of every number in use; a lone replacement joins the generation already running, so a repair does not make the frames in flight belong to nobody |
 
 - **No counter is kept for the next number.** "The highest in use" is derived from the components themselves — the
@@ -279,7 +289,9 @@ in `PipelineVersion` (`Source`, `AudioDecoder`, `AudioRenderer`, `VideoDecoder`,
   (§15).
 - The two halves of a chain are **one generation**: a renderer exists to draw the frames of the decoder published
   with it, and the device exists to play what its decoder produced. That is why they are raised together.
-- **The source and a decoder are two nodes.** A packet leaves the reader stamped with the source it came from, and
+- **The source and a decoder are two nodes.** The source a package came from travels as a `MediaSourceHolder` — the
+  `IMediaSource` and the two streams selected from it — so *which file* and *which tracks of it* are one identity
+  rather than two facts that could disagree. A packet leaves the reader stamped with the source it came from, and
   both the audio decoder (which reads the cursor itself) and the video decoder check that stamp before decoding —
   the same comparison a renderer makes, against a node one step further back. A source that is replaced can
   therefore never feed a decoder that was built for the one before it.
@@ -323,7 +335,7 @@ a "pending" field beside it — one `ComponentSlot<T>` per role, alive for the p
 
 | Call | Who | What it does |
 |---|---|---|
-| `Publish(component, signature, versions)` | the queue thread | makes `component` the one the owner adopts next; a component published earlier and never adopted is released here, because the queue built it for a change the owner never got to |
+| `Publish(component, signature, versions)` | the queue thread | makes `component` the one the owner adopts next; a component published earlier and never adopted is released here, because the queue built it for a change the owner never got to. Publishing **null** is how a role is emptied — the owner adopts nothing and disposes of what it held (§2.5) |
 | `Update(out newComponent, out oldComponent)` | the thread that owns the role | adopts the published component and hands back both what the owner now holds and the one it replaced, which the caller releases — it is the thread that was using it. With nothing published, `newComponent` is what the owner already holds and nothing changes |
 
 The four worker threads keep the component they adopted in a local of their loop (`decoder`, `renderer`, `source`,
@@ -331,10 +343,102 @@ The four worker threads keep the component they adopted in a local of their loop
 up, not one the queue has published behind their back. `Current` is for the queue thread and the host — a name to
 report, a device to flush at a stop — where "the component in effect" is exactly the right question.
 
+**Publication needs no lock of its own, and has none.** `Publish` and `Reset` happen only in commands on the
+playback queue, and the queue runs one command at a time, so the five publishes of one `BuildChains` are
+serialised by the queue rather than by a lock around them — which is also what lets `CurrentVersions()` read
+five slots, take the next number from that reading and publish under it without racing another publisher. A
+worker thread must never publish: two of them reading the highest number in use would give two generations the
+same number, and "a decoder and its renderer are one generation" would stop meaning anything.
+
+The worker threads take no shared lock at all — their adoption is the slot's own lock — which is the other half
+of why a lock around the publication would buy nothing: it could not make a publication atomic against a thread
+that never enters it. What makes a publication that is half-seen harmless is publish-before-wake plus the number
+the holder shares with the pair it was published with (§2.5).
+
 A slot answers two different questions on purpose: `Component`/`Signature`/`Versions` are about the component **in
 effect** — the one just published, or the one the owner still holds until it adopts the new one — which is what the
 queue and the host ask about; `Current` is what the owner has actually adopted. The worker threads use neither: they
 hold `newComponent` from their own `Update`. `Reset()` releases both, and is called only while no thread is running.
+
+### 2.5 What opening does not decide, and what a selection republishes
+
+**Opening a file chooses nothing to play.** `Open` opens the source, reads the stream listing and publishes a holder
+with **no streams**, so nothing is created and nothing is read: no decoder, no device, no read-ahead, no frame
+decoded. That is deliberate, because the streams a host chooses from are only known once the file is open — a
+pipeline that guessed "the first of each kind" would build, configure and decode tracks the host is about to replace,
+and a video track switch builds a *new* renderer (and so a new graphics device) because the chain must be able to
+re-decode. A file opened onto a track menu should cost the container and nothing else.
+
+The consequence is a two-step start, and the host owns the second step: `SelectStream(kind, stream)` chooses one
+kind — with a null stream turning it off — and the host calls it once per kind it wants. `Play` is refused while
+both are unselected — played anyway, the clock would run, the position would advance and no stage would ever say a
+word, because the reader has nothing to read for and the ending is a statement about tracks that were never chosen.
+A file opened and never chosen from holds its source (and the file) until it is stopped or disposed of.
+
+**A kind is chosen on its own, and its failure is its own.** A chain that cannot be built is neither a warning nor a
+half-published selection: the whole command fails, nothing is published, and the kind that was already playing is
+untouched. That is what makes the host the one that weighs the two — a file whose device is missing is still worth
+watching, so a host plays the picture and reports the sound, and a host that would rather refuse the file refuses it.
+The alternative (build what can be built and warn about the rest) was tried and removed: it left a holder naming a
+stream with no chain to play it, which fed that stream's packets to the decoder of the stream it replaced (§2.5).
+
+The selection itself lives with the source, not beside it: `_source` holds a `MediaSourceHolder` (the file and the video and
+audio streams selected from it), so the reader routes by the streams of the holder it adopted. A switch therefore
+publishes a new holder, and it does so under **one new number shared with the chain it rebuilt**:
+
+| Published | Number | Why |
+|---|---|---|
+| the holder, carrying the new selection | `highest in use + 1` | the selection is new, and this number is the generation built for it. It is published whenever the comparison says anything changed, including the first publication of a file |
+| the decoder and renderer of the switched kind | the same number | they are one generation (§2.4), and it is the generation that goes with this selection |
+| the untouched chain | unchanged | rule 2 of §2.4 drops only *older* upstream numbers, so a newer source is accepted by the chain that was not rebuilt: it keeps playing the media it already has and never notices |
+
+**The read-ahead moves with the selection, in the same act.** `BuildChains` also sets the audio minimum from the
+stream it was given — after everything is resolved, so a failed build cannot re-pace a chain that is still the one
+playing, and before anything is published, so no thread can adopt the new selection and pace itself by the old
+stream's numbers.
+
+**What to rebuild is read from the holder, not passed beside it.** `BuildChains` takes the holder and compares it with
+the one in effect: the file, and each kind's stream by its container index. A kind whose index changed is built
+afresh — the point of a switch is a decoder built for a *different stream* even when the two streams happen to share
+codec parameters, and a signature match would quietly keep the decoder that was reading the old track; a kind whose
+stream went away is emptied; a kind whose stream is unchanged keeps what it has, the signature deciding whether
+anything needs repairing (`Reconcile`). The comparison is the same one `SelectStream` already makes, so it is made in
+one place, and a caller cannot ask for a publication that disagrees with the holder it hands over — the earlier
+shape, a "rebuild this kind" flag plus a "renew the source" flag, was a restatement of the holder that could be
+passed wrongly (and once was `true` for an unchanged holder, which cost the reader an epoch it could not see).
+
+Two consequences worth stating, because both are easy to get wrong:
+
+- **The position does not move.** The switch publishes the position it already had, with `SeekMode.Precise`, so the
+  media resumes at the switch and not a frame earlier — the same epoch change also clears the queues, which is what
+  releases the threads parked on them. A switch is therefore a seek in the only sense that matters here: freshness
+  comes from the epoch, compatibility from the version (§2.4).
+- **The holder does not own the source.** `MediaSourceHolder.Dispose` is empty and `StopCore` releases the file it
+  finds in the current holder, because one source outlives every selection of it: disposing it as a holder is
+  replaced would end the file the new holder is still reading.
+- **A kind can be turned off, and that is a publication like any other.** `SelectStream(kind, null)` publishes a
+  holder without that kind's stream and, in that kind's two roles, publishes **nothing** — the same two publishes as a
+  switch, with no component to put in them. The owner adopts the emptiness and disposes of what it was holding, which is
+  the only safe way to take a component away from a thread that is using it (§2.4). Nothing about the mechanism is
+  special: turning a kind off is a pending change of that kind's two roles, so it is marked where a rebuild is marked,
+  published where a component is published, and takes the publication's number along with the selection it belongs to.
+  The other kind is untouched and carries on; when the last kind is turned off the file returns to the state an opened
+  file is in — paused, with nothing to play — because a clock left running would be advancing over nothing. Subtitles
+  are the exception at the surface: asking for one is refused, while turning subtitles off is trivially satisfied,
+  since they were never on.
+- **The surface is given back when the picture is turned off.** A renderer paints into a surface the *host* owns, so a
+  frame it has presented stays there until something paints over it — and once the picture's renderer is let go of,
+  nothing ever will: the last frame would stand on screen for a file playing its sound without a picture. The render
+  thread, which is the one that owns the renderer, therefore empties the surface with `ClearSurface` **on the way out**,
+  at the only moment it exists and may be used, and only when the renderer is handed back rather than replaced — a
+  replaced renderer is drawn over by its successor, and a black flash between two pictures of the same film would be a
+  worse answer than the frame it hides. The clear also forgets the frame a redraw would use, so a surface resize or a
+  pause cannot put it back. A renderer kept because the picture ended (rather than because it was turned off) is not
+  cleared: the file still holds a picture, and the last frame of it is the truest thing on screen.
+
+Nothing outside the reader side of the pipeline changes, because the switch is expressed entirely in what is
+published: each render and decode thread takes up its new component from its own `Update` and judges the packages
+in flight by the rules above, rather than by a case that knows a track was switched.
 
 ## 3. The three hand-offs
 
@@ -397,8 +501,18 @@ stage having to make progress.** These are the rules; §4.1–§4.5 are why each
 ### 4.1 The reader never drops and never blocks on a stage
 
 It fills both queues to their minimums, then idles until either falls below half of its minimum, then fills
-again. The minimums are *read-ahead*, not capacity: 500 ms of audio samples and 64 video packets, waking at
-250 ms and 32. A stream the file does not have is trivially satisfied.
+again. A holder with no streams in it is trivially at its minimums, so a file that is open and unselected is a file
+the reader does not read: what is not going to be played is not read ahead. The minimums are *read-ahead*, not
+capacity: 500 ms of audio samples — of the *selected stream's* own samples, so the number is set with the selection
+(§2.5) — and 64 video packets, waking at 250 ms and 32. A queue is paced only when it can fill *and* drain, which takes
+**both** halves: the kind is being read — the selection has a stream of it — *and* a decoder exists, because the audio
+decoder is what puts samples in the audio queue while the video decode thread is what takes the packet queue back
+down. Either half alone can hold while its queue cannot reach the minimum: a kind turned off leaves a decoder in
+place for a stream nobody reads, and a stream whose decoder could not be built is the mirror image — since a build
+that fails publishes nothing, that one is not reachable today and is exactly what a partial publication would create.
+In either case the reader would never settle into its paced read and would read the file to its end in one go.
+Neither the file's stream list nor the components can answer this alone: it is a question about a queue that
+something fills and something drains.
 
 **It reads for a playback that is playing or paused, and does nothing in any other state.** It is the one
 thread that works while paused — the read-ahead is what a resume starts on — so those two states are what its
@@ -411,10 +525,18 @@ The reader has **no drop path at all**. The single case in which a read packet i
 moved the epoch while it was being read — work for a position nobody wants — and that is the seek's doing, not
 a policy of the reader's.
 
+**It moves the cursor by asking the source to land by a stream**, not by asking for a position and accepting
+whatever the container falls back to (§6). The picture is what a landing is measured by while it has media at the
+position — its keyframes are the only ones there are, and the media it lands on is the lead-in the decoder needs —
+and otherwise it is whichever of the two streams reaches furthest, because sound has no keyframes and lands within a
+packet of the position. That choice is a fact about the file rather than about the request, and it is made where both
+are known: against the lengths the container declares for the picture and the sound, which is also what says whether
+the position is one the picture can reach at all.
+
 *Forbidden by this rule:* any maximum on the packet or audio queue; any drop on overflow; asking the reader to
 wait for a decoder, a renderer or the device.
 
-### 4.2 The video decoder never drops and never consults the clock
+### 4.2 The video decoder drops nothing it could decode, and never consults the clock
 
 It takes a packet, decodes it, and hands the frames to the frame queue; if there is no room it waits there.
 Two things it deliberately does *not* do:
@@ -426,12 +548,28 @@ Two things it deliberately does *not* do:
   business. A decoder gated by the clock is how a stalled device used to stop the sound as well as the
   picture: it is an edge of the historical deadlock (§12).
 
+The one packet it does give up on is one it has **no decoder for**. The thread no longer parks when the slot
+holds nothing: it walks the iteration as usual — the epoch, the room, the version verdict, the take — and then
+releases a packet it cannot decode. That is not the dropping the rule forbids, which exists so a slow decoder
+cannot hide behind lost frames; a decoder that does not exist has no slowness to hide, and leaving the packet
+where it is has a cost the drop avoids: nothing else consumes that queue, the reader's read-ahead skips a kind
+no decoder fills, so the queue becomes the whole file read into memory. Two details make it safe. The **end of
+the stream** is not a packet and is never given up on — it still travels to the frame queue, because the video
+stage's word is what earns the ending (§7), and a chain with no decoder that swallowed that word would leave
+the file unable to end. And the **verdict is still taken first**, which is what tells the two null cases apart:
+a package naming a generation that has been published but not yet adopted *blocks* — that is a decoder on its
+way — while a package naming none is accepted and released, because no decoder was ever published for it.
+That is also why the block is self-limiting here rather than a stall: a publication always precedes the wake,
+so the generation a package names is always on its way, and the next turn adopts it.
+
 While paused the decoder stands still rather than filling the frame queue; that is what keeps a pause from
 spending the look-ahead the resume needs.
 
 ### 4.3 Presentation loses frames, best-effort, and holds the clock when it cannot
 
-The picture is the follower, and it is the **only** stage allowed to give up on media:
+The picture is the follower, and it is the **only** stage allowed to give up on media *it could have
+played*. (A chain with no decoder gives up on its input too, but never on media anybody could have shown —
+§4.2.)
 
 - **Never early.** If the frame's moment has not come, it waits for it, a millisecond at a time. That wait is
   what makes the picture follow the sound, and nothing else waits on this thread.
@@ -552,12 +690,20 @@ it is the same as before — wait, lose nothing, and let the position say what i
   implement `Start`/`Pause` naively (I10).
 - **The clock is not authoritative about where playback started.** A demuxer lands on the keyframe at or before
   the requested position, so what will actually play first is earlier than what was asked for. The clock is
-  therefore *anchored* by the first piece of media that plays — the first buffer handed to the device, or, for a
-  silent file, the first frame the position **showed** (the still offered while paused counts, which is why the
-  clock is anchored at the moment playback starts rather than at the moment the still is drawn) — never by the
-  requested position.
+  therefore *anchored* by the first piece of media that plays — the first buffer handed to the device, or the
+  first frame the position **showed** (the still offered while paused counts, which is why the clock is anchored
+  at the moment playback starts rather than at the moment the still is drawn) — never by the requested position.
   Anchoring to the request leaves the picture permanently a keyframe behind the sound, every frame of it late
   enough to be dropped: the picture then never moves again.
+- **Whichever media plays first claims the position, and the sound is not the only claimant.** The picture asks
+  for the claim on every frame it presents, and `AnchorClock` refuses when this position already has an owner, so
+  in the ordinary case the sound's first buffer claims it and the picture's request costs a comparison. Asking
+  unconditionally is what covers a sound that *cannot* claim: no decoder for the new track yet, a track with
+  nothing left at this position (switching to a shorter track late in the file), or the kind turned off. Leaving
+  those cases to the picture would be a playback that stands still forever with nothing to report: the frame
+  ahead of an unclaimed position waits for a moment only the clock could bring, and the clock waits for a claim
+  only that frame could make (§8). The frame that claims a position is not early against it — its moment is when
+  the position becomes a fact.
 - **The clock is the pipeline's own, and the device corrects it.** It is a stopwatch, so it is never hostage to a
   device that has nothing to play: a WASAPI position counts frames *played*, and a device that has run dry does not
   advance — which would leave every frame due after the sound's last sample waiting for a moment that can never
@@ -588,15 +734,16 @@ rather than by waiting for them** — and by **asking the cursor's owner to move
 In order, on the queue's side:
 
 1. Refuse it outright if the source cannot be moved at all (`CanSeek`) or if the state will not take one
-   (`Paused`, `Playing` and `Ended` are the states a seek is for) — before anything is paused, so the refusal
+   (`Paused`, `Playing` and `Ended` are the states a seek is for) — before anything else moves, so the refusal
    costs nothing. This is the only refusal that can be answered here, because whether a source *can* be moved
    is fixed when it is opened; whether it *will* is only known by trying.
-2. **Pause**: a seek leaves playback paused, always, whatever it was doing. It is a state change of its own —
-   the position has moved, so nothing about the old one is being played any more — and whether the *new*
-   position goes on playing is the host's decision, made with one `Play`. That is also what keeps the two
-   refusals straight: a seek refused here (step 1) changes nothing at all, while a seek the source refuses
-   *when asked* was accepted first, so the pause is the move's doing and the reader's refusal only means the
-   position did not change (§11, I16).
+2. **Leave the state alone.** A seek is not a pause: a file that was playing goes on playing from the new position,
+   and a paused one stays paused, so a jump never overrules a pause the user pressed while it was in flight and a
+   host never has to restore what the seek took away (§11). This also keeps the two refusals straight — a seek
+   refused here (step 1) changes nothing at all, and a seek the source refuses *when asked* was accepted first, so
+   the only thing its refusal means is that the position did not change (§11, I16). The one state a seek does move
+   is `Ended`: a seek from the end takes the file back into itself as `Paused`, because there is nothing to play
+   from the end until it is told to.
 3. **Change the position as one fact, in one change**: publish the position that was asked for, advance the
    epoch, and clear the three queues. The change
    is one fact rather than a sequence of steps — the threads that act on the new position act on all of it, and
@@ -617,11 +764,11 @@ In order, on the queue's side:
    requested here: both belong to the decode thread, which takes up the new position itself the moment it
    sees the epoch move (§2.2). The end of the file is not withdrawn here either, because it is stated *with*
    a position: a new position is simply not the one the file ran out at.
-5. One signal for one seek, sent here rather than with the state change of step 2: what the wake is for is
-   that the position *moved*, and a thread woken between the two would read the position playback has left
-   and go back to sleep — for the reader, which waits without a timeout once the file has run out, that means
-   not taking the seek up at all. So the state change tells subscribers, and this — once the epoch and the
-   clears have moved — tells the threads.
+5. One signal for one seek, sent once the epoch and the clears have moved: what the wake is for is that the
+   position *moved*, and a thread woken early would read the position playback has left and go back to sleep —
+   for the reader, which waits without a timeout once the file has run out, that means not taking the seek up at
+   all. There is nothing else to announce: a seek raises no event, because the only state it can change is a file
+   taken back from `Ended`.
 6. Answer the caller with the result of the request — accepted, or the predictable refusal from step 1.
 
 ### Seek modes
@@ -632,6 +779,23 @@ What a position is *taken as* is part of the request, and it travels with the po
 |---|---|---|
 | `Fast` (the default) | a wish | the keyframe at or before it; that media anchors the clock, so playback resumes *earlier* than asked (§5) |
 | `Precise` | a floor | the first frame at or after it and the first sound block at or after it; nothing earlier is shown or played, and the clock is anchored by that media, so it never stands before the request |
+
+**A wish the picture cannot grant is landed by the stream that reaches furthest.** A demuxer lands on a keyframe,
+and keyframes are the picture's, so the cursor is asked to land by the picture — that is what a fast seek is *for*,
+because the media between a keyframe and the request is the lead-in the decoder needs. A picture that has ended
+before the request has no keyframe there, only its last one — which can be seconds behind — so a landing measured by
+it would put the whole file, the sound included, at the moment the picture stopped, and everything from there to the
+request would be read and thrown away to arrive at it. A position past the end of the picture is a position only the
+sound reaches, and there the cursor lands by the sound: it has no keyframes, so it lands within a packet of the
+request — which is what a file with no picture at all has always done. Where the sound has ended too, the landing
+goes to whichever of the two is the longer one, because that is the closest anything can come to the request; and
+where the container declares no length at all, nothing has been shown to have ended and the picture keeps it. The
+mode is left as it was asked for: a fast seek still resumes at the media of its landing, which is now the request to
+within one sound block, and a precise one still never stands before it.
+
+The picture's end is the length the container declares for the stream (`MediaStreamInfo.Duration`, which Matroska
+writes as a `DURATION` tag rather than as a stream field), and a container that declares nothing leaves the wish as
+it was — silence about a stream's length is not a claim that it has ended.
 
 A precise seek still lets the source land on the keyframe at or before the position: the media between the
 two is needed — the frames after it refer to it — so the decoder produces it as usual. Giving up on it belongs
@@ -1001,11 +1165,11 @@ A change is safe exactly when it leaves all of these true. "Pinned by" names the
 |---|---|---|---|
 | I1 | Only the presentation thread waits on the clock | Every historical deadlock had a clock wait somewhere else in the cycle | pipeline tests: a device that never moves must not stop the picture from being shown; a decoder too slow must hold the clock, not drop its output |
 | I2 | The reader's only waits are the file and its own read-ahead idling | The reader is the sound; anything that stops it stops audio production | queue tests: unbounded enqueue; a decoder at a standstill must not stop the reader |
-| I3 | The video decoder waits only for frame-queue room, and drops nothing | A decoder that drops hides its own slowness; a decoder waiting on anything else adds a cycle edge | frame-queue test: the producer waits for the picture rather than losing a frame |
+| I3 | The video decoder waits only for frame-queue room, and drops nothing **it has a decoder for** — a packet with no decoder in the slot is taken and released, and the end-of-stream marker is never released at all | A decoder that drops hides its own slowness; a decoder waiting on anything else adds a cycle edge. The exception is the other way round: a chain that cannot decode has nothing to hide, and the packet it leaves behind is the whole file read into the queue (§4.2) | frame-queue test: the producer waits for the picture rather than losing a frame |
 | I4 | The presentation thread never displays early and never waits for one particular frame | Both are the failure modes called "frozen" and "out of sync" | `StartsWhereTheFileResumesRatherThanWhereTheSeekAsked`, `DropsOnlyTheFramesWhoseMomentHasGone`. The one frame it does wait for is the still of a paused position, and that wait has no clock behind it: the frame arriving is the wake (§4.3) |
 | I5 | Nothing waits for a queue that no longer exists, and no wait holds on to a position playback has left: a seek is a request the cursor's owner carries out rather than a lock the seek takes, and it *clears* the queues so the threads parked on them are released | Bounded liveness: the decoder's wait for room ends with the picture taking a frame, with the clear a seek performs, or with the close a stop performs — never with a state check that a pause would make false | the seek tests, delivered as "the seek never returned" assertions, `SeeksWhilePausedAndMovesTheReaderAndDecoder` (a paused seek with both producers parked), and every test that disposes a pipeline with a full frame queue |
-| I6 | Media carries the epoch it was produced for **and the component versions that produced it**, and is dropped rather than replayed when either has moved on — checked by the producer before it hands work over and by the consumer before it uses what it took, never by the queue in between | A seek that half-works is worse than one that visibly restarts; and a queue that filtered would be a queue that decides, which is how the epoch gets back into a place with no business knowing it. The version half is what stops a new decoder's packets reaching the decoder it replaced, and an old decoder's frames reaching the renderer that replaced it (§2.4) | `SeeksWhilePlayingAndLeavesItPaused`, `SeeksWhileTheNextFrameIsStillWaiting`, `MediaQueueTests` for the tag travelling untouched, and `ComponentVersionTests` for the comparison itself |
-| I7 | An empty queue is a wait, and only an empty queue *after the end of the stream* is played out: the end arrives as an entry behind the media it follows, and the ending is *earned* — the queue ends playback when the picture and the sound have each said their stream is over, for the position the file ran out at; a pause does not hold it open, and a failure is never talked over by it | A timeout in the queue is two faults at once — it blocks the queue every command is posted to, and it ends a file whose sound has not been heard; and inferring the end from an empty queue makes "the decoder is behind" and "the decoder is done" the same observation, which is a question about a position the asker is not holding. Gating the decision on the state instead needs a second place to ask it again, which is what left a paused-at-the-end file open for good | `PlaysAnAudioFileThroughTheRenderer`, `PlaysAVideoOnlyFileToTheEnd`, `ProducesTheTailOfAFileWhenItsPacketStreamEnds` (a decoder that only releases its tail when drained), `PlaysAgainAfterTheEndOfTheFile`, `AnswersACommandWhileTheSoundHasNotPlayedOut` (fails if the wait comes back), `EndsWhenTheDeviceHasPlayedOutTheSound`, `EndsWhilePausedWhenTheFileHasPlayedOut` (fails if the ending waits for a resume) |
+| I6 | Media carries the epoch it was produced for **and the component versions that produced it**, and is dropped rather than replayed when either has moved on — checked by the producer before it hands work over and by the consumer before it uses what it took, never by the queue in between | A seek that half-works is worse than one that visibly restarts; and a queue that filtered would be a queue that decides, which is how the epoch gets back into a place with no business knowing it. The version half is what stops a new decoder's packets reaching the decoder it replaced, and an old decoder's frames reaching the renderer that replaced it (§2.4) | `SeeksWhilePlayingAndGoesOnPlaying`, `SeeksWhileTheNextFrameIsStillWaiting`, `MediaQueueTests` for the tag travelling untouched, and `PipelineVersionTests` for the comparison itself |
+| I7 | An empty queue is a wait, and only an empty queue *after the end of the stream* is played out: the end arrives as an entry behind the media it follows, and the ending is *earned* — the queue ends playback when the picture and the sound have each said their stream is over, for the position the file ran out at; a pause does not hold it open, and a failure is never talked over by it. Which stages owe a word is asked of the **selection** — the streams of the holder — rather than of the file or of the components: the ending says the media being played has run out, the selection is what names that media, and unlike a component it does not change under the answer. A stage exists for every open — all four threads start together, and each render loop walks its queue to the end marker with or without a component — so a file whose sound has no decoder at all still ends | A timeout in the queue is two faults at once — it blocks the queue every command is posted to, and it ends a file whose sound has not been heard; and inferring the end from an empty queue makes "the decoder is behind" and "the decoder is done" the same observation, which is a question about a position the asker is not holding. Gating the decision on the state instead needs a second place to ask it again, which is what left a paused-at-the-end file open for good | `PlaysAnAudioFileThroughTheRenderer`, `PlaysAVideoOnlyFileToTheEnd`, `ProducesTheTailOfAFileWhenItsPacketStreamEnds` (a decoder that only releases its tail when drained), `PlaysAgainAfterTheEndOfTheFile`, `AnswersACommandWhileTheSoundHasNotPlayedOut` (fails if the wait comes back), `EndsWhenTheDeviceHasPlayedOutTheSound`, `EndsWhilePausedWhenTheFileHasPlayedOut` (fails if the ending waits for a resume), `EndsWhenTheSoundHasNoChainToPlayItThrough` (a kind the file has but nothing can play still reports its end, so the ending does not wait for a stage that will never speak) |
 | I8 | Losing media happens in exactly one place, and it is counted | A media pipeline that loses frames silently cannot be diagnosed | `DroppedFrameCount` assertions in the drop and device tests |
 | I9 | Every wait ends; a stalled device is a wait that ends when the device does, and nothing in the pipeline names it | Nudging, timing out or failing a device that has stopped turns a wait the user can see into a fault they cannot; and naming it needs a judgement the pipeline cannot make — a late device and a broken one report the same frozen position, so the line would be a guess with a threshold behind it (§9) | `WaitsForADeviceThatNeverTakesAudio` (a device with no room parks and resumes without losing the block) |
 | I10 | The clock starts and stops in exactly one decision, made by a render thread out of facts it reads (the state, the position, the starvation verdicts, the claim) — a state change always re-evaluates it, and the clock is *told* only when the answer changes | Two places deciding "is time passing" is how pause, starvation and seek start fighting — and a clock told the same thing twice is a clock whose `Start`/`Pause` have to tolerate it, which the interface does not promise (a naïve `Start` re-anchors, a naïve `Pause` records a stop that never happened; the two real clocks happen to guard themselves). The decision is taken where the facts change rather than asked for by someone who does not hold them, so there is no notification to keep in step — and the facts are all readable without the lock, so a wake that finds nothing changed costs nothing | `PausesAndResumes`, `TellsTheClockOnlyWhenWhatItShouldDoChanges` (a state change that leaves the answer the same tells the clock nothing), `KeepsTheClockWhereTheMediaPutItWhenSomethingElseChangesIt` (a decision made *after* the claim must not put the seek's request back over the media's answer), and every test that asserts `ClockIsRunning` |
@@ -1013,8 +1177,8 @@ A change is safe exactly when it leaves all of these true. "Pinned by" names the
 | I12 | An idle thread sleeps on its own node and is woken by whoever changed what it reads, never on a fixed short sleep — and a wait whose answer depends on time is armed with a **fixed cadence** that never depends on another thread's state | Polling costs power and processor time for nothing, and a missed wake costs the promptness a pause, resume or seek is supposed to have. A cadence derived from the clock's state (`IsRunning`, the claim, the rate, how far behind the picture is) is a prediction that the clock cannot change the answer, whose subject is owned by another thread; a prediction that turns out wrong is a hold that never arrives (§2.3, §8) | `WakesForEachSurfaceChangeWhilePausedRatherThanWaitingForTheBackstop` (counts the wakings inside one backstop period, so it fails if the wake is dropped), `HoldsTheClockBackWhenTheClockReachesTheThreshold` (a silent file: only the clock can change the verdict, and the cadence is what notices) |
 | I13 | A warning is a line, not a state: it is raised as it happens, nothing reads a "current warning" back, and what counts as a repeat is decided by whoever raises it | A warning folded into the state event makes every subscriber ask whether the state moved; a warning held as a value makes its lifetime someone's responsibility, and a value nobody clears is a stale one. A warning's job is only to explain something the user cannot see for themselves, which is why there are as few as there are — a refused seek, audio the device would not take — and why the stalled device, which the pipeline cannot distinguish from a slow one, raises none at all (§9) | `PlaysAnAudioFileThroughTheRenderer` (a file that plays says nothing at all), `RefusesASeekTheSourceWillNotCarryOut` (one line for a refusal) |
 | I14 | Only an item of the orchestration queue changes state or raises an event; the threads that move media only post — and the clock is moved only by the two render threads, out of facts the queue published (the state, the epoch and the position that was asked for) rather than out of a value handed along with a wake | This is what makes the state a volatile field instead of a locked one, and what lets a subscriber touch UI state without asking which thread it is on. Keeping the clock to the threads that read it is what keeps a seek from reaching into a decision it does not own: a seek publishes a request, and the first media of the position is what turns it into a fact | every pipeline test: they call the pipeline from the test thread and assert on what was announced — and on what a command handed back — never on which thread a callback arrived on |
-| I15 | Every call into the pipeline is posted and hands back the task of its own job, carrying whether it could be carried out; nothing inside the pipeline waits for a queue item, no queue item waits for a media thread's progress either, and the only wait in its own surface is `Dispose`'s teardown — a plain wait, because nothing in the teardown waits for something that will not come | A wait inside a queue item — the caller's thread stalls behind whatever is ahead of it in the queue, including another pipeline's work, and a nested call waits for itself. The end of a file used to be exactly that wait, which is why it is now a decision taken from messages instead of a wait taken from flags. A caller awaiting a task it was handed is doing what any asynchronous API allows | `SeeksWhilePlayingAndLeavesItPaused`, `SeeksWhilePausedAndStaysPaused`, `SeeksWhileTheNextFrameIsStillWaiting` (all wait for the seek's task), `AnswersACommandWhileTheSoundHasNotPlayedOut` (a command answered while the tail is still playing out), and every test whose fixture it deletes straight after a dispose |
-| I16 | **A command reports; playback fails.** A request that cannot be carried out is answered by the task it handed back and changes nothing else — no state, no event, no error — while `Error` is only ever playback that cannot continue. The one thing a command *can* leave behind is its own state change: a seek that was accepted pauses playback, and if the source then refuses the move (only known by trying, so only known afterwards) the position is simply where it was — a line, not a failure | Folding the two together is how a pipeline dies because somebody dragged a slider past a source that will not move, and it leaves a caller unable to tell "that did not work" from "this is over" | `RefusesCommandsWhenNothingIsOpen`, `ReportsAFailedPlayOnceTheFileHasEnded`, `RefusesASeekTheSourceWillNotCarryOut` (both refusal paths: refused in advance changes nothing, refused when asked was the move's pause), and `ReportsADecoderThatDiesAsPlaybackFailing` for the other side of it |
+| I15 | Every call into the pipeline is posted and hands back the task of its own job, carrying whether it could be carried out; nothing inside the pipeline waits for a queue item, no queue item waits for a media thread's progress either, and the only wait in its own surface is `Dispose`'s teardown — a plain wait, because nothing in the teardown waits for something that will not come | A wait inside a queue item — the caller's thread stalls behind whatever is ahead of it in the queue, including another pipeline's work, and a nested call waits for itself. The end of a file used to be exactly that wait, which is why it is now a decision taken from messages instead of a wait taken from flags. A caller awaiting a task it was handed is doing what any asynchronous API allows | `SeeksWhilePlayingAndGoesOnPlaying`, `SeeksWhilePausedAndStaysPaused`, `SeeksWhileTheNextFrameIsStillWaiting` (all wait for the seek's task), `AnswersACommandWhileTheSoundHasNotPlayedOut` (a command answered while the tail is still playing out), and every test whose fixture it deletes straight after a dispose |
+| I16 | **A command reports; playback fails.** A request that cannot be carried out is answered by the task it handed back and changes nothing else — no state, no event, no error — while `Error` is only ever playback that cannot continue. The one thing a command *can* leave behind is its own state change — a seek from `Ended` leaves the file `Paused` — and a seek the source refuses (only known by trying, so only known afterwards) leaves the position where it was: a line, not a failure | Folding the two together is how a pipeline dies because somebody dragged a slider past a source that will not move, and it leaves a caller unable to tell "that did not work" from "this is over" | `RefusesCommandsWhenNothingIsOpen`, `ReportsAFailedPlayOnceTheFileHasEnded`, `RefusesASeekTheSourceWillNotCarryOut` (both refusal paths leave the state and the position as they were), and `ReportsADecoderThatDiesAsPlaybackFailing` for the other side of it |
 | I17 | **A queue is a data structure: it takes what it is given, hands it back in order, and waits for nothing.** No thread ever sleeps inside a `MediaQueue<T>`, no entry is ever held across a wait, and the queue has no waits, no timeouts and no pulses left: a consumer that has nothing to do sleeps on its own node and is woken by the producer, a producer that may not run ahead checks its window and sleeps on its own node, and the seek's clear neither waits nor wakes anybody. A consumer that has to judge an entry before owning it looks first (`TryPeek`) and then takes back what it looked at (`TryDequeue(entry)`) | A queue that woke on a clock is a queue whose missing release is survivable and therefore invisible: the end-of-file word and the "nothing to play" hold were both quietly resting on one 20/50 ms tick, and neither release would have been missed if it had been dropped. A queue that makes a *thread* wait is worse than that: the waiter is then parked on a lock the waker does not own, so a pause, a seek or a surface change cannot reach it — which is how a picture went on sleeping through a seek while its decoder was quiet. Every wait now lives on the thread's own node, so there is exactly one lock per thread to reach, and where a wait ends has a test (§2.3, I18) | `HandsTheEndOfTheStreamOverAfterEverythingQueuedBeforeIt` (the end is handed over once, and `TryPeek` is how a test asks what is behind), `TakesTheEntryThatWasLookedAtRatherThanWhateverIsAtTheHead` (identity, not the tag: a replacement entry carries the same one), `AnswersAtOnceOnceItIsClosed`, `DisposesWhatItStillHoldsWhenItIsClosed`, `TakesAsMuchAsItIsGivenRatherThanStoppingTheProducer` |
 | I18 | **One wait per thread.** Each of the four threads sleeps in exactly one place — its own `PipelineNode` — and every shared fact it reads before sleeping has a writer that wakes that node. A wake means "something you read changed": it may be spurious, it must never be missed, it never waits for the woken thread, and it is never sent while holding a queue's lock | Two places to sleep is two locks to reach, and a waker can only reach the one it knows about. The state lock and the queue's lock were exactly that pair: a thread inside `Peek` could not be told that the position had moved, so every command was a timeout away from being noticed, and a missing wake was indistinguishable from a slow one. With one wait, "how does this thread learn about X" has one answer per fact (§2.3) | `PipelineNodeTests` (the stamp protocol, the un-losable wake, the wake that never waits), `KeepsTheSoundComingAfterTheReadAheadIsUsedUp` and `KeepsThePictureComingAfterTheFrameWindowIsUsedUp` (a consumer that is the only possible waker), `TakesUpASurfaceChangeWhileThePictureWaitsForItsPosition` and `TakesUpASeekWhileThePictureWaitsForItsPosition` (a control wake reaching a thread that is waiting for media) |
 | I19 | **A hold on the clock is the pipeline's, and no component may release it.** A renderer's hand-off writes into a stopped device and leaves it stopped; the only starter is the render thread's decision (I10), and a stopped device's buffer filling is the hold itself — the hand-off says it has no room until the decision changes or the device is reset | A component that starts the device decides that time may pass, in a place the decision cannot see. `WasapiAudioRenderer.Submit` did exactly that, and the hold was released by the next block: a first decode that took 400 ms came after the first audio block, so the clock ran with nothing to show and the frames were dropped as late, and the picture fell 1.3 s behind the sound in a held playback — both measured by making the test double start the clock the way the device did. Nothing in the double was starting it, which is why the whole suite stayed green while the backend released every hold | `HoldsTheClockBackUntilThePictureHasSomethingToShow`, `HoldsTheClockBackWhenTheVideoCannotCatchUp`, `PlaysAToneThroughTheDefaultDevice` (a hand-off into a stopped device leaves it stopped, and one into a paused device does not restart it), and their refusal to pass for a double that starts the stream on submit |
@@ -1064,7 +1228,7 @@ A change is safe exactly when it leaves all of these true. "Pinned by" names the
 | Keep a "the decoder has drained" flag for the queue to poll, beside the messages the stages send | It was two writers (the decoder's thread setting it, a seek clearing it) with no ordering between them, so the older fact could land last and silence the next file's tail — and it existed only to serve the wait the row above removes. The fact belongs to the decoder's thread as a local, and its consequence is a message: the tag that carries a position is how a seek is taken up, never a flag retracted behind a writer's back |
 | Change the state, raise an event, or touch the clock from a media thread "because it is the only thread that knows" | The single-writer property that makes the state a volatile field is gone, and every event becomes a thread question for every subscriber. Media threads hand what they know to the queue; that is what the queue is for |
 | Tear the playback down automatically when it fails, so `Error` means "stopped and released" | Three costs for one tidy word. The teardown ends in `SetState(None, null)`, which clears the reason, the `MediaInfo`, every diagnostic counter and the clock — so the pipeline can no longer say *what* failed *where*, which is exactly what a report needs; if `Error` were kept instead, `Play` would answer "Nothing is open." rather than naming the failure, because the source is checked first. And the teardown is four joins with **no timeout** on the queue every command is posted to: a failure is the moment another thread may be stuck inside a component (a hung read, a wedged device submit), so automatic teardown turns "one playback failed, and the app was told why" into "no pipeline in the process accepts a command any more". The release belongs to the host, which can time it and can keep the evidence until it does (`StopsReadingOncePlaybackHasFailed` pins what the failed pipeline *does* do: nothing) |
-| Have a seek resume playback when it found it playing — the command undoing its own pause | The state stops being a fact about playback and becomes half of one: the same command both changes the state and changes it back, so a host cannot ask for "seek and stay paused" (a drag on a paused player, a preview) without racing that decision, and the user pressing pause *while the seek is in flight* is silently overruled. The asynchronous case is worse: a source that refuses the move is only known afterwards, so the pipeline would have to decide the resume before it can know whether there was a move to resume — which is why a refused seek used to resume anyway. A seek pauses, the host's one `Play` says whether it goes on, and the adapter is where the app's "a jump while playing keeps playing" is restored |
+| Have a seek pause and then resume what it found playing — the command undoing its own change | The state stops being a fact about playback and becomes half of one: the same command both changes it and changes it back, so a host cannot ask for "seek and stay paused" (a drag on a paused player, a preview) without racing that decision, and the user pressing pause *while the seek is in flight* is silently overruled. The asynchronous case is worse: a source that refuses the move is only known afterwards, so the pipeline would have to decide the resume before it can know whether there was a move to resume. The answer is not to pause at all: a seek leaves the state where it is, so there is nothing to undo, nothing to overrule, and nothing to restore in a host |
 | Decide the ending only while playing, and ask it again when Play is pressed | Two faults: a file that has played out stays *Paused* — the words are already in and only a resume asks again, so the pipeline holds a file nothing will play — and the resume that "fixes" it reports a `Play` that succeeds into an immediate end, which is a caller told it started what it finished. The ending is earned by the stages, so where they were heard is where it is decided; the one state to respect is `Error`, which an ending would replace with a file that merely finished (`EndsWhilePausedWhenTheFileHasPlayedOut`) |
 | Signal the threads with the state change, "because a woken thread re-reads the epoch anyway" | It re-reads it *before* the change is complete and then waits again — against a signal that has already been sent. For a wait with a timeout that costs promptness; for the reader once a file has run out, which waits with none, it costs the seek: it wakes, reads the position playback has left, parks, and nothing is coming to wake it again. The window is microseconds and the race is usually won, which is the whole reason to remove it rather than race it — measured by widening the window to 150 ms, where `TakesUpASeekFromTheEndWithoutAnotherCommand` fails on exactly that: the file sits where it was while the clock, the state and the seek's answer all say it moved |
 | Keep a field for "the position the clock has been placed for", so that two threads place it exactly once | The claim is already that fact. While nothing of the media has claimed the clock for a position, the request is the only thing there is to place and placing it twice places the same value; once it has been claimed, the claim's own position refuses the request. A second field is a second thing to keep in step — written when placing, written when claiming, reset on a stop, read on every decision — and each of those is a way for it to disagree with the clock it describes. What made it look necessary was the *pair* of facts it stood in for: "has it been placed" and "has it been claimed", which the claim alone answers (measured by removing the guard that reads it: `KeepsTheClockWhereTheMediaPutItWhenSomethingElseChangesIt`) |
@@ -1140,14 +1304,26 @@ The Playback Lab shows all of the above in one line, which is the intended way t
    host currently refuses rather than pretending.
 4. **Subtitles, plugins and fallback** are out of scope by decision, with seams in the contracts only — they
    are factors in the design, not behaviour of it.
-5. **Exactly one video and one audio stream** are played: the first of each. Track selection is not wired to
-   the pipeline yet, and a second track of the same kind is skipped by the reader.
-6. **The clock waits for a position's first media, so a pathologically slow first decode freezes both stages.**
+5. **Opening chooses nothing, so a host that never chooses has a file it cannot play.** `Play` is refused until one
+   kind is selected, and turning every kind off returns the file to that state — paused, with nothing to play.
+   Subtitles are the one kind that cannot be chosen at all: a subtitle stream is refused, while turning subtitles off
+   is trivially satisfied. A file opened and left alone keeps its source — and its file — until it is stopped. A
+   switch also restarts the read from where playback stands, which a source that cannot seek cannot do: on such a
+   source the media already read ahead is given up on rather than re-read, and a source whose read blocks (a live one)
+   cannot be interrupted by the switch until the read returns — which is why the two kinds are chosen one at a time
+   and a live source wants both choices before it has given much media.
+6. **A track is switched, never turned off, and subtitles are not selectable.** One video and one audio stream are
+   played at a time, chosen by `SelectStream` (default: the first of each kind, skipping streams the demuxer says
+   nothing about). Passing null to switch a kind off, and every subtitle stream, is refused with a message rather
+   than ignored. A switch also rebuilds that kind's chain from scratch — the new decoder starts at the switch
+   position, so a track whose codec has a long opening is not warmed up in advance — and a stream whose packets are
+   interleaved badly enough to need a different source seek would show it as a longer gap than the track deserves.
+7. **The clock waits for a position's first media, so a pathologically slow first decode freezes both stages.**
    The hold that keeps a picture from being skipped at the start of a position (§8) is released by the first
    frame, by the end of the stream, or by a stop — and by nothing else. A decoder that takes seconds to
    produce its first frame therefore pauses playback for seconds, by design: the alternative is to start the
    sound alone and lose the picture's opening.
-7. **Two pipelines play two streams the operating system mixes, and each has its own volume and mute.** Each
+8. **Two pipelines play two streams the operating system mixes, and each has its own volume and mute.** Each
    pipeline asks its factory for a renderer per open, so their buffers, clocks and flushes are separate, and each
    renderer drives the **stream's** volume service (`IAudioStreamVolume`), never the session's: a session belongs
    to the process, so a session control would move both players at once. WASAPI has no per-stream mute, so mute is
@@ -1156,35 +1332,40 @@ The Playback Lab shows all of the above in one line, which is the intended way t
    conventional behaviour. And because the mix happens in the audio engine, the two streams have no
    sample-accurate relationship — anything that needs one (a crossfade, stems, karaoke) belongs in a mixer inside
    **one** pipeline, not across two.
-8. **Component factories are stateless or per-renderer; nothing is shared between two pipelines.** The audio
+9. **Component factories are stateless or per-renderer; nothing is shared between two pipelines.** The audio
    factory hands out a renderer per call, and the Direct3D 11 factory creates a graphics device per renderer
    (which that renderer owns and disposes): a renderer draws through the device's immediate context, and a frame
    is a sequence of calls on it, so two renderers on one context let one player's state land between the other's
    setup and its draw. A device per renderer makes that impossible by construction, and
    `CreatesItsNextRendererAfterThePreviousOneWasLetGoOf` pins it — a cached device would be dead by then.
-9. **A stream that ends before the file does is not yet *known* to have ended.** FFmpeg reports the end of the
+10. **A stream that ends before the file does is not yet *known* to have ended.** FFmpeg reports the end of the
    *container* (`AVERROR_EOF`), not of a stream: a stream simply stops producing packets, and `AVStream.duration` is
    metadata (right in MP4, often absent in MKV, meaningless when damaged or live). So the pipeline can know that the
    sound has *no data now*, but not that it will never have more. Today that shows as a hold: a mid-file audio gap
    pauses the clock, and only the container's end releases it. What makes the reported hang different is that it
    needs no such knowledge — the sound is simply over, the clock is the pipeline's own, and time carries on.
-10. **The clock corrects itself to the device while the device plays, so it can step backwards by the sync
+11. **The clock corrects itself to the device while the device plays, so it can step backwards by the sync
    tolerance.** A stalled device pulls the pipeline's clock back to itself every few milliseconds, which
    is how a stall keeps the picture waiting without freezing time altogether; the step is bounded by
    `ClockSyncToleranceMilliseconds` and is well inside the synchronizer's tolerances, but it does mean the clock is
    not strictly monotonic.
-11. **A stalled device freezes playback silently.** The device is the truth about time while it holds audio, so a
+12. **A stalled device freezes playback silently.** The device is the truth about time while it holds audio, so a
    device that stops moving stops the clock with it: the picture holds, the sound has nothing more to give, and
    nothing in the pipeline says why (§9). This is the price of the watchdog that was removed — the pipeline cannot
    tell a device that is late from one that is broken, and a line that guessed wrong turned out to be worse than no
    line at all. What is left to the host is the shape of the freeze itself: `Position` stopped while the state is
    `Playing` and `StarvedFor` is null, which is the only combination that means "the device" rather than "a stage".
-12. **A precise seek resumes at the first media *at or after* the request, not at the request itself.** Video
+13. **A precise seek resumes at the first media *at or after* the request, not at the request itself.** Video
    resumes at the first frame at or after it and sound at the first whole block at or after it, so up to one
    frame interval and one audio block (tens of milliseconds) are skipped rather than trimmed; sample-accurate
    sound would need a buffer that can be sliced. A source that accepts a seek and then refuses it leaves the
    position published without moving the media: a refused *forward* precise seek therefore skips ahead to the
    position instead of standing still, which is the one behaviour a fast seek does not have.
+14. **A fast seek past the end of the picture is exact only when the container says how long the picture is.** A
+   container that declares no per-track length leaves nothing to compare the request against, so the seek stays a
+   wish and resumes at the picture's last keyframe — the behaviour this rule exists to avoid, kept rather than
+   guessed at. Matroska writes the length as a `DURATION` tag and MP4 as a stream field, and both are read; a
+   container that writes neither is the gap.
 
 ## Appendix A — the checklist for any change to this pipeline
 
@@ -1368,6 +1549,11 @@ The Playback Lab shows all of the above in one line, which is the intended way t
 | The one place a thread sleeps, and how a wake cannot be lost | `Internal/PipelineNode.cs`: one node per thread, the stamp read before the decision, a `Wait` that returns at once for a stamp that moved, a wake that never waits for the woken thread, and `WakeCount` so a parked pipeline can be proved not to be polling |
 | The entry a consumer is handed, and why it is a class | `MediaItem<T>` — media (or nothing, for the end of a stream), the tag, and `IsLast`, travelling together. `TryDequeue(MediaItem<T>)` takes the entry that was looked at *by identity*, which is what makes looking and taking two sound steps rather than a race: a `Clear` disposes what it holds, so an entry that is still the head is the one that was seen, whatever a replacement entry's tag might be |
 | The end of a file, and what earns the ending | `PlaybackPipeline`: `_endingEpoch` (the position the file ran out at), `_videoRenderEndedEpoch`/`_audioRenderEndedEpoch` (what each stage said about which position), and `TryNotifyPlaybackEnded` — the one decision, taken when the last word arrives and nowhere else |
+| Which tracks are read, and why that belongs to the source | `MediaSourceHolder` (the `IMediaSource` and the two selected streams, as one component) published in `_source`'s slot, adopted and held by the reader; `PlaybackPipeline.SelectStreamCore` publishes the new holder and the rebuilt pair under one number, through `ApplySelection` (§2.5) |
+| What a publication rebuilds, and what it leaves alone | `PlaybackPipeline.DiffSelection` — the holder in effect against the one handed over: the file by reference, each kind's stream by container index — whose answer `BuildChains` acts on, and `ChainChanges` reports back (§2.5) |
+| What opening leaves undecided, and who decides it | `PlaybackPipeline.PreparePlayback` publishes a holder with no streams (so nothing is created or read) and `PlayCore` refuses to start while both kinds are unselected; the host chooses with `SelectStream(kind, stream)`, once per kind, and a null stream turns that kind off (§2.5) |
+| Which package may be consumed, and by whom | `PipelineVersion` (one number per node: `Source`, `AudioDecoder`, `AudioRenderer`, `VideoDecoder`, `VideoRenderer`, plus `Max`, `Next` and the comparisons) and the verdicts `CompareOwn`/`CompareUpstream`/`CombineVerdict`; carried by `PacketEntry`, `FrameEntry` and `AudioEntry` (§2.4) |
+| How a component reaches the thread that owns it | `ComponentSlot<T>` — `Publish` (queue thread) and `Update(out new, out old)` (owner thread), one slot per role for the pipeline's life, with `Reset` only while no thread runs (§2.4). No lock beside the slots: the queue serialises publication, and the slot's own lock covers publish-against-adopt |
 | Epoch discipline and what a seek uses to interrupt | `PlaybackPipeline`: the epoch, the position published with it, and the reset of everything that belongs to a position are one `SeqLock<long>.Change`; media threads read it through `_epochs.Read()`. The protocol itself — the three reads, the retry, the wait for a change that outlasts the attempts, and how a value of several fields survives it — lives in `Internal/SeqLock.cs` |
 | When it is too late to show a frame | `ISynchronizer` (default: 2 ms early tolerance, 40 ms late) |
 | What a paused file shows, and what wakes that thread | `PlaybackPipeline.VideoRenderCore`, whose one loop both presents and offers the still: `presenting` (the state the presentation steps are for) and `offeringTheStill` (a paused position whose picture has not been shown yet) name the two things the thread does, and `shownEpoch`/`endedForEpoch` are what tell it there is nothing left to offer. The frame arriving in the queue is the only wake the still needs |

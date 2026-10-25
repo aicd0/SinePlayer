@@ -803,6 +803,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="OK" xml:space="preserve">
     <value>好的</value>
   </data>
+  <data name="Off" xml:space="preserve">
+    <value>關閉</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>打開</value>
   </data>
@@ -1061,6 +1064,12 @@ $plugins</value>
   </data>
   <data name="SelectAllAppBarButton.Label" xml:space="preserve">
     <value>全選</value>
+  </data>
+  <data name="SelectAudioTrack" xml:space="preserve">
+    <value>選擇音訊軌道</value>
+  </data>
+  <data name="SelectVideoTrack" xml:space="preserve">
+    <value>選擇影片軌道</value>
   </data>
   <data name="SendFeedback" xml:space="preserve">
     <value>傳送回饋</value>

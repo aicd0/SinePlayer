@@ -16,6 +16,8 @@ using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Playback.Surface;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -26,6 +28,7 @@ using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Backends.Wasapi;
 using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Helpers.Misc;
 
 namespace SinePlayer.Views.Pages.PlaybackLab;
 
@@ -93,15 +96,18 @@ internal sealed partial class PlaybackLabPage : BasePage
     // Events
     //
 
-    private async void OpenButton_Click(object sender, RoutedEventArgs e)
+    private void OpenButton_Click(object sender, RoutedEventArgs e)
     {
-        Windows.Storage.StorageFile? file = await FilePickerUtils.PickFile(WindowId, MEDIA_FILE_TYPES);
-        if (file is null)
+        CoroutineUtils.Run(async () =>
         {
-            return;
-        }
+            Windows.Storage.StorageFile? file = await FilePickerUtils.PickFile(WindowId, MEDIA_FILE_TYPES);
+            if (file is null)
+            {
+                return;
+            }
 
-        OpenMedia(file.Path);
+            await OpenMedia(file.Path);
+        });
     }
 
     private void VolumeSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -144,19 +150,23 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private void PlayButton_Click(object sender, RoutedEventArgs e)
     {
-        PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is null)
+        CoroutineUtils.Run(async () =>
         {
-            return;
-        }
+            PlaybackPipeline? pipeline = _pipeline;
+            if (pipeline is null)
+            {
+                return;
+            }
 
-        if (pipeline.State == MediaEngineState.Ended)
-        {
-            pipeline.Seek(TimeSpan.Zero);
-        }
+            if (pipeline.State == MediaEngineState.Ended)
+            {
+                await pipeline.Seek(TimeSpan.Zero);
+            }
 
-        pipeline.Play();
-        RefreshStatus();
+            OperationResult played = await pipeline.Play();
+            _warning = played.IsSuccessful ? null : played.Message;
+            RefreshStatus();
+        });
     }
 
     private void PauseButton_Click(object sender, RoutedEventArgs e)
@@ -167,71 +177,93 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private void SeekBackButton_Click(object sender, RoutedEventArgs e)
     {
-        SeekBy(-10);
+        CoroutineUtils.Run(() => SeekBy(-10));
     }
 
     private void SeekForwardButton_Click(object sender, RoutedEventArgs e)
     {
-        SeekBy(30);
+        CoroutineUtils.Run(() => SeekBy(30));
     }
 
-    private async void VideoDecoderPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void VideoDecoderPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        PlaybackPipeline? pipeline = _pipeline;
-        if (_updatingPickers || pipeline is null || VideoDecoderPicker.SelectedItem is not ComponentChoice choice)
+        CoroutineUtils.Run(async () =>
         {
-            return;
-        }
+            PlaybackPipeline? pipeline = _pipeline;
+            if (_updatingPickers || pipeline is null || VideoDecoderPicker.SelectedItem is not ComponentChoice choice)
+            {
+                return;
+            }
 
-        ApplyComponentSelection<IVideoDecoderFactory>(pipeline, choice);
-        await ReconcileAndReport(pipeline, "The video decoder");
-        RefreshStatus();
+            ApplyComponentSelection<IVideoDecoderFactory>(pipeline, choice);
+            await ReconcileAndReport(pipeline, "The video decoder");
+            RefreshStatus();
+        });
     }
 
-    private async void AudioDecoderPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void AudioDecoderPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        PlaybackPipeline? pipeline = _pipeline;
-        if (_updatingPickers || pipeline is null || AudioDecoderPicker.SelectedItem is not ComponentChoice choice)
+        CoroutineUtils.Run(async () =>
         {
-            return;
-        }
+            PlaybackPipeline? pipeline = _pipeline;
+            if (_updatingPickers || pipeline is null || AudioDecoderPicker.SelectedItem is not ComponentChoice choice)
+            {
+                return;
+            }
 
-        ApplyComponentSelection<IAudioDecoderFactory>(pipeline, choice);
-        await ReconcileAndReport(pipeline, "The audio decoder");
-        RefreshStatus();
+            ApplyComponentSelection<IAudioDecoderFactory>(pipeline, choice);
+            await ReconcileAndReport(pipeline, "The audio decoder");
+            RefreshStatus();
+        });
     }
 
-    private async void VideoRendererPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void VideoRendererPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        PlaybackPipeline? pipeline = _pipeline;
-        if (_updatingPickers || pipeline is null || VideoRendererPicker.SelectedItem is not ComponentChoice choice)
+        CoroutineUtils.Run(async () =>
         {
-            return;
-        }
+            PlaybackPipeline? pipeline = _pipeline;
+            if (_updatingPickers || pipeline is null || VideoRendererPicker.SelectedItem is not ComponentChoice choice)
+            {
+                return;
+            }
 
-        ApplyComponentSelection<IVideoRendererFactory>(pipeline, choice);
-        await ReconcileAndReport(pipeline, "The renderer");
-        RefreshStatus();
+            ApplyComponentSelection<IVideoRendererFactory>(pipeline, choice);
+            await ReconcileAndReport(pipeline, "The renderer");
+            RefreshStatus();
+        });
     }
 
-    private async void AudioRendererPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void AudioRendererPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        PlaybackPipeline? pipeline = _pipeline;
-        if (_updatingPickers || pipeline is null || AudioRendererPicker.SelectedItem is not ComponentChoice choice)
+        CoroutineUtils.Run(async () =>
         {
-            return;
-        }
+            PlaybackPipeline? pipeline = _pipeline;
+            if (_updatingPickers || pipeline is null || AudioRendererPicker.SelectedItem is not ComponentChoice choice)
+            {
+                return;
+            }
 
-        ApplyComponentSelection<IAudioRendererFactory>(pipeline, choice);
-        await ReconcileAndReport(pipeline, "The output device");
-        RefreshStatus();
+            ApplyComponentSelection<IAudioRendererFactory>(pipeline, choice);
+            await ReconcileAndReport(pipeline, "The output device");
+            RefreshStatus();
+        });
+    }
+
+    private void VideoTrackPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        CoroutineUtils.Run(() => SelectTrack(MediaStreamKind.Video, VideoTrackPicker.SelectedItem as TrackChoice));
+    }
+
+    private void AudioTrackPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        CoroutineUtils.Run(() => SelectTrack(MediaStreamKind.Audio, AudioTrackPicker.SelectedItem as TrackChoice));
     }
 
     //
     // Pipeline
     //
 
-    private async void OpenMedia(string path)
+    private async Task OpenMedia(string path)
     {
         CloseMedia();
 
@@ -278,6 +310,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         _pipeline = pipeline;
         _gain = gain;
         _description = Describe(pipeline);
+        PopulateTrackPickers();
 
         StartStatusTimer();
         RefreshStatus();
@@ -306,6 +339,55 @@ internal sealed partial class PlaybackLabPage : BasePage
         _renderTarget?.DetachSurface();
         _description = string.Empty;
         _warning = null;
+        PopulateTrackPickers();
+    }
+
+    private async Task SelectTrack(MediaStreamKind kind, TrackChoice? choice)
+    {
+        PlaybackPipeline? pipeline = _pipeline;
+        if (_updatingPickers || pipeline is null || choice is null)
+        {
+            return;
+        }
+
+        OperationResult selected = await pipeline.SelectStream(kind, choice.Stream);
+        if (!selected.IsSuccessful)
+        {
+            Report($"The track could not be changed. {selected.Message}");
+        }
+
+        PopulateTrackPickers();
+        RefreshStatus();
+    }
+
+    private async Task SeekBy(double seconds)
+    {
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            return;
+        }
+
+        TimeSpan target = pipeline.Position + TimeSpan.FromSeconds(seconds);
+        if (target < TimeSpan.Zero)
+        {
+            target = TimeSpan.Zero;
+        }
+
+        if (pipeline.Duration > TimeSpan.Zero && target > pipeline.Duration)
+        {
+            target = pipeline.Duration;
+        }
+
+        // Posted like the rest, and awaited here for both halves of the answer: where the seek landed, and
+        // whether the source took it at all — a refused seek leaves playback where it was.
+        OperationResult seeked = await pipeline.Seek(target);
+        if (!seeked.IsSuccessful)
+        {
+            Report($"The seek was refused. {seeked.Message}");
+        }
+
+        RefreshStatus();
     }
 
     private void ApplyLevel()
@@ -345,47 +427,6 @@ internal sealed partial class PlaybackLabPage : BasePage
         // No reconcile and no new frame: the picture that is already there is drawn again through the new
         // transform, which is the whole of what turning it costs.
         pipeline.VideoTransform = CreateTransform();
-        RefreshStatus();
-    }
-
-    private async void SeekBy(double seconds)
-    {
-        PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is null)
-        {
-            return;
-        }
-
-        TimeSpan target = pipeline.Position + TimeSpan.FromSeconds(seconds);
-        if (target < TimeSpan.Zero)
-        {
-            target = TimeSpan.Zero;
-        }
-
-        if (pipeline.Duration > TimeSpan.Zero && target > pipeline.Duration)
-        {
-            target = pipeline.Duration;
-        }
-
-        // Posted like the rest, and awaited here for both halves of the answer: where the seek landed, and
-        // whether the source took it at all — a refused seek leaves playback where it was.
-        //
-        // The pipeline leaves a seek paused: what it reports is a fact about the file, never a wish to keep
-        // playing. Whether the new position goes on playing is the host's call, and this page is the host —
-        // so "a jump while playing goes on playing", which is what the buttons mean, is decided here. Read
-        // before the seek is posted, because the answer is about what playback was doing when it was asked.
-        bool wasPlaying = pipeline.State == MediaEngineState.Playing;
-
-        OperationResult seeked = await pipeline.Seek(target);
-        if (!seeked.IsSuccessful)
-        {
-            Report($"The seek was refused. {seeked.Message}");
-        }
-        else if (wasPlaying)
-        {
-            await pipeline.Play();
-        }
-
         RefreshStatus();
     }
 
@@ -514,6 +555,56 @@ internal sealed partial class PlaybackLabPage : BasePage
         }
     }
 
+    private void PopulateTrackPickers()
+    {
+        static IEnumerable<TrackChoice> Prepend(TrackChoice first, IEnumerable<TrackChoice> rest)
+        {
+            yield return first;
+            foreach (TrackChoice choice in rest)
+            {
+                yield return choice;
+            }
+        }
+
+        static int IndexOf(ComboBox picker, MediaStreamInfo? stream)
+        {
+            if (picker.ItemsSource is not IEnumerable<TrackChoice> choices)
+            {
+                return -1;
+            }
+
+            int index = 0;
+            foreach (TrackChoice choice in choices)
+            {
+                if (choice.Stream?.Index == stream?.Index)
+                {
+                    return index;
+                }
+
+                index++;
+            }
+
+            return -1;
+        }
+
+        _updatingPickers = true;
+        try
+        {
+            PlaybackPipeline? pipeline = _pipeline;
+            MediaInfo? info = pipeline?.MediaInfo;
+
+            VideoTrackPicker.ItemsSource = info is null ? null : Prepend(new TrackChoice(null), info.VideoStreams.Select(stream => new TrackChoice(stream)));
+            VideoTrackPicker.SelectedIndex = IndexOf(VideoTrackPicker, pipeline?.SelectedVideoStream);
+
+            AudioTrackPicker.ItemsSource = info is null ? null : Prepend(new TrackChoice(null), info.AudioStreams.Select(stream => new TrackChoice(stream)));
+            AudioTrackPicker.SelectedIndex = IndexOf(AudioTrackPicker, pipeline?.SelectedAudioStream);
+        }
+        finally
+        {
+            _updatingPickers = false;
+        }
+    }
+
     private void RefreshStatus()
     {
         PlaybackPipeline? pipeline = _pipeline;
@@ -560,9 +651,38 @@ internal sealed partial class PlaybackLabPage : BasePage
             : $"filters {string.Join(", ", pipeline.AudioFilters.Filters.Select(filter => filter.Name))}";
         string pace = $" decode {pipeline.AverageVideoDecodeMilliseconds:0.0} ms {decoding}, render {pipeline.AverageVideoRenderMilliseconds:0.0} ms by {renderer}{sound}, {chain}.";
         string transform = DescribeTransform(pipeline.VideoTransform);
+        string tracks = DescribeTracks(pipeline);
 
         Report($"{pipeline.State}: {_description}. {pipeline.Position:mm\\:ss\\.fff} / {pipeline.Duration:mm\\:ss\\.fff}."
-            + $" {presented} frame(s).{health}{compositor}{pace}{transform}{surface}{error}{warning}");
+            + $" {presented} frame(s).{health}{compositor}{pace}{transform}{tracks}{surface}{error}{warning}");
+    }
+
+    private static string DescribeTracks(PlaybackPipeline pipeline)
+    {
+        if (pipeline.SelectedVideoStream is null && pipeline.SelectedAudioStream is null)
+        {
+            return " No track is chosen: pick a video or audio track to play this file.";
+        }
+
+        MediaInfo? info = pipeline.MediaInfo;
+        List<string> parts = [];
+        if (info is not null && info.VideoStreams.Count > 1 && pipeline.SelectedVideoStream is { } video)
+        {
+            parts.Add($"video {DescribeTrack(video)}");
+        }
+
+        if (info is not null && info.AudioStreams.Count > 1 && pipeline.SelectedAudioStream is { } audio)
+        {
+            parts.Add($"audio {DescribeTrack(audio)}");
+        }
+
+        return parts.Count == 0 ? string.Empty : $" playing {string.Join(" and ", parts)}.";
+    }
+
+    /// <summary>Which stream is playing: its index, and the container's name for it when it has one.</summary>
+    private static string DescribeTrack(MediaStreamInfo stream)
+    {
+        return stream.Title is { Length: > 0 } title ? $"#{stream.Index} \"{title}\"" : $"#{stream.Index}";
     }
 
     /// <summary>
@@ -635,6 +755,14 @@ internal sealed partial class PlaybackLabPage : BasePage
         public override string ToString()
         {
             return Name;
+        }
+    }
+
+    private sealed record TrackChoice(MediaStreamInfo? Stream)
+    {
+        public override string ToString()
+        {
+            return Stream is null ? "Off" : MediaStreamLabel.Describe(Stream);
         }
     }
 }

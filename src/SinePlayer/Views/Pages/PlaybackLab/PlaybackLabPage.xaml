@@ -75,6 +75,14 @@
                 x:Name="AudioRendererPicker"
                 Header="Audio renderer"
                 SelectionChanged="AudioRendererPicker_SelectionChanged" />
+            <ComboBox
+                x:Name="VideoTrackPicker"
+                Header="Video track"
+                SelectionChanged="VideoTrackPicker_SelectionChanged" />
+            <ComboBox
+                x:Name="AudioTrackPicker"
+                Header="Audio track"
+                SelectionChanged="AudioTrackPicker_SelectionChanged" />
         </StackPanel>
 
         <StackPanel

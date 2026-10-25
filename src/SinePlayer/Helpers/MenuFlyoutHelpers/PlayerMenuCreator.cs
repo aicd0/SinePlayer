@@ -8,32 +8,25 @@ using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml.Controls;
 
-using SinePlayer.Common.Actions;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Playback.Core;
+using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
-using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
-using SinePlayer.Data.Models.Playback;
 using SinePlayer.Helpers.Misc;
 
 namespace SinePlayer.Helpers.MenuFlyoutHelpers;
 
 internal static class PlayerMenuCreator
 {
-    public static async Task<List<BaseMenuFlyoutItemModel>> CreateVideoHostMenuItems(
-        ActionHandler actionHandler,
-        MediaModel media,
-        PlayerSettingsModel settings,
-        Action<Action<PlayerSettingsModel>> applyChange,
-        PlayQueueModel.Builder? playQueue = null,
-        PlaybackModel.Builder? playback = null)
+    public static async Task<List<BaseMenuFlyoutItemModel>> CreateVideoHostMenuItems(PlayerMenuContext context)
     {
         List<BaseMenuFlyoutItemModel> mediaItems = await MediaMenuCreator.CreateMediaMenuItems(
-            actionHandler,
-            media,
-            playQueue: playQueue,
-            playback: playback);
+            context.ActionHandler,
+            context.Media,
+            playQueue: context.PlayQueue,
+            playback: context.Playback);
 
         return
         [
@@ -41,19 +34,19 @@ internal static class PlayerMenuCreator
             {
                 Text = StringResourceProvider.Instance.Video,
                 Icon = new FontIconSource() { Glyph = MediaGlyphHelper.VideoGlyph },
-                Items = CreateVideoMenuItems(settings, applyChange),
+                Items = CreateVideoMenuItems(context),
             },
             new SubItemMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.Audio,
                 Icon = new FontIconSource() { Glyph = MediaGlyphHelper.AudioGlyph },
-                Items = CreateAudioMenuItems(settings, applyChange),
+                Items = CreateAudioMenuItems(context),
             },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
             {
-                Text = TrimText(media.Title),
-                Icon = new FontIconSource() { Glyph = MediaGlyphHelper.GetMediaGlyph(media) },
+                Text = TrimText(context.Media.Title),
+                Icon = new FontIconSource() { Glyph = MediaGlyphHelper.GetMediaGlyph(context.Media) },
                 Items = mediaItems,
             },
         ];
@@ -113,8 +106,11 @@ internal static class PlayerMenuCreator
         ];
     }
 
-    private static List<BaseMenuFlyoutItemModel> CreateVideoMenuItems(PlayerSettingsModel settings, Action<Action<PlayerSettingsModel>> applyChange)
+    private static List<BaseMenuFlyoutItemModel> CreateVideoMenuItems(PlayerMenuContext context)
     {
+        PlayerSettingsModel settings = context.Settings;
+        Action<Action<PlayerSettingsModel>> applyChange = context.UpdateSettings;
+
         List<PlaybackComponentOption> decoderOptions = [.. PlaybackComponents.GetVideoDecoderOptions()];
         PlaybackComponentOption decoder = EnsureChoice(decoderOptions, settings.VideoDecoder);
 
@@ -129,6 +125,12 @@ internal static class PlayerMenuCreator
 
         return
         [
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.SelectVideoTrack,
+                Items = CreateTrackItems(context, MediaStreamKind.Video),
+            },
+            new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.Decoder,
@@ -197,8 +199,11 @@ internal static class PlayerMenuCreator
         ];
     }
 
-    private static List<BaseMenuFlyoutItemModel> CreateAudioMenuItems(PlayerSettingsModel settings, Action<Action<PlayerSettingsModel>> applyChange)
+    private static List<BaseMenuFlyoutItemModel> CreateAudioMenuItems(PlayerMenuContext context)
     {
+        PlayerSettingsModel settings = context.Settings;
+        Action<Action<PlayerSettingsModel>> applyChange = context.UpdateSettings;
+
         List<PlaybackComponentOption> decoderOptions = [.. PlaybackComponents.GetAudioDecoderOptions()];
         PlaybackComponentOption decoder = EnsureChoice(decoderOptions, settings.AudioDecoder);
 
@@ -207,6 +212,12 @@ internal static class PlayerMenuCreator
 
         return
         [
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.SelectAudioTrack,
+                Items = CreateTrackItems(context, MediaStreamKind.Audio),
+            },
+            new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.Decoder,
@@ -230,6 +241,39 @@ internal static class PlayerMenuCreator
                 }),
             },
         ];
+    }
+
+    private static List<BaseMenuFlyoutItemModel> CreateTrackItems(PlayerMenuContext context, MediaStreamKind kind)
+    {
+        IReadOnlyList<MediaStreamInfo>? streams = context.Tracks(kind);
+        if (streams is null || streams.Count == 0)
+        {
+            return [new SimpleMenuFlyoutItemModel() { Text = StringResourceProvider.Instance.None, IsEnabled = false }];
+        }
+
+        MediaStreamInfo? selected = context.SelectedTrack(kind);
+
+        List<BaseMenuFlyoutItemModel> items = [];
+        foreach (MediaStreamInfo stream in streams)
+        {
+            MediaStreamInfo choice = stream;
+            items.Add(new ToggleMenuFlyoutItemModel()
+            {
+                Text = MediaStreamLabel.Describe(choice),
+                IsChecked = selected is not null && selected.Index == choice.Index,
+                Click = () => context.SelectTrack(kind, choice),
+            });
+        }
+
+        items.Add(new SeparatorMenuFlyoutItemModel());
+        items.Add(new ToggleMenuFlyoutItemModel()
+        {
+            Text = StringResourceProvider.Instance.Off,
+            IsChecked = selected is null,
+            Click = () => context.SelectTrack(kind, null),
+        });
+
+        return items;
     }
 
     private static string TrimText(string text)

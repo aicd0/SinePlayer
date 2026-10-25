@@ -22,9 +22,11 @@ using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.HotKey;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Playback.Core;
+using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Database;
@@ -378,13 +380,19 @@ internal sealed partial class PlayerPage : BasePage
                 return;
             }
 
-            List<BaseMenuFlyoutItemModel> items = await PlayerMenuCreator.CreateVideoHostMenuItems(
-                PageActionHandler,
-                media,
-                settingsPanel.Settings,
-                settingsPanel.Apply,
-                ViewModel.PlayQueue.ToBuilder(),
-                ViewModel.Playback.ToBuilder());
+            PlayerMenuContext context = new()
+            {
+                ActionHandler = PageActionHandler,
+                Media = media,
+                Settings = settingsPanel.Settings,
+                UpdateSettings = settingsPanel.Apply,
+                PlayQueue = ViewModel.PlayQueue.ToBuilder(),
+                Playback = ViewModel.Playback.ToBuilder(),
+                Engine = _engine,
+                PromptInfo = PromptInfo,
+            };
+
+            List<BaseMenuFlyoutItemModel> items = await PlayerMenuCreator.CreateVideoHostMenuItems(context);
 
             MenuFlyout flyout = new();
             foreach (BaseMenuFlyoutItemModel item in items)
@@ -422,14 +430,16 @@ internal sealed partial class PlayerPage : BasePage
 
     #region Engine
 
+    private const string TAG = nameof(PlayerPage);
+
     private CoreEngine? _engine;
     private PlaybackComponents _components = PlaybackComponents.Default;
     private VideoTransform _videoTransform = VideoTransform.Identity;
-    private long _pendingStartPositionMs = -1;
 
     /// <summary>
-    /// Opens a file through the engine the page owns. Which file, and where in it to start, are the view model's
-    /// decision; this is the engine half: let go of what is open, be told what to play through, open the file.
+    /// Opens a file through the engine the page owns, and starts it. Which file, and where in it to start, are the
+    /// view model's decision; what the file is played through — which tracks, and whether it plays at all — is the
+    /// page's, because the engine opens a file and no more.
     /// </summary>
     private async Task<ErrorResult> OpenMedia(MediaModel media, long startPositionMs)
     {
@@ -438,8 +448,6 @@ internal sealed partial class PlayerPage : BasePage
         // Where the file that is about to be replaced was left: the view model keeps that mark, and it still knows
         // the previous media is the one playing.
         ViewModel.SavePosition();
-
-        _pendingStartPositionMs = startPositionMs;
 
         // What the media was last played through, which is what its settings were saved with.
         var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
@@ -452,7 +460,130 @@ internal sealed partial class PlayerPage : BasePage
         await engine.Stop();
         await engine.SetComponents(_components);
         engine.SetVideoTransform(_videoTransform);
-        return await engine.Load(media.Location);
+
+        ErrorResult loaded = await engine.Load(media.Location);
+        if (!loaded.IsSuccessful)
+        {
+            return loaded;
+        }
+
+        // The order of the three steps below is the order they need: a track can only be chosen once there is a file,
+        // the seek asks for a position on the tracks that will play it, and playing before either is a Play the
+        // pipeline refuses for having nothing to play.
+        ErrorResult selected = await SelectTracks(engine, media);
+        if (!selected.IsSuccessful)
+        {
+            return selected;
+        }
+
+        if (startPositionMs > 0)
+        {
+            SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
+            engine.Seek(TimeSpan.FromMilliseconds(startPositionMs), mode);
+        }
+
+        ViewModel.PositionLiveData.Emit(startPositionMs > 0 ? startPositionMs : 0);
+
+        StartPlaybackOnOpen(engine);
+        return selected;
+    }
+
+    private static async Task<ErrorResult> SelectTracks(CoreEngine engine, MediaModel media)
+    {
+        static T? DefaultTrack<T>(IReadOnlyList<T>? streams) where T : MediaStreamInfo
+        {
+            if (streams is null || streams.Count == 0)
+            {
+                return null;
+            }
+
+            foreach (T stream in streams)
+            {
+                if (stream.IsDefault)
+                {
+                    return stream;
+                }
+            }
+
+            return streams[0];
+        }
+
+        var err = ErrorLogger.Create(TAG);
+
+        MediaInfo? info = engine.PlaybackInfo.Media;
+
+        TrackSelection.Preference videoChoice = TrackSelection.Load(media, MediaStreamKind.Video, info);
+        TrackSelection.Preference audioChoice = TrackSelection.Load(media, MediaStreamKind.Audio, info);
+
+        MediaStreamInfo? video = videoChoice.IsSet ? videoChoice.Stream : DefaultTrack(info?.VideoStreams);
+        MediaStreamInfo? audio = audioChoice.IsSet ? audioChoice.Stream : DefaultTrack(info?.AudioStreams);
+
+        if (video is null && audio is null && (videoChoice.IsSet || audioChoice.IsSet))
+        {
+            video = DefaultTrack(info?.VideoStreams);
+            audio = DefaultTrack(info?.AudioStreams);
+        }
+
+        List<string> unplayable = [];
+        bool playing = false;
+
+        if (video is not null)
+        {
+            ErrorResult chosen = await engine.SelectStream(MediaStreamKind.Video, video);
+            playing |= chosen.IsSuccessful;
+            if (!chosen.IsSuccessful)
+            {
+                unplayable.Add($"the picture could not be played ({chosen.Message})");
+            }
+        }
+
+        if (audio is not null)
+        {
+            ErrorResult chosen = await engine.SelectStream(MediaStreamKind.Audio, audio);
+            playing |= chosen.IsSuccessful;
+            if (!chosen.IsSuccessful)
+            {
+                unplayable.Add($"the sound could not be played ({chosen.Message})");
+            }
+        }
+
+        if (!playing)
+        {
+            string why = unplayable.Count == 0 ? "it holds no track that could be played" : string.Join(", ", unplayable);
+            return err.Error($"Unable to play media file '{media.Location}': {why}.");
+        }
+
+        if (unplayable.Count > 0)
+        {
+            Logger.W(TAG, $"Playing '{media.Location}' without everything it holds: {string.Join(", ", unplayable)}.");
+        }
+
+        return err.Success();
+    }
+
+    /// <summary>
+    /// Whether an opened file starts playing on its own, which is a setting rather than a consequence of opening it.
+    /// Asked after the tracks are chosen, so that "opens paused" means the user turned auto-play off rather than that
+    /// nothing had been chosen yet.
+    /// </summary>
+    private void StartPlaybackOnOpen(CoreEngine engine)
+    {
+        bool restoredFromLastSession = _restoredFromLastSession;
+        _restoredFromLastSession = false;
+
+        if (!AppSettingsModel.AutoPlayOnOpen || (restoredFromLastSession && AppSettingsModel.AutoPlayOnOpenExceptAppLaunch))
+        {
+            return;
+        }
+
+        if (IsResumed)
+        {
+            engine.Play();
+        }
+        else
+        {
+            _playbackPendingOnActivate = true;
+        }
     }
 
     private CoreEngine EnsureEngine()
@@ -543,32 +674,7 @@ internal sealed partial class PlayerPage : BasePage
         }
 
         ViewModel.SetDuration(engine.Duration.Ticks / TimeSpan.TicksPerMillisecond);
-
-        long startPositionMs = _pendingStartPositionMs;
-        _pendingStartPositionMs = -1;
-        if (startPositionMs > 0)
-        {
-            SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
-            engine.Seek(TimeSpan.FromMilliseconds(startPositionMs), mode);
-        }
-
-        ViewModel.PositionLiveData.Emit(startPositionMs > 0 ? startPositionMs : 0);
         ViewModel.PlayerStatusLiveData.Emit(new() { Status = PlayerPageViewModel.PlayerStatusEnum.Working });
-
-        bool restoredFromLastSession = _restoredFromLastSession;
-        _restoredFromLastSession = false;
-
-        if (AppSettingsModel.AutoPlayOnOpen && !(restoredFromLastSession && AppSettingsModel.AutoPlayOnOpenExceptAppLaunch))
-        {
-            if (IsResumed)
-            {
-                engine.Play();
-            }
-            else
-            {
-                _playbackPendingOnActivate = true;
-            }
-        }
     }
 
     private void HandleMediaEnded()

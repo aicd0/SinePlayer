@@ -805,6 +805,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="OK" xml:space="preserve">
     <value>좋아요</value>
   </data>
+  <data name="Off" xml:space="preserve">
+    <value>끄기</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>열기</value>
   </data>
@@ -1063,6 +1066,12 @@ $plugins</value>
   </data>
   <data name="SelectAllAppBarButton.Label" xml:space="preserve">
     <value>모두 선택</value>
+  </data>
+  <data name="SelectAudioTrack" xml:space="preserve">
+    <value>오디오 트랙 선택</value>
+  </data>
+  <data name="SelectVideoTrack" xml:space="preserve">
+    <value>비디오 트랙 선택</value>
   </data>
   <data name="SendFeedback" xml:space="preserve">
     <value>피드백 보내기</value>

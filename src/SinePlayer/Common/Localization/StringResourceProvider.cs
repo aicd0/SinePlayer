@@ -201,6 +201,7 @@ public class StringResourceProvider
     public string NoTagsHint => GetResourceString("NoTagsHint");
     public string None => GetResourceString("None");
     public string OK => GetResourceString("OK");
+    public string Off => GetResourceString("Off");
     public string Open => GetResourceString("Open");
     public string OpenHomePage => GetResourceString("OpenHomePage");
     public string OpenInCurrentTab => GetResourceString("OpenInCurrentTab");
@@ -281,6 +282,8 @@ public class StringResourceProvider
     public string SeekBackward => GetResourceString("SeekBackward");
     public string SeekForward => GetResourceString("SeekForward");
     public string Select => GetResourceString("Select");
+    public string SelectAudioTrack => GetResourceString("SelectAudioTrack");
+    public string SelectVideoTrack => GetResourceString("SelectVideoTrack");
     public string SendFeedback => GetResourceString("SendFeedback");
     public string SendToWindow => GetResourceString("SendToWindow");
     public string SendUsageData => GetResourceString("SendUsageData");
