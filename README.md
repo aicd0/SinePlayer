@@ -16,6 +16,11 @@ Prerequisites:
     ```
     git clone git@github.com:aicd0/SinePlayer.git
     ```
+- Download the FFmpeg native libraries for the architectures you build (they are not in the repository):
+  - x64: `https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-25-13-00/ffmpeg-N-128094-g31855b2a70-win64-gpl-shared.zip`
+    Copy `avcodec-63.dll`, `avdevice-63.dll`, `avfilter-12.dll`, `avformat-63.dll`, `avutil-61.dll`, `swresample-7.dll` and `swscale-10.dll` from the archive's `bin` folder into `src/SinePlayer.Core/native/win-x64`.
+  - ARM64: `https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-25-13-00/ffmpeg-N-128094-g31855b2a70-winarm64-gpl-shared.zip`
+    Copy the same seven files from the archive's `bin` folder into `src/SinePlayer.Core/native/win-arm64`.
 - Open [SinePlayer.sln](src/SinePlayer.sln) in Visual Studio to build and run the Sine Player app.
 
 ## Plugins

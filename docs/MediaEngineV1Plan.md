@@ -201,7 +201,7 @@ Verified facts about the imported `FFmpeg.GPL 20261013.1.0` package:
 |---|---|
 | FFmpeg version | FFmpeg 9.0 ABI series — `Lavc63.18.101`, `Lavu61.13.100` (`libavcodec 63`, `libavformat 63`, `libavutil 61`, `libavfilter 12`, `swresample 7`, `swscale 10`). Built from BtbN's master channel, so it may sit slightly ahead of the 9.0 tag within the same ABI series. |
 | Managed bindings | **None** — headers, `.lib` import libs and runtime DLLs only |
-| Architecture coverage | **win-x64 only** (`runtimes/win-x64`; PE machine `0x8664` for both the runtime and `build/native/bin` copies) |
+| Architecture coverage | **win-x64 only** (`runtimes/win-x64`; PE machine `0x8664` for both the runtime and `build/native/bin` copies) — arm64 comes from `src/SinePlayer.Core/native/win-arm64`, and the package carries no 32-bit assets at all |
 | License | `GPL-3.0-or-later` |
 
 Because the package ships no managed bindings, the P/Invoke layer is ours, written against
@@ -224,34 +224,79 @@ contained by three rules: (1) one directory per backend, (2) all native handles 
 `SafeHandle`-derived type owned by that backend, and (3) no native handle, struct or enum in a
 signature outside its backend directory. See §4.2.
 
-**Architecture decision — arm64 required, x86 deliberately parked.** The imported package covers
-**x64 only**, which reproduces as a real gap: an x64 build of the app carries the FFmpeg DLLs, an
-ARM64 build carries none. BtbN publishes no 32-bit Windows FFmpeg builds at all:
+**Architecture decision — x64 and arm64 supported, x86 dropped.** The imported package covers
+**x64 only**, which reproduced as a real gap: an x64 build of the app carries the FFmpeg DLLs, an
+ARM64 build carried none. Neither BtbN nor any other public Windows channel publishes a 32-bit
+FFmpeg build for the ABI the interop is written against, so the two architectures that are supported
+are each supplied by whatever can supply them:
 
 | Architecture | Availability | Handling |
 |---|---|---|
-| x64 | Available | Supported |
-| arm64 | Available — `ffmpeg-*-winarm64-gpl-shared.zip` from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds); the NuGet package simply omits it | **Required**; binaries must come from the BtbN channel |
-| x86 (32-bit) | **Not available** from any BtbN channel | **Parked** — the build configuration is kept so the decision can be revisited, and the engine deliberately has no source for it for now |
+| x64 | Available — BtbN/FFmpeg-Builds, master channel, `win64-gpl-shared` | **Supported**; the seven DLLs are placed in `src/SinePlayer.Core/native/win-x64` by hand |
+| arm64 | Available — BtbN/FFmpeg-Builds, master channel, `winarm64-gpl-shared`; no NuGet package carries it | **Supported**; the seven DLLs are placed in `src/SinePlayer.Core/native/win-arm64` by hand |
+| x86 (32-bit) | **Not available** — BtbN ships `win64` and `winarm64` only, gyan.dev states "all builds are 64-bit", and MSYS2's `mingw-w64-ffmpeg` has `clang64`/`clangarm64`/`mingw64`/`ucrt64` repos and no 32-bit one | **Dropped** — solution configurations, project `Platforms`, `RuntimeIdentifiers`, publish profile, `NativeMethods.x86.txt` and the two `#if x86` interop branches are gone |
 
-x86 is therefore expected to build but **not** to play media; it is a known, accepted gap rather
-than an oversight, and resolving it is explicitly out of the current scope.
+x86 was dropped rather than parked because supporting it would mean building and maintaining FFmpeg
+9.x for win32 ourselves — a toolchain, a build pipeline and a third copy of ~105 MB of native code —
+for an architecture Windows 11 does not have and Windows 10 has retired. `FFmpegRuntime` now names
+the architectures it has a build for: asking it for an x86 process raises
+`NotSupportedException("This build has no media engine for X86 …")` instead of failing later on a
+missing file.
 
-**Remaining provisioning work (before shipping).** Provisioning must be arch-aware and cannot rely on
-the package's `runtimes/` folder alone, because x64 and arm64 arrive through different channels. The
-runtime side of this is already in place — `FFmpegRuntime` resolves
-`runtimes/win-<arch>/native` then the application directory, and fails loudly with the missing file
-names. What remains is supplying the files:
+**Provisioning.** Neither architecture's libraries come from a `PackageReference`: `FFmpeg.GPL` was
+removed, and both builds read `src/SinePlayer.Core/native/win-<arch>` — a folder `.gitignore` excludes,
+because it is ~190 MB per architecture and reproducible from two pinned archives. The README's
+development steps carry the two URLs and where each archive goes. Both archives are the **master
+channel** of BtbN/FFmpeg-Builds — the same channel the removed NuGet package was built from, pinned to
+one autobuild so the bytes never move — one commit (`31855b2a70`) for both architectures, so the two
+cannot drift.
 
-1. Pin **one** FFmpeg version for both architectures — mixed versions would undermine the
-   reliability priority, and arch-specific bugs would be very hard to attribute.
-2. Place the arm64 libraries where the runtime looks for them; x64 currently resolves through the
-   NuGet package's RID assets.
-3. Keep `FFmpegRuntime`'s expected major versions in step with whatever is supplied — it is the
-   guard that stops a mismatched drop from corrupting memory.
+The runtime resolves `runtimes/win-<arch>/native` then the application directory, and names the missing
+files when it cannot find them, so a wrong folder is a sentence rather than a crash. What keeps a drop
+honest:
 
-**Known cost.** The current GPL build is large: `avcodec-63.dll` alone is ~114 MB, ~183 MB of
-native DLLs per architecture. This is a packaging concern, not an API concern — the isolation
+1. **The build pins what it packages.** `SinePlayer.Core.csproj` maps `Platform` → `FFmpegNativeRid`,
+   and its `None`/`Link` pair copies that one folder to `runtimes/<rid>/native` for the output and the
+   publish directory. Without the `Link` the files would land at `native/<rid>/` — where the runtime
+   does not look — which is what the packaging is for.
+2. **`FFmpegRuntime`'s expected majors** (63/61/63) refuse a mismatched drop before it can corrupt
+   memory, which is why a newer FFmpeg has to be adopted here, in this document's company.
+3. **`FFmpegRuntimeTests`** reads the PE machine type of the libraries the process actually loaded and
+   compares it with the process architecture — the one mistake a file listing would not show.
+
+*Verified:* both outputs carry the seven libraries under their own `runtimes/win-<rid>/native`, PE
+machine `0x8664` and `0xAA64`; the x64 suite passes end to end on the downloaded binaries; swapping an
+arm64 library into the x64 set fails the runtime test.
+
+*Rejected — fetching them during the build.* Two shapes were tried and removed: committed binaries
+(105 MB of history every clone pays for) and a `prebuild.ps1` that downloaded them before compiling
+(the build then depended on network access, on GitHub's anonymous rate limit, and on ~150 MB per clean
+build). A folder filled by hand, once, from two documented URLs is the honest middle: no history
+weight, no build-time network, and the instructions are the only thing in the repository.
+
+**The channel is not interchangeable — release branches cannot decode to a drawable texture.** Measured
+by swapping only the DLLs underneath an unchanged suite:
+
+| Build of FFmpeg 9.0 series | Decoder textures bindable as | Hardware frames draw? |
+|---|---|---|
+| `ffmpeg-N-128094-g31855b2a70-win64-gpl-shared` (master) | decoder **and** shader resource | yes — 318 tests pass |
+| `ffmpeg-n9.0.2-36-g6882969ce9-win64-gpl-shared-9.0` (release/9.0) | decoder only | no — "The device does not offer a shader view of the decoded texture" |
+
+A texture created for decoder output alone cannot have a shader resource view, so the renderer refuses
+a frame that decoded correctly: the GPU path decodes and then fails to present. Master's
+`hwcontext_d3d11va.c` asks for `D3D11_BIND_SHADER_RESOURCE`; the release branch does not. Both channels
+report the same majors, so `FFmpegRuntime` accepts either and the defect appears only as a picture that
+never arrives. This is why the arm64 folder uses the master build as well: it was the 9.0 build that was
+wrong, not the vendor, and an arm64 machine would have hit the same wall.
+
+*Attempted and abandoned:* patching the flag ourselves. The frames context does not exist right after
+`avcodec_open2` in either build (it is created lazily on the first decode), so nothing can be set there;
+the documented route is to provide the frames context (`avcodec_get_hw_frames_parameters` → tinker with
+`AVD3D11VAFramesContext.BindFlags` → `av_hwframe_ctx_init` → assign `hw_frames_ctx`), which is three
+more P/Invokes and unnecessary once the right build is pinned.
+**Known cost.** The GPL build is large: `avcodec-63.dll` alone is ~114 MB (x64) / ~61 MB (arm64), and
+a full set is ~183 MB / ~105 MB, the arm64 half of which is now in the repository's history. This is
+a packaging concern, not an API concern — the isolation
 boundary means a trimmed custom FFmpeg build can be swapped in later without touching any
 contract.
 
@@ -278,7 +323,9 @@ something real to adapt. The seam that matters already exists — `MediaEngineSe
 is the single construction point and the view model only ever touches the port.
 
 Also folded in: the x86 build configuration was removed (see the architecture decision above),
-including the solution configurations, publish profile and `NativeMethods.x86.txt`.
+including the solution configurations, publish profile, `NativeMethods.x86.txt` and the two
+`#if x86` interop branches in the window's message loop; the arm64 native libraries are now
+provisioned and packaged by the build.
 *Verified:* the full solution builds for x64 and ARM64; all 25 existing unit tests pass; behaviour
 unchanged.
 
@@ -526,7 +573,7 @@ same generator the application already uses, and no vtable is written by hand.
 Consequences worth reviewing:
 
 1. **CsWin32 lives in `SinePlayer.Core`** and is configured with per-platform API lists
-   (`NativeMethods.x64.txt`, `.arm64.txt`, `.x86.txt`) copied to `NativeMethods.txt` at build time,
+   (`NativeMethods.x64.txt`, `.arm64.txt`) copied to `NativeMethods.txt` at build time,
    plus a `NativeMethods.json` with `"public": true`. It is a source generator
    (`PrivateAssets="all"`), so it adds no runtime dependency and no assembly to ship. Making the
    generated types public is what lets the application project keep using the Win32 calls it already
@@ -4057,7 +4104,7 @@ fallback policy are described in [MediaEngineV2Plan.md](./MediaEngineV2Plan.md).
 |---|---|---|
 | x64 and arm64 FFmpeg binaries come from different channels | Version drift between architectures | `FFmpegRuntime` asserts the major versions at startup and reports what it found; supplying the arm64 files is the remaining step |
 | Native payload size (~183 MB/arch) | Package size | Decoupled boundary allows a trimmed custom FFmpeg build later without API changes |
-| x86 builds but cannot play media | Known gap on 32-bit devices | Accepted and parked; the FFmpeg source problem is tracked independently of the engine design |
+| arm64 builds from a checkout missing `native/win-arm64` | An arm64 build that opens no media | Mitigated — the libraries are committed, a build warning names the folder when they are absent, and `FFmpegRuntime` reports the missing file names per architecture |
 | A pipeline test fails about once in ten suite runs | A red build that means nothing, and a real defect would hide among the noise | **Resolved — and it was not the tests.** In one process the whole assembly failed 17 of 209 while every one of them passed alone, and a two-pipeline test reproduced it without the suite at all. The snapshot of a stalled pipeline said it in one line: the reader had read the file to its end, `_readerTailVideoTicks` was still `-1` (no packet had ever been routed), and the pipeline was `Ended` at `00:00.000` with nothing shown — an *early* end, not a hang, so every test that waits for a frame simply ran out its budget. The cause: `RoutePacket` decides what a packet is for from the chain that is *running*, and the first video decoder is installed by the decode thread, so a reader that got in first dropped every packet down the "a stream nobody selected" path — a path that returns success — and then announced the end of the file. Two rules came out of it. **The reader routes by stream, never by component**: whether a decoder exists is not a fact for the reader to consult, so a packet is queued and the decode thread drops it if no chain can take it (it cannot eat the first GOP, because the swap is drained at the top of every iteration before a packet is taken, and the end marker is never dropped). **An end signal must be taken, not just posted**: the reader enqueues the audio end marker whether or not a chain exists, but the audio thread parked on `renderer is null` before it ever looked at the queue — so a file whose audio could not be opened never ended, and the pipeline sat in `Playing` after the picture had finished. The thread now consumes the queue with no device (spending the sound it cannot play) and reports the marker. The stream stays *selected* either way: the audio stream exists whether or not a device will take it, and a chain can be built for it later, so nulling the stream info would have made the failure permanent. The suite went from 187 of 209 in one process to 209 of 209, repeatedly |
 | No fixture with audio *and* video | A defect whose cycle needs both cannot be reproduced in a test — the S8i freeze is the first of them, and it had to be reasoned out rather than measured | **Resolved in S8m** by `RawAudioVideoFixtureFile`: uncompressed frames and PCM written by hand into Matroska, intra-only and 200 frames long. It has already paid for itself by reproducing the reader-starvation deadlock that reasoning had missed twice |
 | D3D/WinUI interop complexity (swap-chain attach, device loss) | Schedule, stability | COM interop is generated by CsWin32 rather than handwritten, so the ABI cannot drift; the swap chain remains the step that needs on-screen verification |

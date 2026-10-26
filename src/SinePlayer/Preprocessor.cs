@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 namespace SinePlayer;
@@ -8,7 +8,7 @@ namespace SinePlayer;
 /// </summary>
 internal class Preprocessor
 {
-#if x86 || x64 || ARM64
+#if x64 || ARM64
 #else
 #error Architecture not defined.
 #endif
