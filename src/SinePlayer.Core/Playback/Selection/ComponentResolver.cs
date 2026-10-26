@@ -74,6 +74,15 @@ public sealed class ComponentResolver
         }
     }
 
+    public IEnumerable<IComponentCreator<IVideoDecoder>> ResolveVideoDecoders(IMediaSource source, VideoStreamInfo stream, IGpuDevice? gpuDevice, int bufferedFrames)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bufferedFrames);
+
+        return EnumerateVideoDecoders(source, stream, gpuDevice, bufferedFrames, Preferences.PreferHardwareDecoding);
+    }
+
     public IEnumerable<IComponentCreator<IAudioRenderer>> ResolveAudioRenderers()
     {
         foreach (IAudioRendererFactory factory in _components.GetComponents<IAudioRendererFactory>())
@@ -93,13 +102,28 @@ public sealed class ComponentResolver
         return EnumerateAudioDecoders(source, stream);
     }
 
-    public IEnumerable<IComponentCreator<IVideoDecoder>> ResolveVideoDecoders(IMediaSource source, VideoStreamInfo stream, IGpuDevice? gpuDevice, int bufferedFrames)
+    public IEnumerable<IComponentCreator<ISubtitleRenderer>> ResolveSubtitleRenderers(SubtitleCueFormat format)
     {
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(stream);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bufferedFrames);
+        foreach (ISubtitleRendererFactory factory in _components.GetComponents<ISubtitleRendererFactory>())
+        {
+            if (factory.TryCreate(format, out IComponentCreator<ISubtitleRenderer>? creator).IsSuccessful && creator is not null)
+            {
+                yield return creator;
+            }
+        }
+    }
 
-        return EnumerateVideoDecoders(source, stream, gpuDevice, bufferedFrames, Preferences.PreferHardwareDecoding);
+    public IEnumerable<IComponentCreator<ISubtitleDecoder>> ResolveSubtitleDecoders(IMediaSource? source, SubtitleStreamInfo stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        foreach (ISubtitleDecoderFactory factory in _components.GetComponents<ISubtitleDecoderFactory>())
+        {
+            if (factory.TryCreate(source, stream, out IComponentCreator<ISubtitleDecoder>? creator).IsSuccessful && creator is not null)
+            {
+                yield return creator;
+            }
+        }
     }
 
     private IEnumerable<IComponentCreator<IAudioDecoder>> EnumerateAudioDecoders(IMediaSource source, AudioStreamInfo stream)

@@ -304,6 +304,7 @@ public class StringResourceProvider
     public string State => GetResourceString("State");
     public string Statistics => GetResourceString("Statistics");
     public string Stretch => GetResourceString("Stretch");
+    public string Subtitle => GetResourceString("Subtitle");
     public string Tag => GetResourceString("Tag");
     public string TagLinkTip => GetResourceString("TagLinkTip");
     public string Tags => GetResourceString("Tags");

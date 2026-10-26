@@ -37,6 +37,7 @@ internal static class MediaStreamLabel
         {
             VideoStreamInfo video => $" {video.Width}x{video.Height} {video.FrameRate:0.###} fps",
             AudioStreamInfo audio => $" {audio.SampleRate} Hz {audio.ChannelCount} ch",
+            SubtitleStreamInfo subtitle => string.Empty,
             _ => string.Empty,
         };
 

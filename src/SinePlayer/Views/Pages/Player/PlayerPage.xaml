@@ -21,6 +21,7 @@
             PointerMoved="VideoHost_PointerMoved"
             PointerPressed="VideoHost_PointerPressed"
             PointerReleased="VideoHost_PointerReleased" />
+        <Grid x:Name="SubtitleHost" IsHitTestVisible="False" />
         <player:PlayerTransportBar x:Name="TransportBar" VerticalAlignment="Bottom" />
         <TextBlock
             x:Name="PromptText"

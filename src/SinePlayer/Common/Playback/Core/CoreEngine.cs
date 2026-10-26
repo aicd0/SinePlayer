@@ -34,7 +34,9 @@ internal sealed partial class CoreEngine : IDisposable
 
     private bool _disposed;
     private SwapChainPanel? _videoPanel;
-    private SwapChainPanelRenderTarget? _renderTarget;
+    private SwapChainPanelRenderTarget? _videoRenderTarget;
+    private SwapChainPanel? _subtitlePanel;
+    private SwapChainPanelRenderTarget? _subtitleRenderTarget;
     private GainAudioFilter? _gainFilter;
 
     private readonly PlaybackInfoHandle _playbackInfo = new();
@@ -90,10 +92,14 @@ internal sealed partial class CoreEngine : IDisposable
         _gainFilter = null;
         gainFilter?.Dispose();
 
-        _renderTarget?.DetachSurface();
-        _renderTarget?.Dispose();
-        _renderTarget = null;
+        _videoRenderTarget?.DetachSurface();
+        _videoRenderTarget?.Dispose();
+        _videoRenderTarget = null;
         _videoPanel = null;
+        _subtitleRenderTarget?.DetachSurface();
+        _subtitleRenderTarget?.Dispose();
+        _subtitleRenderTarget = null;
+        _subtitlePanel = null;
     }
 
     public async Task<ErrorResult> Load(string filePath)
@@ -106,7 +112,10 @@ internal sealed partial class CoreEngine : IDisposable
 
         PlaybackPipeline pipeline = EnsurePipeline();
 
-        OperationResult opened = await pipeline.Open(MediaLocator.Parse(filePath), EnsureRenderTarget());
+        OperationResult opened = await pipeline.Open(
+            MediaLocator.Parse(filePath),
+            EnsureVideoRenderTarget(),
+            EnsureSubtitleRenderTarget());
         if (!opened.IsSuccessful)
         {
             return err.Error($"Unable to open media file '{filePath}': {opened.Message}");
@@ -275,6 +284,12 @@ internal sealed partial class CoreEngine : IDisposable
         return _videoPanel;
     }
 
+    public UIElement CreateSubtitleSurface()
+    {
+        _subtitlePanel ??= new SwapChainPanel { IsHitTestVisible = false };
+        return _subtitlePanel;
+    }
+
     #endregion
 
     #region Pipeline
@@ -388,10 +403,16 @@ internal sealed partial class CoreEngine : IDisposable
 
     #region Misc
 
-    private SwapChainPanelRenderTarget EnsureRenderTarget()
+    private SwapChainPanelRenderTarget EnsureVideoRenderTarget()
     {
-        _renderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)CreateVideoSurface());
-        return _renderTarget;
+        _videoRenderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)CreateVideoSurface());
+        return _videoRenderTarget;
+    }
+
+    private SwapChainPanelRenderTarget EnsureSubtitleRenderTarget()
+    {
+        _subtitleRenderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)CreateSubtitleSurface());
+        return _subtitleRenderTarget;
     }
 
     private void RaiseMediaOpened()

@@ -57,6 +57,14 @@ internal sealed class D3D11SwapChain : IDisposable
 
     internal ID3D11RenderTargetView View => _view ?? throw new ObjectDisposedException(nameof(D3D11SwapChain));
 
+    /// <summary>
+    /// The texture being presented, which a drawing that does not go through the render target view — Win2D drawing its
+    /// own text, say — needs in order to reach the same surface.
+    /// </summary>
+    internal ID3D11Texture2D BackBuffer => _backBuffer ?? throw new ObjectDisposedException(nameof(D3D11SwapChain));
+
+    internal ID3D11Device Device => _device.Device;
+
     internal int Width { get; private set; }
 
     internal int Height { get; private set; }
@@ -68,6 +76,17 @@ internal sealed class D3D11SwapChain : IDisposable
     /// <param name="height">Buffer height in physical pixels, as the host's scale requires.</param>
     /// <param name="compositionScale">The scale the host's element will apply when it composes this swap chain.</param>
     internal static bool TryCreate(D3D11Device device, int width, int height, double compositionScale, out D3D11SwapChain? swapChain, out string error)
+    {
+        // A picture covers its whole surface, so what is behind it is never meant to show through.
+        return TryCreate(device, width, height, compositionScale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE, out swapChain, out error);
+    }
+
+    /// <param name="alphaMode">
+    /// Whether the element the swap chain is composed into can see through it. A surface meant to sit over another one —
+    /// subtitles over a picture — has to be premultiplied, or its "nothing here" pixels arrive as opaque black and hide
+    /// what is underneath.
+    /// </param>
+    internal static bool TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode, out D3D11SwapChain? swapChain, out string error)
     {
         swapChain = null;
         width = Math.Max(1, width);
@@ -94,7 +113,7 @@ internal sealed class D3D11SwapChain : IDisposable
                 BufferCount = BufferCount,
                 Scaling = DXGI_SCALING.DXGI_SCALING_STRETCH,
                 SwapEffect = DXGI_SWAP_EFFECT.DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
-                AlphaMode = DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE,
+                AlphaMode = alphaMode,
             };
 
             Graphics_Dxgi_IDXGIFactory2_Extensions.CreateSwapChainForComposition(factory, device.Device, description, null, out IDXGISwapChain1 created);

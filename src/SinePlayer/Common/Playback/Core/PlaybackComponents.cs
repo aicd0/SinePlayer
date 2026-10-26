@@ -10,6 +10,7 @@ using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Backends.Wasapi;
+using SinePlayer.Core.Playback.Backends.Win2D;
 using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Common.Playback.Core;
@@ -18,30 +19,23 @@ internal sealed record PlaybackComponentOption(string Key, string Label);
 
 internal sealed record PlaybackComponents(
     string VideoDecoder,
-    string AudioDecoder,
     string VideoRenderer,
+    string AudioDecoder,
     string AudioRenderer,
+    string SubtitleDecoder,
+    string SubtitleRenderer,
     bool VideoPreferHardwareDecoding)
 {
     public const string AUTO = "auto";
     public const string NONE = "none";
     public const string FFMPEG = "ffmpeg";
     public const string DIRECT3D11 = "d3d11";
+    public const string WIN2D = "win2d";
     private const string WASAPI_PREFIX = "wasapi:";
 
-    public static PlaybackComponents Default { get; } = new(AUTO, AUTO, AUTO, AUTO, true);
+    public static PlaybackComponents Default { get; } = new(AUTO, AUTO, AUTO, AUTO, AUTO, AUTO, true);
 
     public static IReadOnlyList<PlaybackComponentOption> GetVideoDecoderOptions()
-    {
-        return
-        [
-            new(AUTO, StringResourceProvider.Instance.Auto),
-            new(FFMPEG, "FFmpeg"),
-            new(NONE, StringResourceProvider.Instance.None),
-        ];
-    }
-
-    public static IReadOnlyList<PlaybackComponentOption> GetAudioDecoderOptions()
     {
         return
         [
@@ -57,6 +51,16 @@ internal sealed record PlaybackComponents(
         [
             new(AUTO, StringResourceProvider.Instance.Auto),
             new(DIRECT3D11, "Direct3D 11"),
+            new(NONE, StringResourceProvider.Instance.None),
+        ];
+    }
+
+    public static IReadOnlyList<PlaybackComponentOption> GetAudioDecoderOptions()
+    {
+        return
+        [
+            new(AUTO, StringResourceProvider.Instance.Auto),
+            new(FFMPEG, "FFmpeg"),
             new(NONE, StringResourceProvider.Instance.None),
         ];
     }
@@ -83,19 +87,41 @@ internal sealed record PlaybackComponents(
         return options;
     }
 
+    public static IReadOnlyList<PlaybackComponentOption> GetSubtitleDecoderOptions()
+    {
+        return
+        [
+            new(AUTO, StringResourceProvider.Instance.Auto),
+            new(FFMPEG, "FFmpeg"),
+            new(NONE, StringResourceProvider.Instance.None),
+        ];
+    }
+
+    public static IReadOnlyList<PlaybackComponentOption> GetSubtitleRendererOptions()
+    {
+        return
+        [
+            new(AUTO, StringResourceProvider.Instance.Auto),
+            new(WIN2D, "Win2D"),
+            new(NONE, StringResourceProvider.Instance.None),
+        ];
+    }
+
     public void Apply(PlaybackPipeline pipeline)
     {
         ArgumentNullException.ThrowIfNull(pipeline);
 
-        ApplyVideoDecoder(pipeline);
-        ApplyAudioDecoder(pipeline, AudioDecoder);
+        ApplyVideoDecoder(pipeline, VideoDecoder);
         ApplyVideoRenderer(pipeline, VideoRenderer);
+        ApplyAudioDecoder(pipeline, AudioDecoder);
         ApplyAudioRenderer(pipeline, AudioRenderer);
+        ApplySubtitleDecoder(pipeline, SubtitleDecoder);
+        ApplySubtitleRenderer(pipeline, SubtitleRenderer);
     }
 
-    private void ApplyVideoDecoder(PlaybackPipeline pipeline)
+    private void ApplyVideoDecoder(PlaybackPipeline pipeline, string key)
     {
-        switch (VideoDecoder)
+        switch (key)
         {
             case FFMPEG:
                 SetFactories<IVideoDecoderFactory>(pipeline, [new FFmpegVideoDecoderFactory()]);
@@ -104,27 +130,11 @@ internal sealed record PlaybackComponents(
                 SetFactories<IVideoDecoderFactory>(pipeline, [new NullVideoDecoderFactory()]);
                 break;
             default:
-                SetFactories<IVideoDecoderFactory>(pipeline, [new FFmpegVideoDecoderFactory(), new NullVideoDecoderFactory()]);
+                SetFactories<IVideoDecoderFactory>(pipeline, [new FFmpegVideoDecoderFactory()]);
                 break;
         }
 
         pipeline.Components.Preferences = pipeline.Components.Preferences with { PreferHardwareDecoding = VideoPreferHardwareDecoding };
-    }
-
-    private static void ApplyAudioDecoder(PlaybackPipeline pipeline, string key)
-    {
-        switch (key)
-        {
-            case FFMPEG:
-                SetFactories<IAudioDecoderFactory>(pipeline, [new FFmpegAudioDecoderFactory()]);
-                break;
-            case NONE:
-                SetFactories<IAudioDecoderFactory>(pipeline, [new NullAudioDecoderFactory()]);
-                break;
-            default:
-                SetFactories<IAudioDecoderFactory>(pipeline, [new FFmpegAudioDecoderFactory(), new NullAudioDecoderFactory()]);
-                break;
-        }
     }
 
     private static void ApplyVideoRenderer(PlaybackPipeline pipeline, string key)
@@ -138,7 +148,23 @@ internal sealed record PlaybackComponents(
                 SetFactories<IVideoRendererFactory>(pipeline, [new NullVideoRendererFactory()]);
                 break;
             default:
-                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory(), new NullVideoRendererFactory()]);
+                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory()]);
+                break;
+        }
+    }
+
+    private static void ApplyAudioDecoder(PlaybackPipeline pipeline, string key)
+    {
+        switch (key)
+        {
+            case FFMPEG:
+                SetFactories<IAudioDecoderFactory>(pipeline, [new FFmpegAudioDecoderFactory()]);
+                break;
+            case NONE:
+                SetFactories<IAudioDecoderFactory>(pipeline, [new NullAudioDecoderFactory()]);
+                break;
+            default:
+                SetFactories<IAudioDecoderFactory>(pipeline, [new FFmpegAudioDecoderFactory()]);
                 break;
         }
     }
@@ -185,10 +211,41 @@ internal sealed record PlaybackComponents(
                         factories.Add(new WasapiAudioRendererFactory());
                     }
 
-                    factories.Add(new NullAudioRendererFactory());
                     SetFactories<IAudioRendererFactory>(pipeline, factories);
                     return;
                 }
+        }
+    }
+
+    private static void ApplySubtitleDecoder(PlaybackPipeline pipeline, string key)
+    {
+        switch (key)
+        {
+            case FFMPEG:
+                SetFactories<ISubtitleDecoderFactory>(pipeline, [new FFmpegSubtitleDecoderFactory()]);
+                break;
+            case NONE:
+                SetFactories<ISubtitleDecoderFactory>(pipeline, [new NullSubtitleDecoderFactory()]);
+                break;
+            default:
+                SetFactories<ISubtitleDecoderFactory>(pipeline, [new FFmpegSubtitleDecoderFactory()]);
+                break;
+        }
+    }
+
+    private static void ApplySubtitleRenderer(PlaybackPipeline pipeline, string key)
+    {
+        switch (key)
+        {
+            case WIN2D:
+                SetFactories<ISubtitleRendererFactory>(pipeline, [new Win2DSubtitleRendererFactory()]);
+                break;
+            case NONE:
+                SetFactories<ISubtitleRendererFactory>(pipeline, [new NullSubtitleRendererFactory()]);
+                break;
+            default:
+                SetFactories<ISubtitleRendererFactory>(pipeline, [new Win2DSubtitleRendererFactory()]);
+                break;
         }
     }
 

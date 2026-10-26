@@ -1133,6 +1133,9 @@ $plugins</value>
   <data name="Stretch" xml:space="preserve">
     <value>Estirar</value>
   </data>
+  <data name="Subtitle" xml:space="preserve">
+    <value>Subtítulo</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Etiqueta</value>
   </data>

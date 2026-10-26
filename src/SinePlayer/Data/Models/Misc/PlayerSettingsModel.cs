@@ -48,9 +48,11 @@ internal class PlayerSettingsModel
             PresetName = model.PresetName ?? fallbackModel.PresetName,
             AllowPerMediaConfiguration = model.AllowPerMediaConfiguration ?? fallbackModel.AllowPerMediaConfiguration,
             VideoDecoder = model.VideoDecoder ?? fallbackModel.VideoDecoder,
-            AudioDecoder = model.AudioDecoder ?? fallbackModel.AudioDecoder,
             VideoRenderer = model.VideoRenderer ?? fallbackModel.VideoRenderer,
+            AudioDecoder = model.AudioDecoder ?? fallbackModel.AudioDecoder,
             AudioRenderer = model.AudioRenderer ?? fallbackModel.AudioRenderer,
+            SubtitleDecoder = model.SubtitleDecoder ?? fallbackModel.SubtitleDecoder,
+            SubtitleRenderer = model.SubtitleRenderer ?? fallbackModel.SubtitleRenderer,
             VideoPreferHardwareDecoding = model.VideoPreferHardwareDecoding ?? fallbackModel.VideoPreferHardwareDecoding,
             VideoResizeMode = ParseResizeMode(model.VideoResizeMode, fallbackModel.VideoResizeMode),
             VideoRotationDegrees = ParseRotationDegrees(model.VideoRotationDegrees, fallbackModel.VideoRotationDegrees),
@@ -173,9 +175,11 @@ internal class PlayerSettingsModel
     public string PresetName { get; set; } = "?";
     public bool AllowPerMediaConfiguration { get; set; } = true;
     public string VideoDecoder { get; set; } = PlaybackComponents.AUTO;
-    public string AudioDecoder { get; set; } = PlaybackComponents.AUTO;
     public string VideoRenderer { get; set; } = PlaybackComponents.AUTO;
+    public string AudioDecoder { get; set; } = PlaybackComponents.AUTO;
     public string AudioRenderer { get; set; } = PlaybackComponents.AUTO;
+    public string SubtitleDecoder { get; set; } = PlaybackComponents.AUTO;
+    public string SubtitleRenderer { get; set; } = PlaybackComponents.AUTO;
     public bool VideoPreferHardwareDecoding { get; set; } = true;
     public VideoResizeMode VideoResizeMode { get; set; } = VideoResizeMode.Fit;
     public int VideoRotationDegrees { get; set; } = 0;
@@ -196,9 +200,11 @@ internal class PlayerSettingsModel
             PresetName = PresetName,
             AllowPerMediaConfiguration = AllowPerMediaConfiguration,
             VideoDecoder = VideoDecoder,
-            AudioDecoder = AudioDecoder,
             VideoRenderer = VideoRenderer,
+            AudioDecoder = AudioDecoder,
             AudioRenderer = AudioRenderer,
+            SubtitleDecoder = SubtitleDecoder,
+            SubtitleRenderer = SubtitleRenderer,
             VideoPreferHardwareDecoding = VideoPreferHardwareDecoding,
             VideoResizeMode = VideoResizeMode.ToString(),
             VideoRotationDegrees = VideoRotationDegrees,
@@ -209,7 +215,7 @@ internal class PlayerSettingsModel
 
     public PlaybackComponents ToComponents()
     {
-        return new(VideoDecoder, AudioDecoder, VideoRenderer, AudioRenderer, VideoPreferHardwareDecoding);
+        return new(VideoDecoder, VideoRenderer, AudioDecoder, AudioRenderer, SubtitleDecoder, SubtitleRenderer, VideoPreferHardwareDecoding);
     }
 
     public VideoTransform ToVideoTransform()
@@ -350,14 +356,20 @@ internal class PlayerSettingsModel
         [JsonPropertyName("VideoDecoder")]
         public string? VideoDecoder { get; set; }
 
-        [JsonPropertyName("AudioDecoder")]
-        public string? AudioDecoder { get; set; }
-
         [JsonPropertyName("VideoRenderer")]
         public string? VideoRenderer { get; set; }
 
+        [JsonPropertyName("AudioDecoder")]
+        public string? AudioDecoder { get; set; }
+
         [JsonPropertyName("AudioRenderer")]
         public string? AudioRenderer { get; set; }
+
+        [JsonPropertyName("SubtitleDecoder")]
+        public string? SubtitleDecoder { get; set; }
+
+        [JsonPropertyName("SubtitleRenderer")]
+        public string? SubtitleRenderer { get; set; }
 
         [JsonPropertyName("VideoPreferHardwareDecoding")]
         public bool? VideoPreferHardwareDecoding { get; set; }

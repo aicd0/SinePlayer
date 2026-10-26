@@ -59,6 +59,12 @@ internal static partial class FFmpegNative
     internal static partial nint avcodec_find_decoder_by_name(string name);
 
     [LibraryImport(AvCodec)]
+    internal static partial nint avcodec_find_decoder(int codecId);
+
+    [LibraryImport(AvCodec, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint avcodec_descriptor_get_by_name(string name);
+
+    [LibraryImport(AvCodec)]
     internal static partial nint avcodec_alloc_context3(nint codec);
 
     [LibraryImport(AvCodec)]
@@ -81,6 +87,12 @@ internal static partial class FFmpegNative
 
     [LibraryImport(AvCodec)]
     internal static partial int avcodec_receive_frame(nint context, nint frame);
+
+    [LibraryImport(AvCodec)]
+    internal static partial int avcodec_decode_subtitle2(nint context, nint subtitle, nint gotSubtitle, nint packet);
+
+    [LibraryImport(AvCodec)]
+    internal static partial void avsubtitle_free(nint subtitle);
 
     [LibraryImport(AvCodec)]
     internal static partial void avcodec_flush_buffers(nint context);

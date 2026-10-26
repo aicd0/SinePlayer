@@ -44,31 +44,39 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private readonly ITaskDispatcher _playbackQueue = TaskDispatcher.Factory.NewQueue("Pipeline - Playback");
     private readonly SeqLock<VideoTransform> _videoTransform = new(VideoTransform.Identity);
+    private readonly SeqLock<SubtitlePlacement> _subtitlePlacement = new(SubtitlePlacement.Identity);
 
     private MediaInfo? _info;
     private long _audioMinimumSamples;
     private long _audioWakeSamples;
 
     private IVideoRenderTarget? _videoTarget;
+    private IVideoRenderTarget? _subtitleTarget;
+    private long _subtitleSurfaceVersion;
     private readonly ComponentSlot<MediaSourceHolder> _source = new();
     private readonly ComponentSlot<IVideoDecoder> _videoDecoder = new();
-    private readonly ComponentSlot<IAudioDecoder> _audioDecoder = new();
     private readonly ComponentSlot<IVideoRenderer> _videoRenderer = new();
+    private readonly ComponentSlot<IAudioDecoder> _audioDecoder = new();
     private readonly ComponentSlot<IAudioRenderer> _audioRenderer = new();
+    private readonly ComponentSlot<ISubtitleDecoder> _subtitleDecoder = new();
+    private readonly ComponentSlot<ISubtitleRenderer> _subtitleRenderer = new();
 
     private readonly AudioQueue _audioQueue = new();
     private readonly ConcurrentQueue<PacketEntry> _packetQueue = new();
     private readonly ConcurrentQueue<FrameEntry> _frameQueue = new();
+    private readonly SubtitleCueWindow _cueWindow = new();
 
     private Thread? _readerThread;
     private Thread? _videoDecodeThread;
     private Thread? _videoRenderThread;
     private Thread? _audioRenderThread;
+    private Thread? _subtitleRenderThread;
 
     private readonly PipelineNode _readerNode = new();
     private readonly PipelineNode _videoDecodeNode = new();
     private readonly PipelineNode _videoRenderNode = new();
     private readonly PipelineNode _audioRenderNode = new();
+    private readonly PipelineNode _subtitleRenderNode = new();
 
     private bool _disposed;
     private volatile MediaEngineState _state = MediaEngineState.None;
@@ -136,6 +144,21 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
+    public SubtitlePlacement SubtitlePlacement
+    {
+        get => _subtitlePlacement.Read();
+        set
+        {
+            if (_subtitlePlacement.Read() == value)
+            {
+                return;
+            }
+
+            _subtitlePlacement.Write(_ => value);
+            _subtitleRenderNode.Wake();
+        }
+    }
+
     public MediaEngineState State => _state;
 
     public string? Error => _error;
@@ -150,7 +173,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public AudioStreamInfo? SelectedAudioStream => _source.Latest?.Component?.AudioStream;
 
-    public SubtitleStreamInfo? SelectedSubtitleStream => null;
+    public SubtitleStreamInfo? SelectedSubtitleStream => _source.Latest?.Component?.SubtitleStream;
 
     public string? VideoDecoderName => _videoDecoder.CurrentComponent?.Name;
 
@@ -243,10 +266,10 @@ public sealed partial class PlaybackPipeline : IDisposable
         teardown.Wait();
     }
 
-    public Task<OperationResult> Open(MediaLocator locator, IVideoRenderTarget? videoTarget = null)
+    public Task<OperationResult> Open(MediaLocator locator, IVideoRenderTarget? videoTarget = null, IVideoRenderTarget? subtitleTarget = null)
     {
         ArgumentNullException.ThrowIfNull(locator);
-        return Submit(() => OpenCore(locator, videoTarget));
+        return Submit(() => OpenCore(locator, videoTarget, subtitleTarget));
     }
 
     public Task<OperationResult> Play()
@@ -283,7 +306,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     #region Playback
 
-    private OperationResult OpenCore(MediaLocator locator, IVideoRenderTarget? videoTarget)
+    private OperationResult OpenCore(MediaLocator locator, IVideoRenderTarget? videoTarget, IVideoRenderTarget? subtitleTarget)
     {
         if (_disposed)
         {
@@ -299,7 +322,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         StopCore();
         SetState(MediaEngineState.Opening);
 
-        OperationResult result = PreparePlayback(locator, sourceFactory, videoTarget);
+        OperationResult result = PreparePlayback(locator, sourceFactory, videoTarget, subtitleTarget);
         if (!result.IsSuccessful)
         {
             StopCore();
@@ -313,11 +336,12 @@ public sealed partial class PlaybackPipeline : IDisposable
         StartVideoDecodeThread();
         StartVideoRenderThread();
         StartAudioRenderThread();
+        StartSubtitleRenderThread();
 
         return OperationResult.Success();
     }
 
-    private OperationResult PreparePlayback(MediaLocator locator, ISourceProviderFactory sourceFactory, IVideoRenderTarget? videoTarget)
+    private OperationResult PreparePlayback(MediaLocator locator, ISourceProviderFactory sourceFactory, IVideoRenderTarget? videoTarget, IVideoRenderTarget? subtitleTarget)
     {
         OperationResult opened = sourceFactory.TryOpen(locator, out IMediaSource? source);
         if (!opened.IsSuccessful)
@@ -345,7 +369,14 @@ public sealed partial class PlaybackPipeline : IDisposable
             _videoTarget?.SurfaceSizeChanged += VideoTarget_SurfaceSizeChanged;
         }
 
-        MediaSourceHolder sourceHolder = new(source, null, null);
+        if (!ReferenceEquals(_subtitleTarget, subtitleTarget))
+        {
+            _subtitleTarget?.SurfaceSizeChanged -= SubtitleTarget_SurfaceSizeChanged;
+            _subtitleTarget = subtitleTarget;
+            _subtitleTarget?.SurfaceSizeChanged += SubtitleTarget_SurfaceSizeChanged;
+        }
+
+        MediaSourceHolder sourceHolder = new(source, null, null, null);
         OperationResult built = BuildChains(sourceHolder, out _);
         if (!built.IsSuccessful)
         {
@@ -359,13 +390,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             _clock.SetPosition(TimeSpan.Zero);
         }
 
-        _epochGate.Write(x => new EpochGate()
-        {
-            Epoch = x.Epoch + 1,
-            SeekPosition = TimeSpan.Zero,
-            SeekMode = SeekMode.Fast,
-        });
-
+        AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
         return OperationResult.Success();
     }
 
@@ -427,6 +452,21 @@ public sealed partial class PlaybackPipeline : IDisposable
             Name = "Pipeline - Audio render",
         };
         _audioRenderThread.Start();
+    }
+
+    private void StartSubtitleRenderThread()
+    {
+        if (_subtitleRenderThread is not null)
+        {
+            return;
+        }
+
+        _subtitleRenderThread = new Thread(SubtitleRenderCore)
+        {
+            IsBackground = true,
+            Name = "Pipeline - Subtitle render",
+        };
+        _subtitleRenderThread.Start();
     }
 
     private OperationResult PlayCore()
@@ -512,12 +552,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             SetState(MediaEngineState.Paused);
         }
 
-        _epochGate.Write(x => new EpochGate()
-        {
-            Epoch = x.Epoch + 1,
-            SeekPosition = position,
-            SeekMode = mode,
-        });
+        AdvanceEpoch(position, mode);
 
         lock (_clockLock)
         {
@@ -562,15 +597,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         if (changes != ChainChanges.None)
         {
-            TimeSpan position = _clock.Position;
-
-            _epochGate.Write(x => new EpochGate()
-            {
-                Epoch = x.Epoch + 1,
-                SeekPosition = position,
-                SeekMode = SeekMode.Precise,
-            });
-
+            AdvanceEpoch(_clock.Position, SeekMode.Precise);
             WakeAll();
         }
 
@@ -595,13 +622,6 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure($"Cannot change tracks when the state is {state}.");
         }
 
-        if (kind is not (MediaStreamKind.Video or MediaStreamKind.Audio))
-        {
-            return stream is null
-                ? OperationResult.Success()
-                : OperationResult.Failure("Subtitle tracks are not supported yet.");
-        }
-
         MediaStreamInfo? target = null;
         if (stream is not null)
         {
@@ -620,7 +640,8 @@ public sealed partial class PlaybackPipeline : IDisposable
         var sourceHolder = new MediaSourceHolder(
             current.Source,
             kind == MediaStreamKind.Video ? (VideoStreamInfo?)target : current.VideoStream,
-            kind == MediaStreamKind.Audio ? (AudioStreamInfo?)target : current.AudioStream);
+            kind == MediaStreamKind.Audio ? (AudioStreamInfo?)target : current.AudioStream,
+            kind == MediaStreamKind.Subtitle ? (SubtitleStreamInfo?)target : current.SubtitleStream);
 
         OperationResult built = BuildChains(sourceHolder, out ChainChanges changes);
         if (!built.IsSuccessful)
@@ -635,14 +656,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 SetState(MediaEngineState.Paused);
             }
 
-            TimeSpan position = _clock.Position;
-            _epochGate.Write(x => new EpochGate()
-            {
-                Epoch = x.Epoch + 1,
-                SeekPosition = position,
-                SeekMode = SeekMode.Precise,
-            });
-
+            AdvanceEpoch(_clock.Position, SeekMode.Precise);
             WakeAll();
         }
 
@@ -662,6 +676,8 @@ public sealed partial class PlaybackPipeline : IDisposable
         _videoRenderThread = null;
         _audioRenderThread?.Join();
         _audioRenderThread = null;
+        _subtitleRenderThread?.Join();
+        _subtitleRenderThread = null;
 
         while (_packetQueue.TryDequeue(out PacketEntry packet))
         {
@@ -682,9 +698,13 @@ public sealed partial class PlaybackPipeline : IDisposable
         _videoRenderer.Reset();
         _audioRenderer.CurrentComponent?.Flush();
         _audioRenderer.Reset();
+        _subtitleDecoder.Reset();
+        _subtitleRenderer.Reset();
 
         _videoTarget?.SurfaceSizeChanged -= VideoTarget_SurfaceSizeChanged;
         _videoTarget = null;
+        _subtitleTarget?.SurfaceSizeChanged -= SubtitleTarget_SurfaceSizeChanged;
+        _subtitleTarget = null;
 
         lock (_clockLock)
         {
@@ -712,8 +732,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         Interlocked.Exchange(ref _renderTicks, 0);
         Interlocked.Exchange(ref _pictureTicks, -1);
 
-        _epochGate.Write(x => new EpochGate() { Epoch = x.Epoch + 1 });
-
+        AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
         SetState(MediaEngineState.None, null);
         return OperationResult.Success();
     }
@@ -768,6 +787,16 @@ public sealed partial class PlaybackPipeline : IDisposable
         WakeAll();
     }
 
+    private void AdvanceEpoch(TimeSpan position, SeekMode mode)
+    {
+        _epochGate.Write(x => new EpochGate()
+        {
+            Epoch = x.Epoch + 1,
+            SeekPosition = position,
+            SeekMode = mode,
+        });
+    }
+
     private OperationResult Fail(string message, Exception? exception = null)
     {
         PlaybackLogger.E(TAG, message, exception);
@@ -809,6 +838,8 @@ public sealed partial class PlaybackPipeline : IDisposable
         VideoDecoder = 4,
         AudioRenderer = 8,
         AudioDecoder = 16,
+        SubtitleRenderer = 32,
+        SubtitleDecoder = 64,
     }
 
     private OperationResult BuildChains(MediaSourceHolder sourceHolder, out ChainChanges changes)
@@ -818,6 +849,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         IMediaSource source = sourceHolder.Source;
         VideoStreamInfo? videoStream = sourceHolder.VideoStream;
         AudioStreamInfo? audioStream = sourceHolder.AudioStream;
+        SubtitleStreamInfo? subtitleStream = sourceHolder.SubtitleStream;
         ChainChanges sourceChanges = DiffSource(sourceHolder);
 
         ComponentResolver resolver = Components.Clone();
@@ -825,6 +857,8 @@ public sealed partial class PlaybackPipeline : IDisposable
         PipelineComponent<IVideoDecoder>? newDecoder = null;
         PipelineComponent<IAudioRenderer>? newAudioRenderer = null;
         PipelineComponent<IAudioDecoder>? newAudioDecoder = null;
+        PipelineComponent<ISubtitleRenderer>? newSubtitleRenderer = null;
+        PipelineComponent<ISubtitleDecoder>? newSubtitleDecoder = null;
         try
         {
             ChainChanges pendingChanges = sourceChanges & ChainChanges.Source;
@@ -934,6 +968,69 @@ public sealed partial class PlaybackPipeline : IDisposable
                 pendingChanges |= sourceChanges & (ChainChanges.AudioDecoder | ChainChanges.AudioRenderer);
             }
 
+            if (subtitleStream is not null)
+            {
+                IVideoRenderTarget? subtitleTarget = _subtitleTarget;
+                if (subtitleTarget is null)
+                {
+                    return OperationResult.Failure("The file has a subtitle track but no subtitle surface was supplied.");
+                }
+
+                // Resolve subtitle decoder
+                bool rebuildSubtitleDecoder = sourceChanges.HasFlag(ChainChanges.SubtitleDecoder);
+                PipelineComponent<ISubtitleDecoder>? latestDecoder = _subtitleDecoder.Latest;
+                IMediaSource? subtitleSource = subtitleStream.IsExternal ? null : source;
+                OperationResult<PipelineComponent<ISubtitleDecoder>?> decoderResolved = ResolveComponent(
+                    resolver.ResolveSubtitleDecoders(subtitleSource, subtitleStream),
+                    rebuildSubtitleDecoder ? null : latestDecoder?.Signature,
+                    "subtitle decoder");
+                if (!decoderResolved.IsSuccessful)
+                {
+                    return OperationResult.Failure(decoderResolved);
+                }
+
+                newSubtitleDecoder = decoderResolved.Result;
+                if (newSubtitleDecoder is not null)
+                {
+                    pendingChanges |= ChainChanges.SubtitleDecoder;
+                }
+
+                // Resolve subtitle renderer
+                PipelineComponent<ISubtitleDecoder>? subtitleDecoder = newSubtitleDecoder ?? latestDecoder;
+                if (subtitleDecoder is null)
+                {
+                    return OperationResult.Failure("The subtitle track has no decoder to say what its cues are made of.");
+                }
+
+                SubtitleCueFormat format = subtitleDecoder.Component.CueFormat;
+                bool rebuildSubtitleRenderer = newSubtitleDecoder is not null || sourceChanges.HasFlag(ChainChanges.SubtitleRenderer);
+                PipelineComponent<ISubtitleRenderer>? latestRenderer = _subtitleRenderer.Latest;
+                OperationResult<PipelineComponent<ISubtitleRenderer>?> rendererResolved = ResolveComponent(
+                    resolver.ResolveSubtitleRenderers(format),
+                    rebuildSubtitleRenderer ? null : latestRenderer?.Signature,
+                    "subtitle renderer");
+                if (!rendererResolved.IsSuccessful)
+                {
+                    return OperationResult.Failure(rendererResolved);
+                }
+
+                newSubtitleRenderer = rendererResolved.Result;
+                if (newSubtitleRenderer is not null)
+                {
+                    OperationResult configured = newSubtitleRenderer.Component.Configure(subtitleStream, subtitleTarget);
+                    if (!configured.IsSuccessful)
+                    {
+                        return configured;
+                    }
+
+                    pendingChanges |= ChainChanges.SubtitleRenderer;
+                }
+            }
+            else
+            {
+                pendingChanges |= sourceChanges & (ChainChanges.SubtitleDecoder | ChainChanges.SubtitleRenderer);
+            }
+
             PipelineVersion versions = CurrentVersions();
             long nextVersion = versions.Next;
             versions = new()
@@ -943,6 +1040,8 @@ public sealed partial class PlaybackPipeline : IDisposable
                 VideoRenderer = pendingChanges.HasFlag(ChainChanges.VideoRenderer) ? nextVersion : versions.VideoRenderer,
                 AudioDecoder = pendingChanges.HasFlag(ChainChanges.AudioDecoder) ? nextVersion : versions.AudioDecoder,
                 AudioRenderer = pendingChanges.HasFlag(ChainChanges.AudioRenderer) ? nextVersion : versions.AudioRenderer,
+                SubtitleDecoder = pendingChanges.HasFlag(ChainChanges.SubtitleDecoder) ? nextVersion : versions.SubtitleDecoder,
+                SubtitleRenderer = pendingChanges.HasFlag(ChainChanges.SubtitleRenderer) ? nextVersion : versions.SubtitleRenderer,
             };
 
             if (audioStream is not null)
@@ -990,6 +1089,20 @@ public sealed partial class PlaybackPipeline : IDisposable
                 newAudioRenderer = null;
                 changes |= ChainChanges.AudioRenderer;
             }
+
+            if (pendingChanges.HasFlag(ChainChanges.SubtitleDecoder))
+            {
+                _subtitleDecoder.Publish(newSubtitleDecoder, versions);
+                newSubtitleDecoder = null;
+                changes |= ChainChanges.SubtitleDecoder;
+            }
+
+            if (pendingChanges.HasFlag(ChainChanges.SubtitleRenderer))
+            {
+                _subtitleRenderer.Publish(newSubtitleRenderer, versions);
+                newSubtitleRenderer = null;
+                changes |= ChainChanges.SubtitleRenderer;
+            }
         }
         finally
         {
@@ -997,6 +1110,8 @@ public sealed partial class PlaybackPipeline : IDisposable
             newDecoder?.Dispose();
             newAudioRenderer?.Dispose();
             newAudioDecoder?.Dispose();
+            newSubtitleRenderer?.Dispose();
+            newSubtitleDecoder?.Dispose();
         }
 
         return OperationResult.Success();
@@ -1009,7 +1124,8 @@ public sealed partial class PlaybackPipeline : IDisposable
         {
             return ChainChanges.Source
                 | ChainChanges.VideoDecoder | ChainChanges.VideoRenderer
-                | ChainChanges.AudioDecoder | ChainChanges.AudioRenderer;
+                | ChainChanges.AudioDecoder | ChainChanges.AudioRenderer
+                | ChainChanges.SubtitleDecoder | ChainChanges.SubtitleRenderer;
         }
 
         ChainChanges changes = ChainChanges.None;
@@ -1022,6 +1138,11 @@ public sealed partial class PlaybackPipeline : IDisposable
         if (current.AudioStream?.Index != sourceHolder.AudioStream?.Index)
         {
             changes |= ChainChanges.Source | ChainChanges.AudioDecoder | ChainChanges.AudioRenderer;
+        }
+
+        if (current.SubtitleStream?.Index != sourceHolder.SubtitleStream?.Index || current.SubtitleStream?.Path != sourceHolder.SubtitleStream?.Path)
+        {
+            changes |= ChainChanges.Source | ChainChanges.SubtitleDecoder | ChainChanges.SubtitleRenderer;
         }
 
         return changes;
@@ -1062,6 +1183,8 @@ public sealed partial class PlaybackPipeline : IDisposable
         versions = PipelineVersion.Max(versions, _audioDecoder.HighestVersions);
         versions = PipelineVersion.Max(versions, _videoRenderer.HighestVersions);
         versions = PipelineVersion.Max(versions, _audioRenderer.HighestVersions);
+        versions = PipelineVersion.Max(versions, _subtitleDecoder.HighestVersions);
+        versions = PipelineVersion.Max(versions, _subtitleRenderer.HighestVersions);
         return versions;
     }
 
@@ -1082,6 +1205,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         ComponentSlot<MediaSourceHolder> sourceSlot = _source;
         ComponentSlot<IAudioDecoder> audioDecoderSlot = _audioDecoder;
+        ComponentSlot<ISubtitleDecoder> subtitleDecoderSlot = _subtitleDecoder;
         bool pendingEpochChange = false;
         bool buffering = false;
         long workingEpoch = -1;
@@ -1126,8 +1250,17 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             IAudioDecoder? audioDecoder = audioDecoderSlot.CurrentComponent;
 
-            // Bump epoch
+            // Install subtitle decoder
             EpochGate epochGate = _epochGate.Read();
+            if (subtitleDecoderSlot.Update(out ISubtitleDecoder? oldSubtitleDecoder))
+            {
+                oldSubtitleDecoder?.Dispose();
+                _cueWindow.Reset();
+            }
+
+            ISubtitleDecoder? subtitleDecoder = subtitleDecoderSlot.CurrentComponent;
+
+            // Bump epoch
             long epoch = epochGate.Epoch;
             if (epoch != workingEpoch)
             {
@@ -1160,6 +1293,15 @@ public sealed partial class PlaybackPipeline : IDisposable
                     catch (Exception ex)
                     {
                         PostWarning($"The audio decoder could not be flushed: {ex.Message}");
+                    }
+
+                    try
+                    {
+                        subtitleDecoder?.Flush();
+                    }
+                    catch (Exception ex)
+                    {
+                        PostWarning($"The subtitle decoder could not be flushed: {ex.Message}");
                     }
                 }
                 else
@@ -1215,6 +1357,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             // Route package
             PipelineVersion sourceVersions = sourceSlot.CurrentVersions;
             PipelineVersion audioDecoderVersions = audioDecoderSlot.CurrentVersions;
+            PipelineVersion subtitleDecoderVersions = subtitleDecoderSlot.CurrentVersions;
             var audioBufferVersions = PipelineVersion.Max(sourceVersions, audioDecoderVersions);
             var routed = OperationResult.Success();
             bool ending = false;
@@ -1227,6 +1370,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             {
                 AudioStreamInfo? audioStreamInfo = sourceHolder.AudioStream;
                 VideoStreamInfo? videoStreamInfo = sourceHolder.VideoStream;
+                SubtitleStreamInfo? subtitleStreamInfo = sourceHolder.SubtitleStream;
                 if (audioStreamInfo is not null && packet.StreamIndex == audioStreamInfo.Index)
                 {
                     if (audioDecoder is not null)
@@ -1254,6 +1398,26 @@ public sealed partial class PlaybackPipeline : IDisposable
                     _packetQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch));
                     handedOn = true;
                     TryWakeVideoDecode();
+                }
+                else if (subtitleStreamInfo is not null && packet.StreamIndex == subtitleStreamInfo.Index)
+                {
+                    if (subtitleDecoder is not null)
+                    {
+                        VersionVerdict verdict = PipelineVersion.CompareSubtitleDecoder(sourceVersions, subtitleDecoderVersions);
+                        switch (verdict)
+                        {
+                            case VersionVerdict.Accept:
+                                routed = DecodeSubtitle(subtitleDecoder, packet);
+                                break;
+                            case VersionVerdict.Block:
+                                _readerNode.Wait(stamp);
+                                continue;
+                            case VersionVerdict.Drop:
+                                break;
+                            default:
+                                throw new InvalidOperationException($"Unknown verdict '{verdict}'.");
+                        }
+                    }
                 }
             }
 
@@ -1352,6 +1516,38 @@ public sealed partial class PlaybackPipeline : IDisposable
         if (buffers.Count > 0)
         {
             TryWakeAudioRender();
+        }
+
+        return OperationResult.Success();
+    }
+
+    private OperationResult DecodeSubtitle(ISubtitleDecoder subtitleDecoder, MediaPacket packet)
+    {
+        OperationResult decoded;
+        IReadOnlyList<SubtitleCue> cues;
+        try
+        {
+            decoded = subtitleDecoder.TryDecode(packet, out cues);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Failure(ex.Message);
+        }
+
+        if (!decoded.IsSuccessful)
+        {
+            return decoded;
+        }
+
+        if (cues is null)
+        {
+            return OperationResult.Failure("The subtitle decoder returned no cues.");
+        }
+
+        _cueWindow.Add(cues, _clock.Position);
+        if (cues.Count > 0)
+        {
+            _subtitleRenderNode.Wake();
         }
 
         return OperationResult.Success();
@@ -2297,7 +2493,127 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
 
             clock.SetPosition(expected);
+            NotifyClockMoved();
         }
+    }
+
+    #endregion
+
+    #region Subtitle render
+
+    private void SubtitleRenderCore()
+    {
+        void ReportOnFailure(string message, OperationResult result)
+        {
+            if (!result.IsSuccessful)
+            {
+                PostWarning($"{message}: {result.Message}");
+            }
+        }
+
+        ComponentSlot<ISubtitleRenderer> subtitleRendererSlot = _subtitleRenderer;
+        bool drawnInvalidated = true;
+        long workingEpoch = -1;
+        long drawnSurfaceVersion = -1;
+        SubtitlePlacement drawnPlacement = default;
+        List<SubtitleCue> drawnCues = [];
+
+        while (true)
+        {
+            long stamp = _subtitleRenderNode.Stamp;
+            if (_stopRequested)
+            {
+                return;
+            }
+
+            // Install subtitle renderer
+            if (subtitleRendererSlot.Update(out ISubtitleRenderer? oldRenderer))
+            {
+                if (oldRenderer is not null)
+                {
+                    if (subtitleRendererSlot.CurrentComponent is null)
+                    {
+                        ReportOnFailure("The subtitles could not be cleared", SafeInvoke(() => oldRenderer.Show([], SubtitlePlacement)));
+                    }
+
+                    oldRenderer.Dispose();
+                }
+
+                drawnInvalidated = true;
+                continue;
+            }
+
+            ISubtitleRenderer? renderer = subtitleRendererSlot.CurrentComponent;
+            if (renderer is null)
+            {
+                _subtitleRenderNode.Wait(stamp);
+                continue;
+            }
+
+            if (!CheckState(out MediaEngineState state, MediaEngineState.Playing, MediaEngineState.Paused))
+            {
+                _subtitleRenderNode.Wait(stamp);
+                continue;
+            }
+
+            // Bump epoch
+            EpochGate epochGate = _epochGate.Read();
+            long epoch = epochGate.Epoch;
+            if (workingEpoch != epoch)
+            {
+                workingEpoch = epoch;
+                drawnInvalidated = true;
+            }
+
+            // Show
+            TimeSpan position = _clock.Position;
+            IReadOnlyList<SubtitleCue> cues = _cueWindow.Visible(position);
+            long surfaceVersion = Interlocked.Read(ref _subtitleSurfaceVersion);
+            SubtitlePlacement placement = SubtitlePlacement;
+            if (drawnInvalidated ||
+                surfaceVersion != drawnSurfaceVersion ||
+                placement != drawnPlacement ||
+                !SameCues(cues, drawnCues))
+            {
+                ReportOnFailure("The subtitles could not be drawn", SafeInvoke(() => renderer.Show(cues, placement)));
+                drawnInvalidated = false;
+                drawnSurfaceVersion = surfaceVersion;
+                drawnPlacement = placement;
+                drawnCues.Clear();
+                drawnCues.AddRange(cues);
+            }
+
+            // Idle
+            int timeout = Timeout.Infinite;
+            if (state == MediaEngineState.Playing)
+            {
+                TimeSpan? next = _cueWindow.TimeUntilNextChange(position);
+                if (next.HasValue)
+                {
+                    timeout = (int)Math.Clamp(Math.Ceiling(next.Value.TotalMilliseconds), 1, int.MaxValue);
+                }
+            }
+
+            _subtitleRenderNode.Wait(stamp, timeout);
+        }
+    }
+
+    private static bool SameCues(IReadOnlyList<SubtitleCue> visible, List<SubtitleCue> drawn)
+    {
+        if (visible.Count != drawn.Count)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < visible.Count; index++)
+        {
+            if (!ReferenceEquals(visible[index], drawn[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     #endregion
@@ -2307,6 +2623,12 @@ public sealed partial class PlaybackPipeline : IDisposable
     private void VideoTarget_SurfaceSizeChanged()
     {
         _videoRenderNode.Wake();
+    }
+
+    private void SubtitleTarget_SurfaceSizeChanged()
+    {
+        Interlocked.Increment(ref _subtitleSurfaceVersion);
+        _subtitleRenderNode.Wake();
     }
 
     #endregion
@@ -2356,7 +2678,14 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         _anchoredEpoch = iterationEpoch;
         _clock.SetPosition(mediaTimestamp);
+        NotifyClockMoved();
         return true;
+    }
+
+    private void NotifyClockMoved()
+    {
+        // Subtitle might be changed
+        _subtitleRenderNode.Wake();
     }
 
     private void WakeAll()
@@ -2365,6 +2694,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         _videoDecodeNode.Wake();
         _videoRenderNode.Wake();
         _audioRenderNode.Wake();
+        _subtitleRenderNode.Wake();
     }
 
     private void PostWarning(string warning)
@@ -2390,6 +2720,22 @@ public sealed partial class PlaybackPipeline : IDisposable
     private Task<T> Submit<T>(Func<T> work)
     {
         return _playbackQueue.Submit(work);
+    }
+
+    #endregion
+
+    #region Utilities
+
+    private static OperationResult SafeInvoke(Func<OperationResult> action)
+    {
+        try
+        {
+            return action();
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Failure(ex);
+        }
     }
 
     #endregion

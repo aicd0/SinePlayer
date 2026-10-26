@@ -37,6 +37,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleTabTitle = string.Empty;
+    public string SubtitleTabTitle
+    {
+        get => _subtitleTabTitle;
+        set
+        {
+            _subtitleTabTitle = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleTabTitle)));
+        }
+    }
+
     private string _videoDecoderLabel = string.Empty;
     public string VideoDecoderLabel
     {
@@ -124,7 +135,6 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AudioDecoderLabel)));
         }
     }
-
     private string _audioRendererLabel = string.Empty;
     public string AudioRendererLabel
     {
@@ -133,6 +143,28 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         {
             _audioRendererLabel = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AudioRendererLabel)));
+        }
+    }
+
+    private string _subtitleDecoderLabel = string.Empty;
+    public string SubtitleDecoderLabel
+    {
+        get => _subtitleDecoderLabel;
+        set
+        {
+            _subtitleDecoderLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleDecoderLabel)));
+        }
+    }
+
+    private string _subtitleRendererLabel = string.Empty;
+    public string SubtitleRendererLabel
+    {
+        get => _subtitleRendererLabel;
+        set
+        {
+            _subtitleRendererLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleRendererLabel)));
         }
     }
 

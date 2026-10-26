@@ -565,6 +565,16 @@ so the generation a package names is always on its way, and the next turn adopts
 While paused the decoder stands still rather than filling the frame queue; that is what keeps a pause from
 spending the look-ahead the resume needs.
 
+A hardware frame is copied out of the GPU before it is handed on, and **the copy carries the frame's time by
+hand**. `av_hwframe_transfer_data` moves pixels and nothing else: the destination frame comes back with no
+timestamp, and a frame with none is placed by the last packet that was submitted — which is not where it belongs.
+The consequence is not a small one, and it is invisible to every counter the pipeline keeps: the frames of a
+hardware-decoded file carry the times of the packets that happened to be in flight, the first of them is stamped
+with a moment well past the start, and the clock's anchor (§5) is that frame, so playback of every file began
+several tenths of a second in and the first subtitle cue arrived late with it. Measured on a 10 fps file: frames
+of the first 0.9 s all absent from the queue with the software decoder showing them from 0, and the difference
+was the timestamp alone — the frames were never lost, only mis-dated.
+
 ### 4.3 Presentation loses frames, best-effort, and holds the clock when it cannot
 
 The picture is the follower, and it is the **only** stage allowed to give up on media *it could have

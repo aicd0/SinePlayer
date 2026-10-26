@@ -103,17 +103,25 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     {
         string selectedTabKey = string.Empty;
         SelectorBarItem selectedItem = sender.SelectedItem;
+
+        VideoSettingsGrid.Visibility = Visibility.Collapsed;
+        AudioSettingsGrid.Visibility = Visibility.Collapsed;
+        SubtitleSettingsGrid.Visibility = Visibility.Collapsed;
+
         if (selectedItem == SelectorBarItem1)
         {
             selectedTabKey = "Video";
             VideoSettingsGrid.Visibility = Visibility.Visible;
-            AudioSettingsGrid.Visibility = Visibility.Collapsed;
         }
         else if (selectedItem == SelectorBarItem2)
         {
             selectedTabKey = "Audio";
             AudioSettingsGrid.Visibility = Visibility.Visible;
-            VideoSettingsGrid.Visibility = Visibility.Collapsed;
+        }
+        else if (selectedItem == SelectorBarItem3)
+        {
+            selectedTabKey = "Subtitle";
+            SubtitleSettingsGrid.Visibility = Visibility.Visible;
         }
 
         AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).Set(RegistryNames.StateKey.SELECTED_PLAYER_SETTINGS_TAB, selectedTabKey);
@@ -328,6 +336,27 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             ViewModel.AudioTabTitle = GetLabel(StringResource.Audio, tabModified);
         }
 
+        {
+            bool tabModified = false;
+
+            {
+                bool modified = settings.SubtitleDecoder != presetSettings.SubtitleDecoder;
+                tabModified = tabModified || modified;
+                UpdateSubtitleDecoder(settings);
+                ViewModel.SubtitleDecoderLabel = GetLabel(StringResource.Decoder, modified);
+            }
+
+            {
+                bool modified = settings.SubtitleRenderer != presetSettings.SubtitleRenderer;
+                tabModified = tabModified || modified;
+                UpdateSubtitleRenderer(settings);
+                ViewModel.SubtitleRendererLabel = GetLabel(StringResource.Renderer, modified);
+            }
+
+            settingsModified = settingsModified || tabModified;
+            ViewModel.SubtitleTabTitle = GetLabel(StringResource.Subtitle, tabModified);
+        }
+
         PresetDropDownButton.Flyout = CreatePresetContextMenu(_mediaSettings);
         PresetDropDownButton.Content = GetLabel(
             _mediaSettings.PresetKey == PlayerSettingsModel.PRESET_KEY_CUSTOM ?
@@ -347,6 +376,20 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
         });
         VideoDecoderDropDownButton.Content = choice.Label;
+    }
+
+    private void UpdateVideoRenderer(PlayerSettingsModel settings)
+    {
+        List<PlaybackComponentOption> options = [.. PlaybackComponents.GetVideoRendererOptions()];
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoRenderer);
+        VideoRendererDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            if (settings.VideoRenderer != key)
+            {
+                Apply(target => target.VideoRenderer = key);
+            }
+        });
+        VideoRendererDropDownButton.Content = choice.Label;
     }
 
     private void UpdateVideoPreferHardwareDecoding(PlayerSettingsModel settings)
@@ -408,20 +451,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         AudioDecoderDropDownButton.Content = choice.Label;
     }
 
-    private void UpdateVideoRenderer(PlayerSettingsModel settings)
-    {
-        List<PlaybackComponentOption> options = [.. PlaybackComponents.GetVideoRendererOptions()];
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoRenderer);
-        VideoRendererDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
-        {
-            if (settings.VideoRenderer != key)
-            {
-                Apply(target => target.VideoRenderer = key);
-            }
-        });
-        VideoRendererDropDownButton.Content = choice.Label;
-    }
-
     private void UpdateAudioRenderer(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetAudioRendererOptions()];
@@ -434,6 +463,34 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
         });
         AudioRendererDropDownButton.Content = choice.Label;
+    }
+
+    private void UpdateSubtitleDecoder(PlayerSettingsModel settings)
+    {
+        List<PlaybackComponentOption> options = [.. PlaybackComponents.GetSubtitleDecoderOptions()];
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.SubtitleDecoder);
+        SubtitleDecoderDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            if (settings.SubtitleDecoder != key)
+            {
+                Apply(target => target.SubtitleDecoder = key);
+            }
+        });
+        SubtitleDecoderDropDownButton.Content = choice.Label;
+    }
+
+    private void UpdateSubtitleRenderer(PlayerSettingsModel settings)
+    {
+        List<PlaybackComponentOption> options = [.. PlaybackComponents.GetSubtitleRendererOptions()];
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.SubtitleRenderer);
+        SubtitleRendererDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            if (settings.SubtitleRenderer != key)
+            {
+                Apply(target => target.SubtitleRenderer = key);
+            }
+        });
+        SubtitleRendererDropDownButton.Content = choice.Label;
     }
 
     private MenuFlyout CreateChoiceMenu(IReadOnlyList<PlaybackComponentOption> options, string? selectedKey, Action<string> select)
