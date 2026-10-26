@@ -145,9 +145,10 @@ public static class FFmpegRuntime
     {
         return RuntimeInformation.ProcessArchitecture switch
         {
-            Architecture.X86 => "win-x86",
+            Architecture.X64 => "win-x64",
             Architecture.Arm64 => "win-arm64",
-            _ => "win-x64",
+            Architecture arch => throw new NotSupportedException(
+                $"This build has no media engine for {arch}: the FFmpeg native libraries are provisioned for x64 and arm64 only."),
         };
     }
 

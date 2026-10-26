@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -6,7 +6,7 @@
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
 		<AppxBundle>Always</AppxBundle>
-		<AppxBundlePlatforms>x86|x64|arm64</AppxBundlePlatforms>
+		<AppxBundlePlatforms>x64|arm64</AppxBundlePlatforms>
 		<AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
 		<AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
 		<AppxSymbolPackageEnabled>True</AppxSymbolPackageEnabled>
@@ -25,10 +25,10 @@
 		<OutputType>WinExe</OutputType>
 		<PackageCertificateKeyFile>SinePlayer_TemporaryKey.pfx</PackageCertificateKeyFile>
 		<PackageCertificateThumbprint>5827D6A7C402566A4B97D91CBCEF03C14B86F1D3</PackageCertificateThumbprint>
-		<Platforms>x86;x64;ARM64</Platforms>
+		<Platforms>x64;ARM64</Platforms>
 		<PublishProfile>win10-$(Platform).pubxml</PublishProfile>
 		<RunCodeAnalysis>false</RunCodeAnalysis>
-		<RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+		<RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
 		<TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
 		<TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
 		<TreatWarningsAsErrors>True</TreatWarningsAsErrors>
@@ -38,12 +38,6 @@
 		<UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
-		<OutputPath>bin\x86\Debug\</OutputPath>
-	</PropertyGroup>
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
-		<OutputPath>bin\x86\Release\</OutputPath>
-	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
 		<OutputPath>bin\x64\Debug\</OutputPath>
 	</PropertyGroup>
