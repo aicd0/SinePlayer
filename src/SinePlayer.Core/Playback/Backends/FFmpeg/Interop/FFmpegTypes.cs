@@ -210,6 +210,68 @@ internal struct AVHWFramesContext
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal struct AVCodecDescriptor
+{
+    /// <summary><c>enum AVCodecID</c>.</summary>
+    public int Id;
+
+    /// <summary><c>enum AVMediaType</c>.</summary>
+    public int Type;
+
+    public nint Name;
+}
+
+/// <summary>
+/// One decoded subtitle event. Its display times are milliseconds <em>relative to the packet that carried it</em>, not
+/// absolute positions, which is what makes a subtitle packet readable on its own.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct AVSubtitle
+{
+    /// <summary>Zero for a graphics event; decoders set it to a non-zero value for text.</summary>
+    public ushort Format;
+
+    public uint StartDisplayTime;
+
+    public uint EndDisplayTime;
+
+    public uint RectCount;
+
+    public nint Rects;
+
+    public long Pts;
+}
+
+/// <summary>
+/// One piece of a subtitle event: a text line, an ASS line, or a bitmap. A text line is either plain text or an ASS
+/// dialogue line whose override tags are left for the renderer to interpret.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct AVSubtitleRect
+{
+    public int X;
+    public int Y;
+    public int W;
+    public int H;
+    public int ColorCount;
+
+    /// <summary><c>uint8_t *data[4]</c>.</summary>
+    public fixed long Data[4];
+
+    /// <summary><c>int linesize[4]</c>.</summary>
+    public fixed int LineSize[4];
+
+    public int Flags;
+
+    /// <summary>0 = nothing, 1 = bitmap, 2 = text, 3 = ASS.</summary>
+    public int Type;
+
+    public nint Text;
+
+    public nint Ass;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal struct AVInputFormat
 {
     public nint Name;

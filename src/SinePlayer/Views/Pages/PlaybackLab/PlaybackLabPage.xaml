@@ -64,17 +64,25 @@
                 Header="Video decoder"
                 SelectionChanged="VideoDecoderPicker_SelectionChanged" />
             <ComboBox
-                x:Name="AudioDecoderPicker"
-                Header="Audio decoder"
-                SelectionChanged="AudioDecoderPicker_SelectionChanged" />
-            <ComboBox
                 x:Name="VideoRendererPicker"
                 Header="Video renderer"
                 SelectionChanged="VideoRendererPicker_SelectionChanged" />
             <ComboBox
+                x:Name="AudioDecoderPicker"
+                Header="Audio decoder"
+                SelectionChanged="AudioDecoderPicker_SelectionChanged" />
+            <ComboBox
                 x:Name="AudioRendererPicker"
                 Header="Audio renderer"
                 SelectionChanged="AudioRendererPicker_SelectionChanged" />
+            <ComboBox
+                x:Name="SubtitleDecoderPicker"
+                Header="Subtitle decoder"
+                SelectionChanged="SubtitleDecoderPicker_SelectionChanged" />
+            <ComboBox
+                x:Name="SubtitleRendererPicker"
+                Header="Subtitle renderer"
+                SelectionChanged="SubtitleRendererPicker_SelectionChanged" />
             <ComboBox
                 x:Name="VideoTrackPicker"
                 Header="Video track"
@@ -83,6 +91,10 @@
                 x:Name="AudioTrackPicker"
                 Header="Audio track"
                 SelectionChanged="AudioTrackPicker_SelectionChanged" />
+            <ComboBox
+                x:Name="SubtitleTrackPicker"
+                Header="Subtitle track"
+                SelectionChanged="SubtitleTrackPicker_SelectionChanged" />
         </StackPanel>
 
         <StackPanel
@@ -149,7 +161,8 @@
         </StackPanel>
 
         <Grid Grid.Row="3" Background="Black">
-            <SwapChainPanel x:Name="VideoPanel" />
+            <SwapChainPanel x:Name="VideoPanel" IsHitTestVisible="False" />
+            <SwapChainPanel x:Name="SubtitlePanel" IsHitTestVisible="False" />
         </Grid>
 
         <TextBlock

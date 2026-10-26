@@ -41,6 +41,10 @@
                 x:Name="SelectorBarItem2"
                 Padding="12,0,12,4"
                 Text="{x:Bind ViewModel.AudioTabTitle, Mode=OneWay}" />
+            <SelectorBarItem
+                x:Name="SelectorBarItem3"
+                Padding="12,0,12,4"
+                Text="{x:Bind ViewModel.SubtitleTabTitle, Mode=OneWay}" />
         </SelectorBar>
         <Rectangle Height="1" Fill="{ThemeResource MediaInfoSeparatorForeground}" />
 
@@ -217,6 +221,48 @@
                     Text="{x:Bind ViewModel.AudioRendererLabel, Mode=OneWay}" />
                 <DropDownButton
                     x:Name="AudioRendererDropDownButton"
+                    Grid.Column="3"
+                    HorizontalAlignment="Right" />
+            </Grid>
+        </StackPanel>
+
+        <StackPanel
+            x:Name="SubtitleSettingsGrid"
+            MinWidth="360"
+            Padding="0,8"
+            Orientation="Vertical"
+            Visibility="Collapsed">
+            <Grid Style="{StaticResource TallSettingRowStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Column="0"
+                    Margin="0,0,0,2"
+                    VerticalAlignment="Center"
+                    Text="{x:Bind ViewModel.SubtitleDecoderLabel, Mode=OneWay}" />
+                <DropDownButton
+                    x:Name="SubtitleDecoderDropDownButton"
+                    Grid.Column="3"
+                    HorizontalAlignment="Right" />
+            </Grid>
+            <Grid Style="{StaticResource TallSettingRowStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Column="0"
+                    Margin="0,0,0,2"
+                    VerticalAlignment="Center"
+                    Text="{x:Bind ViewModel.SubtitleRendererLabel, Mode=OneWay}" />
+                <DropDownButton
+                    x:Name="SubtitleRendererDropDownButton"
                     Grid.Column="3"
                     HorizontalAlignment="Right" />
             </Grid>

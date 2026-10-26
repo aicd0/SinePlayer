@@ -62,6 +62,18 @@ internal sealed class SyntheticMediaScript
     internal int SampleRate { get; init; } = 44100;
 
     internal int SamplesPerAudioPacket { get; init; } = 1024;
+
+    /// <summary>
+    /// Subtitle events, as a real container carries them: one packet per event, timed by the event itself. Empty means
+    /// the file has no subtitle track at all, which is every script that does not ask for one.
+    /// </summary>
+    internal IReadOnlyList<ScriptedSubtitle> Subtitles { get; init; } = [];
+}
+
+/// <summary>One subtitle event of a scripted file.</summary>
+internal readonly record struct ScriptedSubtitle(TimeSpan Start, TimeSpan End)
+{
+    internal TimeSpan Length => End - Start;
 }
 
 internal sealed class SyntheticSourceProviderFactory : ISourceProviderFactory
@@ -101,6 +113,9 @@ internal sealed class SyntheticMediaSource : IMediaSource
     private readonly ManualResetEventSlim _closed = new(false);
     private readonly List<ScriptedPacket> _timeline = [];
 
+    /// <summary>The subtitle stream's index, when the script has one. The picture and the sound keep 0 and 1.</summary>
+    internal const int SubtitleStreamIndex = 2;
+
     private int _next;
     private readonly Stopwatch _since = Stopwatch.StartNew();
 
@@ -136,13 +151,15 @@ internal sealed class SyntheticMediaSource : IMediaSource
         {
             ContainerId = "synthetic",
             Duration = script.Duration,
-            Streams = [video, audio],
+            Streams = script.Subtitles.Count == 0
+                ? [video, audio]
+                : [video, audio, new SubtitleStreamInfo { Index = SubtitleStreamIndex, CodecId = "synthetic-subtitle", Duration = script.Duration }],
         };
 
         int frameCount = (int)(script.Duration.TotalSeconds * script.FrameRate);
         for (int index = 0; index < frameCount; index++)
         {
-            _timeline.Add(new ScriptedPacket(true, TimeSpan.FromSeconds((double)index / script.FrameRate), TimeSpan.FromSeconds(1.0 / script.FrameRate)));
+            _timeline.Add(new ScriptedPacket(true, false, TimeSpan.FromSeconds((double)index / script.FrameRate), TimeSpan.FromSeconds(1.0 / script.FrameRate)));
         }
 
         int packetCount = (int)(script.Duration.TotalSeconds * script.SampleRate / script.SamplesPerAudioPacket);
@@ -150,7 +167,12 @@ internal sealed class SyntheticMediaSource : IMediaSource
         {
             var start = TimeSpan.FromSeconds((double)(index * script.SamplesPerAudioPacket) / script.SampleRate);
             var length = TimeSpan.FromSeconds((double)script.SamplesPerAudioPacket / script.SampleRate);
-            _timeline.Add(new ScriptedPacket(false, start, length));
+            _timeline.Add(new ScriptedPacket(false, false, start, length));
+        }
+
+        foreach (ScriptedSubtitle subtitle in script.Subtitles)
+        {
+            _timeline.Add(new ScriptedPacket(false, true, subtitle.Start, subtitle.Length));
         }
 
         // Interleaved the way a real file is, so the reader meets the two streams together.
@@ -221,6 +243,12 @@ internal sealed class SyntheticMediaSource : IMediaSource
                 continue;
             }
 
+            // A subtitle event is not a keyframe and cannot be what a landing is measured by.
+            if (packet.Subtitle)
+            {
+                continue;
+            }
+
             if (byVideo is null ? packet.Video : packet.Video == byVideo.Value)
             {
                 landing = index;
@@ -265,14 +293,16 @@ internal sealed class SyntheticMediaSource : IMediaSource
             }
 
             ScriptedPacket scripted = _timeline[_next++];
-            if (scripted.Video ? scripted.Timestamp >= _script.VideoStopsAt : scripted.Timestamp >= _script.AudioStopsAt)
+            if (scripted.Video ? scripted.Timestamp >= _script.VideoStopsAt
+                : scripted.Subtitle ? false
+                : scripted.Timestamp >= _script.AudioStopsAt)
             {
                 continue;
             }
 
             packet = new MediaPacket
             {
-                StreamIndex = scripted.Video ? 0 : 1,
+                StreamIndex = scripted.Video ? 0 : scripted.Subtitle ? SubtitleStreamIndex : 1,
                 Timestamp = scripted.Timestamp,
                 Duration = scripted.Length,
                 IsKeyFrame = true,
@@ -295,7 +325,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
         _closed.Dispose();
     }
 
-    private readonly record struct ScriptedPacket(bool Video, TimeSpan Timestamp, TimeSpan Length);
+    private readonly record struct ScriptedPacket(bool Video, bool Subtitle, TimeSpan Timestamp, TimeSpan Length);
 }
 
 internal sealed class SyntheticMediaBuffer : IMediaBuffer
@@ -419,5 +449,69 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
         public void Dispose()
         {
         }
+    }
+}
+
+/// <summary>
+/// Turns a scripted subtitle packet into one cue. The text is derived from the event's own time, so the same event read
+/// twice produces the same text — which is what makes a duplicate recognizable, and what a re-read after a seek
+/// produces.
+/// </summary>
+internal sealed class SyntheticSubtitleDecoderFactory : ISubtitleDecoderFactory
+{
+    public OperationResult TryCreate(IMediaSource? source, SubtitleStreamInfo stream, out IComponentCreator<ISubtitleDecoder>? creator)
+    {
+        creator = new FixedCreator<ISubtitleDecoder>(Signature, () => new Decoder(stream));
+        return OperationResult.Success();
+    }
+
+    /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>
+    internal string Signature => "synthetic:subtitle";
+
+    private sealed class Decoder(SubtitleStreamInfo stream) : ISubtitleDecoder
+    {
+        public string Name => "synthetic";
+
+        public MediaStreamInfo Stream => stream;
+
+        public bool IsHardwareAccelerated => false;
+
+        public SubtitleCueFormat CueFormat => SubtitleCueFormat.Ass;
+
+        public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<SubtitleCue> cues)
+        {
+            cues =
+            [
+                new SubtitleCue
+                {
+                    Start = packet.Timestamp,
+                    End = packet.Timestamp + packet.Duration,
+                    Text = SyntheticSubtitleDecoderFactory.TextAt(packet.Timestamp),
+                },
+            ];
+
+            return OperationResult.Success();
+        }
+
+        public OperationResult Drain(out IReadOnlyList<SubtitleCue> cues)
+        {
+            cues = [];
+            return OperationResult.Success();
+        }
+
+        public OperationResult Flush()
+        {
+            return OperationResult.Success();
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    /// <summary>What the cue of an event starting at that moment says, so a test can recognise it.</summary>
+    internal static string TextAt(TimeSpan start)
+    {
+        return $"cue@{start.TotalSeconds:0.###}";
     }
 }

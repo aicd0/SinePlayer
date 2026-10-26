@@ -13,17 +13,17 @@ namespace SinePlayer.Core.Tests.Playback;
 public class PipelineVersionTests
 {
     /// <summary>A version in which only the source has a number: the stamp a packet carries when it leaves the reader.</summary>
-    private static PipelineVersion Source(long source) => new(source, 0, 0, 0, 0);
+    private static PipelineVersion Source(long source) => new(source, 0, 0, 0, 0, 0, 0);
 
-    private static PipelineVersion Video(long source, long decoder, long renderer) => new(source, 0, 0, decoder, renderer);
+    private static PipelineVersion Video(long source, long decoder, long renderer) => new(source, 0, 0, decoder, renderer, 0, 0);
 
-    private static PipelineVersion Audio(long source, long decoder, long renderer) => new(source, decoder, renderer, 0, 0);
+    private static PipelineVersion Audio(long source, long decoder, long renderer) => new(source, decoder, renderer, 0, 0, 0, 0);
 
     [Test]
     public void PublishesAPairUnderOneNumberAboveTheHighestInUse()
     {
         // What is in use, and the number a publication takes: one above everything, so no two generations can share one.
-        var inUse = new PipelineVersion(1, 3, 3, 2, 2);
+        var inUse = new PipelineVersion(1, 3, 3, 2, 2, 0, 0);
 
         using (Assert.EnterMultipleScope())
         {
@@ -34,7 +34,7 @@ public class PipelineVersionTests
         // What the pipeline publishes for a switch of the picture: one number read into both of that kind's roles, and
         // every role it does not touch left as it was. (BuildChains writes this as an initializer over one
         // nextVersion, so the pair sharing it is structural; what is asserted here is the arithmetic it must produce.)
-        var published = new PipelineVersion(inUse.Source, inUse.AudioDecoder, inUse.AudioRenderer, inUse.Next, inUse.Next);
+        var published = new PipelineVersion(inUse.Source, inUse.AudioDecoder, inUse.AudioRenderer, inUse.Next, inUse.Next, inUse.SubtitleDecoder, inUse.SubtitleRenderer);
 
         using (Assert.EnterMultipleScope())
         {
@@ -54,7 +54,7 @@ public class PipelineVersionTests
         {
             Assert.That(default(PipelineVersion).Highest, Is.Zero);
             Assert.That(default(PipelineVersion).Next, Is.EqualTo(1), "the first publication takes the first number");
-            Assert.That(new PipelineVersion(1, 7, 2, 5, 4).Highest, Is.EqualTo(7));
+            Assert.That(new PipelineVersion(1, 7, 2, 5, 4, 0, 0).Highest, Is.EqualTo(7));
         }
     }
 
@@ -192,14 +192,14 @@ public class PipelineVersionTests
     [Test]
     public void IgnoresTheSoundWhenComparingThePicture()
     {
-        Assert.That(PipelineVersion.CompareVideoRenderer(new PipelineVersion(1, 9, 9, 2, 2), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
-        Assert.That(PipelineVersion.CompareVideoDecoder(new PipelineVersion(1, 9, 9, 2, 2), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
+        Assert.That(PipelineVersion.CompareVideoRenderer(new PipelineVersion(1, 9, 9, 2, 2, 0, 0), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
+        Assert.That(PipelineVersion.CompareVideoDecoder(new PipelineVersion(1, 9, 9, 2, 2, 0, 0), Video(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
     }
 
     [Test]
     public void IgnoresThePictureWhenComparingTheSound()
     {
-        Assert.That(PipelineVersion.CompareAudioRenderer(new PipelineVersion(1, 2, 2, 9, 9), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
-        Assert.That(PipelineVersion.CompareAudioDecoder(new PipelineVersion(1, 2, 2, 9, 9), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
+        Assert.That(PipelineVersion.CompareAudioRenderer(new PipelineVersion(1, 2, 2, 9, 9, 0, 0), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
+        Assert.That(PipelineVersion.CompareAudioDecoder(new PipelineVersion(1, 2, 2, 9, 9, 0, 0), Audio(1, 2, 2)), Is.EqualTo(VersionVerdict.Accept));
     }
 }

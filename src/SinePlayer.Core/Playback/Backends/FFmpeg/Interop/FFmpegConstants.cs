@@ -27,4 +27,13 @@ internal static class FFmpegConstants
 
     /// <summary><c>AVERROR(EAGAIN)</c>: the call would block, try again after the other direction made progress.</summary>
     internal const int ErrorAgain = -11;
+
+    /// <summary>
+    /// <c>enum AVSubtitleType</c>: a piece of a subtitle event is nothing, a bitmap, plain text, or an ASS line. The
+    /// enum counts from zero, so the three kinds that carry something are one, two and three.
+    /// </summary>
+    internal const int SubtitleTypeNone = 0;
+    internal const int SubtitleTypeBitmap = 1;
+    internal const int SubtitleTypeText = 2;
+    internal const int SubtitleTypeAss = 3;
 }

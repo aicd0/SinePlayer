@@ -16,6 +16,7 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
+using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Core.Playback.Registry;
 using SinePlayer.Core.Playback.Selection;
@@ -3571,7 +3572,9 @@ public class PlaybackPipelineTests
         FakeAudioRenderer audioRenderer,
         IVideoDecoderFactory? videoDecoders = null,
         ISourceProviderFactory? sourceFactory = null,
-        IAudioDecoderFactory? audioDecoders = null)
+        IAudioDecoderFactory? audioDecoders = null,
+        ISubtitleDecoderFactory? subtitleDecoders = null,
+        ISubtitleRendererFactory? subtitleRenderers = null)
     {
         PlaybackPipeline pipeline = new()
         {
@@ -3582,6 +3585,19 @@ public class PlaybackPipelineTests
         pipeline.Components.Register(new FakeVideoRendererFactory(videoRenderer));
         pipeline.Components.Register(audioDecoders ?? new FFmpegAudioDecoderFactory());
         pipeline.Components.Register(new FixedAudioRendererFactory(audioRenderer));
+
+        // A pipeline with no subtitle factory of its own has no subtitle support at all, which is what every test that
+        // is not about subtitles wants: the kind stays unreachable rather than half-wired.
+        if (subtitleDecoders is not null)
+        {
+            pipeline.Components.Register(subtitleDecoders);
+        }
+
+        if (subtitleRenderers is not null)
+        {
+            pipeline.Components.Register(subtitleRenderers);
+        }
+
         return pipeline;
     }
 
@@ -7205,6 +7221,413 @@ public class PlaybackPipelineTests
             double played = Math.Min(elapsed, _queuedSeconds);
             _queuedSeconds -= played;
             _playedSeconds += played;
+        }
+    }
+
+    //
+    // Subtitles
+    //
+
+    [Test]
+    public void ShowsTheCueThatCoversThePositionAndTakesItDownWhenItEnds()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(1.5))],
+        };
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+        Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+        WaitFor(
+            () => subtitleRenderer.Texts.Contains(SyntheticSubtitleDecoderFactory.TextAt(TimeSpan.FromSeconds(0.5))),
+            "the cue of the position has to be drawn when its moment comes");
+
+        WaitFor(() => subtitleRenderer.Texts.Length == 0, "the cue has to come down when it ends");
+    }
+
+    [Test]
+    public void KeepsACueOnScreenWhenThePositionIsMovedIntoIt()
+    {
+        // The cue's own packet lies before where the seek lands, so a re-read never delivers it again. Throwing the
+        // window away on a seek would therefore blank the text until the cue happened to end.
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        };
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+        Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+        string cue = SyntheticSubtitleDecoderFactory.TextAt(TimeSpan.FromSeconds(0.2));
+        WaitFor(() => subtitleRenderer.Texts.Contains(cue), "the long cue to be up");
+        WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.5), "playback to be under way");
+
+        Assert.That(Await(pipeline.Seek(TimeSpan.FromSeconds(2), SeekMode.Precise)).IsSuccessful, Is.True);
+        WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(2.2), "the seek to have taken effect");
+
+        Assert.That(subtitleRenderer.Texts, Does.Contain(cue), "a cue that still covers the position stays up across a seek");
+    }
+
+    [Test]
+    public void SwapsTheSubtitleRendererWhileTheTrackKeepsPlaying()
+    {
+        // What the Lab's pickers do: change the registration, then reconcile. The track stays selected and the new
+        // renderer takes over the drawing — the old one is let go of, and its last drawing is cleared first.
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        };
+
+        FakeSubtitleRenderer first = new();
+        FakeSubtitleRenderer second = new();
+        SwappableSubtitleRendererFactory renderers = new(first);
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, first, renderers);
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+        Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+        WaitFor(() => first.ShowCount > 1, "the first renderer to be drawing");
+
+        renderers.Swap(second);
+        Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+        WaitFor(() => second.ShowCount > 0, "the second renderer takes the drawing over");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.Disposed, Is.True, "the renderer that was replaced is released");
+            Assert.That(pipeline.SelectedSubtitleStream, Is.Not.Null, "the track itself is untouched by a renderer switch");
+            Assert.That(second.Texts, Is.Not.Empty, "and the words carry on being drawn, by the new one");
+        }
+    }
+
+    [Test]
+    public void SwapsTheSubtitleDecoderAndRebuildsTheRendererWithIt()
+    {
+        // A cue's format comes from the decoder, so the pair is judged again: a renderer is never kept across a decoder
+        // change, because the new decoder may produce something the old renderer cannot draw.
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        };
+
+        FakeSubtitleRenderer renderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, renderer);
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+        Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+        WaitFor(() => renderer.ShowCount > 1, "the renderer to be drawing");
+
+        long drawn = renderer.ShowCount;
+        pipeline.Components.Clear<ISubtitleDecoderFactory>();
+        pipeline.Components.Register(new NullSubtitleDecoderFactory());
+        Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+        // The null decoder produces no cues, so the last thing drawn is an empty set: the words that were up have to go,
+        // which is itself the proof that the chain was rebuilt rather than left as it was.
+        WaitFor(() => renderer.Texts.Length == 0, "the rebuilt chain to take the old cue down");
+        Assert.That(renderer.ShowCount, Is.GreaterThan(drawn), "the renderer was rebuilt and asked to draw again");
+    }
+
+    [Test]
+    public void TakesDownWhatWasShownWhenTheTrackIsTurnedOff()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        };
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+        Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+        WaitFor(() => subtitleRenderer.Texts.Length == 1, "the cue to be up");
+
+        Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Subtitle, null)).IsSuccessful, Is.True);
+
+        WaitFor(() => subtitleRenderer.Texts.Length == 0, "nothing may be left on the surface of a track that was turned off");
+        Assert.That(pipeline.SelectedSubtitleStream, Is.Null);
+    }
+
+    [Test]
+    public void CarriesThePlacementWithEverythingItDraws()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        };
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
+
+        // Set before anything is drawn, so the very first call has to carry it: a renderer is never told twice.
+        SubtitlePlacement placement = new(0.25, -0.5);
+        pipeline.SubtitlePlacement = placement;
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+        Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+        WaitFor(() => subtitleRenderer.Texts.Length == 1, "the cue to be up");
+
+        Assert.That(subtitleRenderer.Placements, Is.All.EqualTo(placement), "every drawing carries the adjustment in force");
+    }
+
+    [Test]
+    public void DrawsNothingAgainWhileTheFileIsPaused()
+    {
+        // A paused file cannot change, so a pass that finds the same cues and the same placement must not ask the
+        // renderer to draw them again. (A loop that wakes without drawing is invisible from here — what a renderer does
+        // besides draw is nothing — so this holds the redraw, which is the part a consumer can feel.)
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        };
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+        Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+        WaitFor(() => subtitleRenderer.Texts.Length == 1, "the cue to be up");
+
+        Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+
+        // Let a pass or two of the loop go by: nothing changed, so nothing may be drawn.
+        long drawn = subtitleRenderer.ShowCount;
+        Thread.Sleep(300);
+
+        Assert.That(subtitleRenderer.ShowCount, Is.EqualTo(drawn), "a paused subtitle loop redraws nothing");
+    }
+
+    [Test]
+    public void RefusesToBuildASubtitleChainTheRendererCannotDraw()
+    {
+        // The format comes from the decoder, and a factory that cannot draw it refuses to offer a renderer at all — so
+        // an incompatible pair is never assembled, which is the whole of the compatibility rule for subtitles.
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(1))],
+        };
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(
+            script,
+            subtitleRenderer,
+            new RefusingSubtitleRendererFactory());
+
+        OperationResult opened = OpenForSubtitles(pipeline, selectTheTrack: false);
+        Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+
+        MediaInfo info = pipeline.MediaInfo!;
+        OperationResult selected = Await(pipeline.SelectStream(MediaStreamKind.Subtitle, info.SubtitleStreams[0]));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(selected.IsSuccessful, Is.False);
+            Assert.That(selected.Message, Does.Contain("subtitle renderer"));
+            Assert.That(pipeline.SelectedSubtitleStream, Is.Null, "a refused pairing leaves nothing selected");
+            Assert.That(subtitleRenderer.ShowCount, Is.Zero, "and nothing was drawn");
+        }
+    }
+
+    /// <summary>
+    /// A pipeline whose only picture and sound are the scripted ones, plus the synthetic subtitle decoder — and the
+    /// surfaces a subtitle chain needs to be buildable at all.
+    /// </summary>
+    private static PlaybackPipeline CreateSubtitlePipeline(
+        SyntheticMediaScript script,
+        FakeSubtitleRenderer subtitleRenderer,
+        ISubtitleRendererFactory? subtitleRenderers = null)
+    {
+        return CreatePipeline(
+            new FakeVideoRenderer(),
+            new FakeAudioRenderer { PlaysWhatItIsGiven = true },
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: new SyntheticSourceProviderFactory(script),
+            audioDecoders: new SyntheticAudioDecoderFactory(),
+            subtitleDecoders: new SyntheticSubtitleDecoderFactory(),
+            subtitleRenderers: subtitleRenderers ?? new FakeSubtitleRendererFactory(subtitleRenderer));
+    }
+
+    private static readonly SubtitleSurface SubtitleSurfaceTarget = new();
+
+    /// <summary>
+    /// Opens the scripted file and selects the picture and the subtitle track, one kind at a time — the order the host
+    /// uses, since opening chooses nothing by itself.
+    /// </summary>
+    private static OperationResult OpenForSubtitles(PlaybackPipeline pipeline, bool selectTheTrack = true)
+    {
+        OperationResult opened = pipeline.Open(
+            MediaLocator.Parse(SyntheticPath()),
+            new FakeRenderTarget(),
+            SubtitleSurfaceTarget).GetAwaiter().GetResult();
+        if (!opened.IsSuccessful || !selectTheTrack)
+        {
+            return opened;
+        }
+
+        MediaInfo info = pipeline.MediaInfo!;
+        OperationResult video = Await(pipeline.SelectStream(MediaStreamKind.Video, info.VideoStreams[0]));
+        if (!video.IsSuccessful)
+        {
+            return video;
+        }
+
+        return Await(pipeline.SelectStream(MediaStreamKind.Subtitle, info.SubtitleStreams[0]));
+    }
+
+    /// <summary>The surface subtitles are presented into, which is not the one the picture goes into.</summary>
+    private sealed class SubtitleSurface : IVideoRenderTarget
+    {
+        public int SurfaceWidth => 640;
+
+        public int SurfaceHeight => 480;
+
+        public double RasterizationScale => 1.0;
+
+        public event Action? SurfaceSizeChanged;
+
+        public void AttachPresentationSurface(nint swapChain)
+        {
+            SurfaceSizeChanged?.Invoke();
+        }
+    }
+
+    private sealed class FakeSubtitleRendererFactory(ISubtitleRenderer renderer) : ISubtitleRendererFactory
+    {
+        private readonly string _signature = NextSignature("fake-subtitle");
+
+        /// <summary>The format the pipeline asked for, which is the decoder's word about what a cue is made of.</summary>
+        internal SubtitleCueFormat? RequestedFormat { get; private set; }
+
+        public OperationResult TryCreate(SubtitleCueFormat format, out IComponentCreator<ISubtitleRenderer>? creator)
+        {
+            RequestedFormat = format;
+            creator = new FixedCreator<ISubtitleRenderer>(_signature, () => renderer);
+            return OperationResult.Success();
+        }
+    }
+
+    /// <summary>A factory that cannot draw what it is asked for, which is how a renderer says so at all.</summary>
+    private sealed class RefusingSubtitleRendererFactory : ISubtitleRendererFactory
+    {
+        public OperationResult TryCreate(SubtitleCueFormat format, out IComponentCreator<ISubtitleRenderer>? creator)
+        {
+            creator = null;
+            return OperationResult.Failure($"This renderer does not draw {format} cues.");
+        }
+    }
+
+    /// <summary>
+    /// Records every drawing rather than presenting it, because what a subtitle loop has to be checked for is what it
+    /// decided to show and when — not what a compositor made of it.
+    /// </summary>
+    /// <summary>
+    /// A factory whose renderer can be changed, with a new signature each time — which is how the pipeline recognises a
+    /// switch rather than the same component being offered again.
+    /// </summary>
+    private sealed class SwappableSubtitleRendererFactory(ISubtitleRenderer renderer) : ISubtitleRendererFactory
+    {
+        private ISubtitleRenderer _renderer = renderer;
+        private string _signature = NextSignature("swappable-subtitle");
+
+        internal void Swap(ISubtitleRenderer renderer)
+        {
+            _renderer = renderer;
+            _signature = NextSignature("swappable-subtitle");
+        }
+
+        public OperationResult TryCreate(SubtitleCueFormat format, out IComponentCreator<ISubtitleRenderer>? creator)
+        {
+            creator = new FixedCreator<ISubtitleRenderer>(_signature, () => _renderer);
+            return OperationResult.Success();
+        }
+    }
+
+    private sealed class FakeSubtitleRenderer : ISubtitleRenderer
+    {
+        private readonly Lock _lock = new();
+        private readonly List<string[]> _texts = [];
+        private readonly List<SubtitlePlacement> _placements = [];
+
+        public string Name => "fake-subtitle";
+
+        public SubtitleStreamInfo? ConfiguredStream { get; private set; }
+
+        public IVideoRenderTarget? Target { get; private set; }
+
+        /// <summary>The text of the cues of the most recent drawing, which is the whole visible set.</summary>
+        public string[] Texts
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _texts.Count == 0 ? [] : _texts[^1];
+                }
+            }
+        }
+
+        /// <summary>The placement of every drawing, in order, so a test can check nothing was drawn without it.</summary>
+        public IReadOnlyList<SubtitlePlacement> Placements
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return [.. _placements];
+                }
+            }
+        }
+
+        public int ShowCount
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _texts.Count;
+                }
+            }
+        }
+
+        public bool Disposed { get; private set; }
+
+        public OperationResult Configure(SubtitleStreamInfo stream, IVideoRenderTarget target)
+        {
+            ConfiguredStream = stream;
+            Target = target;
+            return OperationResult.Success();
+        }
+
+        public OperationResult Show(IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement)
+        {
+            string[] texts = [.. cues.Select(cue => cue.Text ?? string.Empty)];
+            lock (_lock)
+            {
+                _texts.Add(texts);
+                _placements.Add(placement);
+            }
+
+            return OperationResult.Success();
+        }
+
+        public void Dispose()
+        {
+            Disposed = true;
         }
     }
 }

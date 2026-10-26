@@ -186,6 +186,54 @@ public class FFmpegVideoDecoderTests
     }
 
     [Test]
+    public void KeepsTheTimeOfEveryFrameItCopiesOutOfTheGpu()
+    {
+        // av_hwframe_transfer_data moves pixels and nothing else, so a copy-back frame carries no timestamp unless the
+        // decoder puts it there. Without it every frame is placed by whichever packet happened to be submitted, the
+        // first of them is stamped seconds into the file, and the clock anchors to that — so playback starts late and
+        // the frames are paced against a moment that never happened. Nothing counts these as lost, which is why a
+        // comparison of the times is the only thing that finds them.
+        string path = VideoFixtureFile.CreateH264();
+        try
+        {
+            List<TimeSpan> software = DecodeTimestamps(path, hardwareDecoding: false, out _);
+            List<TimeSpan> accelerated = DecodeTimestamps(path, hardwareDecoding: true, out bool hardware);
+
+            if (!hardware)
+            {
+                Assert.Ignore("This machine has no H.264 hardware decoder, so there is nothing to compare against.");
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(accelerated, Is.EqualTo(software), "a frame copied out of the GPU keeps its own moment");
+                Assert.That(accelerated.Count, Is.EqualTo(software.Count), "and no frame is lost to the copy");
+                Assert.That(accelerated[0], Is.EqualTo(TimeSpan.Zero), "the first frame starts where the file does");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>The moment of every frame a stream produces, in the order it produced them.</summary>
+    private static List<TimeSpan> DecodeTimestamps(string path, bool hardwareDecoding, out bool accelerated)
+    {
+        FFmpegSourceProviderFactory factory = new();
+        Assert.That(factory.TryOpen(MediaLocator.Parse(path), out IMediaSource? opened).IsSuccessful, Is.True);
+
+        using var source = (FFmpegSource)opened!;
+        using IVideoDecoder decoder = CreateDecoder(source, hardwareDecoding);
+        List<RawVideoFrame> frames = DecodeAll(source, decoder);
+        accelerated = decoder.IsHardwareAccelerated;
+
+        List<TimeSpan> timestamps = [.. frames.Select(frame => frame.Timestamp)];
+        DisposeFrames(frames);
+        return timestamps;
+    }
+
+    [Test]
     public void KeepsTheFrameOnTheDeviceItWasGiven()
     {
         // The renderer owns the pipeline's device, so a decoder has to be able to decode on a device it was

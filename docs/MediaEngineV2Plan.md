@@ -70,8 +70,30 @@ whatever comes back; and the seam between decoder and renderer, which is where t
 being needed to prove anything about the others.
 
 **What v1 leaves in place.** `ISubtitleDecoder`, `ISubtitleRenderer` and `ISubtitleDecoderFactory` exist, the
-demuxer enumerates subtitle streams so they appear in `MediaInfo`, and the pipeline has the slot. Nothing
-implements them, and a file with subtitles plays with the picture and the sound only.
+demuxer enumerates subtitle streams so they appear in `MediaInfo`, and the pipeline has the slot.
+
+**Where it stands now.** The chain is real and runs end to end, and the text is still invisible:
+
+- **Decoding.** `FFmpegSubtitleDecoder` decodes text formats through libavcodec's legacy subtitle entry point and
+  hands each event on as a cue. Bitmap formats (PGS, VobSub) are refused by its factory, so a track that cannot be
+  drawn is never offered. Every text format is normalised to an **ASS dialogue line**,
+  `ReadOrder,Layer,Style,Speaker,MarginL,MarginR,MarginV,Effect,Text` — the ninth field is the whole rest of the line,
+  and the timing is the cue's own rather than a field of it. `AssSubtitleText` is the one place that shape is known.
+- **Timing.** `SubtitleCueWindow` holds the track's decoded cues, recognises an event it already holds (a seek re-reads
+  from a keyframe, so the same event arrives twice) and keeps a cue for a second past its end so a consumer drawing it
+  is not left holding freed memory. `SubtitleRenderCore` is a fifth thread: it follows the clock, sleeps until the next
+  boundary that can change the screen, never anchors the clock and never sets a starved flag — text that is late cannot
+  stall the picture or the sound.
+- **Selection.** A subtitle track is selected with the same `SelectStream` as the other two kinds. Compatibility between
+  decoder and renderer is settled once, at chain construction: the decoder declares a `SubtitleCueFormat`, the renderer
+  factory refuses a format it cannot draw, and an incompatible pair is never published. There is no per-payload verdict
+  for subtitles and none is needed — the format cannot change between cues.
+- **Adjustment.** `SubtitlePlacement` is a player adjustment pushed by the pipeline with every drawing, in fractions of
+  the surface. It is deliberately not derived from `VideoTransform`: turning a picture must not turn text.
+- **What is missing.** `NullSubtitleRenderer` draws nothing, so `AddSubtitleFile`, the D3D11 renderer (D2D +
+  DirectWrite on its own swap chain), the host's second surface and the player's menu entry are still to come. Bitmap
+  cues cannot be rendered yet either: `IMediaBuffer` carries no width, height or stride, so the geometry has to reach
+  the cue before `SubtitleCueFormat.BitmapBgra` can mean anything.
 
 ## 4. Plugin surface
 

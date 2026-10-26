@@ -101,6 +101,8 @@ internal sealed partial class PlayerPage : BasePage
 
         VideoHost.Children.Clear();
         VideoHost.Children.Add(EnsureEngine().CreateVideoSurface());
+        SubtitleHost.Children.Clear();
+        SubtitleHost.Children.Add(EnsureEngine().CreateSubtitleSurface());
 
         CoroutineUtils.Run(async () =>
         {

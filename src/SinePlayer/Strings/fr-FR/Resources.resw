@@ -1133,6 +1133,9 @@ Démarrer en mode sans échec ?</value>
   <data name="Stretch" xml:space="preserve">
     <value>Étirer</value>
   </data>
+  <data name="Subtitle" xml:space="preserve">
+    <value>Sous-titre</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Étiquette</value>
   </data>

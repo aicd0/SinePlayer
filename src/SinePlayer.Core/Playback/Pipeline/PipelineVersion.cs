@@ -8,14 +8,18 @@ internal readonly record struct PipelineVersion(
     long AudioDecoder,
     long AudioRenderer,
     long VideoDecoder,
-    long VideoRenderer)
+    long VideoRenderer,
+    long SubtitleDecoder,
+    long SubtitleRenderer)
 {
     public static PipelineVersion Max(PipelineVersion x, PipelineVersion y) => new(
         Math.Max(x.Source, y.Source),
         Math.Max(x.AudioDecoder, y.AudioDecoder),
         Math.Max(x.AudioRenderer, y.AudioRenderer),
         Math.Max(x.VideoDecoder, y.VideoDecoder),
-        Math.Max(x.VideoRenderer, y.VideoRenderer));
+        Math.Max(x.VideoRenderer, y.VideoRenderer),
+        Math.Max(x.SubtitleDecoder, y.SubtitleDecoder),
+        Math.Max(x.SubtitleRenderer, y.SubtitleRenderer));
 
     public static VersionVerdict CompareVideoDecoder(PipelineVersion package, PipelineVersion self) => CombineVerdict(
         CompareOwn(package.VideoDecoder, self.VideoDecoder),
@@ -34,6 +38,10 @@ internal readonly record struct PipelineVersion(
         CompareOwn(package.AudioRenderer, self.AudioRenderer),
         CompareUpstream(package.Source, self.Source),
         CompareUpstream(package.AudioDecoder, self.AudioDecoder));
+
+    public static VersionVerdict CompareSubtitleDecoder(PipelineVersion package, PipelineVersion self) => CombineVerdict(
+        CompareOwn(package.SubtitleDecoder, self.SubtitleDecoder),
+        CompareUpstream(package.Source, self.Source));
 
     private static VersionVerdict CompareOwn(long package, long self)
     {
@@ -62,7 +70,7 @@ internal readonly record struct PipelineVersion(
             : VersionVerdict.Accept;
     }
 
-    public long Highest => Math.Max(Source, Math.Max(AudioDecoder, Math.Max(AudioRenderer, Math.Max(VideoDecoder, VideoRenderer))));
+    public long Highest => new[] { Source, AudioDecoder, AudioRenderer, VideoDecoder, VideoRenderer, SubtitleDecoder, SubtitleRenderer }.Max();
 
     public long Next => Highest + 1;
 }

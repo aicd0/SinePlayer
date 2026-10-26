@@ -27,6 +27,7 @@ using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Backends.Wasapi;
+using SinePlayer.Core.Playback.Backends.Win2D;
 using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Helpers.Misc;
 
@@ -63,7 +64,8 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private PlaybackPipeline? _pipeline;
     private GainAudioFilter? _gain;
-    private SwapChainPanelRenderTarget? _renderTarget;
+    private SwapChainPanelRenderTarget? _videoRenderTarget;
+    private SwapChainPanelRenderTarget? _subtitleRenderTarget;
     private DispatcherQueueTimer? _statusTimer;
     private string _description = string.Empty;
     private string? _warning;
@@ -88,8 +90,10 @@ internal sealed partial class PlaybackLabPage : BasePage
         base.OnStop();
 
         CloseMedia();
-        _renderTarget?.Dispose();
-        _renderTarget = null;
+        _videoRenderTarget?.Dispose();
+        _videoRenderTarget = null;
+        _subtitleRenderTarget?.Dispose();
+        _subtitleRenderTarget = null;
     }
 
     //
@@ -249,6 +253,38 @@ internal sealed partial class PlaybackLabPage : BasePage
         });
     }
 
+    private void SubtitleDecoderPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        CoroutineUtils.Run(async () =>
+        {
+            PlaybackPipeline? pipeline = _pipeline;
+            if (_updatingPickers || pipeline is null || SubtitleDecoderPicker.SelectedItem is not ComponentChoice choice)
+            {
+                return;
+            }
+
+            ApplyComponentSelection<ISubtitleDecoderFactory>(pipeline, choice);
+            await ReconcileAndReport(pipeline, "The subtitle decoder");
+            RefreshStatus();
+        });
+    }
+
+    private void SubtitleRendererPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        CoroutineUtils.Run(async () =>
+        {
+            PlaybackPipeline? pipeline = _pipeline;
+            if (_updatingPickers || pipeline is null || SubtitleRendererPicker.SelectedItem is not ComponentChoice choice)
+            {
+                return;
+            }
+
+            ApplyComponentSelection<ISubtitleRendererFactory>(pipeline, choice);
+            await ReconcileAndReport(pipeline, "The subtitle renderer");
+            RefreshStatus();
+        });
+    }
+
     private void VideoTrackPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         CoroutineUtils.Run(() => SelectTrack(MediaStreamKind.Video, VideoTrackPicker.SelectedItem as TrackChoice));
@@ -259,6 +295,11 @@ internal sealed partial class PlaybackLabPage : BasePage
         CoroutineUtils.Run(() => SelectTrack(MediaStreamKind.Audio, AudioTrackPicker.SelectedItem as TrackChoice));
     }
 
+    private void SubtitleTrackPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        CoroutineUtils.Run(() => SelectTrack(MediaStreamKind.Subtitle, SubtitleTrackPicker.SelectedItem as TrackChoice));
+    }
+
     //
     // Pipeline
     //
@@ -267,7 +308,8 @@ internal sealed partial class PlaybackLabPage : BasePage
     {
         CloseMedia();
 
-        _renderTarget ??= new SwapChainPanelRenderTarget(VideoPanel);
+        _videoRenderTarget ??= new SwapChainPanelRenderTarget(VideoPanel);
+        _subtitleRenderTarget ??= new SwapChainPanelRenderTarget(SubtitlePanel);
 
         // The renderer is created by the pipeline, on the thread that will use it: its graphics device
         // cannot be built here, because this thread is an STA that no other apartment can use.
@@ -277,9 +319,11 @@ internal sealed partial class PlaybackLabPage : BasePage
         };
 
         ApplyComponentSelection<IVideoDecoderFactory>(pipeline, VideoDecoderPicker.SelectedItem as ComponentChoice);
-        ApplyComponentSelection<IAudioDecoderFactory>(pipeline, AudioDecoderPicker.SelectedItem as ComponentChoice);
         ApplyComponentSelection<IVideoRendererFactory>(pipeline, VideoRendererPicker.SelectedItem as ComponentChoice);
+        ApplyComponentSelection<IAudioDecoderFactory>(pipeline, AudioDecoderPicker.SelectedItem as ComponentChoice);
         ApplyComponentSelection<IAudioRendererFactory>(pipeline, AudioRendererPicker.SelectedItem as ComponentChoice);
+        ApplyComponentSelection<ISubtitleDecoderFactory>(pipeline, SubtitleDecoderPicker.SelectedItem as ComponentChoice);
+        ApplyComponentSelection<ISubtitleRendererFactory>(pipeline, SubtitleRendererPicker.SelectedItem as ComponentChoice);
 
         // What the transform controls say is what the file is opened with, so a picture that is turned stays
         // turned across files rather than snapping back on every open.
@@ -296,7 +340,10 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         // Awaited rather than blocked: setup attaches the presentation surface from the playback thread,
         // and the panel can only be touched from this one.
-        OperationResult opened = await pipeline.Open(MediaLocator.Parse(path), _renderTarget);
+        OperationResult opened = await pipeline.Open(
+            MediaLocator.Parse(path),
+            _videoRenderTarget,
+            _subtitleRenderTarget);
         if (!opened.IsSuccessful)
         {
             pipeline.StateChanged -= Pipeline_StateChanged;
@@ -336,7 +383,8 @@ internal sealed partial class PlaybackLabPage : BasePage
         gain?.Dispose();
 
         // The panel gives the surface back before the swap chain it is showing goes away.
-        _renderTarget?.DetachSurface();
+        _videoRenderTarget?.DetachSurface();
+        _subtitleRenderTarget?.DetachSurface();
         _description = string.Empty;
         _warning = null;
         PopulateTrackPickers();
@@ -490,6 +538,15 @@ internal sealed partial class PlaybackLabPage : BasePage
                 new("Nothing", [nullVideoDecoder]),
             };
 
+            IVideoRendererFactory d3d11VideoRenderer = new D3D11VideoRendererFactory();
+            IVideoRendererFactory nullVideoRenderer = new NullVideoRendererFactory();
+            VideoRendererPicker.ItemsSource = new ComponentChoice[]
+            {
+                new("Auto", [d3d11VideoRenderer, nullVideoRenderer]),
+                new("Direct3D 11", [d3d11VideoRenderer]),
+                new("Nothing", [nullVideoRenderer]),
+            };
+
             IAudioDecoderFactory ffmpegAudioDecoder = new FFmpegAudioDecoderFactory();
             IAudioDecoderFactory nullAudioDecoder = new NullAudioDecoderFactory();
             AudioDecoderPicker.ItemsSource = new ComponentChoice[]
@@ -499,13 +556,22 @@ internal sealed partial class PlaybackLabPage : BasePage
                 new("Nothing", [nullAudioDecoder]),
             };
 
-            IVideoRendererFactory d3d11VideoRenderer = new D3D11VideoRendererFactory();
-            IVideoRendererFactory nullVideoRenderer = new NullVideoRendererFactory();
-            VideoRendererPicker.ItemsSource = new ComponentChoice[]
+            ISubtitleDecoderFactory ffmpegSubtitleDecoder = new FFmpegSubtitleDecoderFactory();
+            ISubtitleDecoderFactory nullSubtitleDecoder = new NullSubtitleDecoderFactory();
+            SubtitleDecoderPicker.ItemsSource = new ComponentChoice[]
             {
-                new("Auto", [d3d11VideoRenderer, nullVideoRenderer]),
-                new("Direct3D 11", [d3d11VideoRenderer]),
-                new("Nothing", [nullVideoRenderer]),
+                new("Auto", [ffmpegSubtitleDecoder, nullSubtitleDecoder]),
+                new("FFmpeg", [ffmpegSubtitleDecoder]),
+                new("Nothing", [nullSubtitleDecoder]),
+            };
+
+            ISubtitleRendererFactory win2dSubtitleRenderer = new Win2DSubtitleRendererFactory();
+            ISubtitleRendererFactory nullSubtitleRenderer = new NullSubtitleRendererFactory();
+            SubtitleRendererPicker.ItemsSource = new ComponentChoice[]
+            {
+                new("Auto", [win2dSubtitleRenderer, nullSubtitleRenderer]),
+                new("Win2D", [win2dSubtitleRenderer]),
+                new("Nothing", [nullSubtitleRenderer]),
             };
 
             List<ComponentChoice> audioRenderers = [];
@@ -545,9 +611,11 @@ internal sealed partial class PlaybackLabPage : BasePage
             FittingPicker.SelectedIndex = 0;
 
             VideoDecoderPicker.SelectedIndex = 0;
-            AudioDecoderPicker.SelectedIndex = 0;
             VideoRendererPicker.SelectedIndex = 0;
+            AudioDecoderPicker.SelectedIndex = 0;
             AudioRendererPicker.SelectedIndex = 0;
+            SubtitleDecoderPicker.SelectedIndex = 0;
+            SubtitleRendererPicker.SelectedIndex = 0;
         }
         finally
         {
@@ -598,6 +666,9 @@ internal sealed partial class PlaybackLabPage : BasePage
 
             AudioTrackPicker.ItemsSource = info is null ? null : Prepend(new TrackChoice(null), info.AudioStreams.Select(stream => new TrackChoice(stream)));
             AudioTrackPicker.SelectedIndex = IndexOf(AudioTrackPicker, pipeline?.SelectedAudioStream);
+
+            SubtitleTrackPicker.ItemsSource = info is null ? null : Prepend(new TrackChoice(null), info.SubtitleStreams.Select(stream => new TrackChoice(stream)));
+            SubtitleTrackPicker.SelectedIndex = IndexOf(SubtitleTrackPicker, pipeline?.SelectedSubtitleStream);
         }
         finally
         {
@@ -613,9 +684,9 @@ internal sealed partial class PlaybackLabPage : BasePage
             return;
         }
 
-        string surface = _renderTarget is null
+        string surface = _videoRenderTarget is null
             ? string.Empty
-            : $" Surface {_renderTarget.SurfaceWidth}x{_renderTarget.SurfaceHeight} at {_renderTarget.RasterizationScale:0.##}x.";
+            : $" Surface {_videoRenderTarget.SurfaceWidth}x{_videoRenderTarget.SurfaceHeight} at {_videoRenderTarget.RasterizationScale:0.##}x.";
 
         // The reason playback stopped is the most important thing on this line, so it is never omitted.
         string error = pipeline.Error is null ? string.Empty : $" Error: {pipeline.Error}";

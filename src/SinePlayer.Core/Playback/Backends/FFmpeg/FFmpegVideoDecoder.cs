@@ -504,6 +504,12 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         {
             // A hardware frame holds a texture, which nothing downstream of the decoder can read. The copy
             // into system memory is what turns it into one of the frames the pipeline hands out.
+            //
+            // The transfer moves pixels and nothing else: the destination carries no timestamp, and a frame
+            // without one is placed by the last packet that was submitted, which is not where it belongs. The
+            // picture's own timing is carried across by hand for that reason — without it the first frames of
+            // every hardware-decoded file are stamped with the wrong moment and the clock anchors to them.
+            long sourcePts = GetFrameTimestamp(_receiveFrame);
             int result = FFmpegNative.av_hwframe_transfer_data(owned, _receiveFrame, 0);
             FFmpegNative.av_frame_unref(_receiveFrame);
             if (result < 0)
@@ -511,6 +517,11 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
                 FFmpegNative.av_frame_free(ref owned);
                 error = $"Unable to copy a decoded frame out of the GPU: {FFmpegInterop.GetErrorMessage(result)}";
                 return false;
+            }
+
+            unsafe
+            {
+                ((AVFrame*)owned)->Pts = sourcePts;
             }
         }
         else

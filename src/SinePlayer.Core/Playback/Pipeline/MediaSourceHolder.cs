@@ -6,13 +6,15 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed partial class MediaSourceHolder(IMediaSource source, VideoStreamInfo? videoStream, AudioStreamInfo? audioStream) : IDisposable
+internal sealed partial class MediaSourceHolder(IMediaSource source, VideoStreamInfo? videoStream, AudioStreamInfo? audioStream, SubtitleStreamInfo? subtitleStream) : IDisposable
 {
     public IMediaSource Source { get; } = source;
 
     public VideoStreamInfo? VideoStream { get; } = videoStream;
 
     public AudioStreamInfo? AudioStream { get; } = audioStream;
+
+    public SubtitleStreamInfo? SubtitleStream { get; } = subtitleStream;
 
     public void Dispose()
     {

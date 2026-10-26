@@ -3,6 +3,7 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
+using SinePlayer.Core.Playback.Abstractions.Info;
 
 namespace SinePlayer.Core.Playback.Abstractions.Render;
 
@@ -10,7 +11,7 @@ public interface ISubtitleRenderer : IDisposable
 {
     string Name { get; }
 
-    OperationResult Configure();
+    OperationResult Configure(SubtitleStreamInfo stream, IVideoRenderTarget target);
 
-    OperationResult Render(SubtitleCue? cue);
+    OperationResult Show(IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement);
 }
