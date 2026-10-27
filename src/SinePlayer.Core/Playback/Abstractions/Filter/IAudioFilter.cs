@@ -9,7 +9,9 @@ namespace SinePlayer.Core.Playback.Abstractions.Filter;
 
 public interface IAudioFilter : IMediaFilter
 {
-    OperationResult Configure(AudioStreamInfo stream);
+    AudioStreamInfo? OutputFormat { get; }
+
+    OperationResult Configure(AudioStreamInfo input, AudioStreamInfo target);
 
     OperationResult Apply(RawAudioBuffer input, out RawAudioBuffer output);
 }

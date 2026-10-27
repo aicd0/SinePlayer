@@ -4,6 +4,8 @@
 using System.Diagnostics;
 
 using SinePlayer.Core.Common.ErrorHandling;
+using System.Runtime.InteropServices;
+
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -60,6 +62,11 @@ internal sealed class SyntheticMediaScript
     internal int FrameRate { get; init; } = 30;
 
     internal int SampleRate { get; init; } = 44100;
+
+    /// <summary>How many channels the sound's stream declares, which is what a device with fewer speaks to.</summary>
+    internal int AudioChannelCount { get; init; } = 2;
+
+    internal ChannelLayout AudioChannelLayout { get; init; } = ChannelLayout.Stereo;
 
     internal int SamplesPerAudioPacket { get; init; } = 1024;
 
@@ -141,8 +148,8 @@ internal sealed class SyntheticMediaSource : IMediaSource
             Index = 1,
             CodecId = "synthetic-audio",
             SampleRate = script.SampleRate,
-            ChannelCount = 2,
-            ChannelLayout = ChannelLayout.Stereo,
+            ChannelCount = script.AudioChannelCount,
+            ChannelLayout = script.AudioChannelLayout,
             SampleFormat = AudioSampleFormat.Int16,
             Duration = script.AudioDuration ?? script.Duration,
         };
@@ -328,12 +335,39 @@ internal sealed class SyntheticMediaSource : IMediaSource
     private readonly record struct ScriptedPacket(bool Video, bool Subtitle, TimeSpan Timestamp, TimeSpan Length);
 }
 
-internal sealed class SyntheticMediaBuffer : IMediaBuffer
+/// <summary>
+/// A packet's worth of silence. It is planar like a decoder's own block, because what a renderer or a filter is
+/// handed is described by its planes — a stand-in without them cannot be converted, so a test about a conversion
+/// would say nothing.
+/// </summary>
+internal sealed class SyntheticMediaBuffer : IPlanarAudioBuffer
 {
-    public long Length => 0;
+    private readonly byte[] _bytes;
+    private readonly GCHandle _handle;
+
+    internal SyntheticMediaBuffer(int byteCount = 0)
+    {
+        _bytes = new byte[Math.Max(byteCount, 0)];
+        _handle = GCHandle.Alloc(_bytes, GCHandleType.Pinned);
+    }
+
+    public int PlaneCount => 1;
+
+    public long Length => _bytes.Length;
+
+    public nint GetPlanePointer(int plane)
+    {
+        return plane == 0 ? _handle.AddrOfPinnedObject() : throw new ArgumentOutOfRangeException(nameof(plane), plane, "A synthetic block has one plane.");
+    }
+
+    public int GetPlaneByteCount(int plane)
+    {
+        return plane == 0 ? _bytes.Length : throw new ArgumentOutOfRangeException(nameof(plane), plane, "A synthetic block has one plane.");
+    }
 
     public void Dispose()
     {
+        _handle.Free();
     }
 }
 
@@ -428,7 +462,7 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
                     ChannelLayout = stream.ChannelLayout,
                     SampleFormat = AudioSampleFormat.Int16,
                     SampleCount = (int)(packet.Duration.TotalSeconds * stream.SampleRate),
-                    Buffer = new SyntheticMediaBuffer(),
+                    Buffer = new SyntheticMediaBuffer((int)(packet.Duration.TotalSeconds * stream.SampleRate) * stream.ChannelCount * sizeof(short)),
                 },
             ];
 

@@ -18,6 +18,8 @@ public interface IAudioRenderer : IDisposable
 
     long QueuedSampleCount { get; }
 
+    OperationResult<AudioStreamInfo> Negotiate(AudioStreamInfo stream);
+
     OperationResult Configure(AudioStreamInfo stream);
 
     IAudioSubmit Submit(RawAudioBuffer buffer);

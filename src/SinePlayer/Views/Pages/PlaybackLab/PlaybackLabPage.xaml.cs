@@ -15,6 +15,7 @@ using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Playback.Surface;
 using SinePlayer.Common.Utils;
+using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
@@ -23,6 +24,7 @@ using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
+using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Null;
@@ -35,6 +37,8 @@ namespace SinePlayer.Views.Pages.PlaybackLab;
 
 internal sealed partial class PlaybackLabPage : BasePage
 {
+    private const string TAG = nameof(PlaybackLabPage);
+
     private static readonly string[] MEDIA_FILE_TYPES =
     [
         ".mp4", ".mkv", ".mov", ".webm", ".avi", ".ts", ".m4v",
@@ -64,11 +68,11 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private PlaybackPipeline? _pipeline;
     private GainAudioFilter? _gain;
+    private DownmixAudioFilter? _downmix;
     private SwapChainPanelRenderTarget? _videoRenderTarget;
     private SwapChainPanelRenderTarget? _subtitleRenderTarget;
     private DispatcherQueueTimer? _statusTimer;
     private string _description = string.Empty;
-    private string? _warning;
     private bool _updatingPickers;
 
     public PlaybackLabPage()
@@ -168,7 +172,11 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             OperationResult played = await pipeline.Play();
-            _warning = played.IsSuccessful ? null : played.Message;
+            if (!played.IsSuccessful)
+            {
+                Logger.E(TAG, $"Playback was refused. {played.Message}");
+            }
+
             RefreshStatus();
         });
     }
@@ -200,7 +208,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<IVideoDecoderFactory>(pipeline, choice);
-            await ReconcileAndReport(pipeline, "The video decoder");
+            await ReconcileAndLog(pipeline, "The video decoder");
             RefreshStatus();
         });
     }
@@ -216,7 +224,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<IAudioDecoderFactory>(pipeline, choice);
-            await ReconcileAndReport(pipeline, "The audio decoder");
+            await ReconcileAndLog(pipeline, "The audio decoder");
             RefreshStatus();
         });
     }
@@ -232,7 +240,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<IVideoRendererFactory>(pipeline, choice);
-            await ReconcileAndReport(pipeline, "The renderer");
+            await ReconcileAndLog(pipeline, "The renderer");
             RefreshStatus();
         });
     }
@@ -248,7 +256,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<IAudioRendererFactory>(pipeline, choice);
-            await ReconcileAndReport(pipeline, "The output device");
+            await ReconcileAndLog(pipeline, "The output device");
             RefreshStatus();
         });
     }
@@ -264,7 +272,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<ISubtitleDecoderFactory>(pipeline, choice);
-            await ReconcileAndReport(pipeline, "The subtitle decoder");
+            await ReconcileAndLog(pipeline, "The subtitle decoder");
             RefreshStatus();
         });
     }
@@ -280,7 +288,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<ISubtitleRendererFactory>(pipeline, choice);
-            await ReconcileAndReport(pipeline, "The subtitle renderer");
+            await ReconcileAndLog(pipeline, "The subtitle renderer");
             RefreshStatus();
         });
     }
@@ -332,14 +340,13 @@ internal sealed partial class PlaybackLabPage : BasePage
         pipeline.StateChanged += Pipeline_StateChanged;
         pipeline.WarningRaised += Pipeline_WarningRaised;
 
-        // The level is the host's now: this page makes the filter, adds it to the chain and sets it — which is
-        // the whole of the volume API, and the reason no renderer below has to provide one.
         GainAudioFilter gain = new();
         gain.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
         pipeline.AudioFilters.Add(gain);
 
-        // Awaited rather than blocked: setup attaches the presentation surface from the playback thread,
-        // and the panel can only be touched from this one.
+        DownmixAudioFilter downmix = new();
+        pipeline.AudioFilters.Add(downmix);
+
         OperationResult opened = await pipeline.Open(
             MediaLocator.Parse(path),
             _videoRenderTarget,
@@ -350,12 +357,14 @@ internal sealed partial class PlaybackLabPage : BasePage
             pipeline.WarningRaised -= Pipeline_WarningRaised;
             pipeline.Dispose();
             gain.Dispose();
-            Report($"Opening the file failed. {opened.Message}");
+            downmix.Dispose();
+            Logger.E(TAG, $"Opening the file failed. {opened.Message}");
             return;
         }
 
         _pipeline = pipeline;
         _gain = gain;
+        _downmix = downmix;
         _description = Describe(pipeline);
         PopulateTrackPickers();
 
@@ -376,17 +385,18 @@ internal sealed partial class PlaybackLabPage : BasePage
             pipeline.Dispose();
         }
 
-        // The filter belongs to this page rather than to the pipeline, so letting go of the pipeline does not
-        // end it: it is disposed here, once nothing is playing through it.
         GainAudioFilter? gain = _gain;
         _gain = null;
         gain?.Dispose();
+
+        DownmixAudioFilter? downmix = _downmix;
+        _downmix = null;
+        downmix?.Dispose();
 
         // The panel gives the surface back before the swap chain it is showing goes away.
         _videoRenderTarget?.DetachSurface();
         _subtitleRenderTarget?.DetachSurface();
         _description = string.Empty;
-        _warning = null;
         PopulateTrackPickers();
     }
 
@@ -401,7 +411,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         OperationResult selected = await pipeline.SelectStream(kind, choice.Stream);
         if (!selected.IsSuccessful)
         {
-            Report($"The track could not be changed. {selected.Message}");
+            Logger.E(TAG, $"The track could not be changed. {selected.Message}");
         }
 
         PopulateTrackPickers();
@@ -432,7 +442,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         OperationResult seeked = await pipeline.Seek(target);
         if (!seeked.IsSuccessful)
         {
-            Report($"The seek was refused. {seeked.Message}");
+            Logger.E(TAG, $"The seek was refused. {seeked.Message}");
         }
 
         RefreshStatus();
@@ -480,14 +490,17 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private void Pipeline_StateChanged(MediaEngineState state, string? error)
     {
-        // Raised on the playback queue; the status line belongs to the UI thread.
-        DispatcherQueue.TryEnqueue(RefreshStatus);
+        if (error is not null)
+        {
+            Logger.E(TAG, error);
+        }
+
+        CoroutineUtils.PostInMainThread(RefreshStatus);
     }
 
     private void Pipeline_WarningRaised(string warning)
     {
-        // Raised on the playback queue, and shown where the status line lives.
-        DispatcherQueue.TryEnqueue(() => _warning = warning);
+        Logger.W(TAG, warning);
     }
 
     //
@@ -589,7 +602,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
             else
             {
-                Report($"Unable to list the audio output devices. {error}");
+                Logger.E(TAG, $"Unable to list the audio output devices. {error}");
             }
 
             if (audioRenderers.Count == 0)
@@ -687,25 +700,9 @@ internal sealed partial class PlaybackLabPage : BasePage
         string surface = _videoRenderTarget is null
             ? string.Empty
             : $" Surface {_videoRenderTarget.SurfaceWidth}x{_videoRenderTarget.SurfaceHeight} at {_videoRenderTarget.RasterizationScale:0.##}x.";
-
-        // The reason playback stopped is the most important thing on this line, so it is never omitted.
-        string error = pipeline.Error is null ? string.Empty : $" Error: {pipeline.Error}";
-        string warning = _warning is null ? string.Empty : $" {_warning}";
-
-        // Drops and underruns are how "stutter" and "glitchy" turn into numbers: a trickle is the
-        // synchronizer working, a torrent is the pipeline being starved. The lag says how far the picture
-        // is behind the sound, which is what a picture that has stopped moving while sound plays shows.
-        // "dropped" counts decoded frames that were never shown, and a stage being waited for is what the
-        // clock standing still means: playback is not failing, it is waiting for something to work with.
         string waiting = pipeline.StarvedFor is null ? string.Empty : $" waiting for {pipeline.StarvedFor}.";
         long underruns = pipeline.AudioUnderruns;
         string health = $" dropped {pipeline.DroppedFrameCount}, underruns {underruns}, lag {pipeline.PictureLag.TotalMilliseconds:0} ms.{waiting}";
-
-        // What the compositor did with them is the other half of the picture: frames the pipeline handed over
-        // that never reached the display — presented, then superseded before the screen took them — are drops
-        // no pipeline counter can see, so the display's own count is shown beside the pipeline's. Both are
-        // read once here so the line describes one moment: the display's answer lags by the frame or two
-        // still in flight, so the difference can briefly be short of the number it will settle at.
         long presented = pipeline.PresentedFrameCount;
         long? displayed = pipeline.DisplayedFrameCount;
         string compositor = displayed is null
@@ -724,8 +721,12 @@ internal sealed partial class PlaybackLabPage : BasePage
         string transform = DescribeTransform(pipeline.VideoTransform);
         string tracks = DescribeTracks(pipeline);
 
-        Report($"{pipeline.State}: {_description}. {pipeline.Position:mm\\:ss\\.fff} / {pipeline.Duration:mm\\:ss\\.fff}."
-            + $" {presented} frame(s).{health}{compositor}{pace}{transform}{tracks}{surface}{error}{warning}");
+        string status = $"{pipeline.State}: {_description}. {pipeline.Position:mm\\:ss\\.fff} / {pipeline.Duration:mm\\:ss\\.fff}."
+            + $" {presented} frame(s).{health}{compositor}{pace}{transform}{tracks}{surface}";
+        if (status != StatusText.Text)
+        {
+            StatusText.Text = status;
+        }
     }
 
     private static string DescribeTracks(PlaybackPipeline pipeline)
@@ -791,20 +792,12 @@ internal sealed partial class PlaybackLabPage : BasePage
         return string.Join(", ", parts);
     }
 
-    private async Task ReconcileAndReport(PlaybackPipeline pipeline, string what)
+    private async Task ReconcileAndLog(PlaybackPipeline pipeline, string what)
     {
         OperationResult reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
-            Report($"{what} could not be changed. {reconciled.Message}");
-        }
-    }
-
-    private void Report(string message)
-    {
-        if (message != StatusText.Text)
-        {
-            StatusText.Text = message;
+            Logger.E(TAG, $"{what} could not be changed. {reconciled.Message}");
         }
     }
 
