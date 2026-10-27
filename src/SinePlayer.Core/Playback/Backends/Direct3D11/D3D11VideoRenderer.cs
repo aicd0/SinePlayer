@@ -17,25 +17,24 @@ using Windows.Win32.Graphics.Dxgi.Common;
 
 namespace SinePlayer.Core.Playback.Backends.Direct3D11;
 
-internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
+internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevice
 {
     #region Constructor
 
     /// <summary>The texture registers the array shader samples; the plane shaders use the three before them.</summary>
     private const uint GpuTextureSlot = 3;
 
-    internal static bool TryCreate(D3D11Device device, [NotNullWhen(true)] out D3D11VideoRenderer? renderer, out string error)
+    internal static OperationResult<D3D11VideoRenderer> TryCreate(D3D11Device device)
     {
-        renderer = null;
+        OperationResultCreator<D3D11VideoRenderer> result = new();
 
-        if (!D3D11VideoShaders.TryCreate(device, out D3D11VideoShaders? shaders, out error))
+        OperationResult<D3D11VideoShaders> shaders = D3D11VideoShaders.TryCreate(device);
+        if (!shaders.IsSuccessful)
         {
-            return false;
+            return result.Failure(shaders);
         }
 
-        renderer = new D3D11VideoRenderer(device, shaders);
-        error = string.Empty;
-        return true;
+        return result.Success(new D3D11VideoRenderer(device, shaders.Result));
     }
 
     private readonly D3D11Device _device;
@@ -69,6 +68,12 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 
     private int _frameWidth;
     private int _frameHeight;
+
+    /// <summary>
+    /// The layout of the textures <see cref="_planeTextures"/> were created for, which is what says whether an upload
+    /// can reuse them. It is therefore about the last frame <em>uploaded</em>, not the last one drawn: a hardware frame
+    /// is sampled from the decoder's own texture, which this cache has no part in and which says what it holds itself.
+    /// </summary>
     private PixelFormat _frameFormat = PixelFormat.Unknown;
 
     private ID3D11RenderTargetView? _outputView;
@@ -89,6 +94,20 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 
     #endregion
 
+    /// <summary>
+    /// The layouts a hardware frame can be drawn from: one row per video format DXGI defines plane views for, with the
+    /// two channel layouts those views are cast to. It is the only statement of that fact — the pre-check reads a row by
+    /// layout, before any texture exists, and the draw reads the same row by the texture's own format. Two copies of it
+    /// could disagree, and a pre-check wider than the draw would accept a frame that is then refused every time it
+    /// arrives, which reads as a decoder fault rather than as this one.
+    /// </summary>
+    private static readonly (PixelFormat Layout, DXGI_FORMAT Texture, DXGI_FORMAT Luma, DXGI_FORMAT Chroma)[] sGpuLayouts =
+    [
+        (PixelFormat.Nv12, DXGI_FORMAT.DXGI_FORMAT_NV12, DXGI_FORMAT.DXGI_FORMAT_R8_UNORM, DXGI_FORMAT.DXGI_FORMAT_R8G8_UNORM),
+        (PixelFormat.P010, DXGI_FORMAT.DXGI_FORMAT_P010, DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, DXGI_FORMAT.DXGI_FORMAT_R16G16_UNORM),
+        (PixelFormat.P016, DXGI_FORMAT.DXGI_FORMAT_P016, DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, DXGI_FORMAT.DXGI_FORMAT_R16G16_UNORM),
+    ];
+
     #region Public API
 
     public string Name => "Direct3D 11";
@@ -98,6 +117,24 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
     public nint NativeDevice => _device.NativeDevice;
 
     public object DeviceLock => _deviceLock;
+
+    /// <summary>
+    /// The layouts a decoder may keep on this device: a semi-planar texture eight or sixteen bits wide, which is
+    /// exactly what the views below can be cast out of. Stated as a layout because a decoder asks before any texture
+    /// exists, and refusing here is what keeps a frame that could never be sampled from ever being produced.
+    /// </summary>
+    public OperationResult CanDisplayGpuFrame(PixelFormat format)
+    {
+        foreach ((PixelFormat layout, _, _, _) in sGpuLayouts)
+        {
+            if (layout == format)
+            {
+                return OperationResult.Success();
+            }
+        }
+
+        return OperationResult.Failure($"The Direct3D renderer cannot sample {format} frames that are still on the GPU.");
+    }
 
     internal int OutputPixelWidth => _outputWidth;
 
@@ -148,19 +185,20 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 
         if (_swapChain is null)
         {
-            if (!D3D11SwapChain.TryCreate(_device, width, height, scale, out D3D11SwapChain? created, out string error))
+            OperationResult<D3D11SwapChain> created = D3D11SwapChain.TryCreate(_device, width, height, scale);
+            if (!created.IsSuccessful)
             {
-                return OperationResult.Failure(error);
+                return OperationResult.Failure(created);
             }
 
-            OperationResult attach = created.AttachTo(target);
+            OperationResult attach = created.Result.AttachTo(target);
             if (!attach.IsSuccessful)
             {
-                created.Dispose();
+                created.Result.Dispose();
                 return attach;
             }
 
-            _swapChain = created;
+            _swapChain = created.Result;
         }
         else
         {
@@ -205,18 +243,15 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 
             if (frame.Buffer is IGpuVideoBuffer gpuBuffer)
             {
-                if (!_shaders.TryGetArrayPixelShader(frame.Format, out ID3D11PixelShader? arrayShader))
-                {
-                    return OperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames that are still on the GPU.");
-                }
-
+                // The layout is the texture's, so the shader that unpacks it is chosen once the texture has been read
+                // rather than from the format the frame reports.
                 OperationResult bound = BindGpuFrame(frame, gpuBuffer);
                 if (!bound.IsSuccessful)
                 {
                     return bound;
                 }
 
-                return Draw(arrayShader, _gpuViews, GpuTextureSlot, _gpuTexCoordScale, transform);
+                return Draw(_shaders.SemiPlanarArrayShader, _gpuViews, GpuTextureSlot, _gpuTexCoordScale, transform);
             }
 
             if (frame.Buffer is not IPlanarVideoBuffer buffer)
@@ -334,29 +369,44 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 
     private OperationResult BindGpuFrame(RawVideoFrame frame, IGpuVideoBuffer buffer)
     {
-        // The planes of a decoded texture are read through views cast to a channel layout the shader can sample: one
-        // channel for luma, two for interleaved chroma. Ten-bit frames hold the same planes sixteen bits wide, and a
-        // P010 texture refuses an eight-bit view, so the width follows the frame.
-        (DXGI_FORMAT Luma, DXGI_FORMAT Chroma)? viewFormats = frame.Format switch
-        {
-            PixelFormat.Nv12 => (DXGI_FORMAT.DXGI_FORMAT_R8_UNORM, DXGI_FORMAT.DXGI_FORMAT_R8G8_UNORM),
-            PixelFormat.P010 => (DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, DXGI_FORMAT.DXGI_FORMAT_R16G16_UNORM),
-            _ => null,
-        };
-
-        if (viewFormats is not (DXGI_FORMAT lumaFormat, DXGI_FORMAT chromaFormat))
-        {
-            return OperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} hardware frames.");
-        }
-
-        if (_gpuViews.Length == 2 && _gpuTexture == buffer.NativeTexture && _gpuSlice == buffer.SubresourceIndex && _frameFormat == frame.Format && _frameWidth == frame.Width && _frameHeight == frame.Height)
+        // The views outlive the call, so the same slice of the same texture at the same picture size is already bound.
+        // The texture's format belongs to the texture, which is why it need not be part of the comparison.
+        if (_gpuViews.Length == 2 && _gpuTexture == buffer.NativeTexture && _gpuSlice == buffer.SubresourceIndex && _frameWidth == frame.Width && _frameHeight == frame.Height)
         {
             return OperationResult.Success();
         }
 
-        var texture = (ID3D11Resource)Marshal.GetObjectForIUnknown(buffer.NativeTexture);
+        var resource = (ID3D11Resource)Marshal.GetObjectForIUnknown(buffer.NativeTexture);
         try
         {
+            if (resource is not ID3D11Texture2D texture)
+            {
+                return OperationResult.Failure("The decoded frame is not a two-dimensional texture.");
+            }
+
+            // What the texture holds, not what the frame says it holds: the layout was chosen by the decoder and the
+            // driver before this renderer saw the frame, and a view may only be cast to a channel layout its format
+            // allows. One channel for luma, two for interleaved chroma; ten-bit frames hold the same planes sixteen
+            // bits wide, and a P010 or P016 texture refuses an eight-bit view, so the width follows the texture.
+            D3D11_TEXTURE2D_DESC description = D3D11Interop.GetDescription(texture);
+
+            DXGI_FORMAT lumaFormat = DXGI_FORMAT.DXGI_FORMAT_UNKNOWN;
+            DXGI_FORMAT chromaFormat = DXGI_FORMAT.DXGI_FORMAT_UNKNOWN;
+            foreach ((_, DXGI_FORMAT textureFormat, DXGI_FORMAT lumaView, DXGI_FORMAT chromaView) in sGpuLayouts)
+            {
+                if (textureFormat == description.Format)
+                {
+                    lumaFormat = lumaView;
+                    chromaFormat = chromaView;
+                    break;
+                }
+            }
+
+            if (lumaFormat == DXGI_FORMAT.DXGI_FORMAT_UNKNOWN)
+            {
+                return OperationResult.Failure($"The Direct3D renderer cannot sample a {description.Format} texture.");
+            }
+
             ID3D11ShaderResourceView? luma = CreateSliceView(texture, buffer.SubresourceIndex, lumaFormat);
             ID3D11ShaderResourceView? chroma = luma is null ? null : CreateSliceView(texture, buffer.SubresourceIndex, chromaFormat);
 
@@ -364,7 +414,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
             {
                 D3D11Interop.Release(luma);
                 D3D11Interop.Release(chroma);
-                return OperationResult.Failure("The device does not offer a shader view of the decoded texture.");
+                return OperationResult.Failure($"The device offers no shader view of the {description.Format} texture.");
             }
 
             // The views name the slice but do not pin it: the texture is the decoder's own, and it will hand this
@@ -387,13 +437,12 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
             _retainedFrame = retained;
             _frameWidth = frame.Width;
             _frameHeight = frame.Height;
-            _frameFormat = frame.Format;
-            _gpuTexCoordScale = GetTexCoordScale(texture, frame);
+            _gpuTexCoordScale = GetTexCoordScale(description, frame);
             return OperationResult.Success();
         }
         finally
         {
-            D3D11Interop.Release(texture);
+            D3D11Interop.Release(resource);
         }
     }
 
@@ -425,14 +474,8 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
     /// written, and sampling them puts a band of whatever they happen to contain — nothing, which converts to
     /// green — along the bottom of the picture.
     /// </summary>
-    private static (float X, float Y) GetTexCoordScale(ID3D11Resource resource, RawVideoFrame frame)
+    private static (float X, float Y) GetTexCoordScale(in D3D11_TEXTURE2D_DESC description, RawVideoFrame frame)
     {
-        if (resource is not ID3D11Texture2D texture)
-        {
-            return (1.0f, 1.0f);
-        }
-
-        D3D11_TEXTURE2D_DESC description = D3D11Interop.GetDescription(texture);
         if (description.Width <= 0 || description.Height <= 0)
         {
             return (1.0f, 1.0f);
@@ -496,9 +539,13 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
 
         return format switch
         {
-            PixelFormat.Bgra8 or PixelFormat.Rgba8 =>
+            PixelFormat.Bgra8 =>
             [
                 (DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM, width, height),
+            ],
+            PixelFormat.Rgba8 =>
+            [
+                (DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM, width, height),
             ],
             PixelFormat.Nv12 =>
             [
@@ -506,6 +553,11 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
                 (DXGI_FORMAT.DXGI_FORMAT_R8G8_UNORM, chromaWidth, chromaHeight),
             ],
             PixelFormat.P010 =>
+            [
+                (DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, width, height),
+                (DXGI_FORMAT.DXGI_FORMAT_R16G16_UNORM, chromaWidth, chromaHeight),
+            ],
+            PixelFormat.P016 =>
             [
                 (DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, width, height),
                 (DXGI_FORMAT.DXGI_FORMAT_R16G16_UNORM, chromaWidth, chromaHeight),
@@ -521,6 +573,18 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, IGpuDevice
                 (DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, width, height),
                 (DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, chromaWidth, chromaHeight),
                 (DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, chromaWidth, chromaHeight),
+            ],
+            PixelFormat.Yuv422P =>
+            [
+                (DXGI_FORMAT.DXGI_FORMAT_R8_UNORM, width, height),
+                (DXGI_FORMAT.DXGI_FORMAT_R8_UNORM, chromaWidth, height),
+                (DXGI_FORMAT.DXGI_FORMAT_R8_UNORM, chromaWidth, height),
+            ],
+            PixelFormat.Yuv444P =>
+            [
+                (DXGI_FORMAT.DXGI_FORMAT_R8_UNORM, width, height),
+                (DXGI_FORMAT.DXGI_FORMAT_R8_UNORM, width, height),
+                (DXGI_FORMAT.DXGI_FORMAT_R8_UNORM, width, height),
             ],
             _ => [],
         };

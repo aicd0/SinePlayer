@@ -1,6 +1,7 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 
 using Windows.Win32.Graphics.Direct3D;
@@ -19,10 +20,10 @@ public class D3D11DeviceTests
     [Test]
     public void CreatesHardwareDeviceAtAnAcceptableFeatureLevel()
     {
-        bool created = D3D11Device.TryCreate(out D3D11Device? device, out string error);
-        Assert.That(created, Is.True, error);
+        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
 
-        using D3D11Device ownedDevice = device!;
+        using D3D11Device ownedDevice = created.Result;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(ownedDevice.Context, Is.Not.Null);
@@ -33,10 +34,10 @@ public class D3D11DeviceTests
     [Test]
     public void CreatesTextureWithTheRequestedDescription()
     {
-        bool created = D3D11Device.TryCreate(out D3D11Device? device, out string error);
-        Assert.That(created, Is.True, error);
+        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
 
-        using D3D11Device ownedDevice = device!;
+        using D3D11Device ownedDevice = created.Result;
         D3D11_TEXTURE2D_DESC description = new()
         {
             Width = 16,

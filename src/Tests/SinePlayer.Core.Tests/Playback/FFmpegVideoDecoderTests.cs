@@ -233,15 +233,151 @@ public class FFmpegVideoDecoderTests
         return timestamps;
     }
 
+    /// <summary>
+    /// A stream the device cannot draw is refused before anything is opened, so the caller can still ask for a
+    /// decoder that does not keep frames on the GPU. The layout is derived from the stream rather than from a
+    /// decoded frame, which is what makes it knowable this early — and it is why this needs no hardware at all.
+    /// </summary>
+    [Test]
+    public void RefusesAStreamTheDeviceCannotDraw()
+    {
+        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
+
+        using D3D11Device device = created.Result;
+
+        string path = VideoFixtureFile.CreateH264();
+        try
+        {
+            using FFmpegSource source = OpenSource(path);
+            var gpuDevice = new TestGpuDevice(device.NativeDevice, canDisplay: false);
+            OperationResult<FFmpegVideoDecoder> decoderCreated = FFmpegVideoDecoder.TryCreate(
+                source,
+                source.Info.VideoStreams[0],
+                hardwareDecoding: true,
+                gpuFrames: true,
+                gpuDevice,
+                bufferedFrames: 0);
+
+            if (decoderCreated.IsSuccessful)
+            {
+                decoderCreated.Result.Dispose();
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(decoderCreated.IsSuccessful, Is.False, "a layout nothing can draw has to fail at open");
+                Assert.That(decoderCreated.Message, Does.Contain("Nv12"), "the refusal names the layout the stream is decoded into");
+                Assert.That(decoderCreated.Message, Does.Contain("cannot draw"), decoderCreated.Message);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The same stream is accepted by a device that can draw it, and asking the question costs nothing: a stream whose
+    /// layout the renderer can sample still opens, on the GPU, exactly as it did before.
+    /// </summary>
+    [Test]
+    public void LeavesAStreamTheDeviceCanDrawAlone()
+    {
+        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
+
+        using D3D11Device device = created.Result;
+
+        string path = VideoFixtureFile.CreateH264();
+        try
+        {
+            using FFmpegSource source = OpenSource(path);
+            var gpuDevice = new TestGpuDevice(device.NativeDevice);
+            OperationResult<FFmpegVideoDecoder> decoderCreated = FFmpegVideoDecoder.TryCreate(
+                source,
+                source.Info.VideoStreams[0],
+                hardwareDecoding: true,
+                gpuFrames: true,
+                gpuDevice,
+                bufferedFrames: 0);
+
+            Assert.That(decoderCreated.IsSuccessful, Is.True, decoderCreated.Message);
+            using FFmpegVideoDecoder owned = decoderCreated.Result;
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A device of an API this backend cannot decode on is refused, and the request fails rather than the decode
+    /// producing frames nothing can read. That the device is not a D3D11 one is what says so — there is no pointer to
+    /// mistake for an <c>ID3D11Device</c>.
+    /// </summary>
+    [Test]
+    public void RefusesADeviceItCannotDecodeOn()
+    {
+        string path = VideoFixtureFile.CreateH264();
+        try
+        {
+            using FFmpegSource source = OpenSource(path);
+            var device = new ForeignGpuDevice();
+            OperationResult<FFmpegVideoDecoder> decoderCreated = FFmpegVideoDecoder.TryCreate(
+                source,
+                source.Info.VideoStreams[0],
+                hardwareDecoding: true,
+                gpuFrames: true,
+                device,
+                bufferedFrames: 0);
+
+            if (decoderCreated.IsSuccessful)
+            {
+                decoderCreated.Result.Dispose();
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(decoderCreated.IsSuccessful, Is.False, "a device of another API cannot be decoded on");
+                Assert.That(decoderCreated.Message, Does.Contain("has no decoder for the device a renderer offered"), decoderCreated.Message);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A device of another API: it can be drawn on, which is all the pipeline asks of it, and it says nothing about a
+    /// Direct3D handle because it has none to offer.
+    /// </summary>
+    private sealed class ForeignGpuDevice : IGpuDevice
+    {
+        public OperationResult CanDisplayGpuFrame(PixelFormat format)
+        {
+            return OperationResult.Success();
+        }
+    }
+
+    private static FFmpegSource OpenSource(string path)
+    {
+        FFmpegSourceProviderFactory factory = new();
+        Assert.That(factory.TryOpen(MediaLocator.Parse(path), out IMediaSource? opened).IsSuccessful, Is.True);
+        return (FFmpegSource)opened!;
+    }
+
     [Test]
     public void KeepsTheFrameOnTheDeviceItWasGiven()
     {
-        // The renderer owns the pipeline's device, so a decoder has to be able to decode on a device it was
-        // handed. Reading the texture back through that same device is what proves it: no other device can
-        // read it.
-        Assert.That(D3D11Device.TryCreate(out D3D11Device? created, out string deviceError), Is.True, deviceError);
+        // The renderer owns the pipeline's device, so a decoder has to be able to decode on a device it was handed.
+        // Reading the texture back through that same device is what proves it — no other device can read it — and it is
+        // the proof rather than a comparison of handles: what the assertion is about is the frame, not the plumbing.
+        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
 
-        using D3D11Device device = created!;
+        using D3D11Device device = created.Result;
 
         string path = VideoFixtureFile.CreateH264();
         try
@@ -252,18 +388,16 @@ public class FFmpegVideoDecoderTests
             using var source = (FFmpegSource)opened!;
             VideoStreamInfo stream = source.Info.VideoStreams[0];
             var gpuDevice = new TestGpuDevice(device.NativeDevice);
-            bool decoderCreated = FFmpegVideoDecoder.TryCreate(
+            OperationResult<FFmpegVideoDecoder> decoderCreated = FFmpegVideoDecoder.TryCreate(
                 source,
                 stream,
                 hardwareDecoding: true,
                 gpuFrames: true,
                 gpuDevice,
-                bufferedFrames: 0,
-                out FFmpegVideoDecoder? decoder,
-                out string error);
-            Assert.That(decoderCreated, Is.True, error);
+                bufferedFrames: 0);
+            Assert.That(decoderCreated.IsSuccessful, Is.True, decoderCreated.Message);
 
-            using FFmpegVideoDecoder owned = decoder!;
+            using FFmpegVideoDecoder owned = decoderCreated.Result;
             using RawVideoFrame? accelerated = DecodeFrame(source, owned);
             Assert.That(accelerated, Is.Not.Null, "the stream has to produce a frame");
 
@@ -272,7 +406,6 @@ public class FFmpegVideoDecoderTests
                 Assert.Ignore("This machine has no H.264 hardware decoder, so there is nothing to look at.");
             }
 
-            Assert.That(owned.HardwareDevice.Device, Is.EqualTo(device.NativeDevice), "the decoder has to decode on the device it was given");
             Assert.That(accelerated!.IsHardwareBacked, Is.True, "the frame has to be the texture the decoder wrote");
             Assert.That(accelerated.Format, Is.EqualTo(PixelFormat.Nv12), "the texture holds the pixels the software decoder would have produced");
             Assert.That(accelerated.Buffer, Is.InstanceOf<IGpuVideoBuffer>());
@@ -332,10 +465,13 @@ public class FFmpegVideoDecoderTests
     {
         // The whole point of the GPU path: the frame the renderer draws is the texture the decoder wrote, on
         // the device the renderer draws with. What it must produce is the picture the CPU path produces.
-        Assert.That(D3D11Device.TryCreate(out D3D11Device? created, out string deviceError), Is.True, deviceError);
-        using D3D11Device device = created!;
-        Assert.That(D3D11VideoRenderer.TryCreate(device, out D3D11VideoRenderer? createdRenderer, out string rendererError), Is.True, rendererError);
-        using D3D11VideoRenderer renderer = createdRenderer!;
+        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
+        using D3D11Device device = created.Result;
+
+        OperationResult<D3D11VideoRenderer> createdRenderer = D3D11VideoRenderer.TryCreate(device);
+        Assert.That(createdRenderer.IsSuccessful, Is.True, createdRenderer.Message);
+        using D3D11VideoRenderer renderer = createdRenderer.Result;
 
         string path = VideoFixtureFile.CreateH264();
         try
@@ -345,12 +481,10 @@ public class FFmpegVideoDecoderTests
 
             using var source = (FFmpegSource)opened!;
             VideoStreamInfo stream = source.Info.VideoStreams[0];
-            Assert.That(
-                FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: true, renderer, bufferedFrames: 0, out FFmpegVideoDecoder? decoder, out string error),
-                Is.True,
-                error);
+            OperationResult<FFmpegVideoDecoder> createdDecoder = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: true, renderer, bufferedFrames: 0);
+            Assert.That(createdDecoder.IsSuccessful, Is.True, createdDecoder.Message);
 
-            using FFmpegVideoDecoder owned = decoder!;
+            using FFmpegVideoDecoder owned = createdDecoder.Result;
             using RawVideoFrame? frame = DecodeFrame(source, owned);
             Assert.That(frame, Is.Not.Null, "the stream has to produce a frame");
 
@@ -386,10 +520,13 @@ public class FFmpegVideoDecoderTests
     [Test]
     public void KeepsDecodingAfterTheRendererItWasBuiltOnIsGone()
     {
-        Assert.That(D3D11Device.TryCreate(out D3D11Device? created, out string deviceError), Is.True, deviceError);
-        using D3D11Device device = created!;
-        Assert.That(D3D11VideoRenderer.TryCreate(device, out D3D11VideoRenderer? createdRenderer, out string rendererError), Is.True, rendererError);
-        D3D11VideoRenderer renderer = createdRenderer!;
+        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
+        using D3D11Device device = created.Result;
+
+        OperationResult<D3D11VideoRenderer> createdRenderer = D3D11VideoRenderer.TryCreate(device);
+        Assert.That(createdRenderer.IsSuccessful, Is.True, createdRenderer.Message);
+        D3D11VideoRenderer renderer = createdRenderer.Result;
 
         string path = VideoFixtureFile.CreateH264();
         try
@@ -399,12 +536,10 @@ public class FFmpegVideoDecoderTests
 
             using var source = (FFmpegSource)opened!;
             VideoStreamInfo stream = source.Info.VideoStreams[0];
-            Assert.That(
-                FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: true, renderer, bufferedFrames: 0, out FFmpegVideoDecoder? decoder, out string error),
-                Is.True,
-                error);
+            OperationResult<FFmpegVideoDecoder> createdDecoder = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: true, renderer, bufferedFrames: 0);
+            Assert.That(createdDecoder.IsSuccessful, Is.True, createdDecoder.Message);
 
-            using FFmpegVideoDecoder owned = decoder!;
+            using FFmpegVideoDecoder owned = createdDecoder.Result;
             using RawVideoFrame? first = DecodeFrame(source, owned);
             Assert.That(first, Is.Not.Null, "the stream has to produce a frame");
 
@@ -438,10 +573,13 @@ public class FFmpegVideoDecoderTests
         const int width = 1920;
         const int height = 1080;
 
-        Assert.That(D3D11Device.TryCreate(out D3D11Device? created, out string deviceError), Is.True, deviceError);
-        using D3D11Device device = created!;
-        Assert.That(D3D11VideoRenderer.TryCreate(device, out D3D11VideoRenderer? createdRenderer, out string rendererError), Is.True, rendererError);
-        using D3D11VideoRenderer renderer = createdRenderer!;
+        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
+        using D3D11Device device = created.Result;
+
+        OperationResult<D3D11VideoRenderer> createdRenderer = D3D11VideoRenderer.TryCreate(device);
+        Assert.That(createdRenderer.IsSuccessful, Is.True, createdRenderer.Message);
+        using D3D11VideoRenderer renderer = createdRenderer.Result;
 
         string path = VideoFixtureFile.CreateH264(frameCount: 8, width: width, height: height);
         try
@@ -451,12 +589,10 @@ public class FFmpegVideoDecoderTests
 
             using var source = (FFmpegSource)opened!;
             VideoStreamInfo stream = source.Info.VideoStreams[0];
-            Assert.That(
-                FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: true, renderer, bufferedFrames: 0, out FFmpegVideoDecoder? decoder, out string error),
-                Is.True,
-                error);
+            OperationResult<FFmpegVideoDecoder> createdDecoder = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: true, renderer, bufferedFrames: 0);
+            Assert.That(createdDecoder.IsSuccessful, Is.True, createdDecoder.Message);
 
-            using FFmpegVideoDecoder owned = decoder!;
+            using FFmpegVideoDecoder owned = createdDecoder.Result;
             using RawVideoFrame? frame = DecodeFrame(source, owned);
             Assert.That(frame, Is.Not.Null, "the stream has to produce a frame");
 
@@ -528,12 +664,10 @@ public class FFmpegVideoDecoderTests
             VideoStreamInfo stream = source.Info.VideoStreams[0];
             Assert.That(stream.CodecId, Is.EqualTo("av1"));
 
-            Assert.That(
-                FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: false, gpuFrames: false, gpuDevice: null, bufferedFrames: 0, candidates: ["av1", "libdav1d"], out FFmpegVideoDecoder? decoder, out string error),
-                Is.True,
-                error);
+            OperationResult<FFmpegVideoDecoder> createdDecoder = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: false, gpuFrames: false, gpuDevice: null, bufferedFrames: 0, candidates: ["av1", "libdav1d"]);
+            Assert.That(createdDecoder.IsSuccessful, Is.True, createdDecoder.Message);
 
-            using FFmpegVideoDecoder owned = decoder!;
+            using FFmpegVideoDecoder owned = createdDecoder.Result;
             Assert.That(owned.Name, Is.EqualTo("FFmpeg av1"), "the first candidate is what gets opened");
 
             List<RawVideoFrame> frames = DecodeAll(source, owned);
@@ -565,12 +699,10 @@ public class FFmpegVideoDecoderTests
 
             using var source = (FFmpegSource)opened!;
             VideoStreamInfo stream = source.Info.VideoStreams[0];
-            Assert.That(
-                FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: false, gpuFrames: false, gpuDevice: null, bufferedFrames: 0, candidates: ["h264", "libdav1d"], out FFmpegVideoDecoder? decoder, out string error),
-                Is.True,
-                error);
+            OperationResult<FFmpegVideoDecoder> createdDecoder = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: false, gpuFrames: false, gpuDevice: null, bufferedFrames: 0, candidates: ["h264", "libdav1d"]);
+            Assert.That(createdDecoder.IsSuccessful, Is.True, createdDecoder.Message);
 
-            using FFmpegVideoDecoder owned = decoder!;
+            using FFmpegVideoDecoder owned = createdDecoder.Result;
 
             OperationResult read = source.TryReadPacket(out MediaPacket? packet);
             Assert.That(read.IsSuccessful, Is.True, read.Message);
@@ -619,12 +751,10 @@ public class FFmpegVideoDecoderTests
 
             using var source = (FFmpegSource)opened!;
             VideoStreamInfo stream = source.Info.VideoStreams[0];
-            Assert.That(
-                FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: false, gpuDevice: null, bufferedFrames: 0, out FFmpegVideoDecoder? decoder, out string error),
-                Is.True,
-                error);
+            OperationResult<FFmpegVideoDecoder> decoderCreated = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: false, gpuDevice: null, bufferedFrames: 0);
+            Assert.That(decoderCreated.IsSuccessful, Is.True, decoderCreated.Message);
 
-            using FFmpegVideoDecoder owned = decoder!;
+            using FFmpegVideoDecoder owned = decoderCreated.Result;
             List<RawVideoFrame> frames = DecodeAll(source, owned);
             bool accelerated = owned.IsHardwareAccelerated;
             string name = owned.Name;
@@ -892,9 +1022,10 @@ public class FFmpegVideoDecoderTests
         // libavcodec is given the lock with the device and takes it around every use of the immediate context.
         // Without that, the decode thread could build a sequence of calls on the context while the drawing
         // thread was building one.
-        Assert.That(D3D11Device.TryCreate(out D3D11Device? created, out string deviceError), Is.True, deviceError);
+        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
 
-        using D3D11Device device = created!;
+        using D3D11Device device = created.Result;
 
         string path = VideoFixtureFile.CreateH264();
         try
@@ -905,12 +1036,10 @@ public class FFmpegVideoDecoderTests
             using var source = (FFmpegSource)opened!;
             VideoStreamInfo stream = source.Info.VideoStreams[0];
             var gpuDevice = new TestGpuDevice(device.NativeDevice);
-            Assert.That(
-                FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: true, gpuDevice, bufferedFrames: 0, out FFmpegVideoDecoder? decoder, out string error),
-                Is.True,
-                error);
+            OperationResult<FFmpegVideoDecoder> decoderCreated = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: true, gpuDevice, bufferedFrames: 0);
+            Assert.That(decoderCreated.IsSuccessful, Is.True, decoderCreated.Message);
 
-            using FFmpegVideoDecoder owned = decoder!;
+            using FFmpegVideoDecoder owned = decoderCreated.Result;
 
             // One frame first, because whether this machine decodes on the GPU at all is only known afterwards.
             using RawVideoFrame? first = DecodeFrame(source, owned);
@@ -956,9 +1085,10 @@ public class FFmpegVideoDecoderTests
     [Test]
     public void LeavesRoomInThePoolForTheFramesTheCallerHolds()
     {
-        Assert.That(D3D11Device.TryCreate(out D3D11Device? created, out string deviceError), Is.True, deviceError);
+        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
 
-        using D3D11Device device = created!;
+        using D3D11Device device = created.Result;
 
         string path = VideoFixtureFile.CreateAv1();
         try
@@ -973,12 +1103,10 @@ public class FFmpegVideoDecoderTests
             // Twelve is what libavcodec sizes a D3D11 pool to when it is left to decide, so holding twelve
             // frames is exactly what the pool cannot do without being told about it.
             const int heldFrames = 12;
-            Assert.That(
-                FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: true, gpuDevice, bufferedFrames: heldFrames, out FFmpegVideoDecoder? decoder, out string error),
-                Is.True,
-                error);
+            OperationResult<FFmpegVideoDecoder> decoderCreated = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: true, gpuFrames: true, gpuDevice, bufferedFrames: heldFrames);
+            Assert.That(decoderCreated.IsSuccessful, Is.True, decoderCreated.Message);
 
-            using FFmpegVideoDecoder owned = decoder!;
+            using FFmpegVideoDecoder owned = decoderCreated.Result;
             List<RawVideoFrame> held = [];
             try
             {
@@ -1049,16 +1177,27 @@ public class FFmpegVideoDecoderTests
     }
 
     /// <summary>A GPU device with nothing behind it: the tests that use it are about the lock, not the device.</summary>
-    private sealed class TestGpuDevice : IGpuDevice
+    private sealed class TestGpuDevice : ID3D11GpuDevice
     {
-        internal TestGpuDevice(nint device)
+        internal TestGpuDevice(nint device, bool canDisplay = true)
         {
             NativeDevice = device;
+            CanDisplay = canDisplay;
         }
+
+        /// <summary>Whether the renderer behind this device claims it can draw the layout it is asked about.</summary>
+        internal bool CanDisplay { get; }
 
         public nint NativeDevice { get; }
 
         public object DeviceLock { get; } = new();
+
+        public OperationResult CanDisplayGpuFrame(PixelFormat format)
+        {
+            return CanDisplay
+                ? OperationResult.Success()
+                : OperationResult.Failure($"This stand-in cannot draw {format} frames.");
+        }
     }
 
     private sealed class ForeignBuffer : IMediaBuffer

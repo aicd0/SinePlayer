@@ -51,8 +51,7 @@ internal static class FFmpegInterop
 
     internal static PixelFormat ToPixelFormat(int format)
     {
-        string? name = ToUtf8String(FFmpegNative.av_get_pix_fmt_name(format));
-        return name switch
+        return GetPixelFormatName(format) switch
         {
             "yuv420p" => PixelFormat.Yuv420P,
             "yuv420p10le" => PixelFormat.Yuv420P10,
@@ -60,10 +59,18 @@ internal static class FFmpegInterop
             "yuv444p" => PixelFormat.Yuv444P,
             "nv12" => PixelFormat.Nv12,
             "p010le" => PixelFormat.P010,
+            "p016le" => PixelFormat.P016,
+            "p012le" => PixelFormat.P016,
             "bgra" => PixelFormat.Bgra8,
             "rgba" => PixelFormat.Rgba8,
             _ => PixelFormat.Unknown,
         };
+    }
+
+    /// <summary>The name FFmpeg gives a pixel format, or null when the format is not one it knows.</summary>
+    internal static string? GetPixelFormatName(int format)
+    {
+        return ToUtf8String(FFmpegNative.av_get_pix_fmt_name(format));
     }
 
     internal static AudioSampleFormat ToSampleFormat(int format)
@@ -107,7 +114,7 @@ internal static class FFmpegInterop
     {
         return format switch
         {
-            PixelFormat.Nv12 or PixelFormat.P010 => 2,
+            PixelFormat.Nv12 or PixelFormat.P010 or PixelFormat.P016 => 2,
             PixelFormat.Yuv420P or PixelFormat.Yuv420P10 or PixelFormat.Yuv422P or PixelFormat.Yuv444P => 3,
             _ => 1,
         };

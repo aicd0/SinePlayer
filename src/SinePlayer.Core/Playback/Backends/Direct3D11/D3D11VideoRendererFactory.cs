@@ -47,20 +47,21 @@ public sealed class D3D11VideoRendererFactory : IVideoRendererFactory
         {
             component = null;
 
-            if (!D3D11Device.TryCreate(out D3D11Device? device, out string deviceError) || device is null)
+            OperationResult<D3D11Device> device = D3D11Device.TryCreate();
+            if (!device.IsSuccessful)
             {
-                return OperationResult.Failure(
-                    string.IsNullOrEmpty(deviceError) ? "No Direct3D device was created." : deviceError);
+                return OperationResult.Failure(device);
             }
 
-            if (!D3D11VideoRenderer.TryCreate(device, out D3D11VideoRenderer? created, out string rendererError))
+            OperationResult<D3D11VideoRenderer> renderer = D3D11VideoRenderer.TryCreate(device.Result);
+            if (!renderer.IsSuccessful)
             {
                 // The renderer would have been the device's owner, so nothing else can release it.
-                device.Dispose();
-                return OperationResult.Failure(rendererError);
+                device.Result.Dispose();
+                return OperationResult.Failure(renderer);
             }
 
-            component = created;
+            component = renderer.Result;
             return OperationResult.Success();
         }
     }

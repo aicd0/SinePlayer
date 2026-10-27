@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Backends.Wasapi;
 
 namespace SinePlayer.Core.Tests.Playback;
@@ -15,11 +16,11 @@ internal sealed class WasapiAudioEndpointTests
     [Test]
     public void ListsTheOutputDevicesThisMachineHas()
     {
-        bool listed = WasapiAudioEndpoints.TryGetRenderEndpoints(out IReadOnlyList<WasapiAudioEndpoint> endpoints, out string error);
-        Assert.That(listed, Is.True, error);
+        OperationResult<IReadOnlyList<WasapiAudioEndpoint>> listed = WasapiAudioEndpoints.TryGetRenderEndpoints();
+        Assert.That(listed.IsSuccessful, Is.True, listed.Message);
 
         int defaults = 0;
-        foreach (WasapiAudioEndpoint endpoint in endpoints)
+        foreach (WasapiAudioEndpoint endpoint in listed.Result)
         {
             TestContext.Out.WriteLine($"{(endpoint.IsDefault ? "*" : " ")} {endpoint.Name} [{endpoint.Id}]");
 
@@ -37,10 +38,10 @@ internal sealed class WasapiAudioEndpointTests
 
         if (defaults == 1)
         {
-            Assert.That(endpoints[0].IsDefault, Is.True, "the default device has to come first in the list");
+            Assert.That(listed.Result[0].IsDefault, Is.True, "the default device has to come first in the list");
         }
 
-        if (endpoints.Count == 0)
+        if (listed.Result.Count == 0)
         {
             Assert.Ignore("This machine reports no audio output device, so there is nothing to list.");
         }

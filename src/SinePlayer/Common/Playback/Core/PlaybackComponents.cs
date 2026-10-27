@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 
 using SinePlayer.Common.Localization;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -72,9 +73,10 @@ internal sealed record PlaybackComponents(
             new(AUTO, StringResourceProvider.Instance.Auto),
         ];
 
-        if (WasapiAudioEndpoints.TryGetRenderEndpoints(out IReadOnlyList<WasapiAudioEndpoint> endpoints, out _))
+        OperationResult<IReadOnlyList<WasapiAudioEndpoint>> endpoints = WasapiAudioEndpoints.TryGetRenderEndpoints();
+        if (endpoints.IsSuccessful)
         {
-            foreach (WasapiAudioEndpoint endpoint in endpoints)
+            foreach (WasapiAudioEndpoint endpoint in endpoints.Result)
             {
                 options.Add(new(WASAPI_PREFIX + endpoint.Id,
                     endpoint.IsDefault ?
@@ -174,9 +176,10 @@ internal sealed record PlaybackComponents(
         if (key.StartsWith(WASAPI_PREFIX, StringComparison.Ordinal))
         {
             string endpointId = key[WASAPI_PREFIX.Length..];
-            if (WasapiAudioEndpoints.TryGetRenderEndpoints(out IReadOnlyList<WasapiAudioEndpoint> endpoints, out _))
+            OperationResult<IReadOnlyList<WasapiAudioEndpoint>> endpoints = WasapiAudioEndpoints.TryGetRenderEndpoints();
+            if (endpoints.IsSuccessful)
             {
-                foreach (WasapiAudioEndpoint endpoint in endpoints)
+                foreach (WasapiAudioEndpoint endpoint in endpoints.Result)
                 {
                     if (endpoint.Id == endpointId)
                     {
@@ -198,9 +201,10 @@ internal sealed record PlaybackComponents(
             default:
                 {
                     List<IComponentFactory> factories = [];
-                    if (WasapiAudioEndpoints.TryGetRenderEndpoints(out IReadOnlyList<WasapiAudioEndpoint> endpoints, out _))
+                    OperationResult<IReadOnlyList<WasapiAudioEndpoint>> endpoints = WasapiAudioEndpoints.TryGetRenderEndpoints();
+                    if (endpoints.IsSuccessful)
                     {
-                        foreach (WasapiAudioEndpoint endpoint in endpoints)
+                        foreach (WasapiAudioEndpoint endpoint in endpoints.Result)
                         {
                             factories.Add(WasapiAudioRendererFactory.For(endpoint));
                         }

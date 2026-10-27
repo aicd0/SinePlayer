@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 
@@ -68,9 +69,9 @@ internal static class WasapiAudioFormat
         };
     }
 
-    internal static bool TryDescribe(AudioStreamInfo stream, out Descriptor descriptor, out string error)
+    internal static OperationResult<Descriptor> TryDescribe(AudioStreamInfo stream)
     {
-        return TryDescribe(stream, stream.ChannelCount, stream.ChannelLayout, out descriptor, out error);
+        return TryDescribe(stream, stream.ChannelCount, stream.ChannelLayout);
     }
 
     /// <summary>
@@ -78,29 +79,26 @@ internal static class WasapiAudioFormat
     /// than it was decoded in: a surround mix folded down for an endpoint with two speakers, for instance, needs
     /// to open the device as a stereo stream or the device would convert the very channels the fold just built.
     /// </summary>
-    internal static bool TryDescribe(AudioStreamInfo stream, int channelCount, ChannelLayout channelLayout, out Descriptor descriptor, out string error)
+    internal static OperationResult<Descriptor> TryDescribe(AudioStreamInfo stream, int channelCount, ChannelLayout channelLayout)
     {
-        descriptor = default;
+        OperationResultCreator<Descriptor> result = new();
 
         if (stream.SampleRate <= 0)
         {
-            error = "The stream declares no sample rate.";
-            return false;
+            return result.Failure("The stream declares no sample rate.");
         }
 
         if (channelCount <= 0)
         {
-            error = "The stream declares no channels.";
-            return false;
+            return result.Failure("The stream declares no channels.");
         }
 
         int bitsPerSample = GetBitsPerSample(stream.SampleFormat);
         if (bitsPerSample == 0)
         {
-            error = stream.SampleFormat == AudioSampleFormat.Int24
+            return result.Failure(stream.SampleFormat == AudioSampleFormat.Int24
                 ? "A 24 bit stream is not described in the 24-in-32 layout WASAPI expects."
-                : $"The sample format '{stream.SampleFormat}' has no WASAPI equivalent.";
-            return false;
+                : $"The sample format '{stream.SampleFormat}' has no WASAPI equivalent.");
         }
 
         uint channelMask = GetChannelMask(channelLayout);
@@ -109,12 +107,11 @@ internal static class WasapiAudioFormat
         {
             // Guessing positions for a layout we cannot name would decide for the device which speaker
             // gets which channel. Refusing is more honest than producing a plausible lie.
-            error = $"No speaker layout is known for {channelCount} channels of layout '{channelLayout}'.";
-            return false;
+            return result.Failure($"No speaker layout is known for {channelCount} channels of layout '{channelLayout}'.");
         }
 
         int blockAlign = (bitsPerSample / 8) * channelCount;
-        descriptor = new Descriptor
+        return result.Success(new Descriptor
         {
             SampleRate = stream.SampleRate,
             ChannelCount = channelCount,
@@ -124,9 +121,7 @@ internal static class WasapiAudioFormat
             IsFloat = stream.SampleFormat is AudioSampleFormat.Float32 or AudioSampleFormat.Float64,
             IsExtensible = isExtensible,
             ChannelMask = channelMask,
-        };
-        error = string.Empty;
-        return true;
+        });
     }
 
     private static int GetBitsPerSample(AudioSampleFormat format)

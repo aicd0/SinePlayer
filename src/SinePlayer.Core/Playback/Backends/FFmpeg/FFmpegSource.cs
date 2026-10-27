@@ -88,9 +88,9 @@ public sealed class FFmpegSource : IMediaSource
     /// <summary>
     /// Opens a locator with libavformat and reads its stream table.
     /// </summary>
-    public static bool TryOpen(MediaLocator locator, out FFmpegSource? source, out string error)
+    public static OperationResult<FFmpegSource> TryOpen(MediaLocator locator)
     {
-        source = null;
+        OperationResultCreator<FFmpegSource> result = new();
 
         try
         {
@@ -98,38 +98,32 @@ public sealed class FFmpegSource : IMediaSource
         }
         catch (Exception exception)
         {
-            error = exception.Message;
-            return false;
+            return result.Failure(exception);
         }
 
         nint context = 0;
-        int result = FFmpegNative.avformat_open_input(out context, locator.Value, 0, 0);
-        if (result < 0)
+        int opened = FFmpegNative.avformat_open_input(out context, locator.Value, 0, 0);
+        if (opened < 0)
         {
-            error = $"Unable to open '{locator.Value}': {FFmpegInterop.GetErrorMessage(result)}";
-            return false;
+            return result.Failure($"Unable to open '{locator.Value}': {FFmpegInterop.GetErrorMessage(opened)}");
         }
 
-        result = FFmpegNative.avformat_find_stream_info(context, 0);
-        if (result < 0)
+        int stacked = FFmpegNative.avformat_find_stream_info(context, 0);
+        if (stacked < 0)
         {
             FFmpegNative.avformat_close_input(ref context);
-            error = $"Unable to read stream information from '{locator.Value}': {FFmpegInterop.GetErrorMessage(result)}";
-            return false;
+            return result.Failure($"Unable to read stream information from '{locator.Value}': {FFmpegInterop.GetErrorMessage(stacked)}");
         }
 
         nint readPacket = FFmpegNative.av_packet_alloc();
         if (readPacket == 0)
         {
             FFmpegNative.avformat_close_input(ref context);
-            error = "Unable to allocate an FFmpeg packet.";
-            return false;
+            return result.Failure("Unable to allocate an FFmpeg packet.");
         }
 
         MediaInfo info = CreateInfo(context, out AVRational[] timeBases);
-        source = new FFmpegSource(context, readPacket, info, timeBases);
-        error = string.Empty;
-        return true;
+        return result.Success(new FFmpegSource(context, readPacket, info, timeBases));
     }
 
     public OperationResult Seek(TimeSpan position, int streamIndex)

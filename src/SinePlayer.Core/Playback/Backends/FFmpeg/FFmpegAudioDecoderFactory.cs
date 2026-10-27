@@ -34,12 +34,13 @@ public sealed class FFmpegAudioDecoderFactory : IAudioDecoderFactory
         {
             component = null;
 
-            if (!FFmpegAudioDecoder.TryCreate(source, stream, out FFmpegAudioDecoder? ffmpegDecoder, out string error))
+            OperationResult<FFmpegAudioDecoder> decoder = FFmpegAudioDecoder.TryCreate(source, stream);
+            if (!decoder.IsSuccessful)
             {
-                return OperationResult.Failure(error);
+                return OperationResult.Failure(decoder);
             }
 
-            component = ffmpegDecoder;
+            component = decoder.Result;
             return OperationResult.Success();
         }
     }

@@ -47,13 +47,19 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
 
     private nint _context;
     private nint _receiveFrame;
-    private nint _lockHandle;
+
+    /// <summary>
+    /// The graphics API this decoder decodes on, or null when it decodes in software. Everything API-specific is asked
+    /// of it, which is what keeps this class free of any one API's vocabulary.
+    /// </summary>
+    private IFFmpegHardwareBackend? _hardwareBackend;
+
     private PixelFormat _outputFormat;
     private long _lastPacketTimestamp;
     private bool _hardware;
     private bool _disposed;
 
-    private FFmpegVideoDecoder(FFmpegSource source, VideoStreamInfo stream, nint parameters, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, int bufferedFrames, string[] candidates)
+    private FFmpegVideoDecoder(FFmpegSource source, VideoStreamInfo stream, nint parameters, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, IFFmpegHardwareBackend? hardwareBackend, int bufferedFrames, string[] candidates)
     {
         _source = source;
         Stream = stream;
@@ -61,6 +67,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         _hardwareDecoding = hardwareDecoding;
         _gpuFrames = gpuFrames;
         _gpuDevice = gpuDevice;
+        _hardwareBackend = hardwareBackend;
         _bufferedFrames = bufferedFrames;
         _candidates = candidates;
         _timeBase = source.GetTimeBase(stream.Index);
@@ -74,13 +81,6 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
     public MediaStreamInfo Stream { get; }
 
     public bool IsHardwareAccelerated => _hardware;
-
-    /// <summary>
-    /// The device the hardware frames belong to and the immediate context that can read them back, or
-    /// zeroes when decoding never left the CPU. A texture is only readable by the device that decoded it,
-    /// so whoever draws or inspects a hardware frame needs these.
-    /// </summary>
-    internal (nint Device, nint Context) HardwareDevice => FFmpegHardware.ReadDevice(_context);
 
     public PixelFormat OutputFormat => _outputFormat;
 
@@ -126,23 +126,22 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
     /// owns, and one the caller still holds cannot be reused, so a pool sized without this runs dry while
     /// the caller is doing nothing wrong — which surfaces as a decode failing with "cannot allocate memory".
     /// </param>
-    public static bool TryCreate(IMediaSource source, VideoStreamInfo stream, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, int bufferedFrames, out FFmpegVideoDecoder? decoder, out string error)
+    public static OperationResult<FFmpegVideoDecoder> TryCreate(IMediaSource source, VideoStreamInfo stream, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, int bufferedFrames)
     {
-        return TryCreate(source, stream, hardwareDecoding, gpuFrames, gpuDevice, bufferedFrames, GetDecoderCandidates(stream.CodecId, hardwareDecoding), out decoder, out error);
+        return TryCreate(source, stream, hardwareDecoding, gpuFrames, gpuDevice, bufferedFrames, GetDecoderCandidates(stream.CodecId, hardwareDecoding));
     }
 
     /// <summary>
     /// Opens a decoder with the candidates named explicitly. This is how a test reaches the fallback for a
     /// decoder that opens and then produces nothing, which is otherwise a property of the FFmpeg build.
     /// </summary>
-    internal static bool TryCreate(IMediaSource source, VideoStreamInfo stream, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, int bufferedFrames, IReadOnlyList<string> candidates, out FFmpegVideoDecoder? decoder, out string error)
+    internal static OperationResult<FFmpegVideoDecoder> TryCreate(IMediaSource source, VideoStreamInfo stream, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, int bufferedFrames, IReadOnlyList<string> candidates)
     {
-        decoder = null;
+        OperationResultCreator<FFmpegVideoDecoder> result = new();
 
         if (source is not FFmpegSource ffmpegSource)
         {
-            error = "The video stream does not come from an FFmpeg source.";
-            return false;
+            return result.Failure("The video stream does not come from an FFmpeg source.");
         }
 
         try
@@ -151,32 +150,64 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         }
         catch (Exception exception)
         {
-            error = exception.Message;
-            return false;
+            return result.Failure(exception);
         }
 
         if (!ffmpegSource.TryGetCodecParameters(stream.Index, out nint parameters))
         {
-            error = $"Stream {stream.Index} exposes no codec parameters.";
-            return false;
+            return result.Failure($"Stream {stream.Index} exposes no codec parameters.");
         }
 
-        var created = new FFmpegVideoDecoder(ffmpegSource, stream, parameters, hardwareDecoding, gpuFrames, gpuDevice, bufferedFrames, [.. candidates]);
-        if (created.TryOpenNextCandidate(out error))
+        // The API to decode on is settled once, before anything is opened: a device the pipeline offers names it, and
+        // nothing offered means this build picks one for itself.
+        IFFmpegHardwareBackend? hardwareBackend = null;
+        if (hardwareDecoding)
         {
-            decoder = created;
-            return true;
+            OperationResult<IFFmpegHardwareBackend> created = FFmpegHardwareBackends.TryCreate(gpuDevice);
+            if (!created.IsSuccessful)
+            {
+                return result.Failure(created);
+            }
+
+            hardwareBackend = created.Result;
         }
 
-        created.Dispose();
-        return false;
+        // A layout the renderer cannot sample is refused before anything is opened, which is the only moment the caller
+        // can still ask for a decoder that does not keep frames on the GPU — a picture that could never be drawn is
+        // better refused once than returned as a failure per frame.
+        if (hardwareBackend is not null && gpuFrames && gpuDevice is not null)
+        {
+            PixelFormat layout = hardwareBackend.GetFrameLayout(stream.PixelFormat);
+
+            // A stream whose pixels this build cannot name is left to the texture: the frame carries its own format,
+            // and guessing at one would refuse content that draws perfectly well.
+            if (layout != PixelFormat.Unknown)
+            {
+                OperationResult displayable = gpuDevice.CanDisplayGpuFrame(layout);
+                if (!displayable.IsSuccessful)
+                {
+                    hardwareBackend.Dispose();
+                    return result.Failure($"The stream is decoded into {layout} frames: {displayable.Message}");
+                }
+            }
+        }
+
+        var decoder = new FFmpegVideoDecoder(ffmpegSource, stream, parameters, hardwareDecoding, gpuFrames, gpuDevice, hardwareBackend, bufferedFrames, [.. candidates]);
+        OperationResult opened = decoder.TryOpenNextCandidate();
+        if (!opened.IsSuccessful)
+        {
+            decoder.Dispose();
+            return result.Failure(opened);
+        }
+
+        return result.Success(decoder);
     }
 
     /// <summary>
-    /// Opens the next candidate that this codec allows, replacing anything already open. Returns false when
-    /// the candidates are exhausted, with the last failure as the reason.
+    /// Opens the next candidate that this codec allows, replacing anything already open. Fails when the candidates are
+    /// exhausted, with the last failure as the reason.
     /// </summary>
-    private bool TryOpenNextCandidate(out string error)
+    private OperationResult TryOpenNextCandidate()
     {
         string lastError = string.Empty;
         while (_candidateIndex < _candidates.Length)
@@ -191,67 +222,70 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
             // Hardware only: this decoder is asked for on the GPU when the caller required it and in software
             // when it did not, and it never decides that for itself — giving the requirement up is the
             // pipeline's decision, and it makes it by asking again.
-            nint context;
-            nint lockHandle = 0;
-            bool opened = _hardwareDecoding
-                ? TryOpenContext(name, codec, _parameters, hardware: true, _gpuDevice, _bufferedFrames, out context, out lockHandle, out lastError)
-                : TryOpenContext(name, codec, _parameters, hardware: false, gpuDevice: null, bufferedFrames: 0, out context, out lockHandle, out lastError);
+            //
+            // What is already open is released first: the attachment the next attempt makes is held by the same
+            // backend, so closing afterwards would release the new one instead of the old one.
+            CloseContext();
 
-            if (!opened)
+            nint context;
+            OperationResult<nint> opened = TryOpenContext(name, codec, _parameters, _hardwareBackend, _bufferedFrames);
+
+            if (!opened.IsSuccessful)
             {
+                lastError = opened.Message;
                 continue;
             }
+
+            context = opened.Result;
 
             nint receiveFrame = FFmpegNative.av_frame_alloc();
             if (receiveFrame == 0)
             {
                 FFmpegNative.avcodec_free_context(ref context);
-                FFmpegHardware.FreeLockHandle(lockHandle);
+                _hardwareBackend?.Detach();
                 lastError = "Unable to allocate an FFmpeg frame.";
                 continue;
             }
 
-            CloseContext();
-
             _context = context;
             _receiveFrame = receiveFrame;
-            _lockHandle = lockHandle;
             _decoderName = name;
             _hardware = false;
-            error = string.Empty;
-            return true;
+            return OperationResult.Success();
         }
 
-        error = string.IsNullOrEmpty(lastError) ? $"No FFmpeg decoder handles codec '{Stream.CodecId}'." : lastError;
-        return false;
+        return OperationResult.Failure(string.IsNullOrEmpty(lastError) ? $"No FFmpeg decoder handles codec '{Stream.CodecId}'." : lastError);
     }
 
     /// <summary>
-    /// Opens a codec context, either on the D3D11 device or without one. The context is owned by the
-    /// caller once this succeeds, and released here when it does not.
+    /// Opens a codec context, either on the device a hardware backend decodes with or without one. The context is owned
+    /// by the caller once this succeeds, and released here when it does not.
     /// </summary>
-    private static bool TryOpenContext(string name, nint codec, nint parameters, bool hardware, IGpuDevice? gpuDevice, int bufferedFrames, out nint context, out nint lockHandle, out string error)
+    private static OperationResult<nint> TryOpenContext(string name, nint codec, nint parameters, IFFmpegHardwareBackend? hardware, int bufferedFrames)
     {
-        lockHandle = 0;
-        context = FFmpegNative.avcodec_alloc_context3(codec);
+        OperationResultCreator<nint> result = new();
+
+        nint context = FFmpegNative.avcodec_alloc_context3(codec);
         if (context == 0)
         {
-            error = "Unable to allocate an FFmpeg codec context.";
-            return false;
+            return result.Failure("Unable to allocate an FFmpeg codec context.");
         }
 
-        int result = FFmpegNative.avcodec_parameters_to_context(context, parameters);
-        if (result < 0)
+        int applied = FFmpegNative.avcodec_parameters_to_context(context, parameters);
+        if (applied < 0)
         {
-            error = $"Unable to apply the stream's codec parameters: {FFmpegInterop.GetErrorMessage(result)}";
             FFmpegNative.avcodec_free_context(ref context);
-            return false;
+            return result.Failure($"Unable to apply the stream's codec parameters: {FFmpegInterop.GetErrorMessage(applied)}");
         }
 
-        if (hardware && !FFmpegHardware.TryAttachDevice(context, gpuDevice?.NativeDevice ?? 0, gpuDevice?.DeviceLock, out lockHandle, out error))
+        if (hardware is not null)
         {
-            FFmpegNative.avcodec_free_context(ref context);
-            return false;
+            OperationResult attached = hardware.TryAttach(context);
+            if (!attached.IsSuccessful)
+            {
+                FFmpegNative.avcodec_free_context(ref context);
+                return result.Failure(attached);
+            }
         }
 
         // A codec context asks for one thread unless it is told otherwise, and one thread is one core:
@@ -261,7 +295,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         // this well is doing.
         FFmpegNative.av_opt_set_int(context, "threads", DecoderThreadCount, SearchChildren);
 
-        if (hardware)
+        if (hardware is not null)
         {
             // Asked for before the decoder opens, because the pool is built from it: libavcodec allocates
             // extra_hw_frames more surfaces than the codec asks for, which is exactly the room the caller's
@@ -272,16 +306,14 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
             }
         }
 
-        result = FFmpegNative.avcodec_open2(context, codec, 0);
-        if (result < 0)
+        int opened = FFmpegNative.avcodec_open2(context, codec, 0);
+        if (opened < 0)
         {
-            error = $"Unable to open the '{name}' decoder: {FFmpegInterop.GetErrorMessage(result)}";
             FFmpegNative.avcodec_free_context(ref context);
-            return false;
+            return result.Failure($"Unable to open the '{name}' decoder: {FFmpegInterop.GetErrorMessage(opened)}");
         }
 
-        error = string.Empty;
-        return true;
+        return result.Success(context);
     }
 
     /// <summary>
@@ -311,7 +343,8 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         // A decoder that opened and then failed before producing a single frame is one this codec cannot
         // use — libavcodec's AV1 decoder has no software path — so the next candidate gets the same packet.
         // Nothing of the stream has been consumed yet, which is what makes handing the packet over safe.
-        if (!TrySwitchDecoder())
+        OperationResult switched = TrySwitchDecoder();
+        if (!switched.IsSuccessful)
         {
             return result;
         }
@@ -368,14 +401,14 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
     /// Moves to the next decoder the codec allows. Only safe before a frame was produced: nothing of the
     /// stream has been decoded yet, so the packet that failed is still the first thing the new one sees.
     /// </summary>
-    private bool TrySwitchDecoder()
+    private OperationResult TrySwitchDecoder()
     {
         if (_framesProduced > 0)
         {
-            return false;
+            return OperationResult.Failure("A decoder that has already produced a frame cannot be replaced.");
         }
 
-        return TryOpenNextCandidate(out _);
+        return TryOpenNextCandidate();
     }
 
     public OperationResult Drain(out IReadOnlyList<RawVideoFrame> frames)
@@ -421,6 +454,8 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
 
         CloseContext();
 
+        _hardwareBackend?.Dispose();
+        _hardwareBackend = null;
         _source = null;
         _parameters = 0;
     }
@@ -445,11 +480,9 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
             FFmpegNative.avcodec_free_context(ref context);
         }
 
-        // The lock handle keeps the renderer's lock object alive for as long as libavcodec could call it, so
-        // it is released only once the context that holds those callbacks is gone.
-        nint lockHandle = _lockHandle;
-        _lockHandle = 0;
-        FFmpegHardware.FreeLockHandle(lockHandle);
+        // What the attachment holds is reached by callbacks the context owned — the renderer's lock object among them —
+        // so it is released only once the context that holds those callbacks is gone.
+        _hardwareBackend?.Detach();
     }
 
     private OperationResult ReceiveFrames(List<RawVideoFrame> frames)
@@ -467,37 +500,36 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
                 return OperationResult.Failure($"Unable to receive a decoded frame: {FFmpegInterop.GetErrorMessage(result)}");
             }
 
-            if (!TryTakeFrame(out RawVideoFrame? frame, out string frameError) || frame is null)
+            OperationResult<RawVideoFrame> taken = TryTakeFrame();
+            if (!taken.IsSuccessful)
             {
-                return OperationResult.Failure(frameError);
+                return OperationResult.Failure(taken);
             }
 
-            frames.Add(frame);
+            frames.Add(taken.Result);
             _framesProduced++;
         }
     }
 
-    private bool TryTakeFrame(out RawVideoFrame? frame, out string error)
+    private OperationResult<RawVideoFrame> TryTakeFrame()
     {
-        frame = null;
-        error = string.Empty;
+        OperationResultCreator<RawVideoFrame> result = new();
 
-        bool hardware = GetFrameFormat(_receiveFrame) == FFmpegHardware.PixelFormatD3D11;
+        bool hardware = _hardwareBackend is not null && GetFrameFormat(_receiveFrame) == _hardwareBackend.FramePixelFormat;
         if (hardware)
         {
             _hardware = true;
 
             if (_gpuFrames)
             {
-                return TryTakeGpuFrame(out frame, out error);
+                return TryTakeGpuFrame();
             }
         }
 
         nint owned = FFmpegNative.av_frame_alloc();
         if (owned == 0)
         {
-            error = "Unable to allocate an FFmpeg frame.";
-            return false;
+            return result.Failure("Unable to allocate an FFmpeg frame.");
         }
 
         if (hardware)
@@ -510,13 +542,12 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
             // picture's own timing is carried across by hand for that reason — without it the first frames of
             // every hardware-decoded file are stamped with the wrong moment and the clock anchors to them.
             long sourcePts = GetFrameTimestamp(_receiveFrame);
-            int result = FFmpegNative.av_hwframe_transfer_data(owned, _receiveFrame, 0);
+            int transferred = FFmpegNative.av_hwframe_transfer_data(owned, _receiveFrame, 0);
             FFmpegNative.av_frame_unref(_receiveFrame);
-            if (result < 0)
+            if (transferred < 0)
             {
                 FFmpegNative.av_frame_free(ref owned);
-                error = $"Unable to copy a decoded frame out of the GPU: {FFmpegInterop.GetErrorMessage(result)}";
-                return false;
+                return result.Failure($"Unable to copy a decoded frame out of the GPU: {FFmpegInterop.GetErrorMessage(transferred)}");
             }
 
             unsafe
@@ -533,7 +564,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         var format = FFmpegInterop.ToPixelFormat(GetFrameFormat(owned));
         _outputFormat = format;
 
-        frame = new RawVideoFrame
+        return result.Success(new RawVideoFrame
         {
             Timestamp = ResolveTimestamp(owned),
             Duration = _frameDuration,
@@ -542,34 +573,37 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
             Format = format,
             IsHardwareBacked = false,
             Buffer = new FFmpegVideoFrameBuffer(owned, FFmpegInterop.GetPlaneCount(format)),
-        };
-        return true;
+        });
     }
 
     /// <summary>
     /// Hands a hardware frame out as the texture it already is. Nothing is copied: the frame keeps the
     /// reference to the texture libavcodec wrote, and disposing the frame is what gives it back.
     /// </summary>
-    private bool TryTakeGpuFrame(out RawVideoFrame? frame, out string error)
+    private OperationResult<RawVideoFrame> TryTakeGpuFrame()
     {
-        frame = null;
-        error = string.Empty;
+        OperationResultCreator<RawVideoFrame> result = new();
 
         nint owned = FFmpegNative.av_frame_alloc();
         if (owned == 0)
         {
-            error = "Unable to allocate an FFmpeg frame.";
-            return false;
+            return result.Failure("Unable to allocate an FFmpeg frame.");
         }
 
         FFmpegNative.av_frame_move_ref(owned, _receiveFrame);
 
         // The frame's own format is the hardware one; the layout of the pixels inside the texture is what
         // the frames context says it holds.
-        var format = FFmpegInterop.ToPixelFormat(FFmpegHardware.ReadHardwareFrameFormat(_context));
+        if (!FFmpegHardwareFrames.TryReadLayout(_context, out int layout))
+        {
+            FFmpegNative.av_frame_free(ref owned);
+            return result.Failure($"'{Name}' produced a frame with no frames context, so there is no texture layout to report.");
+        }
+
+        var format = FFmpegInterop.ToPixelFormat(layout);
         _outputFormat = format;
 
-        frame = new RawVideoFrame
+        return result.Success(new RawVideoFrame
         {
             Timestamp = ResolveTimestamp(owned),
             Duration = _frameDuration,
@@ -578,8 +612,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
             Format = format,
             IsHardwareBacked = true,
             Buffer = new FFmpegGpuVideoFrameBuffer(owned),
-        };
-        return true;
+        });
     }
 
     private TimeSpan ResolveTimestamp(nint frame)

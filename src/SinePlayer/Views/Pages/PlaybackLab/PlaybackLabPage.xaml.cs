@@ -589,9 +589,10 @@ internal sealed partial class PlaybackLabPage : BasePage
 
             List<ComponentChoice> audioRenderers = [];
             List<IComponentFactory> allAudioRenderers = [];
-            if (WasapiAudioEndpoints.TryGetRenderEndpoints(out IReadOnlyList<WasapiAudioEndpoint> endpoints, out string error))
+            OperationResult<IReadOnlyList<WasapiAudioEndpoint>> endpoints = WasapiAudioEndpoints.TryGetRenderEndpoints();
+            if (endpoints.IsSuccessful)
             {
-                foreach (WasapiAudioEndpoint endpoint in endpoints)
+                foreach (WasapiAudioEndpoint endpoint in endpoints.Result)
                 {
                     IAudioRendererFactory device = WasapiAudioRendererFactory.For(endpoint);
                     allAudioRenderers.Add(device);
@@ -602,7 +603,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
             else
             {
-                Logger.E(TAG, $"Unable to list the audio output devices. {error}");
+                Logger.E(TAG, $"Unable to list the audio output devices. {endpoints.ErrorMessage}");
             }
 
             if (audioRenderers.Count == 0)

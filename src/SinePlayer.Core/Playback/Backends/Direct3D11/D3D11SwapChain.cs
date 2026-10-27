@@ -76,10 +76,10 @@ internal sealed class D3D11SwapChain : IDisposable
     /// <param name="width">Buffer width in physical pixels, as the host's scale requires.</param>
     /// <param name="height">Buffer height in physical pixels, as the host's scale requires.</param>
     /// <param name="compositionScale">The scale the host's element will apply when it composes this swap chain.</param>
-    internal static bool TryCreate(D3D11Device device, int width, int height, double compositionScale, [NotNullWhen(true)] out D3D11SwapChain? swapChain, out string error)
+    internal static OperationResult<D3D11SwapChain> TryCreate(D3D11Device device, int width, int height, double compositionScale)
     {
         // A picture covers its whole surface, so what is behind it is never meant to show through.
-        return TryCreate(device, width, height, compositionScale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE, out swapChain, out error);
+        return TryCreate(device, width, height, compositionScale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE);
     }
 
     /// <param name="alphaMode">
@@ -87,9 +87,10 @@ internal sealed class D3D11SwapChain : IDisposable
     /// subtitles over a picture — has to be premultiplied, or its "nothing here" pixels arrive as opaque black and hide
     /// what is underneath.
     /// </param>
-    internal static bool TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode, [NotNullWhen(true)] out D3D11SwapChain? swapChain, out string error)
+    internal static OperationResult<D3D11SwapChain> TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode)
     {
-        swapChain = null;
+        OperationResultCreator<D3D11SwapChain> result = new();
+
         width = Math.Max(1, width);
         height = Math.Max(1, height);
         compositionScale = NormalizeScale(compositionScale);
@@ -100,8 +101,7 @@ internal sealed class D3D11SwapChain : IDisposable
             HRESULT factoryResult = PInvoke.CreateDXGIFactory2(default, factoryId, out object factoryObject);
             if (factoryResult.Value < 0 || factoryObject is not IDXGIFactory2 factory)
             {
-                error = $"Unable to create a DXGI factory: {factoryResult}";
-                return false;
+                return result.Failure($"Unable to create a DXGI factory: {factoryResult}");
             }
 
             DXGI_SWAP_CHAIN_DESC1 description = new()
@@ -120,27 +120,24 @@ internal sealed class D3D11SwapChain : IDisposable
             Graphics_Dxgi_IDXGIFactory2_Extensions.CreateSwapChainForComposition(factory, device.Device, description, null, out IDXGISwapChain1 created);
             if (created is null)
             {
-                error = "Unable to create a composition swap chain.";
-                return false;
+                return result.Failure("Unable to create a composition swap chain.");
             }
 
-            if (!TrySetCompositionScale(created, compositionScale, out error))
+            OperationResult scaled = TrySetCompositionScale(created, compositionScale);
+            if (!scaled.IsSuccessful)
             {
                 D3D11Interop.Release(created);
-                return false;
+                return result.Failure(scaled);
             }
 
             ID3D11Texture2D backBuffer = GetBackBuffer(created);
             ID3D11RenderTargetView view = D3D11Interop.CreateRenderTargetView(device.Device, backBuffer);
 
-            swapChain = new D3D11SwapChain(device, created, backBuffer, view, width, height, compositionScale);
-            error = string.Empty;
-            return true;
+            return result.Success(new D3D11SwapChain(device, created, backBuffer, view, width, height, compositionScale));
         }
         catch (Exception exception)
         {
-            error = $"Unable to create a composition swap chain: {exception.Message}";
-            return false;
+            return result.Failure($"Unable to create a composition swap chain: {exception.Message}");
         }
     }
 
@@ -206,9 +203,10 @@ internal sealed class D3D11SwapChain : IDisposable
 
             _swapChain!.ResizeBuffers(BufferCount, (uint)width, (uint)height, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM, default);
 
-            if (!TrySetCompositionScale(_swapChain, compositionScale, out string error))
+            OperationResult scaled = TrySetCompositionScale(_swapChain, compositionScale);
+            if (!scaled.IsSuccessful)
             {
-                return OperationResult.Failure(error);
+                return scaled;
             }
 
             _backBuffer = GetBackBuffer(_swapChain);
@@ -258,14 +256,11 @@ internal sealed class D3D11SwapChain : IDisposable
     /// Cancels the scale the host's element applies when it composes the swap chain, so a buffer of
     /// physical pixels lands on the display one pixel to one pixel.
     /// </summary>
-    private static unsafe bool TrySetCompositionScale(IDXGISwapChain1 swapChain, double compositionScale, out string error)
+    private static unsafe OperationResult TrySetCompositionScale(IDXGISwapChain1 swapChain, double compositionScale)
     {
-        error = string.Empty;
-
         if (swapChain is not IDXGISwapChain2 swapChain2)
         {
-            error = "The swap chain does not support a transform, so it cannot be shown at device resolution.";
-            return false;
+            return OperationResult.Failure("The swap chain does not support a transform, so it cannot be shown at device resolution.");
         }
 
         float inverse = (float)(1.0 / compositionScale);
@@ -281,11 +276,10 @@ internal sealed class D3D11SwapChain : IDisposable
         }
         catch (Exception exception)
         {
-            error = $"Unable to cancel the display scale on the swap chain: {exception.Message}";
-            return false;
+            return OperationResult.Failure($"Unable to cancel the display scale on the swap chain: {exception.Message}");
         }
 
-        return true;
+        return OperationResult.Success();
     }
 
     private static double NormalizeScale(double scale)

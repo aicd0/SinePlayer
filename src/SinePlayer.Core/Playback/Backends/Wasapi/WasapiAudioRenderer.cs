@@ -83,11 +83,14 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         ArgumentNullException.ThrowIfNull(stream);
 
         OperationResultCreator<AudioStreamInfo> result = new();
-        if (!TryGetEndpointChannelCount(out int channels, out string error))
+
+        OperationResult<int> endpointChannels = TryGetEndpointChannelCount();
+        if (!endpointChannels.IsSuccessful)
         {
-            return result.Failure(error);
+            return result.Failure(endpointChannels);
         }
 
+        int channels = endpointChannels.Result;
         if (channels <= 0 || channels >= stream.ChannelCount)
         {
             return result.Success(stream);
@@ -138,10 +141,13 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
             return OperationResult.Failure("The renderer has already been disposed.");
         }
 
-        if (!WasapiAudioFormat.TryDescribe(stream, out WasapiAudioFormat.Descriptor format, out string descriptionError))
+        OperationResult<WasapiAudioFormat.Descriptor> described = WasapiAudioFormat.TryDescribe(stream);
+        if (!described.IsSuccessful)
         {
-            return OperationResult.Failure(descriptionError);
+            return OperationResult.Failure(described);
         }
+
+        WasapiAudioFormat.Descriptor format = described.Result;
 
         Release();
 
@@ -254,12 +260,14 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         // but bytes, so the caller's buffer is free the moment this returns; and the conversion cannot fail
         // halfway through a device write, where the failure would be indistinguishable from a short one.
         byte[] staging = ArrayPool<byte>.Shared.Rent(required);
-        if (!AudioInterleaver.TryInterleave(buffer, staging, out int byteCount, out string error))
+        OperationResult<int> interleaved = AudioInterleaver.TryInterleave(buffer, staging);
+        if (!interleaved.IsSuccessful)
         {
             ArrayPool<byte>.Shared.Return(staging);
-            return new FinishedAudioSubmit(OperationResult.Failure(error));
+            return new FinishedAudioSubmit(OperationResult.Failure(interleaved));
         }
 
+        int byteCount = interleaved.Result;
         if (byteCount != required)
         {
             ArrayPool<byte>.Shared.Return(staging);
@@ -353,14 +361,13 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
     /// one to leave the conversion to, rather than one to guess a layout for. The answer is kept because it is a
     /// property of the device rather than of a stream, and asking opens a client of its own.
     /// </summary>
-    private unsafe bool TryGetEndpointChannelCount(out int channelCount, out string error)
+    private unsafe OperationResult<int> TryGetEndpointChannelCount()
     {
-        channelCount = 0;
-        error = string.Empty;
+        OperationResultCreator<int> result = new();
+
         if (_deviceChannelCount is int known)
         {
-            channelCount = known;
-            return true;
+            return result.Success(known);
         }
 
         int channels;
@@ -394,13 +401,11 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         {
             // Not remembered: a device that has gone away can come back, and a cached "no" would outlive it.
             PlaybackLogger.W(TAG, $"Unable to read the format the audio device mixes in: {exception.Message}");
-            error = $"Unable to reach the audio output device: {exception.Message}";
-            return false;
+            return result.Failure($"Unable to reach the audio output device: {exception.Message}");
         }
 
         _deviceChannelCount = channels;
-        channelCount = channels;
-        return true;
+        return result.Success(channels);
     }
 
     private static unsafe void InitializeStream(IAudioClient client, WasapiAudioFormat.Descriptor format)

@@ -18,13 +18,15 @@ public sealed class FFmpegSourceProviderFactory : ISourceProviderFactory
     {
         ArgumentNullException.ThrowIfNull(locator);
 
-        if (!FFmpegSource.TryOpen(locator, out FFmpegSource? ffmpegSource, out string error))
+        source = null;
+
+        OperationResult<FFmpegSource> opened = FFmpegSource.TryOpen(locator);
+        if (!opened.IsSuccessful)
         {
-            source = null;
-            return OperationResult.Failure(error);
+            return OperationResult.Failure(opened);
         }
 
-        source = ffmpegSource;
+        source = opened.Result;
         return OperationResult.Success();
     }
 }

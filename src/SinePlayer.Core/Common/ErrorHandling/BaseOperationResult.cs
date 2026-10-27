@@ -12,7 +12,7 @@ public abstract partial class BaseOperationResult(bool isSuccessful)
     public required Exception? Exception { get; init; }
     public required bool IsFatal { get; init; }
 
-    public string DetailedErrorMessage
+    public string ErrorMessage
     {
         get
         {

@@ -4,6 +4,7 @@
 using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Backends.Wasapi;
 
@@ -24,12 +25,12 @@ public class AudioInterleaverTests
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Int16, 2, 2, [source]);
         byte[] destination = new byte[source.Length];
 
-        bool interleaved = AudioInterleaver.TryInterleave(buffer, destination, out int byteCount, out string error);
+        OperationResult<int> interleaved = AudioInterleaver.TryInterleave(buffer, destination);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(interleaved, Is.True, error);
-            Assert.That(byteCount, Is.EqualTo(source.Length));
+            Assert.That(interleaved.IsSuccessful, Is.True, interleaved.Message);
+            Assert.That(interleaved.Result, Is.EqualTo(source.Length));
             Assert.That(destination, Is.EqualTo(source));
         }
     }
@@ -43,12 +44,12 @@ public class AudioInterleaverTests
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, 2, 2, [left, right]);
         byte[] destination = new byte[left.Length + right.Length];
 
-        bool interleaved = AudioInterleaver.TryInterleave(buffer, destination, out int byteCount, out string error);
+        OperationResult<int> interleaved = AudioInterleaver.TryInterleave(buffer, destination);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(interleaved, Is.True, error);
-            Assert.That(byteCount, Is.EqualTo(destination.Length));
+            Assert.That(interleaved.IsSuccessful, Is.True, interleaved.Message);
+            Assert.That(interleaved.Result, Is.EqualTo(destination.Length));
             Assert.That(destination, Is.EqualTo(new byte[]
             {
                 0x11, 0x11, 0x11, 0x11, 0x33, 0x33, 0x33, 0x33,
@@ -65,12 +66,14 @@ public class AudioInterleaverTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(AudioInterleaver.TryInterleave(buffer, new byte[4], out _, out string small), Is.False);
-            Assert.That(small, Does.Contain("needed"));
+            OperationResult<int> small = AudioInterleaver.TryInterleave(buffer, new byte[4]);
+            Assert.That(small.IsSuccessful, Is.False);
+            Assert.That(small.Message, Does.Contain("needed"));
 
             using RawAudioBuffer mismatched = CreateBuffer(AudioSampleFormat.Int16, 4, 2, [new byte[16], new byte[16]]);
-            Assert.That(AudioInterleaver.TryInterleave(mismatched, new byte[16], out _, out string planes), Is.False);
-            Assert.That(planes, Does.Contain("plane"));
+            OperationResult<int> planes = AudioInterleaver.TryInterleave(mismatched, new byte[16]);
+            Assert.That(planes.IsSuccessful, Is.False);
+            Assert.That(planes.Message, Does.Contain("plane"));
         }
     }
 

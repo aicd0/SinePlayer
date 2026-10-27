@@ -3,6 +3,8 @@
 
 using System.Runtime.InteropServices;
 
+using SinePlayer.Core.Common.ErrorHandling;
+
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Media.Audio;
@@ -33,9 +35,10 @@ public static class WasapiAudioEndpoints
     /// list rather than an error, because "nothing to play through" is a fact about the machine rather than a
     /// failure of the question.
     /// </summary>
-    public static bool TryGetRenderEndpoints(out IReadOnlyList<WasapiAudioEndpoint> endpoints, out string error)
+    public static OperationResult<IReadOnlyList<WasapiAudioEndpoint>> TryGetRenderEndpoints()
     {
-        endpoints = [];
+        OperationResultCreator<IReadOnlyList<WasapiAudioEndpoint>> result = new();
+
         try
         {
             // The engine creates its objects on threads of its own, and a caller may reach this from any of
@@ -93,14 +96,11 @@ public static class WasapiAudioEndpoints
                 found.Insert(0, defaultEndpoint);
             }
 
-            endpoints = found;
-            error = string.Empty;
-            return true;
+            return result.Success(found);
         }
         catch (Exception exception)
         {
-            error = $"Unable to list the audio output devices: {exception.Message}";
-            return false;
+            return result.Failure($"Unable to list the audio output devices: {exception.Message}");
         }
     }
 

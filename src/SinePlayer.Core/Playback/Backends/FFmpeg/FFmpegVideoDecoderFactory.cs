@@ -45,12 +45,13 @@ public sealed class FFmpegVideoDecoderFactory : IVideoDecoderFactory
             // Frames stay on the GPU only when the decoder has the pipeline's device: a texture is readable by the
             // device that wrote it, so one decoded on a device of its own would have to be copied back first.
             bool gpuFrames = options.GpuDevice is not null;
-            if (!FFmpegVideoDecoder.TryCreate(source, stream, options.HardwareDecoding, gpuFrames, options.GpuDevice, options.BufferedFrames, out FFmpegVideoDecoder? ffmpegDecoder, out string error))
+            OperationResult<FFmpegVideoDecoder> decoder = FFmpegVideoDecoder.TryCreate(source, stream, options.HardwareDecoding, gpuFrames, options.GpuDevice, options.BufferedFrames);
+            if (!decoder.IsSuccessful)
             {
-                return OperationResult.Failure(error);
+                return OperationResult.Failure(decoder);
             }
 
-            component = ffmpegDecoder;
+            component = decoder.Result;
             return OperationResult.Success();
         }
     }
