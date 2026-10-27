@@ -3,6 +3,7 @@
 
 using System.Runtime.InteropServices;
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 
 namespace SinePlayer.Core.Playback.Backends.Wasapi;
@@ -14,37 +15,32 @@ namespace SinePlayer.Core.Playback.Backends.Wasapi;
 /// </summary>
 internal static class AudioInterleaver
 {
-    internal static bool TryInterleave(RawAudioBuffer buffer, byte[] destination, out int byteCount, out string error)
+    internal static OperationResult<int> TryInterleave(RawAudioBuffer buffer, byte[] destination)
     {
-        byteCount = 0;
-        error = string.Empty;
+        OperationResultCreator<int> result = new();
 
         if (buffer.Buffer is not IPlanarAudioBuffer planar)
         {
-            error = "The audio buffer does not expose its planes.";
-            return false;
+            return result.Failure("The audio buffer does not expose its planes.");
         }
 
         int bytesPerSample = WasapiAudioFormat.GetBytesPerSample(buffer.SampleFormat);
         if (bytesPerSample <= 0)
         {
-            error = $"The sample format '{buffer.SampleFormat}' has no sample size.";
-            return false;
+            return result.Failure($"The sample format '{buffer.SampleFormat}' has no sample size.");
         }
 
         int channels = buffer.ChannelCount;
         int samples = buffer.SampleCount;
         if (channels <= 0 || samples <= 0)
         {
-            error = "The audio buffer holds no samples.";
-            return false;
+            return result.Failure("The audio buffer holds no samples.");
         }
 
         int required = bytesPerSample * channels * samples;
         if (destination.Length < required)
         {
-            error = $"The destination holds {destination.Length} byte(s) but {required} are needed.";
-            return false;
+            return result.Failure($"The destination holds {destination.Length} byte(s) but {required} are needed.");
         }
 
         if (planar.PlaneCount == 1)
@@ -53,19 +49,16 @@ internal static class AudioInterleaver
             int available = planar.GetPlaneByteCount(0);
             if (source == 0 || available < required)
             {
-                error = $"The source holds {available} byte(s) but {required} are needed.";
-                return false;
+                return result.Failure($"The source holds {available} byte(s) but {required} are needed.");
             }
 
             Marshal.Copy(source, destination, 0, required);
-            byteCount = required;
-            return true;
+            return result.Success(required);
         }
 
         if (planar.PlaneCount < channels)
         {
-            error = $"The source has {planar.PlaneCount} plane(s) for {channels} channel(s).";
-            return false;
+            return result.Failure($"The source has {planar.PlaneCount} plane(s) for {channels} channel(s).");
         }
 
         Span<byte> output = destination.AsSpan(0, required);
@@ -74,8 +67,7 @@ internal static class AudioInterleaver
             nint plane = planar.GetPlanePointer(channel);
             if (plane == 0 || planar.GetPlaneByteCount(channel) < bytesPerSample * samples)
             {
-                error = $"Plane {channel} does not hold {samples} sample(s).";
-                return false;
+                return result.Failure($"Plane {channel} does not hold {samples} sample(s).");
             }
 
             for (int sample = 0; sample < samples; sample++)
@@ -89,7 +81,6 @@ internal static class AudioInterleaver
             }
         }
 
-        byteCount = required;
-        return true;
+        return result.Success(required);
     }
 }

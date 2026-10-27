@@ -31,13 +31,13 @@ public class D3D11PlanarRendererTests
     [SetUp]
     public void SetUp()
     {
-        bool deviceCreated = D3D11Device.TryCreate(out D3D11Device? device, out string deviceError);
-        Assert.That(deviceCreated, Is.True, deviceError);
-        _device = device!;
+        OperationResult<D3D11Device> deviceCreated = D3D11Device.TryCreate();
+        Assert.That(deviceCreated.IsSuccessful, Is.True, deviceCreated.Message);
+        _device = deviceCreated.Result;
 
-        bool rendererCreated = D3D11VideoRenderer.TryCreate(_device, out D3D11VideoRenderer? renderer, out string rendererError);
-        Assert.That(rendererCreated, Is.True, rendererError);
-        _renderer = renderer!;
+        OperationResult<D3D11VideoRenderer> rendererCreated = D3D11VideoRenderer.TryCreate(_device);
+        Assert.That(rendererCreated.IsSuccessful, Is.True, rendererCreated.Message);
+        _renderer = rendererCreated.Result;
     }
 
     [TearDown]
@@ -100,6 +100,90 @@ public class D3D11PlanarRendererTests
         byte[] pixels = Render(PixelFormat.Yuv420P, buffer);
 
         AssertPixel(pixels, 0, 0, 0, 0);
+    }
+
+    /// <summary>
+    /// 4:2:2 keeps every row of chroma and halves only its width. It is the same three channels as 4:2:0, so the
+    /// planar shader draws it: only the sizes of the textures the renderer allocates differ.
+    /// </summary>
+    [Test]
+    public void ConvertsPlanarYuv422ToWhite()
+    {
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [0xEB]),
+            ((Width + 1) / 2, Height, 1, (_, _) => [0x80]),
+            ((Width + 1) / 2, Height, 1, (_, _) => [0x80]));
+
+        byte[] pixels = Render(PixelFormat.Yuv422P, buffer);
+
+        AssertPixel(pixels, 0, 255, 255, 255);
+        AssertPixel(pixels, (Width * Height) - 1, 255, 255, 255);
+    }
+
+    [Test]
+    public void ConvertsPlanarYuv422ToRed()
+    {
+        // Every row carries chroma here, so a colour that varies down the picture is told apart from 4:2:0.
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [0x51]),
+            ((Width + 1) / 2, Height, 1, (_, _) => [0x5A]),
+            ((Width + 1) / 2, Height, 1, (_, _) => [0xF0]));
+
+        byte[] pixels = Render(PixelFormat.Yuv422P, buffer);
+
+        AssertPixel(pixels, (Width * Height) - 1, 255, 0, 0);
+    }
+
+    /// <summary>
+    /// 4:4:4 keeps chroma whole, so a picture whose colour changes every pixel down to the last column is the case
+    /// a half-width chroma plane would get wrong.
+    /// </summary>
+    [Test]
+    public void ConvertsPlanarYuv444ToWhite()
+    {
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [0xEB]),
+            (Width, Height, 1, (_, _) => [0x80]),
+            (Width, Height, 1, (_, _) => [0x80]));
+
+        byte[] pixels = Render(PixelFormat.Yuv444P, buffer);
+
+        AssertPixel(pixels, 0, 255, 255, 255);
+        AssertPixel(pixels, (Width * Height) - 1, 255, 255, 255);
+    }
+
+    [Test]
+    public void ConvertsPlanarYuv444ToRed()
+    {
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [0x51]),
+            (Width, Height, 1, (_, _) => [0x5A]),
+            (Width, Height, 1, (_, _) => [0xF0]));
+
+        byte[] pixels = Render(PixelFormat.Yuv444P, buffer);
+
+        AssertPixel(pixels, (Width * Height) - 1, 255, 0, 0);
+    }
+
+    /// <summary>
+    /// A packed frame carries its channels in the order the texture format names, and the packed shader hands them
+    /// on unchanged — so a red-first buffer viewed as a blue-first texture would show its reds and blues exchanged.
+    /// </summary>
+    [Test]
+    public void KeepsPackedChannelOrder()
+    {
+        // Red, green, blue, opaque, in the byte order the layout names.
+        using PlanarFrameBuffer red = new((Width, Height, 4, (_, _) => [0xFF, 0x00, 0x00, 0xFF]));
+        using PlanarFrameBuffer green = new((Width, Height, 4, (_, _) => [0x00, 0xFF, 0x00, 0xFF]));
+        using PlanarFrameBuffer blue = new((Width, Height, 4, (_, _) => [0x00, 0x00, 0xFF, 0xFF]));
+
+        AssertPixel(Render(PixelFormat.Rgba8, red), 0, 255, 0, 0);
+        AssertPixel(Render(PixelFormat.Rgba8, green), 0, 0, 255, 0);
+        AssertPixel(Render(PixelFormat.Rgba8, blue), 0, 0, 0, 255);
+
+        // The blue-first layout is the same bytes read from the other end, which is the case that has to stay right.
+        using PlanarFrameBuffer bgra = new((Width, Height, 4, (_, _) => [0xFF, 0x00, 0x00, 0xFF]));
+        AssertPixel(Render(PixelFormat.Bgra8, bgra), 0, 0, 0, 255);
     }
 
     [Test]
@@ -191,26 +275,47 @@ public class D3D11PlanarRendererTests
     }
 
     /// <summary>
-    /// A ten-bit frame that is still a texture is drawn rather than refused. The texture of a hardware decoder is
-    /// P010, whose planes only cast to sixteen-bit views, and that is what the failure this covers looked like:
-    /// "the Direct3D renderer cannot display P010 frames that are still on the GPU".
+    /// Every layout the renderer claims a decoder may keep on the device is one it can actually draw from. The claim
+    /// and the casting are two readings of the same table, and this is what keeps them one: a layout added to the claim
+    /// without a texture format behind it would pass the pre-check and then be refused on every frame that arrived,
+    /// which looks like a decoder fault rather than this one.
     /// </summary>
-    [Test]
-    public void DrawsATenBitFrameThatIsStillOnTheGpu()
+    [TestCase(PixelFormat.Nv12, DXGI_FORMAT.DXGI_FORMAT_NV12)]
+    [TestCase(PixelFormat.P010, DXGI_FORMAT.DXGI_FORMAT_P010)]
+    [TestCase(PixelFormat.P016, DXGI_FORMAT.DXGI_FORMAT_P016)]
+    public void DrawsEveryLayoutItClaimsItCanDraw(PixelFormat layout, DXGI_FORMAT textureFormat)
     {
-        using P010Texture texture = new(_device, Width, Height);
+        Assert.That(_renderer.CanDisplayGpuFrame(layout).IsSuccessful, Is.True, "the layout is claimed");
+
+        using GpuTexture texture = new(_device, textureFormat, Width, Height);
 
         using FakeGpuBuffer gpuBuffer = new(texture.Native);
-        using var frame = new RawVideoFrame
+        using RawVideoFrame frame = CreateGpuFrame(gpuBuffer, layout);
+
+        using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
+        _renderer.SetOutput(target.View, Width, Height);
+
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+
+        using (Assert.EnterMultipleScope())
         {
-            Timestamp = TimeSpan.Zero,
-            Duration = TimeSpan.FromMilliseconds(40),
-            Width = Width,
-            Height = Height,
-            Format = PixelFormat.P010,
-            Buffer = gpuBuffer,
-            IsHardwareBacked = true,
-        };
+            Assert.That(result.IsSuccessful, Is.True, $"the claim has to be one the draw can keep: {result.Message}");
+            Assert.That(target.ReadPixels(_device), Has.Length.EqualTo(Width * Height * 4), "the picture was drawn into the whole surface");
+        }
+    }
+
+    /// <summary>
+    /// The layout is the texture's own. A frame that misreports it — a decoder's twelve-bit stream reports P016 for
+    /// a P010-shaped pool, and a decoder bug can report anything — is drawn from what the texture actually holds
+    /// rather than from the description, which is the only description that cannot drift.
+    /// </summary>
+    [Test]
+    public void DrawsFromTheTextureFormatRatherThanTheReportedOne()
+    {
+        using GpuTexture texture = new(_device, DXGI_FORMAT.DXGI_FORMAT_NV12, Width, Height);
+
+        using FakeGpuBuffer gpuBuffer = new(texture.Native);
+        using RawVideoFrame frame = CreateGpuFrame(gpuBuffer, PixelFormat.P010);
 
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
         _renderer.SetOutput(target.View, Width, Height);
@@ -218,7 +323,48 @@ public class D3D11PlanarRendererTests
         OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
-        Assert.That(target.ReadPixels(_device), Has.Length.EqualTo(Width * Height * 4));
+    }
+
+    /// <summary>
+    /// A texture whose layout DXGI defines no plane views for is refused, and the refusal names the format that
+    /// arrived rather than the one the frame claimed.
+    /// </summary>
+    [Test]
+    public void RefusesATextureItCannotCast()
+    {
+        using GpuTexture texture = new(_device, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM, Width, Height);
+
+        using FakeGpuBuffer gpuBuffer = new(texture.Native);
+        using RawVideoFrame frame = CreateGpuFrame(gpuBuffer);
+
+        using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
+        _renderer.SetOutput(target.View, Width, Height);
+
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.IsSuccessful, Is.False);
+            Assert.That(result.Message, Does.Contain("B8G8R8A8_UNORM"));
+        }
+    }
+
+    /// <summary>
+    /// The layouts a decoder is allowed to keep on the device are the ones the draw can sample. Asked before a frame
+    /// exists, which is why it is about a layout and not about a texture.
+    /// </summary>
+    [Test]
+    public void AnswersWhichLayoutsItCanDrawFromTheDevice()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(_renderer.CanDisplayGpuFrame(PixelFormat.Nv12).IsSuccessful, Is.True);
+            Assert.That(_renderer.CanDisplayGpuFrame(PixelFormat.P010).IsSuccessful, Is.True);
+            Assert.That(_renderer.CanDisplayGpuFrame(PixelFormat.P016).IsSuccessful, Is.True);
+            Assert.That(_renderer.CanDisplayGpuFrame(PixelFormat.Yuv422P).IsSuccessful, Is.False);
+            Assert.That(_renderer.CanDisplayGpuFrame(PixelFormat.Yuv444P).IsSuccessful, Is.False);
+            Assert.That(_renderer.CanDisplayGpuFrame(PixelFormat.Unknown).IsSuccessful, Is.False);
+        }
     }
 
     /// <summary>
@@ -311,7 +457,7 @@ public class D3D11PlanarRendererTests
     [Test]
     public void RefusesAHardwareFrameItCannotKeepAlive()
     {
-        using P010Texture texture = new(_device, Width, Height);
+        using GpuTexture texture = new(_device, DXGI_FORMAT.DXGI_FORMAT_P010, Width, Height);
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
         _renderer.SetOutput(target.View, Width, Height);
 
@@ -333,7 +479,7 @@ public class D3D11PlanarRendererTests
         }
     }
 
-    private static RawVideoFrame CreateGpuFrame(IGpuVideoBuffer buffer, int? width = null)
+    private static RawVideoFrame CreateGpuFrame(IGpuVideoBuffer buffer, PixelFormat format = PixelFormat.P010, int? width = null)
     {
         return new RawVideoFrame
         {
@@ -341,22 +487,22 @@ public class D3D11PlanarRendererTests
             Duration = TimeSpan.FromMilliseconds(40),
             Width = width ?? Width,
             Height = Height,
-            Format = PixelFormat.P010,
+            Format = format,
             Buffer = buffer,
             IsHardwareBacked = true,
         };
     }
 
     /// <summary>
-    /// A P010 texture with two slices, the way a hardware decoder hands one over: the renderer views a slice of it,
+    /// A texture with two slices, the way a hardware decoder hands one over: the renderer views a slice of it,
     /// so the array has to be a real one for the view to be created.
     /// </summary>
-    private sealed class P010Texture : IDisposable
+    private sealed class GpuTexture : IDisposable
     {
         private readonly ID3D11Texture2D _texture;
         private bool _disposed;
 
-        internal P010Texture(D3D11Device device, int width, int height)
+        internal GpuTexture(D3D11Device device, DXGI_FORMAT format, int width, int height)
         {
             D3D11_TEXTURE2D_DESC description = new()
             {
@@ -364,7 +510,7 @@ public class D3D11PlanarRendererTests
                 Height = (uint)height,
                 MipLevels = 1,
                 ArraySize = 2,
-                Format = DXGI_FORMAT.DXGI_FORMAT_P010,
+                Format = format,
                 SampleDesc = new DXGI_SAMPLE_DESC { Count = 1 },
                 Usage = D3D11_USAGE.D3D11_USAGE_DEFAULT,
                 BindFlags = D3D11_BIND_FLAG.D3D11_BIND_SHADER_RESOURCE,

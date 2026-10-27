@@ -39,12 +39,13 @@ public sealed class FFmpegSubtitleDecoderFactory : ISubtitleDecoderFactory
         {
             component = null;
 
-            if (!FFmpegSubtitleDecoder.TryCreate(source, stream, out FFmpegSubtitleDecoder? ffmpegDecoder, out string error))
+            OperationResult<FFmpegSubtitleDecoder> decoder = FFmpegSubtitleDecoder.TryCreate(source, stream);
+            if (!decoder.IsSuccessful)
             {
-                return OperationResult.Failure(error);
+                return OperationResult.Failure(decoder);
             }
 
-            component = ffmpegDecoder;
+            component = decoder.Result;
             return OperationResult.Success();
         }
     }

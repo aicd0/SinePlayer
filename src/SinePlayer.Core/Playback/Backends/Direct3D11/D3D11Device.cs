@@ -3,6 +3,8 @@
 
 using System.Runtime.InteropServices;
 
+using SinePlayer.Core.Common.ErrorHandling;
+
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Direct3D;
@@ -61,11 +63,11 @@ internal sealed class D3D11Device : IDisposable
     /// Creates a hardware device with the capabilities video rendering needs. BGRA support is what
     /// lets decoded frames be presented directly.
     /// </summary>
-    internal static bool TryCreate(out D3D11Device? device, out string error)
+    internal static OperationResult<D3D11Device> TryCreate()
     {
-        device = null;
+        OperationResultCreator<D3D11Device> result = new();
 
-        HRESULT result = PInvoke.D3D11CreateDevice(
+        HRESULT created = PInvoke.D3D11CreateDevice(
             null,
             D3D_DRIVER_TYPE.D3D_DRIVER_TYPE_HARDWARE,
             default,
@@ -76,17 +78,14 @@ internal sealed class D3D11Device : IDisposable
             out D3D_FEATURE_LEVEL featureLevel,
             out ID3D11DeviceContext? createdContext);
 
-        if (result.Value < 0 || createdDevice is null || createdContext is null)
+        if (created.Value < 0 || createdDevice is null || createdContext is null)
         {
             D3D11Interop.Release(createdContext);
             D3D11Interop.Release(createdDevice);
-            error = $"Unable to create a Direct3D 11 device: {result}";
-            return false;
+            return result.Failure($"Unable to create a Direct3D 11 device: {created}");
         }
 
-        device = new D3D11Device(createdDevice, createdContext, featureLevel);
-        error = string.Empty;
-        return true;
+        return result.Success(new D3D11Device(createdDevice, createdContext, featureLevel));
     }
 
     public void Dispose()

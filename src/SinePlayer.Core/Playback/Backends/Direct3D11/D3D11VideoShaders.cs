@@ -3,6 +3,7 @@
 
 using System.Diagnostics.CodeAnalysis;
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 
 using Windows.Win32.Graphics.Direct3D;
@@ -116,8 +117,7 @@ internal sealed partial class D3D11VideoShaders : IDisposable
         """;
 
     private readonly Dictionary<PixelFormat, ID3D11PixelShader> _pixelShaders = [];
-    private readonly Dictionary<PixelFormat, ID3D11PixelShader> _arrayPixelShaders = [];
-
+    private ID3D11PixelShader? _semiPlanarArrayShader;
     private ID3D11VertexShader? _vertexShader;
     private ID3D11SamplerState? _sampler;
     private ID3D11RasterizerState? _rasterizer;
@@ -135,14 +135,19 @@ internal sealed partial class D3D11VideoShaders : IDisposable
     internal ID3D11SamplerState Sampler => _sampler ?? throw new ObjectDisposedException(nameof(D3D11VideoShaders));
 
     /// <summary>
+    /// The shader for a frame that is still a texture, whose planes are sampled as slices of an array.
+    /// </summary>
+    internal ID3D11PixelShader SemiPlanarArrayShader => _semiPlanarArrayShader ?? throw new ObjectDisposedException(nameof(D3D11VideoShaders));
+
+    /// <summary>
     /// Nothing is culled. The picture is one quad, and mirroring turns it inside out — culling the back faces
     /// of a rectangle whose only face is the one being looked at would make a mirrored picture disappear.
     /// </summary>
     internal ID3D11RasterizerState Rasterizer => _rasterizer ?? throw new ObjectDisposedException(nameof(D3D11VideoShaders));
 
-    internal static bool TryCreate(D3D11Device device, [NotNullWhen(true)] out D3D11VideoShaders? shaders, out string error)
+    internal static OperationResult<D3D11VideoShaders> TryCreate(D3D11Device device)
     {
-        shaders = null;
+        OperationResultCreator<D3D11VideoShaders> result = new();
 
         // Point sampling keeps the mapping from source texels to destination pixels exact, which is
         // what the frame layout negotiation depends on.
@@ -157,9 +162,10 @@ internal sealed partial class D3D11VideoShaders : IDisposable
             MaxLOD = float.MaxValue,
         };
 
-        if (!D3D11Interop.TryCompileShader(ShaderSource, "VSMain", "vs_5_0", out ID3DBlob? vertexBytecode, out error))
+        OperationResult<ID3DBlob> vertexCompiled = D3D11Interop.TryCompileShader(ShaderSource, "VSMain", "vs_5_0");
+        if (!vertexCompiled.IsSuccessful)
         {
-            return false;
+            return result.Failure(vertexCompiled);
         }
 
         D3D11_RASTERIZER_DESC rasterizerDescription = new()
@@ -169,80 +175,61 @@ internal sealed partial class D3D11VideoShaders : IDisposable
         };
 
         D3D11VideoShaders created = new(
-            D3D11Interop.CreateVertexShader(device.Device, vertexBytecode!),
+            D3D11Interop.CreateVertexShader(device.Device, vertexCompiled.Result),
             D3D11Interop.CreateSamplerState(device.Device, samplerDescription),
             D3D11Interop.CreateRasterizerState(device.Device, rasterizerDescription));
 
         try
         {
-            if (!created.TryAddPixelShader(device, PixelFormat.Bgra8, "PSMainPacked", out error))
+            // One row per layout the renderer can receive in memory. The packed layouts keep their channels in memory
+            // order, so the shader only hands them on; which order that is depends on the texture format the renderer
+            // chose for the frame, not on the programme.
+            (PixelFormat Format, string EntryPoint)[] pixelShaders =
+            [
+                (PixelFormat.Bgra8, "PSMainPacked"),
+                (PixelFormat.Rgba8, "PSMainPacked"),
+                (PixelFormat.Nv12, "PSMainSemiPlanar"),
+                (PixelFormat.P010, "PSMainSemiPlanar"),
+                (PixelFormat.P016, "PSMainSemiPlanar"),
+                (PixelFormat.Yuv420P, "PSMainPlanar"),
+                (PixelFormat.Yuv420P10, "PSMainPlanar"),
+                (PixelFormat.Yuv422P, "PSMainPlanar"),
+                (PixelFormat.Yuv444P, "PSMainPlanar"),
+            ];
+
+            foreach ((PixelFormat format, string entryPoint) in pixelShaders)
             {
-                created.Dispose();
-                return false;
+                OperationResult added = created.TryAddPixelShader(device, format, entryPoint);
+                if (!added.IsSuccessful)
+                {
+                    created.Dispose();
+                    return result.Failure(added);
+                }
             }
 
-            if (!created.TryAddPixelShader(device, PixelFormat.Nv12, "PSMainSemiPlanar", out error))
+            // A decoded frame is a slice of an array, which is the only difference from the planes above, and the same
+            // slice is drawn whatever the channels are called: one programme serves every semi-planar texture.
+            OperationResult<ID3DBlob> arrayCompiled = D3D11Interop.TryCompileShader(ShaderSource, "PSMainSemiPlanarArray", "ps_5_0");
+            if (!arrayCompiled.IsSuccessful)
             {
                 created.Dispose();
-                return false;
+                return result.Failure(arrayCompiled);
             }
 
-            if (!created.TryAddPixelShader(device, PixelFormat.Yuv420P, "PSMainPlanar", out error))
-            {
-                created.Dispose();
-                return false;
-            }
-
-            // Ten-bit planar frames are the same three planes, sixteen bits wide, and the same constants describe
-            // them: only the texture format changes, which the renderer picks from the frame.
-            if (!created.TryAddPixelShader(device, PixelFormat.Yuv420P10, "PSMainPlanar", out error))
-            {
-                created.Dispose();
-                return false;
-            }
-
-            if (!created.TryAddArrayPixelShader(device, PixelFormat.Nv12, "PSMainSemiPlanarArray", out error))
-            {
-                created.Dispose();
-                return false;
-            }
-
-            // Ten-bit frames are semi-planar too, and sample the same way: see the note on the shader source for why
-            // the same constants describe them.
-            if (!created.TryAddPixelShader(device, PixelFormat.P010, "PSMainSemiPlanar", out error))
-            {
-                created.Dispose();
-                return false;
-            }
-
-            if (!created.TryAddArrayPixelShader(device, PixelFormat.P010, "PSMainSemiPlanarArray", out error))
-            {
-                created.Dispose();
-                return false;
-            }
+            created._semiPlanarArrayShader = D3D11Interop.CreatePixelShader(device.Device, arrayCompiled.Result);
         }
         catch (Exception exception)
         {
             created.Dispose();
-            error = $"Unable to create the shader programme: {exception.Message}";
-            return false;
+            return result.Failure($"Unable to create the shader programme: {exception.Message}");
         }
 
-        shaders = created;
-        return true;
+        return result.Success(created);
     }
 
     internal bool TryGetPixelShader(PixelFormat format, [NotNullWhen(true)] out ID3D11PixelShader? pixelShader)
     {
         return _pixelShaders.TryGetValue(format, out pixelShader);
-    }
-
-    /// <summary>
-    /// The shader for a frame that is still a texture, whose planes are sampled as slices of an array.
-    /// </summary>
-    internal bool TryGetArrayPixelShader(PixelFormat format, [NotNullWhen(true)] out ID3D11PixelShader? pixelShader)
-    {
-        return _arrayPixelShaders.TryGetValue(format, out pixelShader);
     }
 
     public void Dispose()
@@ -259,13 +246,9 @@ internal sealed partial class D3D11VideoShaders : IDisposable
             D3D11Interop.Release(pixelShader);
         }
 
-        foreach (ID3D11PixelShader pixelShader in _arrayPixelShaders.Values)
-        {
-            D3D11Interop.Release(pixelShader);
-        }
-
         _pixelShaders.Clear();
-        _arrayPixelShaders.Clear();
+        D3D11Interop.Release(_semiPlanarArrayShader);
+        _semiPlanarArrayShader = null;
         D3D11Interop.Release(_sampler);
         _sampler = null;
         D3D11Interop.Release(_rasterizer);
@@ -274,25 +257,15 @@ internal sealed partial class D3D11VideoShaders : IDisposable
         _vertexShader = null;
     }
 
-    private bool TryAddPixelShader(D3D11Device device, PixelFormat format, string entryPoint, out string error)
+    private OperationResult TryAddPixelShader(D3D11Device device, PixelFormat format, string entryPoint)
     {
-        if (!D3D11Interop.TryCompileShader(ShaderSource, entryPoint, "ps_5_0", out ID3DBlob? bytecode, out error))
+        OperationResult<ID3DBlob> compiled = D3D11Interop.TryCompileShader(ShaderSource, entryPoint, "ps_5_0");
+        if (!compiled.IsSuccessful)
         {
-            return false;
+            return OperationResult.Failure(compiled);
         }
 
-        _pixelShaders[format] = D3D11Interop.CreatePixelShader(device.Device, bytecode!);
-        return true;
-    }
-
-    private bool TryAddArrayPixelShader(D3D11Device device, PixelFormat format, string entryPoint, out string error)
-    {
-        if (!D3D11Interop.TryCompileShader(ShaderSource, entryPoint, "ps_5_0", out ID3DBlob? bytecode, out error))
-        {
-            return false;
-        }
-
-        _arrayPixelShaders[format] = D3D11Interop.CreatePixelShader(device.Device, bytecode!);
-        return true;
+        _pixelShaders[format] = D3D11Interop.CreatePixelShader(device.Device, compiled.Result);
+        return OperationResult.Success();
     }
 }

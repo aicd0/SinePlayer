@@ -5,6 +5,8 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 
+using SinePlayer.Core.Common.ErrorHandling;
+
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Direct3D;
@@ -254,11 +256,13 @@ internal static class D3D11Interop
         }
     }
 
-    internal static unsafe bool TryCompileShader(string source, string entryPoint, string target, out ID3DBlob? bytecode, out string error)
+    internal static unsafe OperationResult<ID3DBlob> TryCompileShader(string source, string entryPoint, string target)
     {
+        OperationResultCreator<ID3DBlob> result = new();
+
         byte[] sourceBytes = Encoding.UTF8.GetBytes(source);
 
-        HRESULT result = PInvoke.D3DCompile(
+        HRESULT compiled = PInvoke.D3DCompile(
             sourceBytes,
             null,
             null,
@@ -270,16 +274,12 @@ internal static class D3D11Interop
             out ID3DBlob? code,
             out ID3DBlob? errors);
 
-        if (result.Value < 0 || code is null)
+        if (compiled.Value < 0 || code is null)
         {
-            error = ReadBlobText(errors) ?? $"Shader compilation failed: {result}";
-            bytecode = null;
-            return false;
+            return result.Failure(ReadBlobText(errors) ?? $"Shader compilation failed: {compiled}");
         }
 
-        bytecode = code;
-        error = string.Empty;
-        return true;
+        return result.Success(code);
     }
 
     internal static unsafe ID3D11VertexShader CreateVertexShader(ID3D11Device device, ID3DBlob bytecode)

@@ -268,12 +268,13 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         {
             if (_d3dDevice is null)
             {
-                if (!D3D11Device.TryCreate(out D3D11Device? device, out string error))
+                OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+                if (!created.IsSuccessful)
                 {
-                    throw new InvalidOperationException(error);
+                    throw new InvalidOperationException(created.Message);
                 }
 
-                _d3dDevice = device;
+                _d3dDevice = created.Result;
             }
 
             _canvasDevice = CanvasDevice.CreateFromDirect3D11Device(CreateWin2DDevice(_d3dDevice!));
@@ -304,19 +305,20 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
             if (_swapChain is null)
             {
-                if (!D3D11SwapChain.TryCreate(_d3dDevice!, width, height, scale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_PREMULTIPLIED, out D3D11SwapChain? created, out string error))
+                OperationResult<D3D11SwapChain> created = D3D11SwapChain.TryCreate(_d3dDevice!, width, height, scale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_PREMULTIPLIED);
+                if (!created.IsSuccessful)
                 {
-                    return OperationResult.Failure(error);
+                    return OperationResult.Failure(created);
                 }
 
-                OperationResult attached = created!.AttachTo(target);
+                OperationResult attached = created.Result.AttachTo(target);
                 if (!attached.IsSuccessful)
                 {
-                    created.Dispose();
+                    created.Result.Dispose();
                     return attached;
                 }
 
-                _swapChain = created;
+                _swapChain = created.Result;
                 target.SurfaceSizeChanged += OnSurfaceSizeChanged;
                 return OperationResult.Success();
             }

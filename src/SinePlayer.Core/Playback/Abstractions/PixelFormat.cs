@@ -12,6 +12,7 @@ public enum PixelFormat
     Unknown,
     Nv12,
     P010,
+    P016,
     Yuv420P,
     Yuv420P10,
     Yuv422P,

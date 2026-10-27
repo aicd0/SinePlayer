@@ -171,24 +171,6 @@ internal struct AVHWDeviceContext
 }
 
 /// <summary>
-/// The D3D11 context of a hardware decoder, as <c>AVHWDeviceContext.hwctx</c> points at it. Unlike most
-/// libavutil structs this one starts with the device itself. The three lock fields are the only way to keep
-/// a decoder and a renderer off one immediate context at the same time; libavcodec calls them around every
-/// use of the context it makes.
-/// </summary>
-[StructLayout(LayoutKind.Sequential)]
-internal struct AVD3D11VADeviceContext
-{
-    public nint Device;
-    public nint DeviceContext;
-    public nint VideoDevice;
-    public nint VideoContext;
-    public nint Lock;
-    public nint Unlock;
-    public nint LockContext;
-}
-
-/// <summary>
 /// The frames context libavcodec decodes hardware frames into. Its <c>sw_format</c> is the layout of the
 /// pixels inside the texture, which is what a renderer has to sample them as.
 /// </summary>

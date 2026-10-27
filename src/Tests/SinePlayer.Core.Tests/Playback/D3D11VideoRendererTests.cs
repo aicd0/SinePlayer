@@ -25,13 +25,13 @@ public class D3D11VideoRendererTests
     [SetUp]
     public void SetUp()
     {
-        bool deviceCreated = D3D11Device.TryCreate(out D3D11Device? device, out string deviceError);
-        Assert.That(deviceCreated, Is.True, deviceError);
-        _device = device!;
+        OperationResult<D3D11Device> deviceCreated = D3D11Device.TryCreate();
+        Assert.That(deviceCreated.IsSuccessful, Is.True, deviceCreated.Message);
+        _device = deviceCreated.Result;
 
-        bool rendererCreated = D3D11VideoRenderer.TryCreate(_device, out D3D11VideoRenderer? renderer, out string rendererError);
-        Assert.That(rendererCreated, Is.True, rendererError);
-        _renderer = renderer!;
+        OperationResult<D3D11VideoRenderer> rendererCreated = D3D11VideoRenderer.TryCreate(_device);
+        Assert.That(rendererCreated.IsSuccessful, Is.True, rendererCreated.Message);
+        _renderer = rendererCreated.Result;
     }
 
     [TearDown]
@@ -292,8 +292,9 @@ public class D3D11VideoRendererTests
         FakeRenderTarget target = new() { SurfaceWidth = 8, SurfaceHeight = 4, RasterizationScale = 1.0 };
         VideoStreamInfo stream = CreateStreamInfo(8, 4);
 
-        Assert.That(D3D11SwapChain.TryCreate(_device, 8, 4, 1.0, out D3D11SwapChain? swapChain, out string error), Is.True, error);
-        using D3D11SwapChain ownedSwapChain = swapChain!;
+        OperationResult<D3D11SwapChain> createdSwapChain = D3D11SwapChain.TryCreate(_device, 8, 4, 1.0);
+        Assert.That(createdSwapChain.IsSuccessful, Is.True, createdSwapChain.Message);
+        using D3D11SwapChain ownedSwapChain = createdSwapChain.Result;
 
         // Draw into the swap chain back buffer without presenting, so the pixels can be verified.
         _renderer.SetOutput(ownedSwapChain.View, ownedSwapChain.Width, ownedSwapChain.Height);

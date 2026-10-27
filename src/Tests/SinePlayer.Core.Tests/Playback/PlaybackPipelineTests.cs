@@ -6255,7 +6255,8 @@ public class PlaybackPipelineTests
 
     /// <summary>
     /// A renderer that draws with a GPU and says so. Nothing is drawn: the tests that use it are about what the
-    /// pipeline does with the offer, not about pixels.
+    /// pipeline does with the offer, not about pixels. It offers the general device only — an API's own vocabulary is
+    /// a promise about what that renderer can do with it, and a stand-in with no handle behind it must not make one.
     /// </summary>
     private sealed class GpuDeviceVideoRenderer : IVideoRenderer, IGpuDevice
     {
@@ -6264,9 +6265,10 @@ public class PlaybackPipelineTests
         /// <summary>It is its own device, which is what a renderer that draws with one hands out.</summary>
         public IGpuDevice? GpuDevice => this;
 
-        public nint NativeDevice => 1;
-
-        public object DeviceLock { get; } = new();
+        public OperationResult CanDisplayGpuFrame(PixelFormat format)
+        {
+            return OperationResult.Success();
+        }
 
         public OperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
         {
