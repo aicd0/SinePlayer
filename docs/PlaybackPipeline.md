@@ -486,7 +486,7 @@ close is what the joins depend on not blocking (§7).
 ## 4. The five rules
 
 **Every thread waits only for something it alone depends on, and every wait it takes ends without another
-stage having to make progress.** These are the rules; §4.1–§4.5 are why each is written the way it is.
+stage having to make progress.** These are the rules; §4.1–§4.6 are why each is written the way it is.
 
 | # | Thread | Waits for | Ended by | If it never ends |
 |---|---|---|---|---|
@@ -657,7 +657,54 @@ One ordering rule matters here: the clock is anchored from the first buffer that
 means the claim happens before the wait for room. A claim is for the position it was made for, so one made for
 the old position cannot outlive the seek: a new position is one nothing has claimed yet, and needs no re-arming.
 
-### 4.5 A device that stops is a pause, not a fault
+### 4.5 The sound reaches the device in the format the device plays
+
+What a block looks like when it is handed over is decided before anything is opened, not by whoever converts it
+last. The renderer is asked what its endpoint plays (`IAudioRenderer.Negotiate`), the host's chain is prepared
+with that as its target, and the chain reports what it ends on. Each filter is told both what it is given and what
+the next stage can take, and each reports the format it produces — the second filter of a chain is prepared for
+what the first one hands on, not for the stream the chain opened with.
+
+**One thread opens the device: the audio render thread.** The pipeline does not configure the renderer at all; it
+asks, points the chain, and publishes. That leaves a device that cannot be reached to be found out in two places,
+and both are deliberate. A device that cannot even be described is the answer to the command that asked for the
+sound — `Negotiate` fails, so `SelectStream` fails while it is still the command, which is what a person sees when
+they change to a track the machine cannot play. A device that can be described and then not opened is the audio
+thread's to report, as a warning: the picture plays, and the reason reaches the host rather than the sound simply
+being missing. The opening is attempted once per snapshot — the thread takes one, opens for it, and takes another
+only when the chain has been edited — so a device that refuses is not asked again on every block.
+
+**The pipeline knows no filter.** Which filters exist is the host's business: it adds a level filter, or a downmix,
+the way it adds anything else, and the pipeline's whole part is to pass the device's target down the chain and
+read back the format it ends on — which the chain reports as a format from the moment it is prepared, the stream
+itself when no filter changes it, so a reader never has to reinterpret "nothing changed it". A host that adds a fold down gets a 5.1 file played at the level it was made at;
+a host that adds nothing gets the stream handed to the audio engine as it is. That is the price of the decoupling,
+and it is one line in the host.
+
+The level matters because the engine's own conversion is not a neutral one: an endpoint with two speakers plays
+two channels, and handing WASAPI six lets it convert, which divides the level down until no arrangement of the
+source could clip. Measured, a front channel came through about ten decibels quieter than it left the decoder and
+the centre about thirteen. Folding the mix down instead keeps the level the file was made at, and leaves the
+engine only the sample rate, which it converts transparently.
+
+The same version is what lets the chain move while the sound plays — a host adding or removing a filter. It is not
+used to check a block, though: the audio thread holds a **snapshot** (`AudioFilterChain.Clone`), an object that never
+changes, and runs every block through that. So what a block goes through and the shape the device was opened for are
+one answer rather than two reads that could disagree, and an edit landing mid-block simply publishes a new snapshot
+for the next pass. The thread compares the snapshot's version with the chain's once per pass — one read — and takes a
+new one when they differ; the format is then compared directly, because a version can move without the shape doing
+so (a filter that leaves the format alone is still an edit).
+
+What a snapshot cannot survive is a filter that fails: a block that cannot be transformed is a failure of the sound
+rather than a lost effect, because what the filter would have produced is the shape everything after it — the
+device included — was prepared for. That ends playback with the filter's reason rather than feeding a device
+something it was not opened for. The reopening writes nothing back to the clock: the clock offset (§5) is dropped,
+and the next block reads the fresh device clock and works out where it stands, so a timeline that carried on across
+the reopen is kept by the correction rather than by a position. The cost is a gap for the length of an open — the
+device's buffer is gone with the old stream — which is why the version exists rather than a comparison on every
+block (§14).
+
+### 4.6 A device that stops is a pause, not a fault
 
 The device corrects the pipeline's clock while it plays, so a device that stops taking audio is time that
 stops: the correction holds the clock at the device's own reading, presentation waits for a moment that never
@@ -1371,7 +1418,13 @@ The Playback Lab shows all of the above in one line, which is the intended way t
    sound would need a buffer that can be sliced. A source that accepts a seek and then refuses it leaves the
    position published without moving the media: a refused *forward* precise seek therefore skips ahead to the
    position instead of standing still, which is the one behaviour a fast seek does not have.
-14. **A fast seek past the end of the picture is exact only when the container says how long the picture is.** A
+14. **Changing the sound's format while it plays reopens the device, and the gap is audible.** The chain's version
+   tells the audio thread that there is a newer snapshot; if its format differs it closes the device, opens it again
+   for the new shape, and drops the clock offset so the next block re-reads the fresh device clock. What is lost is the
+   audio the device held — up to its buffer, which the pipeline deliberately keeps large — so a filter that changes the
+   format is heard as a short interruption. A host that cares can pause first; nothing in the pipeline pretends the
+   switch is seamless.
+15. **A fast seek past the end of the picture is exact only when the container says how long the picture is.** A
    container that declares no per-track length leaves nothing to compare the request against, so the seek stays a
    wish and resumes at the picture's last keyframe — the behaviour this rule exists to avoid, kept rather than
    guessed at. Matroska writes the length as a `DURATION` tag and MP4 as a stream field, and both are read; a

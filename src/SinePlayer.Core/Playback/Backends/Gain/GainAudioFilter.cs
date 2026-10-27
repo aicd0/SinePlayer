@@ -36,6 +36,8 @@ public sealed class GainAudioFilter : IAudioFilter
 
     public string Name => "Gain";
 
+    public AudioStreamInfo? OutputFormat => null;
+
     public void SetLevel(double volume, bool muted)
     {
         if (Volatile.Read(ref _disposed))
@@ -52,9 +54,10 @@ public sealed class GainAudioFilter : IAudioFilter
         Interlocked.Exchange(ref _gain, BitConverter.DoubleToInt64Bits(gain));
     }
 
-    public OperationResult Configure(AudioStreamInfo stream)
+    public OperationResult Configure(AudioStreamInfo input, AudioStreamInfo target)
     {
-        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(target);
 
         return Volatile.Read(ref _disposed)
             ? OperationResult.Failure("The filter has already been disposed.")

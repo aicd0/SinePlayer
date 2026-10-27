@@ -751,14 +751,43 @@ instead of by listening.
 
 Decisions worth reviewing:
 
-1. **The renderer will ask for the stream's own format and let the audio engine convert.**
+1. **The renderer asks for the stream's own sample rate and lets the audio engine convert it.**
    `AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | SRC_DEFAULT_QUALITY` lets a shared-mode endpoint open a format
-   it is handed, so rate conversion and speaker mixing stay in the engine instead of in the renderer.
-   That keeps this step out of the resampler business; a higher quality resampler becomes an optional
-   later filter, and the renderer's contract does not change when it arrives.
-2. **The only conversion the renderer performs itself is interleaving.** Decoders hand out planar
-   blocks for most codecs (AAC, FLAC) and devices read interleaved, so the channels are woven together.
-   That is a layout change rather than signal processing, and it is checked byte for byte.
+   it is handed, so rate conversion stays in the engine instead of in the renderer. That keeps this step
+   out of the resampler business; a higher quality resampler becomes an optional later filter, and the
+   renderer's contract does not change when it arrives.
+   **Speaker mixing does not stay in the engine, though — measured, not assumed.** An endpoint mixes in a
+   fixed number of channels (two, on the machine this was measured on), and a 5.1 stream handed to it
+   arrives about ten decibels quieter than it left the decoder: the engine's fold-down divides the level
+   down until no arrangement of the source could clip. A front channel measured −10.6 dB against what was
+   submitted and the centre −13.6 dB, and an eight-second film excerpt played through the renderer peaked
+   at −15.4 dBFS where the same excerpt downmixed by ffmpeg peaks at −5.14 dBFS. Damping the dialogue's
+   channel is exactly what a viewer hears as "this player is quiet", so the mix is folded down here —
+   front channels at unity, centre and surrounds at −3 dB, the low-frequency channel dropped — and the
+   device is opened as a stereo stream so only the rate is left to the engine. After the change the same
+   excerpt measures −5.13 dBFS, matching the ffmpeg reference.
+2. **The renderer's only format conversion is interleaving; the fold-down is an audio filter.** Decoders hand
+   out planar blocks for most codecs (AAC, FLAC) and devices read interleaved, so the channels are woven
+   together — layout arithmetic rather than signal processing, checked byte for byte (`AudioInterleaverTests`).
+   Folding a surround mix down is sample arithmetic too, so it lives in `DownmixAudioFilter`, an `IAudioFilter`
+   with no device, no WASAPI type and no pipeline in it.
+   
+   **The formats are negotiated rather than assumed, which is the contract that makes it a filter.** An
+   `IAudioFilter` is now told both the format of the block it is given and the format the stage after it can
+   take, and it reports the format it hands on (`OutputFormat`); the chain prepares each filter for what the one
+   before it produced. `IAudioRenderer` answers `Negotiate(stream)` with the format its endpoint plays — the
+   stream itself when it fits, or the same stream narrowed to what the device has.
+   
+   **The host adds the fold, and the pipeline knows no filter.** The pipeline asks the renderer, points the host's
+   chain at that target, and leaves the opening to the audio render thread — the one thread that opens or reopens a
+   device, following the chain's format version when a filter moves it mid-playback; `CoreEngine` adds a
+   `DownmixAudioFilter` next to its gain filter, exactly as it would add anything else. The filter decides for
+   itself whether the stream needs changing, so a 5.1 stream on a two-channel endpoint is folded before it reaches
+   WASAPI, a stream that already fits costs one reference, and a layout whose speaker positions are unknown keeps
+   the engine's conversion rather than being guessed at. `DownmixAudioFilterTests` checks the coefficients, the
+   clamping, the format it keeps and the block it hands straight back; `FoldsTheMixDownToWhatTheDevicePlays` and
+   `HandsTheStreamOverUnfoldedWhenTheHostAddedNoFilter` check the two halves of that arrangement, with a stand-in
+   device that plays two channels and a file that has six.
 3. **Channel masks are the KSAUDIO speaker positions**, derived from the engine's `ChannelLayout`, so a
    5.1 stream arrives with 5.1 positions and the engine places the channels where they belong.
 4. **Formats that cannot be described are refused rather than approximated.** A 24 bit stream is not
@@ -783,9 +812,10 @@ position) and `DefaultSynchronizer`. 6 tests, two of which drive the real endpoi
 
 Decisions worth reviewing:
 
-1. **The stream is opened with the decoder's own format and the audio engine converts**, so sample rate
-   conversion and speaker mixing stay out of the engine. The renderer's only format work is
-   interleaving, which was verified byte for byte in S7b.
+1. **The stream is opened with the decoder's own sample rate and the audio engine converts it**, so rate
+   conversion stays out of the engine. Speaker mixing does not: a surround stream is folded down to what
+   the endpoint actually plays before it is handed over (S7b), because the engine's own fold-down costs
+   about ten decibels of level.
 2. **The stream is started before the first write, and that was a real bug the device test caught.** A
    stopped WASAPI stream does not consume its buffer, so writing first filled it and then waited for
    room that could never appear: the test took 31 s and failed with "the audio device did not free its

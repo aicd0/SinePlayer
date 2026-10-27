@@ -51,6 +51,27 @@ public class WasapiAudioFormatTests
     }
 
     [Test]
+    public void DescribesAFoldDownAsStereo()
+    {
+        // A surround stream is opened as a stereo stream once the mix has been folded down here, so the device
+        // sees two channels and has nothing to convert but the sample rate.
+        AudioStreamInfo stream = CreateStream(48000, 6, ChannelLayout.Surround51, AudioSampleFormat.Float32);
+        bool described = WasapiAudioFormat.TryDescribe(stream, 2, ChannelLayout.Stereo, out WasapiAudioFormat.Descriptor descriptor, out string error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(described, Is.True, error);
+            Assert.That(descriptor.SampleRate, Is.EqualTo(48000));
+            Assert.That(descriptor.ChannelCount, Is.EqualTo(2));
+            Assert.That(descriptor.BlockAlign, Is.EqualTo(8));
+            Assert.That(descriptor.AverageBytesPerSecond, Is.EqualTo(384000));
+            Assert.That(descriptor.IsFloat, Is.True);
+            Assert.That(descriptor.IsExtensible, Is.False);
+            Assert.That(descriptor.ChannelMask, Is.EqualTo(0x3));
+        }
+    }
+
+    [Test]
     public void DescribesMonoAsFrontCentre()
     {
         bool described = WasapiAudioFormat.TryDescribe(CreateStream(22050, 1, ChannelLayout.Mono, AudioSampleFormat.UInt8), out WasapiAudioFormat.Descriptor descriptor, out string error);

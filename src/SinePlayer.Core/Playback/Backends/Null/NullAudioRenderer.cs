@@ -26,6 +26,13 @@ public sealed partial class NullAudioRenderer : IAudioRenderer
 
     public long SubmittedSampleCount => Interlocked.Read(ref _submittedSampleCount);
 
+    public OperationResult<AudioStreamInfo> Negotiate(AudioStreamInfo stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        OperationResultCreator<AudioStreamInfo> result = new();
+        return result.Success(stream);
+    }
+
     public OperationResult Configure(AudioStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);

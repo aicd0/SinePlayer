@@ -5,6 +5,7 @@ using System.Buffers;
 using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -18,33 +19,14 @@ using Windows.Win32.System.Com;
 
 namespace SinePlayer.Core.Playback.Backends.Wasapi;
 
-/// <summary>
-/// Plays audio on the default output device through WASAPI in shared mode.
-/// <para>
-/// The stream is opened with the decoder's own format and the audio engine is asked to convert, which
-/// keeps sample rate conversion and speaker mixing out of the engine. The renderer's own work is
-/// interleaving the decoder's planes and keeping the device buffer fed.
-/// </para>
-/// <para>
-/// <see cref="Submit"/> never waits for the device: a device with no room is reported by the hand-off it
-/// returns, so the pipeline waits on its own thread (<see cref="IAudioSubmit"/>) where a pause, a seek and a
-/// stop can reach it.
-/// </para>
-/// <para>
-/// The clock's running state is the pipeline's alone: this class starts and stops the stream only where
-/// the pipeline asks it to through <see cref="Clock"/>, and a hand-off into a stopped stream leaves it
-/// stopped. A renderer that started the stream on its own would make every clock hold advisory, because
-/// the hold is already decided by the time the block reaches it.
-/// </para>
-/// </summary>
 public sealed partial class WasapiAudioRenderer : IAudioRenderer
 {
+    private const string TAG = nameof(WasapiAudioRenderer);
+
     private const ushort WaveFormatPcm = 1;
     private const ushort WaveFormatIeeeFloat = 3;
     private const ushort WaveFormatExtensible = 0xFFFE;
     private const int ExtensibleExtraSize = 22;
-
-    private const string TAG = nameof(WasapiAudioRenderer);
 
     private static readonly Guid SubTypePcm = new("00000001-0000-0010-8000-00AA00389B71");
     private static readonly Guid SubTypeIeeeFloat = new("00000003-0000-0010-8000-00AA00389B71");
@@ -58,6 +40,7 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
     private WasapiAudioClock? _clock;
     private WasapiAudioFormat.Descriptor _format;
     private int _bufferFrameCount;
+    private int? _deviceChannelCount;
     private bool _disposed;
     private int _submittedBlocks;
     private long _underrunCount;
@@ -86,6 +69,39 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         : _endpointIsDefault ? $"WASAPI [{_endpointName}] (default)" : $"WASAPI [{_endpointName}]";
 
     public IPlaybackClock Clock => _clock ?? throw new InvalidOperationException("The audio renderer has not been configured.");
+
+    /// <summary>
+    /// The format this endpoint plays without the system converting it: the stream itself when the device has the
+    /// speakers for it, or the same stream narrowed to what it has. The engine's own conversion is not the answer
+    /// here — it divides the level down until no arrangement of the source could clip, which is about ten decibels
+    /// quieter than the file — so the pipeline folds the mix to this format and the device is opened for the result.
+    /// A stream that cannot be folded is still opened as it is, which is the behaviour this method exists to avoid
+    /// wherever it can.
+    /// </summary>
+    public OperationResult<AudioStreamInfo> Negotiate(AudioStreamInfo stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        OperationResultCreator<AudioStreamInfo> result = new();
+        if (!TryGetEndpointChannelCount(out int channels, out string error))
+        {
+            return result.Failure(error);
+        }
+
+        if (channels <= 0 || channels >= stream.ChannelCount)
+        {
+            return result.Success(stream);
+        }
+
+        ChannelLayout layout = channels switch
+        {
+            1 => ChannelLayout.Mono,
+            2 => ChannelLayout.Stereo,
+            _ => stream.ChannelLayout,
+        };
+
+        return result.Success(stream.WithLayout(channels, layout));
+    }
 
     /// <summary>Frames the device holds that have not been played yet.</summary>
     public long QueuedSampleCount
@@ -147,13 +163,20 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
             // The device the caller chose, or the one Windows would choose: the only difference between the two
             // is which lookup is asked, so a named endpoint behaves exactly like the default one from here on.
             IMMDevice device;
-            if (_endpointId is null)
+            try
             {
-                enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out device);
+                if (_endpointId is null)
+                {
+                    enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out device);
+                }
+                else
+                {
+                    enumerator.GetDevice(_endpointId, out device);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                enumerator.GetDevice(_endpointId, out device);
+                return OperationResult.Failure(ex);
             }
 
             device.Activate(typeof(IAudioClient).GUID, CLSCTX.CLSCTX_ALL, null, out object activated);
@@ -323,6 +346,61 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         }
 
         Release();
+    }
+
+    /// <summary>
+    /// How many channels the endpoint mixes in, or 0 when it cannot be read: a device whose format is a mystery is
+    /// one to leave the conversion to, rather than one to guess a layout for. The answer is kept because it is a
+    /// property of the device rather than of a stream, and asking opens a client of its own.
+    /// </summary>
+    private unsafe bool TryGetEndpointChannelCount(out int channelCount, out string error)
+    {
+        channelCount = 0;
+        error = string.Empty;
+        if (_deviceChannelCount is int known)
+        {
+            channelCount = known;
+            return true;
+        }
+
+        int channels;
+        try
+        {
+            PInvoke.CoInitializeEx(null, COINIT.COINIT_MULTITHREADED);
+            PInvoke.CoCreateInstance(WasapiAudioEndpoints.MMDeviceEnumeratorClassId, null, CLSCTX.CLSCTX_ALL, out IMMDeviceEnumerator enumerator);
+            IMMDevice device;
+            if (_endpointId is null)
+            {
+                enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out device);
+            }
+            else
+            {
+                enumerator.GetDevice(_endpointId, out device);
+            }
+
+            device.Activate(typeof(IAudioClient).GUID, CLSCTX.CLSCTX_ALL, null, out object activated);
+            var client = (IAudioClient)activated;
+            client.GetMixFormat(out WAVEFORMATEX* mix);
+            try
+            {
+                channels = mix->nChannels;
+            }
+            finally
+            {
+                Marshal.FreeCoTaskMem((nint)mix);
+            }
+        }
+        catch (Exception exception)
+        {
+            // Not remembered: a device that has gone away can come back, and a cached "no" would outlive it.
+            PlaybackLogger.W(TAG, $"Unable to read the format the audio device mixes in: {exception.Message}");
+            error = $"Unable to reach the audio output device: {exception.Message}";
+            return false;
+        }
+
+        _deviceChannelCount = channels;
+        channelCount = channels;
+        return true;
     }
 
     private static unsafe void InitializeStream(IAudioClient client, WasapiAudioFormat.Descriptor format)

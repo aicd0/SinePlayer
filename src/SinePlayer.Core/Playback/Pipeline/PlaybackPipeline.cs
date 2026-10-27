@@ -919,6 +919,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 pendingChanges |= sourceChanges & (ChainChanges.VideoDecoder | ChainChanges.VideoRenderer);
             }
 
+            AudioStreamInfo? negotiatedAudioFormat = null;
             if (audioStream is not null)
             {
                 // Resolve audio renderer
@@ -936,12 +937,13 @@ public sealed partial class PlaybackPipeline : IDisposable
                 newAudioRenderer = rendererResolved.Result;
                 if (newAudioRenderer is not null)
                 {
-                    OperationResult configured = newAudioRenderer.Component.Configure(audioStream);
-                    if (!configured.IsSuccessful)
+                    OperationResult<AudioStreamInfo> negotiated = newAudioRenderer.Component.Negotiate(audioStream);
+                    if (!negotiated.IsSuccessful)
                     {
-                        return configured;
+                        return OperationResult.Failure(negotiated);
                     }
 
+                    negotiatedAudioFormat = negotiated.Result;
                     pendingChanges |= ChainChanges.AudioRenderer;
                 }
 
@@ -1046,7 +1048,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             if (audioStream is not null)
             {
-                AudioFilters.Configure(audioStream);
+                if (negotiatedAudioFormat is not null)
+                {
+                    AudioFilters.Configure(audioStream, negotiatedAudioFormat);
+                }
+
                 _audioMinimumSamples = Math.Max(1, (long)audioStream.SampleRate * AudioMinimumMilliseconds / 1000);
                 _audioWakeSamples = _audioMinimumSamples / 2;
             }
@@ -2201,6 +2207,8 @@ public sealed partial class PlaybackPipeline : IDisposable
         TimeSpan? clockOffset = null;
         TimeSpan? startTime = null;
         TimeSpan? tailBufferPosition = null;
+        AudioStreamInfo? deviceFormat = null;
+        AudioFilterChainSnapshot? filters = null;
 
         IAudioSubmit? inFlightSubmit = null;
         RawAudioBuffer? inFlightBuffer = null;
@@ -2228,13 +2236,40 @@ public sealed partial class PlaybackPipeline : IDisposable
                 oldAudioRenderer?.Flush();
                 oldAudioRenderer?.Dispose();
 
-                deviceAvailable = audioRendererSlot.CurrentComponent is not null;
+                deviceAvailable = false;
                 reportedRunningAhead = false;
                 clockOffset = null;
+                deviceFormat = null;
+                filters = null;
                 continue;
             }
 
             IAudioRenderer? audioRenderer = audioRendererSlot.CurrentComponent;
+
+            if (filters is null || filters.Version != AudioFilters.Version)
+            {
+                filters = AudioFilters.Snapshot();
+
+                AudioStreamInfo? outputFormat = filters.OutputFormat;
+                if (audioRenderer is not null && outputFormat is not null && (deviceFormat is null || !AudioFilterChain.IsSameFormat(outputFormat, deviceFormat)))
+                {
+                    ReleaseInFlightAudio();
+
+                    OperationResult opened = audioRenderer.Configure(outputFormat);
+                    if (opened.IsSuccessful)
+                    {
+                        deviceFormat = outputFormat;
+                    }
+                    else
+                    {
+                        deviceFormat = null;
+                        PostWarning($"The audio device could not be opened: {opened.Message}");
+                    }
+
+                    deviceAvailable = deviceFormat is not null;
+                    clockOffset = null;
+                }
+            }
 
             // Bump epoch
             EpochGate epochGate = _epochGate.Read();
@@ -2431,6 +2466,16 @@ public sealed partial class PlaybackPipeline : IDisposable
                 continue;
             }
 
+            OperationResult<RawAudioBuffer> filtersApplied = filters.TryApply(buffer);
+            if (!filtersApplied.IsSuccessful)
+            {
+                buffer.Dispose();
+                PostFailure(filtersApplied.Message, filtersApplied.Exception);
+                return;
+            }
+
+            buffer = filtersApplied.Result;
+
             // Ready to submit
             tailBufferPosition = buffer.Timestamp + buffer.Duration;
 
@@ -2446,8 +2491,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
                 StartOrPauseClock(epoch, state);
             }
-
-            buffer = AudioFilters.Apply(buffer);
 
             if (deviceAvailable && audioRenderer is not null)
             {

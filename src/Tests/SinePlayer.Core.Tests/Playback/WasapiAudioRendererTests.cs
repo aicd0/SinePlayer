@@ -195,6 +195,72 @@ public class WasapiAudioRendererTests
             $"The device took {maximumBlocks} blocks of {buffer.SampleCount} frames without ever reporting that it was full.");
     }
 
+    /// <summary>
+    /// A surround stream is offered to the endpoint as stereo, which is what makes the pipeline fold the mix down
+    /// instead of leaving it to the audio engine: the engine's own conversion divides the level down until no
+    /// arrangement of the source could clip, and that is about ten decibels quieter than the file.
+    /// </summary>
+    [Test]
+    public void NarrowsASurroundStreamToWhatTheEndpointPlays()
+    {
+        using WasapiAudioRenderer renderer = new();
+
+        AudioStreamInfo surround = new()
+        {
+            Index = 0,
+            CodecId = "aac",
+            SampleRate = SampleRate,
+            ChannelCount = 6,
+            ChannelLayout = ChannelLayout.Surround51,
+            SampleFormat = AudioSampleFormat.Float32,
+        };
+
+        OperationResult<AudioStreamInfo> negotiated = renderer.Negotiate(surround);
+        if (!negotiated.IsSuccessful)
+        {
+            Assert.Ignore($"This machine offers no audio endpoint to negotiate with: {negotiated.Message}");
+        }
+
+        AudioStreamInfo format = negotiated.Result;
+        TestContext.Progress.WriteLine($"offered {surround.ChannelCount} channel(s), the endpoint plays {format.ChannelCount}");
+        if (format.ChannelCount == surround.ChannelCount)
+        {
+            Assert.Ignore($"This endpoint plays {format.ChannelCount} channels, so there is nothing to narrow.");
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(format.ChannelCount, Is.EqualTo(2));
+            Assert.That(format.ChannelLayout, Is.EqualTo(ChannelLayout.Stereo));
+            Assert.That(format.SampleRate, Is.EqualTo(surround.SampleRate), "only the channels change");
+            Assert.That(format.SampleFormat, Is.EqualTo(surround.SampleFormat));
+        }
+    }
+
+    [Test]
+    public void OffersAStereoStreamToAnEndpointAsItIs()
+    {
+        using WasapiAudioRenderer renderer = new();
+
+        AudioStreamInfo stereo = new()
+        {
+            Index = 0,
+            CodecId = "aac",
+            SampleRate = SampleRate,
+            ChannelCount = 2,
+            ChannelLayout = ChannelLayout.Stereo,
+            SampleFormat = AudioSampleFormat.Float32,
+        };
+
+        OperationResult<AudioStreamInfo> negotiated = renderer.Negotiate(stereo);
+        if (!negotiated.IsSuccessful)
+        {
+            Assert.Ignore($"This machine offers no audio endpoint to negotiate with: {negotiated.Message}");
+        }
+
+        Assert.That(negotiated.Result, Is.SameAs(stereo), "a stream the endpoint can play needs no new object");
+    }
+
     [Test]
     public void RefusesAStreamItCannotDescribe()
     {

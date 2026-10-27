@@ -70,6 +70,16 @@ internal static class WasapiAudioFormat
 
     internal static bool TryDescribe(AudioStreamInfo stream, out Descriptor descriptor, out string error)
     {
+        return TryDescribe(stream, stream.ChannelCount, stream.ChannelLayout, out descriptor, out error);
+    }
+
+    /// <summary>
+    /// The same description, for a stream that is going to be handed to the device in a different channel layout
+    /// than it was decoded in: a surround mix folded down for an endpoint with two speakers, for instance, needs
+    /// to open the device as a stereo stream or the device would convert the very channels the fold just built.
+    /// </summary>
+    internal static bool TryDescribe(AudioStreamInfo stream, int channelCount, ChannelLayout channelLayout, out Descriptor descriptor, out string error)
+    {
         descriptor = default;
 
         if (stream.SampleRate <= 0)
@@ -78,7 +88,7 @@ internal static class WasapiAudioFormat
             return false;
         }
 
-        if (stream.ChannelCount <= 0)
+        if (channelCount <= 0)
         {
             error = "The stream declares no channels.";
             return false;
@@ -93,21 +103,21 @@ internal static class WasapiAudioFormat
             return false;
         }
 
-        uint channelMask = GetChannelMask(stream.ChannelLayout);
-        bool isExtensible = stream.ChannelCount > 2;
+        uint channelMask = GetChannelMask(channelLayout);
+        bool isExtensible = channelCount > 2;
         if (isExtensible && channelMask == ChannelMaskUnspecified)
         {
             // Guessing positions for a layout we cannot name would decide for the device which speaker
             // gets which channel. Refusing is more honest than producing a plausible lie.
-            error = $"No speaker layout is known for {stream.ChannelCount} channels of layout '{stream.ChannelLayout}'.";
+            error = $"No speaker layout is known for {channelCount} channels of layout '{channelLayout}'.";
             return false;
         }
 
-        int blockAlign = (bitsPerSample / 8) * stream.ChannelCount;
+        int blockAlign = (bitsPerSample / 8) * channelCount;
         descriptor = new Descriptor
         {
             SampleRate = stream.SampleRate,
-            ChannelCount = stream.ChannelCount,
+            ChannelCount = channelCount,
             BitsPerSample = bitsPerSample,
             BlockAlign = blockAlign,
             AverageBytesPerSecond = blockAlign * stream.SampleRate,

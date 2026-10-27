@@ -14,6 +14,7 @@ using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
+using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Null;
@@ -2900,11 +2901,12 @@ public class PlaybackPipelineTests
 
             OperationResult opened = Open(pipeline, path);
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(opened.IsSuccessful, Is.True, opened.Message);
-                Assert.That(audioRenderer.ConfiguredStream, Is.Not.Null, "the second device has to be the one that was configured");
-            }
+            Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+
+            // The device itself is opened by the audio thread, so the second one having been configured is a thing to
+            // wait for rather than to find already done; what the open answers is which factory was used.
+            WaitFor(() => audioRenderer.ConfiguredStream is not null, "the second device to be the one that was configured");
+            Assert.That(audioRenderer.ConfiguredStream, Is.Not.Null, "the second device has to be the one that was configured");
         }
         finally
         {
@@ -4083,6 +4085,228 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// A host that adds a fold down gets a device opened for the folded format, and blocks that are folded: the audio
+    /// engine's own conversion is what this exists to avoid, because it divides the level down until no arrangement
+    /// of the source could clip — about ten decibels quieter than the file.
+    /// </summary>
+    [Test]
+    public void FoldsTheMixDownToWhatTheDevicePlays()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(2),
+            AudioChannelCount = 6,
+            AudioChannelLayout = ChannelLayout.Surround51,
+        };
+
+        FakeAudioRenderer renderer = new() { PlaysWhatItIsGiven = true, ChannelCapacity = 2 };
+        SyntheticSourceProviderFactory sources = new(script);
+        PlaybackPipeline pipeline = CreatePipeline(
+            new FakeVideoRenderer(),
+            renderer,
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            pipeline.AudioFilters.Add(new DownmixAudioFilter());
+            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, pipeline.MediaInfo!.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(renderer.ConfiguredStream?.ChannelCount, Is.EqualTo(2), "the device is opened for what the fold produces");
+                Assert.That(renderer.SubmittedChannelCounts, Is.All.EqualTo(2), "and every block it is handed matches");
+            }
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// And a device that can play the stream as it is gets it untouched: the fold decides for itself, so nothing is
+    /// converted, copied or opened for a format the file does not have.
+    /// </summary>
+    [Test]
+    public void HandsTheStreamToADeviceThatCanPlayItAsItIs()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(2),
+            AudioChannelCount = 6,
+            AudioChannelLayout = ChannelLayout.Surround51,
+        };
+
+        FakeAudioRenderer renderer = new() { PlaysWhatItIsGiven = true, ChannelCapacity = 6 };
+        SyntheticSourceProviderFactory sources = new(script);
+        PlaybackPipeline pipeline = CreatePipeline(
+            new FakeVideoRenderer(),
+            renderer,
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            pipeline.AudioFilters.Add(new DownmixAudioFilter());
+            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(renderer.ConfiguredStream?.ChannelCount, Is.EqualTo(6), "the device plays six channels, so it is asked for six");
+                Assert.That(renderer.SubmittedChannelCounts, Is.All.EqualTo(6), "and the fold down has nothing to do");
+            }
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A device that can be described but not opened is a warning and not a failed playback: the picture still plays,
+    /// and the reason reaches the host. This is the one failure left to the audio thread — everything that can be
+    /// answered before a command promises to play is answered while it is still the command — and the device is asked
+    /// once, not once per iteration.
+    /// </summary>
+    [Test]
+    public void WarnsWhenTheDeviceCannotBeOpenedAfterTheSoundWasChosen()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { CanOpen = false, RefusalReason = "the device vanished" };
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0])).IsSuccessful, Is.True, "the choice was answered before anything was opened");
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => warnings.Messages.Any(message => message.Contains("the device vanished")), "the device to be found out");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(audioRenderer.ConfigureCount, Is.EqualTo(1), "it is opened once, and not again on every iteration");
+                Assert.That(audioRenderer.SubmitsStarted, Is.Zero, "nothing is handed to a device that is not open");
+                Assert.That(pipeline.Error, Is.Null, "a missing device is not a failed playback");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A filter that changes the format can join while the sound plays, and the device is opened again for what the
+    /// chain now hands on: the chain's version is what tells the audio thread to look, and the reopening happens there
+    /// so nothing is submitted in a shape the device was not opened for.
+    /// </summary>
+    [Test]
+    public void ReconfiguresTheDeviceWhenAFilterChangesTheFormatWhilePlaying()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(4),
+            AudioChannelCount = 6,
+            AudioChannelLayout = ChannelLayout.Surround51,
+        };
+
+        FakeAudioRenderer renderer = new() { PlaysWhatItIsGiven = true, ChannelCapacity = 2 };
+        SyntheticSourceProviderFactory sources = new(script);
+        PlaybackPipeline pipeline = CreatePipeline(
+            new FakeVideoRenderer(),
+            renderer,
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
+            Assert.That(renderer.ConfiguredStream?.ChannelCount, Is.EqualTo(6), "with no filter, the device is opened for the stream");
+
+            pipeline.AudioFilters.Add(new DownmixAudioFilter());
+
+            WaitFor(() => renderer.SubmittedChannelCounts.Contains(2), "the device to be reopened for the folded shape");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(renderer.ConfigureCount, Is.GreaterThanOrEqualTo(2), "the device was opened again");
+                Assert.That(renderer.ConfiguredStream?.ChannelCount, Is.EqualTo(2));
+                Assert.That(renderer.SubmittedChannelCounts[^1], Is.EqualTo(2), "and the blocks after it are folded");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a format change is not a stop");
+            }
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// And a host that adds no fold down gets the stream as it is: the pipeline knows no filter exists, so a surround
+    /// mix goes to a two-channel device unchanged — which is what handing it to the audio engine's own conversion is,
+    /// and quieter for it. That is the price of the pipeline not knowing what a fold down is, and it is the host's
+    /// line to write.
+    /// </summary>
+    [Test]
+    public void HandsTheStreamOverUnfoldedWhenTheHostAddedNoFilter()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(2),
+            AudioChannelCount = 6,
+            AudioChannelLayout = ChannelLayout.Surround51,
+        };
+
+        FakeAudioRenderer renderer = new() { PlaysWhatItIsGiven = true, ChannelCapacity = 2 };
+        SyntheticSourceProviderFactory sources = new(script);
+        PlaybackPipeline pipeline = CreatePipeline(
+            new FakeVideoRenderer(),
+            renderer,
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Audio, pipeline.MediaInfo!.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(renderer.ConfiguredStream?.ChannelCount, Is.EqualTo(6), "nothing narrowed it, so the stream is handed over as it is");
+                Assert.That(renderer.SubmittedChannelCounts, Is.All.EqualTo(6));
+            }
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Editing the chain is immediate: the chain already knows the stream, so the filter takes part in the next
     /// block without a reconcile.
     /// </summary>
@@ -4267,13 +4491,18 @@ public class PlaybackPipelineTests
 
         public AudioStreamInfo? ConfiguredStream { get; private set; }
 
+        public AudioStreamInfo? ConfiguredTarget { get; private set; }
+
         public int AppliedBlocks => Volatile.Read(ref _appliedBlocks);
 
         public bool Disposed { get; private set; }
 
-        public OperationResult Configure(AudioStreamInfo stream)
+        public AudioStreamInfo? OutputFormat => null;
+
+        public OperationResult Configure(AudioStreamInfo stream, AudioStreamInfo target)
         {
             ConfiguredStream = stream;
+            ConfiguredTarget = target;
             return OperationResult.Success();
         }
 
@@ -6715,6 +6944,12 @@ public class PlaybackPipelineTests
 
         public bool CanConfigure { get; init; } = true;
 
+        /// <summary>
+        /// Whether the device takes the stream once it has been described. A device that can be described and then not
+        /// opened is the one case left to the audio thread, which is the only thing that opens it.
+        /// </summary>
+        public bool CanOpen { get; init; } = true;
+
         public string RefusalReason { get; init; } = string.Empty;
 
         public int SubmitDelayMilliseconds { get; init; }
@@ -6858,9 +7093,37 @@ public class PlaybackPipelineTests
 
             set => _queuedSampleCount = value;
         }
+        /// <summary>
+        /// How many channels this stand-in device plays; the stream is narrowed to it the way a real endpoint with
+        /// fewer speakers narrows one, which is what makes the pipeline fold the mix down.
+        /// </summary>
+        public int? ChannelCapacity { get; init; }
+
+        public OperationResult<AudioStreamInfo> Negotiate(AudioStreamInfo stream)
+        {
+            OperationResultCreator<AudioStreamInfo> result = new();
+            if (!CanConfigure)
+            {
+                // The device that will not be opened cannot be described either, which is how a selection comes to be
+                // refused before anything is played.
+                return result.Failure(RefusalReason);
+            }
+
+            if (ChannelCapacity is not int capacity || capacity <= 0 || capacity >= stream.ChannelCount)
+            {
+                return result.Success(stream);
+            }
+
+            return result.Success(stream.WithLayout(capacity, capacity == 2 ? ChannelLayout.Stereo : stream.ChannelLayout));
+        }
+
+        /// <summary>How many times the device has been opened: more than one is a device that was reopened mid-stream.</summary>
+        public int ConfigureCount { get; private set; }
+
         public OperationResult Configure(AudioStreamInfo stream)
         {
-            if (!CanConfigure)
+            ConfigureCount++;
+            if (!CanConfigure || !CanOpen)
             {
                 return OperationResult.Failure(RefusalReason);
             }
@@ -6880,9 +7143,28 @@ public class PlaybackPipelineTests
             lock (_submittedTimestamps)
             {
                 _submittedTimestamps.Add(buffer.Timestamp);
+                _submittedChannelCounts.Add(buffer.ChannelCount);
             }
 
             return new FakeAudioSubmit(this, buffer);
+        }
+
+        private readonly List<int> _submittedChannelCounts = [];
+
+        /// <summary>
+        /// How many channels each block the device was handed had, in the order it was handed them: what a fold down
+        /// is visible in, since the format the renderer was configured with says what it should be and this says what
+        /// actually arrived.
+        /// </summary>
+        public IReadOnlyList<int> SubmittedChannelCounts
+        {
+            get
+            {
+                lock (_submittedTimestamps)
+                {
+                    return [.. _submittedChannelCounts];
+                }
+            }
         }
 
         private readonly List<TimeSpan> _submittedTimestamps = [];

@@ -18,6 +18,7 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
+using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Pipeline;
@@ -38,6 +39,7 @@ internal sealed partial class CoreEngine : IDisposable
     private SwapChainPanel? _subtitlePanel;
     private SwapChainPanelRenderTarget? _subtitleRenderTarget;
     private GainAudioFilter? _gainFilter;
+    private DownmixAudioFilter? _downmixFilter;
 
     private readonly PlaybackInfoHandle _playbackInfo = new();
     private PlaybackComponents _components = PlaybackComponents.Default;
@@ -91,6 +93,10 @@ internal sealed partial class CoreEngine : IDisposable
         GainAudioFilter? gainFilter = _gainFilter;
         _gainFilter = null;
         gainFilter?.Dispose();
+
+        DownmixAudioFilter? downmixFilter = _downmixFilter;
+        _downmixFilter = null;
+        downmixFilter?.Dispose();
 
         _videoRenderTarget?.DetachSurface();
         _videoRenderTarget?.Dispose();
@@ -313,12 +319,14 @@ internal sealed partial class CoreEngine : IDisposable
         pipeline.VideoTransform = _videoTransform;
         pipeline.StateChanged += Pipeline_StateChanged;
 
-        // The level of the sound is a filter, and the engine is the host of the pipeline, so it is the one that
-        // makes the filter and holds it, set to what the player has already asked for before anything plays.
         GainAudioFilter gainFilter = new();
         gainFilter.SetLevel(_volume, _muted);
         pipeline.AudioFilters.Add(gainFilter);
         _gainFilter = gainFilter;
+
+        DownmixAudioFilter downmixFilter = new();
+        pipeline.AudioFilters.Add(downmixFilter);
+        _downmixFilter = downmixFilter;
 
         // Warnings are heard as they happen — during the open for something left out of it, and later for a
         // device that stops moving. They were only ever looked at once, at load, before.
@@ -329,23 +337,11 @@ internal sealed partial class CoreEngine : IDisposable
         return pipeline;
     }
 
-    /// <summary>
-    /// Raised on the playback queue, which is where every event of the engine is raised, so this only logs:
-    /// playing on with something left out is a warning, not a failure, and the page still gets its media.
-    /// </summary>
     private void Pipeline_WarningRaised(string warning)
     {
         Logger.W(TAG, $"Playback warning: {warning}");
     }
 
-    /// <summary>
-    /// Passed on as it happens: the pipeline only reports a state it has actually changed to, so this is a
-    /// translation and nothing else — one event in, one event out, with the reason filled in when there is one.
-    /// <para>
-    /// Raised on the playback queue, so the host hears about it on its own thread: it touches live data and the
-    /// status bar, neither of which may be written from where playback runs.
-    /// </para>
-    /// </summary>
     private void Pipeline_StateChanged(MediaEngineState state, string? error)
     {
         string? message = null;
