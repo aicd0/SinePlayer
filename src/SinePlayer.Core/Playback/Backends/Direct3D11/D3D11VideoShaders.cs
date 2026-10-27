@@ -1,5 +1,7 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
+
+using System.Diagnostics.CodeAnalysis;
 
 using SinePlayer.Core.Playback.Abstractions;
 
@@ -13,11 +15,17 @@ namespace SinePlayer.Core.Playback.Backends.Direct3D11;
 /// without any vertex buffer and places it where the picture belongs, and one pixel shader per frame layout
 /// that samples the frame textures and produces RGBA.
 /// </summary>
-internal sealed class D3D11VideoShaders : IDisposable
+internal sealed partial class D3D11VideoShaders : IDisposable
 {
     /// <summary>
     /// BT.601 limited range, which is what the bulk of SD and HD content uses. Colour space and range
     /// belong to the frame once the engine carries them, and become a shader variant at that point.
+    /// <para>
+    /// Ten-bit frames need no variant of their own: a P010 texel is the ten-bit code left-aligned in sixteen bits,
+    /// so sampling it as <c>R16_UNORM</c> normalises it to the same place the eight-bit path puts the same code —
+    /// 64/1023.98 against 16/255 at black, 940/1023.98 against 235/255 at white. The same constants describe both,
+    /// to within half a percent, which is why the ten-bit entry points are the eight-bit ones.
+    /// </para>
     /// </summary>
     private const string ShaderSource = """
         // Everything about where the picture goes. TexCoordScale is the part of the texture the picture occupies:
@@ -132,7 +140,7 @@ internal sealed class D3D11VideoShaders : IDisposable
     /// </summary>
     internal ID3D11RasterizerState Rasterizer => _rasterizer ?? throw new ObjectDisposedException(nameof(D3D11VideoShaders));
 
-    internal static bool TryCreate(D3D11Device device, out D3D11VideoShaders? shaders, out string error)
+    internal static bool TryCreate(D3D11Device device, [NotNullWhen(true)] out D3D11VideoShaders? shaders, out string error)
     {
         shaders = null;
 
@@ -185,7 +193,29 @@ internal sealed class D3D11VideoShaders : IDisposable
                 return false;
             }
 
+            // Ten-bit planar frames are the same three planes, sixteen bits wide, and the same constants describe
+            // them: only the texture format changes, which the renderer picks from the frame.
+            if (!created.TryAddPixelShader(device, PixelFormat.Yuv420P10, "PSMainPlanar", out error))
+            {
+                created.Dispose();
+                return false;
+            }
+
             if (!created.TryAddArrayPixelShader(device, PixelFormat.Nv12, "PSMainSemiPlanarArray", out error))
+            {
+                created.Dispose();
+                return false;
+            }
+
+            // Ten-bit frames are semi-planar too, and sample the same way: see the note on the shader source for why
+            // the same constants describe them.
+            if (!created.TryAddPixelShader(device, PixelFormat.P010, "PSMainSemiPlanar", out error))
+            {
+                created.Dispose();
+                return false;
+            }
+
+            if (!created.TryAddArrayPixelShader(device, PixelFormat.P010, "PSMainSemiPlanarArray", out error))
             {
                 created.Dispose();
                 return false;
@@ -202,7 +232,7 @@ internal sealed class D3D11VideoShaders : IDisposable
         return true;
     }
 
-    internal bool TryGetPixelShader(PixelFormat format, out ID3D11PixelShader? pixelShader)
+    internal bool TryGetPixelShader(PixelFormat format, [NotNullWhen(true)] out ID3D11PixelShader? pixelShader)
     {
         return _pixelShaders.TryGetValue(format, out pixelShader);
     }
@@ -210,7 +240,7 @@ internal sealed class D3D11VideoShaders : IDisposable
     /// <summary>
     /// The shader for a frame that is still a texture, whose planes are sampled as slices of an array.
     /// </summary>
-    internal bool TryGetArrayPixelShader(PixelFormat format, out ID3D11PixelShader? pixelShader)
+    internal bool TryGetArrayPixelShader(PixelFormat format, [NotNullWhen(true)] out ID3D11PixelShader? pixelShader)
     {
         return _arrayPixelShaders.TryGetValue(format, out pixelShader);
     }

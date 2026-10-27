@@ -1,6 +1,7 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Common.ErrorHandling;
@@ -75,7 +76,7 @@ internal sealed class D3D11SwapChain : IDisposable
     /// <param name="width">Buffer width in physical pixels, as the host's scale requires.</param>
     /// <param name="height">Buffer height in physical pixels, as the host's scale requires.</param>
     /// <param name="compositionScale">The scale the host's element will apply when it composes this swap chain.</param>
-    internal static bool TryCreate(D3D11Device device, int width, int height, double compositionScale, out D3D11SwapChain? swapChain, out string error)
+    internal static bool TryCreate(D3D11Device device, int width, int height, double compositionScale, [NotNullWhen(true)] out D3D11SwapChain? swapChain, out string error)
     {
         // A picture covers its whole surface, so what is behind it is never meant to show through.
         return TryCreate(device, width, height, compositionScale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE, out swapChain, out error);
@@ -86,7 +87,7 @@ internal sealed class D3D11SwapChain : IDisposable
     /// subtitles over a picture — has to be premultiplied, or its "nothing here" pixels arrive as opaque black and hide
     /// what is underneath.
     /// </param>
-    internal static bool TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode, out D3D11SwapChain? swapChain, out string error)
+    internal static bool TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode, [NotNullWhen(true)] out D3D11SwapChain? swapChain, out string error)
     {
         swapChain = null;
         width = Math.Max(1, width);
