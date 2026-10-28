@@ -316,7 +316,7 @@ public sealed partial class FFmpegSource : IMediaSource
                 Duration = duration,
                 SampleRate = parameters->SampleRate,
                 ChannelCount = parameters->ChannelLayout.ChannelCount,
-                ChannelLayout = FFmpegInterop.ToChannelLayout(parameters->ChannelLayout.ChannelCount),
+                ChannelLayout = FFmpegInterop.ToChannelLayout(parameters->ChannelLayout),
                 SampleFormat = FFmpegInterop.ToSampleFormat(parameters->Format),
             },
             MediaStreamKind.Subtitle => new SubtitleStreamInfo

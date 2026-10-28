@@ -10,15 +10,6 @@ using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
-/// <summary>
-/// Decodes audio on the CPU with libavcodec. Sample rate, channel count and channel layout come from
-/// the stream: a decoder does not resample, so those cannot change. Only the sample format is read
-/// back from the frames, because that is the one thing a codec is free to choose differently from what
-/// the container declares.
-/// <para>
-/// All calls happen on one thread; the decoder holds no locks.
-/// </para>
-/// </summary>
 public sealed partial class FFmpegAudioDecoder : IAudioDecoder
 {
     private readonly AudioStreamInfo _stream;
@@ -38,8 +29,6 @@ public sealed partial class FFmpegAudioDecoder : IAudioDecoder
         _receiveFrame = receiveFrame;
         _timeBase = timeBase;
         _decoderName = decoderName;
-
-        // Best effort until the first buffer reveals the format the decoder actually chose.
         _outputFormat = stream.SampleFormat;
     }
 
@@ -51,10 +40,7 @@ public sealed partial class FFmpegAudioDecoder : IAudioDecoder
 
     public AudioSampleFormat OutputFormat => _outputFormat;
 
-    /// <summary>
-    /// Creates and opens a decoder for an audio stream of an FFmpeg source.
-    /// </summary>
-    public static OperationResult<FFmpegAudioDecoder> TryCreate(IMediaSource source, AudioStreamInfo stream)
+    public static OperationResult<FFmpegAudioDecoder> Create(IMediaSource source, AudioStreamInfo stream)
     {
         OperationResultCreator<FFmpegAudioDecoder> result = new();
 

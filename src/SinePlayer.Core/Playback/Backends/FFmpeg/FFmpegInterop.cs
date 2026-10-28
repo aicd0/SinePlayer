@@ -101,7 +101,49 @@ internal static class FFmpegInterop
             });
     }
 
-    internal static ChannelLayout ToChannelLayout(int channelCount)
+    /// <summary><c>AV_CHANNEL_ORDER_NATIVE</c>: the union holds the <c>AV_CH_LAYOUT_*</c> mask.</summary>
+    private const int NativeChannelOrder = 1;
+
+    private const ulong MaskMono = 0x4;                // FC alone
+    private const ulong MaskStereo = 0x3;              // FL|FR
+    private const ulong MaskSurround21 = 0xB;          // FL|FR|LFE
+    private const ulong MaskQuad = 0x33;               // FL|FR|BL|BR
+    private const ulong MaskSurround50 = 0x37;         // FL|FR|FC|BL|BR
+    private const ulong MaskSurround51 = 0x3F;         // FL|FR|FC|LFE|BL|BR
+    private const ulong MaskSurround51Side = 0x60F;    // FL|FR|FC|LFE|SL|SR
+    private const ulong MaskSurround61 = 0x70F;        // FL|FR|FC|LFE|BL|BR|BC
+    private const ulong MaskSurround61Back = 0x13F;    // FL|FR|FC|LFE|SL|SR|BC
+    private const ulong MaskSurround71 = 0x63F;        // FL|FR|FC|LFE|BL|BR|SL|SR
+
+    internal static ChannelLayout ToChannelLayout(AVChannelLayout channelLayout)
+    {
+        if (channelLayout.Order == NativeChannelOrder)
+        {
+            ChannelLayout named = (ulong)channelLayout.Layout switch
+            {
+                MaskMono => ChannelLayout.Mono,
+                MaskStereo => ChannelLayout.Stereo,
+                MaskSurround21 => ChannelLayout.Surround21,
+                MaskQuad => ChannelLayout.Quad,
+                MaskSurround50 => ChannelLayout.Surround50,
+                MaskSurround51 => ChannelLayout.Surround51,
+                MaskSurround51Side => ChannelLayout.Surround51,
+                MaskSurround61 => ChannelLayout.Surround61,
+                MaskSurround61Back => ChannelLayout.Surround61,
+                MaskSurround71 => ChannelLayout.Surround71,
+                _ => ChannelLayout.Unknown,
+            };
+
+            if (named != ChannelLayout.Unknown)
+            {
+                return named;
+            }
+        }
+
+        return ByChannelCount(channelLayout.ChannelCount);
+    }
+
+    private static ChannelLayout ByChannelCount(int channelCount)
     {
         return channelCount switch
         {
@@ -111,6 +153,7 @@ internal static class FFmpegInterop
             4 => ChannelLayout.Quad,
             5 => ChannelLayout.Surround50,
             6 => ChannelLayout.Surround51,
+            7 => ChannelLayout.Surround61,
             8 => ChannelLayout.Surround71,
             _ => ChannelLayout.Unknown,
         };
