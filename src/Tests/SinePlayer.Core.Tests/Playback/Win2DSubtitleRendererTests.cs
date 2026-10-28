@@ -140,7 +140,7 @@ public class Win2DSubtitleRendererTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(drawn.IsSuccessful, Is.True, drawn.Message);
-            Assert.That(target.Attached, Is.EqualTo(attached), "resizing replaces the buffers of the same swap chain, so the panel stays bound to it");
+            Assert.That(target.Attached, Is.Not.EqualTo(attached), "a chain Win2D has drawn into cannot be resized, so the panel is handed a new one");
         }
     }
 
@@ -429,6 +429,54 @@ public class Win2DSubtitleRendererTests
             End = TimeSpan.FromSeconds(2),
             Text = text,
         };
+    }
+
+    /// <summary>
+    /// A new size is answered with a new chain, not a resized one. Something Win2D has drawn into cannot be resized: the
+    /// wrapper around its back buffer is a WinRT object whose reference DXGI counts, and it lives until its finalizer runs,
+    /// so <c>ResizeBuffers</c> fails with <c>DXGI_ERROR_INVALID_CALL</c> — and keeps failing — which is how a window that
+    /// changed size came to lose its subtitles with a warning instead.
+    /// </summary>
+    [Test]
+    public void ReplacesItsChainForANewSizeInsteadOfResizingIt()
+    {
+        RecordingTarget target = new(640, 360, 1.0);
+        using Win2DSubtitleRenderer renderer = new();
+
+        OperationResult configured = renderer.Configure(Stream(), target);
+        if (!configured.IsSuccessful)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
+            return;
+        }
+
+        using SubtitleCue cue = new()
+        {
+            Start = TimeSpan.Zero,
+            End = TimeSpan.FromSeconds(2),
+            Text = "0,0,Default,,0,0,0,,Growing",
+        };
+
+        OperationResult first = renderer.Show([cue], SubtitlePlacement.Identity);
+        Assert.That(first.IsSuccessful, Is.True, first.Message);
+        nint firstChain = target.Attached;
+        Assert.That(firstChain, Is.Not.Zero, "the host was handed a chain to compose");
+
+        target.SetSize(800, 450);
+        target.RaiseSizeChanged();
+
+        OperationResult grown = renderer.Show([cue], SubtitlePlacement.Identity);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(grown.IsSuccessful, Is.True, grown.Message);
+            Assert.That(target.Attached, Is.Not.EqualTo(firstChain), "a size change is a new chain, not a resize of the old one");
+        }
+
+        target.SetSize(640, 360);
+        target.RaiseSizeChanged();
+
+        OperationResult shrunk = renderer.Show([cue], SubtitlePlacement.Identity);
+        Assert.That(shrunk.IsSuccessful, Is.True, shrunk.Message);
     }
 
     /// <summary>A cue carrying a small opaque image, positioned and sized as fractions of the frame.</summary>

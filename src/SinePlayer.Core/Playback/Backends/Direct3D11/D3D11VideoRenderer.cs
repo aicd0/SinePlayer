@@ -24,6 +24,20 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     /// <summary>The texture registers the array shader samples; the plane shaders use the three before them.</summary>
     private const uint GpuTextureSlot = 3;
 
+    /// <summary>
+    /// The layouts a hardware frame can be drawn from: one row per video format DXGI defines plane views for, with the
+    /// two channel layouts those views are cast to. It is the only statement of that fact — the pre-check reads a row by
+    /// layout, before any texture exists, and the draw reads the same row by the texture's own format. Two copies of it
+    /// could disagree, and a pre-check wider than the draw would accept a frame that is then refused every time it
+    /// arrives, which reads as a decoder fault rather than as this one.
+    /// </summary>
+    private static readonly (PixelFormat Layout, DXGI_FORMAT Texture, DXGI_FORMAT Luma, DXGI_FORMAT Chroma)[] sGpuLayouts =
+    [
+        (PixelFormat.Nv12, DXGI_FORMAT.DXGI_FORMAT_NV12, DXGI_FORMAT.DXGI_FORMAT_R8_UNORM, DXGI_FORMAT.DXGI_FORMAT_R8G8_UNORM),
+        (PixelFormat.P010, DXGI_FORMAT.DXGI_FORMAT_P010, DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, DXGI_FORMAT.DXGI_FORMAT_R16G16_UNORM),
+        (PixelFormat.P016, DXGI_FORMAT.DXGI_FORMAT_P016, DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, DXGI_FORMAT.DXGI_FORMAT_R16G16_UNORM),
+    ];
+
     internal static OperationResult<D3D11VideoRenderer> Create(D3D11Device device, VideoSurfacePreference surfacePreference)
     {
         OperationResultCreator<D3D11VideoRenderer> result = new();
@@ -41,33 +55,34 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     private readonly D3D11VideoShaders _shaders;
     private readonly object _deviceLock = new();
 
-    private ID3D11Texture2D[] _planeTextures = [];
-    private ID3D11ShaderResourceView[] _planeViews = [];
+    /// <summary>The one number the vertex shader is given: where in its texture the picture lies.</summary>
+    private readonly ID3D11Buffer _frameTransform;
 
-    /// <summary>
-    /// Views over the decoder's own texture, which is where a hardware frame is drawn from. They hold a
-    /// reference to that texture, and the retained frame is what keeps the decoder from reusing its slice.
-    /// </summary>
+    private readonly VideoSurfacePreference _surfacePreference;
+
+    private IVideoRenderTarget? _target;
+    private IVideoSurface? _surface;
+    private VideoSurfaceKind _surfaceKind = VideoSurfaceKind.Sdr;
+    private ID3D11RenderTargetView? _outputView;
+    private int _outputWidth;
+    private int _outputHeight;
+    private bool _needsResize;
+    private string _name;
+
+    /// <summary>How big the frame in hand is, which both ways of getting one use as the key to what they hold.</summary>
+    private int _frameWidth;
+    private int _frameHeight;
+
     private ID3D11ShaderResourceView[] _gpuViews = [];
-    private IGpuVideoBuffer? _retainedFrame;
     private nint _gpuTexture;
     private int _gpuSlice = -1;
+    private IGpuVideoBuffer? _retainedFrame;
 
     /// <summary>How much of the texture the picture fills, which is less than all of it when it was padded.</summary>
     private (float X, float Y) _gpuTexCoordScale = (1.0f, 1.0f);
 
-    /// <summary>The same transform the last draw used, so a redraw shows the same picture.</summary>
-    private (float X, float Y) _lastTexCoordScale = (1.0f, 1.0f);
-
-    /// <summary>The one number the vertex shader is given: where in its texture the picture lies.</summary>
-    private readonly ID3D11Buffer _frameTransform;
-
-    private ID3D11PixelShader? _lastPixelShader;
-    private ID3D11ShaderResourceView[] _lastViews = [];
-    private uint _lastSlot;
-
-    private int _frameWidth;
-    private int _frameHeight;
+    private ID3D11Texture2D[] _planeTextures = [];
+    private ID3D11ShaderResourceView[] _planeViews = [];
 
     /// <summary>
     /// The layout of the textures <see cref="_planeTextures"/> were created for, which is what says whether an upload
@@ -76,23 +91,14 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     /// </summary>
     private PixelFormat _frameFormat = PixelFormat.Unknown;
 
-    private ID3D11RenderTargetView? _outputView;
-    private int _outputWidth;
-    private int _outputHeight;
+    private ID3D11PixelShader? _lastPixelShader;
+    private ID3D11ShaderResourceView[] _lastViews = [];
+    private uint _lastSlot;
 
-    private IVideoRenderTarget? _target;
-    private IVideoSurface? _surface;
-    private bool _needsResize;
+    /// <summary>The same transform the last draw used, so a redraw shows the same picture.</summary>
+    private (float X, float Y) _lastTexCoordScale = (1.0f, 1.0f);
+
     private bool _disposed;
-
-    /// <summary>
-    /// What the surface being drawn into expects, or what a bare output view is being treated as. It is the container
-    /// in effect, and the one thing that decides which transform a frame needs — a picture in memory says what it is,
-    /// but only the surface says what it has to become.
-    /// </summary>
-    private VideoSurfaceKind _surfaceKind = VideoSurfaceKind.Sdr;
-
-    private readonly VideoSurfacePreference _surfacePreference;
 
     private D3D11VideoRenderer(D3D11Device device, D3D11VideoShaders shaders, VideoSurfacePreference surfacePreference)
     {
@@ -100,33 +106,14 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         _shaders = shaders;
         _surfacePreference = surfacePreference;
         _frameTransform = D3D11Interop.CreateConstantBuffer(device.Device);
+        _name = Describe(kind: null);
     }
 
     #endregion
 
-    /// <summary>
-    /// The layouts a hardware frame can be drawn from: one row per video format DXGI defines plane views for, with the
-    /// two channel layouts those views are cast to. It is the only statement of that fact — the pre-check reads a row by
-    /// layout, before any texture exists, and the draw reads the same row by the texture's own format. Two copies of it
-    /// could disagree, and a pre-check wider than the draw would accept a frame that is then refused every time it
-    /// arrives, which reads as a decoder fault rather than as this one.
-    /// </summary>
-    private static readonly (PixelFormat Layout, DXGI_FORMAT Texture, DXGI_FORMAT Luma, DXGI_FORMAT Chroma)[] sGpuLayouts =
-    [
-        (PixelFormat.Nv12, DXGI_FORMAT.DXGI_FORMAT_NV12, DXGI_FORMAT.DXGI_FORMAT_R8_UNORM, DXGI_FORMAT.DXGI_FORMAT_R8G8_UNORM),
-        (PixelFormat.P010, DXGI_FORMAT.DXGI_FORMAT_P010, DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, DXGI_FORMAT.DXGI_FORMAT_R16G16_UNORM),
-        (PixelFormat.P016, DXGI_FORMAT.DXGI_FORMAT_P016, DXGI_FORMAT.DXGI_FORMAT_R16_UNORM, DXGI_FORMAT.DXGI_FORMAT_R16G16_UNORM),
-    ];
-
     #region Public API
 
-    /// <summary>
-    /// Named with its container, because that is the difference a caller can see: two players on one machine may be
-    /// presenting the same file into two different surfaces, and the name is where that shows.
-    /// </summary>
-    public string Name => _surface is null
-        ? "Direct3D 11"
-        : $"Direct3D 11 ({(_surface.Kind == VideoSurfaceKind.Hdr10 ? "HDR10" : "SDR")})";
+    public string Name => _name;
 
     public IGpuDevice? GpuDevice => this;
 
@@ -134,32 +121,10 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
     public object DeviceLock => _deviceLock;
 
-    /// <summary>
-    /// The layouts a decoder may keep on this device: a semi-planar texture eight or sixteen bits wide, which is
-    /// exactly what the views below can be cast out of. Stated as a layout because a decoder asks before any texture
-    /// exists, and refusing here is what keeps a frame that could never be sampled from ever being produced.
-    /// </summary>
-    public OperationResult CanDisplayGpuFrame(PixelFormat format)
-    {
-        foreach ((PixelFormat layout, _, _, _) in sGpuLayouts)
-        {
-            if (layout == format)
-            {
-                return OperationResult.Success();
-            }
-        }
-
-        return OperationResult.Failure($"The Direct3D renderer cannot sample {format} frames that are still on the GPU.");
-    }
-
     internal int OutputPixelWidth => _outputWidth;
 
     internal int OutputPixelHeight => _outputHeight;
 
-    /// <summary>
-    /// What the output view holds, for a caller that supplied one instead of a surface — which is how a test draws into the
-    /// container it wants to pin. With a surface this is the surface's kind and cannot be set.
-    /// </summary>
     internal VideoSurfaceKind SurfaceKind
     {
         get => _surfaceKind;
@@ -226,6 +191,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
             _surface = created.Result;
             _surfaceKind = created.Result.Kind;
+            _name = Describe(_surfaceKind);
         }
         else
         {
@@ -367,6 +333,19 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
             return _surface is null ? OperationResult.Success() : _surface.Present();
         }
+    }
+
+    public OperationResult CanDisplayGpuFrame(PixelFormat format)
+    {
+        foreach ((PixelFormat layout, _, _, _) in sGpuLayouts)
+        {
+            if (layout == format)
+            {
+                return OperationResult.Success();
+            }
+        }
+
+        return OperationResult.Failure($"The Direct3D renderer cannot sample {format} frames that are still on the GPU.");
     }
 
     /// <summary>Sets the surface frames are drawn into when there is no presentation target.</summary>
@@ -764,6 +743,17 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         _frameFormat = PixelFormat.Unknown;
         _frameWidth = 0;
         _frameHeight = 0;
+    }
+
+    private string Describe(VideoSurfaceKind? kind)
+    {
+        string software = _device.IsSoftware ? ", software" : string.Empty;
+        return kind switch
+        {
+            VideoSurfaceKind.Hdr10 => $"Direct3D 11 (HDR10{software})",
+            VideoSurfaceKind.Sdr => $"Direct3D 11 (SDR{software})",
+            _ => _device.IsSoftware ? "Direct3D 11 (software)" : "Direct3D 11",
+        };
     }
 
     #endregion

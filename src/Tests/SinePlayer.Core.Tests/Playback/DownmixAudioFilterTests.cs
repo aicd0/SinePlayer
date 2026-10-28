@@ -61,6 +61,42 @@ public class DownmixAudioFilterTests
     }
 
     [Test]
+    public void FoldsSixPointOneWithItsBackCentreOnBothSides()
+    {
+        // The channel order the 6.1 mask asserts: front pair, centre, low frequency, back pair, then the back centre that
+        // makes this layout what it is. The back centre has no side of its own, so it reaches both.
+        float[][] planes =
+        [
+            [0.5f],
+            [-0.5f],
+            [0.2f],
+            [0.9f],
+            [0.1f],
+            [-0.1f],
+            [0.3f],
+        ];
+
+        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround61, 7);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround61, 7, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                Assert.That(output.ChannelCount, Is.EqualTo(2));
+                Assert.That(output.ChannelLayout, Is.EqualTo(ChannelLayout.Stereo));
+                Assert.That(ReadSamples(output), Is.EqualTo(new[]
+                {
+                    0.5 + (HalfPower * 0.2) + (HalfPower * 0.1) + (HalfPower * 0.3),
+                    -0.5 + (HalfPower * 0.2) - (HalfPower * 0.1) + (HalfPower * 0.3),
+                }).Within(1e-5));
+            }
+        }
+    }
+
+    [Test]
     public void DropsTheLowFrequencyChannel()
     {
         float[][] planes =

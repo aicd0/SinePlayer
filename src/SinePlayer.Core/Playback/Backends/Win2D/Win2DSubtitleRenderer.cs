@@ -49,6 +49,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
     private D3D11Device? _d3dDevice;
     private D3D11SwapChain? _swapChain;
+    private IDirect3DSurface? _surface;
     private CanvasDevice? _canvasDevice;
     private IVideoRenderTarget? _target;
     private SubtitleStreamInfo? _stream;
@@ -142,9 +143,12 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             int width = swapChain.Width;
             int height = swapChain.Height;
 
-            // A fresh wrapper per drawing rather than one kept alive: a resize replaces the buffer it points at, and a
-            // drawing is rare enough — a cue boundary or a resize — that holding one would buy nothing.
-            IDirect3DSurface surface = CreateSurface(swapChain);
+            IDirect3DSurface? surface = _surface;
+            if (surface is null)
+            {
+                return OperationResult.Failure("The subtitle surface has no back buffer to draw into.");
+            }
+
             target = CanvasRenderTarget.CreateFromDirect3D11Surface(_canvasDevice!, surface, 96.0f, CanvasAlphaMode.Premultiplied);
 
             using (CanvasDrawingSession session = target.CreateDrawingSession())
@@ -358,6 +362,16 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
                 EnsureCanvasDevice();
             }
 
+            if (_swapChain is not null && NeedsReplacing(_swapChain, width, height, scale))
+            {
+                // A chain drawn through Win2D is replaced rather than resized. The wrapper this renderer holds around the
+                // chain's back buffer is a WinRT object whose reference DXGI counts, and ResizeBuffers refuses while any
+                // reference to a buffer is outstanding — the wrapper lives until its finalizer runs, so a resize fails
+                // with DXGI_ERROR_INVALID_CALL and would keep failing. A new chain has new buffers and nothing holding
+                // them, which is why the size change is answered by throwing the old one away.
+                ReleaseChain();
+            }
+
             if (_swapChain is null)
             {
                 OperationResult<D3D11SwapChain> created = D3D11SwapChain.TryCreate(_d3dDevice!, width, height, scale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_PREMULTIPLIED);
@@ -374,15 +388,8 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
                 }
 
                 _swapChain = created.Result;
+                _surface = CreateSurface(created.Result);
                 target.SurfaceSizeChanged += OnSurfaceSizeChanged;
-                return OperationResult.Success();
-            }
-
-            OperationResult resized = _swapChain.Resize(width, height, scale);
-            if (!resized.IsSuccessful)
-            {
-                ResetSurface();
-                return resized;
             }
 
             return OperationResult.Success();
@@ -392,6 +399,22 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             ResetSurface();
             return OperationResult.Failure($"Unable to prepare the subtitle surface: {exception.Message}");
         }
+    }
+
+    private static bool NeedsReplacing(D3D11SwapChain swapChain, int width, int height, double scale)
+    {
+        return swapChain.Width != width || swapChain.Height != height || swapChain.CompositionScale != scale;
+    }
+
+    /// <summary>
+    /// Lets go of the chain and of the wrapper around its back buffer. Something that drew this chain cannot be resized
+    /// afterwards, so a resize is answered by this: the chain goes, and the next surface is a new one.
+    /// </summary>
+    private void ReleaseChain()
+    {
+        _surface = null;
+        _swapChain?.Dispose();
+        _swapChain = null;
     }
 
     /// <summary>
@@ -488,8 +511,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
     private void ResetSurface()
     {
-        _swapChain?.Dispose();
-        _swapChain = null;
+        ReleaseChain();
         _canvasDevice?.Dispose();
         _canvasDevice = null;
         _d3dDevice?.Dispose();

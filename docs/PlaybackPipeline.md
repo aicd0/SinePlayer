@@ -701,6 +701,13 @@ source could clip. Measured, a front channel came through about ten decibels qui
 the centre about thirteen. Folding the mix down instead keeps the level the file was made at, and leaves the
 engine only the sample rate, which it converts transparently.
 
+**A layout is named from its channel mask, not its channel count.** Seven channels are not one arrangement: a DTS-ES
+track is 5.1 with a single back centre (`AV_CH_LAYOUT_6POINT1`, `0x70F`), and a count alone cannot tell it from any other
+seven. Reading the mask names `ChannelLayout.Surround61` for it, and the fold sends the back centre to both sides because
+it has no side of its own. Naming it by count had left the track `Unknown`, and a layout with no positions is refused by
+the fold — so the file played a picture and nothing else. A mask the enumeration cannot express is still left to the
+count, which is what every stream used before the mask was read.
+
 The same version is what lets the chain move while the sound plays — a host adding or removing a filter. It is not
 used to check a block, though: the audio thread holds a **snapshot** (`AudioFilterChain.Clone`), an object that never
 changes, and runs every block through that. So what a block goes through and the shape the device was opened for are

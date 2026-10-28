@@ -11,22 +11,6 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 
 namespace SinePlayer.Core.Playback.Backends.Downmix;
 
-/// <summary>
-/// Turns a surround block into two channels. It is a filter rather than part of a renderer because folding a mix
-/// down is arithmetic on samples — a coefficient table and a per-format read and write are the whole of it — and
-/// none of that needs a device to be understood or to be tested.
-/// <para>
-/// A host adds it to a pipeline the way it adds any other filter, and the format the chain is pointed at is what
-/// tells it whether there is anything to do: an endpoint with two speakers makes a five-channel mix worth folding,
-/// and a device that can play all six leaves this filter costing a reference. Nothing here knows that WASAPI,
-/// or any other renderer, exists.
-/// </para>
-/// <para>
-/// The coefficients are the usual ones: front channels at unity, the centre and the surrounds at -3 dB each, and
-/// the low-frequency channel dropped rather than sent to speakers that cannot reproduce it. Unity front channels
-/// leave no headroom for what is added to them, so the result is clamped to full scale rather than allowed to wrap.
-/// </para>
-/// </summary>
 public sealed partial class DownmixAudioFilter : IAudioFilter
 {
     private const int TargetChannelCount = 2;
@@ -42,13 +26,6 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
 
     public AudioStreamInfo? OutputFormat => _outputFormat;
 
-    /// <summary>
-    /// Prepares the fold for a stream and for what the next stage can take. The decision is here rather than in the
-    /// caller: a stream that already fits the target is accepted and then left alone, a layout whose speaker
-    /// positions are unknown is refused because dropping the channels a mask does not account for would silence
-    /// part of the mix rather than place it, and a target that is neither the stream's own count nor two channels
-    /// is refused because two is the only fold this filter knows how to do.
-    /// </summary>
     public OperationResult Configure(AudioStreamInfo input, AudioStreamInfo target)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -217,6 +194,7 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             ChannelLayout.Quad => 4,
             ChannelLayout.Surround50 => 5,
             ChannelLayout.Surround51 => 6,
+            ChannelLayout.Surround61 => 7,
             ChannelLayout.Surround71 => 8,
             _ => 0,
         };
@@ -252,6 +230,15 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
                 right[2] = HalfPower;
                 left[4] = HalfPower;
                 right[5] = HalfPower;
+                break;
+
+            case ChannelLayout.Surround61:
+                left[2] = HalfPower;
+                right[2] = HalfPower;
+                left[4] = HalfPower;
+                right[5] = HalfPower;
+                left[6] = HalfPower;
+                right[6] = HalfPower;
                 break;
 
             case ChannelLayout.Surround71:

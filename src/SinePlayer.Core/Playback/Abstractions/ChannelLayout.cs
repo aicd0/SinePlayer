@@ -3,10 +3,6 @@
 
 namespace SinePlayer.Core.Playback.Abstractions;
 
-/// <summary>
-/// Backend-neutral description of how channels are arranged in an audio block. Channel order
-/// follows the usual convention of the listed layout.
-/// </summary>
 public enum ChannelLayout
 {
     Unknown,
@@ -16,5 +12,6 @@ public enum ChannelLayout
     Quad,
     Surround50,
     Surround51,
+    Surround61,
     Surround71,
 }

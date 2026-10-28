@@ -7,15 +7,6 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 
 namespace SinePlayer.Core.Playback.Backends.Wasapi;
 
-/// <summary>
-/// Describes a decoded stream as a WASAPI format descriptor. The mapping is a pure function so it can
-/// be verified without a device, which matters because a wrong descriptor is the most common reason a
-/// stream fails to open.
-/// <para>
-/// Channel masks are the KSAUDIO speaker positions, which is what both <c>WAVEFORMATEXTENSIBLE</c> and
-/// the audio engine use to decide how channels map onto speakers.
-/// </para>
-/// </summary>
 internal static class WasapiAudioFormat
 {
     private const uint SpeakerFrontLeft = 0x1;
@@ -24,6 +15,7 @@ internal static class WasapiAudioFormat
     private const uint SpeakerLowFrequency = 0x8;
     private const uint SpeakerBackLeft = 0x10;
     private const uint SpeakerBackRight = 0x20;
+    private const uint SpeakerBackCenter = 0x100;
     private const uint SpeakerSideLeft = 0x200;
     private const uint SpeakerSideRight = 0x400;
 
@@ -147,6 +139,7 @@ internal static class WasapiAudioFormat
             ChannelLayout.Quad => SpeakerFrontLeft | SpeakerFrontRight | SpeakerBackLeft | SpeakerBackRight,
             ChannelLayout.Surround50 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerBackLeft | SpeakerBackRight,
             ChannelLayout.Surround51 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerBackLeft | SpeakerBackRight,
+            ChannelLayout.Surround61 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerBackLeft | SpeakerBackRight | SpeakerBackCenter,
             ChannelLayout.Surround71 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerBackLeft | SpeakerBackRight | SpeakerSideLeft | SpeakerSideRight,
             _ => ChannelMaskUnspecified,
         };

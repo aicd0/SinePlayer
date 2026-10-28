@@ -122,6 +122,13 @@ demuxer enumerates subtitle streams so they appear in `MediaInfo`, and the pipel
   events up at once become two lines rather than one drawn over the other. The Matrix's title is the case that found this:
   `帝国黑客` arrives as four separate one-character SRT events, all bottom-centre. The host's second `SwapChainPanel`
   receives that chain, and the player offers the track in its menu.
+- **The subtitle chain is replaced when the surface changes size, never resized.** Win2D draws into the chain through a
+  WinRT wrapper around its back buffer, and DXGI counts that reference: `ResizeBuffers` refuses with
+  `DXGI_ERROR_INVALID_CALL` while any reference to a buffer is outstanding, and the wrapper lives until its finalizer runs.
+  A resize therefore failed — once, and then every time — and the warning `The subtitles could not be drawn` was what the
+  player showed while the subtitles silently stopped. Measuring it took one line: the same resize succeeds if a
+  `GC.Collect` is inserted before it. The chain is now thrown away and a new one attached, which also means the wrapper is
+  created once per chain instead of once per drawing.
 - **What is missing.** An external subtitle file — a sidecar `.srt` or `.ass` beside the video — is still refused,
   because `FFmpegSubtitleDecoder` has no source for one; a file whose own tracks cannot be read has no fallback yet. The
   32-bit pixel layout is still unverified against content of its own — the PGS file to hand paints through a palette, so

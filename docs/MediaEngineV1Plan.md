@@ -563,6 +563,13 @@ Added `Backends/Direct3D11/` with `D3D11Device` (device, immediate context, feat
 `D3D11Interop` (the plumbing that turns the generated pointer-based ABI back into usable COM
 objects), plus 2 tests.
 
+`D3D11Device.Create` now asks for an accelerated device and falls back to **WARP** when there is none (4 tests). A machine
+can display a window with no accelerated 3D driver at all — Windows composes the desktop with Direct3D and falls back to
+its own software rasteriser — so asking only for hardware turned "no GPU driver" into "no picture", where the honest
+outcome is a slow picture and a log line. The device reports which it got (`DriverType`, `IsSoftware`) and a software
+renderer names itself as such; the software path is renderable but not watchable, since decoding drops to the CPU and 4K
+frames will not keep up.
+
 The step turned on one question that had to be answered before any renderer code was worth writing:
 **how the Direct3D interop is produced.** Hand-writing COM vtables means reproducing
 `ID3D11DeviceContext`'s ~110 methods in exact order, where a single mistake silently corrupts memory.
