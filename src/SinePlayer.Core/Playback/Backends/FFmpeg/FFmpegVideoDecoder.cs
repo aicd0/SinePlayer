@@ -10,26 +10,16 @@ using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
-/// <summary>
-/// Decodes video with libavcodec, on the GPU when the codec has a hardware decoder for it and on the CPU
-/// otherwise. Frames are handed out as plane descriptions rather than copies, so uploading them is the
-/// renderer's job.
-/// <para>
-/// All calls happen on one thread; the decoder holds no locks.
-/// </para>
-/// </summary>
 public sealed partial class FFmpegVideoDecoder : IVideoDecoder
 {
-    /// <summary><c>AV_OPT_SEARCH_CHILDREN</c>: look at the codec's own options, not just the context's.</summary>
     private const int SearchChildren = 1;
 
-    /// <summary>
-    /// How many threads a decoder may use. Enough for a 4K stream to be decoded several times faster than
-    /// it plays, and no more: a frame-threaded decoder holds its output back by roughly one frame per
-    /// thread, so handing it every processor on the machine means a seek that lands near the end of a file
-    /// leaves it with less than it needs to fill that pipeline, and the picture does not appear.
-    /// </summary>
     private static readonly int DecoderThreadCount = Math.Clamp(Environment.ProcessorCount, 1, 8);
+
+    private static unsafe int CodecIdOf(nint parameters)
+    {
+        return ((AVCodecParameters*)parameters)->CodecId;
+    }
 
     private readonly AVRational _timeBase;
     private readonly TimeSpan _frameDuration;
@@ -37,7 +27,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
     private readonly bool _hardwareDecoding;
     private readonly IGpuDevice? _gpuDevice;
     private readonly int _bufferedFrames;
-    private readonly string[] _candidates;
+    private readonly FFmpegDecoderCandidate[] _candidates;
 
     private FFmpegSource? _source;
     private nint _parameters;
@@ -48,10 +38,6 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
     private nint _context;
     private nint _receiveFrame;
 
-    /// <summary>
-    /// The graphics API this decoder decodes on, or null when it decodes in software. Everything API-specific is asked
-    /// of it, which is what keeps this class free of any one API's vocabulary.
-    /// </summary>
     private IFFmpegHardwareBackend? _hardwareBackend;
 
     private PixelFormat _outputFormat;
@@ -59,7 +45,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
     private bool _hardware;
     private bool _disposed;
 
-    private FFmpegVideoDecoder(FFmpegSource source, VideoStreamInfo stream, nint parameters, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, IFFmpegHardwareBackend? hardwareBackend, int bufferedFrames, string[] candidates)
+    private FFmpegVideoDecoder(FFmpegSource source, VideoStreamInfo stream, nint parameters, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, IFFmpegHardwareBackend? hardwareBackend, int bufferedFrames, IReadOnlyList<string> candidates)
     {
         _source = source;
         Stream = stream;
@@ -69,12 +55,10 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         _gpuDevice = gpuDevice;
         _hardwareBackend = hardwareBackend;
         _bufferedFrames = bufferedFrames;
-        _candidates = candidates;
+        _candidates = [.. FFmpegDecoders.ByNamesThenCodecId(CodecIdOf(parameters), [.. candidates])];
         _timeBase = source.GetTimeBase(stream.Index);
         _frameDuration = stream.FrameRate > 0 ? TimeSpan.FromSeconds(1 / stream.FrameRate) : TimeSpan.Zero;
         _decoderName = string.Empty;
-
-        // Best effort until the first frame reveals the format the decoder actually chose.
         _outputFormat = stream.PixelFormat;
     }
 
@@ -212,12 +196,9 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         string lastError = string.Empty;
         while (_candidateIndex < _candidates.Length)
         {
-            string name = _candidates[_candidateIndex++];
-            nint codec = FFmpegNative.avcodec_find_decoder_by_name(name);
-            if (codec == 0)
-            {
-                continue;
-            }
+            FFmpegDecoderCandidate candidate = _candidates[_candidateIndex++];
+            nint codec = candidate.Codec;
+            string name = candidate.Name;
 
             // Hardware only: this decoder is asked for on the GPU when the caller required it and in software
             // when it did not, and it never decides that for itself — giving the requirement up is the

@@ -78,13 +78,10 @@ public sealed partial class FFmpegAudioDecoder : IAudioDecoder
         }
 
         string lastError = string.Empty;
-        foreach (string name in GetDecoderCandidates(stream.CodecId))
+        foreach (FFmpegDecoderCandidate candidate in FFmpegDecoders.ByCodecIdThenNames(CodecIdOf(parameters)))
         {
-            nint codec = FFmpegNative.avcodec_find_decoder_by_name(name);
-            if (codec == 0)
-            {
-                continue;
-            }
+            nint codec = candidate.Codec;
+            string name = candidate.Name;
 
             nint context = FFmpegNative.avcodec_alloc_context3(codec);
             if (context == 0)
@@ -120,7 +117,14 @@ public sealed partial class FFmpegAudioDecoder : IAudioDecoder
             return result.Success(new FFmpegAudioDecoder(stream, context, receiveFrame, ffmpegSource.GetTimeBase(stream.Index), name));
         }
 
-        return result.Failure(string.IsNullOrEmpty(lastError) ? $"No FFmpeg decoder handles codec '{stream.CodecId}'." : lastError);
+        return result.Failure(string.IsNullOrEmpty(lastError)
+            ? $"No FFmpeg decoder handles codec '{stream.CodecId}' (id {CodecIdOf(parameters)}), so this build cannot decode it."
+            : lastError);
+    }
+
+    private static unsafe int CodecIdOf(nint parameters)
+    {
+        return ((AVCodecParameters*)parameters)->CodecId;
     }
 
     public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
@@ -320,15 +324,5 @@ public sealed partial class FFmpegAudioDecoder : IAudioDecoder
     private static unsafe long GetFrameTimestamp(nint frame)
     {
         return ((AVFrame*)frame)->Pts;
-    }
-
-    /// <summary>
-    /// Decoder names to try, in order. Video needs this because FFmpeg's default decoder for a codec
-    /// is not always the one that works; audio keeps the same shape so an ordered preference can be
-    /// added here without changing the caller, and so both decoders read alike.
-    /// </summary>
-    private static IEnumerable<string> GetDecoderCandidates(string codecId)
-    {
-        yield return codecId;
     }
 }

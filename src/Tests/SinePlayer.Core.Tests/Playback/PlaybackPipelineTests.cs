@@ -2813,6 +2813,37 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// A track that cannot be decoded is reported through the warning channel as well as to the caller. Without that, a
+    /// file whose sound cannot be decoded plays silently — indistinguishable from a file that has no sound — and the one
+    /// line saying which codec has no decoder never reaches a log or a listener.
+    /// </summary>
+    [Test]
+    public void WarnsWhenAnAudioChainCannotBePrepared()
+    {
+        string path = CreateWaveFile();
+        try
+        {
+            using PlaybackPipeline pipeline = CreatePipeline(
+                new FakeVideoRenderer(),
+                new FakeAudioRenderer(),
+                audioDecoders: new RefusesInsideTheCreator());
+
+            WarningLog warnings = new(pipeline);
+
+            OperationResult opened = Open(pipeline, path);
+
+            Assert.That(opened.IsSuccessful, Is.False, "nothing can be played without a decoder");
+
+            WaitForWarning(warnings, "audio decoder could not be prepared");
+            WaitForWarning(warnings, "cannot decode dts");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
     /// The audio slots are resolved from the registry like everything else, so a factory that refuses leaves
     /// the file to the next one instead of ending the open.
     /// </summary>
@@ -6796,6 +6827,29 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>A factory that refuses every stream, the same way a decoder with no path for a codec does.</summary>
+    /// <summary>
+    /// A factory that offers a decoder and then cannot open it, which is the shape a stream with no decoder in the build
+    /// has: the reason lives in the creator, not in the factory, and that is the reason that has to reach the warning.
+    /// </summary>
+    private sealed class RefusesInsideTheCreator : IAudioDecoderFactory
+    {
+        public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
+        {
+            return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Success(new Creator());
+        }
+
+        private sealed class Creator : IComponentCreator<IAudioDecoder>
+        {
+            public string Signature => "refusing:audio";
+
+            public OperationResult Create(out IAudioDecoder? component)
+            {
+                component = null;
+                return OperationResult.Failure("This build cannot decode dts (id 86020).");
+            }
+        }
+    }
+
     private sealed class RefusingAudioDecoderFactory : IAudioDecoderFactory
     {
         public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)

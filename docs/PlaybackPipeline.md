@@ -407,6 +407,21 @@ one place, and a caller cannot ask for a publication that disagrees with the hol
 shape, a "rebuild this kind" flag plus a "renew the source" flag, was a restatement of the holder that could be
 passed wrongly (and once was `true` for an unchanged holder, which cost the reader an epoch it could not see).
 
+**A decoder is found by codec id, not by the container's name for it.** FFmpeg names a codec and a decoder separately,
+and the two are not always the same word: a DTS stream says `dts`, while the decoder that reads it is `dca`. Looking a
+decoder up by the stream's name therefore found nothing, and a DTS-HD MA track failed with "No FFmpeg decoder handles
+codec 'dts'" while the decoder sat in the same DLL. `FFmpegDecoders` resolves by the codec id from the stream's
+parameters, with names kept only for a caller that ranks its own candidates — the picture prefers a decoder that can run
+on the GPU, so it names `av1`/`libdav1d` and the id's decoder follows as a last resort; the sound has no such ranking and
+takes the id's decoder first. A name that resolves to the id's own decoder is tried once. The same reasoning is why the
+subtitle path has always gone through the codec descriptor.
+
+**A chain that cannot be prepared is warned about, not just refused.** The caller still gets the failure — `SelectStream`
+reports it, and the player shows it — but the same reason is posted as a warning (`RaiseWarning`), because a kind that
+cannot be decoded is otherwise silence: a file whose sound has no decoder plays on with a picture and nothing else, which
+cannot be told apart from a file that has no sound. The warning names the role and keeps the creator's own words, which
+is where the reason lives when a factory offers a decoder and then cannot open it.
+
 Two consequences worth stating, because both are easy to get wrong:
 
 - **The position does not move.** The switch publishes the position it already had, with `SeekMode.Precise`, so the

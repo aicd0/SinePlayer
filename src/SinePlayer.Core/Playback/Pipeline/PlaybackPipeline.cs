@@ -832,6 +832,12 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private OperationResult BuildChains(MediaSourceHolder sourceHolder, out ChainChanges changes)
     {
+        OperationResult Unprepared(string role, string message)
+        {
+            PostWarning($"The {role} could not be prepared: {message}");
+            return OperationResult.Failure(message);
+        }
+
         changes = ChainChanges.None;
 
         IMediaSource source = sourceHolder.Source;
@@ -868,7 +874,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     "video renderer");
                 if (!rendererResolved.IsSuccessful)
                 {
-                    return OperationResult.Failure(rendererResolved);
+                    return Unprepared("video renderer", rendererResolved.Message);
                 }
 
                 newRenderer = rendererResolved.Result;
@@ -877,7 +883,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     OperationResult configured = newRenderer.Component.Configure(videoStream, videoTarget);
                     if (!configured.IsSuccessful)
                     {
-                        return configured;
+                        return Unprepared("video renderer", configured.Message);
                     }
 
                     pendingChanges |= ChainChanges.VideoRenderer;
@@ -893,7 +899,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     "video decoder");
                 if (!decoderResolved.IsSuccessful)
                 {
-                    return OperationResult.Failure(decoderResolved);
+                    return Unprepared("video decoder", decoderResolved.Message);
                 }
 
                 newDecoder = decoderResolved.Result;
@@ -919,7 +925,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     "audio renderer");
                 if (!rendererResolved.IsSuccessful)
                 {
-                    return OperationResult.Failure(rendererResolved);
+                    return Unprepared("audio renderer", rendererResolved.Message);
                 }
 
                 newAudioRenderer = rendererResolved.Result;
@@ -928,7 +934,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     OperationResult<AudioStreamInfo> negotiated = newAudioRenderer.Component.Negotiate(audioStream);
                     if (!negotiated.IsSuccessful)
                     {
-                        return OperationResult.Failure(negotiated);
+                        return Unprepared("audio renderer", negotiated.Message);
                     }
 
                     negotiatedAudioFormat = negotiated.Result;
@@ -944,7 +950,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     "audio decoder");
                 if (!decoderResolved.IsSuccessful)
                 {
-                    return OperationResult.Failure(decoderResolved);
+                    return Unprepared("audio decoder", decoderResolved.Message);
                 }
 
                 newAudioDecoder = decoderResolved.Result;
@@ -976,7 +982,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     "subtitle decoder");
                 if (!decoderResolved.IsSuccessful)
                 {
-                    return OperationResult.Failure(decoderResolved);
+                    return Unprepared("subtitle decoder", decoderResolved.Message);
                 }
 
                 newSubtitleDecoder = decoderResolved.Result;
@@ -989,7 +995,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 PipelineComponent<ISubtitleDecoder>? subtitleDecoder = newSubtitleDecoder ?? latestDecoder;
                 if (subtitleDecoder is null)
                 {
-                    return OperationResult.Failure("The subtitle track has no decoder to say what its cues are made of.");
+                    return Unprepared("subtitle decoder", "The track has no decoder to say what its cues are made of.");
                 }
 
                 SubtitleCueFormat format = subtitleDecoder.Component.CueFormat;
@@ -1001,7 +1007,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     "subtitle renderer");
                 if (!rendererResolved.IsSuccessful)
                 {
-                    return OperationResult.Failure(rendererResolved);
+                    return Unprepared("subtitle renderer", rendererResolved.Message);
                 }
 
                 newSubtitleRenderer = rendererResolved.Result;
@@ -1010,7 +1016,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     OperationResult configured = newSubtitleRenderer.Component.Configure(subtitleStream, subtitleTarget);
                     if (!configured.IsSuccessful)
                     {
-                        return configured;
+                        return Unprepared("subtitle renderer", configured.Message);
                     }
 
                     pendingChanges |= ChainChanges.SubtitleRenderer;
