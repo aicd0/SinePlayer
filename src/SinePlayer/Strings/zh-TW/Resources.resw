@@ -1071,6 +1071,9 @@ $plugins</value>
   <data name="SelectAudioTrack" xml:space="preserve">
     <value>選擇音訊軌道</value>
   </data>
+  <data name="SelectSubtitleTrack" xml:space="preserve">
+    <value>選擇字幕軌道</value>
+  </data>
   <data name="SelectVideoTrack" xml:space="preserve">
     <value>選擇影片軌道</value>
   </data>

@@ -1073,6 +1073,9 @@ Start in Safe Mode?</value>
   <data name="SelectAudioTrack" xml:space="preserve">
     <value>Select audio track</value>
   </data>
+  <data name="SelectSubtitleTrack" xml:space="preserve">
+    <value>Select subtitle track</value>
+  </data>
   <data name="SelectVideoTrack" xml:space="preserve">
     <value>Select video track</value>
   </data>

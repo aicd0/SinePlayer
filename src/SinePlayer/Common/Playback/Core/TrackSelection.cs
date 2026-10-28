@@ -58,7 +58,8 @@ internal static class TrackSelection
         {
             MediaStreamKind.Video => MediaExt.SELECTED_VIDEO_TRACK,
             MediaStreamKind.Audio => MediaExt.SELECTED_AUDIO_TRACK,
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Only the picture and the sound can be chosen."),
+            MediaStreamKind.Subtitle => MediaExt.SELECTED_SUBTITLE_TRACK,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Only the picture, the sound and the subtitles can be chosen."),
         };
     }
 }

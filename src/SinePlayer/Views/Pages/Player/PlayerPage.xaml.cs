@@ -517,6 +517,7 @@ internal sealed partial class PlayerPage : BasePage
 
         TrackSelection.Preference videoChoice = TrackSelection.Load(media, MediaStreamKind.Video, info);
         TrackSelection.Preference audioChoice = TrackSelection.Load(media, MediaStreamKind.Audio, info);
+        TrackSelection.Preference subtitleChoice = TrackSelection.Load(media, MediaStreamKind.Subtitle, info);
 
         MediaStreamInfo? video = videoChoice.IsSet ? videoChoice.Stream : DefaultTrack(info?.VideoStreams);
         MediaStreamInfo? audio = audioChoice.IsSet ? audioChoice.Stream : DefaultTrack(info?.AudioStreams);
@@ -547,6 +548,17 @@ internal sealed partial class PlayerPage : BasePage
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the sound could not be played ({chosen.Message})");
+            }
+        }
+
+        // Subtitles are the one track that stays off until it is asked for: a file's own default subtitle is not a
+        // reason to draw it over the picture, and only a choice made for this file is a reason to.
+        if (subtitleChoice.Stream is not null)
+        {
+            ErrorResult chosen = await engine.SelectStream(MediaStreamKind.Subtitle, subtitleChoice.Stream);
+            if (!chosen.IsSuccessful)
+            {
+                unplayable.Add($"the subtitles could not be played ({chosen.Message})");
             }
         }
 

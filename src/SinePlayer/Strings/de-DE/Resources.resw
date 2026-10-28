@@ -1073,6 +1073,9 @@ Im abgesicherten Modus starten?</value>
   <data name="SelectAudioTrack" xml:space="preserve">
     <value>Audiospur auswählen</value>
   </data>
+  <data name="SelectSubtitleTrack" xml:space="preserve">
+    <value>Untertitelspur auswählen</value>
+  </data>
   <data name="SelectVideoTrack" xml:space="preserve">
     <value>Videospur auswählen</value>
   </data>

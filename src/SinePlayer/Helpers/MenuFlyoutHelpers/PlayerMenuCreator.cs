@@ -42,6 +42,12 @@ internal static class PlayerMenuCreator
                 Icon = new FontIconSource() { Glyph = MediaGlyphHelper.AudioGlyph },
                 Items = CreateAudioMenuItems(context),
             },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Subtitle,
+                Icon = new FontIconSource() { Glyph = MediaGlyphHelper.SubtitleGlyph },
+                Items = CreateSubtitleMenuItems(context),
+            },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
             {
@@ -243,6 +249,50 @@ internal static class PlayerMenuCreator
                     if (settings.AudioRenderer != key)
                     {
                         applyChange(target => target.AudioRenderer = key);
+                    }
+                }),
+            },
+        ];
+    }
+
+    private static List<BaseMenuFlyoutItemModel> CreateSubtitleMenuItems(PlayerMenuContext context)
+    {
+        PlayerSettingsModel settings = context.Settings;
+        Action<Action<PlayerSettingsModel>> applyChange = context.UpdateSettings;
+
+        List<PlaybackComponentOption> decoderOptions = [.. PlaybackComponents.GetSubtitleDecoderOptions()];
+        PlaybackComponentOption decoder = EnsureChoice(decoderOptions, settings.SubtitleDecoder);
+
+        List<PlaybackComponentOption> rendererOptions = [.. PlaybackComponents.GetSubtitleRendererOptions()];
+        PlaybackComponentOption renderer = EnsureChoice(rendererOptions, settings.SubtitleRenderer);
+
+        return
+        [
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.SelectSubtitleTrack,
+                Items = CreateTrackItems(context, MediaStreamKind.Subtitle),
+            },
+            new SeparatorMenuFlyoutItemModel(),
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Decoder,
+                Items = CreateChoiceItems(decoderOptions, decoder.Key, key =>
+                {
+                    if (settings.SubtitleDecoder != key)
+                    {
+                        applyChange(target => target.SubtitleDecoder = key);
+                    }
+                }),
+            },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Renderer,
+                Items = CreateChoiceItems(rendererOptions, renderer.Key, key =>
+                {
+                    if (settings.SubtitleRenderer != key)
+                    {
+                        applyChange(target => target.SubtitleRenderer = key);
                     }
                 }),
             },
