@@ -159,6 +159,12 @@ internal static class PlayerMenuCreator
                 IsChecked = settings.VideoPreferHardwareDecoding,
                 Click = () => applyChange(target => target.VideoPreferHardwareDecoding = !settings.VideoPreferHardwareDecoding),
             },
+            new ToggleMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.PreferHdr,
+                IsChecked = settings.VideoPreferHdr,
+                Click = () => applyChange(target => target.VideoPreferHdr = !settings.VideoPreferHdr),
+            },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
             {

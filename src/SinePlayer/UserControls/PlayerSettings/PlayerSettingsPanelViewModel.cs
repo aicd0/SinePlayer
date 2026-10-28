@@ -81,6 +81,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _videoPreferHdrLabel = string.Empty;
+    public string VideoPreferHdrLabel
+    {
+        get => _videoPreferHdrLabel;
+        set
+        {
+            _videoPreferHdrLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VideoPreferHdrLabel)));
+        }
+    }
+
     private string _videoStretchModeLabel = string.Empty;
     public string VideoStretchModeLabel
     {

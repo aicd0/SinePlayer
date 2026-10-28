@@ -913,6 +913,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>Hardwaredekodierung bevorzugen</value>
   </data>
+  <data name="PreferHdr" xml:space="preserve">
+    <value>HDR bevorzugen</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>Ausgegebene Frames</value>
   </data>

@@ -8,7 +8,7 @@ using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Dxgi;
 using Windows.Win32.Graphics.Dxgi.Common;
 
-namespace SinePlayer.Core.Playback.Backends.Direct3D11;
+namespace SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 
 /// <summary>What the display the picture is meant for can do, as the system reports it.</summary>
 internal readonly record struct DisplayHdrState(bool IsHdrComposed, float PeakLuminanceNits, float MaxFullFrameLuminanceNits);

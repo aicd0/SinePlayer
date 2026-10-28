@@ -1442,15 +1442,21 @@ The Playback Lab shows all of the above in one line, which is the intended way t
      limited range — so nothing is compressed unless the panel cannot reach the grade's peak. HLG content and SDR
      content are encoded into the same scale, at 1000 nits nominal and 203 nits respectively.
    The pairing is `VideoSurfaceTransforms.Select(kind, colour)` and it is the whole of the policy: six transforms, and a
-   shader programme per layout and transform. `VideoSurfaceFactory` chooses the container, and chooses **SDR unless the
-   display is composed for HDR**, or unless the host asks for HDR10 outright, which is what makes the container testable
-   on a display that is not. A chain that refuses the ten-bit format or the colour space is disposed and the SDR one is
-   used instead, because a PQ picture in a chain that still claims BT.709 gamma is a dim, flat picture with nothing to
-   say why.
+   shader programme per layout and transform. `VideoSurfaceFactory` chooses the container from **both halves**: the picture
+   must have range an SDR container would have to compress — `ColourInfo.IsHighDynamicRange`, so a PQ or HLG stream — and
+   the display must be composed for HDR. A standard dynamic range picture gets the SDR container however capable the display
+   is, because its white lands at the reference level either way and rebuilding the swap chain for it would gain nothing.
+   The host's "Prefer HDR" setting (on by default) is exactly this choice; turned off it asks for the SDR container outright
+   and the question is never asked. A host may also name a container outright, which is what makes either one testable on a
+   display that cannot show it. A chain that refuses the ten-bit format or the colour space is disposed and the SDR one is
+   used instead, because a PQ picture in a chain that still claims BT.709 gamma is a dim, flat picture with nothing to say
+   why.
    What is not carried yet: the stream's mastering metadata (`MaxCLL`/`MaxFALL`), so a display's own mapping works from
-   what it can measure rather than from what the grade declares; the subtitle surface, which is still SDR and is therefore
-   lifted by the compositor independently of the picture; and any reaction to the display changing HDR state while a file
-   plays — the container is fixed when the chain is created, and the chain is created when the renderer is configured.
+   what it can measure rather than from what the grade declares; an HDR-to-HDR curve for a panel dimmer than the grade, so
+   anything above the panel's peak is clipped by the display rather than rolled off here; the subtitle surface, which is
+   still SDR and is therefore lifted by the compositor independently of the picture, leaving text dimmer than the highlights
+   around it; and any reaction to the display changing HDR state while a file plays — the container is fixed when the chain
+   is created, and the chain is created when the renderer is configured.
    The range field is read as limited, which is what every HDR delivery uses, and the eight-bit path assumes it too.
 
 ## Appendix A — the checklist for any change to this pipeline

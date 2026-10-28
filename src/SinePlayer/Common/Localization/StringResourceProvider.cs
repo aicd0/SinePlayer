@@ -235,6 +235,7 @@ public class StringResourceProvider
     public string Position => GetResourceString("Position");
     public string PreciseSeeking => GetResourceString("PreciseSeeking");
     public string PreferHardwareDecoding => GetResourceString("PreferHardwareDecoding");
+    public string PreferHdr => GetResourceString("PreferHdr");
     public string PresentedFrames => GetResourceString("PresentedFrames");
     public string PressKeyCombination => GetResourceString("PressKeyCombination");
     public string Previous => GetResourceString("Previous");

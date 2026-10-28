@@ -911,6 +911,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>優先使用硬體解碼</value>
   </data>
+  <data name="PreferHdr" xml:space="preserve">
+    <value>優先使用 HDR</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>已顯示影格數</value>
   </data>

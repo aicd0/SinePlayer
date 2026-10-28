@@ -174,6 +174,20 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
+    private void VideoPreferHdrToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool value = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.VideoPreferHdr != value)
+        {
+            Apply(settings => settings.VideoPreferHdr = value);
+        }
+    }
+
     private void VideoFlipHorizontalToggleSwitch_Toggled(object sender, RoutedEventArgs e)
     {
         if (_updatingUI)
@@ -281,6 +295,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 tabModified = tabModified || modified;
                 UpdateVideoPreferHardwareDecoding(settings);
                 ViewModel.VideoPreferHardwareDecodingLabel = GetLabel(StringResource.PreferHardwareDecoding, modified);
+            }
+
+            {
+                bool modified = settings.VideoPreferHdr != presetSettings.VideoPreferHdr;
+                tabModified = tabModified || modified;
+                UpdateVideoPreferHdr(settings);
+                ViewModel.VideoPreferHdrLabel = GetLabel(StringResource.PreferHdr, modified);
             }
 
             {
@@ -395,6 +416,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoPreferHardwareDecoding(PlayerSettingsModel settings)
     {
         VideoPreferHardwareDecodingToggleSwitch.IsOn = settings.VideoPreferHardwareDecoding;
+    }
+
+    private void UpdateVideoPreferHdr(PlayerSettingsModel settings)
+    {
+        VideoPreferHdrToggleSwitch.IsOn = settings.VideoPreferHdr;
     }
 
     private void UpdateVideoStretchMode(PlayerSettingsModel settings)

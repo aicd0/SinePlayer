@@ -122,11 +122,16 @@ output's colour space, which is PQ/BT.2020 exactly when the desktop is composing
 overrides and a fallback to SDR if the chain refuses the format or the colour space. The Lab chooses between them per
 renderer, which is also how the container is checked on hardware.
 
-**Why the default is still SDR.** Two parts of the path are not there yet, and both are visible to a user: the stream's
-mastering metadata (`MaxCLL`/`MaxFALL`) is not carried, so a display maps from what it can measure rather than from what
-the grade declares; and the subtitle surface is a second swap chain that is still SDR, so the compositor lifts it by the
-user's SDR-white setting while the picture peaks far above it — subtitles come out dim relative to highlights. Auto
-becomes the default when those two are done, not before.
+**What the player does.** "Prefer HDR" (Video settings and the player's video menu, on by default) is the `Auto` choice:
+the HDR container when the stream is PQ or HLG and the display is composed for HDR, the SDR container otherwise — so an
+SDR file costs nothing and a high dynamic range one is shown as it was graded. Turning it off asks for the SDR container
+outright, which is the escape hatch if a display or driver misbehaves with a PQ surface.
+
+Two parts of the path are still missing, and both are visible to a user: the stream's mastering metadata
+(`MaxCLL`/`MaxFALL`) is not carried, so a display maps from what it can measure rather than from what the grade declares;
+and the subtitle surface is a second swap chain that is still SDR, so the compositor lifts it by the user's SDR-white
+setting while the picture peaks far above it — subtitles come out dim relative to highlights. Neither makes the picture
+wrong, which is why the setting is on; both are worth closing before HDR output is described as complete.
 
 **What a complete HDR path still needs.** Mastering metadata on the present (`SetHDRMetaData`); the subtitle surface in
 the same container as the picture; a reaction to the display changing HDR state while a file plays (`WM_DISPLAYCHANGE`

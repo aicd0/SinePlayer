@@ -7,6 +7,8 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
+using SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
+
 using Windows.Win32.Graphics.Direct3D11;
 
 using Windows.Win32.Graphics.Dxgi.Common;
@@ -80,20 +82,28 @@ public class VideoSurfaceTests
     }
 
     /// <summary>
-    /// Whichever container the display is composed for is the one an automatic choice has to make, and the choice has to be
-    /// possible at all: a machine that will not say what it supports gets the SDR container rather than no picture.
+    /// An automatic choice is about two things: whether the picture has range an SDR container would have to compress, and
+    /// whether the display is composed for HDR. A standard dynamic range picture gains nothing from the wider container, so
+    /// it stays in an SDR one however capable the display is — rebuilding the swap chain for it would be a change with no
+    /// gain. A display that will not say what it supports is treated as one that cannot.
     /// </summary>
     [Test]
-    public void AutoFollowsWhatTheDisplaySays()
+    public void AutoNeedsBothHdrContentAndAHdrDisplay()
     {
         OperationResult<DisplayHdrState> queried = DxgiDisplay.TryQuery();
-        bool expectedHdr = queried.IsSuccessful && queried.Result.IsHdrComposed;
+        bool displayShowsHdr = queried.IsSuccessful && queried.Result.IsHdrComposed;
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(VideoSurfaceFactory.ShouldTryHdr(VideoSurfacePreference.Auto), Is.EqualTo(expectedHdr));
-            Assert.That(VideoSurfaceFactory.ShouldTryHdr(VideoSurfacePreference.Sdr), Is.False);
-            Assert.That(VideoSurfaceFactory.ShouldTryHdr(VideoSurfacePreference.Hdr10), Is.True);
+            // Only a picture with more range than an SDR container can hold is worth the wider container.
+            Assert.That(VideoSurfaceFactory.ShouldTryHdr(VideoSurfacePreference.Auto, sPq), Is.EqualTo(displayShowsHdr));
+            Assert.That(VideoSurfaceFactory.ShouldTryHdr(VideoSurfacePreference.Auto, sHlg), Is.EqualTo(displayShowsHdr));
+            Assert.That(VideoSurfaceFactory.ShouldTryHdr(VideoSurfacePreference.Auto, sSdr), Is.False);
+            Assert.That(VideoSurfaceFactory.ShouldTryHdr(VideoSurfacePreference.Auto, ColourInfo.Unknown), Is.False);
+
+            // The host's own answers are absolute: one asks for it, the other refuses it.
+            Assert.That(VideoSurfaceFactory.ShouldTryHdr(VideoSurfacePreference.Sdr, sPq), Is.False);
+            Assert.That(VideoSurfaceFactory.ShouldTryHdr(VideoSurfacePreference.Hdr10, sSdr), Is.True);
         }
 
         TestContext.Out.WriteLine(queried.IsSuccessful
@@ -117,7 +127,7 @@ public class VideoSurfaceTests
         using IVideoSurface sdr = Create(VideoSurfacePreference.Sdr);
         Assert.That(sdr.Kind, Is.EqualTo(VideoSurfaceKind.Sdr));
 
-        OperationResult<IVideoSurface> hdr = VideoSurfaceFactory.TryCreate(created, 16, 9, 1.0, VideoSurfacePreference.Hdr10);
+        OperationResult<IVideoSurface> hdr = VideoSurfaceFactory.Create(created, 16, 9, 1.0, VideoSurfacePreference.Hdr10, sPq);
         if (hdr.IsSuccessful)
         {
             using IVideoSurface surface = hdr.Result;
@@ -132,7 +142,7 @@ public class VideoSurfaceTests
 
         IVideoSurface Create(VideoSurfacePreference preference)
         {
-            OperationResult<IVideoSurface> made = VideoSurfaceFactory.TryCreate(created, 16, 9, 1.0, preference);
+            OperationResult<IVideoSurface> made = VideoSurfaceFactory.Create(created, 16, 9, 1.0, preference, sSdr);
             Assert.That(made.IsSuccessful, Is.True, made.Message);
             return made.Result;
         }

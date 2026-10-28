@@ -3,10 +3,9 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 
-using Windows.Win32.Graphics.Dxgi;
 using Windows.Win32.Graphics.Dxgi.Common;
 
-namespace SinePlayer.Core.Playback.Backends.Direct3D11;
+namespace SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 
 /// <summary>
 /// The container that can carry a high-dynamic-range picture as it was graded: ten-bit RGB holding PQ codes in
