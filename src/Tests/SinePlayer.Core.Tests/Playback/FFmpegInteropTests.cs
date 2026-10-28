@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
@@ -70,6 +71,30 @@ public class FFmpegInteropTests
             Assert.That(FFmpegInterop.ParseDurationTag("3:13"), Is.Null);
             Assert.That(FFmpegInterop.ParseDurationTag("soon"), Is.Null);
             Assert.That(FFmpegInterop.ParseDurationTag("00:00:0x.5"), Is.Null);
+        }
+    }
+
+    /// <summary>
+    /// How to read a picture's samples, taken from the values FFmpeg reports. The numbers are FFmpeg's own, so the ones
+    /// that matter are pinned: SMPTE 2084 is what makes an HDR10 frame a set of light levels, and reading its samples as
+    /// anything else is what leaves the picture dim. An enumeration this build does not name stays unknown rather than
+    /// being guessed at, because a wrong transfer turns a picture grey.
+    /// </summary>
+    [Test]
+    public void MapsColourMetadataFromFFmpegEnumerations()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(FFmpegInterop.ToColourInfo(9, 16, 1), Is.EqualTo(new ColourInfo(ColourPrimaries.Bt2020, ColourTransfer.Smpte2084, ColourRange.Limited)));
+            Assert.That(FFmpegInterop.ToColourInfo(9, 18, 1), Is.EqualTo(new ColourInfo(ColourPrimaries.Bt2020, ColourTransfer.Hlg, ColourRange.Limited)));
+            Assert.That(FFmpegInterop.ToColourInfo(1, 1, 1), Is.EqualTo(new ColourInfo(ColourPrimaries.Bt709, ColourTransfer.Bt709, ColourRange.Limited)));
+            Assert.That(FFmpegInterop.ToColourInfo(1, 1, 2), Is.EqualTo(new ColourInfo(ColourPrimaries.Bt709, ColourTransfer.Bt709, ColourRange.Full)));
+
+            // Untagged is the state of most files, and it has to stay unknown: 2 is "unspecified" to FFmpeg.
+            Assert.That(FFmpegInterop.ToColourInfo(2, 2, 0), Is.EqualTo(ColourInfo.Unknown));
+
+            // A transfer this build has no programme for is not turned into one it does.
+            Assert.That(FFmpegInterop.ToColourInfo(9, 14, 1), Is.EqualTo(new ColourInfo(ColourPrimaries.Bt2020, ColourTransfer.Unknown, ColourRange.Limited)));
         }
     }
 }

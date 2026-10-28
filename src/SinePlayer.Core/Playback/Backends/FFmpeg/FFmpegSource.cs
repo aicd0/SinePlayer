@@ -9,15 +9,11 @@ using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
-/// <summary>
-/// A media source backed by an FFmpeg <c>AVFormatContext</c>. libavformat performs the byte access and
-/// the container parsing in one step, which is why the source and demuxer stages of the design are a
-/// single component here.
-/// </summary>
-public sealed class FFmpegSource : IMediaSource
+public sealed partial class FFmpegSource : IMediaSource
 {
     private const int DispositionDefault = 0x0001;
     private const int DispositionForced = 0x0040;
+    private const int DispositionAttachedPicture = 0x0400;
 
     private static readonly string[] sBitmapSubtitleCodecs =
     [
@@ -277,12 +273,14 @@ public sealed class FFmpegSource : IMediaSource
             return null;
         }
 
+        if ((stream->Disposition & DispositionAttachedPicture) != 0)
+        {
+            return null;
+        }
+
         MediaStreamKind kind = FFmpegInterop.ToStreamKind(parameters->CodecType);
         string codecId = FFmpegInterop.GetCodecId(parameters->CodecId);
 
-        // A stream's own length, which is not the file's: tracks routinely end at different moments, and the
-        // container is the only thing that says where. Matroska leaves the field empty and writes the length down as
-        // a tag instead, so both are read.
         TimeSpan duration = stream->Duration > 0
             ? FFmpegInterop.ToTimeSpan(stream->Duration, stream->TimeBase)
             : FFmpegInterop.ParseDurationTag(FFmpegInterop.GetMetadata(stream->Metadata, "DURATION")) ?? TimeSpan.Zero;
@@ -304,6 +302,7 @@ public sealed class FFmpegSource : IMediaSource
                 FrameRate = ResolveFrameRate(stream, parameters),
                 PixelFormat = FFmpegInterop.ToPixelFormat(parameters->Format),
                 BitDepth = parameters->BitsPerRawSample,
+                Colour = FFmpegInterop.ToColourInfo(parameters->ColorPrimaries, parameters->ColorTransfer, parameters->ColorRange),
             },
             MediaStreamKind.Audio => new AudioStreamInfo
             {

@@ -572,6 +572,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
             Height = GetFrameHeight(owned),
             Format = format,
             IsHardwareBacked = false,
+            Colour = ReadColour(),
             Buffer = new FFmpegVideoFrameBuffer(owned, FFmpegInterop.GetPlaneCount(format)),
         });
     }
@@ -611,6 +612,7 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
             Height = GetFrameHeight(owned),
             Format = format,
             IsHardwareBacked = true,
+            Colour = ReadColour(),
             Buffer = new FFmpegGpuVideoFrameBuffer(owned),
         });
     }
@@ -626,6 +628,12 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         }
 
         return FFmpegInterop.ToTimeSpan(timestamp, _timeBase);
+    }
+
+    private unsafe ColourInfo ReadColour()
+    {
+        var context = (AVCodecContext*)_context;
+        return context == null ? ColourInfo.Unknown : FFmpegInterop.ToColourInfo(context->ColorPrimaries, context->ColorTransfer, context->ColorRange);
     }
 
     private static unsafe int GetFrameFormat(nint frame)

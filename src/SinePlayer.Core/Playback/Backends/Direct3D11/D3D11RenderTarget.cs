@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using Windows.Win32.Graphics.Direct3D11;
@@ -6,12 +6,7 @@ using Windows.Win32.Graphics.Dxgi.Common;
 
 namespace SinePlayer.Core.Playback.Backends.Direct3D11;
 
-/// <summary>
-/// A surface the renderer draws into. An offscreen target is what the tests and frame capture use; a
-/// swap chain back buffer is the same thing with a different owner, which is why the renderer only
-/// ever sees the view.
-/// </summary>
-internal sealed class D3D11RenderTarget : IDisposable
+internal sealed partial class D3D11RenderTarget : IDisposable
 {
     private ID3D11Texture2D? _texture;
     private ID3D11RenderTargetView? _view;
@@ -35,13 +30,18 @@ internal sealed class D3D11RenderTarget : IDisposable
 
     internal static D3D11RenderTarget CreateOffscreen(D3D11Device device, int width, int height)
     {
+        return CreateOffscreen(device, width, height, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM);
+    }
+
+    internal static D3D11RenderTarget CreateOffscreen(D3D11Device device, int width, int height, DXGI_FORMAT format)
+    {
         D3D11_TEXTURE2D_DESC description = new()
         {
             Width = (uint)width,
             Height = (uint)height,
             MipLevels = 1,
             ArraySize = 1,
-            Format = DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM,
+            Format = format,
             SampleDesc = new DXGI_SAMPLE_DESC { Count = 1 },
             Usage = D3D11_USAGE.D3D11_USAGE_DEFAULT,
             BindFlags = D3D11_BIND_FLAG.D3D11_BIND_RENDER_TARGET,
@@ -52,10 +52,14 @@ internal sealed class D3D11RenderTarget : IDisposable
         return new D3D11RenderTarget(texture, view, width, height);
     }
 
-    /// <summary>Copies the surface into system memory as BGRA bytes, top row first.</summary>
     internal byte[] ReadPixels(D3D11Device device)
     {
         return D3D11Interop.ReadPixels(device.Device, device.Context, Texture, Width, Height);
+    }
+
+    internal byte[] ReadPixels(D3D11Device device, DXGI_FORMAT format)
+    {
+        return D3D11Interop.ReadPixels(device.Device, device.Context, Texture, Width, Height, format);
     }
 
     public void Dispose()

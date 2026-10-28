@@ -241,7 +241,7 @@ public class FFmpegVideoDecoderTests
     [Test]
     public void RefusesAStreamTheDeviceCannotDraw()
     {
-        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
 
         using D3D11Device device = created.Result;
@@ -284,7 +284,7 @@ public class FFmpegVideoDecoderTests
     [Test]
     public void LeavesAStreamTheDeviceCanDrawAlone()
     {
-        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
 
         using D3D11Device device = created.Result;
@@ -374,7 +374,7 @@ public class FFmpegVideoDecoderTests
         // The renderer owns the pipeline's device, so a decoder has to be able to decode on a device it was handed.
         // Reading the texture back through that same device is what proves it — no other device can read it — and it is
         // the proof rather than a comparison of handles: what the assertion is about is the frame, not the plumbing.
-        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
 
         using D3D11Device device = created.Result;
@@ -465,11 +465,11 @@ public class FFmpegVideoDecoderTests
     {
         // The whole point of the GPU path: the frame the renderer draws is the texture the decoder wrote, on
         // the device the renderer draws with. What it must produce is the picture the CPU path produces.
-        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
         using D3D11Device device = created.Result;
 
-        OperationResult<D3D11VideoRenderer> createdRenderer = D3D11VideoRenderer.TryCreate(device);
+        OperationResult<D3D11VideoRenderer> createdRenderer = D3D11VideoRenderer.Create(device, VideoSurfacePreference.Auto);
         Assert.That(createdRenderer.IsSuccessful, Is.True, createdRenderer.Message);
         using D3D11VideoRenderer renderer = createdRenderer.Result;
 
@@ -520,11 +520,11 @@ public class FFmpegVideoDecoderTests
     [Test]
     public void KeepsDecodingAfterTheRendererItWasBuiltOnIsGone()
     {
-        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
         using D3D11Device device = created.Result;
 
-        OperationResult<D3D11VideoRenderer> createdRenderer = D3D11VideoRenderer.TryCreate(device);
+        OperationResult<D3D11VideoRenderer> createdRenderer = D3D11VideoRenderer.Create(device, VideoSurfacePreference.Auto);
         Assert.That(createdRenderer.IsSuccessful, Is.True, createdRenderer.Message);
         D3D11VideoRenderer renderer = createdRenderer.Result;
 
@@ -573,11 +573,11 @@ public class FFmpegVideoDecoderTests
         const int width = 1920;
         const int height = 1080;
 
-        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
         using D3D11Device device = created.Result;
 
-        OperationResult<D3D11VideoRenderer> createdRenderer = D3D11VideoRenderer.TryCreate(device);
+        OperationResult<D3D11VideoRenderer> createdRenderer = D3D11VideoRenderer.Create(device, VideoSurfacePreference.Auto);
         Assert.That(createdRenderer.IsSuccessful, Is.True, createdRenderer.Message);
         using D3D11VideoRenderer renderer = createdRenderer.Result;
 
@@ -1022,7 +1022,7 @@ public class FFmpegVideoDecoderTests
         // libavcodec is given the lock with the device and takes it around every use of the immediate context.
         // Without that, the decode thread could build a sequence of calls on the context while the drawing
         // thread was building one.
-        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
 
         using D3D11Device device = created.Result;
@@ -1085,7 +1085,7 @@ public class FFmpegVideoDecoderTests
     [Test]
     public void LeavesRoomInThePoolForTheFramesTheCallerHolds()
     {
-        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
 
         using D3D11Device device = created.Result;

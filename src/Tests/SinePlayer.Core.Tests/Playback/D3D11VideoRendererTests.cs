@@ -25,11 +25,11 @@ public class D3D11VideoRendererTests
     [SetUp]
     public void SetUp()
     {
-        OperationResult<D3D11Device> deviceCreated = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> deviceCreated = D3D11Device.Create();
         Assert.That(deviceCreated.IsSuccessful, Is.True, deviceCreated.Message);
         _device = deviceCreated.Result;
 
-        OperationResult<D3D11VideoRenderer> rendererCreated = D3D11VideoRenderer.TryCreate(_device);
+        OperationResult<D3D11VideoRenderer> rendererCreated = D3D11VideoRenderer.Create(_device, VideoSurfacePreference.Auto);
         Assert.That(rendererCreated.IsSuccessful, Is.True, rendererCreated.Message);
         _renderer = rendererCreated.Result;
     }

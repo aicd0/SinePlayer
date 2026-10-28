@@ -621,6 +621,12 @@ Decisions worth reviewing:
 4. **Shaders are compiled at runtime with `D3DCompile`.** No build step depends on the DirectX SDK,
    and the HLSL lives beside the code that uses it. Shader compilation failure is reported through
    the usual `PlaybackResult`, with the compiler's own message.
+   *(Revised since: 36 programmes registered up front cost 169 ms per renderer — 36 compiles of the same 14 KB
+   source, 14 of them of entry points already compiled. Measured at 6.4 ms for a heavy tone-map programme against
+   0.75 ms for a one-line one, so almost all of it is re-parsing. The registry now holds entry-point names,
+   compiles each distinct one at most once per process, and makes the device object on first use: a renderer is
+   34 ms cold and ~14.5 ms warm, of which 7.8 ms is the device. `ValidateProgrammes` compiles all of them in a
+   test, which is where "every combination works" is proven instead of at every open.)*
 5. **`D3D11RenderTarget` is separate from the renderer** so that a swap chain back buffer is the same
    abstraction with a different owner. The renderer only ever sees a render target view and a size,
    which is why presentation can be added without touching the draw path.
@@ -938,12 +944,9 @@ engine must never hold a thread the host may need.
 *A separate gap, unrelated to the failure:* the Direct3D renderer has no 10 bit path — `GetPlaneLayout`
 covers BGRA, NV12 and YUV420P and there is no 10 bit pixel shader, although `GetTextureCount` already
 lists `Yuv420P10`. The Lab's file turned out to decode as 8 bit, so this was not the cause, but 10 bit
-AV1 and HEVC are common enough that it needs covering before the cutover.
-
-*A separate gap, unrelated to the failure:* the Direct3D renderer has no 10 bit path — `GetPlaneLayout`
-covers BGRA, NV12 and YUV420P and there is no 10 bit pixel shader, although `GetTextureCount` already
-lists `Yuv420P10`. The Lab's file turned out to decode as 8 bit, so this was not the cause, but 10 bit
-AV1 and HEVC are common enough that it needs covering before the cutover.
+AV1 and HEVC are common enough that it needed covering before the cutover. *(Since closed: ten-bit planar
+and P010/P016 frames have programmes of their own, and an HDR stream is tone-mapped — see §14.16 of
+`PlaybackPipeline.md`.)*
 
 **S8d — Audio gets its own thread.** *Done.*
 `AudioQueue` (bounded, holding up to two seconds) plus a dedicated audio thread that owns `Submit` and

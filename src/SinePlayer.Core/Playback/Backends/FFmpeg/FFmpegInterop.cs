@@ -5,20 +5,11 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
-/// <summary>
-/// Translates between FFmpeg's vocabulary and the engine's. Everything crossing the isolation
-/// boundary passes through here, which is why this is the only file in the backend that both reads
-/// FFmpeg types and knows about the neutral contracts.
-/// <para>
-/// Where FFmpeg can name a value itself - codec names, pixel formats, sample formats - the name is
-/// used as the mapping key instead of a replicated enum. That keeps the mapping stable across FFmpeg
-/// versions: an unknown name degrades to <c>Unknown</c> instead of silently meaning something else.
-/// </para>
-/// </summary>
 internal static class FFmpegInterop
 {
     private const int ErrorBufferSize = 256;
@@ -67,7 +58,6 @@ internal static class FFmpegInterop
         };
     }
 
-    /// <summary>The name FFmpeg gives a pixel format, or null when the format is not one it knows.</summary>
     internal static string? GetPixelFormatName(int format)
     {
         return ToUtf8String(FFmpegNative.av_get_pix_fmt_name(format));
@@ -87,10 +77,30 @@ internal static class FFmpegInterop
         };
     }
 
-    /// <summary>
-    /// Channel count is what matters to the pipeline, so the layout is derived from it and the
-    /// descriptive name is only used for reporting.
-    /// </summary>
+    internal static ColourInfo ToColourInfo(int primaries, int transfer, int range)
+    {
+        return new ColourInfo(
+            primaries switch
+            {
+                1 => ColourPrimaries.Bt709,
+                9 => ColourPrimaries.Bt2020,
+                _ => ColourPrimaries.Unknown,
+            },
+            transfer switch
+            {
+                1 => ColourTransfer.Bt709,
+                16 => ColourTransfer.Smpte2084,
+                18 => ColourTransfer.Hlg,
+                _ => ColourTransfer.Unknown,
+            },
+            range switch
+            {
+                1 => ColourRange.Limited,
+                2 => ColourRange.Full,
+                _ => ColourRange.Unknown,
+            });
+    }
+
     internal static ChannelLayout ToChannelLayout(int channelCount)
     {
         return channelCount switch
@@ -106,10 +116,6 @@ internal static class FFmpegInterop
         };
     }
 
-    /// <summary>
-    /// Planes a decoded frame uses. Semi-planar formats keep chroma in one plane, planar formats in
-    /// one per component, and packed formats in a single plane.
-    /// </summary>
     internal static int GetPlaneCount(PixelFormat format)
     {
         return format switch
@@ -134,7 +140,6 @@ internal static class FFmpegInterop
         }
     }
 
-    /// <summary>Converts a value expressed in a stream's time base into a time span.</summary>
     internal static TimeSpan ToTimeSpan(long value, AVRational timeBase)
     {
         if (value == FFmpegConstants.NoPtsValue || timeBase.Denominator <= 0)
@@ -151,7 +156,6 @@ internal static class FFmpegInterop
         return seconds > 0 ? TimeSpan.FromSeconds(seconds) : TimeSpan.Zero;
     }
 
-    /// <summary>Converts a rational rate, for example a frame rate, into a number.</summary>
     internal static double ToRate(AVRational value)
     {
         if (value.Denominator == 0)
@@ -162,11 +166,6 @@ internal static class FFmpegInterop
         return value.Numerator / (double)value.Denominator;
     }
 
-    /// <summary>
-    /// Reads a length written as <c>HH:MM:SS.nnnnnnnnn</c>, which is how Matroska spells a track's own length in its
-    /// <c>DURATION</c> tag — the field a demuxer leaves empty for that container. Anything else is no answer at all,
-    /// because a length that cannot be read is not a length.
-    /// </summary>
     internal static TimeSpan? ParseDurationTag(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))

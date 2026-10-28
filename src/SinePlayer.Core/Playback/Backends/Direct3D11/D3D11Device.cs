@@ -63,7 +63,7 @@ internal sealed class D3D11Device : IDisposable
     /// Creates a hardware device with the capabilities video rendering needs. BGRA support is what
     /// lets decoded frames be presented directly.
     /// </summary>
-    internal static OperationResult<D3D11Device> TryCreate()
+    internal static OperationResult<D3D11Device> Create()
     {
         OperationResultCreator<D3D11Device> result = new();
 

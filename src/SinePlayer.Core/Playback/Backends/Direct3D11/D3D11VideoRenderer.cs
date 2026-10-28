@@ -1,7 +1,6 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
@@ -24,17 +23,17 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     /// <summary>The texture registers the array shader samples; the plane shaders use the three before them.</summary>
     private const uint GpuTextureSlot = 3;
 
-    internal static OperationResult<D3D11VideoRenderer> TryCreate(D3D11Device device)
+    internal static OperationResult<D3D11VideoRenderer> Create(D3D11Device device, VideoSurfacePreference surfacePreference)
     {
         OperationResultCreator<D3D11VideoRenderer> result = new();
 
-        OperationResult<D3D11VideoShaders> shaders = D3D11VideoShaders.TryCreate(device);
+        OperationResult<D3D11VideoShaders> shaders = D3D11VideoShaders.Create(device);
         if (!shaders.IsSuccessful)
         {
             return result.Failure(shaders);
         }
 
-        return result.Success(new D3D11VideoRenderer(device, shaders.Result));
+        return result.Success(new D3D11VideoRenderer(device, shaders.Result, surfacePreference));
     }
 
     private readonly D3D11Device _device;
@@ -81,14 +80,24 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     private int _outputHeight;
 
     private IVideoRenderTarget? _target;
-    private D3D11SwapChain? _swapChain;
+    private IVideoSurface? _surface;
     private bool _needsResize;
     private bool _disposed;
 
-    private D3D11VideoRenderer(D3D11Device device, D3D11VideoShaders shaders)
+    /// <summary>
+    /// What the surface being drawn into expects, or what a bare output view is being treated as. It is the container
+    /// in effect, and the one thing that decides which transform a frame needs — a picture in memory says what it is,
+    /// but only the surface says what it has to become.
+    /// </summary>
+    private VideoSurfaceKind _surfaceKind = VideoSurfaceKind.Sdr;
+
+    private readonly VideoSurfacePreference _surfacePreference;
+
+    private D3D11VideoRenderer(D3D11Device device, D3D11VideoShaders shaders, VideoSurfacePreference surfacePreference)
     {
         _device = device;
         _shaders = shaders;
+        _surfacePreference = surfacePreference;
         _frameTransform = D3D11Interop.CreateConstantBuffer(device.Device);
     }
 
@@ -110,7 +119,13 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
     #region Public API
 
-    public string Name => "Direct3D 11";
+    /// <summary>
+    /// Named with its container, because that is the difference a caller can see: two players on one machine may be
+    /// presenting the same file into two different surfaces, and the name is where that shows.
+    /// </summary>
+    public string Name => _surface is null
+        ? "Direct3D 11"
+        : $"Direct3D 11 ({(_surface.Kind == VideoSurfaceKind.Hdr10 ? "HDR10" : "SDR")})";
 
     public IGpuDevice? GpuDevice => this;
 
@@ -140,6 +155,16 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
     internal int OutputPixelHeight => _outputHeight;
 
+    /// <summary>
+    /// What the output view holds, for a caller that supplied one instead of a surface — which is how a test draws into the
+    /// container it wants to pin. With a surface this is the surface's kind and cannot be set.
+    /// </summary>
+    internal VideoSurfaceKind SurfaceKind
+    {
+        get => _surfaceKind;
+        set => _surfaceKind = value;
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -152,8 +177,8 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         _target?.SurfaceSizeChanged -= Surface_SizeChanged;
         _target = null;
 
-        _swapChain?.Dispose();
-        _swapChain = null;
+        _surface?.Dispose();
+        _surface = null;
 
         ReleaseFrameTextures();
         D3D11Interop.Release(_frameTransform);
@@ -183,9 +208,11 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
         (int width, int height, double scale) = GetSurfaceSize(target);
 
-        if (_swapChain is null)
+        if (_surface is null)
         {
-            OperationResult<D3D11SwapChain> created = D3D11SwapChain.TryCreate(_device, width, height, scale);
+            // The container is decided here because the swap chain's format is fixed when it is created: a resize cannot
+            // change it, so the choice has to be made before the buffers exist rather than adjusted afterwards.
+            OperationResult<IVideoSurface> created = VideoSurfaceFactory.TryCreate(_device, width, height, scale, _surfacePreference);
             if (!created.IsSuccessful)
             {
                 return OperationResult.Failure(created);
@@ -198,11 +225,12 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                 return attach;
             }
 
-            _swapChain = created.Result;
+            _surface = created.Result;
+            _surfaceKind = created.Result.Kind;
         }
         else
         {
-            OperationResult resize = _swapChain.Resize(width, height, scale);
+            OperationResult resize = _surface.Resize(width, height, scale);
             if (!resize.IsSuccessful)
             {
                 return resize;
@@ -210,7 +238,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         }
 
         _needsResize = false;
-        SetOutput(_swapChain.View, _swapChain.Width, _swapChain.Height);
+        SetOutput(_surface.View, _surface.Width, _surface.Height);
         return OperationResult.Success();
     }
 
@@ -223,11 +251,9 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
             return OperationResult.Failure("The renderer has already been disposed.");
         }
 
-        // A decoder sharing this device calls into the same immediate context from its own thread, and
-        // everything below is one sequence of calls that has to arrive intact.
         lock (_deviceLock)
         {
-            if (_swapChain is not null && _needsResize)
+            if (_surface is not null && _needsResize)
             {
                 OperationResult resize = ApplyPendingResize();
                 if (!resize.IsSuccessful)
@@ -241,36 +267,45 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                 return OperationResult.Failure("The renderer has no output surface.");
             }
 
+            VideoSurfaceTransform surfaceTransform = VideoSurfaceTransforms.Select(_surfaceKind, frame.Colour);
+
             if (frame.Buffer is IGpuVideoBuffer gpuBuffer)
             {
-                // The layout is the texture's, so the shader that unpacks it is chosen once the texture has been read
-                // rather than from the format the frame reports.
                 OperationResult bound = BindGpuFrame(frame, gpuBuffer);
                 if (!bound.IsSuccessful)
                 {
                     return bound;
                 }
 
-                return Draw(_shaders.SemiPlanarArrayShader, _gpuViews, GpuTextureSlot, _gpuTexCoordScale, transform);
-            }
+                OperationResult<ID3D11PixelShader> resolvedShader = _shaders.GetArrayShader(surfaceTransform);
+                if (!resolvedShader.IsSuccessful)
+                {
+                    return OperationResult.Failure(resolvedShader);
+                }
 
-            if (frame.Buffer is not IPlanarVideoBuffer buffer)
+                return Draw(resolvedShader.Result, _gpuViews, GpuTextureSlot, _gpuTexCoordScale, transform);
+            }
+            else
             {
-                return OperationResult.Failure("The frame does not expose readable planes.");
-            }
+                if (frame.Buffer is not IPlanarVideoBuffer buffer)
+                {
+                    return OperationResult.Failure("The frame does not expose readable planes.");
+                }
 
-            if (!_shaders.TryGetPixelShader(frame.Format, out ID3D11PixelShader? pixelShader))
-            {
-                return OperationResult.Failure($"The Direct3D renderer cannot display {frame.Format} frames.");
-            }
+                OperationResult<ID3D11PixelShader> resolvedShader = _shaders.GetPixelShader(frame.Format, surfaceTransform);
+                if (!resolvedShader.IsSuccessful)
+                {
+                    return OperationResult.Failure(resolvedShader);
+                }
 
-            OperationResult upload = Upload(frame, buffer);
-            if (!upload.IsSuccessful)
-            {
-                return upload;
-            }
+                OperationResult upload = Upload(frame, buffer);
+                if (!upload.IsSuccessful)
+                {
+                    return upload;
+                }
 
-            return Draw(pixelShader, _planeViews, 0, (1.0f, 1.0f), transform);
+                return Draw(resolvedShader.Result, _planeViews, 0, (1.0f, 1.0f), transform);
+            }
         }
     }
 
@@ -283,7 +318,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
         lock (_deviceLock)
         {
-            if (_swapChain is not null && _needsResize)
+            if (_surface is not null && _needsResize)
             {
                 OperationResult resize = ApplyPendingResize();
                 if (!resize.IsSuccessful)
@@ -294,8 +329,6 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
             if (_lastPixelShader is null || _lastViews.Length == 0 || _outputView is null)
             {
-                // Nothing has been drawn yet, or there is no surface of our own to resize: what would be
-                // drawn again is the last frame, and there is none.
                 return OperationResult.Success();
             }
 
@@ -312,7 +345,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
         lock (_deviceLock)
         {
-            if (_swapChain is not null && _needsResize)
+            if (_surface is not null && _needsResize)
             {
                 OperationResult resize = ApplyPendingResize();
                 if (!resize.IsSuccessful)
@@ -333,14 +366,14 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
             _device.Context.OMSetRenderTargets(1, [_outputView], null);
             _device.Context.ClearRenderTargetView(_outputView, [0.0f, 0.0f, 0.0f, 1.0f]);
 
-            return _swapChain is null ? OperationResult.Success() : _swapChain.Present();
+            return _surface is null ? OperationResult.Success() : _surface.Present();
         }
     }
 
     public bool TryGetDisplayedFrameCount(out long count)
     {
         count = 0;
-        return _swapChain is not null && _swapChain.TryGetDisplayedFrameCount(out count);
+        return _surface is not null && _surface.TryGetDisplayedFrameCount(out count);
     }
 
     /// <summary>Sets the surface frames are drawn into when there is no presentation target.</summary>
@@ -360,7 +393,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         scaleX = 1.0;
         scaleY = 1.0;
 
-        return _swapChain is not null && _swapChain.TryGetCompositionTransform(out scaleX, out scaleY);
+        return _surface is not null && _surface.TryGetCompositionTransform(out scaleX, out scaleY);
     }
 
     #endregion
@@ -655,27 +688,27 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         _lastSlot = textureSlot;
         _lastTexCoordScale = texCoordScale;
 
-        return _swapChain is null ? OperationResult.Success() : _swapChain.Present();
+        return _surface is null ? OperationResult.Success() : _surface.Present();
     }
 
     #region Surface
 
     private OperationResult ApplyPendingResize()
     {
-        if (_swapChain is null || _target is null)
+        if (_surface is null || _target is null)
         {
             return OperationResult.Success();
         }
 
         (int width, int height, double scale) = GetSurfaceSize(_target);
-        OperationResult resize = _swapChain.Resize(width, height, scale);
+        OperationResult resize = _surface.Resize(width, height, scale);
         if (!resize.IsSuccessful)
         {
             return resize;
         }
 
         _needsResize = false;
-        SetOutput(_swapChain.View, _swapChain.Width, _swapChain.Height);
+        SetOutput(_surface.View, _surface.Width, _surface.Height);
         return OperationResult.Success();
     }
 
