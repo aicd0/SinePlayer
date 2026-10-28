@@ -291,6 +291,146 @@ public class Win2DSubtitleRendererTests
         }
     }
 
+    /// <summary>
+    /// Two events can be up at the same time — the Matrix's title arrives as one SRT event per character — and they share an
+    /// alignment band, so each has to make room for the one before it rather than being drawn on the same spot.
+    /// </summary>
+    [Test]
+    public void StacksSimultaneousCuesInsteadOfDrawingThemOnOneAnother()
+    {
+        using Win2DSubtitleRenderer renderer = new();
+
+        CanvasRenderTarget? target = null;
+        try
+        {
+            CanvasDevice device;
+            try
+            {
+                device = renderer.EnsureCanvasDevice();
+            }
+            catch (Exception exception)
+            {
+                Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+                return;
+            }
+
+            const int width = 480;
+            const int height = 200;
+            target = new CanvasRenderTarget(device, width, height, 96.0f);
+
+            using SubtitleCue first = Cue("0,0,Default,,0,0,0,,帝");
+            using SubtitleCue second = Cue("1,0,Default,,0,0,0,,帝国黑客帝国黑客");
+
+            using (CanvasDrawingSession session = target.CreateDrawingSession())
+            {
+                session.Clear(default(Color));
+                renderer.DrawCues(session, [first, second], SubtitlePlacement.Identity, width, height);
+            }
+
+            byte[] pixels = target.GetPixelBytes();
+            List<(int Top, int Bottom, int Left, int Right)> bands = InkBands(pixels, width, height);
+
+            Assert.That(bands, Has.Count.EqualTo(2), "two cues, two separate bands of ink");
+
+            // The bands are listed from the top of the surface down, so the last one is the cue drawn first: it keeps the
+            // bottom, where its alignment asked for it, and the cue after it makes room above.
+            (int Top, int Bottom, int Left, int Right) lowest = bands[^1];
+            (int Top, int Bottom, int Left, int Right) highest = bands[0];
+            Assert.That(highest.Bottom, Is.LessThan(lowest.Top), "the second cue sits above the first, with clear space between them");
+            Assert.That(lowest.Right - lowest.Left, Is.LessThan(highest.Right - highest.Left), "the wide line is the one that went up");
+        }
+        finally
+        {
+            target?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// The rows of the surface that hold ink, as one entry per run of them: what tells "stacked" from "drawn on top of each
+    /// other" without knowing anything about fonts.
+    /// </summary>
+    private static List<(int Top, int Bottom, int Left, int Right)> InkBands(byte[] pixels, int width, int height)
+    {
+        List<(int Top, int Bottom, int Left, int Right)> bands = [];
+        bool inBand = false;
+        int top = 0;
+        for (int y = 0; y < height; y++)
+        {
+            bool rowHasInk = false;
+            for (int x = 0; x < width; x++)
+            {
+                if (AlphaAt(pixels, width, x, y) == 0)
+                {
+                    continue;
+                }
+
+                rowHasInk = true;
+                break;
+            }
+
+            if (rowHasInk && !inBand)
+            {
+                inBand = true;
+                top = y;
+            }
+            else if (!rowHasInk && inBand)
+            {
+                inBand = false;
+                bands.Add((top, y - 1, LeftOf(pixels, width, top, y - 1), RightOf(pixels, width, top, y - 1)));
+            }
+        }
+
+        if (inBand)
+        {
+            bands.Add((top, height - 1, LeftOf(pixels, width, top, height - 1), RightOf(pixels, width, top, height - 1)));
+        }
+
+        // Top of the surface first, so "above" is the earlier entry.
+        return bands;
+    }
+
+    private static int LeftOf(byte[] pixels, int width, int top, int bottom)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = top; y <= bottom; y++)
+            {
+                if (AlphaAt(pixels, width, x, y) != 0)
+                {
+                    return x;
+                }
+            }
+        }
+
+        return width;
+    }
+
+    private static int RightOf(byte[] pixels, int width, int top, int bottom)
+    {
+        for (int x = width - 1; x >= 0; x--)
+        {
+            for (int y = top; y <= bottom; y++)
+            {
+                if (AlphaAt(pixels, width, x, y) != 0)
+                {
+                    return x;
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    private static SubtitleCue Cue(string text)
+    {
+        return new SubtitleCue
+        {
+            Start = TimeSpan.Zero,
+            End = TimeSpan.FromSeconds(2),
+            Text = text,
+        };
+    }
+
     /// <summary>A cue carrying a small opaque image, positioned and sized as fractions of the frame.</summary>
     private static SubtitleCue BitmapCue(double left, double top, double imageWidth, double imageHeight)
     {

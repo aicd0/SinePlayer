@@ -85,11 +85,30 @@ demuxer enumerates subtitle streams so they appear in `MediaInfo`, and the pipel
   (VobSub, DVB, teletext), or 32-bit pixels already in that byte order (PGS). `SubtitleBitmap` does the expansion and the
   multiplication of colour by alpha in one place, over spans, so it is pinned by tests without a device; an event that
   arrives as several rectangles is composed into one image, cropped to their bounding box.
-- **Timing.** `SubtitleCueWindow` holds the track's decoded cues, recognises an event it already holds (a seek re-reads
-  from a keyframe, so the same event arrives twice) and keeps a cue for a second past its end so a consumer drawing it
-  is not left holding freed memory. `SubtitleRenderCore` is a fifth thread: it follows the clock, sleeps until the next
-  boundary that can change the screen, never anchors the clock and never sets a starved flag — a cue that is late cannot
-  stall the picture or the sound.
+- **The frame those fractions are of.** A bitmap subtitle is positioned inside a *plane* of its own, and the plane is not
+  the picture beside it: a 4K remux carries 1080p PGS, so the same window sits at 707/1920 of the plane and 707/3840 of
+  the frame. The plane is what the codec states in the event, which libavcodec records on the decoder context — a
+  Matroska PGS track leaves `codecpar` at zero, so reading the size from the stream's parameters alone left every cue
+  stretched from its own bounding box to the bottom-right corner of the screen.
+- **How long a picture stays.** A bitmap event says when it starts and never when it ends — libavcodec reports
+  `end_display_time` as `UINT32_MAX` and says in as many words that the next event is what ends it, and an event with no
+  objects in it is how a track takes the screen away. So a picture cue is *open* (`SubtitleCue.OpenEnd`) until the next
+  event of the track arrives, `SubtitleCueWindow` closes it there, and a clearing event is a cue with no length and
+  nothing in it: never drawn, it only ends what came before. Reading `UINT32_MAX` as a duration instead put every cue on
+  screen for 49 days, which is what made them pile up.
+- **Timing.** `SubtitleCueWindow` holds the track's decoded cues and recognises an event it already holds (a seek
+  re-reads from a keyframe, so the same event arrives twice). `SubtitleRenderCore` is a fifth thread: it follows the
+  clock, sleeps until the next boundary that can change the screen, never anchors the clock and never sets a starved
+  flag — a cue that is late cannot stall the picture or the sound.
+- **Who owns a cue.** A cue owns a picture, and the window is not the last thing to touch one — a renderer may still be
+  drawing the frame a cue was in when the playhead has moved on, so no amount of time tells you when it is done with it.
+  It is counted instead: `RefCounted<SubtitleCue>` per cue, one reference held by the window while it can still be
+  asked for, and one per `SubtitleCueSnapshot` handed out by `Visible`, which the caller disposes when finished. The
+  picture is freed when the last of them lets go, and `SubtitleRenderCore` keeps the snapshot it last drew until it
+  replaces it. The one-second margin that remains is only about *offering*: the clock that trims runs ahead of the frame
+  being composited, so a cue dropped the instant it ended would be missing from the last frames that still show it.
+  `SubtitleCueSnapshot` is internal — `ISubtitleRenderer.Show` is handed a plain list, so a renderer is written without
+  knowing anything is counted.
 - **Selection.** A subtitle track is selected with the same `SelectStream` as the other two kinds. Compatibility between
   decoder and renderer is settled once, at chain construction: the decoder declares a `SubtitleCueFormat`, the renderer
   factory refuses a format it cannot draw, and an incompatible pair is never published. There is no per-payload verdict
@@ -98,13 +117,17 @@ demuxer enumerates subtitle streams so they appear in `MediaInfo`, and the pipel
   the surface. It is deliberately not derived from `VideoTransform`: turning a picture must not turn the subtitles.
 - **Drawing.** `Win2DSubtitleRenderer` draws both kinds into a swap chain of its own: text is laid out with DirectWrite
   and anchored by its ASS alignment, and a picture is blitted where its fractions say, scaled to the surface and clamped
-  inside it. The host's second `SwapChainPanel` receives that chain, and the player offers the track in its menu.
+  inside it. Cues that share an alignment band — the three bottom alignments, or the middle three, or the top three — are
+  stacked in the order they arrive, each moved away from the edge its alignment names by the height already taken, so two
+  events up at once become two lines rather than one drawn over the other. The Matrix's title is the case that found this:
+  `帝国黑客` arrives as four separate one-character SRT events, all bottom-centre. The host's second `SwapChainPanel`
+  receives that chain, and the player offers the track in its menu.
 - **What is missing.** An external subtitle file — a sidecar `.srt` or `.ass` beside the video — is still refused,
-  because `FFmpegSubtitleDecoder.TryCreate` has no source for one; a file whose own tracks cannot be read has no
-  fallback yet. Two parts of the bitmap path are written but not verified against content: the 32-bit pixel layout,
-  because no PGS file was to hand, and the composition of several rectangles in one event, because every file checked
-  uses one rectangle each. And a bitmap cue is placed against the surface rather than against the letterboxed picture,
-  which is the approximation the text path makes too.
+  because `FFmpegSubtitleDecoder` has no source for one; a file whose own tracks cannot be read has no fallback yet. The
+  32-bit pixel layout is still unverified against content of its own — the PGS file to hand paints through a palette, so
+  the copy path is pinned by the fixture in `SubtitleBitmapTests` alone — and so is the composition of several rectangles
+  in one event, because every file checked uses one rectangle each. And a bitmap cue is placed against the surface rather
+  than against the letterboxed picture, which is the approximation the text path makes too.
 
 ## 4. Plugin surface
 

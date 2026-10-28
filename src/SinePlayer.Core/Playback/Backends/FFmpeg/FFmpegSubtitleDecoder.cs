@@ -186,27 +186,32 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
                 return OperationResult.Failure($"Unable to decode the subtitle: {FFmpegInterop.GetErrorMessage(result)}");
             }
 
-            if (gotSubtitle == 0 || subtitle.RectCount == 0)
+            if (gotSubtitle == 0)
             {
                 return OperationResult.Success();
             }
 
             TimeSpan start = mediaPacket.Timestamp + TimeSpan.FromMilliseconds(subtitle.StartDisplayTime);
-            TimeSpan end = mediaPacket.Timestamp + TimeSpan.FromMilliseconds(subtitle.EndDisplayTime);
-            if (end <= start)
-            {
-                // Some containers state no display time and leave the length to the packet's own duration.
-                end = start + mediaPacket.Duration;
-            }
+            TimeSpan end = ReadEnd(subtitle, mediaPacket, start);
 
             if (_cueFormat == SubtitleCueFormat.BitmapBgra)
             {
+                if (subtitle.RectCount == 0)
+                {
+                    // A display set with nothing in it is how a bitmap track takes the picture away, and a decoder
+                    // reports it as an event like any other. A cue with no length and nothing to draw says exactly
+                    // that: it is never on screen, it only ends what was there before it.
+                    cues.Add(new SubtitleCue
+                    {
+                        Start = start,
+                        End = start,
+                    });
+                    return OperationResult.Success();
+                }
+
                 SubtitleImage? image = CollectImage(subtitle);
                 if (image is null)
                 {
-                    // An event with nothing in it is a cue that clears the screen: the packet has a timing and says no
-                    // more than that. Nothing is added, which leaves the window to the cues that were there before and
-                    // lets them expire on their own.
                     return OperationResult.Success();
                 }
 
@@ -216,6 +221,11 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
                     End = end,
                     Image = image,
                 });
+                return OperationResult.Success();
+            }
+
+            if (subtitle.RectCount == 0)
+            {
                 return OperationResult.Success();
             }
 
@@ -238,6 +248,32 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
         {
             FFmpegNative.avsubtitle_free((nint)(&subtitle));
         }
+    }
+
+    /// <summary>
+    /// When an event stops being on screen. A track may state it, in which case that is the answer; a bitmap track
+    /// usually does not, and it says so with <see cref="uint.MaxValue"/> — the end is then whatever event replaces it,
+    /// which only the reader of the whole track knows, so the cue is left open.
+    /// </summary>
+    internal static TimeSpan ReadEnd(AVSubtitle subtitle, MediaPacket mediaPacket, TimeSpan start)
+    {
+        if (subtitle.EndDisplayTime == uint.MaxValue)
+        {
+            // What a bitmap track says instead of an end: the event after this one is what takes it away, and only the
+            // reader of the whole track knows when that is.
+            return SubtitleCue.OpenEnd;
+        }
+
+        TimeSpan stated = mediaPacket.Timestamp + TimeSpan.FromMilliseconds(subtitle.EndDisplayTime);
+        if (stated > start)
+        {
+            return stated;
+        }
+
+        // Some containers state no display time and leave the length to the packet's own duration.
+        return mediaPacket.Duration > TimeSpan.Zero
+            ? start + mediaPacket.Duration
+            : SubtitleCue.OpenEnd;
     }
 
     /// <summary>
@@ -279,10 +315,12 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
             return null;
         }
 
-        // The frame the rectangles are positioned inside, taken from the container when it said and from the rectangles
-        // themselves when it did not, which is what turns pixels into fractions of the picture.
-        int canvasWidth = _canvasWidth > 0 ? Math.Max(_canvasWidth, right) : right;
-        int canvasHeight = _canvasHeight > 0 ? Math.Max(_canvasHeight, bottom) : bottom;
+        // The frame the rectangles are positioned inside, which is what turns pixels into fractions of the picture. The
+        // decoder knows it — a bitmap codec states it in the event itself, and FFmpeg records it on the context — while
+        // the stream's codec parameters often leave it at zero (a Matroska PGS track says nothing), so the parameters
+        // are only the fallback and the rectangles the last resort.
+        int canvasWidth = ReadCanvasWidth(right);
+        int canvasHeight = ReadCanvasHeight(bottom);
 
         int width = right - left;
         int height = bottom - top;
@@ -328,6 +366,34 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
                 Marshal.FreeHGlobal(pixels);
             }
         }
+    }
+
+    /// <summary>
+    /// How wide the frame the rectangles are placed in is. A bitmap subtitle is positioned inside a plane of its own,
+    /// which the decoder learns from the event — 1920 pixels for a track authored at 1080p even when the picture beside
+    /// it is 4K — so reading it from the context is what keeps a cue where it was drawn rather than stretching it to
+    /// reach the edge of the screen.
+    /// </summary>
+    private unsafe int ReadCanvasWidth(int fallback)
+    {
+        int width = _canvasWidth;
+        if (width <= 0 && _context != 0)
+        {
+            width = ((AVCodecContext*)_context)->Width;
+        }
+
+        return width > 0 ? Math.Max(width, fallback) : fallback;
+    }
+
+    private unsafe int ReadCanvasHeight(int fallback)
+    {
+        int height = _canvasHeight;
+        if (height <= 0 && _context != 0)
+        {
+            height = ((AVCodecContext*)_context)->Height;
+        }
+
+        return height > 0 ? Math.Max(height, fallback) : fallback;
     }
 
     private static unsafe bool IsDrawable(AVSubtitleRect* rect)
