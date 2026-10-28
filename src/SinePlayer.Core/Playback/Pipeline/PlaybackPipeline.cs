@@ -1297,6 +1297,8 @@ public sealed partial class PlaybackPipeline : IDisposable
                     {
                         PostWarning($"The subtitle decoder could not be flushed: {ex.Message}");
                     }
+
+                    _cueWindow.SkipTo(seekPosition);
                 }
                 else
                 {
@@ -1538,7 +1540,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure("The subtitle decoder returned no cues.");
         }
 
-        _cueWindow.Add(cues, _clock.Position);
+        _cueWindow.Add(cues, _clock.Position, _subtitleRenderer.HasComponent);
         if (cues.Count > 0)
         {
             _subtitleRenderNode.Wake();
@@ -2542,14 +2544,14 @@ public sealed partial class PlaybackPipeline : IDisposable
         long workingEpoch = -1;
         long drawnSurfaceVersion = -1;
         SubtitlePlacement drawnPlacement = default;
-        List<SubtitleCue> drawnCues = [];
+        SubtitleCueSnapshot drawnCues = SubtitleCueSnapshot.Empty;
 
         while (true)
         {
             long stamp = _subtitleRenderNode.Stamp;
             if (_stopRequested)
             {
-                return;
+                break;
             }
 
             // Install subtitle renderer
@@ -2593,7 +2595,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             // Show
             TimeSpan position = _clock.Position;
-            IReadOnlyList<SubtitleCue> cues = _cueWindow.Visible(position);
+            SubtitleCueSnapshot cues = _cueWindow.Visible(position);
             long surfaceVersion = Interlocked.Read(ref _subtitleSurfaceVersion);
             SubtitlePlacement placement = SubtitlePlacement;
             if (drawnInvalidated ||
@@ -2601,12 +2603,16 @@ public sealed partial class PlaybackPipeline : IDisposable
                 placement != drawnPlacement ||
                 !SameCues(cues, drawnCues))
             {
-                ReportOnFailure("The subtitles could not be drawn", SafeInvoke(() => renderer.Show(cues, placement)));
+                ReportOnFailure("The subtitles could not be drawn", SafeInvoke(() => renderer.Show(cues.Cues, placement)));
+                drawnCues.Dispose();
+                drawnCues = cues;
                 drawnInvalidated = false;
                 drawnSurfaceVersion = surfaceVersion;
                 drawnPlacement = placement;
-                drawnCues.Clear();
-                drawnCues.AddRange(cues);
+            }
+            else
+            {
+                cues.Dispose();
             }
 
             // Idle
@@ -2622,18 +2628,22 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             _subtitleRenderNode.Wait(stamp, timeout);
         }
+
+        drawnCues.Dispose();
     }
 
-    private static bool SameCues(IReadOnlyList<SubtitleCue> visible, List<SubtitleCue> drawn)
+    private static bool SameCues(SubtitleCueSnapshot x, SubtitleCueSnapshot y)
     {
-        if (visible.Count != drawn.Count)
+        IReadOnlyList<SubtitleCue> xCues = x.Cues;
+        IReadOnlyList<SubtitleCue> yCues = y.Cues;
+        if (xCues.Count != yCues.Count)
         {
             return false;
         }
 
-        for (int index = 0; index < visible.Count; index++)
+        for (int index = 0; index < xCues.Count; index++)
         {
-            if (!ReferenceEquals(visible[index], drawn[index]))
+            if (!ReferenceEquals(xCues[index], yCues[index]))
             {
                 return false;
             }

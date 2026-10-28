@@ -5,13 +5,17 @@ namespace SinePlayer.Core.Playback.Abstractions.Decode;
 
 public sealed partial class SubtitleCue : IDisposable
 {
+    public static readonly TimeSpan OpenEnd = TimeSpan.MaxValue;
+
     public required TimeSpan Start { get; init; }
 
-    public required TimeSpan End { get; init; }
+    public required TimeSpan End { get; set; }
 
     public string? Text { get; init; }
 
     public SubtitleImage? Image { get; init; }
+
+    public bool IsOpenEnded => End == OpenEnd;
 
     public void Dispose()
     {

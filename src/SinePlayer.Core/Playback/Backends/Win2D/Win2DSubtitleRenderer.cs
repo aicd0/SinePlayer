@@ -37,6 +37,9 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
     /// <summary>How far the shadow sits from the text, in physical pixels: what makes light text readable on light frames.</summary>
     private const float ShadowOffset = 2.0f;
 
+    /// <summary>How much clear space is left between two cues that stack, as a fraction of the font's size.</summary>
+    private const float StackGapFraction = 0.15f;
+
     private static readonly Guid sSurfaceInterfaceId = typeof(Windows.Win32.Graphics.Dxgi.IDXGISurface).GUID;
 
     /// <summary><c>IDXGIDevice</c>, which a Direct3D device answers to and Win2D wants.</summary>
@@ -177,6 +180,13 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
         float fontSize = Math.Clamp(height * FontSizeFraction, MinimumFontSize, MaximumFontSize);
         float margin = height * MarginFraction;
+        float gap = fontSize * StackGapFraction;
+
+        // How much of each band is taken, by the alignment's row: bottom, middle, top. Several events can be up at once —
+        // the same speaker's two lines, or a sign beside dialogue — and they share a band far more often than not. Each is
+        // moved away from the edge its alignment names by what is already there, so they stack instead of landing on the
+        // very spot the one before them took.
+        float[] taken = new float[3];
 
         using CanvasTextFormat format = new()
         {
@@ -202,7 +212,16 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             string body = string.Join("\n", text.Lines);
             using CanvasTextLayout layout = new(_canvasDevice, body, format, width, height);
 
-            Vector2 origin = Anchor(layout, text.Alignment, width, height, margin);
+            int row = RowOf(text.Alignment);
+            float stacked = taken[row];
+            taken[row] += (float)layout.LayoutBounds.Height + gap;
+
+            Vector2 origin = Anchor(layout, row, text.Alignment, width, height, margin);
+
+            // The bottom and middle bands grow upwards, the top band downwards: the first cue keeps the place its alignment
+            // asked for, and the ones after it make room above or below rather than covering it.
+            origin.Y += row == 2 ? stacked : -stacked;
+
             origin += new Vector2((float)(placement.OffsetX * width), (float)(placement.OffsetY * height));
             origin = KeepOnSurface(origin, layout, width, height);
 
@@ -250,14 +269,21 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
     }
 
     /// <summary>
+    /// Which band of the surface an alignment belongs to: 0 bottom, 1 middle, 2 top. The three alignments in a band share a
+    /// height, so they are what has to stack together.
+    /// </summary>
+    private static int RowOf(int alignment)
+    {
+        return (Math.Clamp(alignment, 1, 9) - 1) / 3;
+    }
+
+    /// <summary>
     /// Where a block of text goes before any adjustment: the ASS anchor, laid out against the surface with a margin from
     /// the edge it is anchored to. The layout is measured first, because centring needs its width.
     /// </summary>
-    private static Vector2 Anchor(CanvasTextLayout layout, int alignment, int width, int height, float margin)
+    private static Vector2 Anchor(CanvasTextLayout layout, int row, int alignment, int width, int height, float margin)
     {
-        int index = Math.Clamp(alignment, 1, 9) - 1;
-        int column = index % 3;
-        int row = index / 3;
+        int column = (Math.Clamp(alignment, 1, 9) - 1) % 3;
 
         float x = column switch
         {
