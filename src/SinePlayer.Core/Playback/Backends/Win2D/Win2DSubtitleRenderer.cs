@@ -268,7 +268,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         {
             if (_d3dDevice is null)
             {
-                OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+                OperationResult<D3D11Device> created = D3D11Device.Create();
                 if (!created.IsSuccessful)
                 {
                     throw new InvalidOperationException(created.Message);

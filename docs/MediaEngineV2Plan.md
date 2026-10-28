@@ -102,3 +102,35 @@ settled would freeze whatever it happened to look like.
 
 **What v1 leaves in place.** The registry is `internal` in v1 and is not exposed through any `IPluginContext`,
 but registering a factory is one call, so exposing it later is purely additive.
+
+## 5. High dynamic range
+
+**Where it stands now.** Both containers exist. `ColourInfo` — primaries, transfer, range — travels on the stream and
+on every decoded frame, and the surface supplies the other half of the answer, so what a picture costs follows from the
+pair:
+
+| Content | SDR container | HDR10 container |
+|---|---|---|
+| PQ (HDR10) | tone mapped: transfer undone, BT.2020 → BT.709, range compressed (one Hable shoulder above 600 nits), re-encoded | **pass through** — the planes are unpacked and the limited range expanded, nothing else |
+| HLG | tone mapped, from HLG's scene-referred signal | HLG resolved to light, then encoded as PQ |
+| SDR | pass through | lifted: white placed at 203 nits, gamma undone, encoded as PQ |
+
+`IVideoSurface` has one implementation per container, sharing the swap chain that does composition, scaling and
+presenting; `VideoSurfaceTransforms.Select` is the whole of the policy, and `D3D11VideoShaders` holds a programme per
+(layout, transform). The choice is made by `VideoSurfaceFactory` from the display's own state — `DxgiDisplay` reads the
+output's colour space, which is PQ/BT.2020 exactly when the desktop is composing for HDR — with `Hdr10` and `Sdr` as
+overrides and a fallback to SDR if the chain refuses the format or the colour space. The Lab chooses between them per
+renderer, which is also how the container is checked on hardware.
+
+**Why the default is still SDR.** Two parts of the path are not there yet, and both are visible to a user: the stream's
+mastering metadata (`MaxCLL`/`MaxFALL`) is not carried, so a display maps from what it can measure rather than from what
+the grade declares; and the subtitle surface is a second swap chain that is still SDR, so the compositor lifts it by the
+user's SDR-white setting while the picture peaks far above it — subtitles come out dim relative to highlights. Auto
+becomes the default when those two are done, not before.
+
+**What a complete HDR path still needs.** Mastering metadata on the present (`SetHDRMetaData`); the subtitle surface in
+the same container as the picture; a reaction to the display changing HDR state while a file plays (`WM_DISPLAYCHANGE`
+and a re-created chain, since the format cannot be changed in place); an HDR→HDR curve for panels dimmer than the grade,
+which is a different curve from the SDR one — identity below the panel's peak, and only above it compressed — with the
+peak taken from `DXGI_OUTPUT_DESC1`; and a check of what the compositor does with a PQ chain on an SDR desktop, which is
+now testable because the container can be forced.

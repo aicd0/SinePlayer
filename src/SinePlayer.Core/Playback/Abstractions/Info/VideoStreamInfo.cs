@@ -16,4 +16,6 @@ public sealed class VideoStreamInfo : MediaStreamInfo
     public required PixelFormat PixelFormat { get; init; }
 
     public int BitDepth { get; init; }
+
+    public ColourInfo Colour { get; init; }
 }

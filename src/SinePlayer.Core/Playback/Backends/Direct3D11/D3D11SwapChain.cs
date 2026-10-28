@@ -1,7 +1,6 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Common.ErrorHandling;
@@ -28,11 +27,17 @@ namespace SinePlayer.Core.Playback.Backends.Direct3D11;
 /// makes "resized but no longer cancelling the scale" the easy mistake to make.
 /// </para>
 /// </summary>
-internal sealed class D3D11SwapChain : IDisposable
+internal sealed partial class D3D11SwapChain : IDisposable
 {
     private const uint BufferCount = 2;
 
     private readonly D3D11Device _device;
+
+    /// <summary>
+    /// The format every buffer of this chain holds, and what a resize has to ask for again: <c>ResizeBuffers</c> takes
+    /// a format and refuses to change it, so a chain created for one container cannot become another.
+    /// </summary>
+    private readonly DXGI_FORMAT _format;
 
     private IDXGISwapChain1? _swapChain;
     private ID3D11Texture2D? _backBuffer;
@@ -45,9 +50,10 @@ internal sealed class D3D11SwapChain : IDisposable
     /// <summary>What the monitor's count was the last time it answered, or -1 if it never has.</summary>
     private long _displayedCount = -1;
 
-    private D3D11SwapChain(D3D11Device device, IDXGISwapChain1 swapChain, ID3D11Texture2D backBuffer, ID3D11RenderTargetView view, int width, int height, double compositionScale)
+    private D3D11SwapChain(D3D11Device device, DXGI_FORMAT format, IDXGISwapChain1 swapChain, ID3D11Texture2D backBuffer, ID3D11RenderTargetView view, int width, int height, double compositionScale)
     {
         _device = device;
+        _format = format;
         _swapChain = swapChain;
         _backBuffer = backBuffer;
         _view = view;
@@ -66,6 +72,8 @@ internal sealed class D3D11SwapChain : IDisposable
 
     internal ID3D11Device Device => _device.Device;
 
+    internal DXGI_FORMAT Format => _format;
+
     internal int Width { get; private set; }
 
     internal int Height { get; private set; }
@@ -79,7 +87,7 @@ internal sealed class D3D11SwapChain : IDisposable
     internal static OperationResult<D3D11SwapChain> TryCreate(D3D11Device device, int width, int height, double compositionScale)
     {
         // A picture covers its whole surface, so what is behind it is never meant to show through.
-        return TryCreate(device, width, height, compositionScale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE);
+        return TryCreate(device, width, height, compositionScale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM);
     }
 
     /// <param name="alphaMode">
@@ -88,6 +96,15 @@ internal sealed class D3D11SwapChain : IDisposable
     /// what is underneath.
     /// </param>
     internal static OperationResult<D3D11SwapChain> TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode)
+    {
+        return TryCreate(device, width, height, compositionScale, alphaMode, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM);
+    }
+
+    /// <param name="format">
+    /// What each buffer holds. It is the half of a container DXGI is told at creation; the other half, the colour space,
+    /// is declared afterwards with <see cref="TrySetColourSpace"/>.
+    /// </param>
+    internal static OperationResult<D3D11SwapChain> TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode, DXGI_FORMAT format)
     {
         OperationResultCreator<D3D11SwapChain> result = new();
 
@@ -108,7 +125,7 @@ internal sealed class D3D11SwapChain : IDisposable
             {
                 Width = (uint)width,
                 Height = (uint)height,
-                Format = DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM,
+                Format = format,
                 SampleDesc = new DXGI_SAMPLE_DESC { Count = 1 },
                 BufferUsage = DXGI_USAGE.DXGI_USAGE_RENDER_TARGET_OUTPUT,
                 BufferCount = BufferCount,
@@ -133,7 +150,7 @@ internal sealed class D3D11SwapChain : IDisposable
             ID3D11Texture2D backBuffer = GetBackBuffer(created);
             ID3D11RenderTargetView view = D3D11Interop.CreateRenderTargetView(device.Device, backBuffer);
 
-            return result.Success(new D3D11SwapChain(device, created, backBuffer, view, width, height, compositionScale));
+            return result.Success(new D3D11SwapChain(device, format, created, backBuffer, view, width, height, compositionScale));
         }
         catch (Exception exception)
         {
@@ -173,15 +190,59 @@ internal sealed class D3D11SwapChain : IDisposable
     internal byte[] ReadPixels()
     {
         ID3D11Texture2D backBuffer = _backBuffer ?? throw new ObjectDisposedException(nameof(D3D11SwapChain));
-        return D3D11Interop.ReadPixels(_device.Device, _device.Context, backBuffer, Width, Height);
+        return D3D11Interop.ReadPixels(_device.Device, _device.Context, backBuffer, Width, Height, _format);
     }
+    /// <summary>
+    /// Declares what the buffer's codes mean, which is the half of a container DXGI cannot be told at creation.
+    /// <para>
+    /// A swap chain created without this says eight-bit BT.709 gamma relative to the display's white, so writing PQ
+    /// codes into one is not an error DXGI reports — it is a picture that is wrong in a way nobody is told about. The
+    /// support check is therefore part of the operation rather than an assumption, and a refusal is returned so the
+    /// caller can fall back instead of presenting a surface whose meaning it could not establish.
+    /// </para>
+    /// </summary>
+    internal unsafe OperationResult TrySetColourSpace(DXGI_COLOR_SPACE_TYPE colourSpace)
+    {
+        if (_disposed || _swapChain is null)
+        {
+            return OperationResult.Failure("The swap chain has already been disposed.");
+        }
+
+        if (_swapChain is not IDXGISwapChain3 swapChain3)
+        {
+            return OperationResult.Failure("The swap chain does not offer a colour space, so it cannot carry absolute light levels.");
+        }
+
+        try
+        {
+            // Generated as a throwing wrapper, so a chain that cannot answer arrives as an exception below rather than
+            // as a value to check.
+            swapChain3.CheckColorSpaceSupport(colourSpace, out DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG support);
+
+            if ((support & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG.DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) == 0)
+            {
+                return OperationResult.Failure($"The swap chain does not accept {colourSpace} in its {_format} buffers.");
+            }
+
+            swapChain3.SetColorSpace1(colourSpace);
+            return OperationResult.Success();
+        }
+        catch (Exception exception)
+        {
+            return OperationResult.Failure($"Unable to declare {colourSpace} on the swap chain: {exception.Message}");
+        }
+    }
+
     /// <summary>
     /// Sizes the buffers and re-applies the composition scale transform, which <c>ResizeBuffers</c>
     /// throws away.
     /// </summary>
     internal OperationResult Resize(int width, int height, double compositionScale)
     {
-        if (_disposed)
+        // Taken once: a chain disposed from another thread is the only way this can become null, and using the same
+        // reference throughout is what keeps the resize from reaching a chain that was released mid-call.
+        IDXGISwapChain1? swapChain = _swapChain;
+        if (_disposed || swapChain is null)
         {
             return OperationResult.Failure("The swap chain has already been disposed.");
         }
@@ -201,16 +262,19 @@ internal sealed class D3D11SwapChain : IDisposable
             _device.Context.OMSetRenderTargets(0, null, null);
             ReleaseBackBuffer();
 
-            _swapChain!.ResizeBuffers(BufferCount, (uint)width, (uint)height, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM, default);
+            // The format is the one the chain was created with: a resize cannot change it, and passing another would
+            // fail rather than quietly repaint the pictures with another container's meaning.
+            swapChain.ResizeBuffers(BufferCount, (uint)width, (uint)height, _format, default);
 
-            OperationResult scaled = TrySetCompositionScale(_swapChain, compositionScale);
+            OperationResult scaled = TrySetCompositionScale(swapChain, compositionScale);
             if (!scaled.IsSuccessful)
             {
                 return scaled;
             }
 
-            _backBuffer = GetBackBuffer(_swapChain);
-            _view = D3D11Interop.CreateRenderTargetView(_device.Device, _backBuffer);
+            ID3D11Texture2D backBuffer = GetBackBuffer(swapChain);
+            _backBuffer = backBuffer;
+            _view = D3D11Interop.CreateRenderTargetView(_device.Device, backBuffer);
             Width = width;
             Height = height;
             CompositionScale = compositionScale;

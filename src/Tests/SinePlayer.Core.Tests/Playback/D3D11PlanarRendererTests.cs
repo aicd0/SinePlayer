@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 
@@ -31,11 +32,11 @@ public class D3D11PlanarRendererTests
     [SetUp]
     public void SetUp()
     {
-        OperationResult<D3D11Device> deviceCreated = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> deviceCreated = D3D11Device.Create();
         Assert.That(deviceCreated.IsSuccessful, Is.True, deviceCreated.Message);
         _device = deviceCreated.Result;
 
-        OperationResult<D3D11VideoRenderer> rendererCreated = D3D11VideoRenderer.TryCreate(_device);
+        OperationResult<D3D11VideoRenderer> rendererCreated = D3D11VideoRenderer.Create(_device, VideoSurfacePreference.Auto);
         Assert.That(rendererCreated.IsSuccessful, Is.True, rendererCreated.Message);
         _renderer = rendererCreated.Result;
     }
@@ -368,16 +369,17 @@ public class D3D11PlanarRendererTests
     }
 
     /// <summary>
-    /// A ten-bit frame the CPU decoded is three planar components sixteen bits wide — the layout a software decoder
-    /// produces when hardware decoding is off, and the one the renderer had no place for.
+    /// A ten-bit frame the CPU decoded is three planar components sixteen bits wide, with the samples right-aligned —
+    /// 0 to 1023 held in sixteen bits, which is what a software decoder writes. The eight-bit code times four is the
+    /// ten-bit one, so 235 becomes 940 and 128 becomes 512.
     /// </summary>
     [Test]
     public void ConvertsPlanarTenBitToWhite()
     {
         using PlanarFrameBuffer buffer = new(
-            (Width, Height, 2, (_, _) => [0x00, 0xEB]),
-            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x00, 0x80]),
-            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x00, 0x80]));
+            (Width, Height, 2, (_, _) => TenBit(940)),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => TenBit(512)),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => TenBit(512)));
 
         byte[] pixels = Render(PixelFormat.Yuv420P10, buffer);
 
@@ -389,9 +391,9 @@ public class D3D11PlanarRendererTests
     public void ConvertsPlanarTenBitToRed()
     {
         using PlanarFrameBuffer buffer = new(
-            (Width, Height, 2, (_, _) => [0x00, 0x51]),
-            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x00, 0x5A]),
-            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x00, 0xF0]));
+            (Width, Height, 2, (_, _) => TenBit(324)),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => TenBit(360)),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => TenBit(960)));
 
         byte[] pixels = Render(PixelFormat.Yuv420P10, buffer);
 
@@ -402,18 +404,156 @@ public class D3D11PlanarRendererTests
     public void ConvertsPlanarTenBitToBlack()
     {
         using PlanarFrameBuffer buffer = new(
-            (Width, Height, 2, (_, _) => [0x00, 0x04]),
-            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x00, 0x80]),
-            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x00, 0x80]));
+            (Width, Height, 2, (_, _) => TenBit(64)),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => TenBit(512)),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => TenBit(512)));
 
         byte[] pixels = Render(PixelFormat.Yuv420P10, buffer);
 
         AssertPixel(pixels, 0, 0, 0, 0, 3);
     }
 
+    /// <summary>
+    /// A PQ frame holds light levels, not code values: the sample below is a hundred nits, the diffuse white an HDR
+    /// grade is mastered against. Read as SDR it lands in the middle of the scale, which is what made HDR look dim;
+    /// read as the light it stands for it lands near the top of it, which is where diffuse white belongs.
+    /// </summary>
+    [Test]
+    public void ReadsPqAsTheLightItStandsFor()
+    {
+        byte[] readAsSdr = Render(PixelFormat.Yuv420P10, CreateTenBitGrey(509));
+        byte[] toneMapped = Render(PixelFormat.Yuv420P10, CreateTenBitGrey(509), HighDynamicRange(ColourTransfer.Smpte2084));
+
+        AssertPixel(readAsSdr, 0, 129, 129, 129, 4);
+        AssertPixel(toneMapped, 0, 195, 195, 195, 5);
+    }
+
+    /// <summary>
+    /// HLG is backwards compatible with SDR, so its mid-tones are close to SDR's and the difference shows as a brighter
+    /// picture rather than a clipped one: half signal is fifty nits against a thousand-nit white, and it has to land
+    /// well above the same bytes read as SDR — 128 — without reaching white.
+    /// </summary>
+    [Test]
+    public void ReadsHlgAsTheLightItStandsFor()
+    {
+        byte[] readAsSdr = Render(PixelFormat.Yuv420P10, CreateTenBitGrey(504));
+        byte[] toneMapped = Render(PixelFormat.Yuv420P10, CreateTenBitGrey(504), HighDynamicRange(ColourTransfer.Hlg));
+
+        AssertPixel(readAsSdr, 0, 129, 129, 129, 4);
+        AssertPixel(toneMapped, 0, 164, 164, 164, 6);
+    }
+
+    /// <summary>
+    /// A frame that says it is HDR comes out as the programme for that transfer says, and one for a layout with no such
+    /// programme is drawn the way it always was: a stream that carries a transfer this build cannot name, or a depth
+    /// it has no HDR programme for, is shown rather than refused.
+    /// </summary>
+    [Test]
+    public void FallsBackToThePlainProgrammeWhenThereIsNoHdrOne()
+    {
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [235]),
+            ((Width + 1) / 2, (Height + 1) / 2, 1, (_, _) => [128]),
+            ((Width + 1) / 2, (Height + 1) / 2, 1, (_, _) => [128]));
+
+        byte[] pixels = Render(PixelFormat.Yuv420P, buffer, HighDynamicRange(ColourTransfer.Smpte2084));
+
+        AssertPixel(pixels, 0, 255, 255, 255, 3);
+    }
+
+    /// <summary>
+    /// PQ content into an HDR container is handed over as the light it is: the sample that names a hundred nits comes out
+    /// as the same PQ code, and nothing between the file and the surface may reinterpret it. This is the picture the whole
+    /// container exists for — the code is not re-encoded, only expanded from the limited range it is delivered in.
+    /// </summary>
+    [Test]
+    public void PassesPqThroughIntoAnHdrContainer()
+    {
+        (int Red, int Green, int Blue) pixel = RenderIntoTenBit(CreateTenBitGrey(509), HighDynamicRange(ColourTransfer.Smpte2084));
+
+        // 509 is a limited-range PQ code; expanded to the full range a ten-bit surface holds it is 517. The channels differ
+        // slightly because 512 is the neutral chroma code in ten bits and lands a shade below it in sixteen-bit storage.
+        Assert.That(pixel.Red, Is.EqualTo(514).Within(2), "red");
+        Assert.That(pixel.Green, Is.EqualTo(519).Within(2), "green");
+        Assert.That(pixel.Blue, Is.EqualTo(513).Within(2), "blue");
+    }
+
+    /// <summary>
+    /// SDR content in an HDR container is lifted rather than left alone: white is placed at the reference level an HDR grade
+    /// is mastered against — 203 nits — and that light is what the code names. Read as if the surface were SDR it would be
+    /// near black, which is why the lift cannot be skipped.
+    /// </summary>
+    [Test]
+    public void LiftsSdrIntoAnHdrContainer()
+    {
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [235]),
+            ((Width + 1) / 2, (Height + 1) / 2, 1, (_, _) => [128]),
+            ((Width + 1) / 2, (Height + 1) / 2, 1, (_, _) => [128]));
+
+        (int Red, int Green, int Blue) pixel = RenderIntoTenBit(buffer, ColourInfo.Unknown);
+
+        // White at 203 nits is the PQ code 0.5793, which a ten-bit full-range surface holds as 593.
+        Assert.That(pixel.Red, Is.EqualTo(593).Within(3), "red");
+        Assert.That(pixel.Green, Is.EqualTo(593).Within(3), "green");
+        Assert.That(pixel.Blue, Is.EqualTo(593).Within(3), "blue");
+    }
+
+    /// <summary>
+    /// Draws a frame into a ten-bit ten-bit surface, which is what an HDR container is, and reads one pixel back as its
+    /// three ten-bit channels. The container is declared rather than created because a swap chain needs no element for the
+    /// picture itself — only for presenting it, which is what this does not do.
+    /// </summary>
+    private (int Red, int Green, int Blue) RenderIntoTenBit(PlanarFrameBuffer buffer, ColourInfo colour)
+    {
+        _renderer.SurfaceKind = VideoSurfaceKind.Hdr10;
+
+        using RawVideoFrame frame = CreateFrame(PixelFormat.Yuv420P10, buffer, colour);
+        using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height, DXGI_FORMAT.DXGI_FORMAT_R10G10B10A2_UNORM);
+
+        _renderer.SetOutput(target.View, Width, Height);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        Assert.That(result.IsSuccessful, Is.True, result.Message);
+
+        byte[] pixels = target.ReadPixels(_device, DXGI_FORMAT.DXGI_FORMAT_R10G10B10A2_UNORM);
+        uint packed = BitConverter.ToUInt32(pixels, 0);
+        return ((int)(packed & 0x3FF), (int)((packed >> 10) & 0x3FF), (int)((packed >> 20) & 0x3FF));
+    }
+
+    /// <summary>
+    /// A ten-bit 4:2:0 frame of one flat grey. Each call is a fresh buffer, because a frame owns its buffer and
+    /// disposes it once that frame is gone, so the same one cannot be drawn twice.
+    /// </summary>
+    private static PlanarFrameBuffer CreateTenBitGrey(int luma)
+    {
+        return new PlanarFrameBuffer(
+            (Width, Height, 2, (_, _) => TenBit(luma)),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => TenBit(512)),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => TenBit(512)));
+    }
+
+    private static ColourInfo HighDynamicRange(ColourTransfer transfer)
+    {
+        return new ColourInfo(ColourPrimaries.Bt2020, transfer, ColourRange.Limited);
+    }
+
+    /// <summary>
+    /// A ten-bit sample as a software decoder stores it: the code in the low bits of a little-endian sixteen-bit value,
+    /// which is the opposite of the P010 texture a hardware decoder writes, where the same code is left-aligned.
+    /// </summary>
+    private static byte[] TenBit(int value)
+    {
+        return [(byte)value, (byte)(value >> 8)];
+    }
+
     private byte[] Render(PixelFormat format, PlanarFrameBuffer buffer)
     {
-        using RawVideoFrame frame = CreateFrame(format, buffer);
+        return Render(format, buffer, ColourInfo.Unknown);
+    }
+
+    private byte[] Render(PixelFormat format, PlanarFrameBuffer buffer, ColourInfo colour)
+    {
+        using RawVideoFrame frame = CreateFrame(format, buffer, colour);
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
 
         _renderer.SetOutput(target.View, Width, Height);
@@ -425,6 +565,11 @@ public class D3D11PlanarRendererTests
 
     private static RawVideoFrame CreateFrame(PixelFormat format, IMediaBuffer buffer)
     {
+        return CreateFrame(format, buffer, ColourInfo.Unknown);
+    }
+
+    private static RawVideoFrame CreateFrame(PixelFormat format, IMediaBuffer buffer, ColourInfo colour)
+    {
         return new RawVideoFrame
         {
             Timestamp = TimeSpan.Zero,
@@ -432,6 +577,7 @@ public class D3D11PlanarRendererTests
             Width = Width,
             Height = Height,
             Format = format,
+            Colour = colour,
             Buffer = buffer,
         };
     }

@@ -551,12 +551,16 @@ internal sealed partial class PlaybackLabPage : BasePage
                 new("Nothing", [nullVideoDecoder]),
             };
 
-            IVideoRendererFactory d3d11VideoRenderer = new D3D11VideoRendererFactory();
+            IVideoRendererFactory d3d11VideoRenderer = new D3D11VideoRendererFactory(VideoSurfacePreference.Sdr);
             IVideoRendererFactory nullVideoRenderer = new NullVideoRendererFactory();
+            IVideoRendererFactory d3d11AutoContainer = new D3D11VideoRendererFactory(VideoSurfacePreference.Auto);
+            IVideoRendererFactory d3d11HdrContainer = new D3D11VideoRendererFactory(VideoSurfacePreference.Hdr10);
             VideoRendererPicker.ItemsSource = new ComponentChoice[]
             {
                 new("Auto", [d3d11VideoRenderer, nullVideoRenderer]),
-                new("Direct3D 11", [d3d11VideoRenderer]),
+                new("Direct3D 11 (SDR)", [d3d11VideoRenderer]),
+                new("Direct3D 11 (Auto)", [d3d11AutoContainer]),
+                new("Direct3D 11 (HDR10)", [d3d11HdrContainer]),
                 new("Nothing", [nullVideoRenderer]),
             };
 

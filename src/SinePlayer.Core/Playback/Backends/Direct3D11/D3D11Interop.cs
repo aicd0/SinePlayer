@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System.Numerics;
@@ -226,8 +226,12 @@ internal static class D3D11Interop
         }
     }
 
-    /// <summary>Reads a texture back into managed memory. Used by tests and by frame capture.</summary>
     internal static byte[] ReadPixels(ID3D11Device device, ID3D11DeviceContext context, ID3D11Texture2D source, int width, int height)
+    {
+        return ReadPixels(device, context, source, width, height, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM);
+    }
+
+    internal static byte[] ReadPixels(ID3D11Device device, ID3D11DeviceContext context, ID3D11Texture2D source, int width, int height, DXGI_FORMAT format)
     {
         D3D11_TEXTURE2D_DESC description = new()
         {
@@ -235,7 +239,7 @@ internal static class D3D11Interop
             Height = (uint)height,
             MipLevels = 1,
             ArraySize = 1,
-            Format = DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM,
+            Format = format,
             SampleDesc = new DXGI_SAMPLE_DESC { Count = 1 },
             Usage = D3D11_USAGE.D3D11_USAGE_STAGING,
             CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.D3D11_CPU_ACCESS_READ,

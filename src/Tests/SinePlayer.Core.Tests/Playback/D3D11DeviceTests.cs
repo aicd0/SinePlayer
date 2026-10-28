@@ -20,7 +20,7 @@ public class D3D11DeviceTests
     [Test]
     public void CreatesHardwareDeviceAtAnAcceptableFeatureLevel()
     {
-        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
 
         using D3D11Device ownedDevice = created.Result;
@@ -34,7 +34,7 @@ public class D3D11DeviceTests
     [Test]
     public void CreatesTextureWithTheRequestedDescription()
     {
-        OperationResult<D3D11Device> created = D3D11Device.TryCreate();
+        OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
 
         using D3D11Device ownedDevice = created.Result;

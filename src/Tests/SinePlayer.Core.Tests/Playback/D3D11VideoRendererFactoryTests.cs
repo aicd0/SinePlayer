@@ -25,7 +25,7 @@ public class D3D11VideoRendererFactoryTests
     [Test]
     public void CreatesItsNextRendererAfterThePreviousOneWasLetGoOf()
     {
-        D3D11VideoRendererFactory factory = new();
+        D3D11VideoRendererFactory factory = new(VideoSurfacePreference.Sdr);
 
         OperationResult offered = factory.TryCreate(out IComponentCreator<IVideoRenderer>? creator);
         if (!offered.IsSuccessful || creator is null)

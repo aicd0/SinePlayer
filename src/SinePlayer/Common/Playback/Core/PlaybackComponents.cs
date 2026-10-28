@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using SinePlayer.Common.Localization;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Registry;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Null;
@@ -144,13 +145,13 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case DIRECT3D11:
-                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory()]);
+                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory(VideoSurfacePreference.Sdr)]);
                 break;
             case NONE:
                 SetFactories<IVideoRendererFactory>(pipeline, [new NullVideoRendererFactory()]);
                 break;
             default:
-                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory()]);
+                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory(VideoSurfacePreference.Sdr)]);
                 break;
         }
     }

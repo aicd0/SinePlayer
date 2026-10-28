@@ -1429,6 +1429,29 @@ The Playback Lab shows all of the above in one line, which is the intended way t
    wish and resumes at the picture's last keyframe — the behaviour this rule exists to avoid, kept rather than
    guessed at. Matroska writes the length as a `DURATION` tag and MP4 as a stream field, and both are read; a
    container that writes neither is the gap.
+16. **There are two containers, and a picture's treatment follows from the pair: what it is, and what the container
+   expects.** A frame carries how its samples are to be read — `ColourInfo`: primaries, transfer and range, taken from
+   the stream and from each decoded frame. The surface carries the other half, and is one of exactly two:
+   - **SDR**, `B8G8R8A8_UNORM` with the colour space DXGI creates a chain with: gamma-encoded BT.709 relative to the
+     display's white. An HDR picture is tone mapped into it — the transfer is undone, BT.2020 is brought to BT.709, the
+     range is compressed and the result re-encoded. This is the container every SDR display needs and the only one such a
+     display can show correctly. Reference white is 100 nits and lands at about 197 of 255; everything above 600 nits
+     comes off one Hable shoulder instead of being clipped.
+   - **HDR10**, `R10G10B10A2_UNORM` with `RGB_FULL_G2084_NONE_P2020` declared on it: PQ codes in BT.2020, which are
+     absolute light levels. PQ content is handed over as it is — the shader only unpacks the planes and expands the
+     limited range — so nothing is compressed unless the panel cannot reach the grade's peak. HLG content and SDR
+     content are encoded into the same scale, at 1000 nits nominal and 203 nits respectively.
+   The pairing is `VideoSurfaceTransforms.Select(kind, colour)` and it is the whole of the policy: six transforms, and a
+   shader programme per layout and transform. `VideoSurfaceFactory` chooses the container, and chooses **SDR unless the
+   display is composed for HDR**, or unless the host asks for HDR10 outright, which is what makes the container testable
+   on a display that is not. A chain that refuses the ten-bit format or the colour space is disposed and the SDR one is
+   used instead, because a PQ picture in a chain that still claims BT.709 gamma is a dim, flat picture with nothing to
+   say why.
+   What is not carried yet: the stream's mastering metadata (`MaxCLL`/`MaxFALL`), so a display's own mapping works from
+   what it can measure rather than from what the grade declares; the subtitle surface, which is still SDR and is therefore
+   lifted by the compositor independently of the picture; and any reaction to the display changing HDR state while a file
+   plays — the container is fixed when the chain is created, and the chain is created when the renderer is configured.
+   The range field is read as limited, which is what every HDR delivery uses, and the eight-bit path assumes it too.
 
 ## Appendix A — the checklist for any change to this pipeline
 
@@ -1619,6 +1642,9 @@ The Playback Lab shows all of the above in one line, which is the intended way t
 | How a component reaches the thread that owns it | `ComponentSlot<T>` — `Publish` (queue thread) and `Update(out new, out old)` (owner thread), one slot per role for the pipeline's life, with `Reset` only while no thread runs (§2.4). No lock beside the slots: the queue serialises publication, and the slot's own lock covers publish-against-adopt |
 | Epoch discipline and what a seek uses to interrupt | `PlaybackPipeline`: the epoch, the position published with it, and the reset of everything that belongs to a position are one `SeqLock<long>.Change`; media threads read it through `_epochs.Read()`. The protocol itself — the three reads, the retry, the wait for a change that outlasts the attempts, and how a value of several fields survives it — lives in `Internal/SeqLock.cs` |
 | When it is too late to show a frame | `ISynchronizer` (default: 2 ms early tolerance, 40 ms late) |
+| What a picture's samples mean | `ColourInfo` — primaries, transfer, range — on `VideoStreamInfo` and on every `RawVideoFrame`, mapped from FFmpeg's enumerations once, in `FFmpegInterop.ToColourInfo` |
+| Which container the picture goes into, and what that costs | `VideoSurfaceKind` (`Sdr`/`Hdr10`) plus `IVideoSurface` with one implementation per container (`SdrVideoSurface`, `Hdr10VideoSurface`), sharing the swap chain in `SwapChainVideoSurface`. `VideoSurfaceFactory` chooses, `DxgiDisplay` says whether the desktop is composed for HDR, and `VideoSurfaceTransforms.Select` turns (container, frame colour) into one of six transforms (§14.16) |
+| Which programme draws a frame | `D3D11VideoShaders`: `GetPixelShader(format, transform)` for a memory frame and `GetArrayShader(transform)` for a hardware one, both falling back to the plain programme when the pair has none. A registry holds entry-point names only; code is compiled once per process and the device object made on first use, so opening a file pays for the two or three programmes it draws. `ValidateProgrammes` proves all of them in a test. The conversion itself is one shoulder in HLSL (§14.16) |
 | What a paused file shows, and what wakes that thread | `PlaybackPipeline.VideoRenderCore`, whose one loop both presents and offers the still: `presenting` (the state the presentation steps are for) and `offeringTheStill` (a paused position whose picture has not been shown yet) name the two things the thread does, and `shownEpoch`/`endedForEpoch` are what tell it there is nothing left to offer. The frame arriving in the queue is the only wake the still needs |
 | Who wakes the threads, and when | `PlaybackPipeline`: `WakeAll` (control — the state, the epoch, the stop, the ending) called by each command when its own change is complete (`PlayCore`/`PauseCore` after the state, `SeekCore` after the epoch and the clears, `StopCore` before them), by `Fail`/`TryNotifyPlaybackEnded`; and the data wakes `TryWakeReader`/`TryWakeVideoDecode`/`TryWakeVideoRender`/`TryWakeAudioRender`, called by the thread that changed the input (after every `Try*` queue call) — never by `SetState` |
 | The clock contract, and the wall-clock fallback | `IPlaybackClock`, `StopwatchClock` |
