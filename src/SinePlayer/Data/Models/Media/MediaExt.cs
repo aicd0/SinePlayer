@@ -14,6 +14,7 @@ internal static class MediaExt
     public const string PLAYER_SETTING_PRESET_KEY = "PlayerSettingPresetKey";
     public const string RESOURCE_UUID = "ResourceUuid";
     public const string SELECTED_AUDIO_TRACK = "SelectedAudioTrack";
+    public const string SELECTED_SUBTITLE_TRACK = "SelectedSubtitleTrack";
     public const string SELECTED_VIDEO_TRACK = "SelectedVideoTrack";
 
     public static string? GetCoverImageUri(MediaModel media)

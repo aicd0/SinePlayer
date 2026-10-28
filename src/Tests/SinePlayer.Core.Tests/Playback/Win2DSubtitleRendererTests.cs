@@ -1,9 +1,10 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Runtime.InteropServices;
+
 using Microsoft.Graphics.Canvas;
 
-using System.Runtime.InteropServices;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;

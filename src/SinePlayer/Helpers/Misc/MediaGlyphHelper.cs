@@ -10,6 +10,7 @@ internal static class MediaGlyphHelper
 {
     public const string AudioGlyph = "\uE8D6";
     public const string VideoGlyph = "\uE714";
+    public const string SubtitleGlyph = "\uE7F0";
     public const string MediaGlyph = "\uEA69";
 
     public static string GetMediaGlyph(MediaModel? media)

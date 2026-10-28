@@ -41,6 +41,7 @@ internal sealed class PlayerMenuContext
         {
             MediaStreamKind.Video => info?.VideoStreams,
             MediaStreamKind.Audio => info?.AudioStreams,
+            MediaStreamKind.Subtitle => info?.SubtitleStreams,
             _ => null,
         };
     }
@@ -51,6 +52,7 @@ internal sealed class PlayerMenuContext
         {
             MediaStreamKind.Video => Engine?.PlaybackInfo.SelectedVideoStream,
             MediaStreamKind.Audio => Engine?.PlaybackInfo.SelectedAudioStream,
+            MediaStreamKind.Subtitle => Engine?.PlaybackInfo.SelectedSubtitleStream,
             _ => null,
         };
     }

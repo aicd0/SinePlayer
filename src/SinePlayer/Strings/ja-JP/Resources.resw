@@ -1073,6 +1073,9 @@ $plugins</value>
   <data name="SelectAudioTrack" xml:space="preserve">
     <value>オーディオトラックを選択</value>
   </data>
+  <data name="SelectSubtitleTrack" xml:space="preserve">
+    <value>字幕トラックを選択</value>
+  </data>
   <data name="SelectVideoTrack" xml:space="preserve">
     <value>ビデオトラックを選択</value>
   </data>

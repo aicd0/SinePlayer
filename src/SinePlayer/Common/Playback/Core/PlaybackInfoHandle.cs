@@ -18,6 +18,8 @@ internal sealed class PlaybackInfoHandle
 
     public AudioStreamInfo? SelectedAudioStream => _pipeline?.SelectedAudioStream;
 
+    public SubtitleStreamInfo? SelectedSubtitleStream => _pipeline?.SelectedSubtitleStream;
+
     public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
 
     public string? Error => _pipeline?.Error;

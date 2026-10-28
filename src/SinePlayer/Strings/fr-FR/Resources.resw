@@ -1073,6 +1073,9 @@ Démarrer en mode sans échec ?</value>
   <data name="SelectAudioTrack" xml:space="preserve">
     <value>Sélectionner la piste audio</value>
   </data>
+  <data name="SelectSubtitleTrack" xml:space="preserve">
+    <value>Sélectionner la piste de sous-titres</value>
+  </data>
   <data name="SelectVideoTrack" xml:space="preserve">
     <value>Sélectionner la piste vidéo</value>
   </data>
