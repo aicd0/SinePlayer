@@ -72,28 +72,39 @@ being needed to prove anything about the others.
 **What v1 leaves in place.** `ISubtitleDecoder`, `ISubtitleRenderer` and `ISubtitleDecoderFactory` exist, the
 demuxer enumerates subtitle streams so they appear in `MediaInfo`, and the pipeline has the slot.
 
-**Where it stands now.** The chain is real and runs end to end, and the text is still invisible:
+**Where it stands now.** The chain is real and runs end to end, for text and for pictures:
 
 - **Decoding.** `FFmpegSubtitleDecoder` decodes text formats through libavcodec's legacy subtitle entry point and
-  hands each event on as a cue. Bitmap formats (PGS, VobSub) are refused by its factory, so a track that cannot be
-  drawn is never offered. Every text format is normalised to an **ASS dialogue line**,
+  hands each event on as a cue. Every text format is normalised to an **ASS dialogue line**,
   `ReadOrder,Layer,Style,Speaker,MarginL,MarginR,MarginV,Effect,Text` — the ninth field is the whole rest of the line,
   and the timing is the cue's own rather than a field of it. `AssSubtitleText` is the one place that shape is known.
+- **Decoding, pictures.** The same decoder reads DVD (VobSub), Blu-ray (PGS), DVB and teletext subtitles, and hands each
+  event on as an **image** rather than a line: `SubtitleImage` carries an `ISubtitleImageBuffer` — width, height, stride
+  and premultiplied BGRA pixels — and four fractions placing it inside the frame the subtitle was authored against. Two
+  layouts arrive from libavcodec and the palette tells them apart: *indices* into colours given as `0xAARRGGBB` words
+  (VobSub, DVB, teletext), or 32-bit pixels already in that byte order (PGS). `SubtitleBitmap` does the expansion and the
+  multiplication of colour by alpha in one place, over spans, so it is pinned by tests without a device; an event that
+  arrives as several rectangles is composed into one image, cropped to their bounding box.
 - **Timing.** `SubtitleCueWindow` holds the track's decoded cues, recognises an event it already holds (a seek re-reads
   from a keyframe, so the same event arrives twice) and keeps a cue for a second past its end so a consumer drawing it
   is not left holding freed memory. `SubtitleRenderCore` is a fifth thread: it follows the clock, sleeps until the next
-  boundary that can change the screen, never anchors the clock and never sets a starved flag — text that is late cannot
+  boundary that can change the screen, never anchors the clock and never sets a starved flag — a cue that is late cannot
   stall the picture or the sound.
 - **Selection.** A subtitle track is selected with the same `SelectStream` as the other two kinds. Compatibility between
   decoder and renderer is settled once, at chain construction: the decoder declares a `SubtitleCueFormat`, the renderer
   factory refuses a format it cannot draw, and an incompatible pair is never published. There is no per-payload verdict
   for subtitles and none is needed — the format cannot change between cues.
 - **Adjustment.** `SubtitlePlacement` is a player adjustment pushed by the pipeline with every drawing, in fractions of
-  the surface. It is deliberately not derived from `VideoTransform`: turning a picture must not turn text.
-- **What is missing.** `NullSubtitleRenderer` draws nothing, so `AddSubtitleFile`, the D3D11 renderer (D2D +
-  DirectWrite on its own swap chain), the host's second surface and the player's menu entry are still to come. Bitmap
-  cues cannot be rendered yet either: `IMediaBuffer` carries no width, height or stride, so the geometry has to reach
-  the cue before `SubtitleCueFormat.BitmapBgra` can mean anything.
+  the surface. It is deliberately not derived from `VideoTransform`: turning a picture must not turn the subtitles.
+- **Drawing.** `Win2DSubtitleRenderer` draws both kinds into a swap chain of its own: text is laid out with DirectWrite
+  and anchored by its ASS alignment, and a picture is blitted where its fractions say, scaled to the surface and clamped
+  inside it. The host's second `SwapChainPanel` receives that chain, and the player offers the track in its menu.
+- **What is missing.** An external subtitle file — a sidecar `.srt` or `.ass` beside the video — is still refused,
+  because `FFmpegSubtitleDecoder.TryCreate` has no source for one; a file whose own tracks cannot be read has no
+  fallback yet. Two parts of the bitmap path are written but not verified against content: the 32-bit pixel layout,
+  because no PGS file was to hand, and the composition of several rectangles in one event, because every file checked
+  uses one rectangle each. And a bitmap cue is placed against the surface rather than against the letterboxed picture,
+  which is the approximation the text path makes too.
 
 ## 4. Plugin surface
 

@@ -709,10 +709,6 @@ internal sealed partial class PlaybackLabPage : BasePage
         long underruns = pipeline.AudioUnderruns;
         string health = $" dropped {pipeline.DroppedFrameCount}, underruns {underruns}, lag {pipeline.PictureLag.TotalMilliseconds:0} ms.{waiting}";
         long presented = pipeline.PresentedFrameCount;
-        long? displayed = pipeline.DisplayedFrameCount;
-        string compositor = displayed is null
-            ? string.Empty
-            : $" display took {displayed}, compositor dropped {Math.Max(0, presented - displayed.Value)}.";
         // Decode and render are the two candidates for whatever limits playback, so the line names both rather
         // than leaving the question to a guess — and each is named beside its cost, because "hardware decode"
         // and "the Direct3D renderer" are requests the machine may have answered differently.
@@ -727,7 +723,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         string tracks = DescribeTracks(pipeline);
 
         string status = $"{pipeline.State}: {_description}. {pipeline.Position:mm\\:ss\\.fff} / {pipeline.Duration:mm\\:ss\\.fff}."
-            + $" {presented} frame(s).{health}{compositor}{pace}{transform}{tracks}{surface}";
+            + $" {presented} frame(s).{health}{pace}{transform}{tracks}{surface}";
         if (status != StatusText.Text)
         {
             StatusText.Text = status;

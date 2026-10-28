@@ -34,8 +34,6 @@ internal interface IVideoSurface : IDisposable
 
     OperationResult Present();
 
-    bool TryGetDisplayedFrameCount(out long count);
-
     /// <summary>The scale the chain applies when the host composes it, so a test can prove it cancels the display's.</summary>
     bool TryGetCompositionTransform(out double scaleX, out double scaleY);
 

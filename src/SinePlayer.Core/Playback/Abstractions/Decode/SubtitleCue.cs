@@ -3,11 +3,7 @@
 
 namespace SinePlayer.Core.Playback.Abstractions.Decode;
 
-/// <summary>
-/// One subtitle event: either text or a bitmap. Subtitle rendering is deferred, so this type only
-/// needs to carry enough for a future renderer.
-/// </summary>
-public sealed class SubtitleCue : IDisposable
+public sealed partial class SubtitleCue : IDisposable
 {
     public required TimeSpan Start { get; init; }
 
@@ -15,7 +11,7 @@ public sealed class SubtitleCue : IDisposable
 
     public string? Text { get; init; }
 
-    public IMediaBuffer? Image { get; init; }
+    public SubtitleImage? Image { get; init; }
 
     public void Dispose()
     {

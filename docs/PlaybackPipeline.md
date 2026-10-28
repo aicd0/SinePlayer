@@ -163,7 +163,7 @@ declared. There are only a few kinds:
 | **The clock's inputs, owned by the render threads** — whether a stage has nothing to play, and the position whose clock the media has claimed | the two render threads, under `_clockLock`, and only them | both render threads, each reading the other's verdict; and the host, for `StarvedFor` | `volatile` for the verdicts and the claim, so noticing that one of them changed is a read rather than a lock entrance; the lock is entered for the decision itself. Each flag has exactly one writer and the claim is a comparison rather than a flag — a position nothing of the media has claimed is one nothing was reset for |
 | **Thread-owned** — the audio thread's device state: the offset that relates the device's clock to the pipeline's, and the hand-off it is carrying | that thread while it runs | that thread | a local of the loop where nothing outside needs it — the offset and the hand-off are, which is why a seek only has to move the epoch for them to be let go of and re-taken. The device's own clock is reached through the renderer, and the renderer belongs to that thread |
 | **Published by a stage** — whether it has nothing to play, which is also one of the clock's inputs, how far the reader has taken each stream in for the position it is reading, and the three things a stage says about the end of a file (the decoder has produced its tail, the picture has shown everything, the sound has played out) | the stage writes the verdict for the position it is looking at, the reader writes its two marks under the position they belong to, and the queue owns what the end-of-file words become | the queue (for the words), and both render threads and the host (for the verdict) | `volatile` where a media thread reads, and no copy kept by the stage: what a seek makes meaningless is retracted where it is owned. The end-of-file words are messages rather than flags, which is why a stage never reads another stage's; the reader's marks are numbers stamped with their position, which is why a stale one is a mismatch rather than a value |
-| **Counters and hand-offs** — presented/dropped/displayed frames, the tick totals, the last presented picture's timestamp | any thread | anyone, including the host | `Interlocked` |
+| **Counters and hand-offs** — presented and dropped frames, the tick totals, the last presented picture's timestamp | any thread | anyone, including the host | `Interlocked` |
 | **The clock object** | the two render threads, and only them: one places the position a seek asked for, while nothing of the media has claimed it; one claims it with the first media that plays; and either starts and stops it | every thread reads its position | the clock implementation must be safe for that on its own — a read is a read from anywhere, which is what lets the host ask for the position without waiting for a render thread — and the writers are serialized by `_clockLock` |
 
 Every field is declared in the file's one `#region Variables`, in one of those groups, and the group's comment
@@ -631,9 +631,8 @@ played*. (A chain with no decoder gives up on its input too, but never on media 
   renderer's cost, and at a frame rate equal to the display's leaves no slack at all, so lateness ratchets up
   until the drop rule starts firing (measured: a steady tenth of frames dropped with a 70 ms lag on a machine
   doing the frame's work in 0.38 ms — see §11). The price of not waiting is that a frame can be presented and
-  then superseded before the display takes it, so that count is read back from the swap chain and published
-  as `DisplayedFrameCount` (§13): drops that happen after the picture has left the pipeline are invisible to
-  every counter inside it, and a price that cannot be measured cannot be argued about.
+  then superseded before the display takes it. That drop happens after the picture has left the pipeline and no
+  counter here can see it: the frame counts as presented, because presenting is what it did.
 
 ### 4.4 The audio sender keeps the clock honest
 
@@ -1336,7 +1335,6 @@ is §14.1.
 |---|---|---|
 | `PresentedFrameCount` | frames shown | stagnant while `Position` advances ⇒ the picture is not following the sound. It counts what was handed to the compositor, not what was scanned out: since the swap chain presents without waiting for a blank (§4.3), a frame the compositor supersedes is counted here and nowhere else — so `presented + dropped` is not a count of photons |
 | `DroppedFrameCount` | frames decoded and never shown, all of them lost by the best-effort rule | climbing ⇒ the picture cannot be shown in step: a decoder or a renderer too slow |
-| `DisplayedFrameCount` | how many of the frames handed over reached the display, when the renderer can tell, else null | null ⇒ the backend will not report it (and a swap chain that is not a flip-model one may not); rising much more slowly than `PresentedFrameCount` ⇒ the compositor is superseding frames, which is the price of presenting without waiting for a blank. It is a statistic about a swap chain, so it is documented as unreliable with several monitors or another fullscreen application, and it lags by the frame or two still in flight |
 | `PictureLag` | how far the shown picture is behind the clock | a small constant is the synchronizer working; a growing one is the old freeze arriving |
 | `IsStarving` / `StarvedFor` | time is deliberately stopped, and for which stage | "video" ⇒ a slow decoder is pausing playback (expected under load); "audio" ⇒ the sound has nothing to play *and* the device has nothing left in it, so the pipe behind it is what is not feeding the sound |
 | `WarningRaised` (event) | one line about something that is not a failure: audio that was refused, and a device that stopped moving | a warning is not a failure and not a state; it is raised as it happens and nothing holds it afterwards, so a consumer that wants to display one keeps the last |
@@ -1359,20 +1357,20 @@ The Playback Lab shows all of the above in one line, which is the intended way t
 3. **Playback rate changes and component switching are not implemented.** The clock can be retimed and the
    factories are swappable, but a rate change or a live decoder/renderer swap has no orchestration yet; the
    host currently refuses rather than pretending.
-4. **Subtitles, plugins and fallback** are out of scope by decision, with seams in the contracts only — they
-   are factors in the design, not behaviour of it.
+4. **Plugins and fallback** are out of scope by decision, with seams in the contracts only — they are factors in
+   the design, not behaviour of it. Subtitles were in that list and no longer are: a subtitle track is selected and
+   drawn like the other two kinds, in text or as pictures ([MediaEngineV2Plan.md](./MediaEngineV2Plan.md) §3).
 5. **Opening chooses nothing, so a host that never chooses has a file it cannot play.** `Play` is refused until one
    kind is selected, and turning every kind off returns the file to that state — paused, with nothing to play.
-   Subtitles are the one kind that cannot be chosen at all: a subtitle stream is refused, while turning subtitles off
-   is trivially satisfied. A file opened and left alone keeps its source — and its file — until it is stopped. A
+   A file opened and left alone keeps its source — and its file — until it is stopped. A
    switch also restarts the read from where playback stands, which a source that cannot seek cannot do: on such a
    source the media already read ahead is given up on rather than re-read, and a source whose read blocks (a live one)
    cannot be interrupted by the switch until the read returns — which is why the two kinds are chosen one at a time
    and a live source wants both choices before it has given much media.
-6. **A track is switched, never turned off, and subtitles are not selectable.** One video and one audio stream are
-   played at a time, chosen by `SelectStream` (default: the first of each kind, skipping streams the demuxer says
-   nothing about). Passing null to switch a kind off, and every subtitle stream, is refused with a message rather
-   than ignored. A switch also rebuilds that kind's chain from scratch — the new decoder starts at the switch
+6. **A track is switched, never turned off.** One video and one audio stream are played at a time, chosen by
+   `SelectStream` (default: the first of each kind, skipping streams the demuxer says nothing about). Passing null to
+   switch a kind off is refused with a message rather than ignored. A switch also rebuilds that kind's chain from
+   scratch — the new decoder starts at the switch
    position, so a track whose codec has a long opening is not warmed up in advance — and a stream whose packets are
    interleaved badly enough to need a different source seek would show it as a longer gap than the track deserves.
 7. **The clock waits for a position's first media, so a pathologically slow first decode freezes both stages.**

@@ -80,42 +80,6 @@ public class PlaybackPipelineTests
         }
     }
 
-    [Test]
-    public void ReportsWhatTheDisplayTookWhenTheRendererCanTell()
-    {
-        // The frames the compositor supersedes are drops no counter in the pipeline can see, so what the
-        // display took is passed on from the renderer — and a renderer that cannot tell says nothing, which
-        // is a different statement from zero.
-        //
-        // Two frames rather than one: a file that is open shows the picture of where it is (the still of a
-        // paused position), and a one-frame file would have shown all of it before the renderer was able to
-        // tell anything — so the second frame is what carries the answer this test is about.
-        string path = CreateY4mFile(frameCount: 2, frameRate: "30:1");
-        try
-        {
-            FakeVideoRenderer videoRenderer = new();
-            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
-
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
-            Assert.That(pipeline.DisplayedFrameCount, Is.Null, "a renderer that cannot tell is not a renderer that reported zero");
-
-            videoRenderer.DisplayedFrameCount = 0;
-            pipeline.Play();
-            WaitForPlaybackToFinish(pipeline);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(pipeline.PresentedFrameCount, Is.GreaterThan(0));
-                Assert.That(pipeline.DisplayedFrameCount, Is.Zero, "the renderer's answer is what is reported, however disappointing");
-                Assert.That(pipeline.DisplayedFrameCount, Is.Not.Null, "and zero is an answer, not silence");
-            }
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
     /// <summary>
     /// A file longer than the read-ahead is what makes the reader wait at all: it fills the minimum, parks,
     /// and every block the sound plays brings it back. Nothing in the pipeline tells it that — the sound is
@@ -419,10 +383,10 @@ public class PlaybackPipelineTests
         /// <summary>Waits for the decoder to be inside a decode, which is when the gate holds it.</summary>
         internal bool WaitUntilDecoding() => _decoding.Wait(TimeSpan.FromSeconds(5));
 
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
-            return TestCreators.Wrap(offered, inner, component => new GatedDecoder(component, this), out creator);
+            OperationResult<IComponentCreator<IVideoDecoder>> offered = _inner.Create(source, stream, options);
+            return TestCreators.Wrap(offered, component => new GatedDecoder(component, this));
         }
 
         private sealed class GatedDecoder(IVideoDecoder inner, GatedVideoDecoderFactory owner) : IVideoDecoder
@@ -463,10 +427,10 @@ public class PlaybackPipelineTests
         /// <summary>How long each packet after the first takes, for a decoder that is slow at the start and
         /// then merely behind.</summary>
         internal int SubsequentDecodeMilliseconds { get; init; }
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
-            return TestCreators.Wrap(offered, inner, component => new SlowFirstDecoder(component, FirstDecodeMilliseconds, SubsequentDecodeMilliseconds), out creator);
+            OperationResult<IComponentCreator<IVideoDecoder>> offered = _inner.Create(source, stream, options);
+            return TestCreators.Wrap(offered, component => new SlowFirstDecoder(component, FirstDecodeMilliseconds, SubsequentDecodeMilliseconds));
         }
 
         private sealed class SlowFirstDecoder(IVideoDecoder inner, int firstDecodeMilliseconds, int subsequentDecodeMilliseconds) : IVideoDecoder
@@ -3675,10 +3639,10 @@ public class PlaybackPipelineTests
     /// </summary>
     private sealed class RefusingVideoDecoderFactory : IVideoDecoderFactory
     {
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            creator = new Creator();
-            return OperationResult.Success();
+            IComponentCreator<IVideoDecoder> creator = new Creator();
+            return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
         }
 
         private sealed class Creator : IComponentCreator<IVideoDecoder>
@@ -3718,14 +3682,14 @@ public class PlaybackPipelineTests
             }
         }
 
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
             lock (_requests)
             {
                 _requests.Add(options);
             }
 
-            return _inner.TryCreate(source, stream, options, out creator);
+            return _inner.Create(source, stream, options);
         }
     }
 
@@ -3742,11 +3706,16 @@ public class PlaybackPipelineTests
     {
         private readonly FFmpegVideoDecoderFactory _inner = new();
 
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
-            creator = offered.IsSuccessful && inner is not null ? new Creator(inner, hardware, signature) : null;
-            return creator is null ? offered : OperationResult.Success();
+            OperationResult<IComponentCreator<IVideoDecoder>> offered = _inner.Create(source, stream, options);
+            if (!offered.IsSuccessful)
+            {
+                return offered;
+            }
+
+            IComponentCreator<IVideoDecoder> creator = new Creator(offered.Result, hardware, signature);
+            return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
         }
 
         private sealed class Creator(IComponentCreator<IVideoDecoder> inner, bool hardware, string signature) : IComponentCreator<IVideoDecoder>
@@ -3807,10 +3776,9 @@ public class PlaybackPipelineTests
             _renderer = renderer;
         }
 
-        public OperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+        public OperationResult<IComponentCreator<IAudioRenderer>> Create()
         {
-            creator = new FixedCreator<IAudioRenderer>(_signature, () => _renderer);
-            return OperationResult.Success();
+            return new OperationResultCreator<IComponentCreator<IAudioRenderer>>().Success(new FixedCreator<IAudioRenderer>(_signature, () => _renderer));
         }
     }
 
@@ -4530,7 +4498,7 @@ public class PlaybackPipelineTests
 
         public List<FakeAudioRenderer> Created { get; } = [];
 
-        public OperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+        public OperationResult<IComponentCreator<IAudioRenderer>> Create()
         {
             FakeAudioRenderer renderer = new();
             lock (_lock)
@@ -4538,8 +4506,7 @@ public class PlaybackPipelineTests
                 Created.Add(renderer);
             }
 
-            creator = new FixedCreator<IAudioRenderer>(_signature, () => renderer);
-            return OperationResult.Success();
+            return new OperationResultCreator<IComponentCreator<IAudioRenderer>>().Success(new FixedCreator<IAudioRenderer>(_signature, () => renderer));
         }
     }
 
@@ -5522,15 +5489,14 @@ public class PlaybackPipelineTests
         /// <summary>The container index this factory refuses. Set after the file is open, which is when it is known.</summary>
         internal int RefusedIndex { get; set; } = -1;
 
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
             if (stream.Index == RefusedIndex)
             {
-                creator = null;
-                return OperationResult.Failure($"Stream {stream.Index} cannot be decoded.");
+                return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Failure($"Stream {stream.Index} cannot be decoded.");
             }
 
-            return _inner.TryCreate(source, stream, options, out creator);
+            return _inner.Create(source, stream, options);
         }
     }
 
@@ -5727,10 +5693,10 @@ public class PlaybackPipelineTests
     {
         private readonly FFmpegAudioDecoderFactory _inner = new();
 
-        public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
         {
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
-            return TestCreators.Wrap(offered, inner, component => new BrokenDrainAudioDecoder(component), out creator);
+            OperationResult<IComponentCreator<IAudioDecoder>> offered = _inner.Create(source, stream, options);
+            return TestCreators.Wrap(offered, component => new BrokenDrainAudioDecoder(component));
         }
 
         private sealed class BrokenDrainAudioDecoder(IAudioDecoder inner) : IAudioDecoder
@@ -5774,10 +5740,10 @@ public class PlaybackPipelineTests
     {
         private readonly FFmpegVideoDecoderFactory _inner = new();
 
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
-            return TestCreators.Wrap(offered, inner, component => new BrokenDrainVideoDecoder(component, returnsNothing), out creator);
+            OperationResult<IComponentCreator<IVideoDecoder>> offered = _inner.Create(source, stream, options);
+            return TestCreators.Wrap(offered, component => new BrokenDrainVideoDecoder(component, returnsNothing));
         }
 
         private sealed class BrokenDrainVideoDecoder(IVideoDecoder inner, bool returnsNothing) : IVideoDecoder
@@ -5828,10 +5794,10 @@ public class PlaybackPipelineTests
     private sealed class DelayedVideoDecoderFactory : IVideoDecoderFactory
     {
         private readonly FFmpegVideoDecoderFactory _inner = new();
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
-            return TestCreators.Wrap(offered, inner, component => new DelayedVideoDecoder(component), out creator);
+            OperationResult<IComponentCreator<IVideoDecoder>> offered = _inner.Create(source, stream, options);
+            return TestCreators.Wrap(offered, component => new DelayedVideoDecoder(component));
         }
 
         private sealed class DelayedVideoDecoder : IVideoDecoder
@@ -5968,10 +5934,10 @@ public class PlaybackPipelineTests
         internal int DecodeMilliseconds { get; init; } = DecodePaceMilliseconds;
 
         public int Decodes => Volatile.Read(ref _decodes);
-        public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
         {
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
-            return TestCreators.Wrap(offered, inner, component => new PacedAudioDecoder(component, this, DecodeMilliseconds), out creator);
+            OperationResult<IComponentCreator<IAudioDecoder>> offered = _inner.Create(source, stream, options);
+            return TestCreators.Wrap(offered, component => new PacedAudioDecoder(component, this, DecodeMilliseconds));
         }
 
         private sealed class PacedAudioDecoder(IAudioDecoder inner, PacedAudioDecoderFactory owner, int decodeMilliseconds) : IAudioDecoder
@@ -6020,10 +5986,10 @@ public class PlaybackPipelineTests
 
         /// <summary>How many packets decode cleanly before the decoder throws.</summary>
         internal int PacketsBeforeThrow { get; init; } = 1;
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
-            return TestCreators.Wrap(offered, inner, component => new ThrowingVideoDecoder(component, PacketsBeforeThrow), out creator);
+            OperationResult<IComponentCreator<IVideoDecoder>> offered = _inner.Create(source, stream, options);
+            return TestCreators.Wrap(offered, component => new ThrowingVideoDecoder(component, PacketsBeforeThrow));
         }
 
         private sealed class ThrowingVideoDecoder : IVideoDecoder
@@ -6079,10 +6045,10 @@ public class PlaybackPipelineTests
     /// </summary>
     private sealed class SilentVideoDecoderFactory : IVideoDecoderFactory
     {
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            creator = new FixedCreator<IVideoDecoder>("silent:video", () => new SilentVideoDecoder(stream));
-            return OperationResult.Success();
+            IComponentCreator<IVideoDecoder> creator = new FixedCreator<IVideoDecoder>("silent:video", () => new SilentVideoDecoder(stream));
+            return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
         }
 
         private sealed class SilentVideoDecoder(VideoStreamInfo stream) : IVideoDecoder
@@ -6128,10 +6094,10 @@ public class PlaybackPipelineTests
 
         /// <summary>How many packets decode cleanly before the decoder gives up.</summary>
         internal int PacketsBeforeFailure { get; init; } = 1;
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
-            return TestCreators.Wrap(offered, inner, component => new FailingVideoDecoder(component, PacketsBeforeFailure), out creator);
+            OperationResult<IComponentCreator<IVideoDecoder>> offered = _inner.Create(source, stream, options);
+            return TestCreators.Wrap(offered, component => new FailingVideoDecoder(component, PacketsBeforeFailure));
         }
 
         private sealed class FailingVideoDecoder : IVideoDecoder
@@ -6199,10 +6165,10 @@ public class PlaybackPipelineTests
         /// like, and it is the arrangement in which the picture's verdict has nothing to wake it.
         /// </summary>
         internal int FastPackets { get; init; }
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? inner);
-            return TestCreators.Wrap(offered, inner, component => new ThrottledVideoDecoder(component, DecodeMilliseconds, FastPackets), out creator);
+            OperationResult<IComponentCreator<IVideoDecoder>> offered = _inner.Create(source, stream, options);
+            return TestCreators.Wrap(offered, component => new ThrottledVideoDecoder(component, DecodeMilliseconds, FastPackets));
         }
 
         private sealed class ThrottledVideoDecoder : IVideoDecoder
@@ -6289,13 +6255,6 @@ public class PlaybackPipelineTests
         {
             return OperationResult.Success();
         }
-
-        public bool TryGetDisplayedFrameCount(out long count)
-        {
-            count = 0;
-            return false;
-        }
-
         public void Dispose()
         {
         }
@@ -6310,10 +6269,10 @@ public class PlaybackPipelineTests
         private readonly SilentVideoDecoderFactory _inner = new();
 
         internal DecoderOptions? Options { get; private set; }
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
             Options = options;
-            return _inner.TryCreate(source, stream, options, out creator);
+            return _inner.Create(source, stream, options);
         }
     }
 
@@ -6331,10 +6290,9 @@ public class PlaybackPipelineTests
             _renderer = renderer;
         }
 
-        public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+        public OperationResult<IComponentCreator<IVideoRenderer>> Create()
         {
-            creator = new FixedCreator<IVideoRenderer>(_signature, () => _renderer);
-            return OperationResult.Success();
+            return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Success(new FixedCreator<IVideoRenderer>(_signature, () => _renderer));
         }
     }
 
@@ -6821,19 +6779,6 @@ public class PlaybackPipelineTests
 
         /// <summary>Stands in for a surface that cannot be emptied, so the pipeline's answer to that can be seen.</summary>
         public string? ClearFailure { get; init; }
-
-        /// <summary>
-        /// What the display took, for the test that asks: a stand-in has no display, so it says nothing until
-        /// a test tells it what to answer.
-        /// </summary>
-        public long? DisplayedFrameCount { get; set; }
-
-        public bool TryGetDisplayedFrameCount(out long count)
-        {
-            count = DisplayedFrameCount ?? 0;
-            return DisplayedFrameCount.HasValue;
-        }
-
         public void Dispose()
         {
             DisposeCount++;
@@ -6844,20 +6789,18 @@ public class PlaybackPipelineTests
     /// that cannot be presented into.</summary>
     private sealed class RefusingAudioRendererFactory : IAudioRendererFactory
     {
-        public OperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+        public OperationResult<IComponentCreator<IAudioRenderer>> Create()
         {
-            creator = null;
-            return OperationResult.Failure("This audio device refuses to be opened.");
+            return new OperationResultCreator<IComponentCreator<IAudioRenderer>>().Failure("This audio device refuses to be opened.");
         }
     }
 
     /// <summary>A factory that refuses every stream, the same way a decoder with no path for a codec does.</summary>
     private sealed class RefusingAudioDecoderFactory : IAudioDecoderFactory
     {
-        public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
         {
-            creator = null;
-            return OperationResult.Failure("This audio decoder refuses the stream.");
+            return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Failure("This audio decoder refuses the stream.");
         }
     }
 
@@ -6883,12 +6826,17 @@ public class PlaybackPipelineTests
         /// </summary>
         internal int Offers => Volatile.Read(ref _offers);
 
-        public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+        public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
         {
             Interlocked.Increment(ref _offers);
-            OperationResult offered = _inner.TryCreate(source, stream, options, out IComponentCreator<IAudioDecoder>? inner);
-            creator = offered.IsSuccessful && inner is not null ? new SignatureCreator(inner, _signature) : null;
-            return creator is null ? offered : OperationResult.Success();
+            OperationResult<IComponentCreator<IAudioDecoder>> offered = _inner.Create(source, stream, options);
+            if (!offered.IsSuccessful)
+            {
+                return offered;
+            }
+
+            IComponentCreator<IAudioDecoder> creator = new SignatureCreator(offered.Result, _signature);
+            return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Success(creator);
         }
 
         /// <summary>Passes everything through but the signature, which is the only thing that makes this a change.</summary>
@@ -6905,20 +6853,18 @@ public class PlaybackPipelineTests
 
     private sealed class RefusingVideoRendererFactory : IVideoRendererFactory
     {
-        public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+        public OperationResult<IComponentCreator<IVideoRenderer>> Create()
         {
-            creator = null;
-            return OperationResult.Failure("This renderer refuses to be made.");
+            return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Failure("This renderer refuses to be made.");
         }
     }
 
     /// <summary>Offers a renderer and then cannot build it, which is an offer that has to be passed over.</summary>
     private sealed class FailingVideoRendererFactory(string signature) : IVideoRendererFactory
     {
-        public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+        public OperationResult<IComponentCreator<IVideoRenderer>> Create()
         {
-            creator = new Creator(signature);
-            return OperationResult.Success();
+            return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Success(new Creator(signature));
         }
 
         private sealed class Creator(string signature) : IComponentCreator<IVideoRenderer>
@@ -7797,21 +7743,19 @@ public class PlaybackPipelineTests
         /// <summary>The format the pipeline asked for, which is the decoder's word about what a cue is made of.</summary>
         internal SubtitleCueFormat? RequestedFormat { get; private set; }
 
-        public OperationResult TryCreate(SubtitleCueFormat format, out IComponentCreator<ISubtitleRenderer>? creator)
+        public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format)
         {
             RequestedFormat = format;
-            creator = new FixedCreator<ISubtitleRenderer>(_signature, () => renderer);
-            return OperationResult.Success();
+            return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Success(new FixedCreator<ISubtitleRenderer>(_signature, () => renderer));
         }
     }
 
     /// <summary>A factory that cannot draw what it is asked for, which is how a renderer says so at all.</summary>
     private sealed class RefusingSubtitleRendererFactory : ISubtitleRendererFactory
     {
-        public OperationResult TryCreate(SubtitleCueFormat format, out IComponentCreator<ISubtitleRenderer>? creator)
+        public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format)
         {
-            creator = null;
-            return OperationResult.Failure($"This renderer does not draw {format} cues.");
+            return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Failure($"This renderer does not draw {format} cues.");
         }
     }
 
@@ -7834,10 +7778,9 @@ public class PlaybackPipelineTests
             _signature = NextSignature("swappable-subtitle");
         }
 
-        public OperationResult TryCreate(SubtitleCueFormat format, out IComponentCreator<ISubtitleRenderer>? creator)
+        public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format)
         {
-            creator = new FixedCreator<ISubtitleRenderer>(_signature, () => _renderer);
-            return OperationResult.Success();
+            return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Success(new FixedCreator<ISubtitleRenderer>(_signature, () => _renderer));
         }
     }
 

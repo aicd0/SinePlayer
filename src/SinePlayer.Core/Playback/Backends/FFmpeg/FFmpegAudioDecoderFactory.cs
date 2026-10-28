@@ -9,20 +9,14 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
-/// <summary>
-/// Registers libavcodec as a software audio decoder. Like its video counterpart it restricts itself to
-/// no codec, because FFmpeg covers far more than the engine could enumerate and selection is driven by
-/// whatever the container reports. Resampling is not its job: it hands out the decoder's own format.
-/// </summary>
 public sealed class FFmpegAudioDecoderFactory : IAudioDecoderFactory
 {
-    public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+    public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
-        creator = new Creator(source, stream);
-        return OperationResult.Success();
+        return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Success(new Creator(source, stream));
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says nothing more than which backend it is.</summary>

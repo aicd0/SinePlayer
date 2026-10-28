@@ -52,15 +52,6 @@ public sealed partial class NullVideoRenderer : IVideoRenderer
     {
         return OperationResult.Success();
     }
-
-    public bool TryGetDisplayedFrameCount(out long count)
-    {
-        // It has no display, so it has nothing to answer with — which is the honest failure the interface allows,
-        // and what keeps "presented" from being read as "shown".
-        count = 0;
-        return false;
-    }
-
     public void Dispose()
     {
     }

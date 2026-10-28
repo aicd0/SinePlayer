@@ -20,6 +20,4 @@ public interface IVideoRenderer : IDisposable
     OperationResult RefreshSurface(VideoTransform transform);
 
     OperationResult ClearSurface();
-
-    bool TryGetDisplayedFrameCount(out long count);
 }

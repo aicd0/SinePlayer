@@ -21,13 +21,12 @@ namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 /// </summary>
 public sealed class FFmpegVideoDecoderFactory : IVideoDecoderFactory
 {
-    public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+    public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
-        creator = new Creator(source, stream, options);
-        return OperationResult.Success();
+        return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(new Creator(source, stream, options));
     }
 
     /// <summary>

@@ -48,10 +48,10 @@ public class AV1FixtureTests
         Assert.That(stream.Height, Is.EqualTo(VideoFixtureFile.Height));
 
         FFmpegVideoDecoderFactory decoderFactory = new();
-        OperationResult decoderResult = decoderFactory.TryCreate(mediaSource, stream, DecoderOptions.Default, out IComponentCreator<IVideoDecoder>? creator);
+        OperationResult<IComponentCreator<IVideoDecoder>> decoderResult = decoderFactory.Create(mediaSource, stream, DecoderOptions.Default);
         Assert.That(decoderResult.IsSuccessful, Is.True, decoderResult.Message);
 
-        OperationResult createdResult = creator!.Create(out IVideoDecoder? decoder);
+        OperationResult createdResult = decoderResult.Result.Create(out IVideoDecoder? decoder);
         Assert.That(createdResult.IsSuccessful, Is.True, createdResult.Message);
 
         using IVideoDecoder videoDecoder = decoder!;

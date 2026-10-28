@@ -96,10 +96,10 @@ public class FFmpegVideoDecoderTests
 
             FFmpegVideoDecoderFactory decoderFactory = new();
             DecoderOptions options = new() { HardwareDecoding = false };
-            OperationResult offered = decoderFactory.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? creator);
+            OperationResult<IComponentCreator<IVideoDecoder>> offered = decoderFactory.Create(source, stream, options);
             Assert.That(offered.IsSuccessful, Is.True, offered.Message);
 
-            OperationResult created = creator!.Create(out IVideoDecoder? decoder);
+            OperationResult created = offered.Result.Create(out IVideoDecoder? decoder);
             Assert.That(created.IsSuccessful, Is.True, created.Message);
 
             using IVideoDecoder videoDecoder = decoder!;
@@ -937,12 +937,11 @@ public class FFmpegVideoDecoderTests
 
         FFmpegVideoDecoderFactory factory = new();
         DecoderOptions options = new() { HardwareDecoding = hardwareDecoding };
-        OperationResult result = factory.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? creator);
+        OperationResult<IComponentCreator<IVideoDecoder>> result = factory.Create(source, stream, options);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
-        Assert.That(creator, Is.Not.Null);
 
-        OperationResult created = creator!.Create(out IVideoDecoder? decoder);
+        OperationResult created = result.Result.Create(out IVideoDecoder? decoder);
         Assert.That(created.IsSuccessful, Is.True, created.Message);
         Assert.That(decoder, Is.Not.Null);
 

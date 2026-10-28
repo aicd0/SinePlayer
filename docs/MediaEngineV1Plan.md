@@ -1637,7 +1637,11 @@ read out before the failure is heard. It now waits for the failure itself, which
 
 **S9n — The drops after the frame leaves the pipeline are counted too.** *Done, from a question: "Is there any
 way that we can monitor how many frames has been discarded by DWM?", and the choice to put the answer in the
-Lab rather than in a plan.*
+Lab rather than in a plan.* **Since removed on request:** the counter, the renderer method that fed it and the
+Lab's line about it are gone, so the record below describes a step that no longer exists in the code. What is
+left of the observation is what the pipeline counts itself — `PresentedFrameCount` and `DroppedFrameCount` — and
+the fact recorded here, that a frame superseded after it was handed over is counted as presented and nowhere
+else.
 
 `Present(0)` (S9m) made the display a consumer rather than a clock, and the price — a frame handed over that
 the display never scans out because a newer one overtook it — is a drop that no counter inside the pipeline can
@@ -1667,10 +1671,10 @@ see. Counting it means asking the system, and answering the question meant settl
    than an assumed zero, and no reset has to be guessed at. (The documentation for this page is served by the
    SDK metadata as well, which is how it was read while learn.microsoft.com was unreachable.)
 
-*Where the answer is published, and why it is a counter and not a property of the renderer.* The renderer is
+*Where the answer was published, and why it was a counter and not a property of the renderer.* The renderer was
 asked (`IVideoRenderer.TryGetDisplayedFrameCount` — false meaning "this backend cannot tell", which is the
-honest answer, not zero), and the **render thread** publishes what it answered into the pipeline right after
-it publishes `PresentedFrameCount`, so `DisplayedFrameCount` is the same shape as every other counter in §2.2:
+honest answer, not zero), and the **render thread** published what it answered into the pipeline right after
+it published `PresentedFrameCount`, so the counter was the same shape as every other counter in §2.2:
 one thread that has the fact, everyone else reads it. The alternative — a reading property that reaches
 through `_videoRenderer` from the host's thread — would be a second reader of a field that is written on the
 open path, which is the shape S9h was about. It is null until a frame has been presented, so "no answer" and
@@ -1682,16 +1686,22 @@ pipeline already counts exactly that, from exactly the same presents, so the sec
 the field it mirrors (the shape §Appendix A item 15 is about) and was deleted. What the swap chain keeps is
 only what the system said about the frames it handed over.
 
-*What the Lab shows now:* `display took N, compositor dropped M` beside `presented` and `dropped`, where M is
-the two counts subtracted. As the record of §13 says, it lags by the frame or two still in flight, and a
-number that stops advancing on a machine where it used to advance is one of the documented unreliable
-situations rather than a stall — which is why the absence of an answer is reported as an absence.
+*What the Lab showed:* `display took N, compositor dropped M` beside `presented` and `dropped`, where M was
+the two counts subtracted. It lagged by the frame or two still in flight, and a number that stopped advancing
+on a machine where it used to advance was one of the documented unreliable situations rather than a stall —
+which is why the absence of an answer was reported as an absence.
 
-*Verified:* x64 and ARM64 build clean; 130/130 tests, including one that the renderer's answer is carried
-through and that a renderer whose answer is zero is not confused with one that cannot answer. What the suite
-cannot show is the number itself — an offscreen target has no swap chain, so the honest answer there is
-"cannot tell". The measurement it is for is the Lab on a real window: `display took` should track `presented`
-closely on a file that is not being superseded, and the gap should widen on one that is.
+*Verified at the time:* x64 and ARM64 build clean; 130/130 tests, including one that the renderer's answer was
+carried through and that a renderer whose answer is zero was not confused with one that cannot answer. What the
+suite could not show was the number itself — an offscreen target has no swap chain, so the honest answer there
+was "cannot tell". The measurement it was for was the Lab on a real window: `display took` should have tracked
+`presented` closely on a file that is not being superseded, and the gap should have widened on one that is.
+
+*When it was removed*, the pieces that went were `IVideoRenderer.TryGetDisplayedFrameCount` and its
+implementations, `IVideoSurface`/`D3D11SwapChain`'s `DXGI_FRAME_STATISTICS` sampling and its baseline, the
+pipeline's `DisplayedFrameCount` and its publication on the render thread, and the Lab's `display took`/
+`compositor dropped` segment. The swap chain's `Present` no longer touches `GetFrameStatistics`, so presenting a
+frame is one call again.
 
 **S9o — The end of a file stops waiting, and starts being reported.** *Done, from the user's review: "The reader
 always ends reading before decoder and presenter does, which leaves the entire worker queue blocked (remember

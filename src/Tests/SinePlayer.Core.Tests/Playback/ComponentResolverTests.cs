@@ -195,20 +195,19 @@ public class ComponentResolverTests
             return name;
         }
 
-        public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+        public OperationResult<IComponentCreator<IVideoRenderer>> Create()
         {
-            creator = null;
-            return OperationResult.Failure($"{name} cannot serve this machine.");
+            return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Failure($"{name} cannot serve this machine.");
         }
     }
 
     /// <summary>A factory that offers a creator for each way it is asked, so a sequence shows what was asked of it.</summary>
     private sealed class RecordingVideoDecoderFactory : IVideoDecoderFactory
     {
-        public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
-            creator = new FixedCreator<IVideoDecoder>(options.HardwareDecoding ? "hardware:decoder" : "software:decoder", () => null);
-            return OperationResult.Success();
+            IComponentCreator<IVideoDecoder> creator = new FixedCreator<IVideoDecoder>(options.HardwareDecoding ? "hardware:decoder" : "software:decoder", () => null);
+            return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
         }
     }
 }

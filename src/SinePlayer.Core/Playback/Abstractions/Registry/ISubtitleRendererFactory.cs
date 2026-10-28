@@ -9,5 +9,5 @@ namespace SinePlayer.Core.Playback.Abstractions.Registry;
 
 public interface ISubtitleRendererFactory : IComponentFactory
 {
-    OperationResult TryCreate(SubtitleCueFormat format, out IComponentCreator<ISubtitleRenderer>? creator);
+    OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format);
 }

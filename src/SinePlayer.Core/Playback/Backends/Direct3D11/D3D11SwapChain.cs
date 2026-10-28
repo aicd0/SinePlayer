@@ -44,12 +44,6 @@ internal sealed partial class D3D11SwapChain : IDisposable
     private ID3D11RenderTargetView? _view;
     private bool _disposed;
 
-    /// <summary>The monitor's count when this swap chain first asked, or -1 while nothing has answered yet.</summary>
-    private long _displayedBaseline = -1;
-
-    /// <summary>What the monitor's count was the last time it answered, or -1 if it never has.</summary>
-    private long _displayedCount = -1;
-
     private D3D11SwapChain(D3D11Device device, DXGI_FORMAT format, IDXGISwapChain1 swapChain, ID3D11Texture2D backBuffer, ID3D11RenderTargetView view, int width, int height, double compositionScale)
     {
         _device = device;
@@ -366,9 +360,8 @@ internal sealed partial class D3D11SwapChain : IDisposable
     /// The clock is what paces the picture (rule 4); the display only decides what it shows, and a composition
     /// swap chain reads the newest buffer at its own composition. Presenting without the wait still blocks
     /// when every buffer is in flight, which is the compositor being behind and cannot be helped — but that is
-    /// the exception, where waiting for the blank was the rule. What the cost of that choice is — a frame the
-    /// compositor supersedes is presented and never shown — is what <see cref="TryGetDisplayedFrameCount"/>
-    /// exists to make visible.
+    /// the exception, where waiting for the blank was the rule. The cost of that choice is that a frame can be
+    /// presented and then superseded before the display takes it; it is counted as presented like any other.
     /// </para>
     /// </summary>
     internal OperationResult Present()
@@ -384,73 +377,7 @@ internal sealed partial class D3D11SwapChain : IDisposable
             return OperationResult.Failure($"Unable to present a frame: {result}");
         }
 
-        // The count of hand-overs is the pipeline's (it is the same number and it survives a renderer swap);
-        // what is kept here is only what the system said about them.
-        SampleDisplayedFrameCount();
         return OperationResult.Success();
-    }
-
-    /// <summary>
-    /// How many of the frames handed over have reached the monitor, according to the system, or false when it
-    /// will not say.
-    /// <para>
-    /// <c>PresentCount</c> is "the running total count of times that an image was presented to the monitor",
-    /// which the documentation is careful to distinguish from the number of <c>Present</c> calls: the
-    /// difference between the two is what the compositor superseded. In windowed mode the structure's
-    /// documentation says these values are based on when the swap chain was created (full-screen ones are
-    /// based on boot), so the count belongs to this chain and starts near zero — the first answer is taken as
-    /// the baseline rather than assuming zero.
-    /// </para>
-    /// <para>
-    /// It is not always available: the system declines on some drivers, the statistics are documented as
-    /// unreliable with several monitors or another fullscreen application, and on systems with a hardware flip
-    /// queue they may need <c>DwmFlush</c> to be current. A number that stops advancing is one of those, not
-    /// a stall — which is why the caller is told whether there is a number at all rather than being handed
-    /// the last one as if it were now.
-    /// </para>
-    /// <para>
-    /// Read after a present, on the one thread that presents, because a swap chain is not safe to touch from
-    /// anywhere else.
-    /// </para>
-    /// </summary>
-    internal bool TryGetDisplayedFrameCount(out long count)
-    {
-        count = Interlocked.Read(ref _displayedCount);
-        return count >= 0;
-    }
-
-    private void SampleDisplayedFrameCount()
-    {
-        if (_disposed || _swapChain is null)
-        {
-            return;
-        }
-
-        DXGI_FRAME_STATISTICS statistics;
-        try
-        {
-            // Generated as a throwing wrapper — the one DXGI method the metadata does not mark PreserveSig —
-            // so a driver that declines arrives here as an exception rather than as a value to check, which
-            // is the same shrug with fewer branches.
-            _swapChain.GetFrameStatistics(out statistics);
-        }
-        catch (Exception)
-        {
-            // A driver that will not answer keeps the last answer it gave, or none if it never gave one.
-            return;
-        }
-
-        long baseline = Interlocked.Read(ref _displayedBaseline);
-        if (baseline < 0)
-        {
-            baseline = statistics.PresentCount;
-            Interlocked.Exchange(ref _displayedBaseline, baseline);
-        }
-
-        // Subtracted in unsigned arithmetic so a wrap of the system's 32 bit counter reads as the small
-        // number it is rather than as a jump of four billion.
-        uint displayed = unchecked((uint)(statistics.PresentCount - (uint)baseline));
-        Interlocked.Exchange(ref _displayedCount, displayed);
     }
 
     public void Dispose()

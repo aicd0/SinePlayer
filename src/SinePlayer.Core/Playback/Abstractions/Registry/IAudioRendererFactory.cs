@@ -8,5 +8,5 @@ namespace SinePlayer.Core.Playback.Abstractions.Registry;
 
 public interface IAudioRendererFactory : IComponentFactory
 {
-    OperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator);
+    OperationResult<IComponentCreator<IAudioRenderer>> Create();
 }

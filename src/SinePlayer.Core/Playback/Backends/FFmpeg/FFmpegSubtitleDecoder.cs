@@ -11,33 +11,25 @@ using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
-/// <summary>
-/// Decodes text subtitles with libavcodec. Every text format is decoded into an ASS event line, which is what libavcodec
-/// normalises them to, and the line is handed on as it came: the override tags and the style name in it are the
-/// renderer's business, not the decoder's.
-/// <para>
-/// Subtitles take the legacy decode entry point. They are not frames, so there is no send/receive pair and nothing is
-/// held between packets — a packet carries its own timing and produces its cues immediately. What a packet does not
-/// carry is the length of the event: formats such as SubRip leave the display times at zero and put the duration in the
-/// packet, which is the fallback used here.
-/// </para>
-/// <para>
-/// Bitmap formats (PGS, VobSub) produce images instead of text and are turned away before a decoder is created.
-/// </para>
-/// </summary>
 public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
 {
     private readonly SubtitleStreamInfo _stream;
     private readonly string _decoderName;
+    private readonly SubtitleCueFormat _cueFormat;
+    private readonly int _canvasWidth;
+    private readonly int _canvasHeight;
 
     private nint _context;
     private bool _disposed;
 
-    private FFmpegSubtitleDecoder(SubtitleStreamInfo stream, nint context, string decoderName)
+    private FFmpegSubtitleDecoder(SubtitleStreamInfo stream, nint context, string decoderName, SubtitleCueFormat cueFormat, int canvasWidth, int canvasHeight)
     {
         _stream = stream;
         _context = context;
         _decoderName = decoderName;
+        _cueFormat = cueFormat;
+        _canvasWidth = canvasWidth;
+        _canvasHeight = canvasHeight;
     }
 
     public string Name => $"FFmpeg {_decoderName}";
@@ -46,12 +38,9 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
 
     public bool IsHardwareAccelerated => false;
 
-    public SubtitleCueFormat CueFormat => SubtitleCueFormat.Ass;
+    public SubtitleCueFormat CueFormat => _cueFormat;
 
-    /// <summary>
-    /// Creates and opens a decoder for a subtitle stream of an FFmpeg source.
-    /// </summary>
-    public static OperationResult<FFmpegSubtitleDecoder> TryCreate(IMediaSource? source, SubtitleStreamInfo stream)
+    public static OperationResult<FFmpegSubtitleDecoder> Create(IMediaSource? source, SubtitleStreamInfo stream)
     {
         OperationResultCreator<FFmpegSubtitleDecoder> result = new();
 
@@ -109,7 +98,25 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
             return result.Failure($"Unable to open the subtitle decoder: {FFmpegInterop.GetErrorMessage(opened)}");
         }
 
-        return result.Success(new FFmpegSubtitleDecoder(stream, context, decoderName));
+        int canvasWidth = 0;
+        int canvasHeight = 0;
+        if (stream.IsBitmap)
+        {
+            unsafe
+            {
+                var codecParameters = (AVCodecParameters*)parameters;
+                canvasWidth = codecParameters->Width;
+                canvasHeight = codecParameters->Height;
+            }
+        }
+
+        return result.Success(new FFmpegSubtitleDecoder(
+            stream,
+            context,
+            decoderName,
+            stream.IsBitmap ? SubtitleCueFormat.BitmapBgra : SubtitleCueFormat.Ass,
+            canvasWidth,
+            canvasHeight));
     }
 
     public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<SubtitleCue> cues)
@@ -130,10 +137,6 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
         return DecodeSubtitle(packetBuffer.Packet, packet, decoded);
     }
 
-    /// <summary>
-    /// Nothing is ever held back: a subtitle packet is decoded whole and its cues are emitted at once, so there is
-    /// never anything left to drain.
-    /// </summary>
     public OperationResult Drain(out IReadOnlyList<SubtitleCue> cues)
     {
         cues = [];
@@ -188,19 +191,39 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
                 return OperationResult.Success();
             }
 
-            string? text = CollectText(subtitle);
-            if (string.IsNullOrEmpty(text))
-            {
-                // A bitmap event of a stream that was not recognised as bitmap: there is no text to carry.
-                return OperationResult.Success();
-            }
-
             TimeSpan start = mediaPacket.Timestamp + TimeSpan.FromMilliseconds(subtitle.StartDisplayTime);
             TimeSpan end = mediaPacket.Timestamp + TimeSpan.FromMilliseconds(subtitle.EndDisplayTime);
             if (end <= start)
             {
                 // Some containers state no display time and leave the length to the packet's own duration.
                 end = start + mediaPacket.Duration;
+            }
+
+            if (_cueFormat == SubtitleCueFormat.BitmapBgra)
+            {
+                SubtitleImage? image = CollectImage(subtitle);
+                if (image is null)
+                {
+                    // An event with nothing in it is a cue that clears the screen: the packet has a timing and says no
+                    // more than that. Nothing is added, which leaves the window to the cues that were there before and
+                    // lets them expire on their own.
+                    return OperationResult.Success();
+                }
+
+                cues.Add(new SubtitleCue
+                {
+                    Start = start,
+                    End = end,
+                    Image = image,
+                });
+                return OperationResult.Success();
+            }
+
+            string? text = CollectText(subtitle);
+            if (string.IsNullOrEmpty(text))
+            {
+                // A bitmap event of a stream that was not recognised as bitmap: there is no text to carry.
+                return OperationResult.Success();
             }
 
             cues.Add(new SubtitleCue
@@ -217,6 +240,120 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
         }
     }
 
+    /// <summary>
+    /// Turns one event's rectangles into a single picture: the smallest image that holds all of them, with the placement
+    /// that puts it back where it belongs.
+    /// <para>
+    /// A bitmap event often arrives as several rectangles — a DVD subtitle is close to one line per rectangle — but a
+    /// renderer draws a cue it is given, so they are composed into one image. Cropping to their bounding box rather than
+    /// to the frame keeps a cue at the size of the words it holds: a 1920×1080 frame per cue would be eight megabytes
+    /// for a line of text, kept for as long as the cue is.
+    /// </para>
+    /// </summary>
+    private unsafe SubtitleImage? CollectImage(AVSubtitle subtitle)
+    {
+        var rects = (AVSubtitleRect**)subtitle.Rects;
+
+        int left = int.MaxValue;
+        int top = int.MaxValue;
+        int right = int.MinValue;
+        int bottom = int.MinValue;
+        for (uint index = 0; index < subtitle.RectCount; index++)
+        {
+            AVSubtitleRect* rect = rects[index];
+            if (rect == null || !IsDrawable(rect))
+            {
+                continue;
+            }
+
+            left = Math.Min(left, rect->X);
+            top = Math.Min(top, rect->Y);
+            right = Math.Max(right, rect->X + rect->W);
+            bottom = Math.Max(bottom, rect->Y + rect->H);
+        }
+
+        if (left >= right || top >= bottom)
+        {
+            // An event with nothing drawable in it is a cue that clears the screen: the packet carries a timing and says
+            // no more than that. Nothing is added, which leaves the cues already there to expire on their own.
+            return null;
+        }
+
+        // The frame the rectangles are positioned inside, taken from the container when it said and from the rectangles
+        // themselves when it did not, which is what turns pixels into fractions of the picture.
+        int canvasWidth = _canvasWidth > 0 ? Math.Max(_canvasWidth, right) : right;
+        int canvasHeight = _canvasHeight > 0 ? Math.Max(_canvasHeight, bottom) : bottom;
+
+        int width = right - left;
+        int height = bottom - top;
+        int stride = width * 4;
+        nint pixels = Marshal.AllocHGlobal(stride * height);
+        bool handedOver = false;
+        try
+        {
+            // Starts transparent: a cue covers part of the picture, not all of it.
+            Span<byte> image = new((void*)pixels, stride * height);
+            image.Clear();
+
+            for (uint index = 0; index < subtitle.RectCount; index++)
+            {
+                AVSubtitleRect* rect = rects[index];
+                if (rect == null || !IsDrawable(rect))
+                {
+                    continue;
+                }
+
+                // The rectangle's own place inside the cropped image, from its first byte to its last.
+                int offset = ((rect->Y - top) * stride) + ((rect->X - left) * 4);
+                Span<byte> area = image.Slice(offset, ((rect->H - 1) * stride) + (rect->W * 4));
+                DrawRect(rect, area, stride);
+            }
+
+            var buffer = new FFmpegSubtitleImageBuffer(pixels, width, height, stride);
+            handedOver = true;
+
+            return new SubtitleImage
+            {
+                Buffer = buffer,
+                Left = (double)left / canvasWidth,
+                Top = (double)top / canvasHeight,
+                Width = (double)width / canvasWidth,
+                Height = (double)height / canvasHeight,
+            };
+        }
+        finally
+        {
+            if (!handedOver)
+            {
+                Marshal.FreeHGlobal(pixels);
+            }
+        }
+    }
+
+    private static unsafe bool IsDrawable(AVSubtitleRect* rect)
+    {
+        return rect->Type == FFmpegConstants.SubtitleTypeBitmap && rect->W > 0 && rect->H > 0 && rect->Data[0] != 0;
+    }
+
+    /// <summary>
+    /// Draws one rectangle into the image. The palette is what tells the two layouts apart: a subtitle that carries
+    /// colours is indices into them, and one that carries none is already 32-bit pixels.
+    /// </summary>
+    private static unsafe void DrawRect(AVSubtitleRect* rect, Span<byte> area, int stride)
+    {
+        if (rect->ColorCount > 0 && rect->Data[1] != 0)
+        {
+            int indexStride = rect->LineSize[0] > 0 ? rect->LineSize[0] : rect->W;
+            ReadOnlySpan<byte> indices = new((void*)rect->Data[0], indexStride * rect->H);
+            ReadOnlySpan<uint> palette = new((void*)rect->Data[1], rect->ColorCount);
+            SubtitleBitmap.ExpandIndices(indices, indexStride, palette, rect->W, rect->H, area, stride);
+            return;
+        }
+
+        int pixelStride = rect->LineSize[0] > 0 ? rect->LineSize[0] : rect->W * 4;
+        ReadOnlySpan<byte> pixels = new((void*)rect->Data[0], pixelStride * rect->H);
+        SubtitleBitmap.CopyBgra(pixels, pixelStride, rect->W, rect->H, area, stride);
+    }
     private static unsafe string? CollectText(AVSubtitle subtitle)
     {
         var rects = (AVSubtitleRect**)subtitle.Rects;

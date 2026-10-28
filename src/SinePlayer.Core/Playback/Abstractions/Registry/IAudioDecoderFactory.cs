@@ -10,5 +10,5 @@ namespace SinePlayer.Core.Playback.Abstractions.Registry;
 
 public interface IAudioDecoderFactory : IComponentFactory
 {
-    OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator);
+    OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options);
 }

@@ -100,7 +100,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private long _presentedFrameCount;
     private long _droppedFrameCount;
-    private long _displayedFrameCount = -1;
     private long _decodedFrameCount;
     private long _decodeTicks;
     private long _renderTicks;
@@ -194,16 +193,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     public long PresentedFrameCount => Interlocked.Read(ref _presentedFrameCount);
 
     public long DroppedFrameCount => Interlocked.Read(ref _droppedFrameCount);
-
-    public long? DisplayedFrameCount
-    {
-        get
-        {
-            long displayed = Interlocked.Read(ref _displayedFrameCount);
-            return displayed < 0 ? null : displayed;
-        }
-    }
-
     public string? StarvedFor => _videoStarved ? "video" : _audioStarved ? "audio" : null;
 
     internal TimeSpan LastPresentedTimestamp
@@ -726,7 +715,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         Interlocked.Exchange(ref _presentedFrameCount, 0);
         Interlocked.Exchange(ref _droppedFrameCount, 0);
-        Interlocked.Exchange(ref _displayedFrameCount, -1);
         Interlocked.Exchange(ref _decodedFrameCount, 0);
         Interlocked.Exchange(ref _decodeTicks, 0);
         Interlocked.Exchange(ref _renderTicks, 0);
@@ -2160,11 +2148,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         Interlocked.Increment(ref _presentedFrameCount);
         Interlocked.Exchange(ref _pictureTicks, frame.Timestamp.Ticks);
-
-        if (renderer.TryGetDisplayedFrameCount(out long displayed))
-        {
-            Interlocked.Exchange(ref _displayedFrameCount, displayed);
-        }
 
         return OperationResult.Success();
     }

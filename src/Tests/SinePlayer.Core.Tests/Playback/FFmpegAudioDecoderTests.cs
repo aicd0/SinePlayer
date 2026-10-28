@@ -168,12 +168,11 @@ public class FFmpegAudioDecoderTests
         AudioStreamInfo stream = source.Info.AudioStreams[0];
 
         FFmpegAudioDecoderFactory factory = new();
-        OperationResult result = factory.TryCreate(source, stream, DecoderOptions.Default, out IComponentCreator<IAudioDecoder>? creator);
+        OperationResult<IComponentCreator<IAudioDecoder>> result = factory.Create(source, stream, DecoderOptions.Default);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
-        Assert.That(creator, Is.Not.Null);
 
-        OperationResult created = creator!.Create(out IAudioDecoder? decoder);
+        OperationResult created = result.Result.Create(out IAudioDecoder? decoder);
         Assert.That(created.IsSuccessful, Is.True, created.Message);
         Assert.That(decoder, Is.Not.Null);
 
