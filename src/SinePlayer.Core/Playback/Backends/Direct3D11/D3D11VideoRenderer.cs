@@ -369,12 +369,6 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         }
     }
 
-    public bool TryGetDisplayedFrameCount(out long count)
-    {
-        count = 0;
-        return _surface is not null && _surface.TryGetDisplayedFrameCount(out count);
-    }
-
     /// <summary>Sets the surface frames are drawn into when there is no presentation target.</summary>
     internal void SetOutput(ID3D11RenderTargetView? view, int width, int height)
     {

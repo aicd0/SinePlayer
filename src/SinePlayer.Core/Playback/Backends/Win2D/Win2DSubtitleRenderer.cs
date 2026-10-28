@@ -8,33 +8,20 @@ using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Text;
 
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 
+using Windows.Foundation;
+using Windows.Graphics.DirectX;
 using Windows.Graphics.DirectX.Direct3D11;
 using Windows.UI;
 using Windows.Win32.Graphics.Dxgi.Common;
 
 namespace SinePlayer.Core.Playback.Backends.Win2D;
 
-/// <summary>
-/// Draws subtitles with Win2D — Direct2D and DirectWrite underneath — into a swap chain of its own, which the host is
-/// handed the way it is handed the picture's. Two surfaces rather than one drawn over the other, because text changes at
-/// moments the picture's cadence knows nothing about: it has to appear, change and disappear while playback is paused,
-/// and while the picture is starved.
-/// <para>
-/// The swap chain is the engine's own (<see cref="D3D11SwapChain"/>, which already knows about the display's scale), and
-/// Win2D draws on the back buffer of it through a render target wrapped around that surface. Win2D's own
-/// <c>CanvasSwapChain</c> cannot be used for this: it is a WinRT object that does not expose <c>IDXGISwapChain</c>, so a
-/// panel cannot be handed one.
-/// </para>
-/// <para>
-/// Every frame starts fully transparent and is composed premultiplied, so the panel shows the picture underneath instead
-/// of covering it. Everything here happens on the pipeline's subtitle thread.
-/// </para>
-/// </summary>
 public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 {
     /// <summary>How tall a line is, as a fraction of the surface: big enough to read at any window size.</summary>
@@ -200,6 +187,12 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
         foreach (SubtitleCue cue in cues)
         {
+            if (cue.Image is { } image)
+            {
+                DrawImage(session, image, placement, width, height);
+                continue;
+            }
+
             var text = AssSubtitleText.Parse(cue.Text);
             if (text.IsEmpty)
             {
@@ -216,6 +209,44 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             session.DrawTextLayout(layout, origin + new Vector2(ShadowOffset, ShadowOffset), Color.FromArgb(200, 0, 0, 0));
             session.DrawTextLayout(layout, origin, Color.FromArgb(255, 255, 255, 255));
         }
+    }
+
+    /// <summary>
+    /// Draws a bitmap cue where it belongs: its placement is a fraction of the frame the subtitle was authored against,
+    /// so it is scaled to this surface and moved by the same adjustment text is moved by. The image arrives premultiplied,
+    /// which is what a surface composed over the picture expects.
+    /// </summary>
+    private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePlacement placement, int width, int height)
+    {
+        ISubtitleImageBuffer buffer = image.Buffer;
+        if (buffer.Width <= 0 || buffer.Height <= 0)
+        {
+            return;
+        }
+
+        byte[] pixels = new byte[buffer.Stride * buffer.Height];
+        Marshal.Copy(buffer.Pixels, pixels, 0, pixels.Length);
+
+        using var bitmap = CanvasBitmap.CreateFromBytes(
+            _canvasDevice,
+            pixels,
+            buffer.Width,
+            buffer.Height,
+            DirectXPixelFormat.B8G8R8A8UIntNormalized,
+            96.0f,
+            CanvasAlphaMode.Premultiplied);
+
+        double x = ((image.Left + placement.OffsetX) * width);
+        double y = ((image.Top + placement.OffsetY) * height);
+        double scaledWidth = image.Width * width;
+        double scaledHeight = image.Height * height;
+
+        // Kept on the surface for the same reason the text is: an adjustment that pushes a cue off the edge is cut back
+        // rather than obeyed, and a surface that later shrinks must not strand it.
+        x = Math.Clamp(x, 0.0, Math.Max(0.0, width - scaledWidth));
+        y = Math.Clamp(y, 0.0, Math.Max(0.0, height - scaledHeight));
+
+        session.DrawImage(bitmap, new Rect(x, y, scaledWidth, scaledHeight));
     }
 
     /// <summary>

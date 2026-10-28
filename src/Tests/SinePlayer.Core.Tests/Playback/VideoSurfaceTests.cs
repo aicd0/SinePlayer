@@ -57,9 +57,9 @@ public class VideoSurfaceTests
         D3D11VideoRendererFactory hdr = new(VideoSurfacePreference.Hdr10);
         D3D11VideoRendererFactory sdr = new(VideoSurfacePreference.Sdr);
 
-        OperationResult autoCreated = auto.TryCreate(out IComponentCreator<IVideoRenderer>? autoCreator);
-        OperationResult hdrCreated = hdr.TryCreate(out IComponentCreator<IVideoRenderer>? hdrCreator);
-        OperationResult sdrCreated = sdr.TryCreate(out IComponentCreator<IVideoRenderer>? sdrCreator);
+        OperationResult<IComponentCreator<IVideoRenderer>> autoCreated = auto.Create();
+        OperationResult<IComponentCreator<IVideoRenderer>> hdrCreated = hdr.Create();
+        OperationResult<IComponentCreator<IVideoRenderer>> sdrCreated = sdr.Create();
 
         using (Assert.EnterMultipleScope())
         {
@@ -68,11 +68,10 @@ public class VideoSurfaceTests
             Assert.That(sdrCreated.IsSuccessful, Is.True, sdrCreated.Message);
 
             // Every preference is a different identity, or a reconcile would keep a renderer whose container is not the
-            // one the host now wants. A creator that was not handed back has no identity to compare, so the failure above
-            // is the one worth reading, and an empty string here keeps that the only error.
-            string autoSignature = autoCreator?.Signature ?? string.Empty;
-            string hdrSignature = hdrCreator?.Signature ?? string.Empty;
-            string sdrSignature = sdrCreator?.Signature ?? string.Empty;
+            // one the host now wants.
+            string autoSignature = autoCreated.Result.Signature;
+            string hdrSignature = hdrCreated.Result.Signature;
+            string sdrSignature = sdrCreated.Result.Signature;
 
             Assert.That(autoSignature, Is.Not.Empty);
             Assert.That(autoSignature, Is.Not.EqualTo(hdrSignature));

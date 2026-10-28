@@ -8,5 +8,5 @@ namespace SinePlayer.Core.Playback.Abstractions.Registry;
 
 public interface IVideoRendererFactory : IComponentFactory
 {
-    OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator);
+    OperationResult<IComponentCreator<IVideoRenderer>> Create();
 }

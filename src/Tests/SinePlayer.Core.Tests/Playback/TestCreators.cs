@@ -22,17 +22,15 @@ internal static class TestCreators
     /// inner one's, because a wrapper is the same decoder as the one it wraps: it changes the timing or the
     /// contents, not what is running.
     /// </summary>
-    internal static OperationResult Wrap<TComponent>(OperationResult offered, IComponentCreator<TComponent>? inner, Func<TComponent, TComponent> decorate, out IComponentCreator<TComponent>? creator)
+    internal static OperationResult<IComponentCreator<TComponent>> Wrap<TComponent>(OperationResult<IComponentCreator<TComponent>> offered, Func<TComponent, TComponent> decorate)
         where TComponent : class
     {
-        if (!offered.IsSuccessful || inner is null)
+        if (!offered.IsSuccessful)
         {
-            creator = null;
             return offered;
         }
 
-        creator = new DecoratingCreator<TComponent>(inner, decorate);
-        return OperationResult.Success();
+        return new OperationResultCreator<IComponentCreator<TComponent>>().Success(new DecoratingCreator<TComponent>(offered.Result, decorate));
     }
 
     private sealed class DecoratingCreator<TComponent>(IComponentCreator<TComponent> inner, Func<TComponent, TComponent> decorate) : IComponentCreator<TComponent>

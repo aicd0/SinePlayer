@@ -372,10 +372,10 @@ internal sealed class SyntheticMediaBuffer : IPlanarAudioBuffer
 
 internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
 {
-    public OperationResult TryCreate(IMediaSource source, VideoStreamInfo stream, DecoderOptions options, out IComponentCreator<IVideoDecoder>? creator)
+    public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
     {
-        creator = new FixedCreator<IVideoDecoder>(Signature, () => new Decoder(stream));
-        return OperationResult.Success();
+        IComponentCreator<IVideoDecoder> creator = new FixedCreator<IVideoDecoder>(Signature, () => new Decoder(stream));
+        return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>
@@ -429,10 +429,10 @@ internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
 
 internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
 {
-    public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+    public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
     {
-        creator = new FixedCreator<IAudioDecoder>(Signature, () => new Decoder(stream));
-        return OperationResult.Success();
+        IComponentCreator<IAudioDecoder> creator = new FixedCreator<IAudioDecoder>(Signature, () => new Decoder(stream));
+        return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Success(creator);
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>
@@ -492,10 +492,10 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
 /// </summary>
 internal sealed class SyntheticSubtitleDecoderFactory : ISubtitleDecoderFactory
 {
-    public OperationResult TryCreate(IMediaSource? source, SubtitleStreamInfo stream, out IComponentCreator<ISubtitleDecoder>? creator)
+    public OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource? source, SubtitleStreamInfo stream)
     {
-        creator = new FixedCreator<ISubtitleDecoder>(Signature, () => new Decoder(stream));
-        return OperationResult.Success();
+        IComponentCreator<ISubtitleDecoder> creator = new FixedCreator<ISubtitleDecoder>(Signature, () => new Decoder(stream));
+        return new OperationResultCreator<IComponentCreator<ISubtitleDecoder>>().Success(creator);
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>

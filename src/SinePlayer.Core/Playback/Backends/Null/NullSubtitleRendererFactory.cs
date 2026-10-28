@@ -8,10 +8,6 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
 
-/// <summary>
-/// Offers <see cref="NullSubtitleRenderer"/>s. It never refuses, because it draws nothing and so there is no format it
-/// cannot leave undrawn — which is the point: it is the subtitle sink a test or a headless run can always have.
-/// </summary>
 public sealed class NullSubtitleRendererFactory : ISubtitleRendererFactory
 {
     private readonly string _signature;
@@ -22,11 +18,9 @@ public sealed class NullSubtitleRendererFactory : ISubtitleRendererFactory
         _signature = signature;
     }
 
-    public OperationResult TryCreate(SubtitleCueFormat format, out IComponentCreator<ISubtitleRenderer>? creator)
+    public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format)
     {
-        // The format is not part of the identity here: the renderer draws nothing whatever it is handed.
-        creator = new Creator(_signature);
-        return OperationResult.Success();
+        return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Success(new Creator(_signature));
     }
 
     private sealed class Creator(string signature) : IComponentCreator<ISubtitleRenderer>

@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -67,9 +68,10 @@ public sealed class ComponentResolver
     {
         foreach (IVideoRendererFactory factory in _components.GetComponents<IVideoRendererFactory>())
         {
-            if (factory.TryCreate(out IComponentCreator<IVideoRenderer>? creator).IsSuccessful && creator is not null)
+            OperationResult<IComponentCreator<IVideoRenderer>> offered = factory.Create();
+            if (offered.IsSuccessful)
             {
-                yield return creator;
+                yield return offered.Result;
             }
         }
     }
@@ -87,9 +89,10 @@ public sealed class ComponentResolver
     {
         foreach (IAudioRendererFactory factory in _components.GetComponents<IAudioRendererFactory>())
         {
-            if (factory.TryCreate(out IComponentCreator<IAudioRenderer>? creator).IsSuccessful && creator is not null)
+            OperationResult<IComponentCreator<IAudioRenderer>> offered = factory.Create();
+            if (offered.IsSuccessful)
             {
-                yield return creator;
+                yield return offered.Result;
             }
         }
     }
@@ -106,9 +109,10 @@ public sealed class ComponentResolver
     {
         foreach (ISubtitleRendererFactory factory in _components.GetComponents<ISubtitleRendererFactory>())
         {
-            if (factory.TryCreate(format, out IComponentCreator<ISubtitleRenderer>? creator).IsSuccessful && creator is not null)
+            OperationResult<IComponentCreator<ISubtitleRenderer>> offered = factory.Create(format);
+            if (offered.IsSuccessful)
             {
-                yield return creator;
+                yield return offered.Result;
             }
         }
     }
@@ -119,9 +123,10 @@ public sealed class ComponentResolver
 
         foreach (ISubtitleDecoderFactory factory in _components.GetComponents<ISubtitleDecoderFactory>())
         {
-            if (factory.TryCreate(source, stream, out IComponentCreator<ISubtitleDecoder>? creator).IsSuccessful && creator is not null)
+            OperationResult<IComponentCreator<ISubtitleDecoder>> offered = factory.Create(source, stream);
+            if (offered.IsSuccessful)
             {
-                yield return creator;
+                yield return offered.Result;
             }
         }
     }
@@ -130,9 +135,10 @@ public sealed class ComponentResolver
     {
         foreach (IAudioDecoderFactory factory in _components.GetComponents<IAudioDecoderFactory>())
         {
-            if (factory.TryCreate(source, stream, DecoderOptions.Default, out IComponentCreator<IAudioDecoder>? creator).IsSuccessful && creator is not null)
+            OperationResult<IComponentCreator<IAudioDecoder>> offered = factory.Create(source, stream, DecoderOptions.Default);
+            if (offered.IsSuccessful)
             {
-                yield return creator;
+                yield return offered.Result;
             }
         }
     }
@@ -148,9 +154,10 @@ public sealed class ComponentResolver
 
         foreach (IVideoDecoderFactory factory in _components.GetComponents<IVideoDecoderFactory>())
         {
-            if (factory.TryCreate(source, stream, options, out IComponentCreator<IVideoDecoder>? creator).IsSuccessful && creator is not null)
+            OperationResult<IComponentCreator<IVideoDecoder>> offered = factory.Create(source, stream, options);
+            if (offered.IsSuccessful)
             {
-                yield return creator;
+                yield return offered.Result;
             }
         }
 

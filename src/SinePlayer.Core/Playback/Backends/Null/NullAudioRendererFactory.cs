@@ -7,10 +7,6 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
 
-/// <summary>
-/// Offers <see cref="NullAudioRenderer"/>s. It never refuses, so it is the audio device a test or a headless run
-/// can always have.
-/// </summary>
 public sealed class NullAudioRendererFactory : IAudioRendererFactory
 {
     private readonly string _signature;
@@ -21,10 +17,9 @@ public sealed class NullAudioRendererFactory : IAudioRendererFactory
         _signature = signature;
     }
 
-    public OperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+    public OperationResult<IComponentCreator<IAudioRenderer>> Create()
     {
-        creator = new Creator(_signature);
-        return OperationResult.Success();
+        return new OperationResultCreator<IComponentCreator<IAudioRenderer>>().Success(new Creator(_signature));
     }
 
     private sealed class Creator(string signature) : IComponentCreator<IAudioRenderer>

@@ -23,14 +23,13 @@ public sealed class NullAudioDecoderFactory : IAudioDecoderFactory
         _signature = signature;
     }
 
-    public OperationResult TryCreate(IMediaSource source, AudioStreamInfo stream, DecoderOptions options, out IComponentCreator<IAudioDecoder>? creator)
+    public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
-        creator = new Creator(stream, _signature);
-        return OperationResult.Success();
+        return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Success(new Creator(stream, _signature));
     }
 
     private sealed class Creator(AudioStreamInfo stream, string signature) : IComponentCreator<IAudioDecoder>

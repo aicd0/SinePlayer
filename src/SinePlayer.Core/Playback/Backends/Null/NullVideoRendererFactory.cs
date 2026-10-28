@@ -7,10 +7,6 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
 
-/// <summary>
-/// Offers <see cref="NullVideoRenderer"/>s. It never refuses, so it is available on a machine with no usable
-/// graphics device — which is the point: it is the video sink a test or a headless run can always have.
-/// </summary>
 public sealed class NullVideoRendererFactory : IVideoRendererFactory
 {
     private readonly string _signature;
@@ -21,10 +17,9 @@ public sealed class NullVideoRendererFactory : IVideoRendererFactory
         _signature = signature;
     }
 
-    public OperationResult TryCreate(out IComponentCreator<IVideoRenderer>? creator)
+    public OperationResult<IComponentCreator<IVideoRenderer>> Create()
     {
-        creator = new Creator(_signature);
-        return OperationResult.Success();
+        return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Success(new Creator(_signature));
     }
 
     private sealed class Creator(string signature) : IComponentCreator<IVideoRenderer>

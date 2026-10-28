@@ -38,29 +38,19 @@ public sealed class WasapiAudioRendererFactory : IAudioRendererFactory
         _endpointIsDefault = endpointIsDefault;
     }
 
-    /// <summary>
-    /// A factory that opens one particular output device rather than the default one — which is how a caller
-    /// picks the device the sound comes out of.
-    /// </summary>
     public static WasapiAudioRendererFactory For(WasapiAudioEndpoint endpoint)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
         return new WasapiAudioRendererFactory(endpoint.Id, endpoint.Name, endpoint.IsDefault);
     }
 
-    public OperationResult TryCreate(out IComponentCreator<IAudioRenderer>? creator)
+    public OperationResult<IComponentCreator<IAudioRenderer>> Create()
     {
-        creator = new Creator(_endpointId, _endpointName, _endpointIsDefault);
-        return OperationResult.Success();
+        return new OperationResultCreator<IComponentCreator<IAudioRenderer>>().Success(new Creator(_endpointId, _endpointName, _endpointIsDefault));
     }
 
-    /// <summary>
-    /// Opens the device on demand. Nothing here is opened by being offered, which is what lets a reconcile that
-    /// changes nothing leave the device playing alone.
-    /// </summary>
     private sealed class Creator(string? endpointId, string? endpointName, bool endpointIsDefault) : IComponentCreator<IAudioRenderer>
     {
-        /// <summary>The device this would open. Must match what the renderer reports for itself.</summary>
         public string Signature => endpointId is null ? "wasapi" : $"wasapi:{endpointId}";
 
         public OperationResult Create(out IAudioRenderer? component)

@@ -160,7 +160,14 @@ public class SubtitleCueWindowTests
             Start = TimeSpan.FromSeconds(startSeconds),
             End = TimeSpan.FromSeconds(endSeconds),
             Text = startSeconds.ToString("0.###"),
-            Image = image,
+            Image = new SubtitleImage
+            {
+                Buffer = image,
+                Left = 0.0,
+                Top = 0.0,
+                Width = 1.0,
+                Height = 1.0,
+            },
         };
     }
 
@@ -173,9 +180,17 @@ public class SubtitleCueWindowTests
     /// A cue owns its image, and disposing it is the only observable effect a cue has — so a stand-in image is what makes
     /// "still held" checkable at all.
     /// </summary>
-    private sealed class WatchImage : IMediaBuffer
+    private sealed class WatchImage : ISubtitleImageBuffer
     {
         public long Length => 1000;
+
+        public int Width => 1;
+
+        public int Height => 1;
+
+        public int Stride => 4;
+
+        public nint Pixels => 0;
 
         public bool Disposed { get; private set; }
 

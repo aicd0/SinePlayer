@@ -3,7 +3,9 @@
 
 using Microsoft.Graphics.Canvas;
 
+using System.Runtime.InteropServices;
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
@@ -23,20 +25,29 @@ namespace SinePlayer.Core.Tests.Playback;
 [TestFixture]
 public class Win2DSubtitleRendererTests
 {
+    /// <summary>
+    /// Both kinds of cue are drawn by the same renderer, and the kind is part of the signature: a chain assembled for text
+    /// must not be kept when the same track is replaced by one carrying pictures. A format neither knows is refused here
+    /// rather than at the first drawing.
+    /// </summary>
     [Test]
-    public void OffersItselfForTextCuesOnly()
+    public void OffersItselfForTextAndBitmapCues()
     {
         Win2DSubtitleRendererFactory factory = new();
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(factory.TryCreate(SubtitleCueFormat.Ass, out IComponentCreator<ISubtitleRenderer>? creator).IsSuccessful, Is.True);
-            Assert.That(creator, Is.Not.Null);
-            Assert.That(creator!.Signature, Does.Contain("ass"), "the format is part of what the signature names");
+            OperationResult<IComponentCreator<ISubtitleRenderer>> text = factory.Create(SubtitleCueFormat.Ass);
+            Assert.That(text.IsSuccessful, Is.True, text.Message);
+            Assert.That(text.Result.Signature, Does.Contain("ass"), "the format is part of what the signature names");
 
-            OperationResult refused = factory.TryCreate(SubtitleCueFormat.BitmapBgra, out IComponentCreator<ISubtitleRenderer>? none);
-            Assert.That(refused.IsSuccessful, Is.False, "a cue with no geometry cannot be drawn, so no renderer is offered for it");
-            Assert.That(none, Is.Null);
+            OperationResult<IComponentCreator<ISubtitleRenderer>> bitmap = factory.Create(SubtitleCueFormat.BitmapBgra);
+            Assert.That(bitmap.IsSuccessful, Is.True, bitmap.Message);
+            Assert.That(bitmap.Result.Signature, Does.Contain("bitmap"), "and a picture is a different renderer to keep");
+            Assert.That(bitmap.Result.Signature, Is.Not.EqualTo(text.Result.Signature));
+
+            OperationResult<IComponentCreator<ISubtitleRenderer>> refused = factory.Create((SubtitleCueFormat)99);
+            Assert.That(refused.IsSuccessful, Is.False, "a kind of cue this renderer does not know is refused, not guessed at");
         }
     }
 
@@ -225,6 +236,128 @@ public class Win2DSubtitleRendererTests
         finally
         {
             target?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A bitmap cue is drawn where its fractions say, scaled to the surface: the picture of a DVD subtitle arrives as an
+    /// image positioned inside the frame it was authored against, and it has to land there rather than at the corner.
+    /// </summary>
+    [Test]
+    public void DrawsABitmapCueWhereItsFractionsSay()
+    {
+        using Win2DSubtitleRenderer renderer = new();
+
+        CanvasRenderTarget? target = null;
+        try
+        {
+            CanvasDevice device;
+            try
+            {
+                device = renderer.EnsureCanvasDevice();
+            }
+            catch (Exception exception)
+            {
+                Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+                return;
+            }
+
+            const int width = 400;
+            const int height = 200;
+            target = new CanvasRenderTarget(device, width, height, 96.0f);
+
+            // A quarter of the width, half the height, with its top-left at the centre of the surface.
+            using SubtitleCue cue = BitmapCue(left: 0.5, top: 0.5, imageWidth: 0.25, imageHeight: 0.5);
+
+            using (CanvasDrawingSession session = target.CreateDrawingSession())
+            {
+                session.Clear(default(Color));
+                renderer.DrawCues(session, [cue], SubtitlePlacement.Identity, width, height);
+            }
+
+            byte[] pixels = target.GetPixelBytes();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(AlphaAt(pixels, width, 250, 150), Is.EqualTo(255), "inside the cue: drawn");
+                Assert.That(AlphaAt(pixels, width, 199, 99), Is.Zero, "just outside it: left alone");
+                Assert.That(AlphaAt(pixels, width, 5, 5), Is.Zero, "and the corner it was not placed at is empty");
+            }
+        }
+        finally
+        {
+            target?.Dispose();
+        }
+    }
+
+    /// <summary>A cue carrying a small opaque image, positioned and sized as fractions of the frame.</summary>
+    private static SubtitleCue BitmapCue(double left, double top, double imageWidth, double imageHeight)
+    {
+        return new SubtitleCue
+        {
+            Start = TimeSpan.Zero,
+            End = TimeSpan.FromSeconds(2),
+            Image = new SubtitleImage
+            {
+                Buffer = FakeImage.Create(4, 2),
+                Left = left,
+                Top = top,
+                Width = imageWidth,
+                Height = imageHeight,
+            },
+        };
+    }
+
+    /// <summary>The alpha of one pixel of a blue-green-red-alpha buffer.</summary>
+    private static byte AlphaAt(byte[] pixels, int width, int x, int y)
+    {
+        return pixels[((y * width) + x) * 4 + 3];
+    }
+
+    /// <summary>An opaque white image in unmanaged memory, which is what a decoder hands over.</summary>
+    private sealed class FakeImage : ISubtitleImageBuffer
+    {
+        private nint _pixels;
+
+        private FakeImage(nint pixels, int width, int height)
+        {
+            _pixels = pixels;
+            Width = width;
+            Height = height;
+        }
+
+        public int Width { get; }
+
+        public int Height { get; }
+
+        public int Stride => Width * 4;
+
+        public nint Pixels => _pixels;
+
+        public long Length => Stride * Height;
+
+        internal static FakeImage Create(int width, int height)
+        {
+            int stride = width * 4;
+            nint pixels = Marshal.AllocHGlobal(stride * height);
+            for (int index = 0; index < stride * height; index++)
+            {
+                Marshal.WriteByte(pixels, index, 0xFF);
+            }
+
+            return new FakeImage(pixels, width, height);
+        }
+
+        public void Dispose()
+        {
+            nint pixels = _pixels;
+            if (pixels == 0)
+            {
+                return;
+            }
+
+            _pixels = 0;
+            Marshal.FreeHGlobal(pixels);
         }
     }
 

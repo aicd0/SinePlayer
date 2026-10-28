@@ -27,14 +27,14 @@ public class D3D11VideoRendererFactoryTests
     {
         D3D11VideoRendererFactory factory = new(VideoSurfacePreference.Sdr);
 
-        OperationResult offered = factory.TryCreate(out IComponentCreator<IVideoRenderer>? creator);
-        if (!offered.IsSuccessful || creator is null)
+        OperationResult<IComponentCreator<IVideoRenderer>> offered = factory.Create();
+        if (!offered.IsSuccessful)
         {
             Assert.Ignore($"This machine offers no Direct3D device: {offered.Message}");
             return;
         }
 
-        OperationResult first = creator.Create(out IVideoRenderer? renderer);
+        OperationResult first = offered.Result.Create(out IVideoRenderer? renderer);
         if (!first.IsSuccessful || renderer is null)
         {
             Assert.Ignore($"This machine offers no Direct3D device: {first.Message}");
@@ -43,11 +43,10 @@ public class D3D11VideoRendererFactoryTests
 
         renderer.Dispose();
 
-        OperationResult offeredAgain = factory.TryCreate(out IComponentCreator<IVideoRenderer>? nextCreator);
+        OperationResult<IComponentCreator<IVideoRenderer>> offeredAgain = factory.Create();
         Assert.That(offeredAgain.IsSuccessful, Is.True, offeredAgain.Message);
-        Assert.That(nextCreator, Is.Not.Null);
 
-        OperationResult second = nextCreator!.Create(out IVideoRenderer? next);
+        OperationResult second = offeredAgain.Result.Create(out IVideoRenderer? next);
         try
         {
             Assert.That(second.IsSuccessful, Is.True, second.Message);
