@@ -26,7 +26,8 @@ internal sealed record PlaybackComponents(
     string AudioRenderer,
     string SubtitleDecoder,
     string SubtitleRenderer,
-    bool VideoPreferHardwareDecoding)
+    bool VideoPreferHardwareDecoding,
+    bool VideoPreferHdr)
 {
     public const string AUTO = "auto";
     public const string NONE = "none";
@@ -35,7 +36,7 @@ internal sealed record PlaybackComponents(
     public const string WIN2D = "win2d";
     private const string WASAPI_PREFIX = "wasapi:";
 
-    public static PlaybackComponents Default { get; } = new(AUTO, AUTO, AUTO, AUTO, AUTO, AUTO, true);
+    public static PlaybackComponents Default { get; } = new(AUTO, AUTO, AUTO, AUTO, AUTO, AUTO, true, true);
 
     public static IReadOnlyList<PlaybackComponentOption> GetVideoDecoderOptions()
     {
@@ -140,18 +141,20 @@ internal sealed record PlaybackComponents(
         pipeline.Components.Preferences = pipeline.Components.Preferences with { PreferHardwareDecoding = VideoPreferHardwareDecoding };
     }
 
-    private static void ApplyVideoRenderer(PlaybackPipeline pipeline, string key)
+    private void ApplyVideoRenderer(PlaybackPipeline pipeline, string key)
     {
+        VideoSurfacePreference surface = VideoPreferHdr ? VideoSurfacePreference.Auto : VideoSurfacePreference.Sdr;
+
         switch (key)
         {
             case DIRECT3D11:
-                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory(VideoSurfacePreference.Sdr)]);
+                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory(surface)]);
                 break;
             case NONE:
                 SetFactories<IVideoRendererFactory>(pipeline, [new NullVideoRendererFactory()]);
                 break;
             default:
-                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory(VideoSurfacePreference.Sdr)]);
+                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory(surface)]);
                 break;
         }
     }

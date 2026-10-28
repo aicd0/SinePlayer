@@ -54,6 +54,7 @@ internal class PlayerSettingsModel
             SubtitleDecoder = model.SubtitleDecoder ?? fallbackModel.SubtitleDecoder,
             SubtitleRenderer = model.SubtitleRenderer ?? fallbackModel.SubtitleRenderer,
             VideoPreferHardwareDecoding = model.VideoPreferHardwareDecoding ?? fallbackModel.VideoPreferHardwareDecoding,
+            VideoPreferHdr = model.VideoPreferHdr ?? fallbackModel.VideoPreferHdr,
             VideoResizeMode = ParseResizeMode(model.VideoResizeMode, fallbackModel.VideoResizeMode),
             VideoRotationDegrees = ParseRotationDegrees(model.VideoRotationDegrees, fallbackModel.VideoRotationDegrees),
             VideoFlipHorizontal = model.VideoFlipHorizontal ?? fallbackModel.VideoFlipHorizontal,
@@ -181,6 +182,7 @@ internal class PlayerSettingsModel
     public string SubtitleDecoder { get; set; } = PlaybackComponents.AUTO;
     public string SubtitleRenderer { get; set; } = PlaybackComponents.AUTO;
     public bool VideoPreferHardwareDecoding { get; set; } = true;
+    public bool VideoPreferHdr { get; set; } = true;
     public VideoResizeMode VideoResizeMode { get; set; } = VideoResizeMode.Fit;
     public int VideoRotationDegrees { get; set; } = 0;
     public bool VideoFlipHorizontal { get; set; }
@@ -206,6 +208,7 @@ internal class PlayerSettingsModel
             SubtitleDecoder = SubtitleDecoder,
             SubtitleRenderer = SubtitleRenderer,
             VideoPreferHardwareDecoding = VideoPreferHardwareDecoding,
+            VideoPreferHdr = VideoPreferHdr,
             VideoResizeMode = VideoResizeMode.ToString(),
             VideoRotationDegrees = VideoRotationDegrees,
             VideoFlipHorizontal = VideoFlipHorizontal,
@@ -215,7 +218,7 @@ internal class PlayerSettingsModel
 
     public PlaybackComponents ToComponents()
     {
-        return new(VideoDecoder, VideoRenderer, AudioDecoder, AudioRenderer, SubtitleDecoder, SubtitleRenderer, VideoPreferHardwareDecoding);
+        return new(VideoDecoder, VideoRenderer, AudioDecoder, AudioRenderer, SubtitleDecoder, SubtitleRenderer, VideoPreferHardwareDecoding, VideoPreferHdr);
     }
 
     public VideoTransform ToVideoTransform()
@@ -373,6 +376,9 @@ internal class PlayerSettingsModel
 
         [JsonPropertyName("VideoPreferHardwareDecoding")]
         public bool? VideoPreferHardwareDecoding { get; set; }
+
+        [JsonPropertyName("VideoPreferHdr")]
+        public bool? VideoPreferHdr { get; set; }
 
         [JsonPropertyName("VideoResizeMode")]
         public string? VideoResizeMode { get; set; }

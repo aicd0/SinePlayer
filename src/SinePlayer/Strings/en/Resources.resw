@@ -913,6 +913,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>Prefer hardware decoding</value>
   </data>
+  <data name="PreferHdr" xml:space="preserve">
+    <value>Prefer HDR</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>Presented frames</value>
   </data>

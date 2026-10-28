@@ -913,6 +913,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>ハードウェアデコードを優先</value>
   </data>
+  <data name="PreferHdr" xml:space="preserve">
+    <value>HDR を優先</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>表示済みフレーム数</value>
   </data>

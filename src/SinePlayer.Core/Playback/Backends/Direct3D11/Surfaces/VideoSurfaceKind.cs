@@ -3,7 +3,7 @@
 
 using SinePlayer.Core.Playback.Abstractions.Info;
 
-namespace SinePlayer.Core.Playback.Backends.Direct3D11;
+namespace SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 
 internal enum VideoSurfaceKind
 {

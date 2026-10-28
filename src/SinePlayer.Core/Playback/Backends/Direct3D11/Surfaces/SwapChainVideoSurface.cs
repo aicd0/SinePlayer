@@ -7,7 +7,7 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 
 using Windows.Win32.Graphics.Direct3D11;
 
-namespace SinePlayer.Core.Playback.Backends.Direct3D11;
+namespace SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 
 /// <summary>
 /// A surface backed by a composition swap chain. Composition, scaling, resizing, presenting and reading back are the

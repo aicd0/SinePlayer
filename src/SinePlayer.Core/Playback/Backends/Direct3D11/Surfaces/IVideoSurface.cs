@@ -7,7 +7,7 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 
 using Windows.Win32.Graphics.Direct3D11;
 
-namespace SinePlayer.Core.Playback.Backends.Direct3D11;
+namespace SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 
 /// <summary>
 /// A surface the renderer draws into and hands to the compositor, together with what its pixels mean. Two containers

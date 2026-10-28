@@ -3,6 +3,7 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 
 using Windows.Win32.Graphics.Direct3D;
 using Windows.Win32.Graphics.Direct3D11;

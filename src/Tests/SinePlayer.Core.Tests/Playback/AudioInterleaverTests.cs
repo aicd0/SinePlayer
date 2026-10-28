@@ -3,8 +3,8 @@
 
 using System.Runtime.InteropServices;
 
-using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Backends.Wasapi;
 

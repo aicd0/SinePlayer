@@ -9,6 +9,7 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
+using SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 
 using Windows.Win32.Graphics.Direct3D;
 using Windows.Win32.Graphics.Direct3D11;
@@ -210,9 +211,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
         if (_surface is null)
         {
-            // The container is decided here because the swap chain's format is fixed when it is created: a resize cannot
-            // change it, so the choice has to be made before the buffers exist rather than adjusted afterwards.
-            OperationResult<IVideoSurface> created = VideoSurfaceFactory.TryCreate(_device, width, height, scale, _surfacePreference);
+            OperationResult<IVideoSurface> created = VideoSurfaceFactory.Create(_device, width, height, scale, _surfacePreference, stream.Colour);
             if (!created.IsSuccessful)
             {
                 return OperationResult.Failure(created);

@@ -106,6 +106,25 @@
                     Style="{StaticResource CompatToggleSwitchStyle}"
                     Toggled="VideoPreferHardwareDecodingToggleSwitch_Toggled" />
             </Grid>
+            <Grid Style="{StaticResource CommonSettingRowStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Column="0"
+                    Margin="0,0,0,2"
+                    VerticalAlignment="Center"
+                    Text="{x:Bind ViewModel.VideoPreferHdrLabel, Mode=OneWay}" />
+                <ToggleSwitch
+                    x:Name="VideoPreferHdrToggleSwitch"
+                    Grid.Column="3"
+                    HorizontalAlignment="Right"
+                    Style="{StaticResource CompatToggleSwitchStyle}"
+                    Toggled="VideoPreferHdrToggleSwitch_Toggled" />
+            </Grid>
             <Rectangle
                 Height="1"
                 Margin="0,8"

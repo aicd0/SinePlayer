@@ -89,43 +89,43 @@ internal readonly record struct AssSubtitleText
             switch (character)
             {
                 case '{':
-                {
-                    int end = text.IndexOf('}', index);
-                    if (end < 0)
                     {
-                        // An unclosed block runs to the end: drawing the tags as words would be worse than dropping them.
-                        index = text.Length;
+                        int end = text.IndexOf('}', index);
+                        if (end < 0)
+                        {
+                            // An unclosed block runs to the end: drawing the tags as words would be worse than dropping them.
+                            index = text.Length;
+                            break;
+                        }
+
+                        ReadAlignment(text.Substring(index + 1, end - index - 1), ref alignment);
+                        index = end + 1;
                         break;
                     }
 
-                    ReadAlignment(text.Substring(index + 1, end - index - 1), ref alignment);
-                    index = end + 1;
-                    break;
-                }
-
                 case '\\' when index + 1 < text.Length:
-                {
-                    char next = text[index + 1];
-                    index += 2;
-                    switch (next)
                     {
-                        case 'N':
-                        case 'n':
-                            lines.Add(current.ToString().Trim());
-                            current.Clear();
-                            break;
-                        case 'h':
-                            current.Append(' ');
-                            break;
-                        default:
-                            // Any other escape outside a block is a literal, tag or not; keeping the character is
-                            // closer to the file than dropping it.
-                            current.Append('\\').Append(next);
-                            break;
-                    }
+                        char next = text[index + 1];
+                        index += 2;
+                        switch (next)
+                        {
+                            case 'N':
+                            case 'n':
+                                lines.Add(current.ToString().Trim());
+                                current.Clear();
+                                break;
+                            case 'h':
+                                current.Append(' ');
+                                break;
+                            default:
+                                // Any other escape outside a block is a literal, tag or not; keeping the character is
+                                // closer to the file than dropping it.
+                                current.Append('\\').Append(next);
+                                break;
+                        }
 
-                    break;
-                }
+                        break;
+                    }
 
                 default:
                     current.Append(character);

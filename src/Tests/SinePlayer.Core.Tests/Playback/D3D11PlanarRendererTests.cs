@@ -9,6 +9,7 @@ using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
+using SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 
 using Windows.Win32.Graphics.Direct3D11;
 using Windows.Win32.Graphics.Dxgi.Common;

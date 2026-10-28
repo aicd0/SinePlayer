@@ -1,8 +1,6 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
@@ -16,8 +14,8 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 
 using Windows.Graphics.DirectX.Direct3D11;
-using Windows.Win32.Graphics.Dxgi.Common;
 using Windows.UI;
+using Windows.Win32.Graphics.Dxgi.Common;
 
 namespace SinePlayer.Core.Playback.Backends.Win2D;
 

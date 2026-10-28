@@ -913,6 +913,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="PreferHardwareDecoding" xml:space="preserve">
     <value>Préférer le décodage matériel</value>
   </data>
+  <data name="PreferHdr" xml:space="preserve">
+    <value>Préférer le HDR</value>
+  </data>
   <data name="PresentedFrames" xml:space="preserve">
     <value>Images affichées</value>
   </data>
