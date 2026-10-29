@@ -10,9 +10,9 @@ using System.Text;
 using System.Threading.Tasks;
 
 using SinePlayer.Common.Constants;
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.SDK.Models;
@@ -74,18 +74,16 @@ internal class MediaImportExclusionModel
         }
     }
 
-    public async Task<ErrorResult> EditWithNotepad()
+    public async Task<OperationResult> EditWithNotepad()
     {
         EnsureInitialized();
 
-        var err = ErrorLogger.Create(TAG);
-
         string[] lines = [.. _excluded.Keys.OrderBy(location => location, StringComparer.Ordinal)];
 
-        ErrorResult<string> editErr = await ThirdPartyLauncher.EditTemporaryTextFileAsync("MediaImportExclusions.txt", lines);
+        OperationResult<string> editErr = await ThirdPartyLauncher.EditTemporaryTextFileAsync("MediaImportExclusions.txt", lines);
         if (!editErr.IsSuccessful)
         {
-            return err.Error(editErr);
+            return OperationResultExt.Failure(editErr);
         }
 
         string filePath = editErr.Result;
@@ -106,12 +104,12 @@ internal class MediaImportExclusionModel
         }
         catch (Exception ex)
         {
-            return err.Error(ex);
+            return OperationResultExt.Failure(TAG, ex);
         }
 
         Refresh(locations);
 
-        return err.Success();
+        return OperationResult.Success();
     }
 
     private void Refresh(IEnumerable<string> locations)

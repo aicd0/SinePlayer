@@ -18,12 +18,13 @@ using Microsoft.UI.Xaml.Input;
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Constants;
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.HotKey;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Common.Plugins;
+using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
@@ -444,7 +445,7 @@ internal sealed partial class PlayerPage : BasePage
     /// view model's decision; what the file is played through — which tracks, and whether it plays at all — is the
     /// page's, because the engine opens a file and no more.
     /// </summary>
-    private async Task<ErrorResult> OpenMedia(MediaModel media, long startPositionMs)
+    private async Task<OperationResult> OpenMedia(MediaModel media, long startPositionMs)
     {
         CoreEngine engine = EnsureEngine();
 
@@ -464,7 +465,7 @@ internal sealed partial class PlayerPage : BasePage
         await engine.SetComponents(_components);
         engine.SetVideoTransform(_videoTransform);
 
-        ErrorResult loaded = await engine.Load(media.Location);
+        OperationResult loaded = await engine.Load(media.Location);
         if (!loaded.IsSuccessful)
         {
             return loaded;
@@ -473,7 +474,7 @@ internal sealed partial class PlayerPage : BasePage
         // The order of the three steps below is the order they need: a track can only be chosen once there is a file,
         // the seek asks for a position on the tracks that will play it, and playing before either is a Play the
         // pipeline refuses for having nothing to play.
-        ErrorResult selected = await SelectTracks(engine, media);
+        OperationResult selected = await SelectTracks(engine, media);
         if (!selected.IsSuccessful)
         {
             return selected;
@@ -491,7 +492,7 @@ internal sealed partial class PlayerPage : BasePage
         return selected;
     }
 
-    private static async Task<ErrorResult> SelectTracks(CoreEngine engine, MediaModel media)
+    private static async Task<OperationResult> SelectTracks(CoreEngine engine, MediaModel media)
     {
         static T? DefaultTrack<T>(IReadOnlyList<T>? streams) where T : MediaStreamInfo
         {
@@ -510,8 +511,6 @@ internal sealed partial class PlayerPage : BasePage
 
             return streams[0];
         }
-
-        var err = ErrorLogger.Create(TAG);
 
         MediaInfo? info = engine.PlaybackInfo.Media;
 
@@ -533,7 +532,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (video is not null)
         {
-            ErrorResult chosen = await engine.SelectStream(MediaStreamKind.Video, video);
+            OperationResult chosen = await engine.SelectStream(MediaStreamKind.Video, video);
             playing |= chosen.IsSuccessful;
             if (!chosen.IsSuccessful)
             {
@@ -543,7 +542,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (audio is not null)
         {
-            ErrorResult chosen = await engine.SelectStream(MediaStreamKind.Audio, audio);
+            OperationResult chosen = await engine.SelectStream(MediaStreamKind.Audio, audio);
             playing |= chosen.IsSuccessful;
             if (!chosen.IsSuccessful)
             {
@@ -555,7 +554,7 @@ internal sealed partial class PlayerPage : BasePage
         // reason to draw it over the picture, and only a choice made for this file is a reason to.
         if (subtitleChoice.Stream is not null)
         {
-            ErrorResult chosen = await engine.SelectStream(MediaStreamKind.Subtitle, subtitleChoice.Stream);
+            OperationResult chosen = await engine.SelectStream(MediaStreamKind.Subtitle, subtitleChoice.Stream);
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the subtitles could not be played ({chosen.Message})");
@@ -565,7 +564,7 @@ internal sealed partial class PlayerPage : BasePage
         if (!playing)
         {
             string why = unplayable.Count == 0 ? "it holds no track that could be played" : string.Join(", ", unplayable);
-            return err.Error($"Unable to play media file '{media.Location}': {why}.");
+            return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': {why}.");
         }
 
         if (unplayable.Count > 0)
@@ -573,7 +572,7 @@ internal sealed partial class PlayerPage : BasePage
             Logger.W(TAG, $"Playing '{media.Location}' without everything it holds: {string.Join(", ", unplayable)}.");
         }
 
-        return err.Success();
+        return OperationResult.Success();
     }
 
     /// <summary>
@@ -1024,7 +1023,7 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        ErrorResult err = await engine.SetComponents(components);
+        OperationResult err = await engine.SetComponents(components);
         if (!err.IsSuccessful)
         {
             PromptInfo(err.Message);

@@ -6,8 +6,8 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 
 using SinePlayer.Common.Actions;
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Localization;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
@@ -380,7 +380,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     /// <summary>Opens a file, wherever the engine that does it lives. The page supplies this; the view model owns
     /// the rest of loading — which file, where in it, and what the status says while it happens.</summary>
-    public delegate Task<ErrorResult> OpenMediaHandler(MediaModel media, long startPositionMs);
+    public delegate Task<OperationResult> OpenMediaHandler(MediaModel media, long startPositionMs);
     private OpenMediaHandler? _openHandler;
 
     private LoadMediaArgs? _pendingMedia;
@@ -464,7 +464,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
         // The file itself is opened by whoever owns the engine; what it is, where in it to start and what the
         // status says around it is decided here.
-        ErrorResult err = await openHandler(media, startPositionMs);
+        OperationResult err = await openHandler(media, startPositionMs);
         if (!err.IsSuccessful)
         {
             PlayerStatusLiveData.Emit(new()

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -11,10 +12,10 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.Constants;
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Plugins;
 using SinePlayer.Common.Utils;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Database;
@@ -67,24 +68,25 @@ internal sealed partial class PluginSettingsView : BaseUserControl
     {
         CoroutineUtils.Run(async () =>
         {
-            ErrorResult err = await ErrorLogger.Run(nameof(OpenPluginsFolderButton_Click), async err =>
-            {
-                string path = PluginManager.PluginsFolderPath;
-                try
-                {
-                    Windows.Storage.StorageFolder folder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(path);
-                    await Windows.System.Launcher.LaunchFolderAsync(folder);
-                }
-                catch (Exception ex)
-                {
-                    return err.Error(ex);
-                }
-
-                return err.Success();
-            });
-
-            err.ShowErrorMessage(ViewModel.Shared.ActionHandler);
+            OperationResult result = await OpenPluginsFolder();
+            result.ShowErrorMessage(ViewModel.Shared.ActionHandler);
         });
+    }
+
+    private static async Task<OperationResult> OpenPluginsFolder()
+    {
+        string path = PluginManager.PluginsFolderPath;
+        try
+        {
+            Windows.Storage.StorageFolder folder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(path);
+            await Windows.System.Launcher.LaunchFolderAsync(folder);
+        }
+        catch (Exception ex)
+        {
+            return OperationResultExt.Failure(nameof(OpenPluginsFolder), ex);
+        }
+
+        return OperationResult.Success();
     }
 
     private void InstallPluginButton_Click(object sender, RoutedEventArgs e)
@@ -117,27 +119,29 @@ internal sealed partial class PluginSettingsView : BaseUserControl
             string pluginsFolderPath = PluginManager.PluginsFolderPath;
             string dstFilePath = Path.Combine(pluginsFolderPath, file.Name);
 
-            ErrorResult err = ErrorLogger.Run(nameof(InstallPluginButton_Click), err =>
-            {
-                try
-                {
-                    File.Copy(file.Path, dstFilePath, true);
-                }
-                catch (Exception ex)
-                {
-                    return err.Error(ex);
-                }
+            OperationResult installed = InstallPlugin(file.Path, dstFilePath);
 
-                return err.Success();
-            });
-
-            if (err.IsSuccessful)
+            if (installed.IsSuccessful)
             {
                 ViewModel.ApplyOnNextLaunchVisible = true;
             }
 
-            err.ShowErrorMessage(ViewModel.Shared.ActionHandler);
+            installed.ShowErrorMessage(ViewModel.Shared.ActionHandler);
         });
+    }
+
+    private static OperationResult InstallPlugin(string sourcePath, string destinationPath)
+    {
+        try
+        {
+            File.Copy(sourcePath, destinationPath, true);
+        }
+        catch (Exception ex)
+        {
+            return OperationResultExt.Failure(nameof(InstallPlugin), ex);
+        }
+
+        return OperationResult.Success();
     }
 
     private void DownloadPluginsFromGitHubButton_Click(object sender, RoutedEventArgs e)

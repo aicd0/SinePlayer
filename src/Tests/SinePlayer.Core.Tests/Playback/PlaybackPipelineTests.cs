@@ -1,10 +1,12 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
+using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
@@ -2541,6 +2543,10 @@ public class PlaybackPipelineTests
         }
     }
 
+    /// <summary>
+    /// A refused command is the caller's business and nobody else's: it says nothing about playback, so nothing about
+    /// playback changes.
+    /// </summary>
     [Test]
     public void RefusesCommandsWhenNothingIsOpen()
     {
@@ -2559,6 +2565,43 @@ public class PlaybackPipelineTests
             // Stopping is the one request that is always satisfiable, because there is nothing it can fail at.
             Assert.That(Await(pipeline.Stop()).IsSuccessful, Is.True);
         }
+    }
+
+    /// <summary>
+    /// Every public call answers with a failure the caller can read, and that answer has to reach the log as well.
+    /// These refusals are decided on the playback thread — the wrong state, nothing open, a stream of the wrong kind —
+    /// so they never pass through the path the media threads use to report a failure, which made them the one thing a
+    /// host could be told about and leave no trace of.
+    /// </summary>
+    [Test]
+    public void WritesDownEveryPublicCallThatFails()
+    {
+        using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
+        using LogCapture logs = new();
+
+        OperationResult opened = Await(pipeline.Open(MediaLocator.Parse(Path.Combine(Path.GetTempPath(), "sineplayer-missing-file.mkv"))));
+        OperationResult played = Await(pipeline.Play());
+        OperationResult paused = Await(pipeline.Pause());
+        OperationResult sought = Await(pipeline.Seek(TimeSpan.FromSeconds(1)));
+        OperationResult selected = Await(pipeline.SelectStream(MediaStreamKind.Audio, null));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(opened.IsSuccessful, Is.False, "the file does not exist, so opening it has to be refused");
+            Assert.That(played.IsSuccessful, Is.False);
+            Assert.That(paused.IsSuccessful, Is.False);
+            Assert.That(sought.IsSuccessful, Is.False);
+            Assert.That(selected.IsSuccessful, Is.False, "nothing is open, so there is no stream to change");
+
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True, "reconciling nothing is nothing to do");
+            Assert.That(Await(pipeline.Stop()).IsSuccessful, Is.True, "stopping cannot fail");
+        }
+
+        WaitFor(() => logs.Has($"{nameof(PlaybackPipeline.Open)}: {opened.Message}"), "the refused open to be written down");
+        WaitFor(() => logs.Has($"{nameof(PlaybackPipeline.Play)}: {played.Message}"), "the refused play to be written down");
+        WaitFor(() => logs.Has($"{nameof(PlaybackPipeline.Pause)}: {paused.Message}"), "the refused pause to be written down");
+        WaitFor(() => logs.Has($"{nameof(PlaybackPipeline.Seek)}: {sought.Message}"), "the refused seek to be written down");
+        WaitFor(() => logs.Has($"{nameof(PlaybackPipeline.SelectStream)}: {selected.Message}"), "the refused track change to be written down");
     }
 
     [Test]
@@ -4651,15 +4694,15 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
-    /// The read-ahead must be bounded for a file with no picture, too. A picture file is paced by its packet queue;
-    /// an audio-only file never puts anything in that queue, so if the packet term is asked for unconditionally the
-    /// condition "enough packets are queued" can never be met and the reader decodes the whole file at once — the
-    /// sound side of the same bug, and the decoded blocks make it the more expensive one.
+    /// The read-ahead is a length of time, so what the reader is held to is the media in the queues rather than a
+    /// number of packets or samples. This measures the sound's half of that end to end: at the eight-second bound a
+    /// thirty-second file is a quarter read when playback has only just begun, and a count of packets — or a bound
+    /// that a stream can never reach — would have taken it all.
     /// </summary>
     [Test]
     public void DoesNotReadAnAudioOnlyFileAllAtOnce()
     {
-        string path = CreateWaveFile(sampleCount: SampleRate * 3);
+        string path = CreateWaveFile(sampleCount: SampleRate * 30);
         try
         {
             // The device is full: it takes one block and then holds it, so the sound queue is the only thing the
@@ -4677,15 +4720,14 @@ public class PlaybackPipelineTests
             Thread.Sleep(800);
             int early = decoders.Decodes;
 
-            // Let the device take everything, so the file finishes and the total can be compared against.
-            audioRenderer.NoRoom = false;
-            WaitForPlaybackToFinish(pipeline);
-            int total = decoders.Decodes;
+            // What the file is worth read from the file itself: playing a device that takes nothing to the end
+            // would take the length of the film, so the total is counted rather than waited for.
+            int total = CountPackets(path);
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(total, Is.GreaterThan(4), "the file has to be read in several packets, or this measures nothing");
-                Assert.That(early, Is.LessThan(total / 2), $"the reader ran ahead: {early} of {total} packets were read while the sound queue should have held it to about half a second");
+                Assert.That(early, Is.LessThan(total / 2), $"the reader ran ahead: {early} of {total} packets were read while the sound queue should have held it to about eight seconds");
             }
         }
         finally
@@ -6529,6 +6571,35 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// How many packets the file holds, read straight from the source. A test about the read-ahead needs to know what
+    /// the whole file is worth in packets, and playing it to the end to count them would take the length of the file.
+    /// </summary>
+    private static int CountPackets(string path)
+    {
+        ISourceProviderFactory factory = new FFmpegSourceProviderFactory();
+        OperationResult opened = factory.TryOpen(MediaLocator.Parse(path), out IMediaSource? source);
+        Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+        Assert.That(source, Is.Not.Null);
+
+        using (source)
+        {
+            int count = 0;
+            while (true)
+            {
+                OperationResult read = source.TryReadPacket(out MediaPacket? packet);
+                Assert.That(read.IsSuccessful, Is.True, read.Message);
+                if (packet is null)
+                {
+                    return count;
+                }
+
+                packet.Dispose();
+                count++;
+            }
+        }
+    }
+
+    /// <summary>
     /// Writes a video file by hand as YUV4MPEG, which FFmpeg reads as raw frames. Half a frame per
     /// second is what makes it worth having: frame zero is due at once and the next one is two seconds
     /// away, long enough for the thread that shows frames to be certainly still waiting for it.
@@ -6664,6 +6735,48 @@ public class PlaybackPipelineTests
             {
                 _messages.Add(warning);
             }
+        }
+    }
+
+    /// <summary>
+    /// Hears what the logger is told, which is the only place a refused call leaves a trace: a warning is raised on
+    /// the pipeline, but a failure the caller was handed is written to the log. It arrives on the logger's own thread,
+    /// so what it keeps is a snapshot rather than a sequence.
+    /// </summary>
+    private sealed class LogCapture : Logger.ILogListener, IDisposable
+    {
+        private readonly ConcurrentQueue<string> _messages = new();
+
+        internal LogCapture()
+        {
+            Logger.AddListener(this);
+        }
+
+        /// <summary>Whether any line written since this was installed contains <paramref name="text"/>.</summary>
+        internal bool Has(string text)
+        {
+            foreach (string message in _messages)
+            {
+                if (message.Contains(text, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public void OnLog(LogEntry item)
+        {
+            if (item.Message is not null)
+            {
+                _messages.Enqueue(item.Message);
+            }
+        }
+
+        public void Dispose()
+        {
+            Logger.RemoveListener(this);
         }
     }
 

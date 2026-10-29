@@ -13,13 +13,13 @@ using Microsoft.UI.Xaml.Media;
 using SinePlayer.Common.Actions;
 using SinePlayer.Common.Actions.Components;
 using SinePlayer.Common.Actions.Providers;
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Expression;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Plugins;
 using SinePlayer.Common.Storage;
 using SinePlayer.Common.Utils;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
@@ -120,7 +120,7 @@ internal static class MediaMenuCreator
                 {
                     CoroutineUtils.Run(async () =>
                     {
-                        ErrorResult err = await primaryItem.ShowInFileExplorer();
+                        OperationResult err = await primaryItem.ShowInFileExplorer();
                         err.ShowErrorMessage(actionHandler);
                     });
                 },

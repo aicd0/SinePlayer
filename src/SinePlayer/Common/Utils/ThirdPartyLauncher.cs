@@ -8,7 +8,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
-using SinePlayer.Common.ErrorHandling;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Storage;
 
 using Windows.Storage;
@@ -20,13 +20,11 @@ internal static class ThirdPartyLauncher
 {
     private const string TAG = nameof(ThirdPartyLauncher);
 
-    public static async Task<ErrorResult> ShowInFileExplorer(string path)
+    public static async Task<OperationResult> ShowInFileExplorer(string path)
     {
-        var err = ErrorLogger.Create(TAG);
-
         if (string.IsNullOrEmpty(path))
         {
-            return err.Error("Path is empty.", isFatal: true);
+            return OperationResultExt.Failure(TAG, "Path is empty.", isFatal: true);
         }
 
         try
@@ -46,40 +44,36 @@ internal static class ThirdPartyLauncher
             }
             else
             {
-                return err.Error($"Path does not exist: {path}");
+                return OperationResultExt.Failure(TAG, $"Path does not exist: {path}");
             }
         }
         catch (Exception ex)
         {
-            return err.Error(ex);
+            return OperationResultExt.Failure(TAG, ex);
         }
 
-        return err.Success();
+        return OperationResult.Success();
     }
 
-    public static ErrorResult<string> OpenTemporaryTextFile(string filename, string text)
+    public static OperationResult<string> OpenTemporaryTextFile(string filename, string text)
     {
-        var err = ErrorLogger<string>.Create(TAG);
-
-        ErrorResult<string> writeErr = WriteTemporaryTextFile(filename, text);
+        OperationResult<string> writeErr = WriteTemporaryTextFile(filename, text);
         if (!writeErr.IsSuccessful)
         {
-            return err.Error(writeErr);
+            return OperationResultExt.Failure<string>(writeErr);
         }
 
-        ErrorResult openErr = OpenFile(writeErr.Result);
+        OperationResult openErr = OpenFile(writeErr.Result);
         if (!openErr.IsSuccessful)
         {
-            return err.Error(openErr);
+            return OperationResultExt.Failure<string>(openErr);
         }
 
-        return err.Success(writeErr.Result);
+        return OperationResultExt.Success(writeErr.Result);
     }
 
-    public static ErrorResult OpenFile(string path)
+    public static OperationResult OpenFile(string path)
     {
-        var err = ErrorLogger.Create(TAG);
-
         try
         {
             var psi = new ProcessStartInfo
@@ -91,21 +85,19 @@ internal static class ThirdPartyLauncher
         }
         catch (Exception ex)
         {
-            return err.Error(ex);
+            return OperationResultExt.Failure(TAG, ex);
         }
 
-        return err.Success();
+        return OperationResult.Success();
     }
 
-    public static async Task<ErrorResult<string>> EditTemporaryTextFileAsync(string filename, IEnumerable<string> lines)
+    public static async Task<OperationResult<string>> EditTemporaryTextFileAsync(string filename, IEnumerable<string> lines)
     {
-        var err = ErrorLogger<string>.Create(TAG);
-
         string text = string.Join(Environment.NewLine, lines);
-        ErrorResult<string> writeErr = WriteTemporaryTextFile(filename, text);
+        OperationResult<string> writeErr = WriteTemporaryTextFile(filename, text);
         if (!writeErr.IsSuccessful)
         {
-            return err.Error(writeErr);
+            return OperationResultExt.Failure<string>(writeErr);
         }
 
         string filePath = writeErr.Result;
@@ -120,23 +112,21 @@ internal static class ThirdPartyLauncher
             using var process = Process.Start(psi);
             if (process is null)
             {
-                return err.Error("Failed to launch notepad.");
+                return OperationResultExt.Failure<string>(TAG, "Failed to launch notepad.");
             }
 
             await process.WaitForExitAsync();
         }
         catch (Exception ex)
         {
-            return err.Error(ex);
+            return OperationResultExt.Failure<string>(TAG, ex);
         }
 
-        return err.Success(filePath);
+        return OperationResultExt.Success(filePath);
     }
 
-    private static ErrorResult<string> WriteTemporaryTextFile(string filename, string text)
+    private static OperationResult<string> WriteTemporaryTextFile(string filename, string text)
     {
-        var err = ErrorLogger<string>.Create(TAG);
-
         string directoryPath = StorageLocation.TemporaryFolderPath;
         try
         {
@@ -144,7 +134,7 @@ internal static class ThirdPartyLauncher
         }
         catch (Exception ex)
         {
-            return err.Error(ex);
+            return OperationResultExt.Failure<string>(TAG, ex);
         }
 
         string filePath = Path.Combine(directoryPath, filename);
@@ -155,9 +145,9 @@ internal static class ThirdPartyLauncher
         }
         catch (Exception ex)
         {
-            return err.Error(ex);
+            return OperationResultExt.Failure<string>(TAG, ex);
         }
 
-        return err.Success(filePath);
+        return OperationResultExt.Success(filePath);
     }
 }

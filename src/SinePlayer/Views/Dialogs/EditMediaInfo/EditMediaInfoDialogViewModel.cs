@@ -10,13 +10,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Plugins;
 using SinePlayer.Common.Storage;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
@@ -533,7 +533,7 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
             return;
         }
 
-        ErrorResult err = await ThirdPartyLauncher.ShowInFileExplorer(folderPath);
+        OperationResult err = await ThirdPartyLauncher.ShowInFileExplorer(folderPath);
         if (!err.IsSuccessful)
         {
             Logger.E(TAG, err.Message, err.Exception);

@@ -9,12 +9,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Storage;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Lifecycle.Utils;
 using SinePlayer.Core.Common.Threading;
@@ -1254,12 +1254,11 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     // Helpers
     //
 
-    public Task<ErrorResult> ShowInFileExplorer()
+    public Task<OperationResult> ShowInFileExplorer()
     {
         if (IsCollection)
         {
-            var err = ErrorLogger.Create(TAG);
-            return Task.FromResult(err.Error("A collection has no file location."));
+            return Task.FromResult(OperationResultExt.Failure(TAG, "A collection has no file location."));
         }
 
         return ThirdPartyLauncher.ShowInFileExplorer(_internalModel.FileSystemPath);
