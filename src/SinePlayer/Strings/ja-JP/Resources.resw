@@ -1242,8 +1242,11 @@ $info</value>
   <data name="ViewType" xml:space="preserve">
     <value>ビュー</value>
   </data>
-  <data name="ViewTypeLarge" xml:space="preserve">
-    <value>大きい</value>
+  <data name="ViewTypeLargeLandscape" xml:space="preserve">
+    <value>大きい（横長）</value>
+  </data>
+  <data name="ViewTypeLargePortrait" xml:space="preserve">
+    <value>大きい（縦長）</value>
   </data>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>中くらい</value>

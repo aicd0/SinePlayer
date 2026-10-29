@@ -1242,8 +1242,11 @@ $info</value>
   <data name="ViewType" xml:space="preserve">
     <value>보다</value>
   </data>
-  <data name="ViewTypeLarge" xml:space="preserve">
-    <value>더 큰</value>
+  <data name="ViewTypeLargeLandscape" xml:space="preserve">
+    <value>더 큰(가로)</value>
+  </data>
+  <data name="ViewTypeLargePortrait" xml:space="preserve">
+    <value>더 큰(세로)</value>
   </data>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>보통의</value>

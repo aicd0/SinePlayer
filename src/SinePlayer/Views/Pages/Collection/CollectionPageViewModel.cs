@@ -131,7 +131,7 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
 
     public string ItemCountText => StringResourceProvider.Instance.NItems.Replace("$n", ItemCount.ToString());
 
-    private MediaFilterModel.ViewTypeEnum _viewType = MediaFilterModel.ViewTypeEnum.Medium;
+    private MediaFilterModel.ViewTypeEnum _viewType = MediaFilterModel.ViewTypeEnum.LargeLandscape;
     public MediaFilterModel.ViewTypeEnum ViewType
     {
         get => _viewType;

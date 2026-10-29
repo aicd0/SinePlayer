@@ -1240,8 +1240,11 @@ $info</value>
   <data name="ViewType" xml:space="preserve">
     <value>視圖</value>
   </data>
-  <data name="ViewTypeLarge" xml:space="preserve">
-    <value>較大</value>
+  <data name="ViewTypeLargeLandscape" xml:space="preserve">
+    <value>較大（橫式）</value>
+  </data>
+  <data name="ViewTypeLargePortrait" xml:space="preserve">
+    <value>較大（直式）</value>
   </data>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>適中</value>

@@ -1242,8 +1242,11 @@ $info</value>
   <data name="ViewType" xml:space="preserve">
     <value>视图</value>
   </data>
-  <data name="ViewTypeLarge" xml:space="preserve">
-    <value>较大</value>
+  <data name="ViewTypeLargeLandscape" xml:space="preserve">
+    <value>较大（横版）</value>
+  </data>
+  <data name="ViewTypeLargePortrait" xml:space="preserve">
+    <value>较大（竖版）</value>
   </data>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>适中</value>

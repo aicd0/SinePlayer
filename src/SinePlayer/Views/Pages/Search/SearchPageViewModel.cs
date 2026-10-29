@@ -46,7 +46,7 @@ internal partial class SearchPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private MediaFilterModel.ViewTypeEnum _viewType = MediaFilterModel.ViewTypeEnum.Medium;
+    private MediaFilterModel.ViewTypeEnum _viewType = MediaFilterModel.ViewTypeEnum.LargeLandscape;
     public MediaFilterModel.ViewTypeEnum ViewType
     {
         get => _viewType;

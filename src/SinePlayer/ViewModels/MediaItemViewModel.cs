@@ -29,7 +29,6 @@ internal partial class MediaItemViewModel : INotifyPropertyChanged
 
     public bool IsCollection => Media.IsCollection;
     public bool IsRatingVisible => !string.IsNullOrEmpty(Rating);
-    public int TitleMaxLines => IsCollection && IsRatingVisible ? 2 : 3;
 
     public bool IsCoverImageVisible => !string.IsNullOrEmpty(_coverImageUri);
 
@@ -93,7 +92,6 @@ internal partial class MediaItemViewModel : INotifyPropertyChanged
             _rating = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Rating)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRatingVisible)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TitleMaxLines)));
         }
     }
 
