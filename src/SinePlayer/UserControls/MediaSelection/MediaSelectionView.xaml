@@ -4,10 +4,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:adaptivegrid="using:SinePlayer.UserControls.AdaptiveGrid"
     xmlns:base="using:SinePlayer.Common.BaseUI"
-    xmlns:mediaitemview="using:SinePlayer.UserControls.MediaItemView"
     xmlns:converters="using:SinePlayer.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:mediaitemview="using:SinePlayer.UserControls.MediaItemView"
     xmlns:vm="using:SinePlayer.ViewModels"
     mc:Ignorable="d">
 
@@ -57,12 +57,16 @@
                 IsSourceGrouped="True"
                 ItemsPath="DisplayItems" />
 
-            <DataTemplate x:Name="LargeItemTemplate" x:DataType="vm:MediaItemViewModel">
-                <mediaitemview:MediaItemVertical />
+            <DataTemplate x:Name="LargeItemPortraitTemplate" x:DataType="vm:MediaItemViewModel">
+                <mediaitemview:MediaItemLargePortrait />
+            </DataTemplate>
+
+            <DataTemplate x:Name="LargeLandscapeItemTemplate" x:DataType="vm:MediaItemViewModel">
+                <mediaitemview:MediaItemLargeLandscape />
             </DataTemplate>
 
             <DataTemplate x:Name="MediumItemTemplate" x:DataType="vm:MediaItemViewModel">
-                <mediaitemview:MediaItemHorizontal />
+                <mediaitemview:MediaItemMedium />
             </DataTemplate>
 
         </ResourceDictionary>

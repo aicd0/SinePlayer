@@ -48,7 +48,7 @@ internal sealed partial class MediaSelectionView : BaseUserControl
         nameof(ItemViewType),
         typeof(MediaFilterModel.ViewTypeEnum),
         typeof(MediaSelectionView),
-        new PropertyMetadata(MediaFilterModel.ViewTypeEnum.Medium, OnItemViewTypeChanged));
+        new PropertyMetadata(MediaFilterModel.ViewTypeEnum.LargeLandscape, OnItemViewTypeChanged));
 
     private static void OnItemViewTypeChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
@@ -165,17 +165,23 @@ internal sealed partial class MediaSelectionView : BaseUserControl
     {
         switch (ItemViewType)
         {
-            case MediaFilterModel.ViewTypeEnum.Large:
-                ItemsGrid.ItemTemplate = LargeItemTemplate;
+            case MediaFilterModel.ViewTypeEnum.LargePortrait:
+                ItemsGrid.ItemTemplate = LargeItemPortraitTemplate;
                 ItemsGrid.ItemContainerStyle = (Style)Resources["VerticalMediaItemContainerStyle"];
-                ItemsGrid.DesiredWidth = (double)Application.Current.Resources["MediaItemVerticalDesiredWidth"];
-                ItemsGrid.ItemHeight = (double)Application.Current.Resources["MediaItemVerticalDesiredHeight"];
+                ItemsGrid.DesiredWidth = (double)Application.Current.Resources["MediaItemLargePortraitDesiredWidth"];
+                ItemsGrid.ItemHeight = (double)Application.Current.Resources["MediaItemLargePortraitDesiredHeight"];
+                break;
+            case MediaFilterModel.ViewTypeEnum.LargeLandscape:
+                ItemsGrid.ItemTemplate = LargeLandscapeItemTemplate;
+                ItemsGrid.ItemContainerStyle = (Style)Resources["VerticalMediaItemContainerStyle"];
+                ItemsGrid.DesiredWidth = (double)Application.Current.Resources["MediaItemLargeLandscapeDesiredWidth"];
+                ItemsGrid.ItemHeight = (double)Application.Current.Resources["MediaItemLargeLandscapeDesiredHeight"];
                 break;
             case MediaFilterModel.ViewTypeEnum.Medium:
                 ItemsGrid.ItemTemplate = MediumItemTemplate;
                 ItemsGrid.ItemContainerStyle = (Style)Resources["SearchResultItemContainerExpandedStyle"];
-                ItemsGrid.DesiredWidth = (double)Application.Current.Resources["MediaItemHorizontalDesiredWidth"];
-                ItemsGrid.ItemHeight = (double)Application.Current.Resources["MediaItemHorizontalDesiredHeight"];
+                ItemsGrid.DesiredWidth = (double)Application.Current.Resources["MediaItemMediumDesiredWidth"];
+                ItemsGrid.ItemHeight = (double)Application.Current.Resources["MediaItemMediumDesiredHeight"];
                 break;
             default:
                 Logger.AssertNotReachHere("8A1F72C69B4D5307");

@@ -334,7 +334,8 @@ public class StringResourceProvider
     public string VideoDecodeTime => GetResourceString("VideoDecodeTime");
     public string VideoRenderTime => GetResourceString("VideoRenderTime");
     public string ViewType => GetResourceString("ViewType");
-    public string ViewTypeLarge => GetResourceString("ViewTypeLarge");
+    public string ViewTypeLargeLandscape => GetResourceString("ViewTypeLargeLandscape");
+    public string ViewTypeLargePortrait => GetResourceString("ViewTypeLargePortrait");
     public string ViewTypeMedium => GetResourceString("ViewTypeMedium");
     public string Volume => GetResourceString("Volume");
     public string VolumeDown => GetResourceString("VolumeDown");

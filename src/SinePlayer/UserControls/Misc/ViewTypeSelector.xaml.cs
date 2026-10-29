@@ -19,7 +19,8 @@ internal sealed partial class ViewTypeSelector : BaseUserControl
     public event ViewTypeChangedEventHandler? ViewTypeChanged;
 
     private static readonly List<MediaFilterModel.ViewTypeEnum> _viewTypes = [
-        MediaFilterModel.ViewTypeEnum.Large,
+        MediaFilterModel.ViewTypeEnum.LargePortrait,
+        MediaFilterModel.ViewTypeEnum.LargeLandscape,
         MediaFilterModel.ViewTypeEnum.Medium,
     ];
 
@@ -33,7 +34,7 @@ internal sealed partial class ViewTypeSelector : BaseUserControl
         nameof(SelectedViewType),
         typeof(MediaFilterModel.ViewTypeEnum),
         typeof(ViewTypeSelector),
-        new PropertyMetadata(MediaFilterModel.ViewTypeEnum.Medium));
+        new PropertyMetadata(MediaFilterModel.ViewTypeEnum.LargeLandscape));
 
     public ViewTypeSelector()
     {
@@ -67,7 +68,8 @@ internal sealed partial class ViewTypeSelector : BaseUserControl
     {
         return viewType switch
         {
-            MediaFilterModel.ViewTypeEnum.Large => StringResourceProvider.Instance.ViewTypeLarge,
+            MediaFilterModel.ViewTypeEnum.LargePortrait => StringResourceProvider.Instance.ViewTypeLargePortrait,
+            MediaFilterModel.ViewTypeEnum.LargeLandscape => StringResourceProvider.Instance.ViewTypeLargeLandscape,
             MediaFilterModel.ViewTypeEnum.Medium => StringResourceProvider.Instance.ViewTypeMedium,
             _ => "Unknown"
         };

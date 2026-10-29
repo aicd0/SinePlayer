@@ -15,7 +15,8 @@ namespace SinePlayer.Data.Models.Misc;
 
 class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
 {
-    public const string VIEW_TYPE_LARGE = "Large";
+    public const string VIEW_TYPE_LARGE_PORTRAIT = "LargePortrait";
+    public const string VIEW_TYPE_LARGE_LANDSCAPE = "LargeLandscape";
     public const string VIEW_TYPE_MEDIUM = "Medium";
     public const string FUNCTION_TYPE_NONE = "None";
     public const string FUNCTION_TYPE_ITEM_COUNT = "ItemCount";
@@ -40,7 +41,7 @@ class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
 
     public ViewTypeEnum LastViewType
     {
-        get => GetModel()?.LastFilter?.ViewType ?? ViewTypeEnum.Medium;
+        get => GetModel()?.LastFilter?.ViewType ?? ViewTypeEnum.LargeLandscape;
         set
         {
             ExternalModel? model = GetModel();
@@ -123,7 +124,7 @@ class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
         public FunctionTypeEnum GroupSortingFunction { get; set; } = FunctionTypeEnum.None;
         public MediaPropertyModel? GroupSortingProperty { get; set; } = null;
         public IReadOnlySet<string> CollapsedGroups { get; set; } = FrozenSet<string>.Empty;
-        public ViewTypeEnum ViewType { get; set; } = ViewTypeEnum.Large;
+        public ViewTypeEnum ViewType { get; set; } = ViewTypeEnum.LargeLandscape;
         public bool IncludeHiddenItems { get; set; } = false;
         public bool SaveViewSettings { get; set; } = false;
         public bool SaveSortingAndGroupingSettings { get; set; } = true;
@@ -201,9 +202,10 @@ class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
         {
             return value switch
             {
-                ViewTypeEnum.Large => VIEW_TYPE_LARGE,
+                ViewTypeEnum.LargePortrait => VIEW_TYPE_LARGE_PORTRAIT,
+                ViewTypeEnum.LargeLandscape => VIEW_TYPE_LARGE_LANDSCAPE,
                 ViewTypeEnum.Medium => VIEW_TYPE_MEDIUM,
-                _ => VIEW_TYPE_LARGE,
+                _ => VIEW_TYPE_LARGE_PORTRAIT,
             };
         }
 
@@ -211,9 +213,10 @@ class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
         {
             return value switch
             {
-                VIEW_TYPE_LARGE => ViewTypeEnum.Large,
+                VIEW_TYPE_LARGE_PORTRAIT => ViewTypeEnum.LargePortrait,
+                VIEW_TYPE_LARGE_LANDSCAPE => ViewTypeEnum.LargeLandscape,
                 VIEW_TYPE_MEDIUM => ViewTypeEnum.Medium,
-                _ => ViewTypeEnum.Large,
+                _ => ViewTypeEnum.LargeLandscape,
             };
         }
 
@@ -280,7 +283,8 @@ class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
 
     public enum ViewTypeEnum
     {
-        Large,
+        LargePortrait,
+        LargeLandscape,
         Medium,
     }
 

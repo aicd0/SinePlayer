@@ -11,16 +11,21 @@ using SinePlayer.ViewModels;
 
 namespace SinePlayer.UserControls.MediaItemView;
 
-internal sealed partial class MediaItemHorizontal : BaseUserControl, IMediaItemView
+internal sealed partial class MediaItemLargePortrait : BaseUserControl, IMediaItemView
 {
     private bool _isPrimaryPointerPressed;
 
-    public MediaItemHorizontal()
+    public MediaItemLargePortrait()
     {
         InitializeComponent();
     }
 
     public MediaItemViewModel? Item { get; private set; }
+
+    public int GetTitleMaxLines(bool isCollection, bool isRatingVisible)
+    {
+        return isCollection && isRatingVisible ? 2 : 3;
+    }
 
     public void SetMediaModel(MediaItemViewModel? item)
     {

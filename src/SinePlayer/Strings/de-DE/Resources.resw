@@ -1242,8 +1242,11 @@ $info</value>
   <data name="ViewType" xml:space="preserve">
     <value>Sicht</value>
   </data>
-  <data name="ViewTypeLarge" xml:space="preserve">
-    <value>Groß</value>
+  <data name="ViewTypeLargeLandscape" xml:space="preserve">
+    <value>Groß (Querformat)</value>
+  </data>
+  <data name="ViewTypeLargePortrait" xml:space="preserve">
+    <value>Groß (Hochformat)</value>
   </data>
   <data name="ViewTypeMedium" xml:space="preserve">
     <value>Medium</value>
