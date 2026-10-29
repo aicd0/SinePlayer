@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -14,10 +15,10 @@ using Microsoft.UI.Xaml.Input;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.Constants;
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Utils;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
@@ -181,25 +182,26 @@ internal sealed partial class MediaInfoPage : BasePage
     {
         CoroutineUtils.Run(async () =>
         {
-            ErrorResult err = await ErrorLogger.Run(nameof(OnDirectoryTapped), async err =>
-            {
-                MediaModel? media = ViewModel.Media;
-                if (media is null)
-                {
-                    return err.Error("Media is null.");
-                }
-
-                ErrorResult innerErr = await media.ShowInFileExplorer();
-                if (!innerErr.IsSuccessful)
-                {
-                    return err.Error(innerErr);
-                }
-
-                return err.Success();
-            });
-
-            err.ShowErrorMessage(PageActionHandler);
+            OperationResult result = await OnDirectoryTappedInternal();
+            result.ShowErrorMessage(PageActionHandler);
         });
+    }
+
+    private async Task<OperationResult> OnDirectoryTappedInternal()
+    {
+        MediaModel? media = ViewModel.Media;
+        if (media is null)
+        {
+            return OperationResultExt.Failure(nameof(OnDirectoryTapped), "Media is null.");
+        }
+
+        OperationResult innerErr = await media.ShowInFileExplorer();
+        if (!innerErr.IsSuccessful)
+        {
+            return OperationResultExt.Failure(innerErr);
+        }
+
+        return OperationResult.Success();
     }
 
     private void OnEditInfoClick(object sender, RoutedEventArgs e)

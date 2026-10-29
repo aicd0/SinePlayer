@@ -121,6 +121,10 @@ whole class of questions:
   and the error (`StateChanged`), and something that did not stop playback is one line (`WarningRaised`). A
   command's own outcome is the one thing that is *not* an event: it belongs to the caller that asked, which is
   also why a seek needs no event of its own: the only state it can change is a file taken back from `Ended`.
+  It is, however, written down: every public call that answers with a failure leaves one line — `Seek: Nothing is
+  open.` — because those refusals are decided on the queue and never reach the path a media thread uses to report
+  a failure, so a host told nothing worked would otherwise leave no trace of it. Success writes nothing at all, or
+  the log would carry a line for every slider dragged.
 - **`Dispose` is the one call that waits.** A disposed pipeline must not still hold the file open — whoever
   opens it next would not be able to — so teardown is posted and waited for, with a bound
   (`TeardownWaitMilliseconds`) because a teardown that cannot finish is a broken pipeline, not a slow one.
@@ -470,8 +474,10 @@ There are exactly three queues, and each has a different policy because each is 
 | **On a seek** | cleared: what it holds belongs to the position playback has left. The clear wakes nobody — the position moving is what wakes the threads (`WakeAll`) | cleared, for the same reason | cleared, for the same reason — which also frees the decoder, whose window the clear empties |
 | **At end of file** | the reader says the end of the packet stream with an entry of its own, after the last packet; the decoder takes that entry, produces its tail into the frame queue, and says *that* stream's end behind it; the pipeline's own statement — the file ran out at this position (`_endingEpoch`) — is the third thing the reader does, and the ending is decided on it | the reader says the end of the audio stream with an entry, after the last block (the drain above is what produces it); the sound says it has played out when the device holds nothing after that | the decoder says the end of the frame stream with an entry behind every frame it produced; the picture says it has shown everything when it takes that entry while holding nothing — and an empty queue before it means the decoder is behind |
 
-The three are one class, `MediaQueue<T>`, given one thing each: nothing, a way to weigh items in samples, and
-nothing. The window and the read-ahead minimums live at the ends that act on them, and the queue enforces
+The three are one class, `MediaQueue<T>`, given one thing each: nothing, a way to weigh items, and nothing. The
+two that are weighed weigh the *media*: the audio queue in samples of the selected stream, the packet queue in the
+durations of the packets it holds — because what the read-ahead is for is time, so time is what it is counted in.
+The window and the read-ahead minimums live at the ends that act on them, and the queue enforces
 nothing; it also waits for nothing — see §2.3.
 The queue itself knows nothing about epochs — it carries a tag,
 decided by the producer that writes it and the consumer that reads it — and it knows nothing about what the
@@ -518,13 +524,17 @@ stage having to make progress.** These are the rules; §4.1–§4.6 are why each
 It fills both queues to their minimums, then idles until either falls below half of its minimum, then fills
 again. A holder with no streams in it is trivially at its minimums, so a file that is open and unselected is a file
 the reader does not read: what is not going to be played is not read ahead. The minimums are *read-ahead*, not
-capacity: 500 ms of audio samples — of the *selected stream's* own samples, so the number is set with the selection
-(§2.5) — and 64 video packets, waking at 250 ms and 32. A queue is paced only when it can fill *and* drain, which takes
-**both** halves: the kind is being read — the selection has a stream of it — *and* a decoder exists, because the audio
-decoder is what puts samples in the audio queue while the video decode thread is what takes the packet queue back
-down. Either half alone can hold while its queue cannot reach the minimum: a kind turned off leaves a decoder in
-place for a stream nobody reads, and a stream whose decoder could not be built is the mirror image — since a build
-that fails publishes nothing, that one is not reachable today and is exactly what a partial publication would create.
+capacity, and both are stated in **media time — eight seconds** — because the wait they exist to outlast is of
+unknown length (a read that takes seconds), and only a length of time says how much playback that is. The audio
+minimum is eight seconds of the *selected stream's* own samples, so the number is set with the selection (§2.5);
+the video minimum is eight seconds of the packets' own durations, summed as they go in and out, so it holds at any
+frame rate and any bitrate. Both wake at half, four seconds. A queue is paced only when it can fill *and* drain,
+which takes **both** halves: the kind is being read — the selection has a stream of it — *and* a decoder exists,
+because the audio decoder is what puts samples in the audio queue while the video decode thread is what takes the
+packet queue back down. Either half alone can hold while its queue cannot reach the minimum: a kind turned off
+leaves a decoder in place for a stream nobody reads, and a stream whose decoder could not be built is the mirror
+image — since a build that fails publishes nothing, that one is not reachable today and is exactly what a partial
+publication would create.
 In either case the reader would never settle into its paced read and would read the file to its end in one go.
 Neither the file's stream list nor the components can answer this alone: it is a question about a queue that
 something fills and something drains.

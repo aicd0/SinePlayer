@@ -5,8 +5,8 @@ using System;
 using System.Collections.Generic;
 
 using SinePlayer.Common.Actions;
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Playback.Core;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -67,7 +67,7 @@ internal sealed class PlayerMenuContext
 
         CoroutineUtils.Run(async () =>
         {
-            ErrorResult selected = await engine.SelectStream(kind, stream);
+            OperationResult selected = await engine.SelectStream(kind, stream);
             if (!selected.IsSuccessful)
             {
                 PromptInfo?.Invoke(selected.Message);

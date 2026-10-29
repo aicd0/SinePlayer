@@ -27,16 +27,20 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private const int FrameQueueCapacity = 8;
     private const int DecoderBufferedFrames = FrameQueueCapacity + 4;
-    private const int VideoPacketMinimum = 64;
-    private const int VideoPacketWake = VideoPacketMinimum / 2;
 
-    private const int AudioMinimumMilliseconds = 500;
+    private const int ReadAheadMilliseconds = 8000;
+    private const int ReadAheadWakeMilliseconds = ReadAheadMilliseconds / 2;
+    private const int FallbackFrameMilliseconds = 40;
+
     private const int VideoStarvationMilliseconds = 200;
     private const int VideoStarvationResumeMilliseconds = 100;
     private const int VideoIdleTimeoutMilliseconds = 50;
     private const int AudioIdleTimeoutMilliseconds = 5;
     private const int ClockSyncToleranceMilliseconds = 10;
     private const int AudioDeviceLeewayMilliseconds = 3000;
+
+    private static readonly TimeSpan ReadAhead = TimeSpan.FromMilliseconds(ReadAheadMilliseconds);
+    private static readonly TimeSpan ReadAheadWake = TimeSpan.FromMilliseconds(ReadAheadWakeMilliseconds);
 
     #endregion
 
@@ -62,7 +66,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private readonly ComponentSlot<ISubtitleRenderer> _subtitleRenderer = new();
 
     private readonly AudioQueue _audioQueue = new();
-    private readonly ConcurrentQueue<PacketEntry> _packetQueue = new();
+    private readonly PacketQueue _packetQueue = new();
     private readonly ConcurrentQueue<FrameEntry> _frameQueue = new();
     private readonly SubtitleCueWindow _cueWindow = new();
 
@@ -258,37 +262,37 @@ public sealed partial class PlaybackPipeline : IDisposable
     public Task<OperationResult> Open(MediaLocator locator, IVideoRenderTarget? videoTarget = null, IVideoRenderTarget? subtitleTarget = null)
     {
         ArgumentNullException.ThrowIfNull(locator);
-        return Submit(() => OpenCore(locator, videoTarget, subtitleTarget));
+        return SubmitAndLog(nameof(Open), () => OpenCore(locator, videoTarget, subtitleTarget));
     }
 
     public Task<OperationResult> Play()
     {
-        return Submit(PlayCore);
+        return SubmitAndLog(nameof(Play), PlayCore);
     }
 
     public Task<OperationResult> Pause()
     {
-        return Submit(PauseCore);
+        return SubmitAndLog(nameof(Pause), PauseCore);
     }
 
     public Task<OperationResult> Seek(TimeSpan position, SeekMode mode = SeekMode.Fast)
     {
-        return Submit(() => SeekCore(position, mode));
+        return SubmitAndLog(nameof(Seek), () => SeekCore(position, mode));
     }
 
     public Task<OperationResult> Reconcile()
     {
-        return Submit(ReconcileCore);
+        return SubmitAndLog(nameof(Reconcile), ReconcileCore);
     }
 
     public Task<OperationResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)
     {
-        return Submit(() => SelectStreamCore(kind, stream));
+        return SubmitAndLog(nameof(SelectStream), () => SelectStreamCore(kind, stream));
     }
 
     public Task<OperationResult> Stop()
     {
-        return Submit(StopCore);
+        return SubmitAndLog(nameof(Stop), StopCore);
     }
 
     #endregion
@@ -668,10 +672,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         _subtitleRenderThread?.Join();
         _subtitleRenderThread = null;
 
-        while (_packetQueue.TryDequeue(out PacketEntry packet))
-        {
-            packet.Packet?.Dispose();
-        }
+        _packetQueue.Clear();
 
         while (_frameQueue.TryDequeue(out FrameEntry frame))
         {
@@ -1047,7 +1048,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     AudioFilters.Configure(audioStream, negotiatedAudioFormat);
                 }
 
-                _audioMinimumSamples = Math.Max(1, (long)audioStream.SampleRate * AudioMinimumMilliseconds / 1000);
+                _audioMinimumSamples = Math.Max(1, (long)audioStream.SampleRate * ReadAheadMilliseconds / 1000);
                 _audioWakeSamples = _audioMinimumSamples / 2;
             }
             else
@@ -1203,6 +1204,26 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void ReaderCore()
     {
+        static TimeSpan SpanOf(MediaPacket? packet, TimeSpan previous, double frameRate)
+        {
+            if (packet is not null && packet.Duration > TimeSpan.Zero)
+            {
+                return packet.Duration;
+            }
+
+            if (previous > TimeSpan.Zero)
+            {
+                return previous;
+            }
+
+            if (!double.IsFinite(frameRate) || frameRate <= 0 || frameRate > 1000)
+            {
+                return TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
+            }
+
+            return TimeSpan.FromSeconds(1 / frameRate);
+        }
+
         ComponentSlot<MediaSourceHolder> sourceSlot = _source;
         ComponentSlot<IAudioDecoder> audioDecoderSlot = _audioDecoder;
         ComponentSlot<ISubtitleDecoder> subtitleDecoderSlot = _subtitleDecoder;
@@ -1210,6 +1231,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         bool buffering = false;
         long workingEpoch = -1;
         long endingEpoch = -1;
+        TimeSpan lastVideoPacketSpan = TimeSpan.Zero;
 
         MediaPacket? packet = null;
 
@@ -1397,7 +1419,9 @@ public sealed partial class PlaybackPipeline : IDisposable
                 else if (videoStreamInfo is not null && packet.StreamIndex == videoStreamInfo.Index)
                 {
                     AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailVideoTicks);
-                    _packetQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch));
+                    TimeSpan span = SpanOf(packet, lastVideoPacketSpan, videoStreamInfo.FrameRate);
+                    lastVideoPacketSpan = span;
+                    _packetQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
                     handedOn = true;
                     TryWakeVideoDecode();
                 }
@@ -1447,7 +1471,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     PostWarning(drained.Message);
                 }
 
-                _packetQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch));
+                _packetQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 _audioQueue.Enqueue(new AudioEntry(null, audioBufferVersions, epoch));
                 TryWakeVideoDecode();
                 TryWakeAudioRender();
@@ -1562,7 +1586,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return false;
         }
 
-        if (holder.VideoStream is not null && _videoDecoder.HasComponent && _packetQueue.Count < VideoPacketMinimum)
+        if (holder.VideoStream is not null && _videoDecoder.HasComponent && _packetQueue.Queued < ReadAhead)
         {
             return false;
         }
@@ -1577,7 +1601,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return true;
         }
 
-        if (holder.VideoStream is not null && _videoDecoder.HasComponent && _packetQueue.Count < VideoPacketWake)
+        if (holder.VideoStream is not null && _videoDecoder.HasComponent && _packetQueue.Queued < ReadAheadWake)
         {
             return true;
         }
@@ -1679,7 +1703,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void VideoDecodeCore()
     {
-        ConcurrentQueue<PacketEntry> queue = _packetQueue;
+        PacketQueue queue = _packetQueue;
         ComponentSlot<IVideoDecoder> videoDecoderSlot = _videoDecoder;
         bool awaitingKeyFrame = false;
         long workingEpoch = -1;
@@ -2762,6 +2786,20 @@ public sealed partial class PlaybackPipeline : IDisposable
     private Task<T> Submit<T>(Func<T> work)
     {
         return _playbackQueue.Submit(work);
+    }
+
+    private Task<OperationResult> SubmitAndLog(string action, Func<OperationResult> func)
+    {
+        return Submit(() =>
+        {
+            OperationResult result = func();
+            if (!result.IsSuccessful)
+            {
+                PlaybackLogger.E(TAG, $"{action}: {result.Message}", result.Exception);
+            }
+
+            return result;
+        });
     }
 
     #endregion

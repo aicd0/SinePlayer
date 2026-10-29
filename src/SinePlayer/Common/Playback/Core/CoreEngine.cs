@@ -9,8 +9,8 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Playback.Surface;
+using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Utils;
@@ -108,12 +108,11 @@ internal sealed partial class CoreEngine : IDisposable
         _subtitlePanel = null;
     }
 
-    public async Task<ErrorResult> Load(string filePath)
+    public async Task<OperationResult> Load(string filePath)
     {
-        var err = ErrorLogger.Create(TAG);
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
         {
-            return err.Error($"Media file not found: '{filePath}'.");
+            return OperationResultExt.Failure(TAG, $"Media file not found: '{filePath}'.");
         }
 
         PlaybackPipeline pipeline = EnsurePipeline();
@@ -124,42 +123,39 @@ internal sealed partial class CoreEngine : IDisposable
             EnsureSubtitleRenderTarget());
         if (!opened.IsSuccessful)
         {
-            return err.Error($"Unable to open media file '{filePath}': {opened.Message}");
+            return OperationResultExt.Failure(TAG, $"Unable to open media file '{filePath}'", opened);
         }
 
         StartPositionTimer();
         RaiseMediaOpened();
-        return err.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ErrorResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)
+    public async Task<OperationResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)
     {
-        var err = ErrorLogger.Create(TAG);
-
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is null)
         {
-            return err.Error("There is nothing open to change a track of.");
+            return OperationResultExt.Failure(TAG, "There is nothing open to change a track of.");
         }
 
         OperationResult selected = await pipeline.SelectStream(kind, stream);
         if (!selected.IsSuccessful)
         {
             string wanted = stream is null ? "no track" : $"track #{stream.Index}";
-            return err.Error($"The {kind.ToString().ToLowerInvariant()} could not be changed to {wanted}. {selected.Message}");
+            return OperationResultExt.Failure(TAG, $"The {kind.ToString().ToLowerInvariant()} could not be changed to {wanted}. {selected.Message}");
         }
 
-        return err.Success();
+        return OperationResult.Success();
     }
 
-    public async Task<ErrorResult> SetComponents(PlaybackComponents components)
+    public async Task<OperationResult> SetComponents(PlaybackComponents components)
     {
-        var err = ErrorLogger.Create(TAG);
         ArgumentNullException.ThrowIfNull(components);
 
         if (_components == components)
         {
-            return err.Success();
+            return OperationResult.Success();
         }
 
         _components = components;
@@ -167,7 +163,7 @@ internal sealed partial class CoreEngine : IDisposable
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is null)
         {
-            return err.Success();
+            return OperationResult.Success();
         }
 
         components.Apply(pipeline);
@@ -175,10 +171,10 @@ internal sealed partial class CoreEngine : IDisposable
         OperationResult reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
-            return err.Error($"The components could not be changed. {reconciled.Message}");
+            return OperationResultExt.Failure(TAG, $"The components could not be changed. {reconciled.Message}");
         }
 
-        return err.Success();
+        return OperationResult.Success();
     }
 
     public void SetVideoTransform(VideoTransform transform)

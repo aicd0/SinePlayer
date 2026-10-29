@@ -44,6 +44,8 @@ internal sealed partial class DevToolsPage : BasePage
 
         _logListener = new LogListener(this);
 
+        InitializeLogLevelComboBox();
+
         _logFilterTimer = DispatcherQueue.CreateTimer();
         _logFilterTimer.Interval = TimeSpan.FromMilliseconds(LOG_FILTER_DELAY_MILLISECONDS);
         _logFilterTimer.IsRepeating = false;
@@ -219,6 +221,7 @@ internal sealed partial class DevToolsPage : BasePage
     private DispatcherQueueTimer? _logFilterTimer;
     private bool _logStarted = false;
     private bool _logStickToLatest = true;
+    private LogLevel _logMinimumLevel = LogLevel.Console;
     private string[] _logFilters = [];
     private readonly ObservableRingCollection<LogItemViewModel> _logItems = [];
     private readonly Queue<LogEntry> _logEntries = new();
@@ -239,6 +242,34 @@ internal sealed partial class DevToolsPage : BasePage
         {
             ScrollToLatestLog();
         }
+    }
+
+    /// <summary>
+    /// The choices are the levels a reader thinks in, and each one keeps its own level and everything above it.
+    /// Console lines sit below every choice, so the lowest choice — Debug — is the one that shows them.
+    /// </summary>
+    private void InitializeLogLevelComboBox()
+    {
+        LogLevelComboBox.ItemsSource = new List<LogLevelOption>
+        {
+            new("Debug", LogLevel.Console),
+            new("Info", LogLevel.Info),
+            new("Warning", LogLevel.Warning),
+            new("Error", LogLevel.Error),
+            new("Fatal", LogLevel.Fatal),
+        };
+        LogLevelComboBox.SelectedIndex = 0;
+    }
+
+    private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (LogLevelComboBox.SelectedItem is not LogLevelOption option)
+        {
+            return;
+        }
+
+        _logMinimumLevel = option.MinimumLevel;
+        ApplyLogFilter();
     }
 
     private void LogFilterTextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -278,7 +309,12 @@ internal sealed partial class DevToolsPage : BasePage
 
     private bool IsLogAccepted(LogEntry entry)
     {
-        if (entry.Level > 4)
+        if (entry.Level < _logMinimumLevel)
+        {
+            return false;
+        }
+
+        if (entry.Level >= LogLevel.Fatal)
         {
             return true;
         }
@@ -379,7 +415,7 @@ internal sealed partial class DevToolsPage : BasePage
 
     private class LogListener(DevToolsPage page) : Logger.ILogListener
     {
-        public void OnLog(Logger.LogItem item)
+        public void OnLog(Core.Common.DebugTools.LogEntry item)
         {
             Interlocked.Increment(ref page._receivedLogCount);
             page.RequestCounterUpdate();
@@ -393,7 +429,15 @@ internal sealed partial class DevToolsPage : BasePage
         }
     }
 
-    private readonly record struct LogEntry(int Level, string Tag, LogItemViewModel Item);
+    private readonly record struct LogEntry(LogLevel Level, string Tag, LogItemViewModel Item);
+
+    private sealed record LogLevelOption(string Label, LogLevel MinimumLevel)
+    {
+        public override string ToString()
+        {
+            return Label;
+        }
+    }
 
     //
     // Counters

@@ -2,15 +2,16 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
+using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Common.BaseUI;
-using SinePlayer.Common.ErrorHandling;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Storage;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Misc;
@@ -93,23 +94,24 @@ internal sealed partial class AdvancedSettingsView : BaseUserControl
 
     private async void OnOpenUserDataFolderClick(object sender, RoutedEventArgs e)
     {
-        ErrorResult err = await ErrorLogger.Run(nameof(OnOpenUserDataFolderClick), async err =>
+        OperationResult result = await OpenUserDataFolder();
+        result.ShowErrorMessage(ViewModel.Shared.ActionHandler);
+    }
+
+    private static async Task<OperationResult> OpenUserDataFolder()
+    {
+        string path = StorageLocation.LocalFolderPath;
+        try
         {
-            string path = StorageLocation.LocalFolderPath;
-            try
-            {
-                Windows.Storage.StorageFolder folder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(path);
-                await Windows.System.Launcher.LaunchFolderAsync(folder);
-            }
-            catch (Exception ex)
-            {
-                return err.Error(ex);
-            }
+            Windows.Storage.StorageFolder folder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(path);
+            await Windows.System.Launcher.LaunchFolderAsync(folder);
+        }
+        catch (Exception ex)
+        {
+            return OperationResultExt.Failure(nameof(OpenUserDataFolder), ex);
+        }
 
-            return err.Success();
-        });
-
-        err.ShowErrorMessage(ViewModel.Shared.ActionHandler);
+        return OperationResult.Success();
     }
 
     private void ResetAllSettingsButton_Click(object sender, RoutedEventArgs e)

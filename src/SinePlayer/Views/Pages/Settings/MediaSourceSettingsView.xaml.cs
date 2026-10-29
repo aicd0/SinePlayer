@@ -7,7 +7,8 @@ using Microsoft.UI.Xaml.Controls;
 using SinePlayer.Common.Actions;
 using SinePlayer.Common.Actions.Providers;
 using SinePlayer.Common.BaseUI;
-using SinePlayer.Common.ErrorHandling;
+using SinePlayer.Common.Utils;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
@@ -100,8 +101,8 @@ internal sealed partial class MediaSourceSettingsView : BaseUserControl
     {
         CoroutineUtils.Run(async () =>
         {
-            ErrorResult err = await MediaImportExclusionModel.Instance.EditWithNotepad();
-            err.ShowErrorMessage(ViewModel.Shared.ActionHandler);
+            OperationResult result = await MediaImportExclusionModel.Instance.EditWithNotepad();
+            result.ShowErrorMessage(ViewModel.Shared.ActionHandler);
         });
 
     }
