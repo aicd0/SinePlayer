@@ -46,7 +46,26 @@ internal class MediaImportExclusionModel
     public bool Contains(string location)
     {
         EnsureInitialized();
-        return _excluded.ContainsKey(location);
+
+        if (_excluded.ContainsKey(location))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrEmpty(location))
+        {
+            return false;
+        }
+
+        foreach (string excluded in _excluded.Keys)
+        {
+            if (!string.IsNullOrEmpty(excluded) && StringUtils.FolderContain(excluded, location))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public void Add(IEnumerable<MediaModel> mediaItems)

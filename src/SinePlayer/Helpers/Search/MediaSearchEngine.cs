@@ -162,7 +162,8 @@ internal class MediaSearchEngine
         var matches = new List<Match>();
         await MediaHandle.Enqueue(() =>
         {
-            var command = SelectCommand.Create(MediaTable.Instance);
+            SelectCommand command = SelectCommand.Create(MediaTable.Instance)
+                .AppendCondition(MediaHandle.CreateNonExternalCondition());
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             IReaderToken<string> title1Token = command.PutQueryString(MediaTable.ColumnTitle1);
             IReaderToken<string> title2Token = command.PutQueryString(MediaTable.ColumnTitle2);

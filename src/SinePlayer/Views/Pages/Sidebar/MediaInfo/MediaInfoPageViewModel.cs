@@ -32,17 +32,6 @@ internal partial class MediaInfoPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _isEditable;
-    public bool IsEditable
-    {
-        get => _isEditable;
-        set
-        {
-            _isEditable = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEditable)));
-        }
-    }
-
     private string _mediaTitle1 = string.Empty;
     public string MediaTitle1
     {
@@ -107,7 +96,6 @@ internal partial class MediaInfoPageViewModel : INotifyPropertyChanged
     public ObservableCollection<string> ImageDescriptions { get; } = [];
 
     public readonly MutableLiveData<string> MediaDescriptionLiveData = new();
-    public readonly MutableLiveData<bool> IsExternalMediaLiveData = new(true);
     public readonly MutableLiveData<CompletionStatusEnum> CompletionStatusLiveData = new();
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
@@ -210,7 +198,6 @@ internal partial class MediaInfoPageViewModel : INotifyPropertyChanged
         }
 
         IsEmpty = false;
-        IsExternalMediaLiveData.Emit(media.IsExternal);
 
         if (media.Title1.Length == 0)
         {
@@ -225,16 +212,12 @@ internal partial class MediaInfoPageViewModel : INotifyPropertyChanged
         MediaDescriptionLiveData.Emit(media.Description);
 
         MediaDir = media.Location;
-        IsEditable = media.IsEditable;
 
         TagCollectionViewModel.Update(MediaTags, media, _actionHandler);
         HasAnyTags = MediaTags.Count > 0;
         CompletionStatusLiveData.Emit(media.CompletionStatus);
 
-        if (!media.IsExternal)
-        {
-            int rating = media.Rating;
-            Rating = rating >= 0 ? rating * 0.05F : -1.0;
-        }
+        int rating = media.Rating;
+        Rating = rating >= 0 ? rating * 0.05F : -1.0;
     }
 }

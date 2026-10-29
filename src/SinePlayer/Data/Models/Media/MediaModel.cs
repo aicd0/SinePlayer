@@ -51,7 +51,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
     public static MediaModel CreateCollection()
     {
-        return new MediaModel(CollectionMediaHandle.FromExternal());
+        return new MediaModel(CollectionMediaHandle.CreateNew());
     }
 
     public static async Task<MediaModel?> FromId(long id)
@@ -70,22 +70,6 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         return null;
     }
 
-    public static async Task<MediaModel?> FromLocation(string location)
-    {
-        MediaHandle? mediaHandle = await MediaHandle.FromLocation(location);
-        if (mediaHandle is not null)
-        {
-            return ReplaceWithExisting(mediaHandle);
-        }
-
-        if (TryGetExisting(location, out MediaModel? model))
-        {
-            return model;
-        }
-
-        return null;
-    }
-
     public static async Task<MediaModel?> FromFile(string path)
     {
         string extension = Path.GetExtension(path).ToLower();
@@ -95,28 +79,15 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             return null;
         }
 
-        MediaHandle? media = await MediaHandle.FromLocation(path);
-        media ??= FileMediaHandle.FromExternal(path);
-        return ReplaceWithExisting(media);
-    }
+        MediaType type = AppInfoProvider.IsSupportedAudioExtension(extension) ? MediaType.Audio : MediaType.Video;
 
-    public static Task<MediaModel?> FromExternalLocation(string location)
-    {
-        if (File.Exists(location))
+        MediaHandle? media = null;
+        await AlterLibrary(async () =>
         {
-            string extension = Path.GetExtension(location);
-            if (!AppInfoProvider.IsSupportedExternalFileExtension(extension))
-            {
-                Logger.E(TAG, $"Unsupported external file extension: {extension}");
-                return Task.FromResult<MediaModel?>(null);
-            }
+            media = await MediaHandle.FromLocationOrInsertExternal(type, path);
+        });
 
-            MediaHandle media = FileMediaHandle.FromExternal(location);
-            return Task.FromResult<MediaModel?>(ReplaceWithExisting(media));
-        }
-
-        Logger.E(TAG, $"Invalid location: {location}");
-        return Task.FromResult<MediaModel?>(null);
+        return media is null ? null : ReplaceWithExisting(media);
     }
 
     public static async Task<List<MediaModel>> BatchFromId(IEnumerable<long> ids)
@@ -379,7 +350,24 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
     public static async Task RemoveMedia(IEnumerable<MediaModel> mediaItems)
     {
-        await AlterLibrary(() => RemoveMediaInternal(mediaItems));
+        List<MediaModel> removingMedia = [.. mediaItems.Where(x => x.IsCollection || !x.IsExternal)];
+        if (removingMedia.Count == 0)
+        {
+            return;
+        }
+
+        await AlterLibrary(() => RemoveMediaFromLibrary(removingMedia));
+    }
+
+    private static async Task RemoveMediaFromLibrary(IReadOnlyList<MediaModel> mediaItems)
+    {
+        List<MediaModel> collections = [.. mediaItems.Where(x => x.IsCollection)];
+        if (collections.Count > 0)
+        {
+            await RemoveMediaInternal(collections);
+        }
+
+        await TransitionToExternal([.. mediaItems.Where(x => !x.IsCollection)]);
     }
 
     public static Task<List<string>> GetAllTagCategories()
@@ -478,31 +466,61 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             ids.Add(mediaId);
         }
 
-        Dictionary<string, List<long>> mediaIdsByFolder = [];
+        static bool IsUnavailableLocation(string location, IReadOnlySet<string> noAccessLocations)
+        {
+            string? root = Path.GetPathRoot(location);
+            if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+            {
+                return true;
+            }
+
+            foreach (string noAccessLocation in noAccessLocations)
+            {
+                if (StringUtils.FolderContain(noAccessLocation, location))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        Dictionary<string, List<long>> mediaIdsByFolder = new(StringComparer.OrdinalIgnoreCase);
         HashSet<long> changedMediaIds = [];
         HashSet<long> newMediaIds = [];
 
         // Get all locations from database
-        HashSet<string> oldLocations = [];
+        HashSet<string> libraryLocations = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> externalLocations = new(StringComparer.OrdinalIgnoreCase);
         await MediaHandle.Enqueue(() =>
         {
             SelectCommand command = SelectCommand.Create(MediaTable.Instance)
                 .AppendCondition(MediaHandle.CreateMediaOnlyCondition());
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             IReaderToken<string> locationToken = command.PutQueryString(MediaTable.ColumnLocation);
+            IReaderToken<bool> externalToken = command.PutQueryBoolean(MediaTable.ColumnExternal);
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
                 string location = locationToken.GetValue();
-                oldLocations.Add(location);
+                if (externalToken.GetValue())
+                {
+                    externalLocations.Add(location);
+                }
+                else
+                {
+                    libraryLocations.Add(location);
+                }
+
                 AddToFolder(mediaIdsByFolder, location, idToken.GetValue());
             }
         });
 
         // Scan mediaItems
-        Dictionary<string, MediaType> pendingLocations = [];
-        HashSet<string> newLocations = [];
-        HashSet<string> noAccessLocations = [];
+        Dictionary<string, MediaType> pendingLocations = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> pendingPromotions = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> newLocations = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> noAccessLocations = new(StringComparer.OrdinalIgnoreCase);
 
         async Task FlushPendingLocations()
         {
@@ -517,8 +535,18 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
                     continue;
                 }
 
-                if (oldLocations.Contains(location))
+                if (libraryLocations.Contains(location))
                 {
+                    continue;
+                }
+
+                if (externalLocations.Contains(location))
+                {
+                    if (!MediaImportExclusionModel.Instance.Contains(location))
+                    {
+                        pendingPromotions.Add(location);
+                    }
+
                     continue;
                 }
 
@@ -551,6 +579,13 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
                         }
                     }
                 });
+            }
+
+            if (pendingPromotions.Count > 0)
+            {
+                List<long> promotedIds = await PromoteToLibrary([.. pendingPromotions]);
+                pendingPromotions.Clear();
+                changedMediaIds.UnionWith(promotedIds);
             }
         }
 
@@ -646,18 +681,13 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         // Remove unreachable media items
         if (AppSettingsModel.RemoveUnreachableMedia)
         {
-            List<string> locationRemoved = [.. oldLocations.Except(newLocations)];
-
+            List<string> locationRemoved = [.. libraryLocations.Except(newLocations, StringComparer.OrdinalIgnoreCase)];
+            locationRemoved.AddRange(externalLocations.Where(x => !File.Exists(x)));
             for (int i = locationRemoved.Count - 1; i >= 0; i--)
             {
-                string location = locationRemoved[i];
-                foreach (string noAccessLocation in noAccessLocations)
+                if (IsUnavailableLocation(locationRemoved[i], noAccessLocations))
                 {
-                    if (StringUtils.FolderContain(noAccessLocation, location))
-                    {
-                        locationRemoved.RemoveAt(i);
-                        break;
-                    }
+                    locationRemoved.RemoveAt(i);
                 }
             }
 
@@ -711,12 +741,19 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
             if (removingMedia.Count > 0)
             {
-                bool proceed = true;
-                if (AppSettingsModel.PromptBeforeRemovingMedia)
+                List<MediaModel> externalMedia = [.. removingMedia.Where(x => x.IsExternal)];
+                if (externalMedia.Count > 0)
                 {
-                    List<string> itemNames = [.. removingMedia.Select(x => x.IsCollection ? x.Title : x.Location)];
+                    await RemoveMediaInternal(externalMedia);
+                }
+
+                bool proceed = true;
+                List<MediaModel> libraryMedia = [.. removingMedia.Where(x => !x.IsExternal)];
+                if (libraryMedia.Count > 0 && AppSettingsModel.PromptBeforeRemovingMedia)
+                {
+                    List<string> itemNames = [.. libraryMedia.Select(x => x.IsCollection ? x.Title : x.Location)];
                     string promptContent = StringResourceProvider.Instance.RemoveItemsConfirmation
-                        .Replace("$count", removingMedia.Count.ToString())
+                        .Replace("$count", libraryMedia.Count.ToString())
                         .Replace("$items", string.Join('\n', itemNames));
                     DialogOptions options = new DialogOptions.Builder()
                         .SetTitle(StringResourceProvider.Instance.Warning)
@@ -730,7 +767,14 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
                 if (proceed)
                 {
-                    await RemoveMediaInternal(removingMedia);
+                    List<MediaModel> reachableMedia = [.. libraryMedia.Where(x => !x.IsCollection && File.Exists(x.Location))];
+                    await TransitionToExternal(reachableMedia);
+
+                    List<MediaModel> deletingMedia = [.. libraryMedia.Except(reachableMedia)];
+                    if (deletingMedia.Count > 0)
+                    {
+                        await RemoveMediaInternal(deletingMedia);
+                    }
                 }
             }
         }
@@ -741,9 +785,94 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         }
     }
 
+    private static Task<List<long>> PromoteToLibrary(IReadOnlyList<string> locations)
+    {
+        return MediaHandle.Enqueue(() =>
+        {
+            List<long> mediaIds = [];
+            foreach (IEnumerable<string> locationChunk in SqlUtils.ChunkBy(locations))
+            {
+                SelectCommand selectCommand = SelectCommand.Create(MediaTable.Instance)
+                    .AppendCondition(MediaHandle.CreateMediaOnlyCondition())
+                    .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnLocation), locationChunk))
+                    .AppendCondition(MediaTable.ColumnExternal, true);
+                IReaderToken<long> idToken = selectCommand.PutQueryInt64(MediaTable.ColumnId);
+                using SelectCommand.IReader reader = selectCommand.Execute();
+                while (reader.Read())
+                {
+                    mediaIds.Add(idToken.GetValue());
+                }
+            }
+
+            if (mediaIds.Count == 0)
+            {
+                return mediaIds;
+            }
+
+            SqliteDB.MediaDatabase.WithTransaction(() =>
+            {
+                foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(mediaIds))
+                {
+                    UpdateCommand.Create(MediaTable.Instance)
+                        .AppendColumn(MediaTable.ColumnExternal, false)
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), idChunk))
+                        .Execute();
+                }
+            });
+
+            foreach (long mediaId in mediaIds)
+            {
+                if (TryGetExisting(mediaId, out MediaModel? model))
+                {
+                    model._internalModel.IsExternal = false;
+                }
+
+                Logger.I(TAG, $"Promoting media {mediaId} to the library");
+            }
+
+            return mediaIds;
+        });
+    }
+
+    private static async Task TransitionToExternal(IReadOnlyList<MediaModel> mediaItems)
+    {
+        List<MediaModel> files = [.. mediaItems.Where(x => !x.IsExternal)];
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        List<long> ids = [.. files.Select(x => x.Id)];
+        await MediaHandle.Enqueue(() =>
+        {
+            SqliteDB.MediaDatabase.WithTransaction(() =>
+            {
+                foreach (IEnumerable<long> idChunk in SqlUtils.ChunkBy(ids))
+                {
+                    UpdateCommand.Create(MediaTable.Instance)
+                        .AppendColumn(MediaTable.ColumnExternal, true)
+                        .AppendColumn(MediaTable.ColumnHidden, false)
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), idChunk))
+                        .Execute();
+                    DeleteCommand.Create(MediaCollectionTable.Instance)
+                        .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnMediaId), idChunk))
+                        .Execute();
+                }
+            });
+
+            foreach (MediaModel media in files)
+            {
+                media._internalModel.IsExternal = true;
+                media._internalModel.IsHidden = false;
+            }
+        });
+
+        DispatchUpdateEvent(ids);
+    }
+
     private static async Task RemoveMediaInternal(IEnumerable<MediaModel> mediaItems)
     {
-        List<MediaModel> removingMedia = [.. mediaItems.Where(x => !x.IsExternal).Distinct()];
+        List<MediaModel> removingMedia = [.. mediaItems.Distinct()];
 
         List<long> ids = [.. removingMedia.Select(x => x.Id)];
         if (ids.Count == 0)
@@ -831,11 +960,6 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         }
 
         await Task.WhenAll(resourceTasks);
-
-        foreach (MediaModel media in removingMedia)
-        {
-            _locationPool.GetOrAdd(media.Location, media);
-        }
 
         foreach (long id in ids)
         {
@@ -947,28 +1071,16 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     //
 
     private static readonly ConcurrentWeakPool<long, MediaModel> _idPool = new();
-    private static readonly ConcurrentWeakPool<string, MediaModel> _locationPool = new();
 
     private static bool TryGetExisting(long id, [MaybeNullWhen(false)] out MediaModel model)
     {
         return _idPool.TryGetValue(id, out model);
     }
 
-    private static bool TryGetExisting(string location, [MaybeNullWhen(false)] out MediaModel model)
-    {
-        return _locationPool.TryGetValue(location, out model);
-    }
-
     private static MediaModel ReplaceWithExisting(MediaHandle mediaHandle)
     {
         var model = new MediaModel(mediaHandle);
-
-        if (!model.IsExternal)
-        {
-            return _idPool.GetOrAdd(model.Id, model);
-        }
-
-        return _locationPool.GetOrAdd(model.Location, model);
+        return mediaHandle.IsPersistent ? _idPool.GetOrAdd(model.Id, model) : model;
     }
 
     //
@@ -1050,9 +1162,9 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     public long Id => _internalModel.Id;
     public MediaType Type => _internalModel.Type;
     public bool IsHidden => _internalModel.IsHidden;
-    public bool IsEditable => _internalModel.IsEditable;
     public bool IsExternal => _internalModel.IsExternal;
     public bool IsCollection => _internalModel.IsCollection;
+    public bool IsPersistent => _internalModel.IsPersistent;
     public long LastPositionMs => _internalModel.LastPositionMs;
     public string Location => _internalModel.Location;
     public int Progress => _internalModel.Progress;
@@ -1100,10 +1212,10 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
     public async Task Save()
     {
-        bool wasExternal = IsExternal;
+        bool wasPersistent = _internalModel.IsPersistent;
         await _internalModel.Save();
 
-        if (wasExternal)
+        if (!wasPersistent)
         {
             _idPool.Set(Id, this);
         }
@@ -1236,7 +1348,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         _internalModel.DurationMs = durationMs;
         await MediaHandle.Enqueue(() =>
         {
-            if (IsExternal)
+            if (!_internalModel.IsPersistent)
             {
                 return;
             }
@@ -1368,25 +1480,6 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         CompletionStatusEnum convertedStatus = CompletionStatusService.SDKEnumToHostEnum(status);
         await _internalModel.SaveCompletionStatus(convertedStatus);
         DispatchUpdateEvent([Id]);
-    }
-
-    async Task<bool> SDK.Plugins.Media.IMediaModel.MoveToLocation(string location)
-    {
-        string oldLocation = Location;
-        bool success = await _internalModel.MoveToLocation(location);
-
-        if (success)
-        {
-            if (IsExternal)
-            {
-                _locationPool.TryRemove(oldLocation, out _);
-                _locationPool.GetOrAdd(location, this);
-            }
-
-            DispatchUpdateEvent([Id]);
-        }
-
-        return success;
     }
 
     //

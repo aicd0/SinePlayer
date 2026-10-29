@@ -103,7 +103,7 @@ internal static class CollectionModel
 
     public static async Task AddMedia(MediaModel collection, IEnumerable<MediaModel> mediaItems)
     {
-        if (collection.IsExternal || !collection.IsCollection)
+        if (!collection.IsPersistent || !collection.IsCollection)
         {
             return;
         }
@@ -120,7 +120,7 @@ internal static class CollectionModel
 
         int insertedCount = await MediaHandle.Enqueue(() =>
         {
-            if (collection.IsExternal)
+            if (!collection.IsPersistent)
             {
                 Logger.F(TAG, "AddMedia: Cannot add mediaItems to a collection which is not saved");
                 return 0;
@@ -163,7 +163,7 @@ internal static class CollectionModel
 
         int removedCount = await MediaHandle.Enqueue(() =>
         {
-            if (collection.IsExternal)
+            if (!collection.IsPersistent)
             {
                 Logger.F(TAG, "RemoveMedia: Cannot remove mediaItems from a collection which is not saved");
                 return 0;

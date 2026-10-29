@@ -64,8 +64,8 @@ internal static class MediaMenuCreator
             }
         }
 
-        List<MediaModel> inLibraryItems = [.. selectedItems.Where(x => !x.IsExternal)];
-        List<MediaModel> inLibraryMedia = [.. inLibraryItems.Where(x => !x.IsCollection)];
+        List<MediaModel> editableItems = [.. selectedItems.Where(x => x.IsPersistent)];
+        List<MediaModel> collectionCandidateItems = [.. editableItems.Where(x => !x.IsExternal && !x.IsCollection)];
 
         Route primaryMediaRoute = OpenMediaHelper.GetMediaRoute(
             primaryItem,
@@ -143,7 +143,7 @@ internal static class MediaMenuCreator
             Items = CreateMediaTagMenuItems(primaryItem, actionHandler),
         });
 
-        if (canEdit && inLibraryItems.Count > 0)
+        if (canEdit && editableItems.Count > 0)
         {
             items.Add(new SeparatorMenuFlyoutItemModel());
 
@@ -156,7 +156,7 @@ internal static class MediaMenuCreator
                     Icon = new FontIconSource() { Glyph = "\uE8D9" },
                     Click = () =>
                     {
-                        FavoriteModel.Instance.BatchRemoveWithId(inLibraryItems.ConvertAll(x => x.Id));
+                        FavoriteModel.Instance.BatchRemoveWithId(editableItems.ConvertAll(x => x.Id));
                     },
                 });
             }
@@ -168,7 +168,7 @@ internal static class MediaMenuCreator
                     Icon = new FontIconSource() { Glyph = "\uE734" },
                     Click = () =>
                     {
-                        FavoriteModel.Instance.BatchAdd(inLibraryItems.ConvertAll(x => new FavoriteModel.FavoriteItem
+                        FavoriteModel.Instance.BatchAdd(editableItems.ConvertAll(x => new FavoriteModel.FavoriteItem
                         {
                             Id = x.Id,
                             Title = x.Title,
@@ -177,13 +177,13 @@ internal static class MediaMenuCreator
                 });
             }
 
-            if (inLibraryMedia.Count > 0)
+            if (collectionCandidateItems.Count > 0)
             {
                 items.Add(new SubItemMenuFlyoutItemModel()
                 {
                     Text = StringResourceProvider.Instance.AddToCollection,
                     Icon = new FontIconSource() { Glyph = "\uF5ED" },
-                    Items = await CreateAddToCollectionMenuItems(actionHandler, inLibraryMedia),
+                    Items = await CreateAddToCollectionMenuItems(actionHandler, collectionCandidateItems),
                 });
             }
 
@@ -191,38 +191,42 @@ internal static class MediaMenuCreator
             {
                 Text = StringResourceProvider.Instance.SetCompletionState,
                 Icon = new FontIconSource() { Glyph = "\uE7C1" },
-                Items = CreateCompletionStatusMenuItems(inLibraryItems),
+                Items = CreateCompletionStatusMenuItems(editableItems),
             });
 
-            if (primaryItem.IsHidden)
+            List<MediaModel> hideableItems = [.. editableItems.Where(x => !x.IsExternal)];
+            if (hideableItems.Count > 0)
             {
-                items.Add(new SimpleMenuFlyoutItemModel()
+                if (primaryItem.IsHidden)
                 {
-                    Text = StringResourceProvider.Instance.Unhide,
-                    Icon = new FontIconSource() { Glyph = "\uE7B3" },
-                    Click = () =>
+                    items.Add(new SimpleMenuFlyoutItemModel()
                     {
-                        CoroutineUtils.Run(() => BusyStateManager.WithBusyState(async () =>
+                        Text = StringResourceProvider.Instance.Unhide,
+                        Icon = new FontIconSource() { Glyph = "\uE7B3" },
+                        Click = () =>
                         {
-                            await Task.WhenAll(inLibraryItems.Select(x => x.SetHidden(false)));
-                        }));
-                    },
-                });
-            }
-            else
-            {
-                items.Add(new SimpleMenuFlyoutItemModel()
+                            CoroutineUtils.Run(() => BusyStateManager.WithBusyState(async () =>
+                            {
+                                await Task.WhenAll(hideableItems.Select(x => x.SetHidden(false)));
+                            }));
+                        },
+                    });
+                }
+                else
                 {
-                    Text = StringResourceProvider.Instance.Hide,
-                    Icon = new FontIconSource() { Glyph = "\uED1A" },
-                    Click = () =>
+                    items.Add(new SimpleMenuFlyoutItemModel()
                     {
-                        CoroutineUtils.Run(() => BusyStateManager.WithBusyState(async () =>
+                        Text = StringResourceProvider.Instance.Hide,
+                        Icon = new FontIconSource() { Glyph = "\uED1A" },
+                        Click = () =>
                         {
-                            await Task.WhenAll(inLibraryItems.Select(x => x.SetHidden(true)));
-                        }));
-                    },
-                });
+                            CoroutineUtils.Run(() => BusyStateManager.WithBusyState(async () =>
+                            {
+                                await Task.WhenAll(hideableItems.Select(x => x.SetHidden(true)));
+                            }));
+                        },
+                    });
+                }
             }
 
             items.Add(new SimpleMenuFlyoutItemModel()
@@ -231,7 +235,7 @@ internal static class MediaMenuCreator
                 Icon = new FontIconSource() { Glyph = "\uE70F" },
                 Click = () =>
                 {
-                    string idList = string.Join(',', inLibraryItems.Select(x => x.Id.ToString()));
+                    string idList = string.Join(',', editableItems.Select(x => x.Id.ToString()));
                     ActionModel actionModel = ActionModel.Builder.Create(EditMediaProvider.NAME)
                         .AddParameter(EditMediaProvider.PARAM_MEDIA_ID, idList)
                         .Build();
@@ -239,25 +243,29 @@ internal static class MediaMenuCreator
                 },
             });
 
-            items.Add(new SeparatorMenuFlyoutItemModel());
-
-            items.Add(new SimpleMenuFlyoutItemModel()
+            List<MediaModel> removableItems = [.. editableItems.Where(x => !x.IsExternal)];
+            if (removableItems.Count > 0)
             {
-                Text = StringResourceProvider.Instance.Remove,
-                Icon = new FontIconSource()
+                items.Add(new SeparatorMenuFlyoutItemModel());
+
+                items.Add(new SimpleMenuFlyoutItemModel()
                 {
-                    Glyph = "\uE74D",
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 69, 0)),
-                },
-                Click = () =>
-                {
-                    string idList = string.Join(',', inLibraryItems.Select(x => x.Id.ToString()));
-                    ActionModel actionModel = ActionModel.Builder.Create(RemoveMediaProvider.NAME)
-                        .AddParameter(RemoveMediaProvider.PARAM_MEDIA_ID, idList)
-                        .Build();
-                    actionHandler.HandleNoResult(actionModel);
-                },
-            });
+                    Text = StringResourceProvider.Instance.Remove,
+                    Icon = new FontIconSource()
+                    {
+                        Glyph = "\uE74D",
+                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 69, 0)),
+                    },
+                    Click = () =>
+                    {
+                        string idList = string.Join(',', removableItems.Select(x => x.Id.ToString()));
+                        ActionModel actionModel = ActionModel.Builder.Create(RemoveMediaProvider.NAME)
+                            .AddParameter(RemoveMediaProvider.PARAM_MEDIA_ID, idList)
+                            .Build();
+                        actionHandler.HandleNoResult(actionModel);
+                    },
+                });
+            }
         }
 
         {
@@ -480,7 +488,7 @@ internal static class MediaMenuCreator
                     await collection.SetTitle1(StringResourceProvider.Instance.NewCollection);
                     var dialog = new EditMediaInfoDialog([collection]);
                     await dialog.ShowAsync(windowId);
-                    if (collection.IsExternal)
+                    if (!collection.IsPersistent)
                     {
                         return;
                     }

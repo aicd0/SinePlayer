@@ -41,7 +41,6 @@ internal sealed partial class MediaInfoPage : BasePage
         ViewModel.MediaTitle1 = "";
         ViewModel.MediaTitle2 = "";
         ViewModel.MediaDir = "";
-        ViewModel.IsEditable = false;
     }
 
     protected override void OnStart(PageBundle bundle)
@@ -89,12 +88,6 @@ internal sealed partial class MediaInfoPage : BasePage
         ViewModel.CompletionStatusLiveData.ObserveSticky(this, completionStatus =>
         {
             SetCompletionStateButton.Label = CompletionStatusService.EnumToString(completionStatus);
-        });
-
-        ViewModel.IsExternalMediaLiveData.ObserveSticky(this, isExternal =>
-        {
-            RcRating.Visibility = isExternal ? Visibility.Collapsed : Visibility.Visible;
-            SetCompletionStateButton.Visibility = isExternal ? Visibility.Collapsed : Visibility.Visible;
         });
 
         ViewModel.MediaDescriptionLiveData.ObserveSticky(this, description =>

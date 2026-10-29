@@ -146,7 +146,7 @@ internal partial class SettingsPageViewModel : INotifyPropertyChanged
         long QueryMediaCount(Action<SelectCommand>? condition = null)
         {
             SelectCommand command = SelectCommand.Create(MediaTable.Instance)
-                .AppendCondition(MediaHandle.CreateMediaOnlyCondition());
+                .AppendCondition(MediaHandle.CreateLibraryOnlyCondition());
             condition?.Invoke(command);
             IReaderToken<long> mediaCountToken = command.PutQueryCountAll();
             using SelectCommand.IReader reader = command.Execute();

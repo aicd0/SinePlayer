@@ -312,11 +312,6 @@ internal sealed partial class PlayerPage : BasePage
             _navigationBar?.SetFavorite(isFavorite);
         });
 
-        ViewModel.IsExternalMediaLiveData.Observe(this, isExternal =>
-        {
-            _navigationBar?.SetExternalMedia(isExternal);
-        });
-
         ViewModel.VolumeLiveData.Observe(this, TransportBar.SetVolume);
 
         ViewModel.MuteLiveData.Observe(this, TransportBar.SetMuted);

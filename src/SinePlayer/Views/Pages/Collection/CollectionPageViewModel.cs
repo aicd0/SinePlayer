@@ -96,17 +96,6 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _isEditable = false;
-    public bool IsEditable
-    {
-        get => _isEditable;
-        set
-        {
-            _isEditable = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsEditable)));
-        }
-    }
-
     private bool _isFavorite = false;
     public bool IsFavorite
     {
@@ -362,7 +351,6 @@ internal partial class CollectionPageViewModel : INotifyPropertyChanged
         Rating = rating >= 0 ? rating * 0.05F : -1.0;
         CoverImageUri = MediaExt.GetCoverImageUri(collection);
         BackgroundImageUri = collection.GetExt(MediaExt.BACKGROUND_IMAGE);
-        IsEditable = collection.IsEditable;
         IsFavorite = isFavorite;
         TagCollectionViewModel.Update(MediaTags, collection, _actionHandler);
         TitleLiveData.Emit(collection.Title);

@@ -145,7 +145,6 @@
                     <AutoSuggestBox
                         Grid.Column="0"
                         GotFocus="NewTagsAutoSuggestBox_GotFocus"
-                        IsEnabled="{x:Bind ViewModel.IsEditable, Mode=OneWay}"
                         PlaceholderText="{x:Bind StringResource.EnterNewTags}"
                         QuerySubmitted="NewTagsAutoSuggestBox_QuerySubmitted"
                         SuggestionChosen="NewTagsAutoSuggestBox_SuggestionChosen"
@@ -167,7 +166,6 @@
                     <AppBarButton
                         Click="OnEditInfoClick"
                         Icon="Edit"
-                        IsEnabled="{x:Bind ViewModel.IsEditable, Mode=OneWay}"
                         Label="{x:Bind StringResource.Edit}"
                         Style="{StaticResource InfoPanelAppBarButtonStyle}" />
                     <AppBarButton

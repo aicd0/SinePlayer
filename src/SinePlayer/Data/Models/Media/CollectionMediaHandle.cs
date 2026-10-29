@@ -13,7 +13,7 @@ internal partial class CollectionMediaHandle : MediaHandle
     {
     }
 
-    public static MediaHandle FromExternal()
+    public static MediaHandle CreateNew()
     {
         return new CollectionMediaHandle()
         {
@@ -21,8 +21,6 @@ internal partial class CollectionMediaHandle : MediaHandle
             Title1 = string.Empty,
         };
     }
-
-    public override bool IsEditable => !IsExternal;
 
     public override IReadOnlyList<string> GetFolderViewPath()
     {

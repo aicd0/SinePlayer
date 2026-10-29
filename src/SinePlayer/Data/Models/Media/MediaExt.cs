@@ -26,6 +26,6 @@ internal static class MediaExt
             return coverImage;
         }
 
-        return media.IsExternal ? null : ResourceUri.CreateMediaThumbnail(media.Id).ToString();
+        return ResourceUri.CreateMediaThumbnail(media.Id).ToString();
     }
 }

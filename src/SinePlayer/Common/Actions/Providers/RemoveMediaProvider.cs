@@ -51,6 +51,8 @@ internal class RemoveMediaProvider : IActionProvider
         }
 
         List<MediaModel> mediaItems = await MediaModel.BatchFromId(ids);
+
+        mediaItems = [.. mediaItems.Where(x => !x.IsExternal)];
         if (mediaItems.Count == 0)
         {
             return ActionResult.FromSuccess();

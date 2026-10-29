@@ -42,6 +42,4 @@ public interface IMediaModel
     Task SetHidden(bool isHidden);
 
     Task SetCompletionStatus(CompletionStatusEnum status);
-
-    Task<bool> MoveToLocation(string location);
 }
