@@ -40,6 +40,21 @@ internal abstract partial class MediaHandle(MediaType type)
             ComparisonCondition.TypeEnum.NotEqual);
     }
 
+    public static ICondition CreateNonExternalCondition()
+    {
+        return new ComparisonCondition(
+            ColumnOrValue.FromColumn(MediaTable.ColumnExternal),
+            ColumnOrValue.FromValue(false));
+    }
+
+    public static ICondition CreateLibraryOnlyCondition()
+    {
+        return new AndCondition([
+            CreateMediaOnlyCondition(),
+            CreateNonExternalCondition(),
+        ]);
+    }
+
     public static Task Enqueue(Action action)
     {
         return SqliteDB.MediaDatabaseDispatcher.Submit(action);
@@ -59,9 +74,34 @@ internal abstract partial class MediaHandle(MediaType type)
         }
 
         media.Location = location;
+        media.IsExternal = false;
         media.SetAsDefaultInfo();
         media.InsertNewNoLock();
         return media.Id;
+    }
+
+    public static Task<MediaHandle?> FromLocationOrInsertExternal(MediaType type, string location)
+    {
+        return Enqueue(() =>
+        {
+            MediaHandle? existing = FromLocationNoLock(location);
+            if (existing is not null)
+            {
+                return existing;
+            }
+
+            MediaHandle? media = FromType(type);
+            if (media is null)
+            {
+                return null;
+            }
+
+            media.Location = location;
+            media.IsExternal = true;
+            media.SetAsDefaultInfo();
+            media.InsertNewNoLock();
+            return media;
+        });
     }
 
     public static Task<MediaHandle?> FromId(long id)
@@ -69,14 +109,6 @@ internal abstract partial class MediaHandle(MediaType type)
         return Enqueue(() =>
         {
             return FromIdNoLock(id);
-        });
-    }
-
-    public static Task<MediaHandle?> FromLocation(string location)
-    {
-        return Enqueue(() =>
-        {
-            return FromLocationNoLock(location);
         });
     }
 
@@ -122,6 +154,7 @@ internal abstract partial class MediaHandle(MediaType type)
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             IReaderToken<long> typeToken = command.PutQueryInt64(MediaTable.ColumnType);
             IReaderToken<string> locationToken = command.PutQueryString(MediaTable.ColumnLocation);
+            IReaderToken<bool> externalToken = command.PutQueryBoolean(MediaTable.ColumnExternal);
             IReaderToken<string> title1Token = command.PutQueryString(MediaTable.ColumnTitle1);
             IReaderToken<string> title2Token = command.PutQueryString(MediaTable.ColumnTitle2);
             IReaderToken<bool> hiddenToken = command.PutQueryBoolean(MediaTable.ColumnHidden);
@@ -140,6 +173,7 @@ internal abstract partial class MediaHandle(MediaType type)
                 long id = idToken.GetValue();
                 var type = (MediaType)typeToken.GetValue();
                 string location = locationToken.GetValue();
+                bool isExternal = externalToken.GetValue();
                 string title1 = title1Token.GetValue();
                 string title2 = title2Token.GetValue();
                 bool isHidden = hiddenToken.GetValue();
@@ -160,6 +194,7 @@ internal abstract partial class MediaHandle(MediaType type)
 
                 media.Id = id;
                 media.Location = location;
+                media.IsExternal = isExternal;
                 media.Title1 = title1;
                 media.Title2 = title2;
                 media.IsHidden = isHidden;
@@ -327,12 +362,13 @@ internal abstract partial class MediaHandle(MediaType type)
     //
 
     public long Id { get; set; } = -1;
+    public bool IsExternal { get; set; }
     public MediaType Type { get; } = type;
     public CompletionStatusEnum CompletionStatus { get; private set; }
     public string Location { get; protected set; } = string.Empty;
     public string Title1 { get; protected set; } = string.Empty;
     public string Title2 { get; protected set; } = string.Empty;
-    public bool IsHidden { get; protected set; } = false;
+    public bool IsHidden { get; set; } = false;
     public int Rating { get; protected set; } = -1;
     public int Progress { get; protected set; } = -1;
     public DateTimeOffset LastVisit { get; protected set; } = DateTimeOffset.MinValue;
@@ -342,9 +378,10 @@ internal abstract partial class MediaHandle(MediaType type)
     public IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory> TagsForPlugin => _tags;
     public long DurationMs { get; set; } = -1;
 
-    public abstract bool IsEditable { get; }
     public virtual string FileSystemPath => Location;
-    public bool IsExternal => Id < 0;
+
+    public bool IsPersistent => Id >= 0;
+
     public bool IsCollection => Type == MediaType.Collection;
 
     //
@@ -368,7 +405,7 @@ internal abstract partial class MediaHandle(MediaType type)
     {
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 InsertNewNoLock();
             }
@@ -401,7 +438,7 @@ internal abstract partial class MediaHandle(MediaType type)
     {
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 return;
             }
@@ -418,7 +455,7 @@ internal abstract partial class MediaHandle(MediaType type)
         Title1 = title;
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 return;
             }
@@ -435,7 +472,7 @@ internal abstract partial class MediaHandle(MediaType type)
         Title2 = title;
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 return;
             }
@@ -452,7 +489,7 @@ internal abstract partial class MediaHandle(MediaType type)
         Description = description;
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 return;
             }
@@ -508,7 +545,7 @@ internal abstract partial class MediaHandle(MediaType type)
 
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 return;
             }
@@ -522,7 +559,7 @@ internal abstract partial class MediaHandle(MediaType type)
         Location = location;
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 return;
             }
@@ -540,7 +577,7 @@ internal abstract partial class MediaHandle(MediaType type)
         Rating = rating;
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 return;
             }
@@ -559,7 +596,7 @@ internal abstract partial class MediaHandle(MediaType type)
 
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 return;
             }
@@ -570,24 +607,6 @@ internal abstract partial class MediaHandle(MediaType type)
                 .AppendCondition(MediaTable.ColumnId, Id)
                 .Execute();
         });
-    }
-
-    //
-    // Utilities
-    //
-
-    public async Task<bool> MoveToLocation(string newLocation)
-    {
-        return await MoveToLocationInternal(newLocation);
-    }
-
-    //
-    // Virtual Methods
-    //
-
-    protected virtual Task<bool> MoveToLocationInternal(string newLocation)
-    {
-        return Task.FromResult(false);
     }
 
     //
@@ -605,6 +624,7 @@ internal abstract partial class MediaHandle(MediaType type)
         return [
             MediaTable.ColumnType,
             MediaTable.ColumnLocation,
+            MediaTable.ColumnExternal,
             MediaTable.ColumnTitle1,
             MediaTable.ColumnTitle2,
             MediaTable.ColumnHidden,
@@ -625,6 +645,7 @@ internal abstract partial class MediaHandle(MediaType type)
         evaluators[MediaTable.ColumnId.Name] = i => TypeAssert.AssertLong(i.Id);
         evaluators[MediaTable.ColumnType.Name] = i => TypeAssert.AssertLong((long)i.Type);
         evaluators[MediaTable.ColumnLocation.Name] = i => TypeAssert.AssertString(i.Location);
+        evaluators[MediaTable.ColumnExternal.Name] = i => TypeAssert.AssertBoolean(i.IsExternal);
         evaluators[MediaTable.ColumnTitle1.Name] = i => TypeAssert.AssertString(i.Title1);
         evaluators[MediaTable.ColumnTitle2.Name] = i => TypeAssert.AssertString(i.Title2);
         evaluators[MediaTable.ColumnHidden.Name] = i => TypeAssert.AssertBoolean(i.IsHidden);
@@ -663,11 +684,16 @@ internal abstract partial class MediaHandle(MediaType type)
 
     public async Task SaveHiddenAsync(bool hidden)
     {
+        if (IsExternal)
+        {
+            return;
+        }
+
         IsHidden = hidden;
 
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent || IsExternal)
             {
                 return;
             }
@@ -685,7 +711,7 @@ internal abstract partial class MediaHandle(MediaType type)
 
         await Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 return;
             }
@@ -704,7 +730,7 @@ internal abstract partial class MediaHandle(MediaType type)
 
         CoroutineUtils.Run(() => Enqueue(() =>
         {
-            if (IsExternal)
+            if (!IsPersistent)
             {
                 return;
             }

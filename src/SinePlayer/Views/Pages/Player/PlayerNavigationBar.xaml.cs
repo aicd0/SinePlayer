@@ -56,11 +56,6 @@ internal sealed partial class PlayerNavigationBar : BaseUserControl
         FavoriteChanged?.Invoke(isFavorite);
     }
 
-    public void SetExternalMedia(bool isExternalMedia)
-    {
-        AbbAddToFavorite.IsEnabled = !isExternalMedia;
-    }
-
     public void SetPlayerSettings(MediaModel media)
     {
         MainPlayerSettingPanel.SetMedia(media);

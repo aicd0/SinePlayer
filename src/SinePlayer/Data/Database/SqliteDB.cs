@@ -111,6 +111,7 @@ internal static class SqliteDB
             MediaTable.ColumnId.Name + " INTEGER PRIMARY KEY AUTOINCREMENT" +
             "," + MediaTable.ColumnType.Name + " INTEGER NOT NULL" +
             "," + MediaTable.ColumnLocation.Name + " TEXT NOT NULL" +
+            "," + MediaTable.ColumnExternal.Name + " BOOLEAN NOT NULL" +
             "," + MediaTable.ColumnTitle1.Name + " TEXT" +
             "," + MediaTable.ColumnTitle2.Name + " TEXT" +
             "," + MediaTable.ColumnHidden.Name + " BOOLEAN NOT NULL" +

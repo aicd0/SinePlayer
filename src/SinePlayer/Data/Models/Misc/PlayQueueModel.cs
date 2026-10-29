@@ -45,59 +45,30 @@ internal class PlayQueueModel
 
     private static async Task<PlayQueueModel> CreateFromBuilder(IEnumerable<PlayQueueItemJsonModel> builder)
     {
-        List<long> mediaIds = [];
-        foreach (PlayQueueItemJsonModel jsonItem in builder)
-        {
-            if (!jsonItem.IsExternal.HasValue)
-            {
-                continue;
-            }
+        List<PlayQueueItemJsonModel> jsonItems = [.. builder.Where(x => x.MediaId.HasValue)];
+        List<long> mediaIds = [.. jsonItems.Select(x => x.MediaId.GetValueOrDefault()).Distinct()];
 
-            if (!jsonItem.IsExternal.Value)
-            {
-                if (!jsonItem.MediaId.HasValue)
-                {
-                    continue;
-                }
-
-                mediaIds.Add(jsonItem.MediaId.Value);
-            }
-        }
-
-        List<MediaModel> libraryMedia = await MediaModel.BatchFromId(mediaIds);
+        List<MediaModel> media = await MediaModel.BatchFromId(mediaIds);
         var mediaIdMap = new Dictionary<long, MediaModel>();
-        foreach (MediaModel media in libraryMedia)
+        foreach (MediaModel item in media)
         {
-            mediaIdMap[media.Id] = media;
+            mediaIdMap[item.Id] = item;
         }
 
         List<PlayQueueItem> items = [];
-        foreach (PlayQueueItemJsonModel jsonItem in builder)
+        foreach (PlayQueueItemJsonModel jsonItem in jsonItems)
         {
-            if (!jsonItem.IsExternal.HasValue)
+            if (!mediaIdMap.TryGetValue(jsonItem.MediaId.GetValueOrDefault(), out MediaModel? item) || item.IsCollection)
             {
                 continue;
             }
 
-            MediaModel? media = null;
-            if (jsonItem.IsExternal.Value)
+            string id = string.IsNullOrEmpty(jsonItem.Id) ? Guid.NewGuid().ToString() : jsonItem.Id;
+            items.Add(new()
             {
-                media = await MediaModel.FromExternalLocation(jsonItem.Location ?? string.Empty);
-            }
-            else if (jsonItem.MediaId.HasValue)
-            {
-                mediaIdMap.TryGetValue(jsonItem.MediaId.Value, out media);
-            }
-
-            if (media is not null && !media.IsCollection)
-            {
-                string id = string.IsNullOrEmpty(jsonItem.Id) ? Guid.NewGuid().ToString() : jsonItem.Id;
-                items.Add(new()
-                {
-                    Media = media,
-                    Id = id,
-                });
-            }
+                Media = item,
+                Id = id,
+            });
         }
 
         return new(items);
@@ -123,9 +94,7 @@ internal class PlayQueueModel
             .Select(x => new PlayQueueItemJsonModel()
             {
                 Id = x.Id,
-                IsExternal = x.Media.IsExternal,
                 MediaId = x.Media.Id,
-                Location = x.Media.Location,
             });
         return JsonSerializer.Serialize(new List<PlayQueueItemJsonModel>(jsonItems));
     }
@@ -141,14 +110,8 @@ internal class PlayQueueModel
         [JsonPropertyName("Id")]
         public string? Id { get; set; }
 
-        [JsonPropertyName("IsExternal")]
-        public bool? IsExternal { get; set; }
-
         [JsonPropertyName("MediaId")]
         public long? MediaId { get; set; }
-
-        [JsonPropertyName("Location")]
-        public string? Location { get; set; }
     }
 
     public class Builder
@@ -167,9 +130,7 @@ internal class PlayQueueModel
                 _mediaItems.Add(new PlayQueueItemJsonModel()
                 {
                     Id = item.Id,
-                    IsExternal = item.Media.IsExternal,
-                    Location = item.Media.Location,
-                    MediaId = item.Media.Id
+                    MediaId = item.Media.Id,
                 });
             }
 
@@ -193,9 +154,7 @@ internal class PlayQueueModel
             {
                 var item = new PlayQueueItemJsonModel()
                 {
-                    IsExternal = media.IsExternal,
-                    Location = media.Location,
-                    MediaId = media.Id
+                    MediaId = media.Id,
                 };
                 itemId = EnsureId(item);
                 _mediaItems.Insert(0, item);
@@ -213,19 +172,7 @@ internal class PlayQueueModel
 
             _mediaItems.Add(new PlayQueueItemJsonModel()
             {
-                IsExternal = media.IsExternal,
-                Location = media.Location,
-                MediaId = media.Id
-            });
-            return this;
-        }
-
-        public Builder AddMediaLocation(string location)
-        {
-            _mediaItems.Add(new PlayQueueItemJsonModel()
-            {
-                IsExternal = true,
-                Location = location,
+                MediaId = media.Id,
             });
             return this;
         }
@@ -234,24 +181,9 @@ internal class PlayQueueModel
         {
             foreach (PlayQueueItemJsonModel item in _mediaItems)
             {
-                if (media.IsExternal != item.IsExternal)
+                if (media.Id != item.MediaId)
                 {
                     continue;
-                }
-
-                if (media.IsExternal)
-                {
-                    if (media.Location != item.Location)
-                    {
-                        continue;
-                    }
-                }
-                else
-                {
-                    if (media.Id != item.MediaId)
-                    {
-                        continue;
-                    }
                 }
 
                 return EnsureId(item);

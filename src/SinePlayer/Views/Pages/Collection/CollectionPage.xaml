@@ -89,7 +89,6 @@
                                 Margin="0,8,0,0"
                                 HorizontalAlignment="Left"
                                 IsClearEnabled="True"
-                                IsEnabled="{x:Bind ViewModel.IsEditable, Mode=OneWay}"
                                 ValueChanged="RatingControl_ValueChanged"
                                 Value="{x:Bind ViewModel.Rating, Mode=TwoWay}" />
                             <!--  Tags  -->
@@ -105,7 +104,6 @@
                             <Button
                                 Padding="8"
                                 Click="EditButton_Click"
-                                IsEnabled="{x:Bind ViewModel.IsEditable, Mode=OneWay}"
                                 ToolTipService.ToolTip="{x:Bind StringResource.Edit}">
                                 <Button.Content>
                                     <FontIcon FontSize="18" Glyph="&#xE70F;" />

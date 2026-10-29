@@ -45,7 +45,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     public readonly MutableLiveData<bool> PlaybackChangeLiveData = new();
     public readonly MutableLiveData<PlayerStatusInfo> PlayerStatusLiveData = new(new() { Status = PlayerStatusEnum.Idle });
-    public readonly MutableLiveData<bool> IsExternalMediaLiveData = new(true);
     public readonly MutableLiveData<bool> IsFavoriteLiveData = new();
     public readonly MutableLiveData<bool> IsPlayingLiveData = new();
     public readonly MutableLiveData<long> PositionLiveData = new();
@@ -214,14 +213,13 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         Playback.Previous(false);
     }
 
-    /// <summary>The duration the engine probed, kept on the media when it was not known before.</summary>
     public void SetDuration(long durationMs)
     {
         _positionMs = 0;
         _durationMs = durationMs;
 
         MediaModel? media = _media;
-        if (durationMs > 0 && media is not null && media.DurationMs <= 0 && !media.IsExternal)
+        if (durationMs > 0 && media is not null && media.DurationMs <= 0)
         {
             CoroutineUtils.Run(async () => await media.SetDuration(durationMs));
         }
@@ -229,10 +227,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         DurationMs = durationMs;
     }
 
-    /// <summary>
-    /// Where playback has got to, as the engine reports it. The view keeps a position it can show and the media
-    /// keeps a mark every few seconds; both cadences and the write are here, so the page only reads the engine.
-    /// </summary>
     public void SetPosition(long positionMs, long durationMs)
     {
         _positionMs = positionMs;
@@ -293,7 +287,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         IsFavoriteLiveData.Emit(isFavorite);
 
         MediaModel? media = _media;
-        if (writeDatabase && media != null && !media.IsExternal)
+        if (writeDatabase && media != null)
         {
             if (isFavorite)
             {
@@ -365,7 +359,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         _lastPositionSaveTicks = Environment.TickCount64;
 
         MediaModel? media = _media;
-        if (media is null || media.IsExternal)
+        if (media is null)
         {
             return;
         }
@@ -495,16 +489,12 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         UpdateMediaMetadata();
 
         // Save to history
-        if (!media.IsExternal)
+        await media.SetAsVisited();
+        if (AppSettingsModel.SaveBrowsingHistory)
         {
-            await media.SetAsVisited();
-            if (AppSettingsModel.SaveBrowsingHistory)
-            {
-                await MediaHistoryItemModel.AddAsync(media.Id, media.Title1);
-            }
+            await MediaHistoryItemModel.AddAsync(media.Id, media.Title1);
         }
 
-        IsExternalMediaLiveData.Emit(media.IsExternal);
         UpdateFavoriteStatusInternal(media);
     }
 
@@ -539,7 +529,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     private void UpdateFavoriteStatusInternal(MediaModel media)
     {
-        bool isFavorite = !media.IsExternal && FavoriteModel.Instance.FromId(media.Id) != null;
+        bool isFavorite = FavoriteModel.Instance.FromId(media.Id) != null;
         SetFavorite(isFavorite, false);
     }
 
@@ -569,7 +559,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     public void CompleteMedia()
     {
         MediaModel? media = _media;
-        if (media is not null && !media.IsExternal)
+        if (media is not null)
         {
             CoroutineUtils.Run(async () => await media.SetProgress(100, 0));
         }

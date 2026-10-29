@@ -13,6 +13,7 @@ internal class MediaTable : ITable
     public static Int64Column ColumnId { get; } = new("id");
     public static Int64Column ColumnType { get; } = new("type");
     public static StringColumn ColumnLocation { get; } = new("location");
+    public static BooleanColumn ColumnExternal { get; } = new("external");
     public static StringColumn ColumnTitle1 { get; } = new("title1");
     public static StringColumn ColumnTitle2 { get; } = new("title2");
     public static BooleanColumn ColumnHidden { get; } = new("hidden");

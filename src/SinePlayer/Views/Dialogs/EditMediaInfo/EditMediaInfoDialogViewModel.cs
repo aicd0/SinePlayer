@@ -186,7 +186,7 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
     public void Initialize(IEnumerable<MediaModel> mediaItems)
     {
         _mediaItems.AddRange(mediaItems);
-        IsCreationMode = mediaItems.All(x => x.IsExternal);
+        IsCreationMode = mediaItems.All(x => !x.IsPersistent);
         IsCollectionOnlyMode = mediaItems.All(x => x.IsCollection);
         Title = GetTitle();
 
