@@ -480,7 +480,7 @@ $files</value>
 %rating              - 評価。例：100は星5つ、-1は評価なしを表します。
 %completion_status   - 完了状態。
 %progress            - 進捗率。例：50は50%を表します。
-%duration            - 合計時間。
+%duration            - 合計時間（ミリ秒）。
 
 2. 変数演算子
 

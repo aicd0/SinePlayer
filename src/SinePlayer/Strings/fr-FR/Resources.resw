@@ -480,7 +480,7 @@ Catégorie :: Tag1, Tag2    - Remplacez « Catégorie » par « Tag1 » et « Ta
 %rating              - Note. Par exemple, 100 représente 5 étoiles et -1 signifie qu'aucune note n'est disponible.
 %completion_status   - État d'achèvement.
 %progress            - Progression en pourcentage. Par exemple, 50 représente 50 %.
-%duration            - Durée totale.
+%duration            - Durée totale en millisecondes.
 
 2. Opérateurs sur les variables
 

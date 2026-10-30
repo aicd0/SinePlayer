@@ -23,7 +23,7 @@
 
         </ResourceDictionary>
     </base:BaseUserControl.Resources>
-
+ 
     <Grid
         x:Name="RootGrid"
         Background="{ThemeResource ButtonBackground}"
@@ -44,11 +44,11 @@
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0" Padding="16,24,16,0">
-                <Grid Height="200">
+                <Grid Height="184">
                     <Border
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        CornerRadius="5">
+                        CornerRadius="4">
                         <image:SimpleImageView x:Name="ImageHolder" ImageUri="{x:Bind Item.CoverImageUri, Mode=OneWay}" />
                     </Border>
                     <FontIcon

@@ -480,7 +480,7 @@ $files</value>
 %rating              - 评分。例如，100 表示 5 星，-1 表示无评分。
 %completion_status   - 完成状态。
 %progress            - 进度百分比。例如，50 表示 50%。
-%duration            - 总时长。
+%duration            - 总时长，单位为毫秒。
 
 2. 变量运算符
 

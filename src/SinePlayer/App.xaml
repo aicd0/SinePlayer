@@ -106,12 +106,12 @@
                     <x:Double x:Key="ContentDialogMinHeight">10</x:Double>
                     <x:Double x:Key="ContentDialogMaxWidth">1000</x:Double>
                     <x:Double x:Key="ContentDialogMinWidth">10</x:Double>
-                    <x:Double x:Key="MediaItemLargePortraitDesiredWidth">180</x:Double>
-                    <x:Double x:Key="MediaItemLargePortraitDesiredHeight">352</x:Double>
+                    <x:Double x:Key="MediaItemLargePortraitDesiredWidth">170</x:Double>
+                    <x:Double x:Key="MediaItemLargePortraitDesiredHeight">340</x:Double>
                     <x:Double x:Key="MediaItemLargeLandscapeDesiredWidth">220</x:Double>
                     <x:Double x:Key="MediaItemLargeLandscapeDesiredHeight">240</x:Double>
                     <x:Double x:Key="MediaItemMediumDesiredWidth">320</x:Double>
-                    <x:Double x:Key="MediaItemMediumDesiredHeight">136</x:Double>
+                    <x:Double x:Key="MediaItemMediumDesiredHeight">144</x:Double>
 
                     <Style TargetType="main:TitleBar">
                         <Setter Property="ButtonBackground" Value="Transparent" />
