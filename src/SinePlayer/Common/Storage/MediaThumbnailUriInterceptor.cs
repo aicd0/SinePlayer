@@ -7,8 +7,8 @@ using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 
-using SinePlayer.Common.Imaging;
 using SinePlayer.Common.Misc;
+using SinePlayer.Core.Imaging;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Helpers.Imaging;
 

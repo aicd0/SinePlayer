@@ -1,16 +1,11 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 using SinePlayer.Core.Common.Threading;
 
-namespace SinePlayer.Common.Imaging;
+namespace SinePlayer.Core.Imaging;
 
 internal static class ImageLoaderScheduler
 {

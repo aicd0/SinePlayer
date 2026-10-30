@@ -6,10 +6,10 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Threading.Tasks;
 
-using SinePlayer.Common.Imaging;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Imaging;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Thumbnails;

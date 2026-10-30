@@ -8,8 +8,8 @@
     xmlns:cw="using:CommunityToolkit.WinUI"
     xmlns:cwm="using:CommunityToolkit.WinUI.Media"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:image="using:SinePlayer.Common.Imaging"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:usercontrols="using:SinePlayer.UserControls.Misc"
     xmlns:vm="using:SinePlayer.ViewModels"
     d:DataContext="{d:DesignInstance Type=vm:MediaItemViewModel}"
     Tapped="BaseUserControl_Tapped"
@@ -23,7 +23,7 @@
 
         </ResourceDictionary>
     </base:BaseUserControl.Resources>
- 
+
     <Grid
         x:Name="RootGrid"
         Background="{ThemeResource ButtonBackground}"
@@ -49,7 +49,7 @@
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         CornerRadius="4">
-                        <image:SimpleImageView x:Name="ImageHolder" ImageUri="{x:Bind Item.CoverImageUri, Mode=OneWay}" />
+                        <usercontrols:SimpleImageView x:Name="ImageHolder" ImageUri="{x:Bind Item.CoverImageUri, Mode=OneWay}" />
                     </Border>
                     <FontIcon
                         HorizontalAlignment="Center"

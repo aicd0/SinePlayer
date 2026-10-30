@@ -5,9 +5,9 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 
-using SinePlayer.Common.Imaging;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Imaging;
 
 namespace SinePlayer.Helpers.Imaging;
 

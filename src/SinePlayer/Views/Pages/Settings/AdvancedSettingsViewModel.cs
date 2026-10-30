@@ -6,12 +6,12 @@ using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 
-using SinePlayer.Common.Imaging;
 using SinePlayer.Common.Localization;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Storage;
 using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Imaging;
 using SinePlayer.Data.Models.Misc;
 
 namespace SinePlayer.Views.Pages.Settings;

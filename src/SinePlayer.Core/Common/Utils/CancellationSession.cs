@@ -1,13 +1,9 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System;
-using System.Collections.Generic;
-using System.Threading;
+namespace SinePlayer.Core.Common.Utils;
 
-namespace SinePlayer.Common.Utils;
-
-internal sealed class CancellationSession
+public sealed class CancellationSession
 {
     private readonly Lock _lock = new();
     private readonly List<WeakReference<CancellationSession>> _subSessions = [];

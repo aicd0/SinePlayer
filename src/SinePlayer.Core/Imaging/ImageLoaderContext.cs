@@ -1,19 +1,14 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
 
 using Windows.Graphics.Imaging;
 
-namespace SinePlayer.Common.Imaging;
+namespace SinePlayer.Core.Imaging;
 
-internal partial class ImageLoaderContext(IImageSource source) : IDisposable
+public partial class ImageLoaderContext(IImageSource source) : IDisposable
 {
     private const string TAG = nameof(ImageLoaderContext);
 
@@ -22,12 +17,12 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
 
     private static ImageCacheDatabase? sDatabase = null;
 
-    public static void InjectDatabase(ImageCacheDatabase database)
+    internal static void InjectDatabase(ImageCacheDatabase database)
     {
         sDatabase = database;
     }
 
-    public static bool ValidateCacheRecord(ImageCacheDatabase.CacheRecord record, string? fingerprint)
+    internal static bool ValidateCacheRecord(ImageCacheDatabase.CacheRecord record, string? fingerprint)
     {
         string metaVersion = record.GetExt(ImageCacheExt.IMAGE_META_VERSION) ?? string.Empty;
         if (metaVersion != IMAGE_META_VERSION.ToString())
@@ -39,7 +34,7 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
         return fingerprint is null || metaFingerprint == fingerprint;
     }
 
-    public static void SaveImageMetaToCacheRecord(ImageCacheDatabase.CacheRecord record, string sourceFingerprint, long size, BitmapDecoder decoder)
+    internal static void SaveImageMetaToCacheRecord(ImageCacheDatabase.CacheRecord record, string sourceFingerprint, long size, BitmapDecoder decoder)
     {
         uint width = decoder.OrientedPixelWidth;
         uint height = decoder.OrientedPixelHeight;
@@ -102,7 +97,7 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
     private int _referenceCount = 1;
     private ValidationState _validation = ValidationState.NotValidated;
 
-    public IImageSource Source => _source;
+    internal IImageSource Source => _source;
 
     public void Dispose()
     {
@@ -114,7 +109,7 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
         Release();
     }
 
-    public void Acquire()
+    internal void Acquire()
     {
         lock (_lock)
         {
@@ -129,7 +124,7 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
         }
     }
 
-    public void Release()
+    internal void Release()
     {
         lock (_lock)
         {
@@ -148,7 +143,7 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
         _vectorService = null;
     }
 
-    public async Task<ImageCacheDatabase.CacheRecord?> GetOrCreateCache()
+    internal async Task<ImageCacheDatabase.CacheRecord?> GetOrCreateCache()
     {
         ImageCacheDatabase? db = sDatabase ?? throw new InvalidOperationException("No cache database was injected into this context.");
 
@@ -175,7 +170,7 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
         return db.GetOrCreateCache(cacheKey);
     }
 
-    public async Task<string?> GetValidationFingerprint()
+    internal async Task<string?> GetValidationFingerprint()
     {
         switch (_source.CacheValidationMode)
         {
@@ -191,7 +186,7 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
         }
     }
 
-    public async Task<string> GetFingerprint()
+    internal async Task<string> GetFingerprint()
     {
         if (_fingerprint is not null)
         {
@@ -208,7 +203,7 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
         return _fingerprint;
     }
 
-    public async Task<Stream?> GetSourceStream()
+    internal async Task<Stream?> GetSourceStream()
     {
         if (_sourceStream is not null)
         {
@@ -234,13 +229,13 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
         return _sourceStream;
     }
 
-    public void UnrefSourceStream()
+    internal void UnrefSourceStream()
     {
         _sourceStream = null;
         _bitmapDecoder = null;
     }
 
-    public async Task<BitmapDecoder?> GetBitmapDecoder()
+    internal async Task<BitmapDecoder?> GetBitmapDecoder()
     {
         if (_bitmapDecoder is not null)
         {
@@ -265,7 +260,7 @@ internal partial class ImageLoaderContext(IImageSource source) : IDisposable
         return _bitmapDecoder;
     }
 
-    public async Task<IVectorImageService?> GetVectorService()
+    internal async Task<IVectorImageService?> GetVectorService()
     {
         if (_vectorService is not null)
         {

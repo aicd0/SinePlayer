@@ -1,13 +1,9 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Text;
 
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI.Xaml;
@@ -15,7 +11,6 @@ using Microsoft.UI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Media.Imaging;
 
-using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.Caching;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Storage;
@@ -24,9 +19,9 @@ using SinePlayer.Core.Common.Utils;
 
 using Windows.Graphics.Imaging;
 
-namespace SinePlayer.Common.Imaging;
+namespace SinePlayer.Core.Imaging;
 
-internal static partial class ImageLoader
+public static partial class ImageLoader
 {
     private const string TAG = nameof(ImageLoader);
     private const int VERSION = 1;
@@ -610,7 +605,7 @@ internal static partial class ImageLoader
 
         try
         {
-            string entry = StringUtils.RandomFileName(16);
+            string entry = RandomFileName(16);
             using LRUCacheStream? cacheFileStream = imageCache.Put(entry);
             if (cacheFileStream is null)
             {
@@ -885,6 +880,18 @@ internal static partial class ImageLoader
 
             Logger.E(TAG, $"Failed to delete directory: {path}", ex);
         }
+    }
+
+    private static string RandomFileName(int length)
+    {
+        const string symbols = "0123456789abcdefghijklmnopqrstuvwxyz";
+        StringBuilder sb = new();
+        for (int i = 0; i < length; ++i)
+        {
+            sb.Append(symbols[Random.Shared.Next(symbols.Length)]);
+        }
+
+        return sb.ToString();
     }
 
     private static long GetCurrentTick()

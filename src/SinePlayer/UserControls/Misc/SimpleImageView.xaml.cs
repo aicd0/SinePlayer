@@ -12,11 +12,12 @@ using Microsoft.UI.Xaml.Media;
 using SinePlayer.Common.Storage;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Imaging;
 using SinePlayer.Helpers.Imaging;
 
 using Windows.Foundation;
 
-namespace SinePlayer.Common.Imaging;
+namespace SinePlayer.UserControls.Misc;
 
 internal partial class SimpleImageView : UserControl
 {

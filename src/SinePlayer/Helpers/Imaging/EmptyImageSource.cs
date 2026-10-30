@@ -3,7 +3,7 @@
 
 using System.Threading.Tasks;
 
-using SinePlayer.Common.Imaging;
+using SinePlayer.Core.Imaging;
 
 namespace SinePlayer.Helpers.Imaging;
 
