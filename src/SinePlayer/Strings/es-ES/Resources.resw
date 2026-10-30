@@ -480,7 +480,7 @@ Categoría:: Etiqueta1, Etiqueta2    - Sobrescribe “Categoría” con “Etiqu
 %rating              - Valoración. Por ejemplo, 100 representa 5 estrellas y -1 significa que no hay valoración.
 %completion_status   - Estado de finalización.
 %progress            - Progreso en porcentaje. Por ejemplo, 50 representa el 50 %.
-%duration            - Duración total.
+%duration            - Duración total en milisegundos.
 
 2. Operadores de variables
 

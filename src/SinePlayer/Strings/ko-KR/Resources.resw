@@ -480,7 +480,7 @@ $files</value>
 %rating              - 평점. 예: 100은 별 5개, -1은 평점 없음을 의미합니다.
 %completion_status   - 완료 상태.
 %progress            - 진행률(백분율). 예: 50은 50%를 의미합니다.
-%duration            - 전체 재생 시간.
+%duration            - 전체 재생 시간(밀리초).
 
 2. 변수 연산자
 

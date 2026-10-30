@@ -54,7 +54,7 @@ internal sealed partial class PlayerPage : BasePage
     private const int VOLUME_STEP = 5;
     private const int SINGLE_TAP_DELAY_MS = 100;
     private const int HIDE_OVERLAY_DELAY_MS = 0;
-    private const long ALMOST_ENDED_THRESHOLD_MS = 5000;
+    private const int HIDE_CURSOR_DELAY_MS = 3000;
 
     // Can only be accessed on UI thread
     public static IReadOnlyList<Tuple<int, string>> ActiveTabs { get; private set; } = [];
@@ -126,6 +126,7 @@ internal sealed partial class PlayerPage : BasePage
     {
         base.OnPause();
         UpdatePageState();
+        ShowCursor();
     }
 
     protected override void OnStop()
@@ -137,6 +138,7 @@ internal sealed partial class PlayerPage : BasePage
         StopPromptTimer();
         _navigationBar = null;
         GetMainPageAbility().SetCustomCenteredNavigationBar(null);
+        ShowCursor();
         RemoveFromActiveTabs();
     }
 
@@ -720,6 +722,18 @@ internal sealed partial class PlayerPage : BasePage
     private void VideoHost_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
         _gestureRecognizer.ProcessMoveEvents(e.GetIntermediatePoints(VideoHost));
+
+        // A move reported at the position the pointer already had is not the user moving it: a frame presented on the
+        // surface underneath sends one too. Restarting the wait for those is what makes the cursor hide late, so only a
+        // real movement counts.
+        Windows.Foundation.Point position = e.GetCurrentPoint(VideoHost).Position;
+        if (_lastPointerPosition == position)
+        {
+            return;
+        }
+
+        _lastPointerPosition = position;
+        KeepCursorVisible();
     }
 
     private void VideoHost_PointerReleased(object sender, PointerRoutedEventArgs e)
@@ -769,12 +783,18 @@ internal sealed partial class PlayerPage : BasePage
     {
         _isPointerInsideVideo = true;
         UpdateOverlayState();
+
+        _lastPointerPosition = null;
+        KeepCursorVisible();
     }
 
     private void VideoHost_PointerExited(object sender, PointerRoutedEventArgs e)
     {
         _isPointerInsideVideo = false;
         UpdateOverlayState();
+
+        _lastPointerPosition = null;
+        ShowCursor();
     }
 
     #endregion
@@ -1035,6 +1055,80 @@ internal sealed partial class PlayerPage : BasePage
 
         _videoTransform = transform;
         _engine?.SetVideoTransform(transform);
+    }
+
+    #endregion
+
+    #region Cursor
+
+    private bool _isCursorHidden = false;
+    private long _hideCursorDeadline = -1;
+    private bool _waitingToHideCursor = false;
+    private Windows.Foundation.Point? _lastPointerPosition = null;
+
+    private void KeepCursorVisible()
+    {
+        ShowCursor();
+        _hideCursorDeadline = Environment.TickCount64 + HIDE_CURSOR_DELAY_MS;
+
+        if (_waitingToHideCursor)
+        {
+            return;
+        }
+
+        _waitingToHideCursor = true;
+        CoroutineUtils.Run(async () =>
+        {
+            while (true)
+            {
+                long deadline = _hideCursorDeadline;
+                if (deadline == -1)
+                {
+                    _waitingToHideCursor = false;
+                    return;
+                }
+
+                long remainingMs = deadline - Environment.TickCount64;
+                if (remainingMs <= 0)
+                {
+                    break;
+                }
+
+                await Task.Delay((int)remainingMs);
+            }
+
+            _waitingToHideCursor = false;
+            HideCursor();
+        });
+    }
+
+    private void ShowCursor()
+    {
+        _hideCursorDeadline = -1;
+
+        if (!_isCursorHidden)
+        {
+            return;
+        }
+
+        _isCursorHidden = false;
+        ProtectedCursor = null;
+    }
+
+    private void HideCursor()
+    {
+        _hideCursorDeadline = -1;
+
+        if (_isCursorHidden)
+        {
+            return;
+        }
+
+        _isCursorHidden = true;
+
+        InputCursor cursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
+        cursor.Dispose();
+        ProtectedCursor = cursor;
     }
 
     #endregion

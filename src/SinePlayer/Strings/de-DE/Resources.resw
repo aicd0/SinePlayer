@@ -480,7 +480,7 @@ Kategorie:: Tag1, Tag2    - Überschreibe „Kategorie“ mit „Tag1“ und „
 %rating              - Bewertung. Beispiel: 100 entspricht 5 Sternen, -1 bedeutet keine Bewertung.
 %completion_status   - Abschlussstatus.
 %progress            - Fortschritt in Prozent. Beispiel: 50 entspricht 50 %.
-%duration            - Gesamtdauer.
+%duration            - Gesamtdauer in Millisekunden.
 
 2. Variablenoperatoren
 

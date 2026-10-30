@@ -478,7 +478,7 @@
 %rating              - 評分。例如，100 代表 5 顆星，-1 代表沒有評分。
 %completion_status   - 完成狀態。
 %progress            - 進度百分比。例如，50 代表 50%。
-%duration            - 總時長。
+%duration            - 總時長，單位為毫秒。
 
 2. 變數運算子
 
