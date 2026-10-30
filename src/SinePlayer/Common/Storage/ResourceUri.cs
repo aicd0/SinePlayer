@@ -5,7 +5,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 
-using SinePlayer.Common.Imaging;
+using SinePlayer.Core.Imaging;
 
 namespace SinePlayer.Common.Storage;
 

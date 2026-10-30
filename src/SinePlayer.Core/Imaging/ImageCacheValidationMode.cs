@@ -1,12 +1,12 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-namespace SinePlayer.Common.Imaging;
+namespace SinePlayer.Core.Imaging;
 
 /// <summary>
 /// Whether a cached picture is checked against the file it came from before it is handed out.
 /// </summary>
-internal enum ImageCacheValidationMode
+public enum ImageCacheValidationMode
 {
     /// <summary>
     /// Never checked. Whatever is cached is used, and a file edited afterwards keeps the picture it had.

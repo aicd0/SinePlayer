@@ -3,9 +3,9 @@
 
 using Microsoft.UI.Xaml.Media;
 
-namespace SinePlayer.Common.Imaging;
+namespace SinePlayer.Core.Imaging;
 
-internal class DecodedImageModel
+public class DecodedImageModel
 {
     public required ImageSource Source { get; init; }
 }

@@ -10,7 +10,6 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.Globalization;
 
-using SinePlayer.Common.Imaging;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Plugins;
@@ -22,6 +21,7 @@ using SinePlayer.Core.Common.ServiceManagement.Models;
 using SinePlayer.Core.Common.ServiceManagement.Services;
 using SinePlayer.Core.Common.Storage;
 using SinePlayer.Core.Common.Threading;
+using SinePlayer.Core.Imaging;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Misc;
 

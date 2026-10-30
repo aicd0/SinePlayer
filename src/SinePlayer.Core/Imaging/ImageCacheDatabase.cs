@@ -1,20 +1,15 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 
 using Microsoft.Data.Sqlite;
 
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
 
-namespace SinePlayer.Common.Imaging;
+namespace SinePlayer.Core.Imaging;
 
 internal class ImageCacheDatabase(string databaseFilePath)
 {
