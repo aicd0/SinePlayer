@@ -152,6 +152,18 @@ internal struct AVStream
     public AVRational AverageFrameRate;
 }
 
+/// <summary>
+/// One piece of <c>AVPacketSideData</c>: an out of band payload such as the display matrix. The same array type
+/// backs <c>AVCodecParameters::coded_side_data</c>, which is where a container puts the display matrix.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct AVPacketSideData
+{
+    public nint Data;
+    public nuint Size;
+    public int Type;
+}
+
 [StructLayout(LayoutKind.Sequential)]
 internal struct AVBufferRef
 {

@@ -11,7 +11,7 @@ internal interface IImageSource
 
     ImageLoaderSchedulerGroup PreferredSchedulerGroup { get; }
 
-    bool IsCacheValidationEnabled { get; }
+    ImageCacheValidationMode CacheValidationMode { get; }
 
     Task<IImageConnection?> Open();
 }

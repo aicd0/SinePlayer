@@ -41,6 +41,9 @@ internal static partial class VideoFixtureFile
     private static partial int avcodec_parameters_from_context(nint parameters, nint context);
 
     [LibraryImport(FFmpegNative.AvCodec)]
+    private static partial nint av_packet_side_data_new(nint sideData, nint count, int type, nuint size, int flags);
+
+    [LibraryImport(FFmpegNative.AvCodec)]
     private static partial int av_packet_rescale_ts(nint packet, Rational source, Rational destination);
 
     [LibraryImport(FFmpegNative.AvFormat, StringMarshalling = StringMarshalling.Utf8)]
@@ -83,12 +86,16 @@ internal static partial class VideoFixtureFile
     /// FFmpeg's H.264 decoder decodes in software and on the GPU, so the same decoder is reached either
     /// way, unlike AV1 where the two are separate decoders.
     /// </summary>
-    internal static string CreateH264(int frameCount = FrameCount, int gopSize = 4, int width = Width, int height = Height)
+    /// <param name="rotation">
+    /// Counter-clockwise degrees to tag the stream with, the way a phone records the turn it was held at.
+    /// </param>
+    /// <param name="mirrored">Whether the tag also mirrors the picture, which a selfie camera records.</param>
+    internal static string CreateH264(int frameCount = FrameCount, int gopSize = 4, int width = Width, int height = Height, int rotation = 0, bool mirrored = false)
     {
-        return Create("libx264", "h264", frameCount, gopSize, width, height);
+        return Create("libx264", "h264", frameCount, gopSize, width, height, rotation, mirrored);
     }
 
-    private static string Create(string encoderName, string expectedCodecId, int frameCount, int gopSize, int width, int height)
+    private static string Create(string encoderName, string expectedCodecId, int frameCount, int gopSize, int width, int height, int rotation = 0, bool mirrored = false)
     {
         FFmpegRuntime.EnsureInitialized();
 
@@ -128,6 +135,11 @@ internal static partial class VideoFixtureFile
         int parametersResult = avcodec_parameters_from_context(streamLayout.Codecpar, context);
         Assert.That(parametersResult, Is.GreaterThanOrEqualTo(0), $"parameters: {FFmpegInterop.GetErrorMessage(parametersResult)}");
 
+        if (rotation != 0 || mirrored)
+        {
+            SetDisplayMatrix(streamLayout.Codecpar, rotation, mirrored);
+        }
+
         int ioResult = avio_open(out nint io, path, AvioFlagWrite);
         Assert.That(ioResult, Is.GreaterThanOrEqualTo(0), $"io: {FFmpegInterop.GetErrorMessage(ioResult)}");
         Marshal.WriteIntPtr(muxer, (int)Marshal.OffsetOf<AVFormatContext>(nameof(AVFormatContext.IoContext)), io);
@@ -156,6 +168,45 @@ internal static partial class VideoFixtureFile
         avio_closep(ref io);
         avformat_free_context(muxer);
         return path;
+    }
+
+    /// <summary>
+    /// Tags the stream with the display matrix a container writes for a rotated video. The matrix is nine 16.16 fixed
+    /// point numbers, and it is the codec parameters' coded side data that carries it. It is the inverse of what a
+    /// player applies, so the angle is written the other way round; mirroring the picture negates the first column.
+    /// </summary>
+    private static unsafe void SetDisplayMatrix(nint parameters, int rotation, bool mirrored)
+    {
+        int dataOffset = (int)Marshal.OffsetOf<AVCodecParameters>(nameof(AVCodecParameters.CodedSideData));
+        int countOffset = (int)Marshal.OffsetOf<AVCodecParameters>(nameof(AVCodecParameters.CodedSideDataCount));
+
+        const int matrixLength = 9 * sizeof(int);
+        nint sideData = av_packet_side_data_new(
+            (nint)((byte*)parameters + dataOffset),
+            (nint)((byte*)parameters + countOffset),
+            FFmpegConstants.SideDataTypeDisplayMatrix,
+            matrixLength,
+            0);
+        Assert.That(sideData, Is.Not.EqualTo(0), "no display matrix");
+
+        double radians = rotation * Math.PI / 180.0;
+        double cosine = Math.Round(Math.Cos(radians) * 65536.0);
+        double sine = Math.Round(Math.Sin(radians) * 65536.0);
+        double sign = mirrored ? -1.0 : 1.0;
+
+        int[] matrix =
+        [
+            (int)(sign * cosine),
+            (int)(-sine),
+            0,
+            (int)(sign * sine),
+            (int)cosine,
+            0,
+            0,
+            0,
+            1 << 30,
+        ];
+        Marshal.Copy(matrix, 0, Marshal.ReadIntPtr(sideData), matrix.Length);
     }
 
     private static void SetEncoderGeometry(nint context, int mediaType, int codecId, int frameRate, int width, int height)

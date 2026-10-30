@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -99,6 +100,41 @@ internal static class FFmpegInterop
                 2 => ColourRange.Full,
                 _ => ColourRange.Unknown,
             });
+    }
+
+    /// <summary>
+    /// The orientation a display matrix asks for. The matrix is nine 16.16 fixed point numbers that map the stored
+    /// picture onto the display, so what a player has to apply is the inverse of it; with a determinant of +1 or -1
+    /// that inverse is the matrix's own quarter turn read backwards. FFmpeg counts a turn counter-clockwise while a
+    /// rotation here counts clockwise quarters, which is the other sign; a negative determinant is a mirrored
+    /// picture, and a mirror reverses the sense of a turn, so the two signs cancel out.
+    /// <para>
+    /// What else the matrix can carry is dropped: the two entries that move the picture and the scale are ignored, as
+    /// FFmpeg's own <c>av_display_rotation_get</c> ignores them, and an angle that is not a quarter turn is rounded to
+    /// the nearest one rather than shown as a skewed picture. The magnitude of the linear part is divided out by
+    /// <c>atan2</c>, which is what leaves the turn of a scaled matrix readable.
+    /// </para>
+    /// </summary>
+    internal static unsafe VideoOrientation ToOrientation(int* matrix)
+    {
+        // The linear part of the matrix as it is written: x' = a x + b y, y' = c x + d y.
+        double a = matrix[0] / 65536.0;
+        double b = matrix[1] / 65536.0;
+        double c = matrix[3] / 65536.0;
+        double d = matrix[4] / 65536.0;
+
+        if (a == 0.0 && b == 0.0 && c == 0.0 && d == 0.0)
+        {
+            return VideoOrientation.Identity;
+        }
+
+        bool mirrored = ((a * d) - (b * c)) < 0.0;
+
+        // The turn of that inverse, read off its first column. A mirror commutes a turn into the other direction,
+        // which is why a mirrored matrix is read without the sign that reverses it.
+        double inverseSine = mirrored ? c : -c;
+        int quarterTurns = (int)Math.Round(Math.Atan2(inverseSine, d) * 2.0 / Math.PI);
+        return new VideoOrientation(quarterTurns, mirrored);
     }
 
     /// <summary><c>AV_CHANNEL_ORDER_NATIVE</c>: the union holds the <c>AV_CH_LAYOUT_*</c> mask.</summary>

@@ -30,12 +30,11 @@ internal sealed partial class LocalFileImageSource : IImageSource
 
     public ImageLoaderSchedulerGroup PreferredSchedulerGroup => _preferredSchedulerGroup;
 
-    public bool IsCacheValidationEnabled => true;
+    public ImageCacheValidationMode CacheValidationMode => ImageCacheValidationMode.Deferred;
 
     public Task<IImageConnection?> Open()
     {
-        IImageConnection? connection = File.Exists(_path) ? new LocalFileImageConnection(_path) : null;
-        return Task.FromResult(connection);
+        return Task.FromResult<IImageConnection?>(new LocalFileImageConnection(_path));
     }
 
     private sealed partial class LocalFileImageConnection(string path) : IImageConnection

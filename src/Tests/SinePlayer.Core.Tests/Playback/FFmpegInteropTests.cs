@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
@@ -95,6 +96,52 @@ public class FFmpegInteropTests
 
             // A transfer this build has no programme for is not turned into one it does.
             Assert.That(FFmpegInterop.ToColourInfo(9, 14, 1), Is.EqualTo(new ColourInfo(ColourPrimaries.Bt2020, ColourTransfer.Unknown, ColourRange.Limited)));
+        }
+    }
+
+    /// <summary>
+    /// The display matrix a phone writes when it records sideways. What a player applies is the inverse of that matrix,
+    /// so the sign is the whole point: the matrix <c>-display_rotation 90</c> produces has to come back as three
+    /// quarter turns clockwise, or every portrait recording is drawn upside down. A negative determinant is a mirrored
+    /// picture, and a mirror reverses the sense of the turn.
+    /// </summary>
+    [Test]
+    public unsafe void ReadsTheOrientationADisplayMatrixAsksFor()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Orientation(65536, 0, 0, 65536), Is.EqualTo(VideoOrientation.Identity), "no turn");
+            Assert.That(Orientation(0, -65536, 65536, 0), Is.EqualTo(new VideoOrientation(3, false)), "what -display_rotation 90 writes");
+            Assert.That(Orientation(-65536, 0, 0, -65536), Is.EqualTo(new VideoOrientation(2, false)), "half a turn");
+            Assert.That(Orientation(0, 65536, -65536, 0), Is.EqualTo(new VideoOrientation(1, false)), "90 degrees clockwise");
+
+            Assert.That(Orientation(-65536, 0, 0, 65536), Is.EqualTo(new VideoOrientation(0, true)), "a horizontal flip");
+            Assert.That(Orientation(65536, 0, 0, -65536), Is.EqualTo(new VideoOrientation(2, true)), "a vertical flip");
+            Assert.That(Orientation(0, 65536, 65536, 0), Is.EqualTo(new VideoOrientation(1, true)), "a quarter turn and a flip");
+
+            Assert.That(Orientation(0, 0, 0, 0), Is.EqualTo(VideoOrientation.Identity), "an empty matrix is not a transform");
+            Assert.That(Orientation(65536, 1000, -1000, 65536), Is.EqualTo(VideoOrientation.Identity), "a correction of a degree is not a turn");
+
+            // What a matrix can also carry is dropped on purpose: a scale or an offset is not a transform a surface is
+            // shown at, and FFmpeg's own accessor ignores them as well.
+            Assert.That(Orientation(32768, 0, 0, 32768), Is.EqualTo(VideoOrientation.Identity), "a scale is not an orientation");
+            Assert.That(Orientation(0, -65536, 65536, 0, 4096, 8192), Is.EqualTo(new VideoOrientation(3, false)), "where the picture is moved to is not part of its orientation");
+        }
+
+        // The linear part as the matrix is written: x' = a x + b y, y' = c x + d y; u and v are where it is moved to.
+        static VideoOrientation Orientation(int a, int b, int c, int d, int u = 0, int v = 0)
+        {
+            int* matrix = stackalloc int[9];
+            matrix[0] = a;
+            matrix[1] = b;
+            matrix[2] = u;
+            matrix[3] = c;
+            matrix[4] = d;
+            matrix[5] = v;
+            matrix[6] = 0;
+            matrix[7] = 0;
+            matrix[8] = 1 << 30;
+            return FFmpegInterop.ToOrientation(matrix);
         }
     }
 }

@@ -5,42 +5,8 @@ using System.Numerics;
 
 namespace SinePlayer.Core.Playback.Abstractions.Render;
 
-/// <summary>
-/// How a picture is turned for display: quarter turns clockwise, and whether it is mirrored. The four turns and
-/// the mirror are the whole of the group — a vertical flip is a mirror plus half a turn — so any combination of
-/// the two composes into another value of this type, which is what makes one transform buildable out of several.
-/// </summary>
 public readonly record struct VideoOrientation
 {
-    private readonly int _quarterTurns;
-    private readonly bool _mirrored;
-
-    /// <param name="quarterTurns">Quarter turns clockwise; any whole number, reduced to 0 to 3.</param>
-    /// <param name="mirrored">Whether the picture is mirrored left to right.</param>
-    public VideoOrientation(int quarterTurns, bool mirrored)
-    {
-        _quarterTurns = Normalize(quarterTurns);
-        _mirrored = mirrored;
-    }
-
-    /// <summary>The picture as it was decoded.</summary>
-    public static VideoOrientation Identity => default;
-
-    public int QuarterTurns => _quarterTurns;
-
-    public bool Mirrored => _mirrored;
-
-    public int RotationDegrees => _quarterTurns * 90;
-
-    public bool IsIdentity => _quarterTurns == 0 && !_mirrored;
-
-    /// <summary>Whether the turn leaves the picture lying the other way round, so its width and height trade places.</summary>
-    public bool SwapsAxes => (_quarterTurns & 1) == 1;
-
-    /// <summary>
-    /// What a person asked for, in the terms they asked it: degrees and the two flips a picture can be given.
-    /// Mirroring both ways is the same as turning the picture round, so the two flags become one mirror and a turn.
-    /// </summary>
     public static VideoOrientation FromDegrees(int degrees, bool flipHorizontal, bool flipVertical)
     {
         if (degrees % 90 != 0)
@@ -57,10 +23,29 @@ public readonly record struct VideoOrientation
         return new VideoOrientation(quarterTurns, flipHorizontal ^ flipVertical);
     }
 
-    /// <summary>
-    /// This orientation applied after <paramref name="inner"/>. Mirroring commutes a turn into the other
-    /// direction, which is the whole of the arithmetic.
-    /// </summary>
+    private readonly int _quarterTurns;
+    private readonly bool _mirrored;
+
+    /// <param name="quarterTurns">Quarter turns clockwise; any whole number, reduced to 0 to 3.</param>
+    /// <param name="mirrored">Whether the picture is mirrored left to right.</param>
+    public VideoOrientation(int quarterTurns, bool mirrored)
+    {
+        _quarterTurns = Normalize(quarterTurns);
+        _mirrored = mirrored;
+    }
+
+    public static VideoOrientation Identity => default;
+
+    public int QuarterTurns => _quarterTurns;
+
+    public bool Mirrored => _mirrored;
+
+    public int RotationDegrees => _quarterTurns * 90;
+
+    public bool IsIdentity => _quarterTurns == 0 && !_mirrored;
+
+    public bool SwapsAxes => (_quarterTurns & 1) == 1;
+
     public VideoOrientation Combine(VideoOrientation inner)
     {
         int quarterTurns = _mirrored ? _quarterTurns - inner._quarterTurns : _quarterTurns + inner._quarterTurns;
@@ -73,36 +58,14 @@ public readonly record struct VideoOrientation
     }
 }
 
-/// <summary>How a picture of one shape is made to occupy a surface of another.</summary>
 public enum VideoResizeMode
 {
-    /// <summary>All of the picture inside the surface, keeping its shape; what does not reach the edges is bars.</summary>
     Fit,
-
-    /// <summary>All of the surface covered, keeping the picture's shape; what does not fit is cropped.</summary>
     Fill,
-
-    /// <summary>The surface filled outright, whatever that does to the picture's shape.</summary>
     Stretch,
-
-    /// <summary>
-    /// One source pixel per surface pixel, centred: the picture is neither enlarged nor shrunk, and whatever runs
-    /// past the surface is cropped. The surface is measured in physical pixels, so the host's display scale does
-    /// not change what "one pixel" means.
-    /// </summary>
     OriginalSize,
 }
 
-/// <summary>
-/// Where the picture lands on the surface, as one value: its orientation, how it is fitted, and how far it is
-/// zoomed and panned. Everything a renderer needs to place a frame is here, so a renderer that can place a
-/// picture needs no per-feature support for turning, mirroring or fitting it.
-/// <para>
-/// The placement is derived from the frame's size and the surface's size rather than stored as a matrix: a
-/// surface changes size whenever the window does, and a finished matrix cannot be recomputed from itself. A
-/// renderer turns this value into a matrix at the moment it draws, which is where both sizes are known.
-/// </para>
-/// </summary>
 public readonly record struct VideoTransform(
     VideoOrientation Orientation,
     VideoResizeMode ResizeMode,
@@ -110,16 +73,10 @@ public readonly record struct VideoTransform(
     double PanX,
     double PanY)
 {
-    /// <summary>Untouched: the picture fitted to the surface, keeping its shape.</summary>
     public static VideoTransform Identity => new(VideoOrientation.Identity, VideoResizeMode.Fit, 1.0, 0.0, 0.0);
 
     public bool IsIdentity => Orientation.IsIdentity && ResizeMode == VideoResizeMode.Fit && Zoom == 1.0 && PanX == 0.0 && PanY == 0.0;
 
-    /// <summary>
-    /// The transform that places the unit square a renderer draws (0 to 1 across and down) onto the surface,
-    /// itself given in normalized surface coordinates. Divided into what the picture is and where it goes, so
-    /// turning it is applying this to a square and not to its pixels.
-    /// </summary>
     public Matrix3x2 GetPlacement(int frameWidth, int frameHeight, int surfaceWidth, int surfaceHeight)
     {
         if (frameWidth <= 0 || frameHeight <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0)
