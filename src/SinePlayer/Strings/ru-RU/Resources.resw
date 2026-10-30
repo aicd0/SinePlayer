@@ -118,7 +118,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="About" xml:space="preserve">
-    <value>О приложении</value>
+    <value>О программе</value>
   </data>
   <data name="AboutCopyright" xml:space="preserve">
     <value>© 2026 $author. Все права защищены.</value>
@@ -127,7 +127,7 @@
     <value>Действие</value>
   </data>
   <data name="Add" xml:space="preserve">
-    <value>Добавлять</value>
+    <value>Добавить</value>
   </data>
   <data name="AddFolder" xml:space="preserve">
     <value>Добавить папку</value>
@@ -136,7 +136,7 @@
     <value>Добавить сочетание клавиш</value>
   </data>
   <data name="AddNewTab" xml:space="preserve">
-    <value>Добавить новую вкладку</value>
+    <value>Новая вкладка</value>
   </data>
   <data name="AddToCollection" xml:space="preserve">
     <value>Добавить в подборку</value>
@@ -145,10 +145,10 @@
     <value>Добавить в избранное</value>
   </data>
   <data name="AdvancedExpander.Detail" xml:space="preserve">
-    <value>Необычные настройки</value>
+    <value>Расширенные настройки</value>
   </data>
   <data name="AdvancedExpander.Header" xml:space="preserve">
-    <value>Передовой</value>
+    <value>Дополнительно</value>
   </data>
   <data name="AllHidden" xml:space="preserve">
     <value>Все скрытые элементы</value>
@@ -157,7 +157,7 @@
     <value>Все элементы</value>
   </data>
   <data name="AllMatchedResults" xml:space="preserve">
-    <value>Все совпавшие результаты</value>
+    <value>Все найденные совпадения</value>
   </data>
   <data name="AllPages" xml:space="preserve">
     <value>Все страницы</value>
@@ -181,13 +181,13 @@
     <value>Sine Player</value>
   </data>
   <data name="AppearanceExpander.Detail" xml:space="preserve">
-    <value>Выберите тему приложения для отображения</value>
+    <value>Настройте оформление приложения</value>
   </data>
   <data name="AppearanceExpander.Header" xml:space="preserve">
-    <value>Появление</value>
+    <value>Оформление</value>
   </data>
   <data name="ApplyOnNextLaunch" xml:space="preserve">
-    <value>Вы увидите изменения при следующем запуске приложения.</value>
+    <value>Изменения вступят в силу при следующем запуске приложения</value>
   </data>
   <data name="ArchiveEncoding.Text" xml:space="preserve">
     <value>Кодировка сжатого файла</value>
@@ -238,7 +238,7 @@
     <value>Битрейт</value>
   </data>
   <data name="Calculating" xml:space="preserve">
-    <value>Расчет...</value>
+    <value>Вычисление...</value>
   </data>
   <data name="Cancel" xml:space="preserve">
     <value>Отмена</value>
@@ -268,7 +268,7 @@
     <value>Очистить кэш</value>
   </data>
   <data name="CloseLastTabBehavior" xml:space="preserve">
-    <value>Поведение при закрытии последней вкладки</value>
+    <value>Действие при закрытии последней вкладки</value>
   </data>
   <data name="CloseSidebar" xml:space="preserve">
     <value>Закрыть боковую панель</value>
@@ -289,13 +289,13 @@
     <value>Коллекция</value>
   </data>
   <data name="CollectionInformation" xml:space="preserve">
-    <value>Информация о коллекции</value>
+    <value>Сведения о коллекции</value>
   </data>
   <data name="CompletionStatus" xml:space="preserve">
     <value>Состояние завершения</value>
   </data>
   <data name="CompletionStatusAbandoned" xml:space="preserve">
-    <value>Брошено</value>
+    <value>Заброшено</value>
   </data>
   <data name="CompletionStatusCompleted" xml:space="preserve">
     <value>Завершено</value>
@@ -343,7 +343,7 @@
     <value>Режим отладки</value>
   </data>
   <data name="DebugModeWarning" xml:space="preserve">
-    <value>Включение режима отладки может привести к нестабильной работе приложения. Что делать?</value>
+    <value>Включение режима отладки может привести к нестабильной работе приложения. Продолжить?</value>
   </data>
   <data name="DecodeMode" xml:space="preserve">
     <value>Режим декодирования</value>
@@ -381,7 +381,7 @@ $files</value>
     <value>Инструменты разработчика</value>
   </data>
   <data name="DiffMode" xml:space="preserve">
-    <value>Режим дифференциации</value>
+    <value>Режим сравнения</value>
   </data>
   <data name="Disable" xml:space="preserve">
     <value>Отключить</value>
@@ -393,7 +393,7 @@ $files</value>
     <value>Отказ от ответственности</value>
   </data>
   <data name="Done" xml:space="preserve">
-    <value>Сделанный</value>
+    <value>Готово</value>
   </data>
   <data name="DownloadPluginsFromGitHub" xml:space="preserve">
     <value>Скачать плагины с GitHub</value>
@@ -405,7 +405,7 @@ $files</value>
     <value>Длительность</value>
   </data>
   <data name="Edit" xml:space="preserve">
-    <value>Редактировать</value>
+    <value>Изменить</value>
   </data>
   <data name="EditImportExclusionList" xml:space="preserve">
     <value>Изменить список исключений при импорте</value>
@@ -414,7 +414,7 @@ $files</value>
     <value>Изменить сочетание клавиш</value>
   </data>
   <data name="EditPreset" xml:space="preserve">
-    <value>Редактировать пресет</value>
+    <value>Изменить пресет</value>
   </data>
   <data name="Enable" xml:space="preserve">
     <value>Включить</value>
@@ -520,7 +520,7 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
     <value>SQL-запрос: $query</value>
   </data>
   <data name="Favorite" xml:space="preserve">
-    <value>Собирать</value>
+    <value>В избранное</value>
   </data>
   <data name="Favorites" xml:space="preserve">
     <value>Избранное</value>
@@ -532,7 +532,7 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
     <value>Используйте кнопку ниже, чтобы отправить нам предложения или сообщить об ошибке на GitHub.</value>
   </data>
   <data name="FileOperations" xml:space="preserve">
-    <value>Операции с файлами</value>
+    <value>Действия с файлами</value>
   </data>
   <data name="Fill" xml:space="preserve">
     <value>Заполнить</value>
@@ -571,7 +571,7 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
     <value>Средний</value>
   </data>
   <data name="FunctionItemCount" xml:space="preserve">
-    <value>Количество предметов</value>
+    <value>Количество элементов</value>
   </data>
   <data name="FunctionMax" xml:space="preserve">
     <value>Максимум</value>
@@ -589,10 +589,10 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
     <value>Изменить поведение приложения по умолчанию</value>
   </data>
   <data name="GoBack" xml:space="preserve">
-    <value>Возвращаться</value>
+    <value>Перейти назад</value>
   </data>
   <data name="GoForward" xml:space="preserve">
-    <value>Идти вперед</value>
+    <value>Перейти вперед</value>
   </data>
   <data name="Group" xml:space="preserve">
     <value>Группировка</value>
@@ -601,22 +601,22 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
     <value>Аппаратный</value>
   </data>
   <data name="Help" xml:space="preserve">
-    <value>Помощь</value>
+    <value>Справка</value>
   </data>
   <data name="Hidden" xml:space="preserve">
     <value>Скрыто</value>
   </data>
   <data name="Hide" xml:space="preserve">
-    <value>Скрывать</value>
+    <value>Скрыть</value>
   </data>
   <data name="HideCursorAutomatically" xml:space="preserve">
-    <value>Скрыть курсор автоматически (экспериментальный)</value>
+    <value>Автоматически скрывать курсор (экспериментальное)</value>
   </data>
   <data name="History" xml:space="preserve">
     <value>История</value>
   </data>
   <data name="HomeButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Дом</value>
+    <value>Домой</value>
   </data>
   <data name="Horizontal" xml:space="preserve">
     <value>Горизонтальный</value>
@@ -634,7 +634,7 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
     <value>Насыщенность</value>
   </data>
   <data name="Images" xml:space="preserve">
-    <value>Картинки</value>
+    <value>Изображения</value>
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>Включить скрытые элементы</value>
@@ -737,7 +737,7 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
     <value>Прочее</value>
   </data>
   <data name="More" xml:space="preserve">
-    <value>Более</value>
+    <value>Еще</value>
   </data>
   <data name="Mute" xml:space="preserve">
     <value>Выключить звук</value>
@@ -767,7 +767,7 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
     <value>Новое окно</value>
   </data>
   <data name="Next" xml:space="preserve">
-    <value>Следующий</value>
+    <value>Далее</value>
   </data>
   <data name="NoContent" xml:space="preserve">
     <value>Нет содержимого для отображения</value>
@@ -800,7 +800,7 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
     <value>Ваши теги будут отображаться здесь</value>
   </data>
   <data name="None" xml:space="preserve">
-    <value>Никто</value>
+    <value>Нет</value>
   </data>
   <data name="OK" xml:space="preserve">
     <value>ХОРОШО</value>
@@ -950,10 +950,10 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
     <value>Обновить случайное зерно</value>
   </data>
   <data name="Remove" xml:space="preserve">
-    <value>Удалять</value>
+    <value>Удалить</value>
   </data>
   <data name="RemoveAndExclude" xml:space="preserve">
-    <value>Удалить (добавить в список исключений)</value>
+    <value>Удалить (добавить в исключения)</value>
   </data>
   <data name="RemoveFromFavorites" xml:space="preserve">
     <value>Удалить из избранного</value>
@@ -1029,7 +1029,7 @@ $plugins</value>
     <value>Частота дискретизации</value>
   </data>
   <data name="Save" xml:space="preserve">
-    <value>Сохранять</value>
+    <value>Сохранить</value>
   </data>
   <data name="SaveAsDefaultConfig" xml:space="preserve">
     <value>Сохранить как конфигурацию по умолчанию</value>
@@ -1050,7 +1050,7 @@ $plugins</value>
     <value>Сканировать при запуске</value>
   </data>
   <data name="Search" xml:space="preserve">
-    <value>Искать</value>
+    <value>Поиск</value>
   </data>
   <data name="SearchResults" xml:space="preserve">
     <value>Результаты поиска</value>
@@ -1065,7 +1065,7 @@ $plugins</value>
     <value>Перемотка вперёд</value>
   </data>
   <data name="Select" xml:space="preserve">
-    <value>Выбирать</value>
+    <value>Выбрать</value>
   </data>
   <data name="SelectAllAppBarButton.Label" xml:space="preserve">
     <value>Выбрать все</value>
@@ -1143,7 +1143,7 @@ $plugins</value>
     <value>Субтитры</value>
   </data>
   <data name="Tag" xml:space="preserve">
-    <value>Ярлык</value>
+    <value>Тег</value>
   </data>
   <data name="TagIntroduction.Message" xml:space="preserve">
     <value>Правильное использование тегов может облегчить организацию вашей библиотеки. Например:
@@ -1163,25 +1163,25 @@ $plugins</value>
     <value>$text: </value>
   </data>
   <data name="ThemeDark.Content" xml:space="preserve">
-    <value>Темный</value>
+    <value>Темная</value>
   </data>
   <data name="ThemeLight.Content" xml:space="preserve">
-    <value>Светлый цвет</value>
+    <value>Светлая</value>
   </data>
   <data name="ThemeUseSystemSetting.Content" xml:space="preserve">
-    <value>Следуйте системным настройкам</value>
+    <value>Использовать системные настройки</value>
   </data>
   <data name="Tip" xml:space="preserve">
-    <value>Кончик</value>
+    <value>Подсказка</value>
   </data>
   <data name="Title" xml:space="preserve">
-    <value>Заголовок</value>
+    <value>Название</value>
   </data>
   <data name="Title1" xml:space="preserve">
-    <value>Заголовок 1</value>
+    <value>Название 1</value>
   </data>
   <data name="Title2" xml:space="preserve">
-    <value>Заголовок 2</value>
+    <value>Название 2</value>
   </data>
   <data name="ToggleFullscreen" xml:space="preserve">
     <value>Переключить полноэкранный режим</value>
@@ -1207,7 +1207,7 @@ $plugins</value>
 $info</value>
   </data>
   <data name="UnhandledExceptionTitle" xml:space="preserve">
-    <value>Это приложение могло выйти из строя</value>
+    <value>Возможно, приложение аварийно завершилось</value>
   </data>
   <data name="Unhide" xml:space="preserve">
     <value>Показать</value>
@@ -1219,13 +1219,13 @@ $info</value>
     <value>Открепить</value>
   </data>
   <data name="Untitled" xml:space="preserve">
-    <value>Безымянный</value>
+    <value>Без названия</value>
   </data>
   <data name="UseFolderNameAsTitle" xml:space="preserve">
     <value>Использовать имя папки в качестве названия, если в ней только один элемент</value>
   </data>
   <data name="UseSystemLanguage" xml:space="preserve">
-    <value>Использовать системный язык</value>
+    <value>Использовать язык системы</value>
   </data>
   <data name="Vertical" xml:space="preserve">
     <value>Вертикальный</value>
@@ -1243,13 +1243,13 @@ $info</value>
     <value>Вид</value>
   </data>
   <data name="ViewTypeLargeLandscape" xml:space="preserve">
-    <value>Большой (альбомная)</value>
+    <value>Крупный (альбомная)</value>
   </data>
   <data name="ViewTypeLargePortrait" xml:space="preserve">
-    <value>Большой (книжная)</value>
+    <value>Крупный (книжная)</value>
   </data>
   <data name="ViewTypeMedium" xml:space="preserve">
-    <value>Середина</value>
+    <value>Средний</value>
   </data>
   <data name="Volume" xml:space="preserve">
     <value>Громкость</value>
@@ -1264,7 +1264,7 @@ $info</value>
     <value>Предупреждение</value>
   </data>
   <data name="WatchingFolders.Text" xml:space="preserve">
-    <value>Прямо сейчас мы наблюдаем за этими папками:</value>
+    <value>В данный момент мы отслеживаем следующие папки:</value>
   </data>
   <data name="WhilePlaying" xml:space="preserve">
     <value>Во время воспроизведения</value>

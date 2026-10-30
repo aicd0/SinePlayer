@@ -14,6 +14,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
@@ -67,6 +68,7 @@ internal sealed partial class PlayerPage : BasePage
     {
         InitializeComponent();
         _gestureRecognizer.Tapped += GestureRecognizer_Tapped;
+        AddHandler(PointerPressedEvent, new PointerEventHandler(PlayerPage_AnyPointerPressed), handledEventsToo: true);
     }
 
     #endregion
@@ -116,7 +118,7 @@ internal sealed partial class PlayerPage : BasePage
     {
         base.OnResume();
         AddToActiveTabs();
-        UpdateOverlayState();
+        UpdateOverlayStateByMouse();
         UpdatePageState();
         SyncCurrentMedia();
         FocusPlayer();
@@ -247,8 +249,8 @@ internal sealed partial class PlayerPage : BasePage
 
         GetMainWindowAbility().RegisterPointerInsideRootElementChangedHandler(this, isInside =>
         {
-            _isPointerInsideRootElement = isInside;
-            UpdateOverlayState();
+            _isMouseInsideRootElement = isInside;
+            UpdateOverlayStateByMouse();
         });
 
         GetMainPageAbility().RegisterOverlayVisibilityChangedHandler(this, visible =>
@@ -639,6 +641,7 @@ internal sealed partial class PlayerPage : BasePage
         {
             case MediaEngineState.Playing:
                 ViewModel.IsPlaying = true;
+                UnholdOverlay();
                 break;
             case MediaEngineState.None:
             case MediaEngineState.Paused:
@@ -769,7 +772,7 @@ internal sealed partial class PlayerPage : BasePage
                     return;
                 }
 
-                SetOverlayHold(!_isOverlayVisible);
+                ToggleOverlayHold();
             });
         }
         else if (e.TapCount == 2)
@@ -779,10 +782,38 @@ internal sealed partial class PlayerPage : BasePage
         }
     }
 
+    private void PlayerPage_AnyPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.Pointer.PointerDeviceType == PointerDeviceType.Mouse)
+        {
+            return;
+        }
+
+        bool IsElementInsideVideo(object? source)
+        {
+            for (var element = source as DependencyObject; element is not null; element = VisualTreeHelper.GetParent(element))
+            {
+                if (element == VideoHost)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        _isPointerInsideOverlay = !IsElementInsideVideo(e.OriginalSource);
+    }
+
     private void VideoHost_PointerEntered(object sender, PointerRoutedEventArgs e)
     {
-        _isPointerInsideVideo = true;
-        UpdateOverlayState();
+        if (e.Pointer.PointerDeviceType != PointerDeviceType.Mouse)
+        {
+            return;
+        }
+
+        _isMouseInsideVideo = true;
+        UpdateOverlayStateByMouse();
 
         _lastPointerPosition = null;
         KeepCursorVisible();
@@ -790,8 +821,13 @@ internal sealed partial class PlayerPage : BasePage
 
     private void VideoHost_PointerExited(object sender, PointerRoutedEventArgs e)
     {
-        _isPointerInsideVideo = false;
-        UpdateOverlayState();
+        if (e.Pointer.PointerDeviceType != PointerDeviceType.Mouse)
+        {
+            return;
+        }
+
+        _isMouseInsideVideo = false;
+        UpdateOverlayStateByMouse();
 
         _lastPointerPosition = null;
         ShowCursor();
@@ -801,19 +837,21 @@ internal sealed partial class PlayerPage : BasePage
 
     #region Overlay
 
-    private bool _shouldOverlayVisible = false;
-    private bool _isPointerInsideRootElement = true;
-    private bool _isPointerInsideVideo = false;
+    private bool _isPointerInsideOverlay = false;
+    private bool _isMouseInsideRootElement = true;
+    private bool _isMouseInsideVideo = false;
+
     private double _topOverlayHeight = 0.0;
     private double _rightOverlayWidth = 0.0;
     private double _bottomGridHeight = 0.0;
     private bool _isOverlayVisible = false;
     private bool _isOverlayHold = false;
+    private long _hideOverlaySession = 0;
     private long _hideOverlayDeadline = -1;
 
-    private void UpdateOverlayState()
+    private void UpdateOverlayStateByMouse()
     {
-        bool GetPointerInsideWindowState()
+        bool GetMouseInsideWindowState()
         {
             SizeF windowSize = GetMainWindowAbility().WindowSize;
             PointF pointerPos = GetMainWindowAbility().GetPointerPosition();
@@ -825,68 +863,55 @@ internal sealed partial class PlayerPage : BasePage
                 pointerPos.Y <= windowSize.Height - padding;
         }
 
-        bool isPointerInsideWindow = GetPointerInsideWindowState();
-        bool shouldOverlayVisible = (isPointerInsideWindow || _isPointerInsideRootElement) && !_isPointerInsideVideo;
-        if (shouldOverlayVisible == _shouldOverlayVisible)
+        bool isMouseInsideWindow = GetMouseInsideWindowState();
+        bool isPointerInsideOverlay = (isMouseInsideWindow || _isMouseInsideRootElement) && !_isMouseInsideVideo;
+
+        if (isPointerInsideOverlay == _isPointerInsideOverlay)
         {
             return;
         }
 
-        _shouldOverlayVisible = shouldOverlayVisible;
+        _isPointerInsideOverlay = isPointerInsideOverlay;
 
         if (AppSettingsModel.AutoToggleOverlaysOnCursor)
         {
-            if (shouldOverlayVisible)
+            if (isPointerInsideOverlay)
             {
                 ShowOverlay();
             }
             else
             {
-                TryHideOverlay(HIDE_OVERLAY_DELAY_MS);
+                HideOverlay(delay: HIDE_OVERLAY_DELAY_MS);
             }
         }
     }
 
-    private void TryHideOverlay(int delayMilliseconds = 0)
+    private void ToggleOverlayHold()
     {
-        if (!_isOverlayVisible ||
-            ViewModel.IsPinned ||
-            _isOverlayHold ||
-            _shouldOverlayVisible)
+        _isOverlayHold = !_isOverlayHold;
+        if (_isOverlayHold)
         {
-            return;
+            ShowOverlay();
         }
-
-        if (delayMilliseconds > 0)
+        else
         {
-            void PostHideTask(int delay)
-            {
-                CoroutineUtils.Run(async () =>
-                {
-                    await Task.Delay(delay);
-
-                    if (_hideOverlayDeadline == -1)
-                    {
-                        return;
-                    }
-
-                    long currentTick = GetTick();
-                    if (currentTick < _hideOverlayDeadline)
-                    {
-                        PostHideTask((int)(_hideOverlayDeadline - currentTick));
-                        return;
-                    }
-
-                    TryHideOverlay();
-                });
-            }
-
-            _hideOverlayDeadline = GetTick() + delayMilliseconds;
-            PostHideTask(delayMilliseconds);
-            return;
+            HideOverlay();
         }
+    }
 
-        HideOverlay();
+    private void UnholdOverlay()
+    {
+        _isOverlayHold = false;
+
+        PointerDeviceType pointerDeviceType = GetMainWindowAbility().LastPointerDeviceType;
+        if (pointerDeviceType == PointerDeviceType.Mouse || !_isPointerInsideOverlay)
+        {
+            HideOverlay();
+        }
+        else
+        {
+            HideOverlay(delay: 3000, ignorePointerPosition: true);
+        }
     }
 
     private void ShowOverlay()
@@ -903,7 +928,56 @@ internal sealed partial class PlayerPage : BasePage
         GetMainPageAbility().SetOverlayVisibility(true);
     }
 
-    private void HideOverlay()
+    private void HideOverlay(int delay = 0, bool ignorePointerPosition = false)
+    {
+        bool CanHideOverlay()
+        {
+            return _isOverlayVisible &&
+                !ViewModel.IsPinned &&
+                (ignorePointerPosition || !_isPointerInsideOverlay) &&
+                !_isOverlayHold;
+        }
+
+        if (!CanHideOverlay())
+        {
+            return;
+        }
+
+        CoroutineUtils.Run(async () =>
+        {
+            long session = ++_hideOverlaySession;
+
+            if (delay > 0)
+            {
+                _hideOverlayDeadline = GetTick() + delay;
+
+                while (true)
+                {
+                    long remaining = _hideOverlayDeadline - GetTick();
+                    if (remaining <= 0)
+                    {
+                        if (!CanHideOverlay())
+                        {
+                            return;
+                        }
+
+                        break;
+                    }
+
+                    await Task.Delay((int)remaining + 1);
+
+                    if (session != _hideOverlaySession || _hideOverlayDeadline == -1)
+                    {
+                        return;
+                    }
+                }
+            }
+
+            HideOverlayInternal();
+        });
+    }
+
+    private void HideOverlayInternal()
     {
         _hideOverlayDeadline = -1;
 
@@ -916,20 +990,6 @@ internal sealed partial class PlayerPage : BasePage
         _isOverlayHold = false;
         UpdatePromptMargin();
         GetMainPageAbility().SetOverlayVisibility(false);
-    }
-
-    private void SetOverlayHold(bool hold)
-    {
-        _isOverlayHold = hold;
-
-        if (hold)
-        {
-            ShowOverlay();
-        }
-        else
-        {
-            TryHideOverlay();
-        }
     }
 
     private void UpdatePinRelatedUI()
