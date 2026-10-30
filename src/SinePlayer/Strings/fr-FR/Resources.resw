@@ -854,7 +854,7 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
     <value>Pause</value>
   </data>
   <data name="PauseOnLeaveTab" xml:space="preserve">
-    <value>Mettre en pause en quittant l’onglet du lecteur</value>
+    <value>Mettre la vidéo en pause en quittant l’onglet du lecteur</value>
   </data>
   <data name="PictureLag" xml:space="preserve">
     <value>Retard de l’image</value>

@@ -852,7 +852,7 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
     <value>暫停</value>
   </data>
   <data name="PauseOnLeaveTab" xml:space="preserve">
-    <value>離開播放器分頁時暫停</value>
+    <value>離開播放器分頁時暫停視訊</value>
   </data>
   <data name="PictureLag" xml:space="preserve">
     <value>畫面延遲</value>

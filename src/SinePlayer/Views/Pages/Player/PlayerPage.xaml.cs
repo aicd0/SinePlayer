@@ -1270,7 +1270,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (!IsResumed)
         {
-            if (AppSettingsModel.PauseOnLeaveTab)
+            if (AppSettingsModel.PauseOnLeaveTab && !ViewModel.IsAudio)
             {
                 _engine?.Pause();
             }
