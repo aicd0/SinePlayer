@@ -15,7 +15,7 @@ internal class EmptyImageSource : IImageSource
 
     public ImageLoaderSchedulerGroup PreferredSchedulerGroup => ImageLoaderSchedulerGroup.Default;
 
-    public bool IsCacheValidationEnabled => false;
+    public ImageCacheValidationMode CacheValidationMode => ImageCacheValidationMode.None;
 
     private EmptyImageSource() { }
 

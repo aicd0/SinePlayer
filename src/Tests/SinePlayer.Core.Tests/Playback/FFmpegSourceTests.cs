@@ -4,6 +4,7 @@
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 
@@ -122,6 +123,64 @@ public class FFmpegSourceTests
             Assert.That(result.IsSuccessful, Is.False);
             Assert.That(result.Message, Is.Not.Empty);
             Assert.That(source, Is.Null);
+        }
+    }
+
+    /// <summary>
+    /// A recording tagged with the orientation it was made at. The matrix sits in the stream's codec parameters, which
+    /// is a part of the FFmpeg structures this project only declares as far as it reads, so this test is also what
+    /// catches that declaration drifting away from the pinned build.
+    /// </summary>
+    [TestCase(90, false)]
+    [TestCase(90, true)]
+    [TestCase(180, true)]
+    public void ReportsTheOrientationTheStreamIsTaggedWith(int rotation, bool mirrored)
+    {
+        string tagged = VideoFixtureFile.CreateH264(rotation: rotation, mirrored: mirrored);
+        try
+        {
+            FFmpegSourceProviderFactory factory = new();
+            OperationResult result = factory.TryOpen(MediaLocator.Parse(tagged), out IMediaSource? source);
+            Assert.That(result.IsSuccessful, Is.True, result.Message);
+
+            using (source)
+            {
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(source!.Info.VideoStreams, Has.Count.EqualTo(1));
+
+                    VideoStreamInfo video = source.Info.VideoStreams[0];
+                    var expected = new VideoOrientation(-rotation / 90, mirrored);
+                    Assert.That(video.Orientation, Is.EqualTo(expected), "the turn is read backwards, and a mirror is kept");
+                    Assert.That(video.Width, Is.EqualTo(VideoFixtureFile.Width), "the stored size is not turned");
+                    Assert.That(video.Height, Is.EqualTo(VideoFixtureFile.Height));
+                }
+            }
+        }
+        finally
+        {
+            File.Delete(tagged);
+        }
+    }
+
+    [Test]
+    public void ReportsNoOrientationForAStreamThatIsNotTagged()
+    {
+        string upright = VideoFixtureFile.CreateH264();
+        try
+        {
+            FFmpegSourceProviderFactory factory = new();
+            OperationResult result = factory.TryOpen(MediaLocator.Parse(upright), out IMediaSource? source);
+            Assert.That(result.IsSuccessful, Is.True, result.Message);
+
+            using (source)
+            {
+                Assert.That(source!.Info.VideoStreams[0].Orientation, Is.EqualTo(VideoOrientation.Identity));
+            }
+        }
+        finally
+        {
+            File.Delete(upright);
         }
     }
 

@@ -2006,6 +2006,12 @@ public sealed partial class PlaybackPipeline : IDisposable
             bool playing = CheckState(out MediaEngineState state, MediaEngineState.Playing);
             VideoTransform transform = VideoTransform;
 
+            VideoOrientation containerTransform = SelectedVideoStream?.Orientation ?? VideoOrientation.Identity;
+            if (!containerTransform.IsIdentity)
+            {
+                transform = transform with { Orientation = transform.Orientation.Combine(containerTransform) };
+            }
+
             if (deviceAvailable && videoRenderer is not null && state is MediaEngineState.Paused or MediaEngineState.Ended)
             {
                 OperationResult refreshed;

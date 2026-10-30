@@ -1,6 +1,8 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Playback.Abstractions.Render;
+
 namespace SinePlayer.Core.Playback.Abstractions.Info;
 
 public sealed class VideoStreamInfo : MediaStreamInfo
@@ -14,6 +16,8 @@ public sealed class VideoStreamInfo : MediaStreamInfo
     public required double FrameRate { get; init; }
 
     public required PixelFormat PixelFormat { get; init; }
+
+    public VideoOrientation Orientation { get; init; }
 
     public int BitDepth { get; init; }
 

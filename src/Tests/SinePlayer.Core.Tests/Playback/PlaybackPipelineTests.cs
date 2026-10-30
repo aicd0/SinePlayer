@@ -987,6 +987,42 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// A phone records the turn it was held at, and a player that ignores it draws the picture on its side. What the
+    /// container says is turned before what the viewer asks for, so a viewer turning a portrait recording further
+    /// means further.
+    /// </summary>
+    [Test]
+    public void TurnsThePictureTheContainerSaysIsSideways()
+    {
+        string path = VideoFixtureFile.CreateH264(rotation: 90);
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            WaitFor(() => videoRenderer.RenderedFrames > 0, "the paused picture to be drawn once");
+
+            var recorded = new VideoOrientation(3, false);
+            Assert.That(videoRenderer.LastRenderedTransform.Orientation, Is.EqualTo(recorded), "the turn the recording was made at is applied");
+
+            var asked = new VideoOrientation(1, false);
+            pipeline.VideoTransform = VideoTransform.Identity with { Orientation = asked };
+            WaitFor(() => videoRenderer.LastRefreshedTransform.Orientation == asked.Combine(recorded), "the viewer's turn is added to the recording's");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(videoRenderer.LastRefreshedTransform.Orientation, Is.EqualTo(VideoOrientation.Identity), "a quarter turn against the recording's three quarters is upright");
+                Assert.That(pipeline.VideoTransform.Orientation, Is.EqualTo(asked), "the pipeline keeps what the host set");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
     /// While frames are arriving, the transform travels with each one rather than being remembered by the
     /// renderer: a renderer replaced mid-playback must not be able to keep a picture turned the way the old one
     /// had it.

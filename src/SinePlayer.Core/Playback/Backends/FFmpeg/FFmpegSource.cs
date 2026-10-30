@@ -4,6 +4,7 @@
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
@@ -301,6 +302,7 @@ public sealed partial class FFmpegSource : IMediaSource
                 Height = parameters->Height,
                 FrameRate = ResolveFrameRate(stream, parameters),
                 PixelFormat = FFmpegInterop.ToPixelFormat(parameters->Format),
+                Orientation = ResolveOrientation(parameters),
                 BitDepth = parameters->BitsPerRawSample,
                 Colour = FFmpegInterop.ToColourInfo(parameters->ColorPrimaries, parameters->ColorTransfer, parameters->ColorRange),
             },
@@ -340,6 +342,33 @@ public sealed partial class FFmpegSource : IMediaSource
     {
         double average = FFmpegInterop.ToRate(stream->AverageFrameRate);
         return average > 0 ? average : FFmpegInterop.ToRate(parameters->FrameRate);
+    }
+
+    private static unsafe VideoOrientation ResolveOrientation(AVCodecParameters* parameters)
+    {
+        if (parameters->CodedSideDataCount <= 0 || parameters->CodedSideData == 0)
+        {
+            return VideoOrientation.Identity;
+        }
+
+        var entries = (AVPacketSideData*)parameters->CodedSideData;
+        for (int i = 0; i < parameters->CodedSideDataCount; i++)
+        {
+            if (entries[i].Type != FFmpegConstants.SideDataTypeDisplayMatrix || entries[i].Data == 0)
+            {
+                continue;
+            }
+
+            if (entries[i].Size < 9 * sizeof(int))
+            {
+                return VideoOrientation.Identity;
+            }
+
+            int* matrix = (int*)entries[i].Data;
+            return FFmpegInterop.ToOrientation(matrix);
+        }
+
+        return VideoOrientation.Identity;
     }
 
     private static bool IsBitmapSubtitle(string codecId)

@@ -93,8 +93,12 @@ internal sealed class MediaThumbnailUriInterceptor : IResourceUriInterceptor
                 return null;
             }
 
-            ThumbnailMode thumbnailMode = isAudioExtension ? ThumbnailMode.MusicView : ThumbnailMode.VideosView;
-            return new MediaThumbnailImageSource(location, _uri.ToString(), thumbnailMode);
+            if (isAudioExtension)
+            {
+                return new WindowsThumbnailImageSource(location, _uri.ToString(), ThumbnailMode.MusicView);
+            }
+
+            return new EngineThumbnailImageSource(location, _uri.ToString());
         }
 
         public Task Release()
