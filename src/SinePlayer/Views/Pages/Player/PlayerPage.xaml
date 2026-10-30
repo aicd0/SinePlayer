@@ -14,6 +14,7 @@
     <Grid x:Name="RootGrid" Background="Black">
         <Grid
             x:Name="VideoHost"
+            Background="Transparent"
             ContextRequested="VideoHost_ContextRequested"
             PointerCanceled="VideoHost_PointerCanceled"
             PointerEntered="VideoHost_PointerEntered"
@@ -22,6 +23,14 @@
             PointerPressed="VideoHost_PointerPressed"
             PointerReleased="VideoHost_PointerReleased" />
         <Grid x:Name="SubtitleHost" IsHitTestVisible="False" />
+        <FontIcon
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            FontSize="96"
+            Glyph="&#xE8D6;"
+            IsHitTestVisible="False"
+            Opacity="0.6"
+            Visibility="{x:Bind ViewModel.IsAudio, Mode=OneWay}" />
         <player:PlayerTransportBar x:Name="TransportBar" VerticalAlignment="Bottom" />
         <TextBlock
             x:Name="PromptText"

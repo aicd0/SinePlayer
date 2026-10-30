@@ -13,6 +13,7 @@ using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
+using SinePlayer.Data.Tables;
 
 namespace SinePlayer.Views.Pages.Player;
 
@@ -170,6 +171,17 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         {
             _backgroundImageUri = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BackgroundImageUri)));
+        }
+    }
+
+    private bool _isAudio = false;
+    public bool IsAudio
+    {
+        get => _isAudio;
+        set
+        {
+            _isAudio = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAudio)));
         }
     }
 
@@ -478,6 +490,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         _media = null;
         BackgroundImageUri = null;
         DurationMs = 0;
+        IsAudio = false;
 
         if (media is null)
         {
@@ -486,6 +499,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         }
 
         _media = media;
+        IsAudio = media.Type == MediaType.Audio;
         UpdateMediaMetadata();
 
         // Save to history

@@ -107,6 +107,7 @@ internal static unsafe class BgraFrameConverter
         Planar,
         SemiPlanar8,
         SemiPlanar16,
+        Planar16,
     }
 
     /// <summary>Reads the colour of one source pixel out of planes it does not own.</summary>
@@ -181,7 +182,7 @@ internal static unsafe class BgraFrameConverter
                     layout = Layout.Planar;
                     break;
                 case PixelFormat.Yuv420P10:
-                    layout = Layout.Planar;
+                    layout = Layout.Planar16;
                     chromaShiftX = 1;
                     chromaShiftY = 1;
                     bitShift = 2; // ten bits held in the low bits of a sixteen bit word
@@ -209,7 +210,7 @@ internal static unsafe class BgraFrameConverter
 
             int requiredPlanes = layout switch
             {
-                Layout.Planar => 3,
+                Layout.Planar or Layout.Planar16 => 3,
                 Layout.SemiPlanar8 or Layout.SemiPlanar16 => 2,
                 _ => 1,
             };
@@ -233,14 +234,14 @@ internal static unsafe class BgraFrameConverter
                 return;
             }
 
-            int bytesPerSample = _layout == Layout.SemiPlanar16 ? 2 : 1;
+            int bytesPerSample = _layout is Layout.SemiPlanar16 or Layout.Planar16 ? 2 : 1;
             float luma = ReadSample(_plane0 + (y * _stride0) + (x * bytesPerSample));
             int chromaX = x >> _chromaShiftX;
             int chromaY = y >> _chromaShiftY;
 
             float chromaBlue;
             float chromaRed;
-            if (_layout == Layout.Planar)
+            if (_layout is Layout.Planar or Layout.Planar16)
             {
                 chromaBlue = ReadSample(_plane1 + (chromaY * _stride1) + (chromaX * bytesPerSample));
                 chromaRed = ReadSample(_plane2 + (chromaY * _stride2) + (chromaX * bytesPerSample));
@@ -267,7 +268,7 @@ internal static unsafe class BgraFrameConverter
         /// <summary>One sample of a plane, brought down to the eight bit range the conversion works in.</summary>
         private float ReadSample(byte* position)
         {
-            int value = _layout == Layout.SemiPlanar16 ? *(ushort*)position : *position;
+            int value = _layout is Layout.SemiPlanar16 or Layout.Planar16 ? *(ushort*)position : *position;
             return value >> _bitShift;
         }
 

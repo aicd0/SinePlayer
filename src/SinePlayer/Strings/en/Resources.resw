@@ -854,7 +854,7 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
     <value>Pause</value>
   </data>
   <data name="PauseOnLeaveTab" xml:space="preserve">
-    <value>Pause when leaving the player tab</value>
+    <value>Pause video when leaving the player tab</value>
   </data>
   <data name="PictureLag" xml:space="preserve">
     <value>Picture lag</value>

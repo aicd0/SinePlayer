@@ -149,6 +149,31 @@ public class BgraFrameConverterTests
         Assert.That(Red(thumbnail, 0, 0), Is.EqualTo(255).Within(2));
     }
 
+    /// <summary>
+    /// Ten bits per sample, laid out as planar as well. The samples are two bytes wide, and reading them a byte at a
+    /// time is what once turned a white into a dark grey.
+    /// </summary>
+    [Test]
+    public void ReadsLumaOutOfATenBitPlanarFrame()
+    {
+        // Full white in ten bit limited range is 940, which is 235 once brought down to eight bits.
+        var buffer = FrameBuffer.CreatePlanarYuv420Wide(2, 2);
+        buffer.FillPlane10(0, 940);
+        buffer.FillPlane10(1, 512);
+        buffer.FillPlane10(2, 512);
+        using RawVideoFrame frame = Frame(buffer, 2, 2, PixelFormat.Yuv420P10);
+
+        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, maxEdge: 8, new VideoOrientation(0, false));
+
+        Assert.That(thumbnail, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Red(thumbnail, 0, 0), Is.EqualTo(255).Within(2), "ten bit white is white, not its low byte");
+            Assert.That(thumbnail.Pixels[0], Is.EqualTo(255).Within(2), "and it is not tinted");
+            Assert.That(thumbnail.Pixels[1], Is.EqualTo(255).Within(2));
+        }
+    }
+
     [Test]
     public void ReportsALayoutItCannotRead()
     {
@@ -206,10 +231,29 @@ public class BgraFrameConverterTests
             return buffer;
         }
 
+        /// <summary>The same layout with two byte samples, the way a ten bit software decoder hands out a frame.</summary>
+        internal static FrameBuffer CreatePlanarYuv420Wide(int width, int height)
+        {
+            FrameBuffer buffer = new();
+            buffer.AddPlane(new byte[width * height * sizeof(ushort)], width * sizeof(ushort));
+            buffer.AddPlane(new byte[width / 2 * (height / 2) * sizeof(ushort)], width / 2 * sizeof(ushort));
+            buffer.AddPlane(new byte[width / 2 * (height / 2) * sizeof(ushort)], width / 2 * sizeof(ushort));
+            return buffer;
+        }
+
         internal void FillPlane(int plane, byte value)
         {
             byte* pointer = (byte*)_pointers[plane];
             for (int i = 0; i < _lengths[plane]; i++)
+            {
+                pointer[i] = value;
+            }
+        }
+
+        internal void FillPlane10(int plane, ushort value)
+        {
+            ushort* pointer = (ushort*)_pointers[plane];
+            for (int i = 0; i < _lengths[plane] / sizeof(ushort); i++)
             {
                 pointer[i] = value;
             }
