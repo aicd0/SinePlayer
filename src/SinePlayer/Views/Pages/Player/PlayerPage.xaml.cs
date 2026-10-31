@@ -439,45 +439,33 @@ internal sealed partial class PlayerPage : BasePage
     private PlaybackComponents _components = PlaybackComponents.Default;
     private VideoTransform _videoTransform = VideoTransform.Identity;
 
-    /// <summary>
-    /// Opens a file through the engine the page owns, and starts it. Which file, and where in it to start, are the
-    /// view model's decision; what the file is played through — which tracks, and whether it plays at all — is the
-    /// page's, because the engine opens a file and no more.
-    /// </summary>
     private async Task<OperationResult> OpenMedia(MediaModel media, long startPositionMs)
     {
-        CoreEngine engine = EnsureEngine();
-
-        // Where the file that is about to be replaced was left: the view model keeps that mark, and it still knows
-        // the previous media is the one playing.
         ViewModel.SavePosition();
 
-        // What the media was last played through, which is what its settings were saved with.
+        CoreEngine engine = EnsureEngine();
+
         var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
         _components = mediaSettings.ToComponents();
         _videoTransform = mediaSettings.ToVideoTransform();
 
-        // Components are only read when the file is opened, so the engine lets go of what it has before it is
-        // told what to use, and then opens the new file with it. A component that cannot be applied is reported by
-        // the open itself, which has nothing to build its chains from.
-        await engine.Stop();
-        await engine.SetComponents(_components);
+        await engine.Reset();
+        engine.SetComponents(_components);
         engine.SetVideoTransform(_videoTransform);
 
-        OperationResult loaded = await engine.Load(media.Location);
+        OperationResult loaded = await engine.AddSource(media.Location);
         if (!loaded.IsSuccessful)
         {
             return loaded;
         }
 
-        // The order of the three steps below is the order they need: a track can only be chosen once there is a file,
-        // the seek asks for a position on the tracks that will play it, and playing before either is a Play the
-        // pipeline refuses for having nothing to play.
         OperationResult selected = await SelectTracks(engine, media);
         if (!selected.IsSuccessful)
         {
             return selected;
         }
+
+        ViewModel.SetDuration(engine.Duration.Ticks / TimeSpan.TicksPerMillisecond);
 
         if (startPositionMs > 0)
         {
@@ -532,6 +520,11 @@ internal sealed partial class PlayerPage : BasePage
         if (video is not null)
         {
             OperationResult chosen = await engine.SelectStream(MediaStreamKind.Video, video);
+            if (chosen.IsSuccessful)
+            {
+                chosen = await engine.Reconcile();
+            }
+
             playing |= chosen.IsSuccessful;
             if (!chosen.IsSuccessful)
             {
@@ -542,6 +535,11 @@ internal sealed partial class PlayerPage : BasePage
         if (audio is not null)
         {
             OperationResult chosen = await engine.SelectStream(MediaStreamKind.Audio, audio);
+            if (chosen.IsSuccessful)
+            {
+                chosen = await engine.Reconcile();
+            }
+
             playing |= chosen.IsSuccessful;
             if (!chosen.IsSuccessful)
             {
@@ -549,11 +547,14 @@ internal sealed partial class PlayerPage : BasePage
             }
         }
 
-        // Subtitles are the one track that stays off until it is asked for: a file's own default subtitle is not a
-        // reason to draw it over the picture, and only a choice made for this file is a reason to.
         if (subtitleChoice.Stream is not null)
         {
             OperationResult chosen = await engine.SelectStream(MediaStreamKind.Subtitle, subtitleChoice.Stream);
+            if (chosen.IsSuccessful)
+            {
+                chosen = await engine.Reconcile();
+            }
+
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the subtitles could not be played ({chosen.Message})");
@@ -681,13 +682,6 @@ internal sealed partial class PlayerPage : BasePage
 
     private void Engine_MediaOpened()
     {
-        CoreEngine? engine = _engine;
-        if (engine is null)
-        {
-            return;
-        }
-
-        ViewModel.SetDuration(engine.Duration.Ticks / TimeSpan.TicksPerMillisecond);
         ViewModel.PlayerStatusLiveData.Emit(new() { Status = PlayerPageViewModel.PlayerStatusEnum.Working });
     }
 
@@ -1098,7 +1092,14 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        OperationResult err = await engine.SetComponents(components);
+        engine.SetComponents(components);
+
+        if (engine.State == MediaEngineState.None)
+        {
+            return;
+        }
+
+        OperationResult err = await engine.Reconcile();
         if (!err.IsSuccessful)
         {
             PromptInfo(err.Message);

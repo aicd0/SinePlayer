@@ -10,5 +10,5 @@ namespace SinePlayer.Core.Playback.Abstractions.Registry;
 
 public interface ISubtitleDecoderFactory : IComponentFactory
 {
-    OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource? source, SubtitleStreamInfo stream);
+    OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource source, SubtitleStreamInfo stream);
 }

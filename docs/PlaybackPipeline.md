@@ -366,12 +366,41 @@ hold `newComponent` from their own `Update`. `Reset()` releases both, and is cal
 
 ### 2.5 What opening does not decide, and what a selection republishes
 
-**Opening a file chooses nothing to play.** `Open` opens the source, reads the stream listing and publishes a holder
-with **no streams**, so nothing is created and nothing is read: no decoder, no device, no read-ahead, no frame
-decoded. That is deliberate, because the streams a host chooses from are only known once the file is open — a
-pipeline that guessed "the first of each kind" would build, configure and decode tracks the host is about to replace,
-and a video track switch builds a *new* renderer (and so a new graphics device) because the chain must be able to
-re-decode. A file opened onto a track menu should cost the container and nothing else.
+**Opening a file chooses nothing to play, and says nothing to anyone.** `AddSource` opens the source and appends it to
+the list the pipeline was given — that is the whole of it. It publishes nothing, because a publication is how the
+threads are told what to read and there is nothing to read until a stream is chosen; it starts no thread, for the same
+reason. So nothing is created and nothing is decoded: no decoder, no device, no read-ahead, no frame. That is
+deliberate, because the streams a host chooses from are only known once the file is open — a pipeline that guessed
+"the first of each kind" would build, configure and decode tracks the host is about to replace, and a video track switch
+builds a *new* renderer (and so a new graphics device) because the chain must be able to re-decode. A file opened onto
+a track menu should cost the container and nothing else, and no source is a special case while that happens: the first
+one given takes exactly the same path as the hundredth, and no source is ever "the one being played" — the selection is
+what names files, not the order they arrived in.
+
+**A holder carries the files its selection needs, and nothing else.** `SelectStream` builds the holder from the stream
+chosen for that kind — the other kinds come from the holder in effect — plus *only the files those streams come from*,
+and publishes it through `BuildChains` like every other publication. So what the reader is told is exactly what is being
+played: a file nothing is selected from is not in the holder, which is why it is never read, never seeked, and cannot
+decide when playback ends. `AddSource` appends to the pipeline's own file list and publishes nothing, because a
+publication carries a selection and a file nobody has selected from changes no selection; the next selection is the act
+that brings it in. What commands need both halves of — the files, for closing them and for resolving a stream back to the
+file it came from — ask `CurrentHolder()`, which re-derives the holder from the published selection. The selection
+therefore has no second copy to disagree with, and a holder's sources are a function of its streams rather than an
+independent list that could fall out of step.
+
+**The threads start when something needs them, not when a file is added.** The first reconcile that builds a chain
+starts them, once — every later reconcile finds them already running — and it starts them *after* it has settled the
+position, because a thread brought up before the epoch moved could take up media that belongs to the epoch being
+replaced and read it into the new one. `Reset` starts nothing: a reset pipeline holds no threads until a chain is
+published, which is also what removes the first source's last privilege, since no file is the reason threads exist —
+the chain is.
+
+**The surfaces come first, in a reset of their own.** `Reset(videoTarget, subtitleTarget)` closes whatever was open
+and takes the two surfaces the picture and the subtitles are drawn on; only then is a file added. The surfaces belong
+to whatever is on screen and not to the file, so they are handed over once and stay with the pipeline across files
+instead of travelling with the one being opened — and a pipeline that has been reset holds no file at all: no source,
+no duration, nothing to play, nowhere to seek, and a position of zero, since a moment from the last media is not a
+place in the next one. That is also the state `Stop` leaves, since stopping is a reset without surfaces.
 
 The consequence is a two-step start, and the host owns the second step: `SelectStream(kind, stream)` chooses one
 kind — with a null stream turning it off — and the host calls it once per kind it wants. `Play` is refused while
@@ -432,9 +461,23 @@ Two consequences worth stating, because both are easy to get wrong:
   media resumes at the switch and not a frame earlier — the same epoch change also clears the queues, which is what
   releases the threads parked on them. A switch is therefore a seek in the only sense that matters here: freshness
   comes from the epoch, compatibility from the version (§2.4).
-- **The holder does not own the source.** `MediaSourceHolder.Dispose` is empty and `StopCore` releases the file it
-  finds in the current holder, because one source outlives every selection of it: disposing it as a holder is
-  replaced would end the file the new holder is still reading.
+- **The holder does not own the sources.** `MediaSourceHolder.Dispose` is empty and `StopCore` releases the files the
+  pipeline was given, because a source outlives every selection of it: disposing it as a holder is replaced would end
+  the file the new holder is still reading.
+- **A source is just a source.** `AddSource` appends to one ordered list (`MediaSourceHolder.Sources`, reported as
+  `PlaybackPipeline.Sources`); order means nothing to the pipeline, and nothing about a source is decided by it. The
+  pipeline reports no duration, no container and no "has video" of its own: which file the viewer is watching, and
+  therefore what the transport bar measures, is the host's decision, and the host is the one that has the `MediaInfo` of
+  the file it opened. What ends playback is not a designated file either — it is the selected tracks running out, which
+  is per-selection rather than per-source, so a file added only for its subtitles can never extend or shorten anything
+  (§7). A source is read only once one of its streams is selected, and adding one while something plays disturbs nothing:
+  no publication is made for it, no epoch moves and no seek is issued — the file simply joins the list the next
+  selection is built from (§2.5).
+- **A stream is identified by the file it lives in.** Two files number their streams from nothing, so the same number
+  means one stream in each, and a packet carries only the number: `SelectStream` therefore matches the instance the
+  pipeline handed out, the reader asks the holder which file a packet's stream belongs to, and a seek puts every file
+  at the position asked for, with a landing stream only for the one whose timeline it is — the numbers of that file
+  mean nothing to another.
 - **A kind can be turned off, and that is a publication like any other.** `SelectStream(kind, null)` publishes a
   holder without that kind's stream and, in that kind's two roles, publishes **nothing** — the same two publishes as a
   switch, with no component to put in them. The owner adopts the emptiness and disposes of what it was holding, which is
@@ -997,7 +1040,7 @@ stops and every thread stops working for playback: the picture and the sound par
 stopped by the frame queue it can no longer empty, and the reader parks on the state too — playing and paused
 are the only states it reads *for* — instead of filling a read-ahead and re-checking the queues every 15 ms for
 a consumer that is not coming. What stays is what explains the failure and what the host needs to decide about
-it: the reason (`Error`), the scene (`MediaInfo`, `Position`, the §13 counters), and the resources — the same
+it: the reason (`Error`), the scene (`Sources`, `Position`, the §13 counters), and the resources — the same
 lifetime a *paused* pipeline has. Stopping or opening something else is what releases them, and both are the
 host's call, which is the only place that decision belongs: a teardown is four joins with no timeout on the
 queue every command is posted to, and a failure is exactly the moment another thread may be stuck inside a
@@ -1271,6 +1314,10 @@ A change is safe exactly when it leaves all of these true. "Pinned by" names the
 | I18 | **One wait per thread.** Each of the four threads sleeps in exactly one place — its own `PipelineNode` — and every shared fact it reads before sleeping has a writer that wakes that node. A wake means "something you read changed": it may be spurious, it must never be missed, it never waits for the woken thread, and it is never sent while holding a queue's lock | Two places to sleep is two locks to reach, and a waker can only reach the one it knows about. The state lock and the queue's lock were exactly that pair: a thread inside `Peek` could not be told that the position had moved, so every command was a timeout away from being noticed, and a missing wake was indistinguishable from a slow one. With one wait, "how does this thread learn about X" has one answer per fact (§2.3) | `PipelineNodeTests` (the stamp protocol, the un-losable wake, the wake that never waits), `KeepsTheSoundComingAfterTheReadAheadIsUsedUp` and `KeepsThePictureComingAfterTheFrameWindowIsUsedUp` (a consumer that is the only possible waker), `TakesUpASurfaceChangeWhileThePictureWaitsForItsPosition` and `TakesUpASeekWhileThePictureWaitsForItsPosition` (a control wake reaching a thread that is waiting for media) |
 | I19 | **A hold on the clock is the pipeline's, and no component may release it.** A renderer's hand-off writes into a stopped device and leaves it stopped; the only starter is the render thread's decision (I10), and a stopped device's buffer filling is the hold itself — the hand-off says it has no room until the decision changes or the device is reset | A component that starts the device decides that time may pass, in a place the decision cannot see. `WasapiAudioRenderer.Submit` did exactly that, and the hold was released by the next block: a first decode that took 400 ms came after the first audio block, so the clock ran with nothing to show and the frames were dropped as late, and the picture fell 1.3 s behind the sound in a held playback — both measured by making the test double start the clock the way the device did. Nothing in the double was starting it, which is why the whole suite stayed green while the backend released every hold | `HoldsTheClockBackUntilThePictureHasSomethingToShow`, `HoldsTheClockBackWhenTheVideoCannotCatchUp`, `PlaysAToneThroughTheDefaultDevice` (a hand-off into a stopped device leaves it stopped, and one into a paused device does not restart it), and their refusal to pass for a double that starts the stream on submit |
 | I20 | **A component never waits on its device; it hands the thread back.** A hand-off writes what the device has room for and returns, saying it has no room; the pipeline then waits on its own node, where a pause, a seek, a stop and the device's own progress all reach it. Nothing sleeps, retries or gives up inside a renderer, and a backend that can accept an unbounded amount must still stop the caller running away — a high-water mark of its own, reported as the same yield | A wait inside the renderer is a wait nothing in the pipeline can reach: the state, the epoch and the stop flag are the thread's to read, not the component's, so a paused device that never drains parks a submit for good, and the seek that would have dropped the block waits behind it. That is also why the old `Submit` needed a two-second give-up — a number that turned a stalled device into a pipeline error, while §9 says a stalled device is a wait and nothing else. Nothing chose it; it was the shape of the wait | `LetsGoOfTheBlockWhenThePositionMovesWhileTheDeviceHasNoRoom` (a seek reaching a suspended hand-off), `WaitsForADeviceThatNeverTakesAudio` (a device with no room parks and resumes without losing the block), `SaysItHasNoRoomRatherThanWaiting` (the real endpoint reports a full buffer as a yield, and a reset gives the room back) |
+
+| I21 | **A coroutine that has just done work yields the thread.** The reader thread hosts three coroutines — the reader and the two decoders — and a coroutine gives the thread up only where it waits, so each of them ends its turn with a `Task.Yield()` after routing or decoding one packet, and waits on its own node only when there is nothing to do | A packet read is not a wait, and it is the packet a decoder was woken for: with the read loop looping straight into its next read, the decoder it had just woken never got a turn, and the sound sat queued and undecoded while the clock was held on `StarvedFor == "audio"`. It only shows when a stage has work for more than one iteration, which is why the suite stayed green while a stream that stops mid-file — the picture gone, the sound still arriving — pinned the position at zero | `KeepsTheSoundPlayingWhenThePictureStopsArriving`, `HoldsTheClockWhenNothingIsLeftOfEitherStream` |
+
+| I22 | **The pump's exit is a `finally`, not the last line of the coroutines.** `Complete()` is what `RunOnCurrentThread` waits for, so it runs whether the aggregate of the three coroutines succeeded or faulted; the fault then surfaces at `task.Wait()` on the reader thread, where it is reported rather than left to kill the thread unheard | The three coroutines are one thread, and a thread ends where its pump ends: with `Complete()` after the `await`, a faulted aggregate skips it, the pump waits for three coroutines that have all finished, and `task.Wait()` — the only place the exception exists — is never reached. Measured: three cores `[RanToCompletion, Faulted, RanToCompletion]`, `completeRequested=false`, `pumpExited=false`, `waitReached=false`, and `Stop()` blocked in `Join()` for ever with `Error` still null | No test: a coroutine cannot be made to throw from the outside without a fault hook in the pipeline. Verified by planting a throw in the audio decode coroutine: the fault reached `task.Wait()`, `Error` became `A reader coroutine failed: …`, and `Stop` joined the thread instead of hanging |
 
 ## 11. Changes that look reasonable and are not
 
@@ -1671,9 +1718,9 @@ The Playback Lab shows all of the above in one line, which is the intended way t
 | The one place a thread sleeps, and how a wake cannot be lost | `Internal/PipelineNode.cs`: one node per thread, the stamp read before the decision, a `Wait` that returns at once for a stamp that moved, a wake that never waits for the woken thread, and `WakeCount` so a parked pipeline can be proved not to be polling |
 | The entry a consumer is handed, and why it is a class | `MediaItem<T>` — media (or nothing, for the end of a stream), the tag, and `IsLast`, travelling together. `TryDequeue(MediaItem<T>)` takes the entry that was looked at *by identity*, which is what makes looking and taking two sound steps rather than a race: a `Clear` disposes what it holds, so an entry that is still the head is the one that was seen, whatever a replacement entry's tag might be |
 | The end of a file, and what earns the ending | `PlaybackPipeline`: `_endingEpoch` (the position the file ran out at), `_videoRenderEndedEpoch`/`_audioRenderEndedEpoch` (what each stage said about which position), and `TryNotifyPlaybackEnded` — the one decision, taken when the last word arrives and nowhere else |
-| Which tracks are read, and why that belongs to the source | `MediaSourceHolder` (the `IMediaSource` and the two selected streams, as one component) published in `_source`'s slot, adopted and held by the reader; `PlaybackPipeline.SelectStreamCore` publishes the new holder and the rebuilt pair under one number, through `ApplySelection` (§2.5) |
-| What a publication rebuilds, and what it leaves alone | `PlaybackPipeline.DiffSelection` — the holder in effect against the one handed over: the file by reference, each kind's stream by container index — whose answer `BuildChains` acts on, and `ChainChanges` reports back (§2.5) |
-| What opening leaves undecided, and who decides it | `PlaybackPipeline.PreparePlayback` publishes a holder with no streams (so nothing is created or read) and `PlayCore` refuses to start while both kinds are unselected; the host chooses with `SelectStream(kind, stream)`, once per kind, and a null stream turns that kind off (§2.5) |
+| Which tracks are read, and why that belongs to the source | the holder in `_source`, which carries the selected stream of each kind and only the files those streams come from; `PlaybackPipeline.CreateHolder` builds one from a selection over `_sources` (every file given, in the order given), `CurrentHolder()` re-derives the current one for a command, and the reader holds the holder it adopted. `SelectStreamCore` publishes the new holder and the rebuilt pair under one number (§2.5) |
+| What a publication rebuilds, and what it leaves alone | `PlaybackPipeline.DiffSource` — the holder in effect against the one handed over: the timeline by reference, each kind's stream by the file it lives in and its container index — whose answer `BuildChains` acts on, and `ChainChanges` reports back (§2.5) |
+| What opening leaves undecided, and who decides it | `PlaybackPipeline.Reset` takes the surfaces and closes everything; `PlaybackPipeline.AddSource` then publishes a holder with no streams (so nothing is created or read), and `PlayCore` refuses to start while both kinds are unselected; the host chooses with `SelectStream(kind, stream)`, once per kind, and a null stream turns that kind off (§2.5) |
 | Which package may be consumed, and by whom | `PipelineVersion` (one number per node: `Source`, `AudioDecoder`, `AudioRenderer`, `VideoDecoder`, `VideoRenderer`, plus `Max`, `Next` and the comparisons) and the verdicts `CompareOwn`/`CompareUpstream`/`CombineVerdict`; carried by `PacketEntry`, `FrameEntry` and `AudioEntry` (§2.4) |
 | How a component reaches the thread that owns it | `ComponentSlot<T>` — `Publish` (queue thread) and `Update(out new, out old)` (owner thread), one slot per role for the pipeline's life, with `Reset` only while no thread runs (§2.4). No lock beside the slots: the queue serialises publication, and the slot's own lock covers publish-against-adopt |
 | Epoch discipline and what a seek uses to interrupt | `PlaybackPipeline`: the epoch, the position published with it, and the reset of everything that belongs to a position are one `SeqLock<long>.Change`; media threads read it through `_epochs.Read()`. The protocol itself — the three reads, the retry, the wait for a change that outlasts the attempts, and how a value of several fields survives it — lives in `Internal/SeqLock.cs` |

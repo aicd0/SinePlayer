@@ -6,7 +6,6 @@ namespace SinePlayer.Core.Playback.Pipeline;
 public enum MediaEngineState
 {
     None,
-    Opening,
     Playing,
     Paused,
     Ended,

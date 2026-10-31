@@ -42,6 +42,7 @@ internal sealed partial class CoreEngine : IDisposable
     private DownmixAudioFilter? _downmixFilter;
 
     private readonly PlaybackInfoHandle _playbackInfo = new();
+    private bool _hasSource = false;
     private PlaybackComponents _components = PlaybackComponents.Default;
     private VideoTransform _videoTransform = VideoTransform.Identity;
     private double _volume = 1.0;
@@ -59,7 +60,15 @@ internal sealed partial class CoreEngine : IDisposable
 
     public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;
 
-    public TimeSpan Duration => _pipeline?.Duration ?? TimeSpan.Zero;
+    public TimeSpan Duration
+    {
+        get
+        {
+            TimeSpan video = PlaybackInfo.SelectedVideoStream?.Duration ?? TimeSpan.Zero;
+            TimeSpan audio = PlaybackInfo.SelectedAudioStream?.Duration ?? TimeSpan.Zero;
+            return video > audio ? video : audio;
+        }
+    }
 
     public double Volume => _volume;
 
@@ -108,7 +117,39 @@ internal sealed partial class CoreEngine : IDisposable
         _subtitlePanel = null;
     }
 
-    public async Task<OperationResult> Load(string filePath)
+    public async Task<OperationResult> Reset()
+    {
+        PlaybackPipeline pipeline = EnsurePipeline();
+
+        OperationResult reset = await pipeline.Reset(EnsureVideoRenderTarget(), EnsureSubtitleRenderTarget());
+        if (!reset.IsSuccessful)
+        {
+            return OperationResultExt.Failure(TAG, "The player could not be reset.", reset);
+        }
+
+        _hasSource = false;
+        return OperationResult.Success();
+    }
+
+    public void SetComponents(PlaybackComponents components)
+    {
+        ArgumentNullException.ThrowIfNull(components);
+
+        if (_components == components)
+        {
+            return;
+        }
+
+        _components = components;
+
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is not null)
+        {
+            components.Apply(pipeline);
+        }
+    }
+
+    public async Task<OperationResult> AddSource(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
         {
@@ -117,17 +158,19 @@ internal sealed partial class CoreEngine : IDisposable
 
         PlaybackPipeline pipeline = EnsurePipeline();
 
-        OperationResult opened = await pipeline.Open(
-            MediaLocator.Parse(filePath),
-            EnsureVideoRenderTarget(),
-            EnsureSubtitleRenderTarget());
-        if (!opened.IsSuccessful)
+        OperationResult<MediaSource> added = await pipeline.AddSource(MediaLocator.Parse(filePath));
+        if (!added.IsSuccessful)
         {
-            return OperationResultExt.Failure(TAG, $"Unable to open media file '{filePath}'", opened);
+            return OperationResultExt.Failure(TAG, $"Unable to open media file '{filePath}'", added);
         }
 
-        StartPositionTimer();
-        RaiseMediaOpened();
+        if (!_hasSource)
+        {
+            _hasSource = true;
+            StartPositionTimer();
+            RaiseMediaOpened();
+        }
+
         return OperationResult.Success();
     }
 
@@ -149,43 +192,22 @@ internal sealed partial class CoreEngine : IDisposable
         return OperationResult.Success();
     }
 
-    public async Task<OperationResult> SetComponents(PlaybackComponents components)
+    public async Task<OperationResult> Reconcile()
     {
-        ArgumentNullException.ThrowIfNull(components);
-
-        if (_components == components)
-        {
-            return OperationResult.Success();
-        }
-
-        _components = components;
-
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is null)
         {
-            return OperationResult.Success();
+            return OperationResultExt.Failure(TAG, "There is nothing open to build.");
         }
-
-        components.Apply(pipeline);
 
         OperationResult reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
-            return OperationResultExt.Failure(TAG, $"The components could not be changed. {reconciled.Message}");
+            return OperationResultExt.Failure(TAG, $"What was chosen could not be played. {reconciled.Message}");
         }
 
+        RaisePositionChanged();
         return OperationResult.Success();
-    }
-
-    public void SetVideoTransform(VideoTransform transform)
-    {
-        if (_videoTransform == transform)
-        {
-            return;
-        }
-
-        _videoTransform = transform;
-        _pipeline?.VideoTransform = transform;
     }
 
     public void Play()
@@ -209,15 +231,6 @@ internal sealed partial class CoreEngine : IDisposable
         _pipeline?.Pause();
     }
 
-    public async Task Stop()
-    {
-        PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is not null)
-        {
-            await pipeline.Stop();
-        }
-    }
-
     public void Seek(TimeSpan position, SeekMode mode)
     {
         PlaybackPipeline? pipeline = _pipeline;
@@ -226,7 +239,7 @@ internal sealed partial class CoreEngine : IDisposable
             return;
         }
 
-        TimeSpan duration = pipeline.Duration;
+        TimeSpan duration = Duration;
         if (position < TimeSpan.Zero)
         {
             position = TimeSpan.Zero;
@@ -254,6 +267,17 @@ internal sealed partial class CoreEngine : IDisposable
                 RaisePositionChanged();
             }
         });
+    }
+
+    public void SetVideoTransform(VideoTransform transform)
+    {
+        if (_videoTransform == transform)
+        {
+            return;
+        }
+
+        _videoTransform = transform;
+        _pipeline?.VideoTransform = transform;
     }
 
     public void SetVolume(double volume)

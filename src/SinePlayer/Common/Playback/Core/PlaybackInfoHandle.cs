@@ -2,8 +2,10 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
+using System.Collections.Generic;
 
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Common.Playback.Core;
@@ -12,13 +14,15 @@ internal sealed class PlaybackInfoHandle
 {
     private volatile PlaybackPipeline? _pipeline;
 
-    public MediaInfo? Media => _pipeline?.MediaInfo;
+    public MediaInfo? Media => Sources is [MediaSource first, ..] ? first.Info : null;
 
     public VideoStreamInfo? SelectedVideoStream => _pipeline?.SelectedVideoStream;
 
     public AudioStreamInfo? SelectedAudioStream => _pipeline?.SelectedAudioStream;
 
     public SubtitleStreamInfo? SelectedSubtitleStream => _pipeline?.SelectedSubtitleStream;
+
+    public IReadOnlyList<MediaSource> Sources => _pipeline?.Sources ?? [];
 
     public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
 

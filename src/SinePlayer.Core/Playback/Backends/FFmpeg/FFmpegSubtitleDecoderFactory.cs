@@ -11,7 +11,7 @@ namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
 public sealed class FFmpegSubtitleDecoderFactory : ISubtitleDecoderFactory
 {
-    public OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource? source, SubtitleStreamInfo stream)
+    public OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource source, SubtitleStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
@@ -19,7 +19,7 @@ public sealed class FFmpegSubtitleDecoderFactory : ISubtitleDecoderFactory
         return new OperationResultCreator<IComponentCreator<ISubtitleDecoder>>().Success(new Creator(source, stream, format));
     }
 
-    private sealed class Creator(IMediaSource? source, SubtitleStreamInfo stream, SubtitleCueFormat format) : IComponentCreator<ISubtitleDecoder>
+    private sealed class Creator(IMediaSource source, SubtitleStreamInfo stream, SubtitleCueFormat format) : IComponentCreator<ISubtitleDecoder>
     {
         public string Signature => format == SubtitleCueFormat.BitmapBgra ? "ffmpeg:subtitle:bitmap" : "ffmpeg:subtitle:ass";
 
