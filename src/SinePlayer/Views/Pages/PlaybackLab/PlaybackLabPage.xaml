@@ -25,6 +25,10 @@
                 Click="OpenButton_Click"
                 Content="Open image or video" />
             <Button
+                x:Name="AddTracksButton"
+                Click="AddTracksButton_Click"
+                Content="Add tracks" />
+            <Button
                 x:Name="PlayButton"
                 Click="PlayButton_Click"
                 Content="Play" />

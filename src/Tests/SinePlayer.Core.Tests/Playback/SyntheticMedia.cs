@@ -113,6 +113,46 @@ internal sealed class SyntheticSourceProviderFactory : ISourceProviderFactory
     }
 }
 
+/// <summary>
+/// Sources for a test that gives the pipeline more than one file: each locator is scripted by the test, so a file added
+/// later brings tracks of its own — which is what an external subtitle file is.
+/// </summary>
+internal sealed class SyntheticMultiSourceProviderFactory : ISourceProviderFactory
+{
+    private readonly Dictionary<string, SyntheticMediaScript> _scripts = new(StringComparer.Ordinal);
+    private readonly List<SyntheticMediaSource> _opened = [];
+
+    internal void Add(string path, SyntheticMediaScript script)
+    {
+        _scripts[path] = script;
+    }
+
+    public OperationResult TryOpen(MediaLocator locator, out IMediaSource? source)
+    {
+        if (!_scripts.TryGetValue(locator.Value, out SyntheticMediaScript? script))
+        {
+            source = null;
+            return OperationResult.Failure($"No script was written for '{locator}'.");
+        }
+
+        SyntheticMediaSource opened = new(script);
+        _opened.Add(opened);
+        source = opened;
+        return OperationResult.Success();
+    }
+
+    /// <summary>The sources handed out, in the order they were opened.</summary>
+    internal IReadOnlyList<SyntheticMediaSource> Opened => _opened;
+
+    internal void Release()
+    {
+        foreach (SyntheticMediaSource opened in _opened)
+        {
+            opened.Release();
+        }
+    }
+}
+
 internal sealed class SyntheticMediaSource : IMediaSource
 {
     private readonly SyntheticMediaScript _script;
@@ -123,6 +163,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
     internal const int SubtitleStreamIndex = 2;
 
     private int _next;
+    private int _reads;
     private readonly Stopwatch _since = Stopwatch.StartNew();
 
     private static readonly TimeSpan LivePollMilliseconds = TimeSpan.FromMilliseconds(5);
@@ -315,6 +356,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
                 Buffer = new SyntheticMediaBuffer(),
             };
 
+            Interlocked.Increment(ref _reads);
             return OperationResult.Success();
         }
     }
@@ -324,6 +366,9 @@ internal sealed class SyntheticMediaSource : IMediaSource
     {
         _closed.Set();
     }
+
+    /// <summary>How many packets have been handed over, which is what a test can see of the reader's progress.</summary>
+    internal int Reads => Volatile.Read(ref _reads);
 
     public void Dispose()
     {
@@ -370,19 +415,21 @@ internal sealed class SyntheticMediaBuffer : IPlanarAudioBuffer
     }
 }
 
-internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
+internal sealed class SyntheticVideoDecoderFactory(int packetsBeforeFailure = 0) : IVideoDecoderFactory
 {
     public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
     {
-        IComponentCreator<IVideoDecoder> creator = new FixedCreator<IVideoDecoder>(Signature, () => new Decoder(stream));
+        IComponentCreator<IVideoDecoder> creator = new FixedCreator<IVideoDecoder>(Signature, () => new Decoder(stream, packetsBeforeFailure));
         return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>
     internal string Signature => "synthetic:video";
 
-    private sealed class Decoder(VideoStreamInfo stream) : IVideoDecoder
+    private sealed class Decoder(VideoStreamInfo stream, int packetsBeforeFailure) : IVideoDecoder
     {
+        private int _packets;
+
         public string Name => "synthetic";
         public MediaStreamInfo Stream => stream;
 
@@ -394,6 +441,12 @@ internal sealed class SyntheticVideoDecoderFactory : IVideoDecoderFactory
 
         public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
         {
+            if (packetsBeforeFailure > 0 && Interlocked.Increment(ref _packets) > packetsBeforeFailure)
+            {
+                frames = [];
+                return OperationResult.Failure("The synthetic decoder was asked to fail.");
+            }
+
             frames =
             [
                 new RawVideoFrame
@@ -492,7 +545,7 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
 /// </summary>
 internal sealed class SyntheticSubtitleDecoderFactory : ISubtitleDecoderFactory
 {
-    public OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource? source, SubtitleStreamInfo stream)
+    public OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource source, SubtitleStreamInfo stream)
     {
         IComponentCreator<ISubtitleDecoder> creator = new FixedCreator<ISubtitleDecoder>(Signature, () => new Decoder(stream));
         return new OperationResultCreator<IComponentCreator<ISubtitleDecoder>>().Success(creator);

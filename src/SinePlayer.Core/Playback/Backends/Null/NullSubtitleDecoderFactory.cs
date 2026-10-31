@@ -19,7 +19,7 @@ public sealed class NullSubtitleDecoderFactory : ISubtitleDecoderFactory
         _signature = signature;
     }
 
-    public OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource? source, SubtitleStreamInfo stream)
+    public OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource source, SubtitleStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
 

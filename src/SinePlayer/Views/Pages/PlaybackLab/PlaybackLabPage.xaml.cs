@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -37,6 +38,8 @@ namespace SinePlayer.Views.Pages.PlaybackLab;
 
 internal sealed partial class PlaybackLabPage : BasePage
 {
+    #region Constructor
+
     private const string TAG = nameof(PlaybackLabPage);
 
     private static readonly string[] MEDIA_FILE_TYPES =
@@ -44,6 +47,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         ".mp4", ".mkv", ".mov", ".webm", ".avi", ".ts", ".m4v",
         ".bmp", ".png", ".jpg", ".jpeg", ".gif", ".webp",
         ".wav", ".mp3", ".flac", ".m4a", ".aac", ".ogg",
+        ".srt", ".ass", ".ssa", ".vtt", ".sub", ".sup",
     ];
 
     private static void ApplyComponentSelection<TFactory>(PlaybackPipeline pipeline, ComponentChoice? choice) where TFactory : class, IComponentFactory
@@ -72,7 +76,6 @@ internal sealed partial class PlaybackLabPage : BasePage
     private SwapChainPanelRenderTarget? _videoRenderTarget;
     private SwapChainPanelRenderTarget? _subtitleRenderTarget;
     private DispatcherQueueTimer? _statusTimer;
-    private string _description = string.Empty;
     private bool _updatingPickers;
 
     public PlaybackLabPage()
@@ -80,6 +83,10 @@ internal sealed partial class PlaybackLabPage : BasePage
         InitializeComponent();
         PopulatePickers();
     }
+
+    #endregion
+
+    #region Lifecycle
 
     protected override void OnStart(PageBundle bundle)
     {
@@ -100,9 +107,9 @@ internal sealed partial class PlaybackLabPage : BasePage
         _subtitleRenderTarget = null;
     }
 
-    //
-    // Events
-    //
+    #endregion
+
+    #region Events
 
     private void OpenButton_Click(object sender, RoutedEventArgs e)
     {
@@ -115,6 +122,20 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             await OpenMedia(file.Path);
+        });
+    }
+
+    private void AddTracksButton_Click(object sender, RoutedEventArgs e)
+    {
+        CoroutineUtils.Run(async () =>
+        {
+            Windows.Storage.StorageFile? file = await FilePickerUtils.PickFile(WindowId, MEDIA_FILE_TYPES);
+            if (file is null)
+            {
+                return;
+            }
+
+            await AddTracks(file.Path);
         });
     }
 
@@ -308,9 +329,9 @@ internal sealed partial class PlaybackLabPage : BasePage
         CoroutineUtils.Run(() => SelectTrack(MediaStreamKind.Subtitle, SubtitleTrackPicker.SelectedItem as TrackChoice));
     }
 
-    //
-    // Pipeline
-    //
+    #endregion
+
+    #region Pipeline
 
     private async Task OpenMedia(string path)
     {
@@ -347,25 +368,28 @@ internal sealed partial class PlaybackLabPage : BasePage
         DownmixAudioFilter downmix = new();
         pipeline.AudioFilters.Add(downmix);
 
-        OperationResult opened = await pipeline.Open(
-            MediaLocator.Parse(path),
-            _videoRenderTarget,
-            _subtitleRenderTarget);
-        if (!opened.IsSuccessful)
+        OperationResult reset = await pipeline.Reset(_videoRenderTarget, _subtitleRenderTarget);
+        string? failure = reset.IsSuccessful ? null : reset.Message;
+        if (failure is null)
+        {
+            OperationResult<MediaSource> added = await pipeline.AddSource(MediaLocator.Parse(path));
+            failure = added.IsSuccessful ? null : added.Message;
+        }
+
+        if (failure is not null)
         {
             pipeline.StateChanged -= Pipeline_StateChanged;
             pipeline.WarningRaised -= Pipeline_WarningRaised;
             pipeline.Dispose();
             gain.Dispose();
             downmix.Dispose();
-            Logger.E(TAG, $"Opening the file failed. {opened.Message}");
+            Logger.E(TAG, $"Opening the file failed. {failure}");
             return;
         }
 
         _pipeline = pipeline;
         _gain = gain;
         _downmix = downmix;
-        _description = Describe(pipeline);
         PopulateTrackPickers();
 
         StartStatusTimer();
@@ -396,8 +420,27 @@ internal sealed partial class PlaybackLabPage : BasePage
         // The panel gives the surface back before the swap chain it is showing goes away.
         _videoRenderTarget?.DetachSurface();
         _subtitleRenderTarget?.DetachSurface();
-        _description = string.Empty;
         PopulateTrackPickers();
+    }
+
+    private async Task AddTracks(string path)
+    {
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            Logger.E(TAG, "Nothing is open, so there is no playback to add a file to.");
+            return;
+        }
+
+        OperationResult<MediaSource> added = await pipeline.AddSource(MediaLocator.Parse(path));
+        if (!added.IsSuccessful)
+        {
+            Logger.E(TAG, $"Adding '{path}' failed. {added.Message}");
+            return;
+        }
+
+        PopulateTrackPickers();
+        RefreshStatus();
     }
 
     private async Task SelectTrack(MediaStreamKind kind, TrackChoice? choice)
@@ -412,6 +455,14 @@ internal sealed partial class PlaybackLabPage : BasePage
         if (!selected.IsSuccessful)
         {
             Logger.E(TAG, $"The track could not be changed. {selected.Message}");
+        }
+        else
+        {
+            OperationResult reconciled = await pipeline.Reconcile();
+            if (!reconciled.IsSuccessful)
+            {
+                Logger.E(TAG, $"The track could not be played. {reconciled.Message}");
+            }
         }
 
         PopulateTrackPickers();
@@ -432,9 +483,10 @@ internal sealed partial class PlaybackLabPage : BasePage
             target = TimeSpan.Zero;
         }
 
-        if (pipeline.Duration > TimeSpan.Zero && target > pipeline.Duration)
+        TimeSpan duration = ReachableDuration(pipeline);
+        if (duration > TimeSpan.Zero && target > duration)
         {
-            target = pipeline.Duration;
+            target = duration;
         }
 
         // Posted like the rest, and awaited here for both halves of the answer: where the seek landed, and
@@ -453,10 +505,6 @@ internal sealed partial class PlaybackLabPage : BasePage
         _gain?.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
     }
 
-    /// <summary>
-    /// What the transform controls say, as the one value the pipeline is given. Every control writes to this,
-    /// so the value is always the whole of what the panel shows rather than a field-by-field patch.
-    /// </summary>
     private VideoTransform CreateTransform()
     {
         var orientation = VideoOrientation.FromDegrees(
@@ -503,9 +551,36 @@ internal sealed partial class PlaybackLabPage : BasePage
         Logger.W(TAG, warning);
     }
 
-    //
-    // Timer
-    //
+    private async Task ReconcileAndLog(PlaybackPipeline pipeline, string what)
+    {
+        OperationResult reconciled = await pipeline.Reconcile();
+        if (!reconciled.IsSuccessful)
+        {
+            Logger.E(TAG, $"{what} could not be changed. {reconciled.Message}");
+        }
+    }
+
+    private static MediaSource? SourceOf(IReadOnlyList<MediaSource> sources, MediaStreamInfo? stream)
+    {
+        if (stream is null)
+        {
+            return null;
+        }
+
+        foreach (MediaSource source in sources)
+        {
+            if (source.Info.Streams.Any(candidate => ReferenceEquals(candidate, stream)))
+            {
+                return source;
+            }
+        }
+
+        return null;
+    }
+
+    #endregion
+
+    #region Timer
 
     private void StartStatusTimer()
     {
@@ -532,9 +607,9 @@ internal sealed partial class PlaybackLabPage : BasePage
         RefreshStatus();
     }
 
-    //
-    // UI
-    //
+    #endregion
+
+    #region UI
 
     private void PopulatePickers()
     {
@@ -643,16 +718,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private void PopulateTrackPickers()
     {
-        static IEnumerable<TrackChoice> Prepend(TrackChoice first, IEnumerable<TrackChoice> rest)
-        {
-            yield return first;
-            foreach (TrackChoice choice in rest)
-            {
-                yield return choice;
-            }
-        }
-
-        static int IndexOf(ComboBox picker, MediaStreamInfo? stream)
+        static int IndexOf(ComboBox picker, MediaSource? source, MediaStreamInfo? stream)
         {
             if (picker.ItemsSource is not IEnumerable<TrackChoice> choices)
             {
@@ -662,7 +728,8 @@ internal sealed partial class PlaybackLabPage : BasePage
             int index = 0;
             foreach (TrackChoice choice in choices)
             {
-                if (choice.Stream?.Index == stream?.Index)
+                // Matched by the file as well as the number: two files number their streams alike.
+                if (ReferenceEquals(choice.Stream, stream) && ReferenceEquals(choice.Source, source))
                 {
                     return index;
                 }
@@ -677,22 +744,47 @@ internal sealed partial class PlaybackLabPage : BasePage
         try
         {
             PlaybackPipeline? pipeline = _pipeline;
-            MediaInfo? info = pipeline?.MediaInfo;
+            IReadOnlyList<MediaSource> sources = pipeline?.Sources ?? [];
 
-            VideoTrackPicker.ItemsSource = info is null ? null : Prepend(new TrackChoice(null), info.VideoStreams.Select(stream => new TrackChoice(stream)));
-            VideoTrackPicker.SelectedIndex = IndexOf(VideoTrackPicker, pipeline?.SelectedVideoStream);
+            VideoTrackPicker.ItemsSource = Choose(sources, source => source.Info.VideoStreams);
+            VideoTrackPicker.SelectedIndex = IndexOf(VideoTrackPicker, SourceOf(sources, pipeline?.SelectedVideoStream), pipeline?.SelectedVideoStream);
 
-            AudioTrackPicker.ItemsSource = info is null ? null : Prepend(new TrackChoice(null), info.AudioStreams.Select(stream => new TrackChoice(stream)));
-            AudioTrackPicker.SelectedIndex = IndexOf(AudioTrackPicker, pipeline?.SelectedAudioStream);
+            AudioTrackPicker.ItemsSource = Choose(sources, source => source.Info.AudioStreams);
+            AudioTrackPicker.SelectedIndex = IndexOf(AudioTrackPicker, SourceOf(sources, pipeline?.SelectedAudioStream), pipeline?.SelectedAudioStream);
 
-            SubtitleTrackPicker.ItemsSource = info is null ? null : Prepend(new TrackChoice(null), info.SubtitleStreams.Select(stream => new TrackChoice(stream)));
-            SubtitleTrackPicker.SelectedIndex = IndexOf(SubtitleTrackPicker, pipeline?.SelectedSubtitleStream);
+            SubtitleTrackPicker.ItemsSource = Choose(sources, source => source.Info.SubtitleStreams);
+            SubtitleTrackPicker.SelectedIndex = IndexOf(SubtitleTrackPicker, SourceOf(sources, pipeline?.SelectedSubtitleStream), pipeline?.SelectedSubtitleStream);
         }
         finally
         {
             _updatingPickers = false;
         }
+
+        // Every file the pipeline was given, not only the first: a track can be chosen from any of them, and which one it
+        // came from is part of what the page is here to show.
+        static IEnumerable<TrackChoice> Choose(IReadOnlyList<MediaSource> sources, Func<MediaSource, IReadOnlyList<MediaStreamInfo>> streams)
+        {
+            if (sources.Count == 0)
+            {
+                return [];
+            }
+
+            List<TrackChoice> choices = [new(null, null)];
+            foreach (MediaSource source in sources)
+            {
+                foreach (MediaStreamInfo stream in streams(source))
+                {
+                    choices.Add(new(source, stream));
+                }
+            }
+
+            return choices;
+        }
     }
+
+    #endregion
+
+    #region Status
 
     private void RefreshStatus()
     {
@@ -722,7 +814,10 @@ internal sealed partial class PlaybackLabPage : BasePage
         string transform = DescribeTransform(pipeline.VideoTransform);
         string tracks = DescribeTracks(pipeline);
 
-        string status = $"{pipeline.State}: {_description}. {pipeline.Position:mm\\:ss\\.fff} / {pipeline.Duration:mm\\:ss\\.fff}."
+        string media = Describe(pipeline);
+        string described = media.Length == 0 ? string.Empty : $" {media}.";
+
+        string status = $"{pipeline.State}:{described} {pipeline.Position:mm\\:ss\\.fff} / {ReachableDuration(pipeline):mm\\:ss\\.fff}."
             + $" {presented} frame(s).{health}{pace}{transform}{tracks}{surface}";
         if (status != StatusText.Text)
         {
@@ -730,38 +825,46 @@ internal sealed partial class PlaybackLabPage : BasePage
         }
     }
 
-    private static string DescribeTracks(PlaybackPipeline pipeline)
+    private string DescribeTracks(PlaybackPipeline pipeline)
     {
         if (pipeline.SelectedVideoStream is null && pipeline.SelectedAudioStream is null)
         {
             return " No track is chosen: pick a video or audio track to play this file.";
         }
 
-        MediaInfo? info = pipeline.MediaInfo;
+        IReadOnlyList<MediaSource> sources = pipeline.Sources;
         List<string> parts = [];
-        if (info is not null && info.VideoStreams.Count > 1 && pipeline.SelectedVideoStream is { } video)
+        if (sources.Sum(source => source.Info.VideoStreams.Count) > 1 && pipeline.SelectedVideoStream is { } video)
         {
-            parts.Add($"video {DescribeTrack(video)}");
+            parts.Add($"video {DescribeTrack(SourceOf(sources, video), video)}");
         }
 
-        if (info is not null && info.AudioStreams.Count > 1 && pipeline.SelectedAudioStream is { } audio)
+        if (sources.Sum(source => source.Info.AudioStreams.Count) > 1 && pipeline.SelectedAudioStream is { } audio)
         {
-            parts.Add($"audio {DescribeTrack(audio)}");
+            parts.Add($"audio {DescribeTrack(SourceOf(sources, audio), audio)}");
         }
 
         return parts.Count == 0 ? string.Empty : $" playing {string.Join(" and ", parts)}.";
     }
 
-    /// <summary>Which stream is playing: its index, and the container's name for it when it has one.</summary>
-    private static string DescribeTrack(MediaStreamInfo stream)
+    private static string DescribeTrack(MediaSource? source, MediaStreamInfo stream)
     {
-        return stream.Title is { Length: > 0 } title ? $"#{stream.Index} \"{title}\"" : $"#{stream.Index}";
+        string name = stream.Title is { Length: > 0 } title ? $"#{stream.Index} \"{title}\"" : $"#{stream.Index}";
+        return source is null ? name : $"{name} of {FileNameOf(source)}";
     }
 
-    /// <summary>
-    /// What the picture is being placed through, so a transform that looks wrong can be read off the line
-    /// instead of guessed at from the picture.
-    /// </summary>
+    private static string FileNameOf(MediaSource source)
+    {
+        return Path.GetFileName(source.Locator.Value);
+    }
+
+    private static TimeSpan ReachableDuration(PlaybackPipeline pipeline)
+    {
+        TimeSpan video = pipeline.SelectedVideoStream?.Duration ?? TimeSpan.Zero;
+        TimeSpan audio = pipeline.SelectedAudioStream?.Duration ?? TimeSpan.Zero;
+        return video > audio ? video : audio;
+    }
+
     private static string DescribeTransform(VideoTransform transform)
     {
         string orientation = transform.Orientation.IsIdentity
@@ -773,47 +876,46 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private static string Describe(PlaybackPipeline pipeline)
     {
-        MediaInfo? info = pipeline.MediaInfo;
-        if (info is null)
+        IReadOnlyList<MediaSource> sources = pipeline.Sources;
+        if (sources.Count == 0)
         {
             return string.Empty;
         }
 
-        List<string> parts = [];
-        foreach (VideoStreamInfo video in info.VideoStreams)
+        List<string> described = [];
+        foreach (MediaSource source in sources)
         {
-            parts.Add($"{video.CodecName ?? video.CodecId} {video.Width}x{video.Height} at {video.FrameRate:0.###} fps");
+            List<string> parts = [];
+            foreach (VideoStreamInfo video in source.Info.VideoStreams)
+            {
+                parts.Add($"{video.CodecName ?? video.CodecId} {video.Width}x{video.Height} at {video.FrameRate:0.###} fps");
+            }
+
+            foreach (AudioStreamInfo audio in source.Info.AudioStreams)
+            {
+                parts.Add($"{audio.CodecName ?? audio.CodecId} {audio.SampleRate} Hz {audio.ChannelCount} ch {audio.SampleFormat}");
+            }
+
+            foreach (SubtitleStreamInfo subtitle in source.Info.SubtitleStreams)
+            {
+                parts.Add($"{subtitle.CodecName ?? subtitle.CodecId} subtitles");
+            }
+
+            string streams = parts.Count == 0 ? "nothing to play" : string.Join(", ", parts);
+            described.Add($"{FileNameOf(source)} [{source.Id}] ({source.Locator}): {streams}");
         }
 
-        foreach (AudioStreamInfo audio in info.AudioStreams)
-        {
-            parts.Add($"{audio.CodecName ?? audio.CodecId} {audio.SampleRate} Hz {audio.ChannelCount} ch {audio.SampleFormat}");
-        }
-
-        return string.Join(", ", parts);
+        return string.Join("; ", described);
     }
 
-    private async Task ReconcileAndLog(PlaybackPipeline pipeline, string what)
-    {
-        OperationResult reconciled = await pipeline.Reconcile();
-        if (!reconciled.IsSuccessful)
-        {
-            Logger.E(TAG, $"{what} could not be changed. {reconciled.Message}");
-        }
-    }
+    #endregion
 
-    //
-    // Utilities
-    //
+    #region Misc
 
     private IMainPageAbilityForTab GetMainPageAbility()
     {
         return GetAbility<IMainPageAbilityForTab>()!;
     }
-
-    //
-    // Types
-    //
 
     private sealed record ComponentChoice(string Name, IReadOnlyList<IComponentFactory> Factories, bool? HardwareDecoding = null)
     {
@@ -823,11 +925,19 @@ internal sealed partial class PlaybackLabPage : BasePage
         }
     }
 
-    private sealed record TrackChoice(MediaStreamInfo? Stream)
+    private sealed record TrackChoice(MediaSource? Source, MediaStreamInfo? Stream)
     {
         public override string ToString()
         {
-            return Stream is null ? "Off" : MediaStreamLabel.Describe(Stream);
+            if (Stream is null)
+            {
+                return "Off";
+            }
+
+            // The file is named whenever there is more than one, because two files number their streams alike.
+            return Source is null ? MediaStreamLabel.Describe(Stream) : $"{MediaStreamLabel.Describe(Stream)} — {FileNameOf(Source)}";
         }
     }
+
+    #endregion
 }

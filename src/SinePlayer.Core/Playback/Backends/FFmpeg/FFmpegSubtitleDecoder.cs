@@ -40,14 +40,9 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
 
     public SubtitleCueFormat CueFormat => _cueFormat;
 
-    public static OperationResult<FFmpegSubtitleDecoder> Create(IMediaSource? source, SubtitleStreamInfo stream)
+    public static OperationResult<FFmpegSubtitleDecoder> Create(IMediaSource source, SubtitleStreamInfo stream)
     {
         OperationResultCreator<FFmpegSubtitleDecoder> result = new();
-
-        if (source is null)
-        {
-            return result.Failure("A subtitle file of its own is not supported yet.");
-        }
 
         if (source is not FFmpegSource ffmpegSource)
         {

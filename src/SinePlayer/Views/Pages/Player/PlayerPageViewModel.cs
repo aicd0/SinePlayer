@@ -193,7 +193,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     public PlaybackModel Playback { get; } = new();
     public PlayerStatusEnum PlayerStatus => PlayerStatusLiveData.Value.Status;
     public MediaModel? Media => _media;
-    public long DurationMs { get; set; } = 0;
+    public long DurationMs => _durationMs;
     public bool IsLoading => _isLoading;
 
     public void Initialize(ActionHandler actionHandler, OpenMediaHandler openHandler)
@@ -235,17 +235,17 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         {
             CoroutineUtils.Run(async () => await media.SetDuration(durationMs));
         }
-
-        DurationMs = durationMs;
     }
 
     public void SetPosition(long positionMs, long durationMs)
     {
         _positionMs = positionMs;
+
+        bool durationChanged = _durationMs != durationMs;
         _durationMs = durationMs;
 
         long now = Environment.TickCount64;
-        if (now - _lastPositionUiTicks >= POSITION_UI_INTERVAL)
+        if (durationChanged || now - _lastPositionUiTicks >= POSITION_UI_INTERVAL)
         {
             _lastPositionUiTicks = now;
             PositionLiveData.Emit(positionMs);
@@ -488,8 +488,8 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     private async Task SetMedia(MediaModel? media)
     {
         _media = null;
+        _durationMs = 0;
         BackgroundImageUri = null;
-        DurationMs = 0;
         IsAudio = false;
 
         if (media is null)

@@ -117,7 +117,7 @@ public sealed class ComponentResolver
         }
     }
 
-    public IEnumerable<IComponentCreator<ISubtitleDecoder>> ResolveSubtitleDecoders(IMediaSource? source, SubtitleStreamInfo stream)
+    public IEnumerable<IComponentCreator<ISubtitleDecoder>> ResolveSubtitleDecoders(IMediaSource source, SubtitleStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
 

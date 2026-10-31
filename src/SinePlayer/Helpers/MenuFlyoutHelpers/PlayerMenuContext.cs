@@ -68,6 +68,12 @@ internal sealed class PlayerMenuContext
         CoroutineUtils.Run(async () =>
         {
             OperationResult selected = await engine.SelectStream(kind, stream);
+
+            if (selected.IsSuccessful)
+            {
+                selected = await engine.Reconcile();
+            }
+
             if (!selected.IsSuccessful)
             {
                 PromptInfo?.Invoke(selected.Message);
