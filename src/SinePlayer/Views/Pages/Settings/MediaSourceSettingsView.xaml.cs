@@ -113,7 +113,7 @@ internal sealed partial class MediaSourceSettingsView : BaseUserControl
             .WithParam(RouterConstants.ARG_KEYWORD, $"{MediaSQLProviderUtils.VAR_HIDDEN}:1");
         ActionModel action = ActionModel.Builder.Create(OpenTabProvider.NAME)
             .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
-            .AddParameter(OpenTabProvider.PARAM_TAB_ID, string.Empty)
+            .AddParameter(OpenTabProvider.PARAM_TAB_ID, OpenTabProvider.TAB_ID_NEW)
             .Build();
         ViewModel.Shared.ActionHandler.HandleNoResult(action);
     }

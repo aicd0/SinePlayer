@@ -669,7 +669,7 @@ internal static class AppSettingsModel
             OpenItemBehaviorEnum.OpenInCurrentTab => "OpenInCurrentTab",
             OpenItemBehaviorEnum.OpenInNewTab => "OpenInNewTab",
             OpenItemBehaviorEnum.OpenInLastActivePlayerTab => "OpenInLastActivePlayerTab",
-            _ => "OpenInCurrentTab",
+            _ => "OpenInLastActivePlayerTab",
         };
     }
 
@@ -680,7 +680,7 @@ internal static class AppSettingsModel
             "OpenInCurrentTab" => OpenItemBehaviorEnum.OpenInCurrentTab,
             "OpenInNewTab" => OpenItemBehaviorEnum.OpenInNewTab,
             "OpenInLastActivePlayerTab" => OpenItemBehaviorEnum.OpenInLastActivePlayerTab,
-            _ => OpenItemBehaviorEnum.OpenInCurrentTab,
+            _ => OpenItemBehaviorEnum.OpenInLastActivePlayerTab,
         };
     }
 

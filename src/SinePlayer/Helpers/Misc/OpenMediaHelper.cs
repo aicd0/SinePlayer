@@ -14,6 +14,7 @@ using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
 using SinePlayer.Helpers.Navigation;
+using SinePlayer.Views.AppWindows.Main;
 using SinePlayer.Views.Pages.Player;
 
 namespace SinePlayer.Helpers.Misc;
@@ -57,47 +58,52 @@ internal static class OpenMediaHelper
 
     public static void OpenMedia(ActionHandler actionHandler, Route route)
     {
-        AppSettingsModel.OpenItemBehaviorEnum behavior = AppSettingsModel.OpenItemDefaultBehavior;
-        switch (behavior)
+        OpenTarget target = ResolveTarget();
+
+        ActionModel.Builder builder = ActionModel.Builder.Create(OpenTabProvider.NAME)
+            .AddParameter(OpenTabProvider.PARAM_URL, route.Url);
+
+        if (target.WindowId is int windowId)
+        {
+            builder = builder.AddParameter(OpenTabProvider.PARAM_WINDOW_ID, windowId);
+        }
+
+        if (target.TabId is string tabId)
+        {
+            builder = builder.AddParameter(OpenTabProvider.PARAM_TAB_ID, tabId);
+        }
+
+        actionHandler.HandleNoResult(builder.Build());
+    }
+
+    public static MainWindow OpenMedia(MainWindow window, Route route)
+    {
+        OpenTarget target = ResolveTarget();
+        MainWindow targetWindow = target.WindowId is int windowId && App.Instance.WindowManager.GetWindow(windowId) is MainWindow other ? other : window;
+        targetWindow.OpenTab(route.Url, OpenTabProvider.ResolveTabId(targetWindow, target.TabId), string.Empty);
+        return targetWindow;
+    }
+
+    private static OpenTarget ResolveTarget()
+    {
+        switch (AppSettingsModel.OpenItemDefaultBehavior)
         {
             case AppSettingsModel.OpenItemBehaviorEnum.OpenInCurrentTab:
-                {
-                    ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
-                        .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
-                        .Build();
-                    actionHandler.HandleNoResult(actionModel);
-                }
-                break;
+                return new(null, null);
             case AppSettingsModel.OpenItemBehaviorEnum.OpenInNewTab:
-                {
-                    ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
-                        .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
-                        .AddParameter(OpenTabProvider.PARAM_TAB_ID, string.Empty)
-                        .Build();
-                    actionHandler.HandleNoResult(actionModel);
-                }
-                break;
+                return new(null, OpenTabProvider.TAB_ID_NEW);
             case AppSettingsModel.OpenItemBehaviorEnum.OpenInLastActivePlayerTab:
                 {
                     IReadOnlyList<Tuple<int, string>> activePlayerTabs = PlayerPage.ActiveTabs;
-                    if (activePlayerTabs.Count == 0)
-                    {
-                        goto case AppSettingsModel.OpenItemBehaviorEnum.OpenInNewTab;
-                    }
-
-                    int windowId = activePlayerTabs[activePlayerTabs.Count - 1].Item1;
-                    string tabId = activePlayerTabs[activePlayerTabs.Count - 1].Item2;
-                    ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
-                        .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
-                        .AddParameter(OpenTabProvider.PARAM_WINDOW_ID, windowId.ToString())
-                        .AddParameter(OpenTabProvider.PARAM_TAB_ID, tabId)
-                        .Build();
-                    actionHandler.HandleNoResult(actionModel);
+                    return activePlayerTabs.Count == 0
+                        ? new(null, OpenTabProvider.TAB_ID_NEW)
+                        : new(activePlayerTabs[activePlayerTabs.Count - 1].Item1, activePlayerTabs[activePlayerTabs.Count - 1].Item2);
                 }
-                break;
             default:
-                Logger.F(TAG, $"Unknown enum value {behavior}");
-                goto case AppSettingsModel.OpenItemBehaviorEnum.OpenInCurrentTab;
+                Logger.F(TAG, $"Unknown enum value {AppSettingsModel.OpenItemDefaultBehavior}");
+                return new(null, null);
         }
     }
+
+    private readonly record struct OpenTarget(int? WindowId, string? TabId);
 }
