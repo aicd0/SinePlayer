@@ -67,7 +67,7 @@ public static class FileUtils
             lastWriteTimeTicks = fileInfo.LastWriteTimeUtc.Ticks;
             length = fileInfo.Length;
         }
-        catch (FileNotFoundException)
+        catch (IOException)
         {
             return string.Empty;
         }

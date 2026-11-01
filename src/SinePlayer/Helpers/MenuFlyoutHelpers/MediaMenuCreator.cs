@@ -95,7 +95,7 @@ internal static class MediaMenuCreator
             {
                 ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
                     .AddParameter(OpenTabProvider.PARAM_URL, primaryMediaRoute.Url)
-                    .AddParameter(OpenTabProvider.PARAM_TAB_ID, string.Empty)
+                    .AddParameter(OpenTabProvider.PARAM_TAB_ID, OpenTabProvider.TAB_ID_NEW)
                     .Build();
                 actionHandler.HandleNoResult(actionModel);
             },
@@ -560,7 +560,7 @@ internal static class MediaMenuCreator
             {
                 ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
                     .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
-                    .AddParameter(OpenTabProvider.PARAM_WINDOW_ID, "-1")
+                    .AddParameter(OpenTabProvider.PARAM_WINDOW_ID, OpenTabProvider.WINDOW_ID_NEW)
                     .Build();
                 actionHandler.HandleNoResult(actionModel);
             }
@@ -679,7 +679,7 @@ internal static class MediaMenuCreator
                             .WithParam(RouterConstants.ARG_KEYWORD, $"exp:\"{ExpressionUtils.EscapeString(expression)}\"");
                         ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
                             .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
-                            .AddParameter(OpenTabProvider.PARAM_TAB_ID, string.Empty)
+                            .AddParameter(OpenTabProvider.PARAM_TAB_ID, OpenTabProvider.TAB_ID_NEW)
                             .Build();
                         actionHandler.HandleNoResult(actionModel);
                     }

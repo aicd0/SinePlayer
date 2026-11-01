@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Specialized;
+using System.Globalization;
 
 namespace SinePlayer.Common.Actions;
 
@@ -46,6 +47,11 @@ internal class ActionModel
 
             Query[key] = value ?? string.Empty;
             return this;
+        }
+
+        public Builder AddParameter(string key, int value)
+        {
+            return AddParameter(key, value.ToString(CultureInfo.InvariantCulture));
         }
 
         public ActionModel Build()

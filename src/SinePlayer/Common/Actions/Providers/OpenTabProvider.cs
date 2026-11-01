@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System.Collections.Specialized;
+using System.Globalization;
 using System.Threading.Tasks;
 
 using SinePlayer.Common.Actions.Components;
@@ -15,6 +16,16 @@ internal class OpenTabProvider : IActionProvider
     public const string PARAM_URL = "URL";
     public const string PARAM_WINDOW_ID = "WindowId";
     public const string PARAM_TAB_ID = "TabId";
+
+    public const string TAB_ID_NEW = "-1";
+    public const int WINDOW_ID_NEW = -1;
+
+    public static string ResolveTabId(MainWindow window, string? tabId)
+    {
+        return string.IsNullOrEmpty(tabId) ? window.CurrentTab?.Id ?? string.Empty
+            : tabId == TAB_ID_NEW ? string.Empty
+            : tabId;
+    }
 
     public string Name => NAME;
 
@@ -38,15 +49,20 @@ internal class OpenTabProvider : IActionProvider
 
             windowId = mainWindowCom.WindowId;
         }
-        else if (!int.TryParse(windowIdString, out windowId) || windowId < -1)
+        else if (!int.TryParse(windowIdString, NumberStyles.Integer, CultureInfo.InvariantCulture, out windowId) || windowId < WINDOW_ID_NEW)
         {
             return ActionResult.FromFailure($"'{windowIdString}' is not a valid window ID.");
         }
 
         string? tabId = parameters[PARAM_TAB_ID];
 
-        if (windowId == -1)
+        if (windowId == WINDOW_ID_NEW)
         {
+            if (tabId == TAB_ID_NEW)
+            {
+                return ActionResult.FromFailure("A new window cannot be asked for a new tab as well: it opens with one.");
+            }
+
             MainWindow.Open(url);
         }
         else
@@ -57,10 +73,9 @@ internal class OpenTabProvider : IActionProvider
                 return ActionResult.FromFailure($"Window {windowId} not found.");
             }
 
-            tabId ??= window.CurrentTab?.Id ?? string.Empty;
             IMainPageComponent? mainPageCom = context.GetComponent<IMainPageComponent>();
             string initiateTabId = mainPageCom?.TabId ?? string.Empty;
-            window.OpenTab(url, tabId, initiateTabId);
+            window.OpenTab(url, ResolveTabId(window, tabId), initiateTabId);
         }
 
         return ActionResult.FromSuccess();

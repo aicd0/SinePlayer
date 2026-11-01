@@ -58,12 +58,14 @@ public partial class App : Application
     internal async Task OnCommandLine(MainWindow window, string[] args)
     {
         Route? route = await GetFileActivatedRoute(args);
+
+        MainWindow targetWindow = window;
         if (route is not null)
         {
-            window.OpenTab(route.Url, string.Empty, string.Empty);
+            targetWindow = OpenMediaHelper.OpenMedia(window, route);
         }
 
-        window.BringToFront();
+        targetWindow.BringToFront();
     }
 
     //

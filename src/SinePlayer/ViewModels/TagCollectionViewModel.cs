@@ -113,7 +113,7 @@ internal partial class TagCollectionViewModel(string name) : BaseViewModel, INot
             .WithParam(RouterConstants.ARG_KEYWORD, $"exp:\"{ExpressionUtils.EscapeString(expression)}\"");
         ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
             .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
-            .AddParameter(OpenTabProvider.PARAM_TAB_ID, string.Empty)
+            .AddParameter(OpenTabProvider.PARAM_TAB_ID, OpenTabProvider.TAB_ID_NEW)
             .Build();
         actionHandler.HandleNoResult(actionModel);
     }

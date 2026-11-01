@@ -134,7 +134,7 @@ internal sealed partial class DevToolsPage : BasePage
         var route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_PLAYBACK_LAB);
         ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
             .AddParameter(OpenTabProvider.PARAM_URL, route.Url)
-            .AddParameter(OpenTabProvider.PARAM_WINDOW_ID, "-1")
+            .AddParameter(OpenTabProvider.PARAM_WINDOW_ID, OpenTabProvider.WINDOW_ID_NEW)
             .Build();
         PageActionHandler.HandleNoResult(actionModel);
     }

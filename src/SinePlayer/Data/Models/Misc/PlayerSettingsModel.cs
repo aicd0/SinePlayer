@@ -174,7 +174,7 @@ internal class PlayerSettingsModel
 
     public string PresetKey { get; set; } = string.Empty;
     public string PresetName { get; set; } = "?";
-    public bool AllowPerMediaConfiguration { get; set; } = true;
+    public bool AllowPerMediaConfiguration { get; set; } = false;
     public string VideoDecoder { get; set; } = PlaybackComponents.AUTO;
     public string VideoRenderer { get; set; } = PlaybackComponents.AUTO;
     public string AudioDecoder { get; set; } = PlaybackComponents.AUTO;

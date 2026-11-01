@@ -85,20 +85,25 @@ internal sealed class MediaThumbnailUriInterceptor : IResourceUriInterceptor
             }
 
             string location = media.Location;
-            string extension = Path.GetExtension(location);
-            bool isAudioExtension = AppInfoProvider.IsSupportedAudioExtension(extension);
-            if (string.IsNullOrEmpty(location) || !File.Exists(location) ||
-                !(isAudioExtension || AppInfoProvider.IsSupportedVideoExtension(extension)))
+            if (string.IsNullOrEmpty(location))
             {
                 return null;
             }
 
+            string extension = Path.GetExtension(location);
+            bool isAudioExtension = AppInfoProvider.IsSupportedAudioExtension(extension);
             if (isAudioExtension)
             {
                 return new WindowsThumbnailImageSource(location, _uri.ToString(), ThumbnailMode.MusicView);
             }
 
-            return new EngineThumbnailImageSource(location, _uri.ToString());
+            bool isVideoExtension = AppInfoProvider.IsSupportedVideoExtension(extension);
+            if (isVideoExtension)
+            {
+                return new EngineThumbnailImageSource(location, _uri.ToString());
+            }
+
+            return null;
         }
 
         public Task Release()
