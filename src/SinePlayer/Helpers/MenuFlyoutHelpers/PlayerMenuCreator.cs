@@ -271,7 +271,7 @@ internal static class PlayerMenuCreator
             new SubItemMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.SelectSubtitleTrack,
-                Items = CreateTrackItems(context, MediaStreamKind.Subtitle),
+                Items = CreateSubtitleTrackItems(context),
             },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
@@ -299,6 +299,21 @@ internal static class PlayerMenuCreator
         ];
     }
 
+    private static List<BaseMenuFlyoutItemModel> CreateSubtitleTrackItems(PlayerMenuContext context)
+    {
+        List<BaseMenuFlyoutItemModel> items = [];
+
+        items.Add(new SimpleMenuFlyoutItemModel()
+        {
+            Text = StringResourceProvider.Instance.AddSubtitleTracks,
+            Click = context.AddSubtitleTracks,
+        });
+        items.Add(new SeparatorMenuFlyoutItemModel());
+        items.AddRange(CreateTrackItems(context, MediaStreamKind.Subtitle));
+
+        return items;
+    }
+
     private static List<BaseMenuFlyoutItemModel> CreateTrackItems(PlayerMenuContext context, MediaStreamKind kind)
     {
         IReadOnlyList<MediaStreamInfo>? streams = context.Tracks(kind);
@@ -315,8 +330,8 @@ internal static class PlayerMenuCreator
             MediaStreamInfo choice = stream;
             items.Add(new ToggleMenuFlyoutItemModel()
             {
-                Text = MediaStreamLabel.Describe(choice),
-                IsChecked = selected is not null && selected.Index == choice.Index,
+                Text = MediaStreamLabel.Describe(choice, context.SourceOf(choice)),
+                IsChecked = choice == selected,
                 Click = () => context.SelectTrack(kind, choice),
             });
         }

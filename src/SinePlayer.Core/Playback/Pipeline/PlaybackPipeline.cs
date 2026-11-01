@@ -1097,12 +1097,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         static bool SameStream(MediaSource? beforeSource, MediaStreamInfo? before, MediaSource? afterSource, MediaStreamInfo? after)
         {
-            if (ReferenceEquals(before, after))
-            {
-                return true;
-            }
-
-            return beforeSource == afterSource && before?.Index == after?.Index;
+            return beforeSource == afterSource && before == after;
         }
 
         ChainChanges changes = ChainChanges.None;

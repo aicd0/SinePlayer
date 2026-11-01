@@ -18,7 +18,7 @@ internal sealed partial class MediaSourceHolder(
         {
             foreach (MediaStreamInfo candidate in source.Info.Streams)
             {
-                if (ReferenceEquals(candidate, stream))
+                if (candidate == stream)
                 {
                     return source;
                 }

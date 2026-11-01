@@ -138,6 +138,9 @@
   <data name="AddNewTab" xml:space="preserve">
     <value>Новая вкладка</value>
   </data>
+  <data name="AddSubtitleTracks" xml:space="preserve">
+    <value>Добавить дорожки субтитров</value>
+  </data>
   <data name="AddToCollection" xml:space="preserve">
     <value>Добавить в подборку</value>
   </data>

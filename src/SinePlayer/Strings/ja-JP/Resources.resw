@@ -138,6 +138,9 @@
   <data name="AddNewTab" xml:space="preserve">
     <value>新しいタブを追加</value>
   </data>
+  <data name="AddSubtitleTracks" xml:space="preserve">
+    <value>字幕トラックを追加</value>
+  </data>
   <data name="AddToCollection" xml:space="preserve">
     <value>コレクションに追加</value>
   </data>

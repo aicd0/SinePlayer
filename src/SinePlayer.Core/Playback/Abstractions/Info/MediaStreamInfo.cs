@@ -5,6 +5,15 @@ namespace SinePlayer.Core.Playback.Abstractions.Info;
 
 public abstract class MediaStreamInfo
 {
+    private static int sNextId;
+
+    protected MediaStreamInfo()
+    {
+        Id = Interlocked.Increment(ref sNextId);
+    }
+
+    private int Id { get; }
+
     public required int Index { get; init; }
 
     public abstract MediaStreamKind Kind { get; }
@@ -24,4 +33,29 @@ public abstract class MediaStreamInfo
     public long Bitrate { get; init; }
 
     public bool IsDefault { get; init; }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not MediaStreamInfo other)
+        {
+            return false;
+        }
+
+        return Id == other.Id;
+    }
+
+    public override int GetHashCode()
+    {
+        return Id;
+    }
+
+    public static bool operator ==(MediaStreamInfo? left, MediaStreamInfo? right)
+    {
+        return left?.Id == right?.Id;
+    }
+
+    public static bool operator !=(MediaStreamInfo? left, MediaStreamInfo? right)
+    {
+        return !(left == right);
+    }
 }

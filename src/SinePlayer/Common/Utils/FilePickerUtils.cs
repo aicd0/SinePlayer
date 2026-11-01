@@ -28,7 +28,7 @@ internal static class FilePickerUtils
         return await picker.PickSingleFolderAsync();
     }
 
-    public static async Task<StorageFile?> PickFile(int windowId, IList<string> typeFilter)
+    public static async Task<StorageFile?> PickFile(int windowId, IEnumerable<string> typeFilter)
     {
         MainWindow? window = App.Instance.WindowManager.GetWindow(windowId);
         if (window is null)
@@ -45,5 +45,25 @@ internal static class FilePickerUtils
         }
 
         return await picker.PickSingleFileAsync();
+    }
+
+    public static async Task<IReadOnlyList<StorageFile>> PickFiles(int windowId, IEnumerable<string> typeFilter)
+    {
+        MainWindow? window = App.Instance.WindowManager.GetWindow(windowId);
+        if (window is null)
+        {
+            return [];
+        }
+
+        FileOpenPicker picker = new();
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, window.WindowHandle);
+
+        foreach (string type in typeFilter)
+        {
+            picker.FileTypeFilter.Add(type);
+        }
+
+        IReadOnlyList<StorageFile> files = await picker.PickMultipleFilesAsync();
+        return files ?? [];
     }
 }

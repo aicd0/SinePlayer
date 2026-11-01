@@ -19,6 +19,7 @@ public class StringResourceProvider
     public string AddFolder => GetResourceString("AddFolder");
     public string AddKeyboardShortcut => GetResourceString("AddKeyboardShortcut");
     public string AddNewTab => GetResourceString("AddNewTab");
+    public string AddSubtitleTracks => GetResourceString("AddSubtitleTracks");
     public string AddToCollection => GetResourceString("AddToCollection");
     public string AddToFavorites => GetResourceString("AddToFavorites");
     public string AllHidden => GetResourceString("AllHidden");
