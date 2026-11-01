@@ -441,10 +441,6 @@ public sealed partial class FFmpegVideoDecoder : IVideoDecoder
         _parameters = 0;
     }
 
-    /// <summary>
-    /// Releases the open decoder and everything that belongs to it: the frame, the device lock, and the codec
-    /// context that owns both. The decoder itself stays usable, so a fallback can open the next candidate.
-    /// </summary>
     private void CloseContext()
     {
         nint receiveFrame = _receiveFrame;

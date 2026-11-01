@@ -166,7 +166,10 @@
 
         <Grid Grid.Row="3" Background="Black">
             <SwapChainPanel x:Name="VideoPanel" IsHitTestVisible="False" />
-            <SwapChainPanel x:Name="SubtitlePanel" IsHitTestVisible="False" />
+            <SwapChainPanel
+                x:Name="SubtitlePanel"
+                IsHitTestVisible="False"
+                Opacity="0.999" />
         </Grid>
 
         <TextBlock

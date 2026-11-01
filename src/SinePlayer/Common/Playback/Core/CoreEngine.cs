@@ -324,7 +324,13 @@ internal sealed partial class CoreEngine : IDisposable
 
     public UIElement CreateSubtitleSurface()
     {
-        _subtitlePanel ??= new SwapChainPanel { IsHitTestVisible = false };
+        // The surface sits above the video surface, so its opacity has to stay below 1. At 1 the two swap
+        // chain panels are composed as opaque planes, and once the video panel's swap chain is rebound -
+        // which is what switching the video track off and on does - the plane underneath stops being
+        // composed at all: the picture is gone from the window while its swap chain keeps attaching and
+        // presenting correct frames. Anything below 1 puts this surface in an alpha blended layer instead,
+        // which composes correctly, and a tenth of a percent of transparency is imperceptible.
+        _subtitlePanel ??= new SwapChainPanel { IsHitTestVisible = false, Opacity = 0.999 };
         return _subtitlePanel;
     }
 

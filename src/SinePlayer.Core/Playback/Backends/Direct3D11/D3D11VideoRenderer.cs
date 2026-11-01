@@ -133,26 +133,27 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
     public void Dispose()
     {
-        if (_disposed)
+        lock (_deviceLock)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+
+            _target?.SurfaceSizeChanged -= Surface_SizeChanged;
+            _target = null;
+
+            _surface?.Dispose();
+            _surface = null;
+
+            ReleaseFrameTextures();
+            D3D11Interop.Release(_frameTransform);
+            _shaders.Dispose();
+
+            _device.Dispose();
         }
-
-        _disposed = true;
-
-        _target?.SurfaceSizeChanged -= Surface_SizeChanged;
-        _target = null;
-
-        _surface?.Dispose();
-        _surface = null;
-
-        ReleaseFrameTextures();
-        D3D11Interop.Release(_frameTransform);
-        _shaders.Dispose();
-
-        // The device came with this renderer — the factory creates one per call — so it goes with it. A shared
-        // device would have made this a bug; owning it is what lets two pipelines render at the same time.
-        _device.Dispose();
     }
 
     public OperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
@@ -160,51 +161,54 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(target);
 
-        if (_disposed)
+        lock (_deviceLock)
         {
-            return OperationResult.Failure("The renderer has already been disposed.");
-        }
-
-        if (!ReferenceEquals(_target, target))
-        {
-            _target?.SurfaceSizeChanged -= Surface_SizeChanged;
-            _target = target;
-            target.SurfaceSizeChanged += Surface_SizeChanged;
-        }
-
-        (int width, int height, double scale) = GetSurfaceSize(target);
-
-        if (_surface is null)
-        {
-            OperationResult<IVideoSurface> created = VideoSurfaceFactory.Create(_device, width, height, scale, _surfacePreference, stream.Colour);
-            if (!created.IsSuccessful)
+            if (_disposed)
             {
-                return OperationResult.Failure(created);
+                return OperationResult.Failure("The renderer has already been disposed.");
             }
 
-            OperationResult attach = created.Result.AttachTo(target);
-            if (!attach.IsSuccessful)
+            if (!ReferenceEquals(_target, target))
             {
-                created.Result.Dispose();
-                return attach;
+                _target?.SurfaceSizeChanged -= Surface_SizeChanged;
+                _target = target;
+                target.SurfaceSizeChanged += Surface_SizeChanged;
             }
 
-            _surface = created.Result;
-            _surfaceKind = created.Result.Kind;
-            _name = Describe(_surfaceKind);
-        }
-        else
-        {
-            OperationResult resize = _surface.Resize(width, height, scale);
-            if (!resize.IsSuccessful)
-            {
-                return resize;
-            }
-        }
+            (int width, int height, double scale) = GetSurfaceSize(target);
 
-        _needsResize = false;
-        SetOutput(_surface.View, _surface.Width, _surface.Height);
-        return OperationResult.Success();
+            if (_surface is null)
+            {
+                OperationResult<IVideoSurface> created = VideoSurfaceFactory.Create(_device, width, height, scale, _surfacePreference, stream.Colour);
+                if (!created.IsSuccessful)
+                {
+                    return OperationResult.Failure(created);
+                }
+
+                OperationResult attach = created.Result.AttachTo(target);
+                if (!attach.IsSuccessful)
+                {
+                    created.Result.Dispose();
+                    return attach;
+                }
+
+                _surface = created.Result;
+                _surfaceKind = created.Result.Kind;
+                _name = Describe(_surfaceKind);
+            }
+            else
+            {
+                OperationResult resize = _surface.Resize(width, height, scale);
+                if (!resize.IsSuccessful)
+                {
+                    return resize;
+                }
+            }
+
+            _needsResize = false;
+            SetOutput(_surface.View, _surface.Width, _surface.Height);
+            return OperationResult.Success();
+        }
     }
 
     public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
