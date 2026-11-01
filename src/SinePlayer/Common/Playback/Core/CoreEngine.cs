@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Dispatching;
@@ -149,19 +150,30 @@ internal sealed partial class CoreEngine : IDisposable
         }
     }
 
-    public async Task<OperationResult> AddSource(string filePath)
+    public async Task<OperationResult<MediaSource>> AddSource(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
         {
-            return OperationResultExt.Failure(TAG, $"Media file not found: '{filePath}'.");
+            return OperationResultExt.Failure<MediaSource>(TAG, $"Media file not found: '{filePath}'.");
         }
 
         PlaybackPipeline pipeline = EnsurePipeline();
 
-        OperationResult<MediaSource> added = await pipeline.AddSource(MediaLocator.Parse(filePath));
+        var locator = MediaLocator.Parse(filePath);
+        MediaSource? existing = pipeline.Sources.FirstOrDefault(source => string.Equals(source.Locator.Value, locator.Value, StringComparison.Ordinal));
+        if (existing is not null)
+        {
+            return OperationResultExt.Success(existing);
+        }
+
+        OperationResult<MediaSource> added = await pipeline.AddSource(locator);
         if (!added.IsSuccessful)
         {
-            return OperationResultExt.Failure(TAG, $"Unable to open media file '{filePath}'", added);
+            return OperationResultExt.Failure<MediaSource>(
+                TAG,
+                $"Unable to open media file '{filePath}': {added.Message}",
+                added.Exception,
+                added.IsFatal);
         }
 
         if (!_hasSource)
@@ -171,7 +183,7 @@ internal sealed partial class CoreEngine : IDisposable
             RaiseMediaOpened();
         }
 
-        return OperationResult.Success();
+        return added;
     }
 
     public async Task<OperationResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)

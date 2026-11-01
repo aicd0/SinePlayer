@@ -31,6 +31,7 @@ using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
+using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
@@ -385,6 +386,7 @@ internal sealed partial class PlayerPage : BasePage
 
             PlayerMenuContext context = new()
             {
+                WindowId = WindowId,
                 ActionHandler = PageActionHandler,
                 Media = media,
                 Settings = settingsPanel.Settings,
@@ -453,10 +455,10 @@ internal sealed partial class PlayerPage : BasePage
         engine.SetComponents(_components);
         engine.SetVideoTransform(_videoTransform);
 
-        OperationResult loaded = await engine.AddSource(media.Location);
+        OperationResult<MediaSource> loaded = await engine.AddSource(media.Location);
         if (!loaded.IsSuccessful)
         {
-            return loaded;
+            return OperationResult.Failure(loaded);
         }
 
         OperationResult selected = await SelectTracks(engine, media);
@@ -499,23 +501,38 @@ internal sealed partial class PlayerPage : BasePage
             return streams[0];
         }
 
-        MediaInfo? info = engine.PlaybackInfo.Media;
-
-        TrackSelection.Preference videoChoice = TrackSelection.Load(media, MediaStreamKind.Video, info);
-        TrackSelection.Preference audioChoice = TrackSelection.Load(media, MediaStreamKind.Audio, info);
-        TrackSelection.Preference subtitleChoice = TrackSelection.Load(media, MediaStreamKind.Subtitle, info);
-
-        MediaStreamInfo? video = videoChoice.IsSet ? videoChoice.Stream : DefaultTrack(info?.VideoStreams);
-        MediaStreamInfo? audio = audioChoice.IsSet ? audioChoice.Stream : DefaultTrack(info?.AudioStreams);
-
-        if (video is null && audio is null && (videoChoice.IsSet || audioChoice.IsSet))
+        // Add external sources
+        foreach (MediaStreamKind kind in (MediaStreamKind[])[MediaStreamKind.Video, MediaStreamKind.Audio, MediaStreamKind.Subtitle])
         {
-            video = DefaultTrack(info?.VideoStreams);
-            audio = DefaultTrack(info?.AudioStreams);
+            TrackSelection.Preference? preference = TrackSelection.Load(media, kind, engine.PlaybackInfo.Sources);
+            if (preference is null || !preference.Enabled || string.IsNullOrEmpty(preference.Path) || preference.Stream is not null)
+            {
+                continue;
+            }
+
+            OperationResult<MediaSource> added = await engine.AddSource(preference.Path);
+            if (!added.IsSuccessful)
+            {
+                Logger.W(TAG, $"The chosen {kind} track could not be restored from '{preference.Path}'. {added.Message}");
+            }
         }
 
+        IReadOnlyList<MediaSource> sources = engine.PlaybackInfo.Sources;
+        MediaInfo? info = engine.PlaybackInfo.Media;
         List<string> unplayable = [];
         bool playing = false;
+
+        // Select video track
+        MediaStreamInfo? video = null;
+        TrackSelection.Preference? videoChoice = TrackSelection.Load(media, MediaStreamKind.Video, sources);
+        if (videoChoice is null)
+        {
+            video = DefaultTrack(info?.VideoStreams);
+        }
+        else if (videoChoice.Enabled)
+        {
+            video = videoChoice.Stream ?? DefaultTrack(info?.VideoStreams);
+        }
 
         if (video is not null)
         {
@@ -530,6 +547,18 @@ internal sealed partial class PlayerPage : BasePage
             {
                 unplayable.Add($"the picture could not be played ({chosen.Message})");
             }
+        }
+
+        // Select audio track
+        MediaStreamInfo? audio = null;
+        TrackSelection.Preference? audioChoice = TrackSelection.Load(media, MediaStreamKind.Audio, sources);
+        if (audioChoice is null)
+        {
+            audio = DefaultTrack(info?.AudioStreams);
+        }
+        else if (audioChoice.Enabled)
+        {
+            audio = audioChoice.Stream ?? DefaultTrack(info?.AudioStreams);
         }
 
         if (audio is not null)
@@ -547,9 +576,21 @@ internal sealed partial class PlayerPage : BasePage
             }
         }
 
-        if (subtitleChoice.Stream is not null)
+        // Select subtitle track
+        MediaStreamInfo? subtitle = null;
+        TrackSelection.Preference? subtitleChoice = TrackSelection.Load(media, MediaStreamKind.Subtitle, sources);
+        if (subtitleChoice is null)
         {
-            OperationResult chosen = await engine.SelectStream(MediaStreamKind.Subtitle, subtitleChoice.Stream);
+            subtitle = DefaultTrack(info?.SubtitleStreams);
+        }
+        else if (subtitleChoice.Enabled)
+        {
+            subtitle = subtitleChoice.Stream ?? DefaultTrack(info?.SubtitleStreams);
+        }
+
+        if (subtitle is not null)
+        {
+            OperationResult chosen = await engine.SelectStream(MediaStreamKind.Subtitle, subtitle);
             if (chosen.IsSuccessful)
             {
                 chosen = await engine.Reconcile();
@@ -575,11 +616,6 @@ internal sealed partial class PlayerPage : BasePage
         return OperationResult.Success();
     }
 
-    /// <summary>
-    /// Whether an opened file starts playing on its own, which is a setting rather than a consequence of opening it.
-    /// Asked after the tracks are chosen, so that "opens paused" means the user turned auto-play off rather than that
-    /// nothing had been chosen yet.
-    /// </summary>
     private void StartPlaybackOnOpen(CoreEngine engine)
     {
         bool restoredFromLastSession = _restoredFromLastSession;

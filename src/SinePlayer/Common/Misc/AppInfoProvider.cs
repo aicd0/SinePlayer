@@ -56,6 +56,17 @@ internal static class AppInfoProvider
     ]);
     public static IReadOnlySet<string> SupportedAudioExtensions => _supportedAudioExtensions;
 
+    private static readonly IReadOnlySet<string> _supportedSubtitleExtensions = new HashSet<string>(
+    [
+        ".ass",
+        ".srt",
+        ".ssa",
+        ".sub",
+        ".sup",
+        ".vtt",
+    ]);
+    public static IReadOnlySet<string> SupportedSubtitleExtensions => _supportedSubtitleExtensions;
+
     private static readonly Lazy<IReadOnlySet<string>> _supportedExternalFileExtensions = new(() =>
     {
         HashSet<string> results = [];
@@ -78,5 +89,10 @@ internal static class AppInfoProvider
     public static bool IsSupportedAudioExtension(string extension)
     {
         return SupportedAudioExtensions.Contains(extension.ToLower());
+    }
+
+    public static bool IsSupportedSubtitleExtension(string extension)
+    {
+        return SupportedSubtitleExtensions.Contains(extension.ToLower());
     }
 }

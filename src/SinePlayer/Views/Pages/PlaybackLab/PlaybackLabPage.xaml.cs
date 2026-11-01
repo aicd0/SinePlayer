@@ -569,7 +569,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         foreach (MediaSource source in sources)
         {
-            if (source.Info.Streams.Any(candidate => ReferenceEquals(candidate, stream)))
+            if (source.Info.Streams.Any(candidate => candidate.Equals(stream)))
             {
                 return source;
             }
@@ -729,7 +729,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             foreach (TrackChoice choice in choices)
             {
                 // Matched by the file as well as the number: two files number their streams alike.
-                if (ReferenceEquals(choice.Stream, stream) && ReferenceEquals(choice.Source, source))
+                if (choice.Source == source && choice.Stream == stream)
                 {
                     return index;
                 }
@@ -934,8 +934,7 @@ internal sealed partial class PlaybackLabPage : BasePage
                 return "Off";
             }
 
-            // The file is named whenever there is more than one, because two files number their streams alike.
-            return Source is null ? MediaStreamLabel.Describe(Stream) : $"{MediaStreamLabel.Describe(Stream)} — {FileNameOf(Source)}";
+            return MediaStreamLabel.Describe(Stream, Source);
         }
     }
 

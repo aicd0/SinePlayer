@@ -138,6 +138,9 @@
   <data name="AddNewTab" xml:space="preserve">
     <value>Añadir nueva pestaña</value>
   </data>
+  <data name="AddSubtitleTracks" xml:space="preserve">
+    <value>Añadir pistas de subtítulos</value>
+  </data>
   <data name="AddToCollection" xml:space="preserve">
     <value>Añadir a la colección</value>
   </data>
