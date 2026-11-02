@@ -3,7 +3,7 @@
 
 using System.Text.Json.Serialization;
 
-namespace SinePlayer.Common.Playback.Core;
+namespace SinePlayer.Views.Pages.Player;
 
 internal sealed class SelectedTrackModel
 {

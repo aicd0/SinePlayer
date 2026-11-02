@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -43,8 +44,12 @@ using SinePlayer.Helpers.Misc;
 using SinePlayer.Helpers.Navigation;
 using SinePlayer.SDK.Models;
 using SinePlayer.UserControls.PlayerSettings;
+using SinePlayer.Views.AppWindows.Main;
 using SinePlayer.Views.Pages.Main.Sidebar;
 using SinePlayer.Views.Pages.Sidebar.MediaInfo;
+
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
 
 namespace SinePlayer.Views.Pages.Player;
 
@@ -300,7 +305,7 @@ internal sealed partial class PlayerPage : BasePage
         {
             if (status.Status == PlayerPageViewModel.PlayerStatusEnum.Error)
             {
-                PromptError(status.Description);
+                PromptForever(status.Description);
                 ShowOverlay();
             }
         });
@@ -366,7 +371,7 @@ internal sealed partial class PlayerPage : BasePage
 
     #region Common events
 
-    private void VideoHost_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
+    private void VideoGrid_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
     {
         if (sender is not FrameworkElement fe)
         {
@@ -394,7 +399,7 @@ internal sealed partial class PlayerPage : BasePage
                 PlayQueue = ViewModel.PlayQueue.ToBuilder(),
                 Playback = ViewModel.Playback.ToBuilder(),
                 Engine = _engine,
-                PromptInfo = PromptInfo,
+                PromptInfo = PromptTemporary,
             };
 
             List<BaseMenuFlyoutItemModel> items = await PlayerMenuCreator.CreateVideoHostMenuItems(context);
@@ -428,6 +433,101 @@ internal sealed partial class PlayerPage : BasePage
         if (ViewModel.IsPinned)
         {
             UpdatePinRelatedUI();
+        }
+    }
+
+    #endregion
+
+    #region Drag-and-drop
+
+    private void VideoGrid_Drop(object sender, DragEventArgs args)
+    {
+        if (!args.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            return;
+        }
+
+        DragOperationDeferral deferral = args.GetDeferral();
+        args.Handled = true;
+        CoroutineUtils.Run(async () =>
+        {
+            try
+            {
+                await HandleDropAsync(args);
+            }
+            catch (Exception exception)
+            {
+                Logger.W(TAG, $"What was dropped could not be read: {exception.Message}");
+            }
+            finally
+            {
+                deferral.Complete();
+            }
+        });
+    }
+
+    private async Task HandleDropAsync(DragEventArgs args)
+    {
+        IReadOnlyList<IStorageItem> items = await args.DataView.GetStorageItemsAsync();
+
+        List<string> subtitles = [];
+        List<string> others = [];
+        foreach (IStorageItem item in items)
+        {
+            if (item is not StorageFile file || string.IsNullOrEmpty(file.Path))
+            {
+                Logger.W(TAG, $"'{item.Name}' is not a file that can be reached by its path, so it was ignored.");
+                continue;
+            }
+
+            if (AppInfoProvider.IsSupportedSubtitleExtension(Path.GetExtension(file.Path)))
+            {
+                subtitles.Add(file.Path);
+            }
+            else
+            {
+                others.Add(file.Path);
+            }
+        }
+
+        if (subtitles.Count > 0)
+        {
+            await AddSubtitleFilesAsync(subtitles);
+        }
+
+        MainWindow? window = App.Instance.WindowManager.GetWindow(WindowId);
+        if (window is null)
+        {
+            Logger.W(TAG, $"The window with ID '{WindowId}' could not be found, so the dropped files were not opened.");
+            return;
+        }
+
+        foreach (string path in others)
+        {
+            await App.Instance.OnCommandLine(window, [path]);
+        }
+    }
+
+    private async Task AddSubtitleFilesAsync(IReadOnlyList<string> paths)
+    {
+        CoreEngine? engine = _engine;
+        MediaModel? media = ViewModel.Media;
+        if (engine is null || media is null)
+        {
+            PromptTemporary("There is no playback to add the subtitles to.");
+            return;
+        }
+
+        if (ViewModel.IsLoading)
+        {
+            Logger.W(TAG, "Subtitles were dropped while the player was loading, so they were not added.");
+            return;
+        }
+
+        OperationResult added = await SubtitleSourceLoader.AddAndSelect(engine, media, paths);
+        if (!added.IsSuccessful)
+        {
+            PromptTemporary(added.Message);
         }
     }
 
@@ -648,7 +748,6 @@ internal sealed partial class PlayerPage : BasePage
         engine.SetMuted(AppSettingsModel.PlayerMuted);
         engine.StateChanged += Engine_StateChanged;
         engine.PositionChanged += Engine_PositionChanged;
-        engine.MediaOpened += Engine_MediaOpened;
         _engine = engine;
         ViewModel.VolumeLiveData.Emit((int)Math.Round(engine.Volume * 100.0));
         ViewModel.MuteLiveData.Emit(engine.IsMuted);
@@ -666,7 +765,6 @@ internal sealed partial class PlayerPage : BasePage
 
         engine.StateChanged -= Engine_StateChanged;
         engine.PositionChanged -= Engine_PositionChanged;
-        engine.MediaOpened -= Engine_MediaOpened;
         engine.Dispose();
     }
 
@@ -716,11 +814,6 @@ internal sealed partial class PlayerPage : BasePage
             engine.Duration.Ticks / TimeSpan.TicksPerMillisecond);
     }
 
-    private void Engine_MediaOpened()
-    {
-        ViewModel.PlayerStatusLiveData.Emit(new() { Status = PlayerPageViewModel.PlayerStatusEnum.Working });
-    }
-
     private void HandleMediaEnded()
     {
         ViewModel.CompleteMedia();
@@ -745,14 +838,14 @@ internal sealed partial class PlayerPage : BasePage
     private bool _tapPending = false;
     private bool _tapCancelled = false;
 
-    private void VideoHost_PointerPressed(object sender, PointerRoutedEventArgs e)
+    private void VideoGrid_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         FocusPlayer();
         ((UIElement)sender).CapturePointer(e.Pointer);
         _gestureRecognizer.ProcessDownEvent(e.GetCurrentPoint(VideoHost));
     }
 
-    private void VideoHost_PointerMoved(object sender, PointerRoutedEventArgs e)
+    private void VideoGrid_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
         _gestureRecognizer.ProcessMoveEvents(e.GetIntermediatePoints(VideoHost));
 
@@ -769,13 +862,13 @@ internal sealed partial class PlayerPage : BasePage
         KeepCursorVisible();
     }
 
-    private void VideoHost_PointerReleased(object sender, PointerRoutedEventArgs e)
+    private void VideoGrid_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
         ((UIElement)sender).ReleasePointerCapture(e.Pointer);
         _gestureRecognizer.ProcessUpEvent(e.GetCurrentPoint(VideoHost));
     }
 
-    private void VideoHost_PointerCanceled(object sender, PointerRoutedEventArgs e)
+    private void VideoGrid_PointerCanceled(object sender, PointerRoutedEventArgs e)
     {
         ((UIElement)sender).ReleasePointerCapture(e.Pointer);
         _gestureRecognizer.ProcessUpEvent(e.GetCurrentPoint(VideoHost));
@@ -835,7 +928,7 @@ internal sealed partial class PlayerPage : BasePage
         _isPointerInsideOverlay = !IsElementInsideVideo(e.OriginalSource);
     }
 
-    private void VideoHost_PointerEntered(object sender, PointerRoutedEventArgs e)
+    private void VideoGrid_PointerEntered(object sender, PointerRoutedEventArgs e)
     {
         if (e.Pointer.PointerDeviceType != PointerDeviceType.Mouse)
         {
@@ -849,7 +942,7 @@ internal sealed partial class PlayerPage : BasePage
         KeepCursorVisible();
     }
 
-    private void VideoHost_PointerExited(object sender, PointerRoutedEventArgs e)
+    private void VideoGrid_PointerExited(object sender, PointerRoutedEventArgs e)
     {
         if (e.Pointer.PointerDeviceType != PointerDeviceType.Mouse)
         {
@@ -1138,7 +1231,7 @@ internal sealed partial class PlayerPage : BasePage
         OperationResult err = await engine.Reconcile();
         if (!err.IsSuccessful)
         {
-            PromptInfo(err.Message);
+            PromptTemporary(err.Message);
         }
     }
 
@@ -1236,12 +1329,12 @@ internal sealed partial class PlayerPage : BasePage
 
     private DispatcherQueueTimer? _promptTimer;
 
-    private void PromptInfo(string message)
+    private void PromptTemporary(string message)
     {
         ShowPrompt(message, autoHide: true);
     }
 
-    private void PromptError(string message)
+    private void PromptForever(string message)
     {
         ShowPrompt(message, autoHide: false);
     }

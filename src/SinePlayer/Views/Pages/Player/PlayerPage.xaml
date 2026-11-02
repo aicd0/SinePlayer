@@ -11,18 +11,21 @@
     UseSystemFocusVisuals="False"
     mc:Ignorable="d">
 
-    <Grid x:Name="RootGrid" Background="Black">
+    <Grid>
         <Grid
-            x:Name="VideoHost"
-            Background="Transparent"
-            ContextRequested="VideoHost_ContextRequested"
-            PointerCanceled="VideoHost_PointerCanceled"
-            PointerEntered="VideoHost_PointerEntered"
-            PointerExited="VideoHost_PointerExited"
-            PointerMoved="VideoHost_PointerMoved"
-            PointerPressed="VideoHost_PointerPressed"
-            PointerReleased="VideoHost_PointerReleased" />
-        <Grid x:Name="SubtitleHost" IsHitTestVisible="False" />
+            AllowDrop="True"
+            Background="Black"
+            ContextRequested="VideoGrid_ContextRequested"
+            Drop="VideoGrid_Drop"
+            PointerCanceled="VideoGrid_PointerCanceled"
+            PointerEntered="VideoGrid_PointerEntered"
+            PointerExited="VideoGrid_PointerExited"
+            PointerMoved="VideoGrid_PointerMoved"
+            PointerPressed="VideoGrid_PointerPressed"
+            PointerReleased="VideoGrid_PointerReleased">
+            <Grid x:Name="VideoHost" IsHitTestVisible="False" />
+            <Grid x:Name="SubtitleHost" IsHitTestVisible="False" />
+        </Grid>
         <FontIcon
             HorizontalAlignment="Center"
             VerticalAlignment="Center"

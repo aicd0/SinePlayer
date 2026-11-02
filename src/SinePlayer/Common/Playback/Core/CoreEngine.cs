@@ -55,7 +55,6 @@ internal sealed partial class CoreEngine : IDisposable
 
     public event Action<MediaEngineState, string?>? StateChanged;
     public event Action? PositionChanged;
-    public event Action? MediaOpened;
 
     public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
 
@@ -180,7 +179,6 @@ internal sealed partial class CoreEngine : IDisposable
         {
             _hasSource = true;
             StartPositionTimer();
-            RaiseMediaOpened();
         }
 
         return added;
@@ -447,11 +445,6 @@ internal sealed partial class CoreEngine : IDisposable
     {
         _subtitleRenderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)CreateSubtitleSurface());
         return _subtitleRenderTarget;
-    }
-
-    private void RaiseMediaOpened()
-    {
-        CoroutineUtils.RunInMainThread(() => MediaOpened?.Invoke());
     }
 
     private void RaisePositionChanged()

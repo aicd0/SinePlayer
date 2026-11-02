@@ -4,13 +4,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
 using SinePlayer.Common.Actions;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Common.Utils;
-using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
@@ -19,6 +17,7 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
+using SinePlayer.Views.Pages.Player;
 
 using Windows.Storage;
 
@@ -26,8 +25,6 @@ namespace SinePlayer.Helpers.MenuFlyoutHelpers;
 
 internal sealed class PlayerMenuContext
 {
-    private const string TAG = nameof(PlayerMenuContext);
-
     public required int WindowId { get; init; }
 
     public required ActionHandler ActionHandler { get; init; }
@@ -92,43 +89,11 @@ internal sealed class PlayerMenuContext
                 return;
             }
 
-            (MediaSource Source, SubtitleStreamInfo Stream)? chosen = null;
-            foreach (StorageFile file in files)
+            OperationResult added = await SubtitleSourceLoader.AddAndSelect(engine, Media, [.. files.Select(file => file.Path)]);
+            if (!added.IsSuccessful)
             {
-                MediaSource? source = await AddSubtitleSource(engine, file);
-                if (source is null)
-                {
-                    continue;
-                }
-
-                SubtitleStreamInfo? stream = source.Info.SubtitleStreams.FirstOrDefault();
-                if (stream is null)
-                {
-                    Logger.W(TAG, $"'{file.Path}' holds no subtitle track.");
-                    continue;
-                }
-
-                chosen = (source, stream);
+                PromptInfo?.Invoke(added.Message);
             }
-
-            if (chosen is not { } selection)
-            {
-                return;
-            }
-
-            OperationResult selected = await engine.SelectStream(MediaStreamKind.Subtitle, selection.Stream);
-            if (selected.IsSuccessful)
-            {
-                selected = await engine.Reconcile();
-            }
-
-            if (!selected.IsSuccessful)
-            {
-                PromptInfo?.Invoke(selected.Message);
-                return;
-            }
-
-            TrackSelection.Save(Media, MediaStreamKind.Subtitle, engine.PlaybackInfo.Sources, selection.Source, selection.Stream);
         });
     }
 
@@ -175,18 +140,6 @@ internal sealed class PlayerMenuContext
 
             TrackSelection.Save(Media, kind, engine.PlaybackInfo.Sources, SourceOf(stream), stream);
         });
-    }
-
-    private static async Task<MediaSource?> AddSubtitleSource(CoreEngine engine, StorageFile file)
-    {
-        OperationResult<MediaSource> added = await engine.AddSource(file.Path);
-        if (!added.IsSuccessful)
-        {
-            Logger.W(TAG, $"'{file.Path}' could not be added: {added.Message}");
-            return null;
-        }
-
-        return added.Result;
     }
 
     private static IReadOnlyList<MediaStreamInfo> StreamsOf(MediaSource source, MediaStreamKind kind)
