@@ -11,7 +11,7 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Data.Models.Media;
 
-namespace SinePlayer.Common.Playback.Core;
+namespace SinePlayer.Views.Pages.Player;
 
 internal static class TrackSelection
 {

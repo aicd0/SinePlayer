@@ -259,14 +259,12 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         SavePosition();
     }
 
-    /// <summary>The level the engine was set to, kept where the player remembers it.</summary>
     public void SetVolume(int volume)
     {
         VolumeLiveData.Emit(Math.Clamp(volume, 0, 100));
         SaveVolumeAndMute();
     }
 
-    /// <summary>Whether the sound is muted, kept where the player remembers it.</summary>
     public void SetMute(bool isMuted)
     {
         MuteLiveData.Emit(isMuted);
@@ -478,7 +476,10 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
                 Status = PlayerStatusEnum.Error,
                 Description = err.Message,
             });
+            return;
         }
+
+        PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Working });
     }
 
     /// <summary>
