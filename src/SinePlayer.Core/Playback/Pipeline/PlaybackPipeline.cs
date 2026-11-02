@@ -2420,6 +2420,19 @@ public sealed partial class PlaybackPipeline : IDisposable
             inFlightBuffer = null;
         }
 
+        bool AbandonFailedDevice(IAudioRenderer? renderer)
+        {
+            deviceAvailable = false;
+
+            if (renderer is null || renderer.IsDeviceAvailable)
+            {
+                return false;
+            }
+
+            audioRendererSlot.Publish(null, audioRendererSlot.CurrentVersions);
+            return true;
+        }
+
         while (true)
         {
             long stamp = _audioRenderNode.Stamp;
@@ -2458,14 +2471,18 @@ public sealed partial class PlaybackPipeline : IDisposable
                     if (opened.IsSuccessful)
                     {
                         deviceFormat = outputFormat;
+                        deviceAvailable = true;
                     }
                     else
                     {
                         deviceFormat = null;
                         PostWarning($"The audio device could not be opened: {opened.Message}");
+                        if (AbandonFailedDevice(audioRenderer))
+                        {
+                            continue;
+                        }
                     }
 
-                    deviceAvailable = deviceFormat is not null;
                     clockOffset = null;
                 }
             }
@@ -2521,7 +2538,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                         catch (Exception ex)
                         {
                             PostWarning(ex.Message);
-                            deviceAvailable = false;
+                            AbandonFailedDevice(audioRenderer);
                             continue;
                         }
                     }
@@ -2577,7 +2594,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                         if (!submitted.IsSuccessful)
                         {
                             PostWarning(submitted.Message);
-                            deviceAvailable = false;
+                            AbandonFailedDevice(audioRenderer);
                         }
 
                         continue;

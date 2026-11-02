@@ -52,32 +52,38 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         _endpointIsDefault = endpointIsDefault;
     }
 
-    /// <summary>
-    /// How often the device ran dry between two submits. Every one of them is an audible gap, so this
-    /// is the number that says whether the pipeline is keeping the device fed.
-    /// </summary>
-    public long UnderrunCount => Interlocked.Read(ref _underrunCount);
-
-    /// <summary>
-    /// How much audio the device can hold, in frames. This is the slack a late submit is absorbed by, so it
-    /// is worth being able to see it rather than infer it from audible clicks.
-    /// </summary>
-    internal int BufferFrameCount => _bufferFrameCount;
-
     public string Name => _endpointName is null
         ? "WASAPI"
         : _endpointIsDefault ? $"WASAPI [{_endpointName}] (default)" : $"WASAPI [{_endpointName}]";
 
+    public bool IsDeviceAvailable
+    {
+        get
+        {
+            IAudioClient? client = _client;
+            if (client is null)
+            {
+                return false;
+            }
+
+            try
+            {
+                client.GetCurrentPadding(out _);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+    }
+
+    public long UnderrunCount => Interlocked.Read(ref _underrunCount);
+
+    internal int BufferFrameCount => _bufferFrameCount;
+
     public IPlaybackClock Clock => _clock ?? throw new InvalidOperationException("The audio renderer has not been configured.");
 
-    /// <summary>
-    /// The format this endpoint plays without the system converting it: the stream itself when the device has the
-    /// speakers for it, or the same stream narrowed to what it has. The engine's own conversion is not the answer
-    /// here — it divides the level down until no arrangement of the source could clip, which is about ten decibels
-    /// quieter than the file — so the pipeline folds the mix to this format and the device is opened for the result.
-    /// A stream that cannot be folded is still opened as it is, which is the behaviour this method exists to avoid
-    /// wherever it can.
-    /// </summary>
     public OperationResult<AudioStreamInfo> Negotiate(AudioStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -106,7 +112,6 @@ public sealed partial class WasapiAudioRenderer : IAudioRenderer
         return result.Success(stream.WithLayout(channels, layout));
     }
 
-    /// <summary>Frames the device holds that have not been played yet.</summary>
     public long QueuedSampleCount
     {
         get

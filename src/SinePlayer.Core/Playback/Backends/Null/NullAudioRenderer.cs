@@ -18,6 +18,8 @@ public sealed partial class NullAudioRenderer : IAudioRenderer
 
     public string Name => "Null";
 
+    public bool IsDeviceAvailable => true;
+
     public long UnderrunCount => 0;
 
     public IPlaybackClock Clock => _clock;

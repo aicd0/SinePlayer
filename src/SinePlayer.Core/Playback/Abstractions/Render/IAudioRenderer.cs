@@ -12,6 +12,8 @@ public interface IAudioRenderer : IDisposable
 {
     string Name { get; }
 
+    bool IsDeviceAvailable { get; }
+
     long UnderrunCount { get; }
 
     IPlaybackClock Clock { get; }

@@ -28,7 +28,7 @@ public sealed record WasapiAudioEndpoint(string Id, string Name, bool IsDefault)
 public static class WasapiAudioEndpoints
 {
     /// <summary>The class id of the endpoint enumerator, which is not in the Win32 metadata.</summary>
-    internal static readonly Guid MMDeviceEnumeratorClassId = new("BCDE0395-E52F-467C-8E3D-C4579291692E");
+    public static readonly Guid MMDeviceEnumeratorClassId = new("BCDE0395-E52F-467C-8E3D-C4579291692E");
 
     /// <summary>
     /// Every active output device, with the default first. A machine with no output device answers an empty
@@ -101,6 +101,50 @@ public static class WasapiAudioEndpoints
         catch (Exception exception)
         {
             return result.Failure($"Unable to list the audio output devices: {exception.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Whether a named endpoint is still there to be opened. Listing the devices cannot answer this: a device can be
+    /// listed by one call and gone by the next, which is the gap a renderer falls into when it is created from a list
+    /// that was read a moment earlier. So the endpoint itself is asked, at the moment it is about to be used.
+    /// </summary>
+    internal static unsafe bool IsEndpointActive(string endpointId)
+    {
+        if (string.IsNullOrEmpty(endpointId))
+        {
+            return false;
+        }
+
+        IMMDeviceEnumerator? enumerator = null;
+        try
+        {
+            PInvoke.CoInitializeEx(null, COINIT.COINIT_MULTITHREADED);
+            PInvoke.CoCreateInstance(MMDeviceEnumeratorClassId, null, CLSCTX.CLSCTX_ALL, out IMMDeviceEnumerator created);
+            enumerator = created;
+
+            created.GetDevice(endpointId, out IMMDevice device);
+            try
+            {
+                device.GetState(out DEVICE_STATE state);
+                return state == DEVICE_STATE.DEVICE_STATE_ACTIVE;
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(device);
+            }
+        }
+        catch (Exception)
+        {
+            // A device that refuses to answer is no more usable than one that is missing.
+            return false;
+        }
+        finally
+        {
+            if (enumerator is not null)
+            {
+                Marshal.ReleaseComObject(enumerator);
+            }
         }
     }
 
