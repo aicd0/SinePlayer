@@ -727,13 +727,8 @@ internal sealed partial class MainPage : BasePage
             CoroutineUtils.Run(async () =>
             {
                 IReadOnlyList<Windows.Storage.IStorageItem> items = await e.DataView.GetStorageItemsAsync();
-                foreach (Windows.Storage.IStorageItem? item in items)
-                {
-                    if (item is Windows.Storage.StorageFile file)
-                    {
-                        await App.Instance.OnCommandLine(CurrentWindow, [item.Path]);
-                    }
-                }
+                string[] paths = [.. items.OfType<Windows.Storage.StorageFile>().Select(file => file.Path)];
+                await App.Instance.OnCommandLine(CurrentWindow, paths);
             });
 
             return;

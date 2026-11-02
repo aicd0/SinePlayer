@@ -2,7 +2,9 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml;
@@ -170,7 +172,7 @@ public partial class App : Application
                 case ExtendedActivationKind.File:
                     {
                         var fileArgs = (Windows.ApplicationModel.Activation.FileActivatedEventArgs)e.Data;
-                        cmdArgs = [fileArgs.Files[0].Path];
+                        cmdArgs = [.. fileArgs.Files.Select(file => file.Path)];
                     }
                     break;
                 default:
@@ -323,13 +325,35 @@ public partial class App : Application
             return null;
         }
 
-        MediaModel? media = await MediaModel.FromFile(targetFilePath);
-        if (media is null)
+        if (args.Length > 1)
         {
-            Logger.W(nameof(GetFileActivatedRoute), $"Failed to create a media model from the file: {targetFilePath}");
-            return null;
-        }
+            IReadOnlyList<MediaModel>? batched = await FilePlayQueue.ForFilesAsync(args);
+            if (batched is null)
+            {
+                Logger.W(nameof(GetFileActivatedRoute), "None of the given files is a medium.");
+                return null;
+            }
 
-        return OpenMediaHelper.GetMediaRoute(media);
+            PlayQueueModel.Builder playQueue = new PlayQueueModel.Builder().AddMedia(batched);
+            return OpenMediaHelper.GetMediaRoute(batched[0], playQueue: playQueue);
+        }
+        else
+        {
+            MediaModel? media = await MediaModel.FromFile(targetFilePath);
+            if (media is null)
+            {
+                Logger.W(nameof(GetFileActivatedRoute), $"Failed to create a media model from the file: {targetFilePath}");
+                return null;
+            }
+
+            IReadOnlyList<MediaModel>? folderMedia = await FilePlayQueue.ForFolderAsync(Path.GetDirectoryName(targetFilePath));
+            PlayQueueModel.Builder playQueue = new();
+            if (folderMedia is not null)
+            {
+                playQueue.AddMedia(folderMedia);
+            }
+
+            return OpenMediaHelper.GetMediaRoute(media, playQueue: playQueue);
+        }
     }
 }
