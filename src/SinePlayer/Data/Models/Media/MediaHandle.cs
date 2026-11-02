@@ -65,45 +65,6 @@ internal abstract partial class MediaHandle(MediaType type)
         return SqliteDB.MediaDatabaseDispatcher.Submit(func);
     }
 
-    public static long InsertNoLock(MediaType type, string location)
-    {
-        MediaHandle? media = FromType(type);
-        if (media is null)
-        {
-            return -1;
-        }
-
-        media.Location = location;
-        media.IsExternal = false;
-        media.SetAsDefaultInfo();
-        media.InsertNewNoLock();
-        return media.Id;
-    }
-
-    public static Task<MediaHandle?> FromLocationOrInsertExternal(MediaType type, string location)
-    {
-        return Enqueue(() =>
-        {
-            MediaHandle? existing = FromLocationNoLock(location);
-            if (existing is not null)
-            {
-                return existing;
-            }
-
-            MediaHandle? media = FromType(type);
-            if (media is null)
-            {
-                return null;
-            }
-
-            media.Location = location;
-            media.IsExternal = true;
-            media.SetAsDefaultInfo();
-            media.InsertNewNoLock();
-            return media;
-        });
-    }
-
     public static Task<MediaHandle?> FromId(long id)
     {
         return Enqueue(() =>
@@ -118,6 +79,40 @@ internal abstract partial class MediaHandle(MediaType type)
         {
             return BatchFromIdNoLock(ids);
         });
+    }
+
+    public static List<MediaHandle> BatchFromLocationNoLock(IEnumerable<string> locations)
+    {
+        List<long> mediaIds = [];
+        foreach (IEnumerable<string> locationChunk in SqlUtils.ChunkBy(locations))
+        {
+            SelectCommand command = SelectCommand.Create(MediaTable.Instance)
+                .AppendCondition(CreateMediaOnlyCondition())
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnLocation), locationChunk));
+            IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
+            using SelectCommand.IReader reader = command.Execute();
+            while (reader.Read())
+            {
+                mediaIds.Add(idToken.GetValue());
+            }
+        }
+
+        return BatchFromIdNoLock(mediaIds);
+    }
+
+    public static MediaHandle? InsertNoLock(MediaType type, string location, bool isExternal)
+    {
+        MediaHandle? media = FromType(type);
+        if (media is null)
+        {
+            return null;
+        }
+
+        media.Location = location;
+        media.IsExternal = isExternal;
+        media.SetAsDefaultInfo();
+        media.InsertNewNoLock();
+        return media;
     }
 
     private static MediaHandle? FromIdNoLock(long id)
@@ -305,24 +300,6 @@ internal abstract partial class MediaHandle(MediaType type)
         }
 
         return [.. mediaItems.Values];
-    }
-
-    private static MediaHandle? FromLocationNoLock(string location)
-    {
-        SelectCommand command = SelectCommand.Create(MediaTable.Instance)
-            .AppendCondition(MediaTable.ColumnLocation, location)
-            .AppendCondition(CreateMediaOnlyCondition())
-            .Limit(1);
-        IReaderToken<long> mediaIdToken = command.PutQueryInt64(MediaTable.ColumnId);
-        using SelectCommand.IReader reader = command.Execute();
-
-        if (!reader.Read())
-        {
-            return null;
-        }
-
-        long mediaId = mediaIdToken.GetValue();
-        return FromIdNoLock(mediaId);
     }
 
     private static MediaHandle? FromType(MediaType type)

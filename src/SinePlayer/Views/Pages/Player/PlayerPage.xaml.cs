@@ -495,6 +495,11 @@ internal sealed partial class PlayerPage : BasePage
             await AddSubtitleFilesAsync(subtitles);
         }
 
+        if (others.Count == 0)
+        {
+            return;
+        }
+
         MainWindow? window = App.Instance.WindowManager.GetWindow(WindowId);
         if (window is null)
         {
@@ -502,10 +507,7 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        foreach (string path in others)
-        {
-            await App.Instance.OnCommandLine(window, [path]);
-        }
+        await App.Instance.OnCommandLine(window, [.. others]);
     }
 
     private async Task AddSubtitleFilesAsync(IReadOnlyList<string> paths)

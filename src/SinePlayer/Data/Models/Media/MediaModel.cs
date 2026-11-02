@@ -72,22 +72,99 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
     public static async Task<MediaModel?> FromFile(string path)
     {
-        string extension = Path.GetExtension(path).ToLower();
-        if (!AppInfoProvider.IsSupportedVideoExtension(extension) && !AppInfoProvider.IsSupportedAudioExtension(extension))
+        List<MediaModel> mediaItems = await FromFiles([path]);
+        return mediaItems.Count > 0 ? mediaItems[0] : null;
+    }
+
+    public static async Task<List<MediaModel>> FromFiles(IEnumerable<string> paths)
+    {
+        List<(string Location, MediaType Type)> requested = [];
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        foreach (string path in paths)
         {
-            Logger.E(TAG, $"Unsupported media file extension: {extension}");
-            return null;
+            if (!PathUtils.TryNormalizePath(path, out string? location))
+            {
+                Logger.W(TAG, $"Unrecognized file path: {path}");
+                continue;
+            }
+
+            string extension = Path.GetExtension(location).ToLowerInvariant();
+            MediaType type;
+            if (AppInfoProvider.IsSupportedAudioExtension(extension))
+            {
+                type = MediaType.Audio;
+            }
+            else if (AppInfoProvider.IsSupportedVideoExtension(extension))
+            {
+                type = MediaType.Video;
+            }
+            else
+            {
+                Logger.W(TAG, $"Unsupported media file extension: {extension}");
+                continue;
+            }
+
+            if (seen.Add(location))
+            {
+                requested.Add((location, type));
+            }
         }
 
-        MediaType type = AppInfoProvider.IsSupportedAudioExtension(extension) ? MediaType.Audio : MediaType.Video;
-
-        MediaHandle? media = null;
-        await AlterLibrary(async () =>
+        if (requested.Count == 0)
         {
-            media = await MediaHandle.FromLocationOrInsertExternal(type, path);
-        });
+            return [];
+        }
 
-        return media is null ? null : ReplaceWithExisting(media);
+        List<string> requestedLocations = [.. requested.Select(item => item.Location)];
+        List<MediaHandle> existing = await MediaHandle.Enqueue(() => MediaHandle.BatchFromLocationNoLock(requestedLocations));
+        Dictionary<string, MediaHandle> handles = new(StringComparer.Ordinal);
+        foreach (MediaHandle handle in existing)
+        {
+            handles[handle.Location] = handle;
+        }
+
+        List<(string Location, MediaType Type)> missing = [.. requested.Where(item => !handles.ContainsKey(item.Location))];
+        if (missing.Count > 0)
+        {
+            await AlterLibrary(async () =>
+            {
+                await MediaHandle.Enqueue(() =>
+                {
+                    existing = MediaHandle.BatchFromLocationNoLock(missing.Select(item => item.Location));
+                    foreach (MediaHandle handle in existing)
+                    {
+                        handles[handle.Location] = handle;
+                    }
+
+                    missing = [.. missing.Where(item => !handles.ContainsKey(item.Location))];
+                    if (missing.Count > 0)
+                    {
+                        SqliteDB.MediaDatabase.WithTransaction(() =>
+                        {
+                            foreach ((string location, MediaType type) in missing)
+                            {
+                                var media = MediaHandle.InsertNoLock(type, location, isExternal: true);
+                                if (media is not null)
+                                {
+                                    handles[media.Location] = media;
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        }
+
+        List<MediaModel> results = [];
+        foreach (string location in requestedLocations)
+        {
+            if (handles.TryGetValue(location, out MediaHandle? handle))
+            {
+                results.Add(ReplaceWithExisting(handle));
+            }
+        }
+
+        return results;
     }
 
     public static async Task<List<MediaModel>> BatchFromId(IEnumerable<long> ids)
@@ -570,9 +647,10 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
                 {
                     foreach (UpdateItemInfo info in updateQueue)
                     {
-                        long mediaId = MediaHandle.InsertNoLock(info.ItemType, info.Location);
-                        if (mediaId >= 0)
+                        var media = MediaHandle.InsertNoLock(info.ItemType, info.Location, isExternal: false);
+                        if (media is not null)
                         {
+                            long mediaId = media.Id;
                             changedMediaIds.Add(mediaId);
                             newMediaIds.Add(mediaId);
                             AddToFolder(mediaIdsByFolder, info.Location, mediaId);
