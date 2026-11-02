@@ -56,6 +56,7 @@ internal class PlayerSettingsModel
             VideoPreferHardwareDecoding = model.VideoPreferHardwareDecoding ?? fallbackModel.VideoPreferHardwareDecoding,
             VideoPreferHdr = model.VideoPreferHdr ?? fallbackModel.VideoPreferHdr,
             VideoResizeMode = ParseResizeMode(model.VideoResizeMode, fallbackModel.VideoResizeMode),
+            VideoScalingMode = ParseScalingMode(model.VideoScalingMode, fallbackModel.VideoScalingMode),
             VideoRotationDegrees = ParseRotationDegrees(model.VideoRotationDegrees, fallbackModel.VideoRotationDegrees),
             VideoFlipHorizontal = model.VideoFlipHorizontal ?? fallbackModel.VideoFlipHorizontal,
             VideoFlipVertical = model.VideoFlipVertical ?? fallbackModel.VideoFlipVertical,
@@ -172,6 +173,16 @@ internal class PlayerSettingsModel
         return value is 0 or 90 or 180 or 270 ? value.Value : fallback;
     }
 
+    private static VideoScalingMode ParseScalingMode(string? value, VideoScalingMode fallback)
+    {
+        if (!string.IsNullOrEmpty(value) && Enum.TryParse(value, ignoreCase: true, out VideoScalingMode mode) && Enum.IsDefined(mode))
+        {
+            return mode;
+        }
+
+        return fallback;
+    }
+
     public string PresetKey { get; set; } = string.Empty;
     public string PresetName { get; set; } = "?";
     public bool AllowPerMediaConfiguration { get; set; } = false;
@@ -184,6 +195,7 @@ internal class PlayerSettingsModel
     public bool VideoPreferHardwareDecoding { get; set; } = true;
     public bool VideoPreferHdr { get; set; } = true;
     public VideoResizeMode VideoResizeMode { get; set; } = VideoResizeMode.Fit;
+    public VideoScalingMode VideoScalingMode { get; set; } = VideoScalingMode.Bilinear;
     public int VideoRotationDegrees { get; set; } = 0;
     public bool VideoFlipHorizontal { get; set; }
     public bool VideoFlipVertical { get; set; }
@@ -210,6 +222,7 @@ internal class PlayerSettingsModel
             VideoPreferHardwareDecoding = VideoPreferHardwareDecoding,
             VideoPreferHdr = VideoPreferHdr,
             VideoResizeMode = VideoResizeMode.ToString(),
+            VideoScalingMode = VideoScalingMode.ToString(),
             VideoRotationDegrees = VideoRotationDegrees,
             VideoFlipHorizontal = VideoFlipHorizontal,
             VideoFlipVertical = VideoFlipVertical,
@@ -230,7 +243,8 @@ internal class PlayerSettingsModel
             VideoResizeMode,
             1.0,
             0.0,
-            0.0);
+            0.0,
+            VideoScalingMode);
     }
 
     public void SaveToMedia(MediaModel media)
@@ -382,6 +396,9 @@ internal class PlayerSettingsModel
 
         [JsonPropertyName("VideoResizeMode")]
         public string? VideoResizeMode { get; set; }
+
+        [JsonPropertyName("VideoScalingMode")]
+        public string? VideoScalingMode { get; set; }
 
         [JsonPropertyName("VideoRotationDegrees")]
         public int? VideoRotationDegrees { get; set; }

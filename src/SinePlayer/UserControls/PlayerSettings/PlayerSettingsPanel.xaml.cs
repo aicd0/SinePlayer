@@ -312,6 +312,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = settings.VideoScalingMode != presetSettings.VideoScalingMode;
+                tabModified = tabModified || modified;
+                UpdateVideoInterpolation(settings);
+                ViewModel.VideoInterpolationLabel = GetLabel(StringResource.ImageInterpolation, modified);
+            }
+
+            {
                 bool modified = settings.VideoRotationDegrees != presetSettings.VideoRotationDegrees;
                 tabModified = tabModified || modified;
                 UpdateVideoRotation(settings);
@@ -438,8 +445,22 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         VideoStretchModeDropDownButton.Content = choice.Label;
     }
 
-    private void UpdateVideoRotation(PlayerSettingsModel settings)
+    private void UpdateVideoInterpolation(PlayerSettingsModel settings)
     {
+        List<PlaybackComponentOption> options = PlayerMenuCreator.GetScalingModeOptions();
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoScalingMode.ToString());
+        VideoInterpolationDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            VideoScalingMode mode = Enum.Parse<VideoScalingMode>(key);
+            if (settings.VideoScalingMode != mode)
+            {
+                Apply(target => target.VideoScalingMode = mode);
+            }
+        });
+        VideoInterpolationDropDownButton.Content = choice.Label;
+    }
+
+    private void UpdateVideoRotation(PlayerSettingsModel settings)    {
         List<PlaybackComponentOption> options = PlayerMenuCreator.GetRotationOptions();
         PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoRotationDegrees.ToString(CultureInfo.InvariantCulture));
         VideoRotationDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>

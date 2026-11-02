@@ -158,6 +158,9 @@ public class StringResourceProvider
     public string Image => GetResourceString("Image");
     public string ImageBrightness => GetResourceString("ImageBrightness");
     public string ImageContrast => GetResourceString("ImageContrast");
+    public string ImageInterpolation => GetResourceString("ImageInterpolation");
+    public string ImageInterpolationBilinear => GetResourceString("ImageInterpolationBilinear");
+    public string ImageInterpolationNearestNeighbor => GetResourceString("ImageInterpolationNearestNeighbor");
     public string ImageSaturation => GetResourceString("ImageSaturation");
     public string Images => GetResourceString("Images");
     public string IncludeHiddenItems => GetResourceString("IncludeHiddenItems");

@@ -306,6 +306,7 @@ internal sealed partial class PlayerPage : BasePage
 
         ViewModel.PlayerStatusLiveData.Observe(this, status =>
         {
+            TransportBar.SetLoading(status.Status == PlayerPageViewModel.PlayerStatusEnum.Loading);
             if (status.Status == PlayerPageViewModel.PlayerStatusEnum.Error)
             {
                 PromptForever(status.Description);

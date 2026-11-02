@@ -66,12 +66,19 @@ public enum VideoResizeMode
     OriginalSize,
 }
 
+public enum VideoScalingMode
+{
+    Point,
+    Bilinear,
+}
+
 public readonly record struct VideoTransform(
     VideoOrientation Orientation,
     VideoResizeMode ResizeMode,
     double Zoom,
     double PanX,
-    double PanY)
+    double PanY,
+    VideoScalingMode Scaling = VideoScalingMode.Bilinear)
 {
     public static VideoTransform Identity => new(VideoOrientation.Identity, VideoResizeMode.Fit, 1.0, 0.0, 0.0);
 
@@ -81,7 +88,6 @@ public readonly record struct VideoTransform(
     {
         if (frameWidth <= 0 || frameHeight <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0)
         {
-            // Nothing to place: with no shape to fit, the picture covers the surface, which is the identity here.
             return Matrix3x2.Identity;
         }
 

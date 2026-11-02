@@ -653,7 +653,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         D3D11Interop.SetFrameTransform(context, _frameTransform, texCoordScale.X, texCoordScale.Y, placement);
         D3D11Interop.SetVertexConstantBuffer(context, 0, _frameTransform);
 
-        D3D11Interop.SetTextures(context, textureSlot, views, _shaders.Sampler);
+        D3D11Interop.SetTextures(context, textureSlot, views, _shaders.GetSampler(transform.Scaling));
 
         // Four corners, placed by the transform: no vertex or index buffer is needed, and nothing outside the
         // picture is ever drawn.
