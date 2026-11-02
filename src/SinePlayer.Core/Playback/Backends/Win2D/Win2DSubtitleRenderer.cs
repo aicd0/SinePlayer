@@ -24,11 +24,8 @@ namespace SinePlayer.Core.Playback.Backends.Win2D;
 
 public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 {
-    /// <summary>How tall a line is, as a fraction of the surface: big enough to read at any window size.</summary>
     private const float FontSizeFraction = 0.045f;
-
     private const float MinimumFontSize = 12.0f;
-
     private const float MaximumFontSize = 72.0f;
 
     /// <summary>How far the text is kept from the edge it is anchored to, as a fraction of the surface.</summary>
@@ -36,6 +33,12 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
     /// <summary>How far the shadow sits from the text, in physical pixels: what makes light text readable on light frames.</summary>
     private const float ShadowOffset = 2.0f;
+
+    /// <summary>
+    /// The most of the surface one inset may take. A player that covers nearly everything still leaves a sliver to draw
+    /// in, which is more use than a rectangle with no height.
+    /// </summary>
+    private const double MaximumInsetFraction = 0.9;
 
     /// <summary>How much clear space is left between two cues that stack, as a fraction of the font's size.</summary>
     private const float StackGapFraction = 0.15f;
@@ -154,7 +157,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Color));
-                DrawCues(session, cues, placement, width, height);
+                DrawCues(session, cues, placement, width, height, swapChain.CompositionScale);
             }
 
             return OperationResult.Success();
@@ -169,12 +172,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         }
     }
 
-    /// <summary>
-    /// Draws the visible cues onto a render target, which is the whole of what this renderer does with them — kept apart
-    /// from the swap chain so the drawing can be exercised against an offscreen target, where the pixels can be read
-    /// back. The caller clears the target; an empty set draws nothing onto it.
-    /// </summary>
-    internal void DrawCues(CanvasDrawingSession session, IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement, int width, int height)
+    internal void DrawCues(CanvasDrawingSession session, IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement, int width, int height, double scale = 1.0)
     {
         if (cues.Count == 0 || width <= 0 || height <= 0)
         {
@@ -185,6 +183,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         float fontSize = Math.Clamp(height * FontSizeFraction, MinimumFontSize, MaximumFontSize);
         float margin = height * MarginFraction;
         float gap = fontSize * StackGapFraction;
+        SubtitleArea area = AreaOf(placement, scale, width, height);
 
         // How much of each band is taken, by the alignment's row: bottom, middle, top. Several events can be up at once —
         // the same speaker's two lines, or a sign beside dialogue — and they share a band far more often than not. Each is
@@ -203,7 +202,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         {
             if (cue.Image is { } image)
             {
-                DrawImage(session, image, placement, width, height);
+                DrawImage(session, image, placement, area, width, height);
                 continue;
             }
 
@@ -220,26 +219,31 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             float stacked = taken[row];
             taken[row] += (float)layout.LayoutBounds.Height + gap;
 
-            Vector2 origin = Anchor(layout, row, text.Alignment, width, height, margin);
+            Vector2 origin = Anchor(layout, row, text.Alignment, area, margin);
 
             // The bottom and middle bands grow upwards, the top band downwards: the first cue keeps the place its alignment
             // asked for, and the ones after it make room above or below rather than covering it.
             origin.Y += row == 2 ? stacked : -stacked;
 
             origin += new Vector2((float)(placement.OffsetX * width), (float)(placement.OffsetY * height));
-            origin = KeepOnSurface(origin, layout, width, height);
+            origin = KeepInsideArea(origin, layout, area);
 
             session.DrawTextLayout(layout, origin + new Vector2(ShadowOffset, ShadowOffset), Color.FromArgb(200, 0, 0, 0));
             session.DrawTextLayout(layout, origin, Color.FromArgb(255, 255, 255, 255));
         }
     }
 
-    /// <summary>
-    /// Draws a bitmap cue where it belongs: its placement is a fraction of the frame the subtitle was authored against,
-    /// so it is scaled to this surface and moved by the same adjustment text is moved by. The image arrives premultiplied,
-    /// which is what a surface composed over the picture expects.
-    /// </summary>
-    private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePlacement placement, int width, int height)
+    private static SubtitleArea AreaOf(SubtitlePlacement placement, double scale, int width, int height)
+    {
+        float left = (float)Math.Clamp(placement.Insets.Left * scale, 0.0, width * MaximumInsetFraction);
+        float top = (float)Math.Clamp(placement.Insets.Top * scale, 0.0, height * MaximumInsetFraction);
+        float right = (float)Math.Clamp(placement.Insets.Right * scale, 0.0, width * MaximumInsetFraction);
+        float bottom = (float)Math.Clamp(placement.Insets.Bottom * scale, 0.0, height * MaximumInsetFraction);
+
+        return new SubtitleArea(left, top, Math.Max(1.0f, width - left - right), Math.Max(1.0f, height - top - bottom));
+    }
+
+    private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePlacement placement, SubtitleArea area, int width, int height)
     {
         ISubtitleImageBuffer buffer = image.Buffer;
         if (buffer.Width <= 0 || buffer.Height <= 0)
@@ -259,15 +263,18 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             96.0f,
             CanvasAlphaMode.Premultiplied);
 
+        // The image's own geometry is a fraction of the frame it was authored against, which is the whole surface.
         double x = ((image.Left + placement.OffsetX) * width);
         double y = ((image.Top + placement.OffsetY) * height);
         double scaledWidth = image.Width * width;
         double scaledHeight = image.Height * height;
 
-        // Kept on the surface for the same reason the text is: an adjustment that pushes a cue off the edge is cut back
-        // rather than obeyed, and a surface that later shrinks must not strand it.
-        x = Math.Clamp(x, 0.0, Math.Max(0.0, width - scaledWidth));
-        y = Math.Clamp(y, 0.0, Math.Max(0.0, height - scaledHeight));
+        // Kept in the free part of the surface for the same reason the text is: an adjustment that pushes a cue out of it
+        // is cut back rather than obeyed, and a surface that later changes must not strand it.
+        double maxX = Math.Max(area.Left, area.Left + area.Width - scaledWidth);
+        double maxY = Math.Max(area.Top, area.Top + area.Height - scaledHeight);
+        x = Math.Clamp(x, area.Left, maxX);
+        y = Math.Clamp(y, area.Top, maxY);
 
         session.DrawImage(bitmap, new Rect(x, y, scaledWidth, scaledHeight));
     }
@@ -281,40 +288,44 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         return (Math.Clamp(alignment, 1, 9) - 1) / 3;
     }
 
+    /// <summary>The rectangle of the surface the cues are laid out in, in physical pixels.</summary>
+    private readonly record struct SubtitleArea(float Left, float Top, float Width, float Height);
+
     /// <summary>
-    /// Where a block of text goes before any adjustment: the ASS anchor, laid out against the surface with a margin from
-    /// the edge it is anchored to. The layout is measured first, because centring needs its width.
+    /// Where a block of text goes before any adjustment: the ASS anchor, laid out against the free part of the surface
+    /// with a margin from the edge it is anchored to. The layout is measured first, because centring needs its width.
     /// </summary>
-    private static Vector2 Anchor(CanvasTextLayout layout, int row, int alignment, int width, int height, float margin)
+    private static Vector2 Anchor(CanvasTextLayout layout, int row, int alignment, SubtitleArea area, float margin)
     {
         int column = (Math.Clamp(alignment, 1, 9) - 1) % 3;
 
         float x = column switch
         {
             0 => margin,
-            2 => width - (float)layout.LayoutBounds.Width - margin,
-            _ => (width - (float)layout.LayoutBounds.Width) / 2.0f,
+            2 => area.Width - (float)layout.LayoutBounds.Width - margin,
+            _ => (area.Width - (float)layout.LayoutBounds.Width) / 2.0f,
         };
 
         float y = row switch
         {
-            0 => height - (float)layout.LayoutBounds.Height - margin,
+            0 => area.Height - (float)layout.LayoutBounds.Height - margin,
             2 => margin,
-            _ => (height - (float)layout.LayoutBounds.Height) / 2.0f,
+            _ => (area.Height - (float)layout.LayoutBounds.Height) / 2.0f,
         };
 
-        return new Vector2(x, y);
+        return new Vector2(area.Left + x, area.Top + y);
     }
 
     /// <summary>
-    /// Keeps the text on the surface. An adjustment that would push it off the edge is cut back, because the point of
-    /// adjusting subtitles is still to read them — and a surface that later shrinks must not leave them stranded.
+    /// Keeps the text where it can be read. An adjustment that would push it out of the free part of the surface is cut
+    /// back, because the point of adjusting subtitles is still to read them — and the player's own chrome, which moves as
+    /// it is used, must not strand them.
     /// </summary>
-    private static Vector2 KeepOnSurface(Vector2 origin, CanvasTextLayout layout, int width, int height)
+    private static Vector2 KeepInsideArea(Vector2 origin, CanvasTextLayout layout, SubtitleArea area)
     {
-        double maxX = Math.Max(0.0, width - layout.LayoutBounds.Width);
-        double maxY = Math.Max(0.0, height - layout.LayoutBounds.Height);
-        return new Vector2((float)Math.Clamp(origin.X, 0.0f, maxX), (float)Math.Clamp(origin.Y, 0.0f, maxY));
+        double maxX = Math.Max(area.Left, area.Left + area.Width - layout.LayoutBounds.Width);
+        double maxY = Math.Max(area.Top, area.Top + area.Height - layout.LayoutBounds.Height);
+        return new Vector2((float)Math.Clamp(origin.X, (double)area.Left, maxX), (float)Math.Clamp(origin.Y, (double)area.Top, maxY));
     }
 
     /// <summary>

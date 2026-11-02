@@ -46,6 +46,7 @@ internal sealed partial class CoreEngine : IDisposable
     private bool _hasSource = false;
     private PlaybackComponents _components = PlaybackComponents.Default;
     private VideoTransform _videoTransform = VideoTransform.Identity;
+    private SubtitlePlacement _subtitlePlacement = SubtitlePlacement.Identity;
     private double _volume = 1.0;
     private bool _muted;
 
@@ -66,7 +67,13 @@ internal sealed partial class CoreEngine : IDisposable
         {
             TimeSpan video = PlaybackInfo.SelectedVideoStream?.Duration ?? TimeSpan.Zero;
             TimeSpan audio = PlaybackInfo.SelectedAudioStream?.Duration ?? TimeSpan.Zero;
-            return video > audio ? video : audio;
+            TimeSpan longest = video > audio ? video : audio;
+            if (longest > TimeSpan.Zero)
+            {
+                return longest;
+            }
+
+            return PlaybackInfo.Media?.Duration ?? TimeSpan.Zero;
         }
     }
 
@@ -290,12 +297,23 @@ internal sealed partial class CoreEngine : IDisposable
         _pipeline?.VideoTransform = transform;
     }
 
+    public void SetSubtitlePlacement(SubtitlePlacement placement)
+    {
+        if (_subtitlePlacement == placement)
+        {
+            return;
+        }
+
+        _subtitlePlacement = placement;
+        if (_pipeline is not null)
+        {
+            _pipeline.SubtitlePlacement = placement;
+        }
+    }
+
     public void SetVolume(double volume)
     {
         _volume = Math.Clamp(volume, 0.0, 1.0);
-
-        // The filter is where the level lives now, and it is this engine's own: setting it is all it takes, and
-        // it applies to the next block rather than to what has already been handed to the device.
         _gainFilter?.SetLevel(_volume, _muted);
     }
 
@@ -305,10 +323,6 @@ internal sealed partial class CoreEngine : IDisposable
         _gainFilter?.SetLevel(_volume, _muted);
     }
 
-    /// <summary>
-    /// Not something the engine can do yet: the pipeline plays at the rate the file was written at, and
-    /// reporting a rate it does not honour would be worse than saying so.
-    /// </summary>
     public void SetPlaybackRate(double rate)
     {
         throw new NotSupportedException("This engine cannot change the playback rate yet.");
@@ -353,6 +367,7 @@ internal sealed partial class CoreEngine : IDisposable
 
         _components.Apply(pipeline);
         pipeline.VideoTransform = _videoTransform;
+        pipeline.SubtitlePlacement = _subtitlePlacement;
         pipeline.StateChanged += Pipeline_StateChanged;
 
         GainAudioFilter gainFilter = new();
