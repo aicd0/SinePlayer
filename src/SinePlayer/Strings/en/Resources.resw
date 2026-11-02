@@ -633,6 +633,15 @@ The expression will be evaluated in the following order:
   <data name="ImageContrast" xml:space="preserve">
     <value>Contrast</value>
   </data>
+  <data name="ImageInterpolation" xml:space="preserve">
+    <value>Image interpolation</value>
+  </data>
+  <data name="ImageInterpolationBilinear" xml:space="preserve">
+    <value>Bilinear</value>
+  </data>
+  <data name="ImageInterpolationNearestNeighbor" xml:space="preserve">
+    <value>Nearest-neighbor</value>
+  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Saturation</value>
   </data>

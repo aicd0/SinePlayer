@@ -63,6 +63,15 @@
                             <FontIcon x:Name="PlayPauseIcon" FontSize="14" />
                         </Button.Content>
                     </Button>
+                    <ProgressRing
+                        x:Name="PlayPauseProgressRing"
+                        Width="16"
+                        Height="16"
+                        MinWidth="0"
+                        MinHeight="0"
+                        Margin="11"
+                        IsActive="False"
+                        Visibility="Collapsed" />
                     <Button
                         x:Name="NextButton"
                         hotkey:ShortcutToolTip.Action="OpenNextItem"

@@ -103,6 +103,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _videoInterpolationLabel = string.Empty;
+    public string VideoInterpolationLabel
+    {
+        get => _videoInterpolationLabel;
+        set
+        {
+            _videoInterpolationLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VideoInterpolationLabel)));
+        }
+    }
+
     private string _videoRotationLabel = string.Empty;
     public string VideoRotationLabel
     {

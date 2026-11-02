@@ -76,6 +76,13 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
         ShortcutToolTip.Apply(PlayPauseButton, KeyboardShortcutActions.PlayPause, isPlaying ? StringResource.Pause : StringResource.Play);
     }
 
+    public void SetLoading(bool isLoading)
+    {
+        PlayPauseProgressRing.IsActive = isLoading;
+        PlayPauseProgressRing.Visibility = isLoading ? Visibility.Visible : Visibility.Collapsed;
+        PlayPauseButton.Visibility = isLoading ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     public void SetNavigation(bool isPreviousEnabled, bool isNextEnabled)
     {
         PreviousButton.IsEnabled = isPreviousEnabled;

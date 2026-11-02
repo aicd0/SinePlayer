@@ -633,6 +633,15 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   <data name="ImageContrast" xml:space="preserve">
     <value>Kontrast</value>
   </data>
+  <data name="ImageInterpolation" xml:space="preserve">
+    <value>Bildinterpolation</value>
+  </data>
+  <data name="ImageInterpolationBilinear" xml:space="preserve">
+    <value>Bilinear</value>
+  </data>
+  <data name="ImageInterpolationNearestNeighbor" xml:space="preserve">
+    <value>Nächster Nachbar</value>
+  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Sättigung</value>
   </data>

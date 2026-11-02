@@ -3,6 +3,7 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 
 using Windows.Win32.Graphics.Direct3D;
@@ -460,21 +461,16 @@ float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
     private readonly D3D11Device _device;
 
     private ID3D11VertexShader? _vertexShader;
-    private ID3D11SamplerState? _sampler;
+    private readonly Dictionary<VideoScalingMode, ID3D11SamplerState> _samplers = [];
     private ID3D11RasterizerState? _rasterizer;
     private bool _disposed;
 
-    private D3D11VideoShaders(D3D11Device device, ID3D11VertexShader vertexShader, ID3D11SamplerState sampler, ID3D11RasterizerState rasterizer)
+    private D3D11VideoShaders(D3D11Device device)
     {
         _device = device;
-        _vertexShader = vertexShader;
-        _sampler = sampler;
-        _rasterizer = rasterizer;
     }
 
     internal ID3D11VertexShader VertexShader => _vertexShader ?? throw new ObjectDisposedException(nameof(D3D11VideoShaders));
-
-    internal ID3D11SamplerState Sampler => _sampler ?? throw new ObjectDisposedException(nameof(D3D11VideoShaders));
 
     internal ID3D11RasterizerState Rasterizer => _rasterizer ?? throw new ObjectDisposedException(nameof(D3D11VideoShaders));
 
@@ -500,8 +496,14 @@ float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
         }
 
         _arrayShaders.Clear();
-        D3D11Interop.Release(_sampler);
-        _sampler = null;
+
+        foreach (ID3D11SamplerState sampler in _samplers.Values)
+        {
+            D3D11Interop.Release(sampler);
+        }
+
+        _samplers.Clear();
+
         D3D11Interop.Release(_rasterizer);
         _rasterizer = null;
         D3D11Interop.Release(_vertexShader);
@@ -512,37 +514,43 @@ float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
     {
         OperationResultCreator<D3D11VideoShaders> result = new();
 
-        D3D11_SAMPLER_DESC samplerDescription = new()
-        {
-            Filter = D3D11_FILTER.D3D11_FILTER_MIN_MAG_MIP_POINT,
-            AddressU = D3D11_TEXTURE_ADDRESS_MODE.D3D11_TEXTURE_ADDRESS_CLAMP,
-            AddressV = D3D11_TEXTURE_ADDRESS_MODE.D3D11_TEXTURE_ADDRESS_CLAMP,
-            AddressW = D3D11_TEXTURE_ADDRESS_MODE.D3D11_TEXTURE_ADDRESS_CLAMP,
-            ComparisonFunc = D3D11_COMPARISON_FUNC.D3D11_COMPARISON_ALWAYS,
-            MinLOD = 0,
-            MaxLOD = float.MaxValue,
-        };
-
         OperationResult<ID3DBlob> vertexCompiled = Compile("VSMain", "vs_5_0");
         if (!vertexCompiled.IsSuccessful)
         {
             return result.Failure(vertexCompiled);
         }
 
-        D3D11_RASTERIZER_DESC rasterizerDescription = new()
-        {
-            FillMode = D3D11_FILL_MODE.D3D11_FILL_SOLID,
-            CullMode = D3D11_CULL_MODE.D3D11_CULL_NONE,
-        };
-
-        D3D11VideoShaders created = new(
-            device,
-            D3D11Interop.CreateVertexShader(device.Device, vertexCompiled.Result),
-            D3D11Interop.CreateSamplerState(device.Device, samplerDescription),
-            D3D11Interop.CreateRasterizerState(device.Device, rasterizerDescription));
-
+        D3D11VideoShaders created = new(device);
         try
         {
+            created._vertexShader = D3D11Interop.CreateVertexShader(device.Device, vertexCompiled.Result);
+
+            foreach (VideoScalingMode mode in (VideoScalingMode[])[VideoScalingMode.Point, VideoScalingMode.Bilinear])
+            {
+                D3D11_SAMPLER_DESC samplerDescription = new()
+                {
+                    Filter = mode == VideoScalingMode.Bilinear
+                        ? D3D11_FILTER.D3D11_FILTER_MIN_MAG_MIP_LINEAR
+                        : D3D11_FILTER.D3D11_FILTER_MIN_MAG_MIP_POINT,
+                    AddressU = D3D11_TEXTURE_ADDRESS_MODE.D3D11_TEXTURE_ADDRESS_CLAMP,
+                    AddressV = D3D11_TEXTURE_ADDRESS_MODE.D3D11_TEXTURE_ADDRESS_CLAMP,
+                    AddressW = D3D11_TEXTURE_ADDRESS_MODE.D3D11_TEXTURE_ADDRESS_CLAMP,
+                    ComparisonFunc = D3D11_COMPARISON_FUNC.D3D11_COMPARISON_ALWAYS,
+                    MinLOD = 0,
+                    MaxLOD = float.MaxValue,
+                };
+
+                created._samplers[mode] = D3D11Interop.CreateSamplerState(device.Device, samplerDescription);
+            }
+
+            D3D11_RASTERIZER_DESC rasterizerDescription = new()
+            {
+                FillMode = D3D11_FILL_MODE.D3D11_FILL_SOLID,
+                CullMode = D3D11_CULL_MODE.D3D11_CULL_NONE,
+            };
+
+            created._rasterizer = D3D11Interop.CreateRasterizerState(device.Device, rasterizerDescription);
+
             (PixelFormat Format, VideoSurfaceTransform Transform, string EntryPoint)[] pixelShaders =
             [
                 (PixelFormat.Bgra8, VideoSurfaceTransform.None, "PSMainPacked"),
@@ -665,6 +673,16 @@ float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
             _arrayShaders[transform] = created.Result;
             return created;
         }
+    }
+
+    internal ID3D11SamplerState GetSampler(VideoScalingMode mode)
+    {
+        if (_samplers.TryGetValue(mode, out ID3D11SamplerState? sampler))
+        {
+            return sampler;
+        }
+
+        throw new ObjectDisposedException(nameof(D3D11VideoShaders));
     }
 
     internal OperationResult ValidateProgrammes()

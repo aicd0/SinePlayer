@@ -631,6 +631,15 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="ImageContrast" xml:space="preserve">
     <value>對比度</value>
   </data>
+  <data name="ImageInterpolation" xml:space="preserve">
+    <value>影像插值</value>
+  </data>
+  <data name="ImageInterpolationBilinear" xml:space="preserve">
+    <value>雙線性</value>
+  </data>
+  <data name="ImageInterpolationNearestNeighbor" xml:space="preserve">
+    <value>最近鄰</value>
+  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>飽和度</value>
   </data>

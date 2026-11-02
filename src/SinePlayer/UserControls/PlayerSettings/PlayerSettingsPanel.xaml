@@ -157,6 +157,23 @@
                     Grid.Column="0"
                     Margin="0,0,0,2"
                     VerticalAlignment="Center"
+                    Text="{x:Bind ViewModel.VideoInterpolationLabel, Mode=OneWay}" />
+                <DropDownButton
+                    x:Name="VideoInterpolationDropDownButton"
+                    Grid.Column="3"
+                    HorizontalAlignment="Right" />
+            </Grid>
+            <Grid Style="{StaticResource TallSettingRowStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Column="0"
+                    Margin="0,0,0,2"
+                    VerticalAlignment="Center"
                     Text="{x:Bind ViewModel.VideoRotationLabel, Mode=OneWay}" />
                 <DropDownButton
                     x:Name="VideoRotationDropDownButton"

@@ -633,6 +633,15 @@ L'évaluation s'effectuera dans l'ordre suivant :
   <data name="ImageContrast" xml:space="preserve">
     <value>Contraste</value>
   </data>
+  <data name="ImageInterpolation" xml:space="preserve">
+    <value>Interpolation d'image</value>
+  </data>
+  <data name="ImageInterpolationBilinear" xml:space="preserve">
+    <value>Bilinéaire</value>
+  </data>
+  <data name="ImageInterpolationNearestNeighbor" xml:space="preserve">
+    <value>Plus proche voisin</value>
+  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Saturation</value>
   </data>

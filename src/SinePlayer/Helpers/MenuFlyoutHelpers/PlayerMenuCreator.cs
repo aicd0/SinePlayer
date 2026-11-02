@@ -101,6 +101,15 @@ internal static class PlayerMenuCreator
         ];
     }
 
+    public static List<PlaybackComponentOption> GetScalingModeOptions()
+    {
+        return
+        [
+            new(nameof(VideoScalingMode.Point), StringResourceProvider.Instance.ImageInterpolationNearestNeighbor),
+            new(nameof(VideoScalingMode.Bilinear), StringResourceProvider.Instance.ImageInterpolationBilinear),
+        ];
+    }
+
     public static List<PlaybackComponentOption> GetRotationOptions()
     {
         return
