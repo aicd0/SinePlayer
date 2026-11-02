@@ -28,6 +28,7 @@ using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Lifecycle;
+using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -214,6 +215,7 @@ internal sealed partial class PlayerPage : BasePage
 
             _topOverlayHeight = h;
             UpdatePromptMargin();
+            UpdateSubtitlePlacement();
 
             if (ViewModel.IsPinned)
             {
@@ -231,6 +233,7 @@ internal sealed partial class PlayerPage : BasePage
             _rightOverlayWidth = w;
 
             TransportBar.Margin = new Thickness(0, 0, w, 0);
+            UpdateSubtitlePlacement();
 
             if (ViewModel.IsPinned)
             {
@@ -429,6 +432,7 @@ internal sealed partial class PlayerPage : BasePage
         }
 
         _bottomGridHeight = e.NewSize.Height;
+        UpdateSubtitlePlacement();
 
         if (ViewModel.IsPinned)
         {
@@ -603,6 +607,12 @@ internal sealed partial class PlayerPage : BasePage
             return streams[0];
         }
 
+        MediaInfo? info = engine.PlaybackInfo.Media;
+        if (info is null)
+        {
+            return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': its tracks could not be read.");
+        }
+
         // Add external sources
         foreach (MediaStreamKind kind in (MediaStreamKind[])[MediaStreamKind.Video, MediaStreamKind.Audio, MediaStreamKind.Subtitle])
         {
@@ -619,8 +629,16 @@ internal sealed partial class PlayerPage : BasePage
             }
         }
 
+        foreach (string path in await FindSameNameSubtitlesAsync(media.Location))
+        {
+            OperationResult<MediaSource> added = await engine.AddSource(path);
+            if (!added.IsSuccessful)
+            {
+                Logger.W(TAG, $"'{path}' could not be imported: {added.Message}");
+            }
+        }
+
         IReadOnlyList<MediaSource> sources = engine.PlaybackInfo.Sources;
-        MediaInfo? info = engine.PlaybackInfo.Media;
         List<string> unplayable = [];
         bool playing = false;
 
@@ -629,11 +647,11 @@ internal sealed partial class PlayerPage : BasePage
         TrackSelection.Preference? videoChoice = TrackSelection.Load(media, MediaStreamKind.Video, sources);
         if (videoChoice is null)
         {
-            video = DefaultTrack(info?.VideoStreams);
+            video = DefaultTrack(info.VideoStreams);
         }
         else if (videoChoice.Enabled)
         {
-            video = videoChoice.Stream ?? DefaultTrack(info?.VideoStreams);
+            video = videoChoice.Stream ?? DefaultTrack(info.VideoStreams);
         }
 
         if (video is not null)
@@ -656,11 +674,11 @@ internal sealed partial class PlayerPage : BasePage
         TrackSelection.Preference? audioChoice = TrackSelection.Load(media, MediaStreamKind.Audio, sources);
         if (audioChoice is null)
         {
-            audio = DefaultTrack(info?.AudioStreams);
+            audio = DefaultTrack(info.AudioStreams);
         }
         else if (audioChoice.Enabled)
         {
-            audio = audioChoice.Stream ?? DefaultTrack(info?.AudioStreams);
+            audio = audioChoice.Stream ?? DefaultTrack(info.AudioStreams);
         }
 
         if (audio is not null)
@@ -680,14 +698,15 @@ internal sealed partial class PlayerPage : BasePage
 
         // Select subtitle track
         MediaStreamInfo? subtitle = null;
+        IReadOnlyList<SubtitleStreamInfo> subtitleStreams = [.. sources.SelectMany(source => source.Info.SubtitleStreams)];
         TrackSelection.Preference? subtitleChoice = TrackSelection.Load(media, MediaStreamKind.Subtitle, sources);
         if (subtitleChoice is null)
         {
-            subtitle = DefaultTrack(info?.SubtitleStreams);
+            subtitle = DefaultTrack(subtitleStreams);
         }
         else if (subtitleChoice.Enabled)
         {
-            subtitle = subtitleChoice.Stream ?? DefaultTrack(info?.SubtitleStreams);
+            subtitle = subtitleChoice.Stream ?? DefaultTrack(subtitleStreams);
         }
 
         if (subtitle is not null)
@@ -751,6 +770,7 @@ internal sealed partial class PlayerPage : BasePage
         engine.StateChanged += Engine_StateChanged;
         engine.PositionChanged += Engine_PositionChanged;
         _engine = engine;
+        UpdateSubtitlePlacement();
         ViewModel.VolumeLiveData.Emit((int)Math.Round(engine.Volume * 100.0));
         ViewModel.MuteLiveData.Emit(engine.IsMuted);
         return engine;
@@ -969,6 +989,7 @@ internal sealed partial class PlayerPage : BasePage
     private double _topOverlayHeight = 0.0;
     private double _rightOverlayWidth = 0.0;
     private double _bottomGridHeight = 0.0;
+    private SubtitlePlacement _subtitlePlacement = SubtitlePlacement.Identity;
     private bool _isOverlayVisible = false;
     private bool _isOverlayHold = false;
     private long _hideOverlaySession = 0;
@@ -1050,6 +1071,7 @@ internal sealed partial class PlayerPage : BasePage
 
         _isOverlayVisible = true;
         UpdatePromptMargin();
+        UpdateSubtitlePlacement();
         GetMainPageAbility().SetOverlayVisibility(true);
     }
 
@@ -1114,6 +1136,7 @@ internal sealed partial class PlayerPage : BasePage
         _isOverlayVisible = false;
         _isOverlayHold = false;
         UpdatePromptMargin();
+        UpdateSubtitlePlacement();
         GetMainPageAbility().SetOverlayVisibility(false);
     }
 
@@ -1389,6 +1412,15 @@ internal sealed partial class PlayerPage : BasePage
         PromptText.Margin = new Thickness(16.0, top, 16.0, 0);
     }
 
+    private void UpdateSubtitlePlacement()
+    {
+        SubtitleInsets insets = _isOverlayVisible
+            ? new SubtitleInsets(0.0, _topOverlayHeight, _rightOverlayWidth, _bottomGridHeight)
+            : SubtitleInsets.None;
+        _subtitlePlacement = _subtitlePlacement with { Insets = insets };
+        _engine?.SetSubtitlePlacement(_subtitlePlacement);
+    }
+
     #endregion
 
     #region Page state
@@ -1542,6 +1574,49 @@ internal sealed partial class PlayerPage : BasePage
     #endregion
 
     #region Utilities
+
+    private static async Task<IReadOnlyList<string>> FindSameNameSubtitlesAsync(string mediaPath)
+    {
+        if (string.IsNullOrEmpty(mediaPath))
+        {
+            return [];
+        }
+
+        string? folder = Path.GetDirectoryName(mediaPath);
+        string stem = Path.GetFileNameWithoutExtension(mediaPath);
+        if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(stem))
+        {
+            return [];
+        }
+
+        List<string> candidates = await TaskDispatcher.DefaultThreadPool.Submit(() =>
+        {
+            List<string> found = [];
+            try
+            {
+                foreach (string path in Directory.EnumerateFiles(folder, "*", SearchOption.TopDirectoryOnly))
+                {
+                    if (!AppInfoProvider.IsSupportedSubtitleExtension(Path.GetExtension(path)))
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(Path.GetFileNameWithoutExtension(path), stem, StringComparison.OrdinalIgnoreCase))
+                    {
+                        found.Add(path);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.W(TAG, $"The folder '{folder}' could not be listed for subtitles: {ex.Message}");
+            }
+
+            return found;
+        });
+
+        return [.. candidates.OrderBy(path => StringUtils.SmartFileNameKeySelector(Path.GetFileName(path)), StringUtils.SmartFileNameComparer)];
+    }
 
     private IMainPageAbilityForTab GetMainPageAbility()
     {
