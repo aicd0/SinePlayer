@@ -35,6 +35,7 @@ internal sealed partial class CoreEngine : IDisposable
     private const int PositionIntervalMilliseconds = 250;
 
     private bool _disposed;
+    private readonly AudioDeviceNotifier _audioDeviceNotifier = AudioDeviceNotifier.Shared;
     private SwapChainPanel? _videoPanel;
     private SwapChainPanelRenderTarget? _videoRenderTarget;
     private SwapChainPanel? _subtitlePanel;
@@ -49,6 +50,11 @@ internal sealed partial class CoreEngine : IDisposable
     private SubtitlePlacement _subtitlePlacement = SubtitlePlacement.Identity;
     private double _volume = 1.0;
     private bool _muted;
+
+    public CoreEngine()
+    {
+        _audioDeviceNotifier.Subscribe(AudioDevices_Changed);
+    }
 
     #endregion
 
@@ -93,6 +99,8 @@ internal sealed partial class CoreEngine : IDisposable
         }
 
         _disposed = true;
+
+        _audioDeviceNotifier.Unsubscribe(AudioDevices_Changed);
 
         StopPositionTimer();
         _playbackInfo.Detach();
@@ -403,6 +411,44 @@ internal sealed partial class CoreEngine : IDisposable
         }
 
         CoroutineUtils.RunInMainThread(() => StateChanged?.Invoke(state, message));
+    }
+
+    #endregion
+
+    #region Audio device change
+
+    private void AudioDevices_Changed()
+    {
+        CoroutineUtils.Run(RefreshAudioOutputAsync);
+    }
+
+    private async Task RefreshAudioOutputAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null || pipeline.SelectedAudioStream is null)
+        {
+            return;
+        }
+
+        if (pipeline.State is not (MediaEngineState.Playing or MediaEngineState.Paused or MediaEngineState.Ended))
+        {
+            return;
+        }
+
+        // What is active now is what may be offered now: a device that vanished leaves the list, one that arrived
+        // joins it, and the default is first in either case.
+        _components.Apply(pipeline);
+
+        OperationResult reconciled = await pipeline.Reconcile();
+        if (!reconciled.IsSuccessful)
+        {
+            Logger.W(TAG, $"The audio output could not be re-resolved: {reconciled.Message}");
+        }
     }
 
     #endregion

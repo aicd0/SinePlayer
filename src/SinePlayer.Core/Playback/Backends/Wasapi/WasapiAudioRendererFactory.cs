@@ -55,6 +55,13 @@ public sealed class WasapiAudioRendererFactory : IAudioRendererFactory
 
         public OperationResult Create(out IAudioRenderer? component)
         {
+            component = null;
+
+            if (endpointId is not null && !WasapiAudioEndpoints.IsEndpointActive(endpointId))
+            {
+                return OperationResult.Failure($"The audio device '{endpointName ?? endpointId}' is no longer available.");
+            }
+
             component = new WasapiAudioRenderer(endpointId, endpointName, endpointIsDefault);
             return OperationResult.Success();
         }

@@ -7150,6 +7150,8 @@ public class PlaybackPipelineTests
 
         public string Name { get; init; } = "fake";
 
+        public bool IsDeviceAvailable { get; set; } = true;
+
         /// <summary>What the device says it lost between blocks; a test that cares about the figure sets it.</summary>
         public long UnderrunCount { get; set; }
 
