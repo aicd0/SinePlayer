@@ -859,6 +859,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="OriginalSize" xml:space="preserve">
     <value>원본 크기</value>
   </data>
+  <data name="Output" xml:space="preserve">
+    <value>출력</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>이 작업을 수행하면 기존 항목이 덮어쓰여집니다.</value>
   </data>
@@ -1200,6 +1203,9 @@ $plugins</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>전체 미디어 수</value>
+  </data>
+  <data name="Transform" xml:space="preserve">
+    <value>변환</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>양면 모드</value>

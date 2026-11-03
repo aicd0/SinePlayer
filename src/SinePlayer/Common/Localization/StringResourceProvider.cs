@@ -219,6 +219,7 @@ public class StringResourceProvider
     public string OpenSidebar => GetResourceString("OpenSidebar");
     public string OpenUserDataFolder => GetResourceString("OpenUserDataFolder");
     public string OriginalSize => GetResourceString("OriginalSize");
+    public string Output => GetResourceString("Output");
     public string OverwriteExistingEntries => GetResourceString("OverwriteExistingEntries");
     public string Pause => GetResourceString("Pause");
     public string PauseOnLeaveTab => GetResourceString("PauseOnLeaveTab");
@@ -321,6 +322,7 @@ public class StringResourceProvider
     public string Title2 => GetResourceString("Title2");
     public string ToggleFullscreen => GetResourceString("ToggleFullscreen");
     public string TotalMedia => GetResourceString("TotalMedia");
+    public string Transform => GetResourceString("Transform");
     public string TwoPageMode => GetResourceString("TwoPageMode");
     public string Unavailable => GetResourceString("Unavailable");
     public string Unfavorite => GetResourceString("Unfavorite");

@@ -33,21 +33,21 @@ internal sealed partial class SingleThreadSynchronizationContext : Synchronizati
     {
         while (true)
         {
-            if (!_queue.IsEmpty)
+            while (_queue.TryDequeue(out (SendOrPostCallback Callback, object? State) work))
             {
-                _arrived.Reset();
-
-                while (_queue.TryDequeue(out (SendOrPostCallback Callback, object? State) work))
-                {
-                    work.Callback(work.State);
-                }
-
-                continue;
+                work.Callback(work.State);
             }
+
+            _arrived.Reset();
 
             if (_completed)
             {
                 return;
+            }
+
+            if (!_queue.IsEmpty)
+            {
+                continue;
             }
 
             _arrived.Wait();

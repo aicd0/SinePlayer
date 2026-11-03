@@ -26,6 +26,11 @@ namespace SinePlayer.UserControls.PlayerSettings;
 
 internal sealed partial class PlayerSettingsPanel : BaseUserControl
 {
+    #region Constructor
+
+    private const char SectionPathSeparator = '/';
+    private const char CollapsedSectionsSeparator = ';';
+
     public delegate void DataChangedEventHandler(PlayerSettingsModel data);
     public event DataChangedEventHandler? DataChanged;
 
@@ -48,7 +53,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             "Second" => SelectorBarItem2,
             _ => SelectorBarItem1,
         };
+
+        RestoreSectionStates();
     }
+
+    #endregion
+
+    #region Public API
 
     public PlayerSettingsModel Settings => _mediaSettings;
 
@@ -78,6 +89,83 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         UpdateUI();
     }
 
+    public bool NavigateTo(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        string[] segments = path.Split(SectionPathSeparator);
+        StackPanel? tabPanel = segments[0] switch
+        {
+            "Video" => VideoSettingsGrid,
+            "Audio" => AudioSettingsGrid,
+            "Subtitle" => SubtitleSettingsGrid,
+            _ => null,
+        };
+
+        SelectorBarItem? tabItem = segments[0] switch
+        {
+            "Video" => SelectorBarItem1,
+            "Audio" => SelectorBarItem2,
+            "Subtitle" => SelectorBarItem3,
+            _ => null,
+        };
+
+        if (tabPanel is null || tabItem is null)
+        {
+            return false;
+        }
+
+        List<PlayerSettingsSection> chain = [];
+        IEnumerable<object> container = tabPanel.Children;
+        for (int i = 1; i < segments.Length; i++)
+        {
+            PlayerSettingsSection? found = null;
+            foreach (object child in container)
+            {
+                if (child is PlayerSettingsSection section && string.Equals(section.SectionKey, segments[i], StringComparison.Ordinal))
+                {
+                    found = section;
+                    break;
+                }
+            }
+
+            if (found is null)
+            {
+                return false;
+            }
+
+            chain.Add(found);
+            container = found.SectionChildren;
+        }
+
+        SettingsTabSelectorBar.SelectedItem = tabItem;
+
+        if (chain.Count == 0)
+        {
+            return true;
+        }
+
+        foreach (PlayerSettingsSection section in chain)
+        {
+            section.IsExpanded = true;
+        }
+
+        PlayerSettingsSection target = chain[^1];
+        DispatcherQueue.TryEnqueue(() => target.StartBringIntoView(new BringIntoViewOptions
+        {
+            VerticalAlignmentRatio = 0.0,
+        }));
+
+        return true;
+    }
+
+    #endregion
+
+    #region Lifecycle
+
     protected override void OnResume()
     {
         base.OnResume();
@@ -98,6 +186,10 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             DispatchDataChangeEvent();
         }, options);
     }
+
+    #endregion
+
+    #region Events
 
     private void SelectorBar_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
     {
@@ -215,6 +307,72 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             Apply(settings => settings.VideoFlipVertical = value);
         }
     }
+
+    #endregion
+
+    #region Section UI
+
+    private void RestoreSectionStates()
+    {
+        string collapsed = AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).GetValueOrDefault(RegistryNames.StateKey.PLAYER_SETTINGS_COLLAPSED_SECTIONS, string.Empty);
+        HashSet<string> collapsedPaths = [.. collapsed.Split(CollapsedSectionsSeparator, StringSplitOptions.RemoveEmptyEntries)];
+
+        foreach ((string sectionPath, PlayerSettingsSection section) in EnumerateSections())
+        {
+            section.IsExpanded = !collapsedPaths.Contains(sectionPath);
+            section.ExpandedChanged += Section_ExpandedChanged;
+        }
+    }
+
+    private void Section_ExpandedChanged(PlayerSettingsSection section, bool isExpanded)
+    {
+        List<string> collapsed = [];
+        foreach ((string sectionPath, PlayerSettingsSection candidate) in EnumerateSections())
+        {
+            if (!candidate.IsExpanded)
+            {
+                collapsed.Add(sectionPath);
+            }
+        }
+
+        AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).Set(RegistryNames.StateKey.PLAYER_SETTINGS_COLLAPSED_SECTIONS, string.Join(CollapsedSectionsSeparator, collapsed));
+    }
+
+    private IEnumerable<(string Path, PlayerSettingsSection Section)> EnumerateSections()
+    {
+        foreach ((string Tab, StackPanel Panel) tab in (ValueTuple<string, StackPanel>[])[
+            ("Video", VideoSettingsGrid),
+            ("Audio", AudioSettingsGrid),
+            ("Subtitle", SubtitleSettingsGrid)])
+        {
+            foreach ((string Path, PlayerSettingsSection Section) item in EnumerateSections(tab.Panel.Children))
+            {
+                yield return ($"{tab.Tab}{SectionPathSeparator}{item.Path}", item.Section);
+            }
+        }
+    }
+
+    private static IEnumerable<(string Path, PlayerSettingsSection Section)> EnumerateSections(IEnumerable<object> children)
+    {
+        foreach (object child in children)
+        {
+            if (child is not PlayerSettingsSection section || string.IsNullOrEmpty(section.SectionKey))
+            {
+                continue;
+            }
+
+            yield return (section.SectionKey, section);
+
+            foreach ((string Path, PlayerSettingsSection Section) nested in EnumerateSections(section.SectionChildren))
+            {
+                yield return ($"{section.SectionKey}{SectionPathSeparator}{nested.Path}", nested.Section);
+            }
+        }
+    }
+
+    #endregion
+
+    #region Settings UI
 
     private void LoadSettings()
     {
@@ -460,7 +618,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         VideoInterpolationDropDownButton.Content = choice.Label;
     }
 
-    private void UpdateVideoRotation(PlayerSettingsModel settings)    {
+    private void UpdateVideoRotation(PlayerSettingsModel settings)
+    {
         List<PlaybackComponentOption> options = PlayerMenuCreator.GetRotationOptions();
         PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoRotationDegrees.ToString(CultureInfo.InvariantCulture));
         VideoRotationDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
@@ -614,6 +773,10 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         return flyout;
     }
 
+    #endregion
+
+    #region Misc
+
     private void DispatchDataChangeEvent()
     {
         if (_updatingUI)
@@ -623,4 +786,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         DataChanged?.Invoke(_mediaSettings);
     }
+
+    #endregion
 }

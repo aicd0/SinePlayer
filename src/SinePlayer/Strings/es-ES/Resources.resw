@@ -859,6 +859,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="OriginalSize" xml:space="preserve">
     <value>Tamaño original</value>
   </data>
+  <data name="Output" xml:space="preserve">
+    <value>Salida</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Esta operación sobrescribirá las entradas existentes.</value>
   </data>
@@ -1200,6 +1203,9 @@ Categoría 2: Etiqueta 4, Etiqueta 5</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>Total de archivos multimedia</value>
+  </data>
+  <data name="Transform" xml:space="preserve">
+    <value>Transformación</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Modo de doble página</value>

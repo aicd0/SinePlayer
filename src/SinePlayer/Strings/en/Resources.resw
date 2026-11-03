@@ -859,6 +859,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="OriginalSize" xml:space="preserve">
     <value>Original size</value>
   </data>
+  <data name="Output" xml:space="preserve">
+    <value>Output</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>This operation will overwrite existing entries.</value>
   </data>
@@ -1200,6 +1203,9 @@ Category2: Tag4, Tag5</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>Total media</value>
+  </data>
+  <data name="Transform" xml:space="preserve">
+    <value>Transform</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Two-page mode</value>

@@ -24,6 +24,7 @@ internal static class RegistryNames
     {
         public const string LOG_STARTED = "LogStarted";
         public const string PLAYER_OVERLAY_PINNED = "PlayerOverlayPinned";
+        public const string PLAYER_SETTINGS_COLLAPSED_SECTIONS = "PlayerSettingsCollapsedSections";
         public const string SELECTED_PLAYER_SETTINGS_TAB = "SelectedPlayerSettingsTab";
         public const string SHOW_INSTALL_PLUGIN_WARNING = "ShowInstallPluginWarning";
         public const string SIDEBAR_OPEN = "SidebarOpen";

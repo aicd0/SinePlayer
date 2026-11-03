@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<base:BaseUserControl
+    x:Class="SinePlayer.UserControls.PlayerSettings.PlayerSettingsSection"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:base="using:SinePlayer.Common.BaseUI"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="120"
+    d:DesignWidth="360"
+    mc:Ignorable="d">
+
+    <StackPanel Orientation="Vertical">
+        <Grid
+            x:Name="HeaderRow"
+            Background="{ThemeResource MediaInfoSeparatorForeground}"
+            Tapped="HeaderRow_Tapped">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                x:Name="TitleText"
+                Grid.Column="0"
+                Margin="12,2,0,2"
+                VerticalAlignment="Center"
+                FontSize="12"
+                FontWeight="Bold" />
+            <FontIcon
+                x:Name="ChevronIcon"
+                Grid.Column="1"
+                Margin="12,0,12,0"
+                VerticalAlignment="Center"
+                FontSize="12"
+                Glyph="&#xE70D;" />
+        </Grid>
+        <StackPanel
+            x:Name="SectionContentPanel"
+            Padding="0,8"
+            Orientation="Vertical" />
+    </StackPanel>
+
+</base:BaseUserControl>

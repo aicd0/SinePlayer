@@ -859,6 +859,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="OriginalSize" xml:space="preserve">
     <value>Исходный размер</value>
   </data>
+  <data name="Output" xml:space="preserve">
+    <value>Вывод</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Эта операция перезапишет существующие записи.</value>
   </data>
@@ -1200,6 +1203,9 @@ $plugins</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>Всего медиафайлов</value>
+  </data>
+  <data name="Transform" xml:space="preserve">
+    <value>Преобразование</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Режим разворота</value>

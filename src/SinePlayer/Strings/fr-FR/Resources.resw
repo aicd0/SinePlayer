@@ -859,6 +859,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="OriginalSize" xml:space="preserve">
     <value>Taille d'origine</value>
   </data>
+  <data name="Output" xml:space="preserve">
+    <value>Sortie</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Cette opération écrasera les entrées existantes.</value>
   </data>
@@ -1200,6 +1203,9 @@ Catégorie 2 : Étiquette 4, Étiquette 5</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>Nombre total de médias</value>
+  </data>
+  <data name="Transform" xml:space="preserve">
+    <value>Transformation</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Mode double page</value>
