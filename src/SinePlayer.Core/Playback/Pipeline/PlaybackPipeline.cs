@@ -2326,6 +2326,12 @@ public sealed partial class PlaybackPipeline : IDisposable
 
                 if (deviceAvailable && videoRenderer is not null)
                 {
+                    if (playing && firstFrameTime.HasValue && !videoRenderer.TryAcquireFrameSlot())
+                    {
+                        Interlocked.Increment(ref _droppedFrameCount);
+                        continue;
+                    }
+
                     OperationResult shown = RenderVideoFrame(videoRenderer, frame, transform);
                     if (!shown.IsSuccessful)
                     {

@@ -138,6 +138,9 @@ internal static class PlayerMenuCreator
         List<PlaybackComponentOption> rotationOptions = GetRotationOptions();
         PlaybackComponentOption rotation = EnsureChoice(rotationOptions, settings.VideoRotationDegrees.ToString(CultureInfo.InvariantCulture));
 
+        List<PlaybackComponentOption> interpolationOptions = GetScalingModeOptions();
+        PlaybackComponentOption interpolation = EnsureChoice(interpolationOptions, settings.VideoScalingMode.ToString());
+
         return
         [
             new SubItemMenuFlyoutItemModel()
@@ -216,6 +219,19 @@ internal static class PlayerMenuCreator
                 Text = StringResourceProvider.Instance.FlipHorizontally,
                 IsChecked = settings.VideoFlipHorizontal,
                 Click = () => applyChange(target => target.VideoFlipHorizontal = !settings.VideoFlipHorizontal),
+            },
+            new SeparatorMenuFlyoutItemModel(),
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.ImageInterpolation,
+                Items = CreateChoiceItems(interpolationOptions, interpolation.Key, key =>
+                {
+                    VideoScalingMode mode = Enum.Parse<VideoScalingMode>(key);
+                    if (settings.VideoScalingMode != mode)
+                    {
+                        applyChange(target => target.VideoScalingMode = mode);
+                    }
+                }),
             },
         ];
     }

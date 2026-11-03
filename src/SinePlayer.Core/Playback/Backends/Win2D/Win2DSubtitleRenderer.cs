@@ -385,7 +385,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
             if (_swapChain is null)
             {
-                OperationResult<D3D11SwapChain> created = D3D11SwapChain.TryCreate(_d3dDevice!, width, height, scale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_PREMULTIPLIED);
+                OperationResult<D3D11SwapChain> created = D3D11SwapChain.Create(_d3dDevice!, width, height, scale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_PREMULTIPLIED);
                 if (!created.IsSuccessful)
                 {
                     return OperationResult.Failure(created);
