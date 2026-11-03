@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8" ?>
 <base:BaseUserControl
     x:Class="SinePlayer.UserControls.PlayerSettings.PlayerSettingsPanel"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -5,6 +6,7 @@
     xmlns:base="using:SinePlayer.Common.BaseUI"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:settings="using:SinePlayer.UserControls.PlayerSettings"
     d:DesignHeight="300"
     d:DesignWidth="400"
     mc:Ignorable="d">
@@ -27,9 +29,17 @@
         </ResourceDictionary>
     </base:BaseUserControl.Resources>
 
-    <StackPanel Orientation="Vertical">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
         <SelectorBar
             x:Name="SettingsTabSelectorBar"
+            Grid.Row="0"
             Margin="14,0"
             Padding="0,12,0,8"
             SelectionChanged="SelectorBar_SelectionChanged">
@@ -46,296 +56,326 @@
                 Padding="12,0,12,4"
                 Text="{x:Bind ViewModel.SubtitleTabTitle, Mode=OneWay}" />
         </SelectorBar>
-        <Rectangle Height="1" Fill="{ThemeResource MediaInfoSeparatorForeground}" />
-
-        <StackPanel
-            x:Name="VideoSettingsGrid"
-            MinWidth="360"
-            Padding="0,8"
-            Orientation="Vertical">
-            <Grid Style="{StaticResource TallSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.VideoDecoderLabel, Mode=OneWay}" />
-                <DropDownButton
-                    x:Name="VideoDecoderDropDownButton"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right" />
-            </Grid>
-            <Grid Style="{StaticResource TallSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.VideoRendererLabel, Mode=OneWay}" />
-                <DropDownButton
-                    x:Name="VideoRendererDropDownButton"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right" />
-            </Grid>
-            <Grid Style="{StaticResource CommonSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.VideoPreferHardwareDecodingLabel, Mode=OneWay}" />
-                <ToggleSwitch
-                    x:Name="VideoPreferHardwareDecodingToggleSwitch"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right"
-                    Style="{StaticResource CompatToggleSwitchStyle}"
-                    Toggled="VideoPreferHardwareDecodingToggleSwitch_Toggled" />
-            </Grid>
-            <Grid Style="{StaticResource CommonSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.VideoPreferHdrLabel, Mode=OneWay}" />
-                <ToggleSwitch
-                    x:Name="VideoPreferHdrToggleSwitch"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right"
-                    Style="{StaticResource CompatToggleSwitchStyle}"
-                    Toggled="VideoPreferHdrToggleSwitch_Toggled" />
-            </Grid>
-            <Rectangle
-                Height="1"
-                Margin="0,8"
-                Fill="{ThemeResource MediaInfoSeparatorForeground}" />
-            <Grid Style="{StaticResource TallSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.VideoStretchModeLabel, Mode=OneWay}" />
-                <DropDownButton
-                    x:Name="VideoStretchModeDropDownButton"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right" />
-            </Grid>
-            <Grid Style="{StaticResource TallSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.VideoInterpolationLabel, Mode=OneWay}" />
-                <DropDownButton
-                    x:Name="VideoInterpolationDropDownButton"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right" />
-            </Grid>
-            <Grid Style="{StaticResource TallSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.VideoRotationLabel, Mode=OneWay}" />
-                <DropDownButton
-                    x:Name="VideoRotationDropDownButton"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right" />
-            </Grid>
-            <Grid Style="{StaticResource CommonSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.VideoFlipHorizontalLabel, Mode=OneWay}" />
-                <ToggleSwitch
-                    x:Name="VideoFlipHorizontalToggleSwitch"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right"
-                    Style="{StaticResource CompatToggleSwitchStyle}"
-                    Toggled="VideoFlipHorizontalToggleSwitch_Toggled" />
-            </Grid>
-            <Grid Style="{StaticResource CommonSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.VideoFlipVerticalLabel, Mode=OneWay}" />
-                <ToggleSwitch
-                    x:Name="VideoFlipVerticalToggleSwitch"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right"
-                    Style="{StaticResource CompatToggleSwitchStyle}"
-                    Toggled="VideoFlipVerticalToggleSwitch_Toggled" />
-            </Grid>
-        </StackPanel>
-
-        <StackPanel
-            x:Name="AudioSettingsGrid"
-            MinWidth="360"
-            Padding="0,8"
-            Orientation="Vertical"
-            Visibility="Collapsed">
-            <Grid Style="{StaticResource TallSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.AudioDecoderLabel, Mode=OneWay}" />
-                <DropDownButton
-                    x:Name="AudioDecoderDropDownButton"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right" />
-            </Grid>
-            <Grid Style="{StaticResource TallSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.AudioRendererLabel, Mode=OneWay}" />
-                <DropDownButton
-                    x:Name="AudioRendererDropDownButton"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right" />
-            </Grid>
-        </StackPanel>
-
-        <StackPanel
-            x:Name="SubtitleSettingsGrid"
-            MinWidth="360"
-            Padding="0,8"
-            Orientation="Vertical"
-            Visibility="Collapsed">
-            <Grid Style="{StaticResource TallSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.SubtitleDecoderLabel, Mode=OneWay}" />
-                <DropDownButton
-                    x:Name="SubtitleDecoderDropDownButton"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right" />
-            </Grid>
-            <Grid Style="{StaticResource TallSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.SubtitleRendererLabel, Mode=OneWay}" />
-                <DropDownButton
-                    x:Name="SubtitleRendererDropDownButton"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right" />
-            </Grid>
-        </StackPanel>
 
         <Rectangle
+            Grid.Row="1"
             Height="1"
-            Margin="0,0,0,12"
             Fill="{ThemeResource MediaInfoSeparatorForeground}" />
 
-        <Grid Margin="14,0,14,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <Button
-                Grid.Column="0"
-                Click="ResetButton_Click"
-                Content="{x:Bind StringResource.Reset}" />
-            <DropDownButton
-                x:Name="PresetDropDownButton"
-                Grid.Column="2"
-                Margin="5,0,0,0" />
-            <Button
-                Grid.Column="3"
-                Width="32"
-                Margin="5,0,0,0"
-                Padding="0"
-                VerticalAlignment="Stretch"
-                Click="EditPresetButton_Click"
-                ToolTipService.ToolTip="{x:Bind StringResource.Edit}">
-                <FontIcon FontSize="16" Glyph="&#xE70F;" />
-            </Button>
-        </Grid>
+        <ScrollViewer
+            Grid.Row="2"
+            MaxHeight="500"
+            HorizontalScrollBarVisibility="Disabled"
+            HorizontalScrollMode="Disabled"
+            VerticalScrollBarVisibility="Auto"
+            VerticalScrollMode="Auto">
+            <Grid MinWidth="360">
+                <StackPanel x:Name="VideoSettingsGrid" Orientation="Vertical">
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Output}" SectionKey="Output">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.VideoDecoderLabel, Mode=OneWay}" />
+                                    <DropDownButton
+                                        x:Name="VideoDecoderDropDownButton"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.VideoRendererLabel, Mode=OneWay}" />
+                                    <DropDownButton
+                                        x:Name="VideoRendererDropDownButton"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid Style="{StaticResource CommonSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.VideoPreferHardwareDecodingLabel, Mode=OneWay}" />
+                                    <ToggleSwitch
+                                        x:Name="VideoPreferHardwareDecodingToggleSwitch"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource CompatToggleSwitchStyle}"
+                                        Toggled="VideoPreferHardwareDecodingToggleSwitch_Toggled" />
+                                </Grid>
+                                <Grid Style="{StaticResource CommonSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.VideoPreferHdrLabel, Mode=OneWay}" />
+                                    <ToggleSwitch
+                                        x:Name="VideoPreferHdrToggleSwitch"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource CompatToggleSwitchStyle}"
+                                        Toggled="VideoPreferHdrToggleSwitch_Toggled" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Transform}" SectionKey="Transform">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.VideoStretchModeLabel, Mode=OneWay}" />
+                                    <DropDownButton
+                                        x:Name="VideoStretchModeDropDownButton"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.VideoRotationLabel, Mode=OneWay}" />
+                                    <DropDownButton
+                                        x:Name="VideoRotationDropDownButton"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid Style="{StaticResource CommonSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.VideoFlipHorizontalLabel, Mode=OneWay}" />
+                                    <ToggleSwitch
+                                        x:Name="VideoFlipHorizontalToggleSwitch"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource CompatToggleSwitchStyle}"
+                                        Toggled="VideoFlipHorizontalToggleSwitch_Toggled" />
+                                </Grid>
+                                <Grid Style="{StaticResource CommonSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.VideoFlipVerticalLabel, Mode=OneWay}" />
+                                    <ToggleSwitch
+                                        x:Name="VideoFlipVerticalToggleSwitch"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource CompatToggleSwitchStyle}"
+                                        Toggled="VideoFlipVerticalToggleSwitch_Toggled" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Image}" SectionKey="Image">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.VideoInterpolationLabel, Mode=OneWay}" />
+                                    <DropDownButton
+                                        x:Name="VideoInterpolationDropDownButton"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
+                </StackPanel>
 
-    </StackPanel>
+                <StackPanel
+                    x:Name="AudioSettingsGrid"
+                    Orientation="Vertical"
+                    Visibility="Collapsed">
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Output}" SectionKey="Output">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.AudioDecoderLabel, Mode=OneWay}" />
+                                    <DropDownButton
+                                        x:Name="AudioDecoderDropDownButton"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.AudioRendererLabel, Mode=OneWay}" />
+                                    <DropDownButton
+                                        x:Name="AudioRendererDropDownButton"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
+                </StackPanel>
+
+                <StackPanel
+                    x:Name="SubtitleSettingsGrid"
+                    Orientation="Vertical"
+                    Visibility="Collapsed">
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Output}" SectionKey="Output">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleDecoderLabel, Mode=OneWay}" />
+                                    <DropDownButton
+                                        x:Name="SubtitleDecoderDropDownButton"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleRendererLabel, Mode=OneWay}" />
+                                    <DropDownButton
+                                        x:Name="SubtitleRendererDropDownButton"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="3">
+            <Rectangle Height="1" Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+            <Grid Margin="14,12,14,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button
+                    Grid.Column="0"
+                    Click="ResetButton_Click"
+                    Content="{x:Bind StringResource.Reset}" />
+                <DropDownButton
+                    x:Name="PresetDropDownButton"
+                    Grid.Column="2"
+                    Margin="5,0,0,0" />
+                <Button
+                    Grid.Column="3"
+                    Width="32"
+                    Margin="5,0,0,0"
+                    Padding="0"
+                    VerticalAlignment="Stretch"
+                    Click="EditPresetButton_Click"
+                    ToolTipService.ToolTip="{x:Bind StringResource.Edit}">
+                    <FontIcon FontSize="16" Glyph="&#xE70F;" />
+                </Button>
+            </Grid>
+        </StackPanel>
+
+    </Grid>
 
 </base:BaseUserControl>

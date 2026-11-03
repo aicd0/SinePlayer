@@ -859,6 +859,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="OriginalSize" xml:space="preserve">
     <value>元のサイズ</value>
   </data>
+  <data name="Output" xml:space="preserve">
+    <value>出力</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>この操作により既存のエントリが上書きされます。</value>
   </data>
@@ -1200,6 +1203,9 @@ $plugins</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>メディアの合計数</value>
+  </data>
+  <data name="Transform" xml:space="preserve">
+    <value>変換</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>見開きモード</value>

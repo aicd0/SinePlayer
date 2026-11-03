@@ -859,6 +859,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OriginalSize" xml:space="preserve">
     <value>Originalgröße</value>
   </data>
+  <data name="Output" xml:space="preserve">
+    <value>Ausgabe</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Dieser Vorgang überschreibt vorhandene Einträge.</value>
   </data>
@@ -1200,6 +1203,9 @@ Kategorie 2: Tag 4, Tag 5</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>Medien insgesamt</value>
+  </data>
+  <data name="Transform" xml:space="preserve">
+    <value>Transformation</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Doppelseitenmodus</value>

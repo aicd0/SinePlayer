@@ -859,6 +859,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="OriginalSize" xml:space="preserve">
     <value>原始大小</value>
   </data>
+  <data name="Output" xml:space="preserve">
+    <value>输出</value>
+  </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>此操作将覆盖现有条目。</value>
   </data>
@@ -1200,6 +1203,9 @@ $plugins</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>媒体总数</value>
+  </data>
+  <data name="Transform" xml:space="preserve">
+    <value>变换</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>双页模式</value>
