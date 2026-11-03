@@ -12,7 +12,7 @@ namespace SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 /// gamma-encoded BT.709 relative to the display's white. Nothing is declared on the chain because nothing else is
 /// meant; an HDR picture is converted before it arrives here, which is the whole of what tone mapping does.
 /// </summary>
-internal sealed class SdrVideoSurface : SwapChainVideoSurface
+internal sealed partial class SdrVideoSurface : SwapChainVideoSurface
 {
     private SdrVideoSurface(D3D11SwapChain swapChain)
         : base(swapChain)
@@ -25,7 +25,7 @@ internal sealed class SdrVideoSurface : SwapChainVideoSurface
     {
         OperationResultCreator<SdrVideoSurface> result = new();
 
-        OperationResult<D3D11SwapChain> created = D3D11SwapChain.TryCreate(
+        OperationResult<D3D11SwapChain> created = D3D11SwapChain.Create(
             device,
             width,
             height,

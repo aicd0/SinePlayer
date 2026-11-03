@@ -14,74 +14,18 @@ using Windows.Win32.Graphics.Dxgi.Common;
 
 namespace SinePlayer.Core.Playback.Backends.Direct3D11;
 
-/// <summary>
-/// A composition swap chain the renderer draws into and presents. Composition is what lets the frames
-/// reach a XAML element without the engine knowing anything about XAML: the host is handed the swap
-/// chain handle and binds it to whatever element it owns.
-/// <para>
-/// The buffers are sized in <em>physical</em> pixels and the composition scale of the host's element is
-/// cancelled with <c>IDXGISwapChain2::SetMatrixTransform</c>. Both halves are needed: an element that
-/// reports a scale applies it to the swap chain content when it composes, so a buffer of physical size
-/// would be scaled a second time and a buffer of logical size would be enlarged by the display. The
-/// transform is applied here rather than by the caller because <c>ResizeBuffers</c> resets it, which
-/// makes "resized but no longer cancelling the scale" the easy mistake to make.
-/// </para>
-/// </summary>
 internal sealed partial class D3D11SwapChain : IDisposable
 {
     private const uint BufferCount = 2;
-
-    private readonly D3D11Device _device;
-
-    /// <summary>
-    /// The format every buffer of this chain holds, and what a resize has to ask for again: <c>ResizeBuffers</c> takes
-    /// a format and refuses to change it, so a chain created for one container cannot become another.
-    /// </summary>
-    private readonly DXGI_FORMAT _format;
-
-    private IDXGISwapChain1? _swapChain;
-    private ID3D11Texture2D? _backBuffer;
-    private ID3D11RenderTargetView? _view;
-    private bool _disposed;
-
-    private D3D11SwapChain(D3D11Device device, DXGI_FORMAT format, IDXGISwapChain1 swapChain, ID3D11Texture2D backBuffer, ID3D11RenderTargetView view, int width, int height, double compositionScale)
-    {
-        _device = device;
-        _format = format;
-        _swapChain = swapChain;
-        _backBuffer = backBuffer;
-        _view = view;
-        Width = width;
-        Height = height;
-        CompositionScale = compositionScale;
-    }
-
-    internal ID3D11RenderTargetView View => _view ?? throw new ObjectDisposedException(nameof(D3D11SwapChain));
-
-    /// <summary>
-    /// The texture being presented, which a drawing that does not go through the render target view — Win2D drawing its
-    /// own text, say — needs in order to reach the same surface.
-    /// </summary>
-    internal ID3D11Texture2D BackBuffer => _backBuffer ?? throw new ObjectDisposedException(nameof(D3D11SwapChain));
-
-    internal ID3D11Device Device => _device.Device;
-
-    internal DXGI_FORMAT Format => _format;
-
-    internal int Width { get; private set; }
-
-    internal int Height { get; private set; }
-
-    /// <summary>The scale of the host's element, whose effect on the swap chain content is cancelled here.</summary>
-    internal double CompositionScale { get; private set; }
+    private const uint FrameSlotTimeoutMilliseconds = 50;
 
     /// <param name="width">Buffer width in physical pixels, as the host's scale requires.</param>
     /// <param name="height">Buffer height in physical pixels, as the host's scale requires.</param>
     /// <param name="compositionScale">The scale the host's element will apply when it composes this swap chain.</param>
-    internal static OperationResult<D3D11SwapChain> TryCreate(D3D11Device device, int width, int height, double compositionScale)
+    internal static OperationResult<D3D11SwapChain> Create(D3D11Device device, int width, int height, double compositionScale)
     {
         // A picture covers its whole surface, so what is behind it is never meant to show through.
-        return TryCreate(device, width, height, compositionScale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM);
+        return Create(device, width, height, compositionScale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM);
     }
 
     /// <param name="alphaMode">
@@ -89,16 +33,16 @@ internal sealed partial class D3D11SwapChain : IDisposable
     /// subtitles over a picture — has to be premultiplied, or its "nothing here" pixels arrive as opaque black and hide
     /// what is underneath.
     /// </param>
-    internal static OperationResult<D3D11SwapChain> TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode)
+    internal static OperationResult<D3D11SwapChain> Create(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode)
     {
-        return TryCreate(device, width, height, compositionScale, alphaMode, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM);
+        return Create(device, width, height, compositionScale, alphaMode, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM);
     }
 
     /// <param name="format">
     /// What each buffer holds. It is the half of a container DXGI is told at creation; the other half, the colour space,
     /// is declared afterwards with <see cref="TrySetColourSpace"/>.
     /// </param>
-    internal static OperationResult<D3D11SwapChain> TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode, DXGI_FORMAT format)
+    internal static OperationResult<D3D11SwapChain> Create(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode, DXGI_FORMAT format)
     {
         OperationResultCreator<D3D11SwapChain> result = new();
 
@@ -126,6 +70,7 @@ internal sealed partial class D3D11SwapChain : IDisposable
                 Scaling = DXGI_SCALING.DXGI_SCALING_STRETCH,
                 SwapEffect = DXGI_SWAP_EFFECT.DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
                 AlphaMode = alphaMode,
+                Flags = DXGI_SWAP_CHAIN_FLAG.DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT,
             };
 
             Graphics_Dxgi_IDXGIFactory2_Extensions.CreateSwapChainForComposition(factory, device.Device, description, null, out IDXGISwapChain1 created);
@@ -144,12 +89,156 @@ internal sealed partial class D3D11SwapChain : IDisposable
             ID3D11Texture2D backBuffer = GetBackBuffer(created);
             ID3D11RenderTargetView view = D3D11Interop.CreateRenderTargetView(device.Device, backBuffer);
 
-            return result.Success(new D3D11SwapChain(device, format, created, backBuffer, view, width, height, compositionScale));
+            D3D11SwapChain chain = new(device, format)
+            {
+                _swapChain = created,
+                _backBuffer = backBuffer,
+                _view = view,
+                _frameLatency = TryEnableFrameLatencyPacing(created),
+                Width = width,
+                Height = height,
+                CompositionScale = compositionScale
+            };
+
+            return result.Success(chain);
         }
         catch (Exception exception)
         {
             return result.Failure($"Unable to create a composition swap chain: {exception.Message}");
         }
+    }
+
+    /// <summary>
+    /// Cancels the scale the host's element applies when it composes the swap chain, so a buffer of
+    /// physical pixels lands on the display one pixel to one pixel.
+    /// </summary>
+    private static unsafe OperationResult TrySetCompositionScale(IDXGISwapChain1 swapChain, double compositionScale)
+    {
+        if (swapChain is not IDXGISwapChain2 swapChain2)
+        {
+            return OperationResult.Failure("The swap chain does not support a transform, so it cannot be shown at device resolution.");
+        }
+
+        float inverse = (float)(1.0 / compositionScale);
+        DXGI_MATRIX_3X2_F matrix = new()
+        {
+            _11 = inverse,
+            _22 = inverse,
+        };
+
+        try
+        {
+            swapChain2.SetMatrixTransform(&matrix);
+        }
+        catch (Exception exception)
+        {
+            return OperationResult.Failure($"Unable to cancel the display scale on the swap chain: {exception.Message}");
+        }
+
+        return OperationResult.Success();
+    }
+
+    private static double NormalizeScale(double scale)
+    {
+        return double.IsFinite(scale) && scale > 0 ? scale : 1.0;
+    }
+
+    /// <summary>
+    /// Hands back the object that says when the display has taken the frame it was holding, for a chain created with
+    /// <c>DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT</c>. One frame in flight is what makes that answer mean
+    /// "the display has taken the last frame"; a deeper queue would answer "there is room in the queue", which is a
+    /// frame that arrives late or not at all.
+    /// </summary>
+    private static HANDLE TryEnableFrameLatencyPacing(IDXGISwapChain1 swapChain)
+    {
+        if (swapChain is not IDXGISwapChain2 swapChain2)
+        {
+            return default;
+        }
+
+        HANDLE handle;
+        try
+        {
+            handle = swapChain2.GetFrameLatencyWaitableObject();
+        }
+        catch (Exception)
+        {
+            // A chain without the object still presents; it just cannot be told when it may, and nothing else about
+            // the picture depends on it.
+            return default;
+        }
+
+        try
+        {
+            swapChain2.SetMaximumFrameLatency(1);
+        }
+        catch (Exception)
+        {
+            // The flag already asks for one frame in flight, so a chain that will not be told so keeps that and loses
+            // nothing; the handle is what this needed, and it is already in hand.
+        }
+
+        return handle;
+    }
+
+    private static unsafe ID3D11Texture2D GetBackBuffer(IDXGISwapChain1 swapChain)
+    {
+        Guid textureId = typeof(ID3D11Texture2D).GUID;
+        swapChain.GetBuffer(0, &textureId, out object surface);
+        return (ID3D11Texture2D)surface;
+    }
+
+    private readonly D3D11Device _device;
+
+    private bool _disposed;
+    private IDXGISwapChain1? _swapChain;
+    private HANDLE _frameLatency;
+    private ID3D11Texture2D? _backBuffer;
+    private ID3D11RenderTargetView? _view;
+    private readonly DXGI_FORMAT _format;
+
+    private D3D11SwapChain(D3D11Device device, DXGI_FORMAT format)
+    {
+        _device = device;
+        _format = format;
+    }
+
+    internal ID3D11RenderTargetView View => _view ?? throw new ObjectDisposedException(nameof(D3D11SwapChain));
+
+    internal ID3D11Texture2D BackBuffer => _backBuffer ?? throw new ObjectDisposedException(nameof(D3D11SwapChain));
+
+    internal ID3D11Device Device => _device.Device;
+
+    internal DXGI_FORMAT Format => _format;
+
+    internal int Width { get; private set; }
+
+    internal int Height { get; private set; }
+
+    /// <summary>The scale of the host's element, whose effect on the swap chain content is cancelled here.</summary>
+    internal double CompositionScale { get; private set; }
+
+    /// <summary>Whether the chain offers a signal for "the display has taken the last frame".</summary>
+    internal unsafe bool HasFrameLatencyPacing => _frameLatency.Value != null;
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        ReleaseBackBuffer();
+
+        if (HasFrameLatencyPacing)
+        {
+            PInvoke.CloseHandle(_frameLatency);
+            _frameLatency = default;
+        }
+
+        D3D11Interop.Release(_swapChain);
+        _swapChain = null;
     }
 
     /// <summary>Hands the swap chain to the host, which binds it to its own presentation element.</summary>
@@ -195,7 +284,7 @@ internal sealed partial class D3D11SwapChain : IDisposable
     /// caller can fall back instead of presenting a surface whose meaning it could not establish.
     /// </para>
     /// </summary>
-    internal unsafe OperationResult TrySetColourSpace(DXGI_COLOR_SPACE_TYPE colourSpace)
+    internal OperationResult TrySetColourSpace(DXGI_COLOR_SPACE_TYPE colourSpace)
     {
         if (_disposed || _swapChain is null)
         {
@@ -257,8 +346,10 @@ internal sealed partial class D3D11SwapChain : IDisposable
             ReleaseBackBuffer();
 
             // The format is the one the chain was created with: a resize cannot change it, and passing another would
-            // fail rather than quietly repaint the pictures with another container's meaning.
-            swapChain.ResizeBuffers(BufferCount, (uint)width, (uint)height, _format, default);
+            // fail rather than quietly repaint the pictures with another container's meaning. The flags are passed on
+            // for the same reason: the waitable object that paces the chain is part of them, and a resize that dropped
+            // it would leave a chain that could no longer say when the display has taken a frame.
+            swapChain.ResizeBuffers(BufferCount, (uint)width, (uint)height, _format, DXGI_SWAP_CHAIN_FLAG.DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
 
             OperationResult scaled = TrySetCompositionScale(swapChain, compositionScale);
             if (!scaled.IsSuccessful)
@@ -278,6 +369,75 @@ internal sealed partial class D3D11SwapChain : IDisposable
         {
             return OperationResult.Failure($"Unable to resize the swap chain: {exception.Message}");
         }
+    }
+
+    /// <summary>
+    /// Waits for the display to take the frame it is holding, and reports whether it did so within the bound.
+    /// <para>
+    /// This is the pattern the frame latency object exists for, and the measurement that matters is what makes it work:
+    /// after a present, the object stays unsignalled for a whole refresh (16.4 ms of a 60 Hz display, measured), and
+    /// <see cref="Present"/> itself returns in a tenth of a millisecond because the flag moved the waiting out of it.
+    /// The same object handed back by a chain presenting with a sync interval of zero says the opposite — it is
+    /// signalled again immediately, because a chain presenting immediately keeps no frame outstanding to wait for —
+    /// which is why <see cref="Present"/> asks for interval one.
+    /// </para>
+    /// <para>
+    /// Waiting here rather than drawing and dropping is what keeps an exact-rate file from losing frames to its own
+    /// jitter: at sixty frames into sixty refreshes the frame is due at the very moment the previous one is displayed,
+    /// so a poll would lose whichever frames arrived early, and the loss would repeat. A file that outruns the display
+    /// instead spends this time idle and is then dropped by the clock's own rule, which has the tolerance to tell late
+    /// from early.
+    /// </para>
+    /// </summary>
+    internal bool TryAcquireFrameSlot()
+    {
+        if (_disposed || _swapChain is null)
+        {
+            return false;
+        }
+
+        if (!HasFrameLatencyPacing)
+        {
+            return true;
+        }
+
+        // One refresh at the slowest refresh rate worth respecting, and then some: a display that has not taken a frame
+        // in this long is not going to, and the caller drops it rather than drawing into a queue that never drains.
+        return PInvoke.WaitForSingleObject(_frameLatency, FrameSlotTimeoutMilliseconds) == WAIT_EVENT.WAIT_OBJECT_0;
+    }
+
+    /// <summary>
+    /// Hands the frame to the display and returns without waiting for a vertical blank, even though the interval asked
+    /// for is one.
+    /// <para>
+    /// The interval is one because that is what the frame latency object needs: a chain presenting with zero keeps no
+    /// frame outstanding, so the object is signalled again the moment the call returns and says nothing about the
+    /// display. Measured on the same chain, both ways: presenting with interval zero, the wait that follows returns in
+    /// 0.0 ms and the pacing is inert; presenting with interval one, it returns after 16.4 ms on a 60 Hz display, and
+    /// this call itself still takes a tenth of a millisecond.
+    /// </para>
+    /// <para>
+    /// That is the difference the flag makes. Waiting for the blank used to land inside this call, where it was the
+    /// render thread's cost and could not be told apart from work: 17.6 ms of a 1080p60 frame's 18.0 ms, which left no
+    /// slack at an equal frame rate and dropped about a tenth of the frames for good. With the flag the same waiting is
+    /// the object's business, taken in <see cref="TryAcquireFrameSlot"/> before any work is done, so a frame that
+    /// cannot reach the display is given up instead of drawn.
+    /// </para>
+    /// </summary>
+    internal OperationResult Present()
+    {
+        if (_disposed || _swapChain is null)
+        {
+            return OperationResult.Failure("The swap chain has already been disposed.");
+        }
+
+        HRESULT result = _swapChain.Present(1, default);
+        if (result.Value < 0)
+        {
+            return OperationResult.Failure($"Unable to present a frame: {result}");
+        }
+
+        return OperationResult.Success();
     }
 
     /// <summary>
@@ -308,96 +468,6 @@ internal sealed partial class D3D11SwapChain : IDisposable
             // that the same way as a missing transform.
             return false;
         }
-    }
-
-    /// <summary>
-    /// Cancels the scale the host's element applies when it composes the swap chain, so a buffer of
-    /// physical pixels lands on the display one pixel to one pixel.
-    /// </summary>
-    private static unsafe OperationResult TrySetCompositionScale(IDXGISwapChain1 swapChain, double compositionScale)
-    {
-        if (swapChain is not IDXGISwapChain2 swapChain2)
-        {
-            return OperationResult.Failure("The swap chain does not support a transform, so it cannot be shown at device resolution.");
-        }
-
-        float inverse = (float)(1.0 / compositionScale);
-        DXGI_MATRIX_3X2_F matrix = new()
-        {
-            _11 = inverse,
-            _22 = inverse,
-        };
-
-        try
-        {
-            swapChain2.SetMatrixTransform(&matrix);
-        }
-        catch (Exception exception)
-        {
-            return OperationResult.Failure($"Unable to cancel the display scale on the swap chain: {exception.Message}");
-        }
-
-        return OperationResult.Success();
-    }
-
-    private static double NormalizeScale(double scale)
-    {
-        return double.IsFinite(scale) && scale > 0 ? scale : 1.0;
-    }
-
-    /// <summary>
-    /// Hands the frame to the compositor and returns without waiting for a vertical blank.
-    /// <para>
-    /// Waiting for the blank — presenting with a sync interval of one — makes the display a second clock that
-    /// the pipeline cannot see. The wait lands inside the presentation thread's frame, is counted as the
-    /// renderer's cost, and at a frame rate equal to the display's it leaves the thread no slack at all: the
-    /// lateness of each frame ratchets up by whatever the loop costs until the drop rule fires, and the drops
-    /// are steady from then on. Measured on a 1080p60 file whose renderer does the whole frame in 0.38 ms:
-    /// <c>render 18.0 ms</c> and about a tenth of the frames dropped, with a lag of 70 ms — which is the drop
-    /// rule's tolerance plus one display interval. It was 17.6 ms of waiting, not work.
-    /// </para>
-    /// <para>
-    /// The clock is what paces the picture (rule 4); the display only decides what it shows, and a composition
-    /// swap chain reads the newest buffer at its own composition. Presenting without the wait still blocks
-    /// when every buffer is in flight, which is the compositor being behind and cannot be helped — but that is
-    /// the exception, where waiting for the blank was the rule. The cost of that choice is that a frame can be
-    /// presented and then superseded before the display takes it; it is counted as presented like any other.
-    /// </para>
-    /// </summary>
-    internal OperationResult Present()
-    {
-        if (_disposed || _swapChain is null)
-        {
-            return OperationResult.Failure("The swap chain has already been disposed.");
-        }
-
-        HRESULT result = _swapChain.Present(0, default);
-        if (result.Value < 0)
-        {
-            return OperationResult.Failure($"Unable to present a frame: {result}");
-        }
-
-        return OperationResult.Success();
-    }
-
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        ReleaseBackBuffer();
-        D3D11Interop.Release(_swapChain);
-        _swapChain = null;
-    }
-
-    private static unsafe ID3D11Texture2D GetBackBuffer(IDXGISwapChain1 swapChain)
-    {
-        Guid textureId = typeof(ID3D11Texture2D).GUID;
-        swapChain.GetBuffer(0, &textureId, out object surface);
-        return (ID3D11Texture2D)surface;
     }
 
     private void ReleaseBackBuffer()

@@ -211,6 +211,17 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         }
     }
 
+    public bool TryAcquireFrameSlot()
+    {
+        IVideoSurface? surface;
+        lock (_deviceLock)
+        {
+            surface = _surface;
+        }
+
+        return surface is null || surface.TryAcquireFrameSlot();
+    }
+
     public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
     {
         ArgumentNullException.ThrowIfNull(frame);

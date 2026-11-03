@@ -10,6 +10,11 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 
+using Windows.Win32;
+using Windows.Win32.Foundation;
+using Windows.Win32.Graphics.Dxgi;
+using Windows.Win32.Graphics.Dxgi.Common;
+
 namespace SinePlayer.Core.Tests.Playback;
 
 /// <summary>
@@ -292,9 +297,13 @@ public class D3D11VideoRendererTests
         FakeRenderTarget target = new() { SurfaceWidth = 8, SurfaceHeight = 4, RasterizationScale = 1.0 };
         VideoStreamInfo stream = CreateStreamInfo(8, 4);
 
-        OperationResult<D3D11SwapChain> createdSwapChain = D3D11SwapChain.TryCreate(_device, 8, 4, 1.0);
+        OperationResult<D3D11SwapChain> createdSwapChain = D3D11SwapChain.Create(_device, 8, 4, 1.0);
         Assert.That(createdSwapChain.IsSuccessful, Is.True, createdSwapChain.Message);
         using D3D11SwapChain ownedSwapChain = createdSwapChain.Result;
+
+        // Nothing has been presented yet, so nothing can be waiting for a composition: a refusal here would be a
+        // picture that could never start.
+        Assert.That(ownedSwapChain.TryAcquireFrameSlot(), Is.True, "a chain with nothing presented has room for a frame");
 
         // Draw into the swap chain back buffer without presenting, so the pixels can be verified.
         _renderer.SetOutput(ownedSwapChain.View, ownedSwapChain.Width, ownedSwapChain.Height);
@@ -314,6 +323,14 @@ public class D3D11VideoRendererTests
 
         OperationResult presentResult = ownedSwapChain.Present();
         Assert.That(presentResult.IsSuccessful, Is.True, presentResult.Message);
+
+        // The frame just presented belongs to the display now, so the next one has to wait for it. That wait is the
+        // whole point of the waitable object, and the thing that stops happening â€” silently â€” when the chain presents
+        // with a sync interval of zero.
+        long waitStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        Assert.That(ownedSwapChain.TryAcquireFrameSlot(), Is.True, "the display takes the frame within the bound");
+        double waitedMilliseconds = (System.Diagnostics.Stopwatch.GetTimestamp() - waitStart) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        Assert.That(waitedMilliseconds, Is.GreaterThan(1.0), "presenting consumed the slot, so the next frame waits for the display");
     }
 
     [Test]
@@ -373,7 +390,7 @@ public class D3D11VideoRendererTests
         Assert.That(before, Is.EqualTo(1.0).Within(0.0001), "a 100% display needs no correction at all");
 
         // The window moved to a display at 200%, which is what the panel reports as a composition scale
-        // change. Resizing the buffers resets the transform in DXGI, so both have to be redone together —
+        // change. Resizing the buffers resets the transform in DXGI, so both have to be redone together â€”
         // and a resize that forgot the transform would leave the picture at half size.
         target.RasterizationScale = 2.0;
         target.RaiseSizeChanged();
@@ -438,7 +455,7 @@ public class D3D11VideoRendererTests
         _renderer.SetOutput(target.View, width, height);
 
         // The frame is released before the redraw, so what appears afterwards can only come from the
-        // planes the renderer kept — which is the whole point: a paused picture has no frame to offer.
+        // planes the renderer kept â€” which is the whole point: a paused picture has no frame to offer.
         using (FrameBuffer buffer = new(width, height, (_, _) => (blue, green, red, 0xFF)))
         using (RawVideoFrame frame = CreateFrame(width, height, buffer))
         {

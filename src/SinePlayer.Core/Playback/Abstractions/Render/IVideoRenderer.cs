@@ -15,6 +15,8 @@ public interface IVideoRenderer : IDisposable
 
     OperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target);
 
+    bool TryAcquireFrameSlot();
+
     OperationResult Render(RawVideoFrame frame, VideoTransform transform);
 
     OperationResult RefreshSurface(VideoTransform transform);

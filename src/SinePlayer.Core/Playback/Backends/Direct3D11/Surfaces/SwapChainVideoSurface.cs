@@ -51,6 +51,11 @@ internal abstract class SwapChainVideoSurface : IVideoSurface
         return _swapChain.Present();
     }
 
+    public bool TryAcquireFrameSlot()
+    {
+        return _swapChain.TryAcquireFrameSlot();
+    }
+
     public bool TryGetCompositionTransform(out double scaleX, out double scaleY)
     {
         return _swapChain.TryGetCompositionTransform(out scaleX, out scaleY);

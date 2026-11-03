@@ -34,7 +34,7 @@ internal sealed class Hdr10VideoSurface : SwapChainVideoSurface
     {
         OperationResultCreator<Hdr10VideoSurface> result = new();
 
-        OperationResult<D3D11SwapChain> created = D3D11SwapChain.TryCreate(
+        OperationResult<D3D11SwapChain> created = D3D11SwapChain.Create(
             device,
             width,
             height,

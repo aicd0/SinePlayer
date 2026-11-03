@@ -30,10 +30,19 @@ public sealed partial class NullVideoRenderer : IVideoRenderer
     /// <summary>How many frames this renderer has been handed since it was created.</summary>
     public long RenderedFrameCount => Interlocked.Read(ref _renderedFrameCount);
 
+    public void Dispose()
+    {
+    }
+
     public OperationResult Configure(VideoStreamInfo stream, IVideoRenderTarget target)
     {
         ArgumentNullException.ThrowIfNull(stream);
         return OperationResult.Success();
+    }
+
+    public bool TryAcquireFrameSlot()
+    {
+        return true;
     }
 
     public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
@@ -51,8 +60,5 @@ public sealed partial class NullVideoRenderer : IVideoRenderer
     public OperationResult ClearSurface()
     {
         return OperationResult.Success();
-    }
-    public void Dispose()
-    {
     }
 }

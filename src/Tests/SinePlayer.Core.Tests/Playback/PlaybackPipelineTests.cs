@@ -903,6 +903,47 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// A surface that has not been relieved of the frame it is holding cannot show another one, so drawing the next
+    /// frame is work for a picture nobody sees. The renderer is asked before the work is done, and a refusal costs the
+    /// frame: it is given up rather than drawn, and the loop carries on instead of waiting for room inside the
+    /// presentation call.
+    /// <para>
+    /// The frame that anchors the clock is the exception and the reason: asking about it would let a display that
+    /// refuses everything leave the picture with no moment to start from, which is a freeze with nothing to report.
+    /// </para>
+    /// </summary>
+    [Test]
+    public void GivesUpAFrameTheDisplayCannotTakeInsteadOfDrawingIt()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            // A display that never offers a slot: everything after the anchoring frame finds the same answer.
+            FakeVideoRenderer videoRenderer = new() { FrameSlotsAvailable = false };
+            FakeAudioRenderer audioRenderer = new() { SubmitDelayMilliseconds = 30 };
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
+
+            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => pipeline.DroppedFrameCount > 0, "a frame the display cannot take has to be given up");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(videoRenderer.RenderedFrames, Is.EqualTo(1), "only the frame that anchors the clock is drawn");
+                Assert.That(pipeline.PresentedFrameCount, Is.EqualTo(1), "and it is the only presentation");
+                Assert.That(pipeline.DroppedFrameCount, Is.GreaterThan(0), "the frames after it are given up, not drawn");
+                Assert.That(pipeline.Error, Is.Null, "a display that is behind is not a failure");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
     /// A paused picture still has to follow the window: the host reports a new surface size or scale, and
     /// nothing is being presented, so the renderer is never asked to draw — which is how a paused video
     /// ends up stretched into a resized window. The presentation thread offers the change up while paused,
@@ -6370,6 +6411,12 @@ public class PlaybackPipelineTests
         {
             return OperationResult.Success();
         }
+
+        public bool TryAcquireFrameSlot()
+        {
+            return true;
+        }
+
         public void Dispose()
         {
         }
@@ -7015,6 +7062,17 @@ public class PlaybackPipelineTests
         {
             ClearedSurfaces++;
             return ClearFailure is string failure ? OperationResult.Failure(failure) : OperationResult.Success();
+        }
+
+        /// <summary>
+        /// Whether the surface has room for another frame. A stand-in has as much room as it is asked for, so what the
+        /// pipeline does when a display cannot take a frame is decided by the test that sets this.
+        /// </summary>
+        public bool FrameSlotsAvailable { get; init; } = true;
+
+        public bool TryAcquireFrameSlot()
+        {
+            return FrameSlotsAvailable;
         }
 
         /// <summary>Stands in for a surface that cannot be emptied, so the pipeline's answer to that can be seen.</summary>
