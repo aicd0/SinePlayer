@@ -16,6 +16,7 @@ using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions.Render;
+using SinePlayer.Core.Playback.Backends.Win2D;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
@@ -30,6 +31,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private const char SectionPathSeparator = '/';
     private const char CollapsedSectionsSeparator = ';';
+
+    private const double MinimumSubtitleFontSize = 4.0;
+    private const double MaximumSubtitleFontSize = 200.0;
+
+    private static readonly double[] SubtitleFontSizePresets = [16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 48.0, 56.0, 64.0, 72.0];
 
     public delegate void DataChangedEventHandler(PlayerSettingsModel data);
     public event DataChangedEventHandler? DataChanged;
@@ -358,6 +364,57 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
+    private void SubtitleFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (sender is not ComboBox comboBox || comboBox.SelectedItem is not ComboBoxItem item || item.Tag is not string family)
+        {
+            return;
+        }
+
+        if (_mediaSettings.SubtitleFontFamily != family)
+        {
+            Apply(settings => settings.SubtitleFontFamily = family);
+        }
+    }
+
+    private void SubtitleFontSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem item && item.Tag is double size)
+        {
+            ApplySubtitleFontSize(size);
+        }
+    }
+
+    private void SubtitleFontSizeComboBox_TextSubmitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        ApplySubtitleFontSize(ParseSubtitleFontSize(sender.Text));
+    }
+
+    private void ApplySubtitleFontSize(double size)
+    {
+        double value = size <= 0.0 ? 0.0 : Math.Clamp(size, MinimumSubtitleFontSize, MaximumSubtitleFontSize);
+        if (_mediaSettings.SubtitleFontSize != value)
+        {
+            Apply(settings => settings.SubtitleFontSize = value);
+            return;
+        }
+    }
+
     #endregion
 
     #region Section UI
@@ -590,6 +647,20 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = settings.SubtitleFontFamily != presetSettings.SubtitleFontFamily;
+                tabModified = tabModified || modified;
+                UpdateSubtitleFontFamily(settings);
+                ViewModel.SubtitleFontFamilyLabel = GetLabel(StringResource.FontFamily, modified);
+            }
+
+            {
+                bool modified = settings.SubtitleFontSize != presetSettings.SubtitleFontSize;
+                tabModified = tabModified || modified;
+                UpdateSubtitleFontSize(settings);
+                ViewModel.SubtitleFontSizeLabel = GetLabel(StringResource.FontSize, modified);
+            }
+
+            {
                 bool modified = settings.SubtitlePanX != presetSettings.SubtitlePanX;
                 tabModified = tabModified || modified;
                 UpdateSubtitlePanX(settings);
@@ -783,6 +854,88 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
+    private void UpdateSubtitleFontFamily(PlayerSettingsModel settings)
+    {
+        int IndexOfSubtitleFontFamily(string family)
+        {
+            for (int i = 0; i < SubtitleFontFamilyComboBox.Items.Count; i++)
+            {
+                if (SubtitleFontFamilyComboBox.Items[i] is ComboBoxItem item && item.Tag is string candidate && string.Equals(candidate, family, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        if (SubtitleFontFamilyComboBox.Items.Count == 0)
+        {
+            SubtitleFontFamilyComboBox.Items.Add(new ComboBoxItem { Content = StringResource.Default, Tag = string.Empty });
+            foreach (string family in SubtitleFonts.GetFamilies())
+            {
+                SubtitleFontFamilyComboBox.Items.Add(new ComboBoxItem { Content = family, Tag = family });
+            }
+        }
+
+        int index = IndexOfSubtitleFontFamily(settings.SubtitleFontFamily);
+        if (index < 0)
+        {
+            index = 0;
+        }
+
+        if (SubtitleFontFamilyComboBox.SelectedIndex != index)
+        {
+            SubtitleFontFamilyComboBox.SelectedIndex = index;
+        }
+    }
+
+    private void UpdateSubtitleFontSize(PlayerSettingsModel settings)
+    {
+        if (SubtitleFontSizeComboBox.Items.Count == 0)
+        {
+            SubtitleFontSizeComboBox.Items.Add(new ComboBoxItem { Content = StringResource.Default, Tag = 0.0 });
+            foreach (double size in SubtitleFontSizePresets)
+            {
+                SubtitleFontSizeComboBox.Items.Add(new ComboBoxItem { Content = FormatSubtitleFontSize(size), Tag = size });
+            }
+        }
+
+        double value = settings.SubtitleFontSize;
+        int index = -1;
+        int insertAt = SubtitleFontSizeComboBox.Items.Count;
+        for (int i = 0; i < SubtitleFontSizeComboBox.Items.Count; i++)
+        {
+            if (SubtitleFontSizeComboBox.Items[i] is not ComboBoxItem item || item.Tag is not double candidate)
+            {
+                continue;
+            }
+
+            if (candidate == value)
+            {
+                index = i;
+                break;
+            }
+
+            if (candidate > value)
+            {
+                insertAt = i;
+                break;
+            }
+        }
+
+        if (index < 0)
+        {
+            SubtitleFontSizeComboBox.Items.Insert(insertAt, new ComboBoxItem { Content = FormatSubtitleFontSize(value), Tag = value });
+            index = insertAt;
+        }
+
+        if (SubtitleFontSizeComboBox.SelectedIndex != index)
+        {
+            SubtitleFontSizeComboBox.SelectedIndex = index;
+        }
+    }
+
     private MenuFlyout CreateChoiceMenu(IReadOnlyList<PlaybackComponentOption> options, string? selectedKey, Action<string> select)
     {
         var flyout = new MenuFlyout();
@@ -869,6 +1022,35 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         DataChanged?.Invoke(_mediaSettings);
+    }
+
+    #endregion
+
+    #region Utilities
+
+    private string FormatSubtitleFontSize(double size)
+    {
+        return size > 0.0 ? size.ToString("0.##", CultureInfo.CurrentCulture) : StringResource.Default;
+    }
+
+    private static double ParseSubtitleFontSize(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return 0.0;
+        }
+
+        if (double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out double size) && double.IsFinite(size))
+        {
+            return size;
+        }
+
+        if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out size) && double.IsFinite(size))
+        {
+            return size;
+        }
+
+        return 0.0;
     }
 
     #endregion

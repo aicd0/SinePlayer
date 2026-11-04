@@ -567,6 +567,15 @@ The expression will be evaluated in the following order:
   <data name="Folders" xml:space="preserve">
     <value>Folders</value>
   </data>
+  <data name="Font" xml:space="preserve">
+    <value>Font</value>
+  </data>
+  <data name="FontFamily" xml:space="preserve">
+    <value>Font family</value>
+  </data>
+  <data name="FontSize" xml:space="preserve">
+    <value>Font size</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Frame rate</value>
   </data>

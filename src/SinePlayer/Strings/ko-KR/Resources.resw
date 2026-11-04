@@ -567,6 +567,15 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="Folders" xml:space="preserve">
     <value>폴더</value>
   </data>
+  <data name="Font" xml:space="preserve">
+    <value>글꼴</value>
+  </data>
+  <data name="FontFamily" xml:space="preserve">
+    <value>글꼴</value>
+  </data>
+  <data name="FontSize" xml:space="preserve">
+    <value>글꼴 크기</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>프레임 레이트</value>
   </data>

@@ -215,7 +215,7 @@ internal sealed partial class PlayerPage : BasePage
 
             _topOverlayHeight = h;
             UpdatePromptMargin();
-            UpdateSubtitlePlacement();
+            UpdateSubtitlePresentation();
 
             if (ViewModel.IsPinned)
             {
@@ -233,7 +233,7 @@ internal sealed partial class PlayerPage : BasePage
             _rightOverlayWidth = w;
 
             TransportBar.Margin = new Thickness(0, 0, w, 0);
-            UpdateSubtitlePlacement();
+            UpdateSubtitlePresentation();
 
             if (ViewModel.IsPinned)
             {
@@ -433,7 +433,7 @@ internal sealed partial class PlayerPage : BasePage
         }
 
         _bottomGridHeight = e.NewSize.Height;
-        UpdateSubtitlePlacement();
+        UpdateSubtitlePresentation();
 
         if (ViewModel.IsPinned)
         {
@@ -545,6 +545,7 @@ internal sealed partial class PlayerPage : BasePage
     private const string TAG = nameof(PlayerPage);
 
     private CoreEngine? _engine;
+    private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
 
     private async Task<OperationResult> OpenMedia(MediaModel media, long startPositionMs)
     {
@@ -783,7 +784,7 @@ internal sealed partial class PlayerPage : BasePage
         engine.StateChanged += Engine_StateChanged;
         engine.PositionChanged += Engine_PositionChanged;
         _engine = engine;
-        UpdateSubtitlePlacement();
+        UpdateSubtitlePresentation();
         ViewModel.VolumeLiveData.Emit((int)Math.Round(engine.Volume * 100.0));
         ViewModel.MuteLiveData.Emit(engine.IsMuted);
         return engine;
@@ -1002,7 +1003,6 @@ internal sealed partial class PlayerPage : BasePage
     private double _topOverlayHeight = 0.0;
     private double _rightOverlayWidth = 0.0;
     private double _bottomGridHeight = 0.0;
-    private SubtitlePlacement _subtitlePlacement = SubtitlePlacement.Identity;
     private bool _isOverlayVisible = false;
     private bool _isOverlayHold = false;
     private long _hideOverlaySession = 0;
@@ -1084,7 +1084,7 @@ internal sealed partial class PlayerPage : BasePage
 
         _isOverlayVisible = true;
         UpdatePromptMargin();
-        UpdateSubtitlePlacement();
+        UpdateSubtitlePresentation();
         GetMainPageAbility().SetOverlayVisibility(true);
     }
 
@@ -1149,7 +1149,7 @@ internal sealed partial class PlayerPage : BasePage
         _isOverlayVisible = false;
         _isOverlayHold = false;
         UpdatePromptMargin();
-        UpdateSubtitlePlacement();
+        UpdateSubtitlePresentation();
         GetMainPageAbility().SetOverlayVisibility(false);
     }
 
@@ -1246,8 +1246,14 @@ internal sealed partial class PlayerPage : BasePage
 
         engine.SetVideoTransform(settings.ToVideoTransform());
 
-        _subtitlePlacement = _subtitlePlacement with { OffsetX = settings.SubtitlePanX, OffsetY = settings.SubtitlePanY };
-        engine.SetSubtitlePlacement(_subtitlePlacement);
+        _subtitlePresentation = _subtitlePresentation with
+        {
+            OffsetX = settings.SubtitlePanX,
+            OffsetY = settings.SubtitlePanY,
+            FontFamily = settings.SubtitleFontFamily,
+            FontSize = settings.SubtitleFontSize,
+        };
+        engine.SetSubtitlePresentation(_subtitlePresentation);
 
         PlaybackComponents components = settings.ToComponents();
         engine.SetComponents(components);
@@ -1422,13 +1428,13 @@ internal sealed partial class PlayerPage : BasePage
         PromptText.Margin = new Thickness(16.0, top, 16.0, 0);
     }
 
-    private void UpdateSubtitlePlacement()
+    private void UpdateSubtitlePresentation()
     {
         SubtitleInsets insets = _isOverlayVisible
             ? new SubtitleInsets(0.0, _topOverlayHeight, _rightOverlayWidth, _bottomGridHeight)
             : SubtitleInsets.None;
-        _subtitlePlacement = _subtitlePlacement with { Insets = insets };
-        _engine?.SetSubtitlePlacement(_subtitlePlacement);
+        _subtitlePresentation = _subtitlePresentation with { Insets = insets };
+        _engine?.SetSubtitlePresentation(_subtitlePresentation);
     }
 
     #endregion

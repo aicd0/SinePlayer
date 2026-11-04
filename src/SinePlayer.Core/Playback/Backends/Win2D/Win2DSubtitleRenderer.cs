@@ -41,7 +41,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
     /// <summary>How much clear space is left between two cues that stack, as a fraction of the font's size.</summary>
     private const float StackGapFraction = 0.15f;
 
-    private readonly string _fontFamily = "Segoe UI";
+    private const string DefaultFontFamily = "Segoe UI";
 
     private bool _disposed;
     private readonly SubtitleSurface _surface = new();
@@ -73,7 +73,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         return _surface.EnsureSurface();
     }
 
-    public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePlacement placement)
+    public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePresentation presentation)
     {
         ArgumentNullException.ThrowIfNull(cues);
 
@@ -91,7 +91,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         }
 
         SubtitleSurface surface = _surface;
-        return surface.DrawAndPresent(session => DrawCues(session, cues, placement, surface.Width, surface.Height, surface.CompositionScale));
+        return surface.DrawAndPresent(session => DrawCues(session, cues, presentation, surface.Width, surface.Height, surface.CompositionScale));
     }
 
     /// <summary>
@@ -103,7 +103,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         return _surface.EnsureCanvasDevice();
     }
 
-    internal void DrawCues(CanvasDrawingSession session, IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement, int width, int height, double scale = 1.0)
+    internal void DrawCues(CanvasDrawingSession session, IReadOnlyList<SubtitleCue> cues, SubtitlePresentation presentation, int width, int height, double scale = 1.0)
     {
         if (cues.Count == 0 || width <= 0 || height <= 0)
         {
@@ -111,10 +111,14 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             return;
         }
 
-        float fontSize = Math.Clamp(height * FontSizeFraction, MinimumFontSize, MaximumFontSize);
+        // An explicit size is in device independent pixels, so it is scaled to the surface it lands on; the automatic one
+        // stays a share of the surface's own pixels, which is what it has always been.
+        float fontSize = presentation.FontSize > 0.0
+            ? (float)(presentation.FontSize * scale)
+            : Math.Clamp(height * FontSizeFraction, MinimumFontSize, MaximumFontSize);
         float margin = height * MarginFraction;
         float gap = fontSize * StackGapFraction;
-        SubtitleArea area = AreaOf(placement, scale, width, height);
+        SubtitleArea area = AreaOf(presentation, scale, width, height);
 
         // How much of each band is taken, by the alignment's row: bottom, middle, top. Several events can be up at once —
         // the same speaker's two lines, or a sign beside dialogue — and they share a band far more often than not. Each is
@@ -124,7 +128,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
         using CanvasTextFormat format = new()
         {
-            FontFamily = _fontFamily,
+            FontFamily = string.IsNullOrEmpty(presentation.FontFamily) ? DefaultFontFamily : presentation.FontFamily,
             FontSize = fontSize,
             WordWrapping = CanvasWordWrapping.NoWrap,
         };
@@ -133,7 +137,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         {
             if (cue.Image is { } image)
             {
-                DrawImage(session, image, placement, area, width, height, scale);
+                DrawImage(session, image, presentation, area, width, height, scale);
                 continue;
             }
 
@@ -156,7 +160,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             // asked for, and the ones after it make room above or below rather than covering it.
             origin.Y += row == 2 ? stacked : -stacked;
 
-            origin += new Vector2((float)(placement.OffsetX * scale), (float)(placement.OffsetY * scale));
+            origin += new Vector2((float)(presentation.OffsetX * scale), (float)(presentation.OffsetY * scale));
             origin = KeepInsideArea(origin, layout, area);
 
             session.DrawTextLayout(layout, origin + new Vector2(ShadowOffset, ShadowOffset), Color.FromArgb(200, 0, 0, 0));
@@ -164,17 +168,17 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         }
     }
 
-    private static SubtitleArea AreaOf(SubtitlePlacement placement, double scale, int width, int height)
+    private static SubtitleArea AreaOf(SubtitlePresentation presentation, double scale, int width, int height)
     {
-        float left = (float)Math.Clamp(placement.Insets.Left * scale, 0.0, width * MaximumInsetFraction);
-        float top = (float)Math.Clamp(placement.Insets.Top * scale, 0.0, height * MaximumInsetFraction);
-        float right = (float)Math.Clamp(placement.Insets.Right * scale, 0.0, width * MaximumInsetFraction);
-        float bottom = (float)Math.Clamp(placement.Insets.Bottom * scale, 0.0, height * MaximumInsetFraction);
+        float left = (float)Math.Clamp(presentation.Insets.Left * scale, 0.0, width * MaximumInsetFraction);
+        float top = (float)Math.Clamp(presentation.Insets.Top * scale, 0.0, height * MaximumInsetFraction);
+        float right = (float)Math.Clamp(presentation.Insets.Right * scale, 0.0, width * MaximumInsetFraction);
+        float bottom = (float)Math.Clamp(presentation.Insets.Bottom * scale, 0.0, height * MaximumInsetFraction);
 
         return new SubtitleArea(left, top, Math.Max(1.0f, width - left - right), Math.Max(1.0f, height - top - bottom));
     }
 
-    private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePlacement placement, SubtitleArea area, int width, int height, double scale)
+    private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePresentation presentation, SubtitleArea area, int width, int height, double scale)
     {
         ISubtitleImageBuffer buffer = image.Buffer;
         if (buffer.Width <= 0 || buffer.Height <= 0)
@@ -195,9 +199,9 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             CanvasAlphaMode.Premultiplied);
 
         // The image's own geometry is a fraction of the frame it was authored against, which is the whole surface; the
-        // placement's offset is in pixels, so it is added after that geometry is scaled.
-        double x = (image.Left * width) + (placement.OffsetX * scale);
-        double y = (image.Top * height) + (placement.OffsetY * scale);
+        // presentation's offset is in pixels, so it is added after that geometry is scaled.
+        double x = (image.Left * width) + (presentation.OffsetX * scale);
+        double y = (image.Top * height) + (presentation.OffsetY * scale);
         double scaledWidth = image.Width * width;
         double scaledHeight = image.Height * height;
 

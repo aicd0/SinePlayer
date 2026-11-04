@@ -76,7 +76,7 @@ public class Win2DSubtitleRendererTests
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show([cue], TimeSpan.Zero, SubtitlePlacement.Identity);
+            drawn = renderer.Show([cue], TimeSpan.Zero, SubtitlePresentation.Identity);
         }
         finally
         {
@@ -100,7 +100,7 @@ public class Win2DSubtitleRendererTests
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
         }
 
-        OperationResult cleared = renderer.Show([], TimeSpan.Zero, SubtitlePlacement.Identity);
+        OperationResult cleared = renderer.Show([], TimeSpan.Zero, SubtitlePresentation.Identity);
         Assert.That(cleared.IsSuccessful, Is.True, cleared.Message);
     }
 
@@ -130,7 +130,7 @@ public class Win2DSubtitleRendererTests
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show([cue], TimeSpan.Zero, SubtitlePlacement.Identity);
+            drawn = renderer.Show([cue], TimeSpan.Zero, SubtitlePresentation.Identity);
         }
         finally
         {
@@ -168,7 +168,7 @@ public class Win2DSubtitleRendererTests
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show([cue], TimeSpan.Zero, new SubtitlePlacement(-50.0, 50.0));
+            drawn = renderer.Show([cue], TimeSpan.Zero, new SubtitlePresentation(-50.0, 50.0));
         }
         finally
         {
@@ -216,7 +216,7 @@ public class Win2DSubtitleRendererTests
                 using (CanvasDrawingSession session = target.CreateDrawingSession())
                 {
                     session.Clear(default(Color));
-                    renderer.DrawCues(session, [cue], SubtitlePlacement.Identity, width, height);
+                    renderer.DrawCues(session, [cue], SubtitlePresentation.Identity, width, height);
                 }
 
                 Assert.That(DrawnPixels(target.GetPixelBytes()), Is.GreaterThan(0), "the cue has to reach the target as pixels");
@@ -224,7 +224,7 @@ public class Win2DSubtitleRendererTests
                 using (CanvasDrawingSession session = target.CreateDrawingSession())
                 {
                     session.Clear(default(Color));
-                    renderer.DrawCues(session, [], SubtitlePlacement.Identity, width, height);
+                    renderer.DrawCues(session, [], SubtitlePresentation.Identity, width, height);
                 }
 
                 Assert.That(DrawnPixels(target.GetPixelBytes()), Is.Zero, "and an empty set has to leave nothing behind");
@@ -238,6 +238,100 @@ public class Win2DSubtitleRendererTests
         {
             target?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// A host that asks for a size gets that size: the same words cover more rows of the surface when the number grows,
+    /// which is the whole of what the setting means.
+    /// </summary>
+    [Test]
+    public void DrawsTheTextAtTheSizeItIsGiven()
+    {
+        using Win2DSubtitleRenderer renderer = new();
+
+        CanvasDevice device;
+        try
+        {
+            device = renderer.EnsureCanvasDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        int small = InkRows(device, renderer, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 12.0));
+        int large = InkRows(device, renderer, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 48.0));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(small, Is.GreaterThan(0), "the size asked for draws words");
+            Assert.That(large, Is.GreaterThan(small * 2), "and four times the size covers several times the rows");
+        }
+    }
+
+    /// <summary>
+    /// Zero means "work it out from the surface", which is what the renderer did before a size could be asked for: an
+    /// explicit size of the value it works out for itself has to draw the same picture.
+    /// </summary>
+    [Test]
+    public void KeepsTheSizeItWorksOutForItselfWhenToldNone()
+    {
+        using Win2DSubtitleRenderer renderer = new();
+
+        CanvasDevice device;
+        try
+        {
+            device = renderer.EnsureCanvasDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int height = 300;
+        double automatic = Math.Clamp(height * 0.045, 12.0, 72.0);
+
+        int unspecified = InkRows(device, renderer, 480, height, SubtitlePresentation.Identity);
+        int sameSize = InkRows(device, renderer, 480, height, new SubtitlePresentation(0.0, 0.0, default, null, automatic));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(unspecified, Is.GreaterThan(0), "an automatic size still draws");
+            Assert.That(unspecified, Is.EqualTo(sameSize).Within(1), "and it is the size the surface alone gives");
+        }
+    }
+
+    /// <summary>How many rows of the surface carry ink, drawing one cue with the presentation given.</summary>
+    private static int InkRows(CanvasDevice device, Win2DSubtitleRenderer renderer, int width, int height, SubtitlePresentation presentation)
+    {
+        using CanvasRenderTarget target = new(device, width, height, 96.0f);
+        using SubtitleCue cue = Cue("0,Default,,0,0,0,,Visible words");
+
+        using (CanvasDrawingSession session = target.CreateDrawingSession())
+        {
+            session.Clear(default(Color));
+            renderer.DrawCues(session, [cue], presentation, width, height);
+        }
+
+        byte[] pixels = target.GetPixelBytes();
+        int rows = 0;
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                if (AlphaAt(pixels, width, x, y) == 0)
+                {
+                    continue;
+                }
+
+                rows++;
+                break;
+            }
+        }
+
+        return rows;
     }
 
     /// <summary>
@@ -273,7 +367,7 @@ public class Win2DSubtitleRendererTests
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Color));
-                renderer.DrawCues(session, [cue], SubtitlePlacement.Identity, width, height);
+                renderer.DrawCues(session, [cue], SubtitlePresentation.Identity, width, height);
             }
 
             byte[] pixels = target.GetPixelBytes();
@@ -324,7 +418,7 @@ public class Win2DSubtitleRendererTests
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Color));
-                renderer.DrawCues(session, [first, second], SubtitlePlacement.Identity, width, height);
+                renderer.DrawCues(session, [first, second], SubtitlePresentation.Identity, width, height);
             }
 
             byte[] pixels = target.GetPixelBytes();
@@ -457,7 +551,7 @@ public class Win2DSubtitleRendererTests
             Text = "0,Default,,0,0,0,,Growing",
         };
 
-        OperationResult first = renderer.Show([cue], TimeSpan.Zero, SubtitlePlacement.Identity);
+        OperationResult first = renderer.Show([cue], TimeSpan.Zero, SubtitlePresentation.Identity);
         Assert.That(first.IsSuccessful, Is.True, first.Message);
         nint firstChain = target.Attached;
         Assert.That(firstChain, Is.Not.Zero, "the host was handed a chain to compose");
@@ -465,7 +559,7 @@ public class Win2DSubtitleRendererTests
         target.SetSize(800, 450);
         target.RaiseSizeChanged();
 
-        OperationResult grown = renderer.Show([cue], TimeSpan.Zero, SubtitlePlacement.Identity);
+        OperationResult grown = renderer.Show([cue], TimeSpan.Zero, SubtitlePresentation.Identity);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(grown.IsSuccessful, Is.True, grown.Message);
@@ -475,7 +569,7 @@ public class Win2DSubtitleRendererTests
         target.SetSize(640, 360);
         target.RaiseSizeChanged();
 
-        OperationResult shrunk = renderer.Show([cue], TimeSpan.Zero, SubtitlePlacement.Identity);
+        OperationResult shrunk = renderer.Show([cue], TimeSpan.Zero, SubtitlePresentation.Identity);
         Assert.That(shrunk.IsSuccessful, Is.True, shrunk.Message);
     }
 

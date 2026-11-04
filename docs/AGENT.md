@@ -35,3 +35,5 @@ instead of needing a re-run:
 ```
 dotnet test src\Tests\SinePlayer.Core.Tests\SinePlayer.Core.Tests.csproj --no-build -p:Platform=x64 --logger "console;verbosity=normal" 2>&1 | Tee-Object -FilePath "$env:TEMP\tests.log"
 ```
+
+Never test UI behavior. Leave it to the user.

@@ -49,7 +49,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private readonly ITaskDispatcher _playbackQueue = TaskDispatcher.Factory.NewQueue("Pipeline - Playback");
     private readonly SeqLock<VideoTransform> _videoTransform = new(VideoTransform.Identity);
-    private readonly SeqLock<SubtitlePlacement> _subtitlePlacement = new(SubtitlePlacement.Identity);
+    private readonly SeqLock<SubtitlePresentation> _subtitlePresentation = new(SubtitlePresentation.Identity);
 
     private volatile MediaSourceHolder _selection = new([], null, null, null);
 
@@ -151,17 +151,17 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
-    public SubtitlePlacement SubtitlePlacement
+    public SubtitlePresentation SubtitlePresentation
     {
-        get => _subtitlePlacement.Read();
+        get => _subtitlePresentation.Read();
         set
         {
-            if (_subtitlePlacement.Read() == value)
+            if (_subtitlePresentation.Read() == value)
             {
                 return;
             }
 
-            _subtitlePlacement.Write(_ => value);
+            _subtitlePresentation.Write(_ => value);
             _subtitleRenderNode.Wake();
         }
     }
@@ -2882,7 +2882,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         long workingEpoch = -1;
         long drawnSurfaceVersion = -1;
         TimeSpan drawnPosition = TimeSpan.MinValue;
-        SubtitlePlacement drawnPlacement = default;
+        SubtitlePresentation drawnPresentation = default;
         SubtitleCueSnapshot drawnCues = SubtitleCueSnapshot.Empty;
 
         while (true)
@@ -2901,7 +2901,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     if (subtitleRendererSlot.CurrentComponent is null)
                     {
                         ReportOnFailure("The subtitles could not be cleared",
-                            SafeInvoke(() => oldRenderer.Show([], TimeSpan.Zero, SubtitlePlacement)));
+                            SafeInvoke(() => oldRenderer.Show([], TimeSpan.Zero, SubtitlePresentation.Identity)));
                     }
 
                     oldRenderer.Dispose();
@@ -2937,21 +2937,21 @@ public sealed partial class PlaybackPipeline : IDisposable
             TimeSpan position = _clock.Position;
             SubtitleCueSnapshot cues = _cueWindow.GetVisibleCues(epoch, position);
             long surfaceVersion = Interlocked.Read(ref _subtitleSurfaceVersion);
-            SubtitlePlacement placement = SubtitlePlacement;
+            SubtitlePresentation presentation = SubtitlePresentation;
             if (drawnInvalidated ||
                 surfaceVersion != drawnSurfaceVersion ||
-                placement != drawnPlacement ||
+                presentation != drawnPresentation ||
                 cues.Cues.Any(cue => cue.HasChanges(drawnPosition, position)) ||
                 !SameCues(cues, drawnCues))
             {
                 ReportOnFailure("The subtitles could not be drawn",
-                    SafeInvoke(() => renderer.Show(cues.Cues, position, placement)));
+                    SafeInvoke(() => renderer.Show(cues.Cues, position, presentation)));
                 drawnCues.Dispose();
                 drawnCues = cues;
                 drawnInvalidated = false;
                 drawnSurfaceVersion = surfaceVersion;
                 drawnPosition = position;
-                drawnPlacement = placement;
+                drawnPresentation = presentation;
             }
             else
             {

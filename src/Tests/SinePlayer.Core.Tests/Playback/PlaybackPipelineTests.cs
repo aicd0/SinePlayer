@@ -8049,7 +8049,7 @@ public class PlaybackPipelineTests
     }
 
     [Test]
-    public void CarriesThePlacementWithEverythingItDraws()
+    public void CarriesThePresentationWithEverythingItDraws()
     {
         SyntheticMediaScript script = new()
         {
@@ -8061,20 +8061,46 @@ public class PlaybackPipelineTests
         using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
 
         // Set before anything is drawn, so the very first call has to carry it: a renderer is never told twice.
-        SubtitlePlacement placement = new(0.25, -0.5);
-        pipeline.SubtitlePlacement = placement;
+        SubtitlePresentation presentation = new(0.25, -0.5, default, "Segoe UI", 32.0);
+        pipeline.SubtitlePresentation = presentation;
 
         Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
         Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
         WaitFor(() => subtitleRenderer.Texts.Length == 1, "the cue to be up");
 
-        Assert.That(subtitleRenderer.Placements, Is.All.EqualTo(placement), "every drawing carries the adjustment in force");
+        Assert.That(subtitleRenderer.Presentations, Is.All.EqualTo(presentation), "every drawing carries both where the words go and how they look");
+    }
+
+    [Test]
+    public void DrawsAgainWhenOnlyTheFontChanges()
+    {
+        // The font travels with the drawing, so a change to it has to be drawn even though the cue, the position and the
+        // surface are all the same. Without that a new size would only appear with the next cue.
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        };
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+        Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+        WaitFor(() => subtitleRenderer.Texts.Length == 1, "the cue to be up");
+        Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+
+        long drawn = subtitleRenderer.ShowCount;
+        pipeline.SubtitlePresentation = SubtitlePresentation.Identity with { FontFamily = "Segoe UI", FontSize = 32.0 };
+
+        WaitFor(() => subtitleRenderer.ShowCount > drawn, "the new font to be drawn");
+        Assert.That(subtitleRenderer.Presentations[^1].FontSize, Is.EqualTo(32.0), "and the drawing carries it");
     }
 
     [Test]
     public void DrawsNothingAgainWhileTheFileIsPaused()
     {
-        // A paused file cannot change, so a pass that finds the same cues and the same placement must not ask the
+        // A paused file cannot change, so a pass that finds the same cues and the same presentation must not ask the
         // renderer to draw them again. (A loop that wakes without drawing is invisible from here — what a renderer does
         // besides draw is nothing — so this holds the redraw, which is the part a consumer can feel.)
         SyntheticMediaScript script = new()
@@ -8814,7 +8840,7 @@ public class PlaybackPipelineTests
     {
         private readonly Lock _lock = new();
         private readonly List<string[]> _texts = [];
-        private readonly List<SubtitlePlacement> _placements = [];
+        private readonly List<SubtitlePresentation> _presentations = [];
 
         public string Name => "fake-subtitle";
 
@@ -8834,14 +8860,14 @@ public class PlaybackPipelineTests
             }
         }
 
-        /// <summary>The placement of every drawing, in order, so a test can check nothing was drawn without it.</summary>
-        public IReadOnlyList<SubtitlePlacement> Placements
+        /// <summary>The presentation of every drawing, in order, so a test can check nothing was drawn without it.</summary>
+        public IReadOnlyList<SubtitlePresentation> Presentations
         {
             get
             {
                 lock (_lock)
                 {
-                    return [.. _placements];
+                    return [.. _presentations];
                 }
             }
         }
@@ -8866,13 +8892,13 @@ public class PlaybackPipelineTests
             return OperationResult.Success();
         }
 
-        public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePlacement placement)
+        public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePresentation presentation)
         {
             string[] texts = [.. cues.Select(cue => cue.Text ?? string.Empty)];
             lock (_lock)
             {
                 _texts.Add(texts);
-                _placements.Add(placement);
+                _presentations.Add(presentation);
             }
 
             return OperationResult.Success();

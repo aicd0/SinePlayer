@@ -55,7 +55,7 @@ public class AssSubtitleRendererTests
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePlacement.Identity);
+            drawn = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
         }
         finally
         {
@@ -91,7 +91,7 @@ public class AssSubtitleRendererTests
         {
             for (int index = 0; index < 4; index++)
             {
-                OperationResult drawn = renderer.Show([cue], TimeSpan.FromMilliseconds(index * 250), SubtitlePlacement.Identity);
+                OperationResult drawn = renderer.Show([cue], TimeSpan.FromMilliseconds(index * 250), SubtitlePresentation.Identity);
                 Assert.That(drawn.IsSuccessful, Is.True, drawn.Message);
             }
         }
@@ -127,12 +127,12 @@ public class AssSubtitleRendererTests
 
         try
         {
-            OperationResult bare = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePlacement.Identity);
+            OperationResult bare = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
             Assert.That(bare.IsSuccessful, Is.True, bare.Message);
             int drawn = InkHeight(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
 
             // What the player hands over while its overlay is up: the strips the chrome covers.
-            SubtitlePlacement covered = new(0.0, 0.0, new SubtitleInsets(0.0, 40.0, 0.0, 90.0));
+            SubtitlePresentation covered = new(0.0, 0.0, new SubtitleInsets(0.0, 40.0, 0.0, 90.0));
             OperationResult withChrome = renderer.Show([cue], TimeSpan.FromSeconds(1), covered);
             Assert.That(withChrome.IsSuccessful, Is.True, withChrome.Message);
 
