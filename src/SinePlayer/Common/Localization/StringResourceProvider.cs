@@ -173,6 +173,7 @@ public class StringResourceProvider
     public string KeyboardKeys => GetResourceString("KeyboardKeys");
     public string KeyboardShortcutInUse => GetResourceString("KeyboardShortcutInUse");
     public string KeyboardShortcutReserved => GetResourceString("KeyboardShortcutReserved");
+    public string Language => GetResourceString("Language");
     public string LastVisitTime => GetResourceString("LastVisitTime");
     public string Library => GetResourceString("Library");
     public string License => GetResourceString("License");
@@ -196,6 +197,7 @@ public class StringResourceProvider
     public string NewTab => GetResourceString("NewTab");
     public string NewWindow => GetResourceString("NewWindow");
     public string Next => GetResourceString("Next");
+    public string No => GetResourceString("No");
     public string NoContent => GetResourceString("NoContent");
     public string NoKeyboardShortcuts => GetResourceString("NoKeyboardShortcuts");
     public string NoMediaHint => GetResourceString("NoMediaHint");
@@ -312,6 +314,9 @@ public class StringResourceProvider
     public string Statistics => GetResourceString("Statistics");
     public string Stretch => GetResourceString("Stretch");
     public string Subtitle => GetResourceString("Subtitle");
+    public string SubtitleForced => GetResourceString("SubtitleForced");
+    public string SubtitleTypeBitmap => GetResourceString("SubtitleTypeBitmap");
+    public string SubtitleTypeText => GetResourceString("SubtitleTypeText");
     public string Tag => GetResourceString("Tag");
     public string TagLinkTip => GetResourceString("TagLinkTip");
     public string Tags => GetResourceString("Tags");
@@ -324,6 +329,7 @@ public class StringResourceProvider
     public string TotalMedia => GetResourceString("TotalMedia");
     public string Transform => GetResourceString("Transform");
     public string TwoPageMode => GetResourceString("TwoPageMode");
+    public string Type => GetResourceString("Type");
     public string Unavailable => GetResourceString("Unavailable");
     public string Unfavorite => GetResourceString("Unfavorite");
     public string Ungrouped => GetResourceString("Ungrouped");
@@ -350,6 +356,7 @@ public class StringResourceProvider
     public string WhilePlaying => GetResourceString("WhilePlaying");
     public string WhilePlayingVideos => GetResourceString("WhilePlayingVideos");
     public string WindowN => GetResourceString("WindowN");
+    public string Yes => GetResourceString("Yes");
     //// SECTION MARKER - DO NOT MOVE ////
 
     private StringResourceProvider() { }

@@ -685,11 +685,11 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="KeyboardShortcutsExpander.Header" xml:space="preserve">
     <value>Сочетания клавиш</value>
   </data>
+  <data name="Language" xml:space="preserve">
+    <value>Язык</value>
+  </data>
   <data name="LanguageExpander.Detail" xml:space="preserve">
     <value>Выберите язык, на котором будет отображаться приложение</value>
-  </data>
-  <data name="LanguageExpander.Header" xml:space="preserve">
-    <value>Язык</value>
   </data>
   <data name="LastVisitTime" xml:space="preserve">
     <value>Время последнего посещения</value>
@@ -780,6 +780,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   </data>
   <data name="Next" xml:space="preserve">
     <value>Далее</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>Нет</value>
   </data>
   <data name="NoContent" xml:space="preserve">
     <value>Нет содержимого для отображения</value>
@@ -1157,6 +1160,15 @@ $plugins</value>
   <data name="Subtitle" xml:space="preserve">
     <value>Субтитры</value>
   </data>
+  <data name="SubtitleForced" xml:space="preserve">
+    <value>Принудительные</value>
+  </data>
+  <data name="SubtitleTypeBitmap" xml:space="preserve">
+    <value>Растровые</value>
+  </data>
+  <data name="SubtitleTypeText" xml:space="preserve">
+    <value>Текстовые</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Тег</value>
   </data>
@@ -1209,6 +1221,9 @@ $plugins</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Режим разворота</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>Тип</value>
   </data>
   <data name="Unavailable" xml:space="preserve">
     <value>Недоступно</value>
@@ -1292,5 +1307,8 @@ $info</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>Окно $n</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>Да</value>
   </data>
 </root>

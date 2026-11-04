@@ -111,6 +111,31 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             Add("audio.renderer", StringResource.Renderer, info.AudioRendererName ?? StringResource.None);
         }
 
+        if (info.SelectedSubtitleStream is { } subtitle)
+        {
+            Group("group.subtitle", StringResource.Subtitle);
+            Add("subtitle.codec", StringResource.Codec, FormatCodec(subtitle));
+            Add("subtitle.type", StringResource.Type, subtitle.IsBitmap ? StringResource.SubtitleTypeBitmap : StringResource.SubtitleTypeText);
+            Add("subtitle.forced", StringResource.SubtitleForced, subtitle.IsForced ? StringResource.Yes : StringResource.No);
+            if (!string.IsNullOrEmpty(subtitle.Language))
+            {
+                Add("subtitle.language", StringResource.Language, subtitle.Language);
+            }
+
+            if (!string.IsNullOrEmpty(subtitle.Title))
+            {
+                Add("subtitle.title", StringResource.Title, subtitle.Title);
+            }
+
+            if (subtitle.Bitrate > 0)
+            {
+                Add("subtitle.bitrate", StringResource.BitRate, FormatBitrate(subtitle.Bitrate));
+            }
+
+            Add("subtitle.decoder", StringResource.Decoder, info.SubtitleDecoderName ?? StringResource.None);
+            Add("subtitle.renderer", StringResource.Renderer, info.SubtitleRendererName ?? StringResource.None);
+        }
+
         Group("group.playback", StringResource.Playback);
         Add("playback.state", StringResource.State, info.State.ToString() + (string.IsNullOrEmpty(info.Error) ? string.Empty : $" ({info.Error})"));
         Add("playback.position", StringResource.Position, FormatTime(info.Position));

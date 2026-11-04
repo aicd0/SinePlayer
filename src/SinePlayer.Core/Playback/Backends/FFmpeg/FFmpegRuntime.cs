@@ -1,9 +1,6 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System.Reflection;
-using System.Runtime.InteropServices;
-
 using SinePlayer.Core.Common.AppEnvironment;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;

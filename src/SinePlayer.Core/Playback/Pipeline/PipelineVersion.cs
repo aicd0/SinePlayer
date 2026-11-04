@@ -21,6 +21,17 @@ internal readonly record struct PipelineVersion(
         Math.Max(x.SubtitleDecoder, y.SubtitleDecoder),
         Math.Max(x.SubtitleRenderer, y.SubtitleRenderer));
 
+    public static bool IsBehind(PipelineVersion versions, PipelineVersion reference)
+    {
+        return versions.Source < reference.Source
+            || versions.VideoDecoder < reference.VideoDecoder
+            || versions.VideoRenderer < reference.VideoRenderer
+            || versions.AudioDecoder < reference.AudioDecoder
+            || versions.AudioRenderer < reference.AudioRenderer
+            || versions.SubtitleDecoder < reference.SubtitleDecoder
+            || versions.SubtitleRenderer < reference.SubtitleRenderer;
+    }
+
     public static VersionVerdict CompareVideoDecoder(PipelineVersion package, PipelineVersion self) => CombineVerdict(
         CompareOwn(package.VideoDecoder, self.VideoDecoder),
         CompareUpstream(package.Source, self.Source));

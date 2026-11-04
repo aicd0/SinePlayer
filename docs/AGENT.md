@@ -5,6 +5,13 @@
 - Always ask before introducing anything new: a new pattern, a new design, new behavior, a new coding style, a new dependency or API.
 - Do not run the full test suite unless explicitly asked. Building x64 is the default verification.
 
+### On a test failure
+
+1. If the test expects an old behavior that the user explicitly asked to change, fix the test expectation.
+2. If it is confirmed an implementation bug, that is not part of the design the user asked for and was only
+   introduced by the agent's mistake, fix the bug.
+3. Otherwise, always ask for the user's expectation before making any changes.
+
 ## Building
 
 `dotnet build` does not work here: the MrtCore PriGen targets load `Microsoft.Build.Packaging.Pri.Tasks.dll`

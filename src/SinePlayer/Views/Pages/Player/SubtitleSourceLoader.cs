@@ -12,6 +12,7 @@ using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
+using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Models.Media;
 
 namespace SinePlayer.Views.Pages.Player;
@@ -47,17 +48,23 @@ internal static class SubtitleSourceLoader
         }
 
         OperationResult selected = await engine.SelectStream(MediaStreamKind.Subtitle, selection.Stream);
-        if (selected.IsSuccessful)
-        {
-            selected = await engine.Reconcile();
-        }
-
         if (!selected.IsSuccessful)
         {
             return selected;
         }
 
-        // Remembered for this medium, so the subtitles chosen here are the ones it opens with next time.
+        OperationResult<ReconcileResult> reconciled = await engine.Reconcile();
+        if (!reconciled.IsSuccessful)
+        {
+            return OperationResultExt.Failure(reconciled);
+        }
+
+        OperationResult built = reconciled.Result.Subtitle;
+        if (!built.IsSuccessful)
+        {
+            return OperationResultExt.Failure(built);
+        }
+
         TrackSelection.Save(media, MediaStreamKind.Subtitle, engine.PlaybackInfo.Sources, selection.Source, selection.Stream);
         return OperationResult.Success();
     }

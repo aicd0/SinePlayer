@@ -588,7 +588,7 @@ internal sealed partial class PlayerPage : BasePage
         return selected;
     }
 
-    private static async Task<OperationResult> SelectTracks(CoreEngine engine, MediaModel media)
+    private async Task<OperationResult> SelectTracks(CoreEngine engine, MediaModel media)
     {
         static T? DefaultTrack<T>(IReadOnlyList<T>? streams) where T : MediaStreamInfo
         {
@@ -641,7 +641,6 @@ internal sealed partial class PlayerPage : BasePage
 
         IReadOnlyList<MediaSource> sources = engine.PlaybackInfo.Sources;
         List<string> unplayable = [];
-        bool playing = false;
 
         // Select video track
         MediaStreamInfo? video = null;
@@ -658,12 +657,6 @@ internal sealed partial class PlayerPage : BasePage
         if (video is not null)
         {
             OperationResult chosen = await engine.SelectStream(MediaStreamKind.Video, video);
-            if (chosen.IsSuccessful)
-            {
-                chosen = await engine.Reconcile();
-            }
-
-            playing |= chosen.IsSuccessful;
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the picture could not be played ({chosen.Message})");
@@ -685,12 +678,6 @@ internal sealed partial class PlayerPage : BasePage
         if (audio is not null)
         {
             OperationResult chosen = await engine.SelectStream(MediaStreamKind.Audio, audio);
-            if (chosen.IsSuccessful)
-            {
-                chosen = await engine.Reconcile();
-            }
-
-            playing |= chosen.IsSuccessful;
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the sound could not be played ({chosen.Message})");
@@ -713,20 +700,51 @@ internal sealed partial class PlayerPage : BasePage
         if (subtitle is not null)
         {
             OperationResult chosen = await engine.SelectStream(MediaStreamKind.Subtitle, subtitle);
-            if (chosen.IsSuccessful)
-            {
-                chosen = await engine.Reconcile();
-            }
-
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the subtitles could not be played ({chosen.Message})");
             }
         }
 
+        bool playing = false;
+        OperationResult<ReconcileResult> reconciled = await engine.Reconcile();
+        if (!reconciled.IsSuccessful)
+        {
+            PromptTemporary(reconciled.Message);
+        }
+        else
+        {
+            ReconcileResult result = reconciled.Result;
+
+            if (video is not null)
+            {
+                playing |= result.Video.IsSuccessful;
+                if (!result.Video.IsSuccessful)
+                {
+                    PromptTemporary(result.Video.Message);
+                }
+            }
+
+            if (audio is not null)
+            {
+                playing |= result.Audio.IsSuccessful;
+                if (!result.Audio.IsSuccessful)
+                {
+                    PromptTemporary(result.Audio.Message);
+                }
+            }
+
+            if (subtitle is not null && !result.Subtitle.IsSuccessful)
+            {
+                PromptTemporary(result.Subtitle.Message);
+            }
+        }
+
         if (!playing)
         {
-            string why = unplayable.Count == 0 ? "it holds no track that could be played" : string.Join(", ", unplayable);
+            string why = unplayable.Count == 0
+                ? "neither the picture nor the sound could be played"
+                : string.Join(", ", unplayable);
             return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': {why}.");
         }
 
@@ -1254,10 +1272,28 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        OperationResult err = await engine.Reconcile();
-        if (!err.IsSuccessful)
+        OperationResult<ReconcileResult> reconciled = await engine.Reconcile();
+        if (!reconciled.IsSuccessful)
         {
-            PromptTemporary(err.Message);
+            PromptTemporary(reconciled.Message);
+            return;
+        }
+
+        ReconcileResult result = reconciled.Result;
+
+        if (!result.Video.IsSuccessful)
+        {
+            PromptTemporary(result.Video.Message);
+        }
+
+        if (!result.Audio.IsSuccessful)
+        {
+            PromptTemporary(result.Audio.Message);
+        }
+
+        if (!result.Subtitle.IsSuccessful)
+        {
+            PromptTemporary(result.Subtitle.Message);
         }
     }
 

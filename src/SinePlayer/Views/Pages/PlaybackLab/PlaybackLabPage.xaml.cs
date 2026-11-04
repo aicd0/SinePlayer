@@ -230,7 +230,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<IVideoDecoderFactory>(pipeline, choice);
-            await ReconcileAndLog(pipeline, "The video decoder");
+            await ReconcileAndLog(pipeline, "The video decoder", MediaStreamKind.Video);
             RefreshStatus();
         });
     }
@@ -246,7 +246,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<IAudioDecoderFactory>(pipeline, choice);
-            await ReconcileAndLog(pipeline, "The audio decoder");
+            await ReconcileAndLog(pipeline, "The audio decoder", MediaStreamKind.Audio);
             RefreshStatus();
         });
     }
@@ -262,7 +262,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<IVideoRendererFactory>(pipeline, choice);
-            await ReconcileAndLog(pipeline, "The renderer");
+            await ReconcileAndLog(pipeline, "The renderer", MediaStreamKind.Video);
             RefreshStatus();
         });
     }
@@ -278,7 +278,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<IAudioRendererFactory>(pipeline, choice);
-            await ReconcileAndLog(pipeline, "The output device");
+            await ReconcileAndLog(pipeline, "The output device", MediaStreamKind.Audio);
             RefreshStatus();
         });
     }
@@ -294,7 +294,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<ISubtitleDecoderFactory>(pipeline, choice);
-            await ReconcileAndLog(pipeline, "The subtitle decoder");
+            await ReconcileAndLog(pipeline, "The subtitle decoder", MediaStreamKind.Subtitle);
             RefreshStatus();
         });
     }
@@ -310,7 +310,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
 
             ApplyComponentSelection<ISubtitleRendererFactory>(pipeline, choice);
-            await ReconcileAndLog(pipeline, "The subtitle renderer");
+            await ReconcileAndLog(pipeline, "The subtitle renderer", MediaStreamKind.Subtitle);
             RefreshStatus();
         });
     }
@@ -459,10 +459,18 @@ internal sealed partial class PlaybackLabPage : BasePage
         }
         else
         {
-            OperationResult reconciled = await pipeline.Reconcile();
+            OperationResult<ReconcileResult> reconciled = await pipeline.Reconcile();
             if (!reconciled.IsSuccessful)
             {
-                Logger.E(TAG, $"The track could not be played. {reconciled.Message}");
+                Logger.E(TAG, $"The track could not be built. {reconciled.Message}");
+            }
+            else
+            {
+                OperationResult built = reconciled.Result.For(kind);
+                if (!built.IsSuccessful)
+                {
+                    Logger.E(TAG, $"The track could not be played. {built.Message}");
+                }
             }
         }
 
@@ -552,12 +560,19 @@ internal sealed partial class PlaybackLabPage : BasePage
         Logger.W(TAG, warning);
     }
 
-    private async Task ReconcileAndLog(PlaybackPipeline pipeline, string what)
+    private async Task ReconcileAndLog(PlaybackPipeline pipeline, string what, MediaStreamKind kind)
     {
-        OperationResult reconciled = await pipeline.Reconcile();
+        OperationResult<ReconcileResult> reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
             Logger.E(TAG, $"{what} could not be changed. {reconciled.Message}");
+            return;
+        }
+
+        OperationResult built = reconciled.Result.For(kind);
+        if (!built.IsSuccessful)
+        {
+            Logger.E(TAG, $"{what} could not be changed. {built.Message}");
         }
     }
 
