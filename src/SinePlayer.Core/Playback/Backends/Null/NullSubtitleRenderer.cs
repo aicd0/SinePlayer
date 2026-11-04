@@ -42,10 +42,8 @@ public sealed partial class NullSubtitleRenderer : ISubtitleRenderer
         }
     }
 
-    public OperationResult Configure(SubtitleStreamInfo stream, IVideoRenderTarget target)
+    public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
     {
-        ArgumentNullException.ThrowIfNull(stream);
-        ArgumentNullException.ThrowIfNull(target);
         return OperationResult.Success();
     }
 

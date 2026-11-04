@@ -65,6 +65,13 @@ internal static class LibassNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, BestFitMapping = false)]
     internal static extern void ass_add_font(IntPtr library, string name, byte[] data, int dataSize);
 
+    /// <summary>
+    /// Whether the fonts a script carries in its own <c>[Fonts]</c> section are taken out of it and made available, which
+    /// is the other way a file brings its own fonts.
+    /// </summary>
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void ass_set_extract_fonts(IntPtr library, int extract);
+
     /// <summary>What <see cref="ass_set_fonts"/> asks for when the system is to be consulted.</summary>
     internal const int FontProviderDirectWrite = 4;
 

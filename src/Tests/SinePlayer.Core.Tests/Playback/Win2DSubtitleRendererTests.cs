@@ -58,7 +58,7 @@ public class Win2DSubtitleRendererTests
         RecordingTarget target = new(640, 360, 1.0);
         using Win2DSubtitleRenderer renderer = new();
 
-        OperationResult configured = renderer.Configure(Stream(), target);
+        OperationResult configured = renderer.Configure(Stream(), [], target);
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
@@ -94,7 +94,7 @@ public class Win2DSubtitleRendererTests
         RecordingTarget target = new(320, 180, 1.0);
         using Win2DSubtitleRenderer renderer = new();
 
-        OperationResult configured = renderer.Configure(Stream(), target);
+        OperationResult configured = renderer.Configure(Stream(), [], target);
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
@@ -110,7 +110,7 @@ public class Win2DSubtitleRendererTests
         RecordingTarget target = new(640, 360, 1.0);
         using Win2DSubtitleRenderer renderer = new();
 
-        OperationResult configured = renderer.Configure(Stream(), target);
+        OperationResult configured = renderer.Configure(Stream(), [], target);
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
@@ -152,7 +152,7 @@ public class Win2DSubtitleRendererTests
         RecordingTarget target = new(400, 200, 1.0);
         using Win2DSubtitleRenderer renderer = new();
 
-        OperationResult configured = renderer.Configure(Stream(), target);
+        OperationResult configured = renderer.Configure(Stream(), [], target);
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
@@ -595,7 +595,7 @@ public class Win2DSubtitleRendererTests
         RecordingTarget target = new(640, 360, 1.0);
         using Win2DSubtitleRenderer renderer = new();
 
-        OperationResult configured = renderer.Configure(Stream(), target);
+        OperationResult configured = renderer.Configure(Stream(), [], target);
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");

@@ -11,7 +11,7 @@ public interface ISubtitleRenderer : IDisposable
 {
     string Name { get; }
 
-    OperationResult Configure(SubtitleStreamInfo stream, IVideoRenderTarget target);
+    OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target);
 
     OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePresentation presentation);
 }
