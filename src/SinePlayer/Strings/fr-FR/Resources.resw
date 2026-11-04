@@ -576,6 +576,21 @@ L'évaluation s'effectuera dans l'ordre suivant :
   <data name="FontSize" xml:space="preserve">
     <value>Taille de police</value>
   </data>
+  <data name="FontStyle" xml:space="preserve">
+    <value>Style de police</value>
+  </data>
+  <data name="FontStyleItalic" xml:space="preserve">
+    <value>Italique</value>
+  </data>
+  <data name="FontStyleNormal" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="FontStyleOblique" xml:space="preserve">
+    <value>Oblique</value>
+  </data>
+  <data name="FontWeight" xml:space="preserve">
+    <value>Graisse de police</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Fréquence d’images</value>
   </data>

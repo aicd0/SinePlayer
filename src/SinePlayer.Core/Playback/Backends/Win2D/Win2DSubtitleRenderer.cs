@@ -17,20 +17,19 @@ using SinePlayer.Core.Playback.Subtitle;
 using Windows.Foundation;
 using Windows.Graphics.DirectX;
 using Windows.UI;
+using Windows.UI.Text;
 
 namespace SinePlayer.Core.Playback.Backends.Win2D;
 
 public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 {
+    private const ushort DefaultFontWeight = 400;
     private const float FontSizeFraction = 0.045f;
     private const float MinimumFontSize = 12.0f;
     private const float MaximumFontSize = 72.0f;
 
     /// <summary>How far the text is kept from the edge it is anchored to, as a fraction of the surface.</summary>
     private const float MarginFraction = 0.03f;
-
-    /// <summary>How far the shadow sits from the text, in physical pixels: what makes light text readable on light frames.</summary>
-    private const float ShadowOffset = 2.0f;
 
     /// <summary>
     /// The most of the surface one inset may take. A player that covers nearly everything still leaves a sliver to draw
@@ -40,8 +39,6 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
     /// <summary>How much clear space is left between two cues that stack, as a fraction of the font's size.</summary>
     private const float StackGapFraction = 0.15f;
-
-    private const string DefaultFontFamily = "Segoe UI";
 
     private bool _disposed;
     private readonly SubtitleSurface _surface = new();
@@ -128,8 +125,10 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
         using CanvasTextFormat format = new()
         {
-            FontFamily = string.IsNullOrEmpty(presentation.FontFamily) ? DefaultFontFamily : presentation.FontFamily,
+            FontFamily = string.IsNullOrEmpty(presentation.FontFamily) ? SubtitleFonts.DefaultFontFamily : presentation.FontFamily,
             FontSize = fontSize,
+            FontStyle = presentation.FontStyle,
+            FontWeight = presentation.FontWeight.Weight > 0 ? presentation.FontWeight : new FontWeight { Weight = DefaultFontWeight },
             WordWrapping = CanvasWordWrapping.NoWrap,
         };
 
@@ -163,7 +162,6 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             origin += new Vector2((float)(presentation.OffsetX * scale), (float)(presentation.OffsetY * scale));
             origin = KeepInsideArea(origin, layout, area);
 
-            session.DrawTextLayout(layout, origin + new Vector2(ShadowOffset, ShadowOffset), Color.FromArgb(200, 0, 0, 0));
             session.DrawTextLayout(layout, origin, Color.FromArgb(255, 255, 255, 255));
         }
     }

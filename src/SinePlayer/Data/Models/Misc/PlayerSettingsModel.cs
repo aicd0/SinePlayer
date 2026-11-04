@@ -15,6 +15,8 @@ using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Data.Models.Media;
 
+using Windows.UI.Text;
+
 namespace SinePlayer.Data.Models.Misc;
 
 internal class PlayerSettingsModel
@@ -57,6 +59,8 @@ internal class PlayerSettingsModel
             SubtitlePanY = model.Subtitle?.PanY ?? fallbackModel.SubtitlePanY,
             SubtitleFontFamily = model.Subtitle?.FontFamily ?? fallbackModel.SubtitleFontFamily,
             SubtitleFontSize = model.Subtitle?.FontSize ?? fallbackModel.SubtitleFontSize,
+            SubtitleFontStyle = model.Subtitle?.FontStyle ?? fallbackModel.SubtitleFontStyle,
+            SubtitleFontWeight = model.Subtitle?.FontWeight ?? fallbackModel.SubtitleFontWeight,
             VideoPreferHardwareDecoding = model.VideoPreferHardwareDecoding ?? fallbackModel.VideoPreferHardwareDecoding,
             VideoPreferHdr = model.VideoPreferHdr ?? fallbackModel.VideoPreferHdr,
             VideoResizeMode = ParseResizeMode(model.VideoResizeMode, fallbackModel.VideoResizeMode),
@@ -200,6 +204,8 @@ internal class PlayerSettingsModel
     public int SubtitlePanY { get; set; }
     public string SubtitleFontFamily { get; set; } = string.Empty;
     public double SubtitleFontSize { get; set; }
+    public string SubtitleFontStyle { get; set; } = nameof(FontStyle.Normal);
+    public int SubtitleFontWeight { get; set; }
     public bool VideoPreferHardwareDecoding { get; set; } = true;
     public bool VideoPreferHdr { get; set; } = true;
     public VideoResizeMode VideoResizeMode { get; set; } = VideoResizeMode.Fit;
@@ -233,6 +239,8 @@ internal class PlayerSettingsModel
                 PanY = SubtitlePanY,
                 FontFamily = SubtitleFontFamily,
                 FontSize = SubtitleFontSize,
+                FontStyle = SubtitleFontStyle,
+                FontWeight = SubtitleFontWeight,
             },
             VideoPreferHardwareDecoding = VideoPreferHardwareDecoding,
             VideoPreferHdr = VideoPreferHdr,
@@ -260,6 +268,16 @@ internal class PlayerSettingsModel
             0.0,
             0.0,
             VideoScalingMode);
+    }
+
+    public FontStyle ToFontStyle()
+    {
+        return Enum.TryParse(SubtitleFontStyle, ignoreCase: true, out FontStyle style) && Enum.IsDefined(style) ? style : FontStyle.Normal;
+    }
+
+    public FontWeight ToFontWeight()
+    {
+        return SubtitleFontWeight > 0 ? new FontWeight { Weight = (ushort)SubtitleFontWeight } : default;
     }
 
     public void SaveToMedia(MediaModel media)
@@ -441,5 +459,11 @@ internal class PlayerSettingsModel
 
         [JsonPropertyName("FontSize")]
         public double? FontSize { get; set; }
+
+        [JsonPropertyName("FontStyle")]
+        public string? FontStyle { get; set; }
+
+        [JsonPropertyName("FontWeight")]
+        public int? FontWeight { get; set; }
     }
 }

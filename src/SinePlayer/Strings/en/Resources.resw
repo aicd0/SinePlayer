@@ -576,6 +576,21 @@ The expression will be evaluated in the following order:
   <data name="FontSize" xml:space="preserve">
     <value>Font size</value>
   </data>
+  <data name="FontStyle" xml:space="preserve">
+    <value>Font style</value>
+  </data>
+  <data name="FontStyleItalic" xml:space="preserve">
+    <value>Italic</value>
+  </data>
+  <data name="FontStyleNormal" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="FontStyleOblique" xml:space="preserve">
+    <value>Oblique</value>
+  </data>
+  <data name="FontWeight" xml:space="preserve">
+    <value>Font weight</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Frame rate</value>
   </data>

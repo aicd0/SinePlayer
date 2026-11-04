@@ -140,6 +140,11 @@ public class StringResourceProvider
     public string Font => GetResourceString("Font");
     public string FontFamily => GetResourceString("FontFamily");
     public string FontSize => GetResourceString("FontSize");
+    public string FontStyle => GetResourceString("FontStyle");
+    public string FontStyleItalic => GetResourceString("FontStyleItalic");
+    public string FontStyleNormal => GetResourceString("FontStyleNormal");
+    public string FontStyleOblique => GetResourceString("FontStyleOblique");
+    public string FontWeight => GetResourceString("FontWeight");
     public string FrameRate => GetResourceString("FrameRate");
     public string FunctionAverage => GetResourceString("FunctionAverage");
     public string FunctionItemCount => GetResourceString("FunctionItemCount");
