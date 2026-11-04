@@ -886,6 +886,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="OriginalSize" xml:space="preserve">
     <value>Tamaño original</value>
   </data>
+  <data name="Outline" xml:space="preserve">
+    <value>Contorno</value>
+  </data>
   <data name="Output" xml:space="preserve">
     <value>Salida</value>
   </data>

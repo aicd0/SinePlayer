@@ -5,8 +5,10 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 
 using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
 
+using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
@@ -23,27 +25,26 @@ namespace SinePlayer.Core.Playback.Backends.Win2D;
 
 public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 {
+    #region Constructor
+
+    private const string TAG = nameof(Win2DSubtitleRenderer);
+
     private const ushort DefaultFontWeight = 400;
     private const float FontSizeFraction = 0.045f;
     private const float MinimumFontSize = 12.0f;
     private const float MaximumFontSize = 72.0f;
-
-    /// <summary>How far the text is kept from the edge it is anchored to, as a fraction of the surface.</summary>
     private const float MarginFraction = 0.03f;
-
-    /// <summary>
-    /// The most of the surface one inset may take. A player that covers nearly everything still leaves a sliver to draw
-    /// in, which is more use than a rectangle with no height.
-    /// </summary>
     private const double MaximumInsetFraction = 0.9;
-
-    /// <summary>How much clear space is left between two cues that stack, as a fraction of the font's size.</summary>
     private const float StackGapFraction = 0.15f;
 
     private bool _disposed;
     private readonly SubtitleSurface _surface = new();
 
     public string Name => "Win2D";
+
+    #endregion
+
+    #region Public API
 
     public void Dispose()
     {
@@ -53,6 +54,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         }
 
         _disposed = true;
+        ClearOutlines();
         _surface.Dispose();
     }
 
@@ -162,19 +164,25 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             origin += new Vector2((float)(presentation.OffsetX * scale), (float)(presentation.OffsetY * scale));
             origin = KeepInsideArea(origin, layout, area);
 
+            if (presentation.OutlineWidth > 0.0)
+            {
+                // The stroke runs down the middle of the glyph's edge, so half of it would be covered by the words. Twice
+                // the width is drawn and the words fill over the inner half, which leaves the border growing outwards by
+                // exactly the width asked for.
+                CanvasGeometry? outline = EnsureOutlineGeometry(body, format, width, height);
+                if (outline is not null)
+                {
+                    session.DrawGeometry(outline, origin, OutlineColor, (float)(2.0 * presentation.OutlineWidth * scale), OutlineStrokeStyle);
+                }
+            }
+
             session.DrawTextLayout(layout, origin, Color.FromArgb(255, 255, 255, 255));
         }
     }
 
-    private static SubtitleArea AreaOf(SubtitlePresentation presentation, double scale, int width, int height)
-    {
-        float left = (float)Math.Clamp(presentation.Insets.Left * scale, 0.0, width * MaximumInsetFraction);
-        float top = (float)Math.Clamp(presentation.Insets.Top * scale, 0.0, height * MaximumInsetFraction);
-        float right = (float)Math.Clamp(presentation.Insets.Right * scale, 0.0, width * MaximumInsetFraction);
-        float bottom = (float)Math.Clamp(presentation.Insets.Bottom * scale, 0.0, height * MaximumInsetFraction);
+    #endregion
 
-        return new SubtitleArea(left, top, Math.Max(1.0f, width - left - right), Math.Max(1.0f, height - top - bottom));
-    }
+    #region Bitmap
 
     private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePresentation presentation, SubtitleArea area, int width, int height, double scale)
     {
@@ -211,6 +219,86 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         y = Math.Clamp(y, area.Top, maxY);
 
         session.DrawImage(bitmap, new Rect(x, y, scaledWidth, scaledHeight));
+    }
+
+    #endregion
+
+    #region Outline
+
+    private const int OutlineCacheLimit = 64;
+
+    private static readonly Color OutlineColor = Color.FromArgb(255, 0, 0, 0);
+    private static readonly CanvasStrokeStyle OutlineStrokeStyle = new() { LineJoin = CanvasLineJoin.Round };
+
+    private readonly Dictionary<OutlineKey, CanvasGeometry> _outlines = [];
+    private CanvasDevice? _outlineDevice;
+
+    /// <summary>
+    /// The outline of one cue's words, as the path the glyphs draw, kept for as long as the words and the style that shape
+    /// it stay the same. The geometry follows the whole layout, so the granularity is one cue — a line or a word cannot be
+    /// taken out on its own without laying it out again, and laying text out per letter would lose the kerning and shaping
+    /// that make it look right.
+    /// </summary>
+    private CanvasGeometry? EnsureOutlineGeometry(string body, CanvasTextFormat format, int width, int height)
+    {
+        CanvasDevice device = EnsureCanvasDevice();
+        if (_outlineDevice != device)
+        {
+            // A geometry belongs to the device that made it, so one made by a device that is gone cannot be drawn with.
+            ClearOutlines();
+            _outlineDevice = device;
+        }
+
+        OutlineKey key = new(body, format.FontFamily, format.FontSize, (int)format.FontStyle, format.FontWeight.Weight, width, height);
+        if (_outlines.TryGetValue(key, out CanvasGeometry? cached))
+        {
+            return cached;
+        }
+
+        if (_outlines.Count >= OutlineCacheLimit)
+        {
+            ClearOutlines();
+        }
+
+        try
+        {
+            using CanvasTextLayout layout = new(device, body, format, width, height);
+            var outline = CanvasGeometry.CreateText(layout);
+            _outlines[key] = outline;
+            return outline;
+        }
+        catch (Exception ex)
+        {
+            Logger.E(TAG, "The outline of a cue could not be built", ex);
+            return null;
+        }
+    }
+
+    private void ClearOutlines()
+    {
+        foreach (CanvasGeometry outline in _outlines.Values)
+        {
+            outline.Dispose();
+        }
+
+        _outlines.Clear();
+    }
+
+    /// <summary>What shapes one cue's outline: the words, and the style they are drawn in at the size of the surface.</summary>
+    private readonly record struct OutlineKey(string Text, string Family, float Size, int Style, ushort Weight, int Width, int Height);
+
+    #endregion
+
+    #region Area calculation
+
+    private static SubtitleArea AreaOf(SubtitlePresentation presentation, double scale, int width, int height)
+    {
+        float left = (float)Math.Clamp(presentation.Insets.Left * scale, 0.0, width * MaximumInsetFraction);
+        float top = (float)Math.Clamp(presentation.Insets.Top * scale, 0.0, height * MaximumInsetFraction);
+        float right = (float)Math.Clamp(presentation.Insets.Right * scale, 0.0, width * MaximumInsetFraction);
+        float bottom = (float)Math.Clamp(presentation.Insets.Bottom * scale, 0.0, height * MaximumInsetFraction);
+
+        return new SubtitleArea(left, top, Math.Max(1.0f, width - left - right), Math.Max(1.0f, height - top - bottom));
     }
 
     /// <summary>
@@ -262,5 +350,5 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         return new Vector2((float)Math.Clamp(origin.X, (double)area.Left, maxX), (float)Math.Clamp(origin.Y, (double)area.Top, maxY));
     }
 
+    #endregion
 }
-

@@ -886,6 +886,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OriginalSize" xml:space="preserve">
     <value>Originalgröße</value>
   </data>
+  <data name="Outline" xml:space="preserve">
+    <value>Kontur</value>
+  </data>
   <data name="Output" xml:space="preserve">
     <value>Ausgabe</value>
   </data>

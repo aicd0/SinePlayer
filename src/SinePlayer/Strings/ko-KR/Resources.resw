@@ -886,6 +886,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="OriginalSize" xml:space="preserve">
     <value>원본 크기</value>
   </data>
+  <data name="Outline" xml:space="preserve">
+    <value>윤곽선</value>
+  </data>
   <data name="Output" xml:space="preserve">
     <value>출력</value>
   </data>

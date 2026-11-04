@@ -51,6 +51,9 @@ internal sealed partial class CoreEngine : IDisposable
     private double _volume = 1.0;
     private bool _muted;
 
+    private bool _pendingReconcile = false;
+    private ReconcileResult? _lastReconcile;
+
     public CoreEngine()
     {
         _audioDeviceNotifier.Subscribe(AudioDevices_Changed);
@@ -143,6 +146,7 @@ internal sealed partial class CoreEngine : IDisposable
         }
 
         _hasSource = false;
+        _pendingReconcile = true;
         return OperationResult.Success();
     }
 
@@ -156,6 +160,7 @@ internal sealed partial class CoreEngine : IDisposable
         }
 
         _components = components;
+        _pendingReconcile = true;
 
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is not null)
@@ -196,6 +201,7 @@ internal sealed partial class CoreEngine : IDisposable
             StartPositionTimer();
         }
 
+        _pendingReconcile = true;
         return added;
     }
 
@@ -214,6 +220,7 @@ internal sealed partial class CoreEngine : IDisposable
             return OperationResultExt.Failure(TAG, $"The {kind.ToString().ToLowerInvariant()} could not be changed to {wanted}. {selected.Message}");
         }
 
+        _pendingReconcile = true;
         return OperationResult.Success();
     }
 
@@ -225,12 +232,19 @@ internal sealed partial class CoreEngine : IDisposable
             return OperationResultExt.Failure<ReconcileResult>(TAG, "There is nothing open to build.");
         }
 
+        if (!_pendingReconcile && _lastReconcile is not null)
+        {
+            return OperationResultExt.Success(_lastReconcile);
+        }
+
         OperationResult<ReconcileResult> reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
             return OperationResultExt.Failure<ReconcileResult>(TAG, $"What was chosen could not be built. {reconciled.Message}");
         }
 
+        _pendingReconcile = false;
+        _lastReconcile = reconciled.Result;
         RaisePositionChanged();
         return reconciled;
     }
@@ -393,6 +407,7 @@ internal sealed partial class CoreEngine : IDisposable
 
         _playbackInfo.Attach(pipeline);
         _pipeline = pipeline;
+        _pendingReconcile = true;
         return pipeline;
     }
 
@@ -445,11 +460,17 @@ internal sealed partial class CoreEngine : IDisposable
         OperationResult<ReconcileResult> reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
+            _pendingReconcile = true;
             Logger.W(TAG, $"The audio output could not be re-resolved: {reconciled.Message}");
         }
         else if (!reconciled.Result.Audio.IsSuccessful)
         {
             Logger.W(TAG, $"The audio output could not be re-resolved: {reconciled.Result.Audio.Message}");
+        }
+        else
+        {
+            _pendingReconcile = false;
+            _lastReconcile = reconciled.Result;
         }
     }
 

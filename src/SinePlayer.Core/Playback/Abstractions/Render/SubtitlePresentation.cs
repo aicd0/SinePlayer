@@ -12,7 +12,8 @@ public readonly record struct SubtitlePresentation(
     string? FontFamily = null,
     double FontSize = 0.0,
     FontStyle FontStyle = FontStyle.Normal,
-    FontWeight FontWeight = default)
+    FontWeight FontWeight = default,
+    double OutlineWidth = 0.0)
 {
     public static SubtitlePresentation Identity => default;
 
@@ -23,5 +24,6 @@ public readonly record struct SubtitlePresentation(
         string.IsNullOrEmpty(FontFamily) &&
         FontSize <= 0.0 &&
         FontStyle == FontStyle.Normal &&
-        FontWeight.Weight <= 0;
+        FontWeight.Weight <= 0 &&
+        OutlineWidth <= 0.0;
 }

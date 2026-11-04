@@ -61,6 +61,7 @@ internal class PlayerSettingsModel
             SubtitleFontSize = model.Subtitle?.FontSize ?? fallbackModel.SubtitleFontSize,
             SubtitleFontStyle = model.Subtitle?.FontStyle ?? fallbackModel.SubtitleFontStyle,
             SubtitleFontWeight = model.Subtitle?.FontWeight ?? fallbackModel.SubtitleFontWeight,
+            SubtitleOutlineWidth = model.Subtitle?.OutlineWidth ?? fallbackModel.SubtitleOutlineWidth,
             VideoPreferHardwareDecoding = model.VideoPreferHardwareDecoding ?? fallbackModel.VideoPreferHardwareDecoding,
             VideoPreferHdr = model.VideoPreferHdr ?? fallbackModel.VideoPreferHdr,
             VideoResizeMode = ParseResizeMode(model.VideoResizeMode, fallbackModel.VideoResizeMode),
@@ -206,6 +207,7 @@ internal class PlayerSettingsModel
     public double SubtitleFontSize { get; set; }
     public string SubtitleFontStyle { get; set; } = nameof(FontStyle.Normal);
     public int SubtitleFontWeight { get; set; }
+    public double SubtitleOutlineWidth { get; set; } = 2.0;
     public bool VideoPreferHardwareDecoding { get; set; } = true;
     public bool VideoPreferHdr { get; set; } = true;
     public VideoResizeMode VideoResizeMode { get; set; } = VideoResizeMode.Fit;
@@ -241,6 +243,7 @@ internal class PlayerSettingsModel
                 FontSize = SubtitleFontSize,
                 FontStyle = SubtitleFontStyle,
                 FontWeight = SubtitleFontWeight,
+                OutlineWidth = SubtitleOutlineWidth,
             },
             VideoPreferHardwareDecoding = VideoPreferHardwareDecoding,
             VideoPreferHdr = VideoPreferHdr,
@@ -465,5 +468,8 @@ internal class PlayerSettingsModel
 
         [JsonPropertyName("FontWeight")]
         public int? FontWeight { get; set; }
+
+        [JsonPropertyName("OutlineWidth")]
+        public double? OutlineWidth { get; set; }
     }
 }

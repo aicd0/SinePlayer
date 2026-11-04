@@ -306,16 +306,7 @@ public class Win2DSubtitleRendererTests
     /// <summary>How many rows of the surface carry ink, drawing one cue with the presentation given.</summary>
     private static int InkRows(CanvasDevice device, Win2DSubtitleRenderer renderer, int width, int height, SubtitlePresentation presentation)
     {
-        using CanvasRenderTarget target = new(device, width, height, 96.0f);
-        using SubtitleCue cue = Cue("0,Default,,0,0,0,,Visible words");
-
-        using (CanvasDrawingSession session = target.CreateDrawingSession())
-        {
-            session.Clear(default(Color));
-            renderer.DrawCues(session, [cue], presentation, width, height);
-        }
-
-        byte[] pixels = target.GetPixelBytes();
+        byte[] pixels = RenderInk(device, renderer, width, height, presentation);
         int rows = 0;
         for (int y = 0; y < height; y++)
         {
@@ -332,6 +323,73 @@ public class Win2DSubtitleRendererTests
         }
 
         return rows;
+    }
+
+    /// <summary>How many pixels carry ink, drawing one cue with the presentation given.</summary>
+    private static int InkPixels(CanvasDevice device, Win2DSubtitleRenderer renderer, int width, int height, SubtitlePresentation presentation)
+    {
+        byte[] pixels = RenderInk(device, renderer, width, height, presentation);
+        int count = 0;
+        for (int index = 3; index < pixels.Length; index += 4)
+        {
+            if (pixels[index] != 0)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static byte[] RenderInk(CanvasDevice device, Win2DSubtitleRenderer renderer, int width, int height, SubtitlePresentation presentation)
+    {
+        using CanvasRenderTarget target = new(device, width, height, 96.0f);
+        using SubtitleCue cue = Cue("0,Default,,0,0,0,,Visible words");
+
+        using (CanvasDrawingSession session = target.CreateDrawingSession())
+        {
+            session.Clear(default(Color));
+            renderer.DrawCues(session, [cue], presentation, width, height);
+        }
+
+        return target.GetPixelBytes();
+    }
+
+    /// <summary>
+    /// A border is drawn as a stroke around the glyph outlines, twice the width asked for so that filling the words over
+    /// it leaves the width wanted outside them: the picture therefore holds more ink, and more rows of it, once a width
+    /// is set.
+    /// </summary>
+    [Test]
+    public void DrawsABorderAroundTheWordsWhenAWidthIsGiven()
+    {
+        using Win2DSubtitleRenderer renderer = new();
+
+        CanvasDevice device;
+        try
+        {
+            device = renderer.EnsureCanvasDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        SubtitlePresentation plain = new(0.0, 0.0, default, null, 24.0);
+        SubtitlePresentation bordered = plain with { OutlineWidth = 6.0 };
+
+        int plainPixels = InkPixels(device, renderer, 480, 240, plain);
+        int borderedPixels = InkPixels(device, renderer, 480, 240, bordered);
+        int plainRows = InkRows(device, renderer, 480, 240, plain);
+        int borderedRows = InkRows(device, renderer, 480, 240, bordered);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(plainPixels, Is.GreaterThan(0), "the words alone are drawn");
+            Assert.That(borderedPixels, Is.GreaterThan(plainPixels), "a border adds ink around them");
+            Assert.That(borderedRows, Is.GreaterThan(plainRows), "and it reaches above and below them");
+        }
     }
 
     /// <summary>
