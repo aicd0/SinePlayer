@@ -3,6 +3,7 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 
@@ -10,7 +11,7 @@ namespace SinePlayer.Core.Playback.Backends.Win2D;
 
 public sealed class Win2DSubtitleRendererFactory : ISubtitleRendererFactory
 {
-    public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format)
+    public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format)
     {
         OperationResultCreator<IComponentCreator<ISubtitleRenderer>> result = new();
 

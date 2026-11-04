@@ -62,7 +62,7 @@ public sealed partial class NullSubtitleRenderer : ISubtitleRenderer
         return OperationResult.Success();
     }
 
-    public OperationResult Show(IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement)
+    public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePlacement placement)
     {
         ArgumentNullException.ThrowIfNull(cues);
 

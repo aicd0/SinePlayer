@@ -10,6 +10,7 @@ using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
+using SinePlayer.Core.Playback.Backends.Libass;
 using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Backends.Wasapi;
 using SinePlayer.Core.Playback.Backends.Win2D;
@@ -34,6 +35,7 @@ internal sealed record PlaybackComponents(
     public const string FFMPEG = "ffmpeg";
     public const string DIRECT3D11 = "d3d11";
     public const string WIN2D = "win2d";
+    public const string LIBASS = "libass";
     private const string WASAPI_PREFIX = "wasapi:";
 
     public static PlaybackComponents Default { get; } = new(AUTO, AUTO, AUTO, AUTO, AUTO, AUTO, true, true);
@@ -107,6 +109,7 @@ internal sealed record PlaybackComponents(
         [
             new(AUTO, StringResourceProvider.Instance.Auto),
             new(WIN2D, "Win2D"),
+            new(LIBASS, "libass"),
             new(NONE, StringResourceProvider.Instance.None),
         ];
     }
@@ -248,11 +251,14 @@ internal sealed record PlaybackComponents(
             case WIN2D:
                 SetFactories<ISubtitleRendererFactory>(pipeline, [new Win2DSubtitleRendererFactory()]);
                 break;
+            case LIBASS:
+                SetFactories<ISubtitleRendererFactory>(pipeline, [new AssSubtitleRendererFactory()]);
+                break;
             case NONE:
                 SetFactories<ISubtitleRendererFactory>(pipeline, [new NullSubtitleRendererFactory()]);
                 break;
             default:
-                SetFactories<ISubtitleRendererFactory>(pipeline, [new Win2DSubtitleRendererFactory()]);
+                SetFactories<ISubtitleRendererFactory>(pipeline, [new AssSubtitleRendererFactory(), new Win2DSubtitleRendererFactory()]);
                 break;
         }
     }

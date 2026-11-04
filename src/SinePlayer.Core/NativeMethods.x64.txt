@@ -8,6 +8,8 @@ CoCreateInstance
 CoInitializeEx
 CommandLineToArgvW
 CreateDXGIFactory2
+CreateDirect3D11DeviceFromDXGIDevice
+CreateDirect3D11SurfaceFromDXGISurface
 D3D11CreateDevice
 D3D11_BIND_FLAG
 D3D11_BOX

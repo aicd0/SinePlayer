@@ -2780,6 +2780,65 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// A source that will not be moved is not a reason to leave the rest behind: every file is asked, so a refusal in
+    /// one does not decide where another lands. A source left where it was may still be at its end, and the packet it
+    /// answers with then reads as the end of the media rather than as the tail of a seek that never reached it — the
+    /// file that could not be moved is a line, and the media goes where it was asked to.
+    /// </summary>
+    [Test]
+    public void MovesEverySourceEvenWhenOneOfThemRefuses()
+    {
+        string refusing = SyntheticPath("refusing");
+        string subtitles = SyntheticPath("subtitles");
+
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(refusing, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            RefusesToSeek = true,
+        });
+        sources.Add(subtitles, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        });
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, subtitleRenderer);
+        try
+        {
+            // The file that refuses is the one the picture comes from, so it is the first the reader reaches and the
+            // file behind it is the one a refusal must not take with it.
+            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(refusing))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(subtitles))).IsSuccessful, Is.True);
+
+            MediaInfo played = pipeline.Sources[0].Info;
+            Assert.That(Select(pipeline, MediaStreamKind.Video, played.VideoStreams[0]).IsSuccessful, Is.True);
+            SubtitleStreamInfo subtitle = pipeline.Sources[1].Info.Streams.OfType<SubtitleStreamInfo>().First();
+            Assert.That(Select(pipeline, MediaStreamKind.Subtitle, subtitle).IsSuccessful, Is.True);
+
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitForState(pipeline, MediaEngineState.Playing);
+
+            var target = TimeSpan.FromSeconds(1);
+            Assert.That(Await(pipeline.Seek(target)).IsSuccessful, Is.True);
+
+            WaitFor(() => sources.Opened[1].LastSeekPosition == target, "the file behind the one that refused to be moved");
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(sources.Opened[0].LastSeekPosition, Is.EqualTo(target), "the source that refuses was asked");
+                Assert.That(sources.Opened[1].LastSeekPosition, Is.EqualTo(target), "and the one behind it moved anyway");
+            }
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
     /// A decoder that throws is the same failure as one that returns a failure, and it has to arrive the same
     /// way — the catch on the decode thread is the only thing between an interop fault and a thread that dies
     /// in silence, and it was once emptied by an edit without any test noticing. Playback stays `Playing` with
@@ -7835,10 +7894,13 @@ public class PlaybackPipelineTests
     {
         // What the Lab's pickers do: change the registration, then reconcile. The track stays selected and the new
         // renderer takes over the drawing — the old one is let go of, and its last drawing is cleared first.
+        // The cue outlasts the switch by far, so what the new renderer is asked for cannot be a screen the cue has
+        // already left: whether a reconcile lands inside the cue's three seconds is a question about the machine's
+        // load, not about the swap.
         SyntheticMediaScript script = new()
         {
-            Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Duration = TimeSpan.FromSeconds(20),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(20))],
         };
 
         FakeSubtitleRenderer first = new();
@@ -7858,8 +7920,43 @@ public class PlaybackPipelineTests
         {
             Assert.That(first.Disposed, Is.True, "the renderer that was replaced is released");
             Assert.That(pipeline.SelectedSubtitleStream, Is.Not.Null, "the track itself is untouched by a renderer switch");
-            Assert.That(second.Texts, Is.Not.Empty, "and the words carry on being drawn, by the new one");
         }
+
+        // The switch clears the screen before it draws again, so the new renderer's first drawing may well be an empty
+        // one — what is being asked is that the words reach it, not that they arrived in the same breath.
+        WaitFor(() => second.Texts.Length > 0, "the words to be drawn by the new one");
+    }
+
+    /// <summary>
+    /// A change with no length still has to be drawn. A karaoke syllable turning over is one instant — nothing covers it
+    /// as a window, so a loop that only asks "is something animating right now" never hears about it, and the words sit
+    /// still while the song moves on. The drawing has to follow the instant, not the cue's end.
+    /// </summary>
+    [Test]
+    public void DrawsTheCueAgainWhenAnInstantInsideItGoesBy()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(6),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(6))],
+        };
+
+        FakeSubtitleRenderer renderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(
+            script,
+            renderer,
+            subtitleDecoders: new InstantSubtitleDecoderFactory(TimeSpan.FromSeconds(1.5)));
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+        Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+        WaitFor(() => renderer.Texts.Length > 0, "the cue to be up");
+        int drawn = renderer.ShowCount;
+
+        // The instant is a second and a half in, and the cue runs for six: a drawing has to arrive long before the cue
+        // ends, which is the only other thing that would ask for one.
+        WaitFor(() => renderer.ShowCount > drawn, "the drawing the instant asks for", 2500);
+        Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the cue is still up while it is drawn again");
     }
 
     [Test]
@@ -8481,7 +8578,8 @@ public class PlaybackPipelineTests
     private static PlaybackPipeline CreateSubtitlePipeline(
         SyntheticMediaScript script,
         FakeSubtitleRenderer subtitleRenderer,
-        ISubtitleRendererFactory? subtitleRenderers = null)
+        ISubtitleRendererFactory? subtitleRenderers = null,
+        ISubtitleDecoderFactory? subtitleDecoders = null)
     {
         return CreatePipeline(
             new FakeVideoRenderer(),
@@ -8489,7 +8587,7 @@ public class PlaybackPipelineTests
             videoDecoders: new SyntheticVideoDecoderFactory(),
             sourceFactory: new SyntheticSourceProviderFactory(script),
             audioDecoders: new SyntheticAudioDecoderFactory(),
-            subtitleDecoders: new SyntheticSubtitleDecoderFactory(),
+            subtitleDecoders: subtitleDecoders ?? new SyntheticSubtitleDecoderFactory(),
             subtitleRenderers: subtitleRenderers ?? new FakeSubtitleRendererFactory(subtitleRenderer));
     }
 
@@ -8571,6 +8669,61 @@ public class PlaybackPipelineTests
         }
     }
 
+    /// <summary>
+    /// The synthetic subtitle decoder with one discrete change declared inside its cue — a karaoke syllable turning over,
+    /// which has no length and so cannot be asked about as a window.
+    /// </summary>
+    private sealed class InstantSubtitleDecoderFactory(TimeSpan instant) : ISubtitleDecoderFactory
+    {
+        public OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource source, SubtitleStreamInfo stream)
+        {
+            IComponentCreator<ISubtitleDecoder> creator = new FixedCreator<ISubtitleDecoder>("instant:subtitle", () => new Decoder(stream, instant));
+            return new OperationResultCreator<IComponentCreator<ISubtitleDecoder>>().Success(creator);
+        }
+
+        private sealed class Decoder(SubtitleStreamInfo stream, TimeSpan instant) : ISubtitleDecoder
+        {
+            public string Name => "instant";
+
+            public MediaStreamInfo Stream => stream;
+
+            public bool IsHardwareAccelerated => false;
+
+            public SubtitleCueFormat CueFormat => SubtitleCueFormat.Ass;
+
+            public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<SubtitleCue> cues)
+            {
+                cues =
+                [
+                    new SubtitleCue
+                    {
+                        Start = packet.Timestamp,
+                        End = packet.Timestamp + packet.Duration,
+                        Text = SyntheticSubtitleDecoderFactory.TextAt(packet.Timestamp),
+                        Changes = [new SubtitleChange(instant, instant, false)],
+                    },
+                ];
+
+                return OperationResult.Success();
+            }
+
+            public OperationResult Drain(out IReadOnlyList<SubtitleCue> cues)
+            {
+                cues = [];
+                return OperationResult.Success();
+            }
+
+            public OperationResult Flush()
+            {
+                return OperationResult.Success();
+            }
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
     private sealed class FakeSubtitleRendererFactory(ISubtitleRenderer renderer) : ISubtitleRendererFactory
     {
         private readonly string _signature = NextSignature("fake-subtitle");
@@ -8578,7 +8731,7 @@ public class PlaybackPipelineTests
         /// <summary>The format the pipeline asked for, which is the decoder's word about what a cue is made of.</summary>
         internal SubtitleCueFormat? RequestedFormat { get; private set; }
 
-        public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format)
+        public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format)
         {
             RequestedFormat = format;
             return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Success(new FixedCreator<ISubtitleRenderer>(_signature, () => renderer));
@@ -8588,7 +8741,7 @@ public class PlaybackPipelineTests
     /// <summary>A factory that cannot draw what it is asked for, which is how a renderer says so at all.</summary>
     private sealed class RefusingSubtitleRendererFactory : ISubtitleRendererFactory
     {
-        public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format)
+        public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format)
         {
             return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Failure($"This renderer does not draw {format} cues.");
         }
@@ -8613,7 +8766,7 @@ public class PlaybackPipelineTests
             _signature = NextSignature("swappable-subtitle");
         }
 
-        public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format)
+        public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format)
         {
             return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Success(new FixedCreator<ISubtitleRenderer>(_signature, () => _renderer));
         }
@@ -8675,7 +8828,7 @@ public class PlaybackPipelineTests
             return OperationResult.Success();
         }
 
-        public OperationResult Show(IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement)
+        public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePlacement placement)
         {
             string[] texts = [.. cues.Select(cue => cue.Text ?? string.Empty)];
             lock (_lock)

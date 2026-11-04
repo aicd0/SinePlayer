@@ -58,6 +58,12 @@ internal sealed class SyntheticMediaScript
     /// </summary>
     internal bool LandsOnTheKeyframeBefore { get; init; }
 
+    /// <summary>
+    /// Whether a seek is refused rather than carried out, which is what a live source does when it finds out only by
+    /// trying: it can be asked to move, it just will not.
+    /// </summary>
+    internal bool RefusesToSeek { get; init; }
+
     internal int FrameRate { get; init; } = 30;
 
     internal int SampleRate { get; init; } = 44100;
@@ -240,6 +246,11 @@ internal sealed class SyntheticMediaSource : IMediaSource
     {
         LastSeekPosition = position;
         LastSeekStreamIndex = streamIndex;
+
+        if (_script.RefusesToSeek)
+        {
+            return OperationResult.Failure("This source refuses to be moved.");
+        }
 
         // The timeline is fixed and ordered, so a position is realised by starting at a packet rather than by
         // decoding and skipping.

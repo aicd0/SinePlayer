@@ -12,13 +12,11 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
-using SinePlayer.Core.Playback.Backends.Direct3D11;
+using SinePlayer.Core.Playback.Subtitle;
 
 using Windows.Foundation;
 using Windows.Graphics.DirectX;
-using Windows.Graphics.DirectX.Direct3D11;
 using Windows.UI;
-using Windows.Win32.Graphics.Dxgi.Common;
 
 namespace SinePlayer.Core.Playback.Backends.Win2D;
 
@@ -43,22 +41,23 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
     /// <summary>How much clear space is left between two cues that stack, as a fraction of the font's size.</summary>
     private const float StackGapFraction = 0.15f;
 
-    private static readonly Guid sSurfaceInterfaceId = typeof(Windows.Win32.Graphics.Dxgi.IDXGISurface).GUID;
-
-    /// <summary><c>IDXGIDevice</c>, which a Direct3D device answers to and Win2D wants.</summary>
-    private static readonly Guid sDeviceInterfaceId = new("54ec77fa-1377-44e6-8c32-88fd5f44c84c");
-
     private readonly string _fontFamily = "Segoe UI";
 
-    private D3D11Device? _d3dDevice;
-    private D3D11SwapChain? _swapChain;
-    private IDirect3DSurface? _surface;
-    private CanvasDevice? _canvasDevice;
-    private IVideoRenderTarget? _target;
-    private SubtitleStreamInfo? _stream;
     private bool _disposed;
+    private readonly SubtitleSurface _surface = new();
 
     public string Name => "Win2D";
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _surface.Dispose();
+    }
 
     public OperationResult Configure(SubtitleStreamInfo stream, IVideoRenderTarget target)
     {
@@ -70,18 +69,11 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             return OperationResult.Failure("The subtitle renderer has already been disposed.");
         }
 
-        if (!ReferenceEquals(_target, target) && _target is not null)
-        {
-            _target.SurfaceSizeChanged -= OnSurfaceSizeChanged;
-            _target = null;
-        }
-
-        _stream = stream;
-        _target = target;
-        return EnsureSurface();
+        _surface.BindTarget(target);
+        return _surface.EnsureSurface();
     }
 
-    public OperationResult Show(IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement)
+    public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePlacement placement)
     {
         ArgumentNullException.ThrowIfNull(cues);
 
@@ -92,84 +84,23 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
         // The surface may have been resized since the last drawing, so the size is read every time rather than
         // remembered from Configure: a caller redraws after a resize precisely so this can take effect.
-        OperationResult sized = EnsureSurface();
+        OperationResult sized = _surface.EnsureSurface();
         if (!sized.IsSuccessful)
         {
             return sized;
         }
 
-        D3D11SwapChain swapChain = _swapChain!;
-
-        OperationResult drawn = Draw(swapChain, cues, placement);
-        if (!drawn.IsSuccessful)
-        {
-            return drawn;
-        }
-
-        try
-        {
-            swapChain.Present();
-            return OperationResult.Success();
-        }
-        catch (Exception exception)
-        {
-            // A lost device is not a reason to stop playback: the next drawing builds everything again.
-            ResetSurface();
-            return OperationResult.Failure($"Unable to present the subtitles: {exception.Message}");
-        }
+        SubtitleSurface surface = _surface;
+        return surface.DrawAndPresent(session => DrawCues(session, cues, placement, surface.Width, surface.Height, surface.CompositionScale));
     }
 
-    public void Dispose()
+    /// <summary>
+    /// The device text is laid out with, built on first use. A test that wants to check the drawing against an offscreen
+    /// target uses this rather than a swap chain, which cannot be read back after it has presented.
+    /// </summary>
+    internal CanvasDevice EnsureCanvasDevice()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-
-        if (_target is not null)
-        {
-            _target.SurfaceSizeChanged -= OnSurfaceSizeChanged;
-        }
-
-        ResetSurface();
-        _target = null;
-        _stream = null;
-    }
-
-    private OperationResult Draw(D3D11SwapChain swapChain, IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement)
-    {
-        CanvasRenderTarget? target = null;
-        try
-        {
-            int width = swapChain.Width;
-            int height = swapChain.Height;
-
-            IDirect3DSurface? surface = _surface;
-            if (surface is null)
-            {
-                return OperationResult.Failure("The subtitle surface has no back buffer to draw into.");
-            }
-
-            target = CanvasRenderTarget.CreateFromDirect3D11Surface(_canvasDevice!, surface, 96.0f, CanvasAlphaMode.Premultiplied);
-
-            using (CanvasDrawingSession session = target.CreateDrawingSession())
-            {
-                session.Clear(default(Color));
-                DrawCues(session, cues, placement, width, height, swapChain.CompositionScale);
-            }
-
-            return OperationResult.Success();
-        }
-        catch (Exception exception)
-        {
-            return OperationResult.Failure($"Unable to draw the subtitles: {exception.Message}");
-        }
-        finally
-        {
-            target?.Dispose();
-        }
+        return _surface.EnsureCanvasDevice();
     }
 
     internal void DrawCues(CanvasDrawingSession session, IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement, int width, int height, double scale = 1.0)
@@ -213,7 +144,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             }
 
             string body = string.Join("\n", text.Lines);
-            using CanvasTextLayout layout = new(_canvasDevice, body, format, width, height);
+            using CanvasTextLayout layout = new(EnsureCanvasDevice(), body, format, width, height);
 
             int row = RowOf(text.Alignment);
             float stacked = taken[row];
@@ -255,7 +186,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         Marshal.Copy(buffer.Pixels, pixels, 0, pixels.Length);
 
         using var bitmap = CanvasBitmap.CreateFromBytes(
-            _canvasDevice,
+            EnsureCanvasDevice(),
             pixels,
             buffer.Width,
             buffer.Height,
@@ -328,204 +259,5 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         return new Vector2((float)Math.Clamp(origin.X, (double)area.Left, maxX), (float)Math.Clamp(origin.Y, (double)area.Top, maxY));
     }
 
-    /// <summary>
-    /// The device text is laid out with, built on first use. A test that wants to check the drawing against an offscreen
-    /// target uses this rather than a swap chain, which cannot be read back after it has presented.
-    /// </summary>
-    internal CanvasDevice EnsureCanvasDevice()
-    {
-        if (_canvasDevice is null)
-        {
-            if (_d3dDevice is null)
-            {
-                OperationResult<D3D11Device> created = D3D11Device.Create();
-                if (!created.IsSuccessful)
-                {
-                    throw new InvalidOperationException(created.Message);
-                }
-
-                _d3dDevice = created.Result;
-            }
-
-            _canvasDevice = CanvasDevice.CreateFromDirect3D11Device(CreateWin2DDevice(_d3dDevice!));
-        }
-
-        return _canvasDevice;
-    }
-
-    private OperationResult EnsureSurface()
-    {
-        IVideoRenderTarget? target = _target;
-        if (target is null)
-        {
-            return OperationResult.Failure("The subtitle renderer has no surface to draw into.");
-        }
-
-        double scale = target.RasterizationScale > 0 && double.IsFinite(target.RasterizationScale) ? target.RasterizationScale : 1.0;
-        int width = Math.Max(1, (int)Math.Round(target.SurfaceWidth * scale));
-        int height = Math.Max(1, (int)Math.Round(target.SurfaceHeight * scale));
-
-        try
-        {
-            if (_d3dDevice is null || _canvasDevice is null)
-            {
-                // A device of its own: the picture's belongs to the video renderer, which owns and releases it.
-                EnsureCanvasDevice();
-            }
-
-            if (_swapChain is not null && NeedsReplacing(_swapChain, width, height, scale))
-            {
-                // A chain drawn through Win2D is replaced rather than resized. The wrapper this renderer holds around the
-                // chain's back buffer is a WinRT object whose reference DXGI counts, and ResizeBuffers refuses while any
-                // reference to a buffer is outstanding — the wrapper lives until its finalizer runs, so a resize fails
-                // with DXGI_ERROR_INVALID_CALL and would keep failing. A new chain has new buffers and nothing holding
-                // them, which is why the size change is answered by throwing the old one away.
-                ReleaseChain();
-            }
-
-            if (_swapChain is null)
-            {
-                OperationResult<D3D11SwapChain> created = D3D11SwapChain.Create(_d3dDevice!, width, height, scale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_PREMULTIPLIED);
-                if (!created.IsSuccessful)
-                {
-                    return OperationResult.Failure(created);
-                }
-
-                OperationResult attached = created.Result.AttachTo(target);
-                if (!attached.IsSuccessful)
-                {
-                    created.Result.Dispose();
-                    return attached;
-                }
-
-                _swapChain = created.Result;
-                _surface = CreateSurface(created.Result);
-                target.SurfaceSizeChanged += OnSurfaceSizeChanged;
-            }
-
-            return OperationResult.Success();
-        }
-        catch (Exception exception)
-        {
-            ResetSurface();
-            return OperationResult.Failure($"Unable to prepare the subtitle surface: {exception.Message}");
-        }
-    }
-
-    private static bool NeedsReplacing(D3D11SwapChain swapChain, int width, int height, double scale)
-    {
-        return swapChain.Width != width || swapChain.Height != height || swapChain.CompositionScale != scale;
-    }
-
-    /// <summary>
-    /// Lets go of the chain and of the wrapper around its back buffer. Something that drew this chain cannot be resized
-    /// afterwards, so a resize is answered by this: the chain goes, and the next surface is a new one.
-    /// </summary>
-    private void ReleaseChain()
-    {
-        _surface = null;
-        _swapChain?.Dispose();
-        _swapChain = null;
-    }
-
-    /// <summary>
-    /// The Win2D device over the engine's Direct3D device, so drawing reaches the same swap chain rather than a device
-    /// of Win2D's own choosing.
-    /// </summary>
-    private static IDirect3DDevice CreateWin2DDevice(D3D11Device device)
-    {
-        nint dxgiDevice = QueryInterface(device.Device, sDeviceInterfaceId);
-        try
-        {
-            int created = CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice, out nint graphicsDevice);
-            if (created < 0)
-            {
-                throw Marshal.GetExceptionForHR(created) ?? new InvalidOperationException($"Unable to wrap the device for Win2D (0x{created:X8}).");
-            }
-
-            try
-            {
-                return WinRT.MarshalInspectable<IDirect3DDevice>.FromAbi(graphicsDevice);
-            }
-            finally
-            {
-                Marshal.Release(graphicsDevice);
-            }
-        }
-        finally
-        {
-            Marshal.Release(dxgiDevice);
-        }
-    }
-
-    /// <summary>The swap chain's back buffer as the surface type Win2D takes.</summary>
-    private static IDirect3DSurface CreateSurface(D3D11SwapChain swapChain)
-    {
-        nint dxgiSurface = QueryInterface(swapChain.BackBuffer, sSurfaceInterfaceId);
-        try
-        {
-            int created = CreateDirect3D11SurfaceFromDXGISurface(dxgiSurface, out nint graphicsSurface);
-            if (created < 0)
-            {
-                throw Marshal.GetExceptionForHR(created) ?? new InvalidOperationException($"Unable to wrap the surface for Win2D (0x{created:X8}).");
-            }
-
-            try
-            {
-                return WinRT.MarshalInspectable<IDirect3DSurface>.FromAbi(graphicsSurface);
-            }
-            finally
-            {
-                Marshal.Release(graphicsSurface);
-            }
-        }
-        finally
-        {
-            Marshal.Release(dxgiSurface);
-        }
-    }
-
-    /// <summary>The same object as another interface, which is how a Direct3D object reaches the WinRT wrappers above.</summary>
-    private static nint QueryInterface(object instance, Guid iid)
-    {
-        nint unknown = Marshal.GetIUnknownForObject(instance);
-        try
-        {
-            int result = Marshal.QueryInterface(unknown, in iid, out nint acquired);
-            if (result < 0)
-            {
-                throw Marshal.GetExceptionForHR(result) ?? new InvalidOperationException($"The object does not expose the interface (0x{result:X8}).");
-            }
-
-            return acquired;
-        }
-        finally
-        {
-            Marshal.Release(unknown);
-        }
-    }
-
-    // The two exports that turn a Direct3D object into the WinRT surface and device Win2D draws through. Declared here
-    // rather than generated, because both hand out a WinRT object through an ABI pointer and the generated wrappers
-    // marshal an interface instead of a pointer.
-    [DllImport("d3d11.dll")]
-    private static extern int CreateDirect3D11DeviceFromDXGIDevice(nint dxgiDevice, out nint graphicsDevice);
-
-    [DllImport("d3d11.dll")]
-    private static extern int CreateDirect3D11SurfaceFromDXGISurface(nint dxgiSurface, out nint graphicsSurface);
-
-    private void OnSurfaceSizeChanged()
-    {
-        // A swap chain cannot be resized from the thread that raised this, and it does not need to be: the pipeline
-        // draws again after telling the renderer, and EnsureSurface compares the size it is asked for with its own.
-    }
-
-    private void ResetSurface()
-    {
-        ReleaseChain();
-        _canvasDevice?.Dispose();
-        _canvasDevice = null;
-        _d3dDevice?.Dispose();
-        _d3dDevice = null;
-    }
 }
+

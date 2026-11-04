@@ -14,18 +14,21 @@ namespace SinePlayer.Core.Tests.Playback;
 [TestFixture]
 public class SubtitleCueWindowTests
 {
+    /// <summary>The run of reading the tests below belong to, unless they are about a jump between runs.</summary>
+    private const long Epoch = 0;
+
     [Test]
     public void ShowsTheCuesThatCoverThePosition()
     {
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 3), Cue(2, 4)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 3), Cue(2, 4)], TimeSpan.Zero);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(0.5))), Is.Empty, "before the first cue starts");
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(2.5))), Is.EqualTo(new[] { "1", "2" }), "overlapping events are both up");
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(3.5))), Is.EqualTo(new[] { "2" }), "the first has ended");
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(4))), Is.Empty, "a cue's end is not its moment");
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(0.5))), Is.Empty, "before the first cue starts");
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(2.5))), Is.EqualTo(new[] { "1", "2" }), "overlapping events are both up");
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(3.5))), Is.EqualTo(new[] { "2" }), "the first has ended");
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(4))), Is.Empty, "a cue's end is not its moment");
         }
     }
 
@@ -34,14 +37,14 @@ public class SubtitleCueWindowTests
     {
         // What a forward seek costs without this: the cue's packet lies before the landing, so the re-read never delivers
         // it again and the text is lost until the cue's own end.
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 20)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 20)], TimeSpan.Zero);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(6))), Is.EqualTo(new[] { "1" }));
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(15))), Is.EqualTo(new[] { "1" }));
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(20))), Is.Empty);
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(6))), Is.EqualTo(new[] { "1" }));
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(15))), Is.EqualTo(new[] { "1" }));
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(20))), Is.Empty);
         }
     }
 
@@ -49,33 +52,66 @@ public class SubtitleCueWindowTests
     public void CountsTheSameEventOnceWhenItIsReadAgain()
     {
         // A seek re-reads from a keyframe, so the events ahead of the new position arrive a second time.
-        SubtitleCueWindow window = new();
-        window.Add([Cue(5, 9)], TimeSpan.Zero);
-        window.Add([Cue(5, 9)], TimeSpan.FromSeconds(5));
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(5, 9)], TimeSpan.Zero);
+        window.Add(Epoch, [Cue(5, 9)], TimeSpan.FromSeconds(5));
 
-        Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(6))), Is.EqualTo(new[] { "5" }), "the same event twice is one cue");
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(6))), Is.EqualTo(new[] { "5" }), "the same event twice is one cue");
     }
 
     [Test]
     public void TellsSimultaneousEventsApartByTheirText()
     {
         // Two speakers at once are written as two events over one span: the same times, different words.
-        SubtitleCueWindow window = new();
-        window.Add([Cue(5, 9, "left"), Cue(5, 9, "right")], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(5, 9, "left"), Cue(5, 9, "right")], TimeSpan.Zero);
 
-        Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(6))), Is.EqualTo(new[] { "left", "right" }));
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(6))), Is.EqualTo(new[] { "left", "right" }));
     }
 
     [Test]
     public void DropsWhatIsBehindButNotWhatIsStillVisible()
     {
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 2), Cue(3, 11)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 2), Cue(3, 11)], TimeSpan.Zero);
 
         // Ten seconds on: the first cue is long gone, the second is still up, and a third arrives.
-        window.Add([Cue(10, 12)], TimeSpan.FromSeconds(10));
+        window.Add(Epoch, [Cue(10, 12)], TimeSpan.FromSeconds(10));
 
-        Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(10.5))), Is.EqualTo(new[] { "3", "10" }), "the ended cue is gone, the running one stayed");
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(10.5))), Is.EqualTo(new[] { "3", "10" }), "the ended cue is gone, the running one stayed");
+    }
+
+    [Test]
+    public void KeepsItsCuesInTimeOrderWhenAJumpGoesBack()
+    {
+        // A jump back leaves the cues that are still ahead of the landing where they were, and what the re-read delivers
+        // begins before them: appending would leave the window holding a timeline whose later end comes first.
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(10, 20)], TimeSpan.Zero);
+
+        window.SeekTo(Epoch, TimeSpan.FromSeconds(5));
+        window.Add(Epoch, [Cue(5, 12)], TimeSpan.FromSeconds(5));
+
+        Assert.That(
+            Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(11))),
+            Is.EqualTo(new[] { "5", "10" }),
+            "the cue that begins first comes first, however the playhead got there");
+    }
+
+    [Test]
+    public void LetsGoOfAStaleCueThatIsNotTheFirst()
+    {
+        // Cues are ordered by where they begin, not by where they end: a line that began early can outlast one that began
+        // after it, so a sweep that stopped at the first cue still up would keep the ended one for ever.
+        WatchImage image = new();
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 20), Cue(2, 3, image)], TimeSpan.Zero);
+
+        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(5)))
+        {
+        }
+
+        Assert.That(image.Disposed, Is.True, "the ended cue is let go of even though a longer one began before it");
     }
 
     [Test]
@@ -84,10 +120,10 @@ public class SubtitleCueWindowTests
         // Asking is what drains, so a quiet stretch of the file does not have to wait for the track to say something else
         // before what has been passed is let go of.
         WatchImage image = new();
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 2, image)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 2, image)], TimeSpan.Zero);
 
-        using (window.Visible(TimeSpan.FromSeconds(5)))
+        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(5)))
         {
         }
 
@@ -95,21 +131,70 @@ public class SubtitleCueWindowTests
     }
 
     [Test]
+    public void IgnoresAQuestionAboutTheReadingAJumpAbandoned()
+    {
+        // What this pins: the renderer asks about the position its clock still reports, and the clock is only repositioned
+        // after the jump has already started a new reading. So the first question after a backward jump is about where the
+        // playhead *was* — and answering it used to move the floor past everything the re-read was about to deliver, which
+        // lost the cue at the top of the file for as long as it took to reach the old position again.
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 3)], TimeSpan.Zero);
+
+        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(60)))
+        {
+        }
+
+        const long moved = Epoch + 1;
+        window.SeekTo(moved, TimeSpan.Zero);
+
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(60))), Is.Empty, "a question from the reading that was abandoned is not answered");
+
+        window.Add(moved, [Cue(1, 3)], TimeSpan.Zero);
+
+        // The renderer does not ask once: it polls, and the clock is only repositioned some time after the jump. Every one
+        // of those questions must leave the new reading alone, not merely the first.
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(60))), Is.Empty);
+
+        Assert.That(
+            Texts(window.GetVisibleCues(moved, TimeSpan.FromSeconds(2))),
+            Is.EqualTo(new[] { "1" }),
+            "the cue at the top of the file comes back, because the abandoned questions did not move the floor past it");
+    }
+
+    [Test]
+    public void RefusesCuesFromAReadingThatHasBeenAbandoned()
+    {
+        // The decoder notices a jump before the reader has finished with the packets it already queued, so a cue can arrive
+        // late from the reading that was replaced. It describes a position nobody will ask about again.
+        WatchImage image = new();
+        SubtitleCueWindow window = Window();
+        window.SeekTo(7, TimeSpan.FromSeconds(4));
+
+        window.Add(6, [Cue(4, 6, image)], TimeSpan.FromSeconds(4));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Texts(window.GetVisibleCues(7, TimeSpan.FromSeconds(5))), Is.Empty, "the stray cue is not shown");
+            Assert.That(image.Disposed, Is.True, "and it is let go of rather than kept for a question that will never come");
+        }
+    }
+
+    [Test]
     public void MovesTheFloorBackwardsWithAJump()
     {
         // A backward jump asks about positions the window has already passed. If the floor stayed where it was, everything
         // the jump landed on would be discarded as already seen.
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 5)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 5)], TimeSpan.Zero);
 
-        using (window.Visible(TimeSpan.FromSeconds(90)))
+        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(90)))
         {
         }
 
-        window.SkipTo(TimeSpan.FromSeconds(2));
-        window.Add([Cue(2, 4)], TimeSpan.FromSeconds(2));
+        window.SeekTo(Epoch, TimeSpan.FromSeconds(2));
+        window.Add(Epoch, [Cue(2, 4)], TimeSpan.FromSeconds(2));
 
-        Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(3))), Is.EqualTo(new[] { "2" }), "the cue the jump landed on was kept");
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(3))), Is.EqualTo(new[] { "2" }), "the cue the jump landed on was kept");
     }
 
     [Test]
@@ -118,18 +203,18 @@ public class SubtitleCueWindowTests
         // The reader runs ahead of the renderer, so a cue that has ended is not necessarily one nobody is about to ask for:
         // the window keeps it until a question arrives that is past its end.
         WatchImage image = new();
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 2, image)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 2, image)], TimeSpan.Zero);
 
-        using (window.Visible(TimeSpan.FromSeconds(1.5)))
+        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(1.5)))
         {
         }
 
-        window.Add([], TimeSpan.FromSeconds(2.5));
+        window.Add(Epoch, [], TimeSpan.FromSeconds(2.5));
 
         Assert.That(image.Disposed, Is.False, "nothing has asked about a position past the cue's end yet");
 
-        using (window.Visible(TimeSpan.FromSeconds(3)))
+        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(3)))
         {
         }
 
@@ -139,13 +224,13 @@ public class SubtitleCueWindowTests
     [Test]
     public void FreesWhatNobodyCanAskForWithoutARenderer()
     {
-        // Nothing draws the cues, so nothing will ever ask: the read position is the floor, and a cue the reader has
+        // Nothing draws the cues, so nothing will ever ask: the caller's position is the floor, and a cue the reader has
         // passed is gone. Without that, a window nobody drains would keep every cue it was ever given.
         WatchImage image = new();
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 2, image)], TimeSpan.Zero, hasConsumer: false);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 2, image)], TimeSpan.Zero, discardStale: true);
 
-        window.Add([], TimeSpan.FromSeconds(5), hasConsumer: false);
+        window.Add(Epoch, [], TimeSpan.FromSeconds(5), discardStale: true);
 
         Assert.That(image.Disposed, Is.True, "no renderer means no future question to wait for");
     }
@@ -153,8 +238,8 @@ public class SubtitleCueWindowTests
     [Test]
     public void WaitsUntilTheNextBoundaryThatCanChangeTheScreen()
     {
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 3), Cue(2, 4)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 3), Cue(2, 4)], TimeSpan.Zero);
 
         using (Assert.EnterMultipleScope())
         {
@@ -178,19 +263,19 @@ public class SubtitleCueWindowTests
         WatchImage image = new();
         // A bitmap display set says when it starts and never when it ends: libavcodec reports the end as unstated, and the
         // event that replaces it is the only thing that says how long it was up.
-        SubtitleCueWindow window = new();
+        SubtitleCueWindow window = Window();
         SubtitleCue first = OpenCue(2);
-        window.Add([first], TimeSpan.Zero);
+        window.Add(Epoch, [first], TimeSpan.Zero);
 
-        Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(5))), Is.EqualTo(new[] { "2" }), "a cue with no stated end stays up");
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(5))), Is.EqualTo(new[] { "2" }), "a cue with no stated end stays up");
 
-        window.Add([OpenCue(6)], TimeSpan.FromSeconds(6));
+        window.Add(Epoch, [OpenCue(6)], TimeSpan.FromSeconds(6));
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(first.End, Is.EqualTo(TimeSpan.FromSeconds(6)), "the replacing event is where it ends");
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(5))), Is.EqualTo(new[] { "2" }), "and it was up until then");
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(6))), Is.EqualTo(new[] { "6" }), "only the new one is up after it");
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(5))), Is.EqualTo(new[] { "2" }), "and it was up until then");
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(6))), Is.EqualTo(new[] { "6" }), "only the new one is up after it");
         }
     }
 
@@ -199,16 +284,16 @@ public class SubtitleCueWindowTests
     {
         // A display set with no objects in it takes the picture away rather than putting something up, so it arrives as a
         // cue with nothing in it: never drawn, it exists to end what came before.
-        SubtitleCueWindow window = new();
-        window.Add([OpenCue(2)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [OpenCue(2)], TimeSpan.Zero);
 
-        window.Add([Unset(4)], TimeSpan.FromSeconds(4));
+        window.Add(Epoch, [Unset(4)], TimeSpan.FromSeconds(4));
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(3.5))), Is.EqualTo(new[] { "2" }), "up until the clear");
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(4))), Is.Empty, "gone from the clear onwards");
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(4.5))), Is.Empty, "and the clear draws nothing itself");
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(3.5))), Is.EqualTo(new[] { "2" }), "up until the clear");
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(4))), Is.Empty, "gone from the clear onwards");
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(4.5))), Is.Empty, "and the clear draws nothing itself");
         }
     }
 
@@ -217,13 +302,13 @@ public class SubtitleCueWindowTests
     {
         // A seek re-reads an event that a later one has since closed, so the copy that comes back says "no end stated"
         // where the one already held says when it ended. Matching on both would keep two copies of one line.
-        SubtitleCueWindow window = new();
-        window.Add([OpenCue(2)], TimeSpan.Zero);
-        window.Add([OpenCue(6)], TimeSpan.FromSeconds(4));
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [OpenCue(2)], TimeSpan.Zero);
+        window.Add(Epoch, [OpenCue(6)], TimeSpan.FromSeconds(4));
 
-        window.Add([OpenCue(2)], TimeSpan.FromSeconds(5.5));
+        window.Add(Epoch, [OpenCue(2)], TimeSpan.FromSeconds(5.5));
 
-        Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(3))), Is.EqualTo(new[] { "2" }), "one copy, not two");
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(3))), Is.EqualTo(new[] { "2" }), "one copy, not two");
     }
 
     [Test]
@@ -231,24 +316,24 @@ public class SubtitleCueWindowTests
     {
         // The two may only be replaced by what comes next when the track said nothing. A line written over another one is
         // a text cue's own business.
-        SubtitleCueWindow window = new();
+        SubtitleCueWindow window = Window();
         SubtitleCue first = Cue(1, 9);
-        window.Add([first], TimeSpan.Zero);
+        window.Add(Epoch, [first], TimeSpan.Zero);
 
-        window.Add([Cue(3, 5)], TimeSpan.FromSeconds(3));
+        window.Add(Epoch, [Cue(3, 5)], TimeSpan.FromSeconds(3));
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(first.End, Is.EqualTo(TimeSpan.FromSeconds(9)), "the end it stated is the end it keeps");
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(6))), Is.EqualTo(new[] { "1" }), "and it is still up after the other began");
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(6))), Is.EqualTo(new[] { "1" }), "and it is still up after the other began");
         }
     }
 
     [Test]
     public void WaitsForAnOpenCueToBeReplacedRatherThanForItsEnd()
     {
-        SubtitleCueWindow window = new();
-        window.Add([OpenCue(2)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [OpenCue(2)], TimeSpan.Zero);
 
         Assert.That(window.TimeUntilNextChange(TimeSpan.FromSeconds(3)), Is.GreaterThan(TimeSpan.FromDays(1)), "nothing is due to happen on its own");
     }
@@ -258,23 +343,23 @@ public class SubtitleCueWindowTests
     {
         // The event that would have ended this cue lies between where it started and where the playhead now is, so it is
         // never read: an open cue left alone would show over whatever the jump landed on.
-        SubtitleCueWindow window = new();
-        window.Add([OpenCue(2)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [OpenCue(2)], TimeSpan.Zero);
 
-        window.SkipTo(TimeSpan.FromSeconds(90));
+        window.SeekTo(Epoch, TimeSpan.FromSeconds(90));
 
-        Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(90.5))), Is.Empty, "a line the jump went past is not still up");
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(90.5))), Is.Empty, "a line the jump went past is not still up");
     }
 
     [Test]
     public void KeepsAnOpenCueThePlayheadHasNotReached()
     {
-        SubtitleCueWindow window = new();
-        window.Add([OpenCue(200)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [OpenCue(200)], TimeSpan.Zero);
 
-        window.SkipTo(TimeSpan.FromSeconds(50));
+        window.SeekTo(Epoch, TimeSpan.FromSeconds(50));
 
-        Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(201))), Is.EqualTo(new[] { "200" }), "a cue ahead of the jump is a fact about the file");
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(201))), Is.EqualTo(new[] { "200" }), "a cue ahead of the jump is a fact about the file");
     }
 
     [Test]
@@ -283,12 +368,12 @@ public class SubtitleCueWindowTests
         // What the deleted one-second margin used to be an estimate of: the window stops offering a cue once a question has
         // passed it, but a renderer may still be drawing it. The hold is what says so, so the picture survives.
         WatchImage image = new();
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 2, image)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 2, image)], TimeSpan.Zero);
 
-        SubtitleCueSnapshot snapshot = window.Visible(TimeSpan.FromSeconds(1.5));
+        SubtitleCueSnapshot snapshot = window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(1.5));
 
-        using (window.Visible(TimeSpan.FromSeconds(5)))
+        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(5)))
         {
         }
 
@@ -303,11 +388,11 @@ public class SubtitleCueWindowTests
     public void StaysAliveUntilTheLastSnapshotIsDropped()
     {
         WatchImage image = new();
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 20, image)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 20, image)], TimeSpan.Zero);
 
-        SubtitleCueSnapshot first = window.Visible(TimeSpan.FromSeconds(2));
-        SubtitleCueSnapshot second = window.Visible(TimeSpan.FromSeconds(3));
+        SubtitleCueSnapshot first = window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(2));
+        SubtitleCueSnapshot second = window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(3));
 
         window.Reset();
         first.Dispose();
@@ -323,9 +408,9 @@ public class SubtitleCueWindowTests
     public void LetsGoOfAnEmptySnapshotTwice()
     {
         // Nothing to draw is the common case, and it is one shared object: releasing it must stay harmless.
-        SubtitleCueWindow window = new();
+        SubtitleCueWindow window = Window();
 
-        SubtitleCueSnapshot snapshot = window.Visible(TimeSpan.Zero);
+        SubtitleCueSnapshot snapshot = window.GetVisibleCues(Epoch, TimeSpan.Zero);
         snapshot.Dispose();
         snapshot.Dispose();
 
@@ -336,16 +421,27 @@ public class SubtitleCueWindowTests
     public void ForgetsEverythingWhenItIsReset()
     {
         WatchImage image = new();
-        SubtitleCueWindow window = new();
-        window.Add([Cue(1, 3, image)], TimeSpan.Zero);
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, [Cue(1, 3, image)], TimeSpan.Zero);
 
         window.Reset();
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(Texts(window.Visible(TimeSpan.FromSeconds(2))), Is.Empty);
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(2))), Is.Empty);
             Assert.That(image.Disposed, Is.True, "a reset is the track going away, so nothing is left to draw");
         }
+    }
+
+    /// <summary>
+    /// A window that has been told where its reading starts, which is what the pipeline does before it reads anything: the
+    /// window is never the one to decide which reading it is in.
+    /// </summary>
+    private static SubtitleCueWindow Window()
+    {
+        SubtitleCueWindow window = new();
+        window.SeekTo(Epoch, TimeSpan.Zero);
+        return window;
     }
 
     private static SubtitleCue Cue(double startSeconds, double endSeconds, string? text = null)

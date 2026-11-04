@@ -8,6 +8,7 @@ using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
+using SinePlayer.Core.Playback.Subtitle;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
@@ -236,6 +237,7 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
                 Start = start,
                 End = end,
                 Text = text,
+                Changes = AssSubtitleChanges.Parse(text, start, end),
             });
             return OperationResult.Success();
         }
@@ -427,19 +429,49 @@ public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
                 continue;
             }
 
-            string? line = rect->Type == FFmpegConstants.SubtitleTypeAss
-                ? Marshal.PtrToStringUTF8(rect->Ass) ?? Marshal.PtrToStringUTF8(rect->Text)
-                : Marshal.PtrToStringUTF8(rect->Text) ?? Marshal.PtrToStringUTF8(rect->Ass);
+            nint pointer;
+            bool eventLine;
+            if (rect->Type == FFmpegConstants.SubtitleTypeAss && rect->Ass != 0)
+            {
+                pointer = rect->Ass;
+                eventLine = true;
+            }
+            else if (rect->Text != 0)
+            {
+                pointer = rect->Text;
+                eventLine = false;
+            }
+            else
+            {
+                pointer = rect->Ass;
+                eventLine = pointer != 0;
+            }
+
+            string? line = pointer != 0 ? Marshal.PtrToStringUTF8(pointer) : null;
             if (string.IsNullOrEmpty(line))
             {
                 continue;
             }
 
             lines ??= [];
-            lines.Add(line);
+            lines.Add(eventLine ? DropReadOrder(line) : line);
         }
 
         return lines is null ? null : string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// The event line without the field that leads it. libavcodec writes one as
+    /// <c>ReadOrder,Layer,Style,Speaker,0,0,0,,Text</c> (libavcodec/ass.c, <c>ff_ass_get_dialog</c>), and the first of
+    /// those is the decoder's own count of the events it has produced since it was last flushed — <c>ff_ass_decoder_flush</c>
+    /// sets it back to zero, which is a seek's doing. So the same event read again carries a different number, and a cue
+    /// would answer "no" when asked whether it is the one already held. The number counts the reading; the cue is the rest
+    /// of the line.
+    /// </summary>
+    private static string DropReadOrder(string eventLine)
+    {
+        int comma = eventLine.IndexOf(',');
+        return comma < 0 ? eventLine : eventLine[(comma + 1)..];
     }
 
     private static unsafe OperationResult<(nint Codec, string Name)> TryFindDecoder(string codecId)

@@ -38,16 +38,16 @@ public class Win2DSubtitleRendererTests
 
         using (Assert.EnterMultipleScope())
         {
-            OperationResult<IComponentCreator<ISubtitleRenderer>> text = factory.Create(SubtitleCueFormat.Ass);
+            OperationResult<IComponentCreator<ISubtitleRenderer>> text = factory.Create(Stream(), SubtitleCueFormat.Ass);
             Assert.That(text.IsSuccessful, Is.True, text.Message);
             Assert.That(text.Result.Signature, Does.Contain("ass"), "the format is part of what the signature names");
 
-            OperationResult<IComponentCreator<ISubtitleRenderer>> bitmap = factory.Create(SubtitleCueFormat.BitmapBgra);
+            OperationResult<IComponentCreator<ISubtitleRenderer>> bitmap = factory.Create(Stream(), SubtitleCueFormat.BitmapBgra);
             Assert.That(bitmap.IsSuccessful, Is.True, bitmap.Message);
             Assert.That(bitmap.Result.Signature, Does.Contain("bitmap"), "and a picture is a different renderer to keep");
             Assert.That(bitmap.Result.Signature, Is.Not.EqualTo(text.Result.Signature));
 
-            OperationResult<IComponentCreator<ISubtitleRenderer>> refused = factory.Create((SubtitleCueFormat)99);
+            OperationResult<IComponentCreator<ISubtitleRenderer>> refused = factory.Create(Stream(), (SubtitleCueFormat)99);
             Assert.That(refused.IsSuccessful, Is.False, "a kind of cue this renderer does not know is refused, not guessed at");
         }
     }
@@ -70,13 +70,13 @@ public class Win2DSubtitleRendererTests
         {
             Start = TimeSpan.Zero,
             End = TimeSpan.FromSeconds(2),
-            Text = "0,0,Default,,0,0,0,,Two\\Nlines",
+            Text = "0,Default,,0,0,0,,Two\\Nlines",
         };
 
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show([cue], SubtitlePlacement.Identity);
+            drawn = renderer.Show([cue], TimeSpan.Zero, SubtitlePlacement.Identity);
         }
         finally
         {
@@ -100,7 +100,7 @@ public class Win2DSubtitleRendererTests
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
         }
 
-        OperationResult cleared = renderer.Show([], SubtitlePlacement.Identity);
+        OperationResult cleared = renderer.Show([], TimeSpan.Zero, SubtitlePlacement.Identity);
         Assert.That(cleared.IsSuccessful, Is.True, cleared.Message);
     }
 
@@ -124,13 +124,13 @@ public class Win2DSubtitleRendererTests
         {
             Start = TimeSpan.Zero,
             End = TimeSpan.FromSeconds(2),
-            Text = "0,0,Default,,0,0,0,,After a resize",
+            Text = "0,Default,,0,0,0,,After a resize",
         };
 
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show([cue], SubtitlePlacement.Identity);
+            drawn = renderer.Show([cue], TimeSpan.Zero, SubtitlePlacement.Identity);
         }
         finally
         {
@@ -162,13 +162,13 @@ public class Win2DSubtitleRendererTests
         {
             Start = TimeSpan.Zero,
             End = TimeSpan.FromSeconds(2),
-            Text = "0,0,Default,,0,0,0,,Off the edge",
+            Text = "0,Default,,0,0,0,,Off the edge",
         };
 
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show([cue], new SubtitlePlacement(-50.0, 50.0));
+            drawn = renderer.Show([cue], TimeSpan.Zero, new SubtitlePlacement(-50.0, 50.0));
         }
         finally
         {
@@ -208,7 +208,7 @@ public class Win2DSubtitleRendererTests
             {
                 Start = TimeSpan.Zero,
                 End = TimeSpan.FromSeconds(2),
-                Text = "0,0,Default,,0,0,0,,Visible words",
+                Text = "0,Default,,0,0,0,,Visible words",
             };
 
             try
@@ -318,8 +318,8 @@ public class Win2DSubtitleRendererTests
             const int height = 200;
             target = new CanvasRenderTarget(device, width, height, 96.0f);
 
-            using SubtitleCue first = Cue("0,0,Default,,0,0,0,,帝");
-            using SubtitleCue second = Cue("1,0,Default,,0,0,0,,帝国黑客帝国黑客");
+            using SubtitleCue first = Cue("0,Default,,0,0,0,,帝");
+            using SubtitleCue second = Cue("0,Default,,0,0,0,,帝国黑客帝国黑客");
 
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
@@ -454,10 +454,10 @@ public class Win2DSubtitleRendererTests
         {
             Start = TimeSpan.Zero,
             End = TimeSpan.FromSeconds(2),
-            Text = "0,0,Default,,0,0,0,,Growing",
+            Text = "0,Default,,0,0,0,,Growing",
         };
 
-        OperationResult first = renderer.Show([cue], SubtitlePlacement.Identity);
+        OperationResult first = renderer.Show([cue], TimeSpan.Zero, SubtitlePlacement.Identity);
         Assert.That(first.IsSuccessful, Is.True, first.Message);
         nint firstChain = target.Attached;
         Assert.That(firstChain, Is.Not.Zero, "the host was handed a chain to compose");
@@ -465,7 +465,7 @@ public class Win2DSubtitleRendererTests
         target.SetSize(800, 450);
         target.RaiseSizeChanged();
 
-        OperationResult grown = renderer.Show([cue], SubtitlePlacement.Identity);
+        OperationResult grown = renderer.Show([cue], TimeSpan.Zero, SubtitlePlacement.Identity);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(grown.IsSuccessful, Is.True, grown.Message);
@@ -475,7 +475,7 @@ public class Win2DSubtitleRendererTests
         target.SetSize(640, 360);
         target.RaiseSizeChanged();
 
-        OperationResult shrunk = renderer.Show([cue], SubtitlePlacement.Identity);
+        OperationResult shrunk = renderer.Show([cue], TimeSpan.Zero, SubtitlePlacement.Identity);
         Assert.That(shrunk.IsSuccessful, Is.True, shrunk.Message);
     }
 
