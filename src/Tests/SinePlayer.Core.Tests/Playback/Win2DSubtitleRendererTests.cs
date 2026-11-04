@@ -393,6 +393,109 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>
+    /// A picture fitted into the surface does not fill it, and the words belong to the picture: given a frame, both the
+    /// text and a bitmap cue are laid out inside it rather than in the bars around it.
+    /// </summary>
+    [Test]
+    public void DrawsInsideThePictureItIsGiven()
+    {
+        using Win2DSubtitleRenderer renderer = new();
+
+        CanvasDevice device;
+        try
+        {
+            device = renderer.EnsureCanvasDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 240;
+        SubtitlePresentation presentation = SubtitlePresentation.Identity with { Frame = new SubtitleFrame(0.25, 0.25, 0.5, 0.5) };
+
+        byte[] pixels = RenderInk(device, renderer, width, height, presentation);
+        (int left, int top, int right, int bottom) = InkBounds(pixels, width, height);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(right, Is.GreaterThanOrEqualTo(left), "the cue is drawn for this to say anything");
+            Assert.That(left, Is.GreaterThanOrEqualTo(120), "no ink left of the picture");
+            Assert.That(top, Is.GreaterThanOrEqualTo(60), "none above it");
+            Assert.That(right, Is.LessThanOrEqualTo(360), "none right of it");
+            Assert.That(bottom, Is.LessThanOrEqualTo(180), "and none below it");
+        }
+    }
+
+    /// <summary>
+    /// The strips are measured from the surface's edges, because that is where the host's chrome is: a bar along the bottom
+    /// of the surface does not reach a picture that ends above it, so the words keep the place the picture's own bottom
+    /// margin gives them instead of being dragged up by the bar's height.
+    /// </summary>
+    [Test]
+    public void KeepsTheWordsInThePictureWhenTheStripIsBelowIt()
+    {
+        using Win2DSubtitleRenderer renderer = new();
+
+        CanvasDevice device;
+        try
+        {
+            device = renderer.EnsureCanvasDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 240;
+        SubtitlePresentation presentation = SubtitlePresentation.Identity with
+        {
+            Frame = new SubtitleFrame(0.0, 0.0, 1.0, 0.5),
+            Insets = new SubtitleInsets(0.0, 0.0, 0.0, 100.0),
+        };
+
+        byte[] pixels = RenderInk(device, renderer, width, height, presentation);
+        (int left, int top, int right, int bottom) = InkBounds(pixels, width, height);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(right, Is.GreaterThanOrEqualTo(left), "the cue is drawn for this to say anything");
+            Assert.That(bottom, Is.LessThanOrEqualTo(120), "the words stay in the picture");
+            Assert.That(bottom, Is.GreaterThan(60), "and are not pulled up by a bar the picture does not reach");
+        }
+    }
+
+    /// <summary>The box the ink of a surface-sized frame covers.</summary>
+    private static (int Left, int Top, int Right, int Bottom) InkBounds(byte[] pixels, int width, int height)
+    {
+        int left = int.MaxValue;
+        int top = int.MaxValue;
+        int right = -1;
+        int bottom = -1;
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                if (AlphaAt(pixels, width, x, y) == 0)
+                {
+                    continue;
+                }
+
+                left = Math.Min(left, x);
+                right = Math.Max(right, x);
+                top = Math.Min(top, y);
+                bottom = Math.Max(bottom, y);
+            }
+        }
+
+        return right >= left && bottom >= top ? (left, top, right, bottom) : (0, 0, -1, -1);
+    }
+
+    /// <summary>
     /// A bitmap cue is drawn where its fractions say, scaled to the surface: the picture of a DVD subtitle arrives as an
     /// image positioned inside the frame it was authored against, and it has to land there rather than at the corner.
     /// </summary>

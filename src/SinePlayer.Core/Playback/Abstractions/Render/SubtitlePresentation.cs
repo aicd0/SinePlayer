@@ -17,6 +17,8 @@ public readonly record struct SubtitlePresentation(
 {
     public static SubtitlePresentation Identity => default;
 
+    public SubtitleFrame Frame { get; init; }
+
     public bool IsIdentity =>
         OffsetX == 0.0 &&
         OffsetY == 0.0 &&
@@ -25,5 +27,6 @@ public readonly record struct SubtitlePresentation(
         FontSize <= 0.0 &&
         FontStyle == FontStyle.Normal &&
         FontWeight.Weight <= 0 &&
-        OutlineWidth <= 0.0;
+        OutlineWidth <= 0.0 &&
+        Frame.IsEmpty;
 }
