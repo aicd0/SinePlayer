@@ -78,8 +78,6 @@ public sealed class ComponentResolver
 
     public IEnumerable<IComponentCreator<IVideoDecoder>> ResolveVideoDecoders(IMediaSource source, VideoStreamInfo stream, IGpuDevice? gpuDevice, int bufferedFrames)
     {
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(stream);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bufferedFrames);
 
         return EnumerateVideoDecoders(source, stream, gpuDevice, bufferedFrames, Preferences.PreferHardwareDecoding);
@@ -99,17 +97,14 @@ public sealed class ComponentResolver
 
     public IEnumerable<IComponentCreator<IAudioDecoder>> ResolveAudioDecoders(IMediaSource source, AudioStreamInfo stream)
     {
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(stream);
-
         return EnumerateAudioDecoders(source, stream);
     }
 
-    public IEnumerable<IComponentCreator<ISubtitleRenderer>> ResolveSubtitleRenderers(SubtitleCueFormat format)
+    public IEnumerable<IComponentCreator<ISubtitleRenderer>> ResolveSubtitleRenderers(SubtitleStreamInfo stream, SubtitleCueFormat format)
     {
         foreach (ISubtitleRendererFactory factory in _components.GetComponents<ISubtitleRendererFactory>())
         {
-            OperationResult<IComponentCreator<ISubtitleRenderer>> offered = factory.Create(format);
+            OperationResult<IComponentCreator<ISubtitleRenderer>> offered = factory.Create(stream, format);
             if (offered.IsSuccessful)
             {
                 yield return offered.Result;

@@ -3,6 +3,7 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 
@@ -18,7 +19,7 @@ public sealed class NullSubtitleRendererFactory : ISubtitleRendererFactory
         _signature = signature;
     }
 
-    public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format)
+    public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format)
     {
         return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Success(new Creator(_signature));
     }

@@ -3,11 +3,12 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Abstractions.Registry;
 
 public interface ISubtitleRendererFactory : IComponentFactory
 {
-    OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleCueFormat format);
+    OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format);
 }

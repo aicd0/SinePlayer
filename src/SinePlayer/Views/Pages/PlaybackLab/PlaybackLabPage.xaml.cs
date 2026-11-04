@@ -28,6 +28,7 @@ using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
+using SinePlayer.Core.Playback.Backends.Libass;
 using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Backends.Wasapi;
 using SinePlayer.Core.Playback.Backends.Win2D;
@@ -620,7 +621,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             IVideoDecoderFactory nullVideoDecoder = new NullVideoDecoderFactory();
             VideoDecoderPicker.ItemsSource = new ComponentChoice[]
             {
-                new("Auto", [ffmpegVideoDecoder, nullVideoDecoder], HardwareDecoding: true),
+                new("Auto", [ffmpegVideoDecoder], HardwareDecoding: true),
                 new("FFmpeg (hardware)", [ffmpegVideoDecoder], HardwareDecoding: true),
                 new("FFmpeg (software)", [ffmpegVideoDecoder], HardwareDecoding: false),
                 new("Nothing", [nullVideoDecoder]),
@@ -632,7 +633,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             IVideoRendererFactory d3d11HdrContainer = new D3D11VideoRendererFactory(VideoSurfacePreference.Hdr10);
             VideoRendererPicker.ItemsSource = new ComponentChoice[]
             {
-                new("Auto", [d3d11VideoRenderer, nullVideoRenderer]),
+                new("Auto", [d3d11VideoRenderer]),
                 new("Direct3D 11 (SDR)", [d3d11VideoRenderer]),
                 new("Direct3D 11 (Auto)", [d3d11AutoContainer]),
                 new("Direct3D 11 (HDR10)", [d3d11HdrContainer]),
@@ -652,16 +653,18 @@ internal sealed partial class PlaybackLabPage : BasePage
             ISubtitleDecoderFactory nullSubtitleDecoder = new NullSubtitleDecoderFactory();
             SubtitleDecoderPicker.ItemsSource = new ComponentChoice[]
             {
-                new("Auto", [ffmpegSubtitleDecoder, nullSubtitleDecoder]),
+                new("Auto", [ffmpegSubtitleDecoder]),
                 new("FFmpeg", [ffmpegSubtitleDecoder]),
                 new("Nothing", [nullSubtitleDecoder]),
             };
 
+            ISubtitleRendererFactory assSubtitleRenderer = new AssSubtitleRendererFactory();
             ISubtitleRendererFactory win2dSubtitleRenderer = new Win2DSubtitleRendererFactory();
             ISubtitleRendererFactory nullSubtitleRenderer = new NullSubtitleRendererFactory();
             SubtitleRendererPicker.ItemsSource = new ComponentChoice[]
             {
-                new("Auto", [win2dSubtitleRenderer, nullSubtitleRenderer]),
+                new("Auto", [assSubtitleRenderer, win2dSubtitleRenderer]),
+                new("libass", [assSubtitleRenderer]),
                 new("Win2D", [win2dSubtitleRenderer]),
                 new("Nothing", [nullSubtitleRenderer]),
             };

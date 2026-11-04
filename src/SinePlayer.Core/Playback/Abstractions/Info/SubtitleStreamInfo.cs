@@ -10,4 +10,6 @@ public sealed class SubtitleStreamInfo : MediaStreamInfo
     public bool IsForced { get; init; }
 
     public bool IsBitmap { get; init; }
+
+    public string? ScriptHeader { get; init; }
 }

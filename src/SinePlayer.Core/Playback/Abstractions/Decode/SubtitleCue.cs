@@ -15,10 +15,55 @@ public sealed partial class SubtitleCue : IDisposable
 
     public SubtitleImage? Image { get; init; }
 
+    public IReadOnlyList<SubtitleChange>? Changes { get; init; }
+
     public bool IsOpenEnded => End == OpenEnd;
 
     public void Dispose()
     {
         Image?.Dispose();
+    }
+
+    public bool HasChanges(TimeSpan drawn, TimeSpan position)
+    {
+        if (Changes is not { Count: > 0 } changes)
+        {
+            return false;
+        }
+
+        foreach (SubtitleChange change in changes)
+        {
+            if (change.Start <= position && change.End > drawn)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public TimeSpan? TimeUntilChange(TimeSpan position)
+    {
+        if (Changes is not { Count: > 0 } changes)
+        {
+            return null;
+        }
+
+        TimeSpan? next = null;
+        foreach (SubtitleChange change in changes)
+        {
+            if (change.End < position)
+            {
+                continue;
+            }
+
+            TimeSpan wait = change.Start > position ? change.Start - position : TimeSpan.Zero;
+            if (next is null || wait < next.Value)
+            {
+                next = wait;
+            }
+        }
+
+        return next;
     }
 }

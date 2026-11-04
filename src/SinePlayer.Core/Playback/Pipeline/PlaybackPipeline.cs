@@ -36,6 +36,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private const int VideoStarvationResumeMilliseconds = 100;
     private const int VideoIdleTimeoutMilliseconds = 50;
     private const int AudioIdleTimeoutMilliseconds = 5;
+    private const int SubtitleChangeIntervalMilliseconds = 16;
     private const int ClockSyncToleranceMilliseconds = 10;
     private const int AudioDeviceLeewayMilliseconds = 3000;
 
@@ -970,7 +971,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 bool rebuildSubtitleRenderer = newSubtitleDecoder is not null || sourceChanges.HasFlag(ChainChanges.SubtitleRenderer);
                 PipelineComponent<ISubtitleRenderer>? latestRenderer = _subtitleRenderer.Latest;
                 OperationResult<PipelineComponent<ISubtitleRenderer>?> rendererResolved = ResolveComponent(
-                    resolver.ResolveSubtitleRenderers(format),
+                    resolver.ResolveSubtitleRenderers(subtitleStream, format),
                     rebuildSubtitleRenderer ? null : latestRenderer?.Signature,
                     "subtitle renderer");
                 if (!rendererResolved.IsSuccessful)
@@ -1410,6 +1411,8 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
         }
 
+        var firstFailure = OperationResult.Success();
+
         foreach (MediaSource entry in sources)
         {
             OperationResult sought;
@@ -1419,16 +1422,16 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
             catch (Exception ex)
             {
-                return OperationResult.Failure(ex);
+                sought = OperationResult.Failure(ex);
             }
 
             if (!sought.IsSuccessful)
             {
-                return sought;
+                firstFailure = sought;
             }
         }
 
-        return OperationResult.Success();
+        return firstFailure;
     }
 
     private static int ChooseSeekLanding(MediaSourceHolder sourceHolder, MediaSource source, TimeSpan position)
@@ -2009,7 +2012,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     PostWarning($"The subtitle decoder could not be flushed: {ex.Message}");
                 }
 
-                _cueWindow.SkipTo(epochGate.SeekPosition);
+                _cueWindow.SeekTo(epoch, epochGate.SeekPosition);
                 continue;
             }
 
@@ -2050,7 +2053,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                     continue;
                 }
 
-                OperationResult routed = DecodeSubtitle(subtitleDecoder, packet);
+                OperationResult routed = DecodeSubtitle(epoch, subtitleDecoder, packet);
                 if (!routed.IsSuccessful)
                 {
                     PostFailure(routed);
@@ -2062,7 +2065,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
-    private OperationResult DecodeSubtitle(ISubtitleDecoder subtitleDecoder, MediaPacket packet)
+    private OperationResult DecodeSubtitle(long epoch, ISubtitleDecoder subtitleDecoder, MediaPacket packet)
     {
         OperationResult decoded;
         IReadOnlyList<SubtitleCue> cues;
@@ -2085,7 +2088,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure("The subtitle decoder returned no cues.");
         }
 
-        _cueWindow.Add(cues, _clock.Position, _subtitleRenderer.HasComponent);
+        _cueWindow.Add(epoch, cues, _clock.Position, discardStale: !_subtitleRenderer.HasComponent);
         if (cues.Count > 0)
         {
             _subtitleRenderNode.Wake();
@@ -2778,6 +2781,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         bool drawnInvalidated = true;
         long workingEpoch = -1;
         long drawnSurfaceVersion = -1;
+        TimeSpan drawnPosition = TimeSpan.MinValue;
         SubtitlePlacement drawnPlacement = default;
         SubtitleCueSnapshot drawnCues = SubtitleCueSnapshot.Empty;
 
@@ -2796,7 +2800,8 @@ public sealed partial class PlaybackPipeline : IDisposable
                 {
                     if (subtitleRendererSlot.CurrentComponent is null)
                     {
-                        ReportOnFailure("The subtitles could not be cleared", SafeInvoke(() => oldRenderer.Show([], SubtitlePlacement)));
+                        ReportOnFailure("The subtitles could not be cleared",
+                            SafeInvoke(() => oldRenderer.Show([], TimeSpan.Zero, SubtitlePlacement)));
                     }
 
                     oldRenderer.Dispose();
@@ -2830,19 +2835,22 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             // Show
             TimeSpan position = _clock.Position;
-            SubtitleCueSnapshot cues = _cueWindow.Visible(position);
+            SubtitleCueSnapshot cues = _cueWindow.GetVisibleCues(epoch, position);
             long surfaceVersion = Interlocked.Read(ref _subtitleSurfaceVersion);
             SubtitlePlacement placement = SubtitlePlacement;
             if (drawnInvalidated ||
                 surfaceVersion != drawnSurfaceVersion ||
                 placement != drawnPlacement ||
+                cues.Cues.Any(cue => cue.HasChanges(drawnPosition, position)) ||
                 !SameCues(cues, drawnCues))
             {
-                ReportOnFailure("The subtitles could not be drawn", SafeInvoke(() => renderer.Show(cues.Cues, placement)));
+                ReportOnFailure("The subtitles could not be drawn",
+                    SafeInvoke(() => renderer.Show(cues.Cues, position, placement)));
                 drawnCues.Dispose();
                 drawnCues = cues;
                 drawnInvalidated = false;
                 drawnSurfaceVersion = surfaceVersion;
+                drawnPosition = position;
                 drawnPlacement = placement;
             }
             else
@@ -2857,7 +2865,9 @@ public sealed partial class PlaybackPipeline : IDisposable
                 TimeSpan? next = _cueWindow.TimeUntilNextChange(position);
                 if (next.HasValue)
                 {
-                    timeout = (int)Math.Clamp(Math.Ceiling(next.Value.TotalMilliseconds), 1, int.MaxValue);
+                    timeout = next.Value <= TimeSpan.Zero
+                        ? SubtitleChangeIntervalMilliseconds
+                        : (int)Math.Clamp(Math.Ceiling(next.Value.TotalMilliseconds), 1, int.MaxValue);
                 }
             }
 

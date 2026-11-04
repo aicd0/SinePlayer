@@ -13,5 +13,5 @@ public interface ISubtitleRenderer : IDisposable
 
     OperationResult Configure(SubtitleStreamInfo stream, IVideoRenderTarget target);
 
-    OperationResult Show(IReadOnlyList<SubtitleCue> cues, SubtitlePlacement placement);
+    OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePlacement placement);
 }

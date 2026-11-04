@@ -1,6 +1,8 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Runtime.InteropServices;
+
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -148,6 +150,16 @@ public sealed partial class FFmpegSource : IMediaSource
         }
 
         int result = FFmpegNative.av_seek_frame(_context, byStream ? streamIndex : -1, timestamp, FFmpegConstants.SeekFlagBackward);
+        if (result == FFmpegConstants.ErrorRange)
+        {
+            // A backward seek promises an event at or before the target, and a subtitle queue refuses to break that
+            // promise: it reads the whole file up front, so when nothing is at or before the target — a seek to the
+            // start of a file whose first event is a second in, for one — the nearest event is after it and the queue
+            // answers ERANGE (libavformat/subtitles.c, ff_subtitles_queue_seek). The honest landing there is the first
+            // event, which is what a forward seek finds.
+            result = FFmpegNative.av_seek_frame(_context, byStream ? streamIndex : -1, timestamp, 0);
+        }
+
         if (result < 0)
         {
             return OperationResult.Failure($"Unable to seek to {position}: {FFmpegInterop.GetErrorMessage(result)}");
@@ -333,6 +345,7 @@ public sealed partial class FFmpegSource : IMediaSource
                 Duration = duration,
                 IsForced = (stream->Disposition & DispositionForced) != 0,
                 IsBitmap = IsBitmapSubtitle(codecId),
+                ScriptHeader = IsBitmapSubtitle(codecId) ? null : ReadScriptHeader(parameters),
             },
             _ => null,
         };
@@ -382,5 +395,16 @@ public sealed partial class FFmpegSource : IMediaSource
         }
 
         return false;
+    }
+
+    private static unsafe string? ReadScriptHeader(AVCodecParameters* parameters)
+    {
+        if (parameters->Extradata == 0 || parameters->ExtradataSize <= 0)
+        {
+            return null;
+        }
+
+        string? header = Marshal.PtrToStringUTF8(parameters->Extradata, parameters->ExtradataSize);
+        return string.IsNullOrWhiteSpace(header) ? null : header;
     }
 }

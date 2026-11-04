@@ -3,14 +3,17 @@
 
 using System.Text;
 
-namespace SinePlayer.Core.Playback;
+namespace SinePlayer.Core.Playback.Subtitle;
 
 /// <summary>
 /// One subtitle event as libavcodec hands it over: an ASS dialogue line, because that is what every text format is
-/// normalised to. The line is
-/// <c>ReadOrder,Layer,Style,Speaker,MarginL,MarginR,MarginV,Effect,Text</c> — the reader's own numbering leads, and the
-/// text is the ninth field, which is the whole rest of the line. The timer fields are not in it: those are the cue's
-/// own, which is the other half of why a cue can be read out of a packet on its own.
+/// normalised to. The line is <c>Layer,Style,Speaker,MarginL,MarginR,MarginV,Effect,Text</c> — the text is the eighth
+/// field, which is the whole rest of the line, and the timing is not in it at all: those are the cue's own, which is the
+/// other half of why a cue can be read out of a packet on its own.
+/// <para>
+/// libavcodec leads the line with the number it has counted its own events by, which the decoder drops before the cue is
+/// built: that number restarts whenever the decoder is flushed, so it says nothing about the event.
+/// </para>
 /// <para>
 /// This is the one place the shape of that line is known, so a renderer does not have to cut strings itself and a
 /// change in the decoder's normalisation cannot silently reach a drawing routine. The override tags in the text are
@@ -54,12 +57,12 @@ internal readonly record struct AssSubtitleText
             return default;
         }
 
-        // Nine fields, and the ninth is the whole rest of the line: dialogue is allowed to contain commas.
-        string[] fields = line.Split(',', 9);
-        int textIndex = fields.Length == 9 ? 8 : -1;
+        // Eight fields, and the eighth is the whole rest of the line: dialogue is allowed to contain commas.
+        string[] fields = line.Split(',', 8);
+        int textIndex = fields.Length == 8 ? 7 : -1;
         string text = textIndex >= 0 ? fields[textIndex] : line;
-        int layer = textIndex >= 0 && int.TryParse(fields[1].Trim(), out int parsedLayer) ? parsedLayer : 0;
-        string style = textIndex >= 0 ? fields[2].Trim() : string.Empty;
+        int layer = textIndex >= 0 && int.TryParse(fields[0].Trim(), out int parsedLayer) ? parsedLayer : 0;
+        string style = textIndex >= 0 ? fields[1].Trim() : string.Empty;
 
         List<string> lines = [];
         int alignment = 0;

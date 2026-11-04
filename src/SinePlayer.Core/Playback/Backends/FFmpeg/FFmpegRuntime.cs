@@ -4,17 +4,18 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
+using SinePlayer.Core.Common.AppEnvironment;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
 /// <summary>
-/// Locates, loads and verifies the FFmpeg native libraries. This is the only place that knows how the
-/// binaries are laid out, which keeps packaging concerns out of the rest of the backend.
+/// Verifies the FFmpeg native libraries this build was written against, and holds what FFmpeg says about itself.
 /// <para>
-/// The libraries are preloaded in dependency order and resolved by full path, so Windows never has to
-/// search for them. If any library is missing, or its major version does not match the one the interop
-/// layer was written against, initialisation fails immediately and loudly rather than producing
+/// Loading them, and resolving the names the interop layer declares, belongs to <see cref="NativeLibraryLoader"/>, which is
+/// the one place that knows how native files are laid out. What is left here is the part only this backend can answer:
+/// whether the loaded libraries are the ones the interop was written for, which fails loudly rather than producing
 /// undefined behaviour later.
 /// </para>
 /// </summary>
@@ -24,24 +25,13 @@ public static class FFmpegRuntime
     private const int ExpectedAvCodecMajor = 63;
     private const int ExpectedAvFormatMajor = 63;
 
-    /// <summary>Load order matters: a library must be loaded before anything that links against it.</summary>
-    private static readonly string[] sLibraryNames =
-    [
-        FFmpegNative.AvUtil,
-        FFmpegNative.SwResample,
-        FFmpegNative.SwScale,
-        FFmpegNative.AvCodec,
-        FFmpegNative.AvFormat,
-    ];
-
     private static readonly object sLock = new();
 
     private static bool sInitialized;
-    private static string? sLibraryDirectory;
     private static string? sVersion;
 
     /// <summary>Directory the libraries were loaded from, or null before initialisation.</summary>
-    public static string? LibraryDirectory => sLibraryDirectory;
+    public static string? LibraryDirectory => NativeLibraryLoader.FfmpegDirectory;
 
     /// <summary>Version string reported by FFmpeg itself, or null before initialisation.</summary>
     public static string? Version => sVersion;
@@ -55,53 +45,21 @@ public static class FFmpegRuntime
         {
             if (!sInitialized)
             {
-                InitializeCore(null);
+                InitializeCore();
             }
         }
     }
 
-    /// <summary>
-    /// Initialises the runtime from an explicit directory, replacing any earlier initialisation. Use
-    /// this when the application ships the libraries somewhere other than the default location.
-    /// </summary>
-    public static void Initialize(string? libraryDirectory)
+    private static void InitializeCore()
     {
-        lock (sLock)
+        OperationResult loaded = NativeLibraryLoader.EnsureFfmpeg();
+        if (!loaded.IsSuccessful)
         {
-            InitializeCore(libraryDirectory);
+            throw new InvalidOperationException(loaded.Message);
         }
-    }
-
-    private static void InitializeCore(string? libraryDirectory)
-    {
-        string directory = ResolveLibraryDirectory(libraryDirectory);
-
-        List<string> missing = [];
-        foreach (string name in sLibraryNames)
-        {
-            if (!File.Exists(Path.Combine(directory, name + ".dll")))
-            {
-                missing.Add(name + ".dll");
-            }
-        }
-
-        if (missing.Count > 0)
-        {
-            throw new InvalidOperationException(
-                $"FFmpeg native libraries are missing from '{directory}': {string.Join(", ", missing)}. " +
-                "Provide the pinned FFmpeg build for this architecture.");
-        }
-
-        foreach (string name in sLibraryNames)
-        {
-            NativeLibrary.Load(Path.Combine(directory, name + ".dll"));
-        }
-
-        sLibraryDirectory = directory;
-        sInitialized = true;
-        NativeLibrary.SetDllImportResolver(typeof(FFmpegRuntime).Assembly, ResolveLibrary);
 
         VerifyVersions();
+        sInitialized = true;
     }
 
     private static void VerifyVersions()
@@ -113,72 +71,12 @@ public static class FFmpegRuntime
         if (avUtilMajor != ExpectedAvUtilMajor || avCodecMajor != ExpectedAvCodecMajor || avFormatMajor != ExpectedAvFormatMajor)
         {
             throw new InvalidOperationException(
-                $"FFmpeg native libraries in '{sLibraryDirectory}' do not match the interop layer. " +
+                $"FFmpeg native libraries in '{LibraryDirectory}' do not match the interop layer. " +
                 $"Expected libavutil {ExpectedAvUtilMajor}, libavcodec {ExpectedAvCodecMajor}, libavformat {ExpectedAvFormatMajor}; " +
                 $"found libavutil {avUtilMajor}, libavcodec {avCodecMajor}, libavformat {avFormatMajor}.");
         }
 
         sVersion = FFmpegInterop.ToUtf8String(FFmpegNative.av_version_info());
-    }
-
-    /// <summary>
-    /// Resolves the default directory: the NuGet package layout first (used by tests and unpackaged
-    /// runs), then the plain application directory (used once the binaries sit beside the app).
-    /// </summary>
-    private static string ResolveLibraryDirectory(string? explicitDirectory)
-    {
-        if (!string.IsNullOrWhiteSpace(explicitDirectory))
-        {
-            return explicitDirectory;
-        }
-
-        string packaged = Path.Combine(AppContext.BaseDirectory, "runtimes", GetRuntimeIdentifier(), "native");
-        if (Directory.Exists(packaged))
-        {
-            return packaged;
-        }
-
-        return AppContext.BaseDirectory;
-    }
-
-    private static string GetRuntimeIdentifier()
-    {
-        return RuntimeInformation.ProcessArchitecture switch
-        {
-            Architecture.X64 => "win-x64",
-            Architecture.Arm64 => "win-arm64",
-            Architecture arch => throw new NotSupportedException(
-                $"This build has no media engine for {arch}: the FFmpeg native libraries are provisioned for x64 and arm64 only."),
-        };
-    }
-
-    private static nint ResolveLibrary(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
-    {
-        string? directory = sLibraryDirectory;
-        if (directory is not null && IsFFmpegLibrary(libraryName))
-        {
-            string path = Path.Combine(directory, libraryName + ".dll");
-            if (File.Exists(path) && NativeLibrary.TryLoad(path, out nint handle))
-            {
-                return handle;
-            }
-        }
-
-        // Anything else keeps the default resolution behaviour.
-        return nint.Zero;
-    }
-
-    private static bool IsFFmpegLibrary(string libraryName)
-    {
-        foreach (string name in sLibraryNames)
-        {
-            if (string.Equals(name, libraryName, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static int GetMajor(uint version)

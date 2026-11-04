@@ -10,11 +10,6 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 
-using Windows.Win32;
-using Windows.Win32.Foundation;
-using Windows.Win32.Graphics.Dxgi;
-using Windows.Win32.Graphics.Dxgi.Common;
-
 namespace SinePlayer.Core.Tests.Playback;
 
 /// <summary>
@@ -325,7 +320,7 @@ public class D3D11VideoRendererTests
         Assert.That(presentResult.IsSuccessful, Is.True, presentResult.Message);
 
         // The frame just presented belongs to the display now, so the next one has to wait for it. That wait is the
-        // whole point of the waitable object, and the thing that stops happening â€” silently â€” when the chain presents
+        // whole point of the waitable object, and the thing that stops happening — silently — when the chain presents
         // with a sync interval of zero.
         long waitStart = System.Diagnostics.Stopwatch.GetTimestamp();
         Assert.That(ownedSwapChain.TryAcquireFrameSlot(), Is.True, "the display takes the frame within the bound");
@@ -390,7 +385,7 @@ public class D3D11VideoRendererTests
         Assert.That(before, Is.EqualTo(1.0).Within(0.0001), "a 100% display needs no correction at all");
 
         // The window moved to a display at 200%, which is what the panel reports as a composition scale
-        // change. Resizing the buffers resets the transform in DXGI, so both have to be redone together â€”
+        // change. Resizing the buffers resets the transform in DXGI, so both have to be redone together —
         // and a resize that forgot the transform would leave the picture at half size.
         target.RasterizationScale = 2.0;
         target.RaiseSizeChanged();
@@ -455,7 +450,7 @@ public class D3D11VideoRendererTests
         _renderer.SetOutput(target.View, width, height);
 
         // The frame is released before the redraw, so what appears afterwards can only come from the
-        // planes the renderer kept â€” which is the whole point: a paused picture has no frame to offer.
+        // planes the renderer kept — which is the whole point: a paused picture has no frame to offer.
         using (FrameBuffer buffer = new(width, height, (_, _) => (blue, green, red, 0xFF)))
         using (RawVideoFrame frame = CreateFrame(width, height, buffer))
         {

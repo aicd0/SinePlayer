@@ -3,6 +3,7 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
@@ -23,6 +24,7 @@ public class FFmpegSourceTests
     private const double DurationSeconds = (double)SampleCount / SampleRate;
 
     private string _wavePath = string.Empty;
+    private string _subtitlePath = string.Empty;
 
     [OneTimeSetUp]
     public void OneTimeSetUp()
@@ -30,6 +32,7 @@ public class FFmpegSourceTests
         // Fails loudly with a clear message when the native libraries are missing or mismatched.
         FFmpegRuntime.EnsureInitialized();
         _wavePath = CreateWaveFile();
+        _subtitlePath = CreateSubtitleFile();
     }
 
     [OneTimeTearDown]
@@ -38,6 +41,11 @@ public class FFmpegSourceTests
         if (File.Exists(_wavePath))
         {
             File.Delete(_wavePath);
+        }
+
+        if (File.Exists(_subtitlePath))
+        {
+            File.Delete(_subtitlePath);
         }
     }
 
@@ -107,6 +115,69 @@ public class FFmpegSourceTests
         {
             Assert.That(packet!.Timestamp.TotalSeconds, Is.GreaterThanOrEqualTo(0.2));
             Assert.That(packet!.Timestamp.TotalSeconds, Is.LessThan(DurationSeconds));
+        }
+    }
+
+    /// <summary>
+    /// A subtitle queue reads the whole file up front and refuses a backward seek that would have to answer with an
+    /// event after the target — seeking to the start of a file whose first cue is a second in. The first cue is the
+    /// right landing there, so the seek must reach it instead of failing and leaving the queue at its end.
+    /// </summary>
+    [TestCase(0.0)]
+    [TestCase(0.5)]
+    public void SeeksBeforeTheFirstCueToThatCue(double seconds)
+    {
+        FFmpegSourceProviderFactory factory = new();
+        OperationResult result = factory.TryOpen(MediaLocator.Parse(_subtitlePath), out IMediaSource? source);
+        Assert.That(result.IsSuccessful, Is.True, result.Message);
+
+        using IMediaSource subtitleSource = source!;
+        result = subtitleSource.Seek(TimeSpan.FromSeconds(seconds), -1);
+        Assert.That(result.IsSuccessful, Is.True, result.Message);
+
+        result = subtitleSource.TryReadPacket(out MediaPacket? packet);
+        Assert.That(result.IsSuccessful, Is.True, result.Message);
+        Assert.That(packet, Is.Not.Null, "The seek left the source at its end.");
+
+        using (packet!)
+        {
+            Assert.That(packet!.Timestamp, Is.EqualTo(TimeSpan.FromSeconds(1)));
+        }
+    }
+
+    /// <summary>
+    /// The same event read twice has to read the same. libavcodec leads each event line with the number it counts its own
+    /// output by, and a flush — which every seek does — sets that count back to zero, so the copy a jump re-reads used to
+    /// differ from the copy still held: the window compared the two, found them different, and kept both.
+    /// </summary>
+    [Test]
+    public void ReadsAnEventTheSameWayAgainAfterAJump()
+    {
+        FFmpegSourceProviderFactory factory = new();
+        OperationResult opened = factory.TryOpen(MediaLocator.Parse(_subtitlePath), out IMediaSource? source);
+        Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+
+        using IMediaSource subtitleSource = source!;
+        SubtitleStreamInfo stream = subtitleSource.Info.Streams.OfType<SubtitleStreamInfo>().Single();
+        OperationResult<FFmpegSubtitleDecoder> created = FFmpegSubtitleDecoder.Create(subtitleSource, stream);
+        Assert.That(created.IsSuccessful, Is.True, created.Message);
+
+        using FFmpegSubtitleDecoder decoder = created.Result;
+
+        IReadOnlyList<(TimeSpan Start, string Text)> first = ReadEvents(subtitleSource, decoder);
+        Assert.That(first, Has.Count.EqualTo(3));
+
+        // The jump lands on the second event, so the decoder counts it as its first one: the copy that comes back carries
+        // a different number from the copy already held unless the number is not part of the cue at all.
+        Assert.That(decoder.Flush().IsSuccessful, Is.True);
+        Assert.That(subtitleSource.Seek(first[1].Start, stream.Index).IsSuccessful, Is.True);
+
+        IReadOnlyList<(TimeSpan Start, string Text)> again = ReadEvents(subtitleSource, decoder);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(again, Is.EqualTo(new[] { first[1], first[2] }), "the jump landed on the second event and read on from it");
+            Assert.That(first[0].Text, Does.StartWith("0,Default,"), "a cue carries its layer and style, not the decoder's count of its own events");
         }
     }
 
@@ -194,6 +265,56 @@ public class FFmpegSourceTests
         return (FFmpegSource)source!;
     }
 
+    /// <summary>
+    /// Everything the decoder produces from what is left of the source, as the cue's start and the event line it carries.
+    /// </summary>
+    private static IReadOnlyList<(TimeSpan Start, string Text)> ReadEvents(IMediaSource source, ISubtitleDecoder decoder)
+    {
+        List<(TimeSpan, string)> events = [];
+        while (true)
+        {
+            OperationResult read = source.TryReadPacket(out MediaPacket? packet);
+            Assert.That(read.IsSuccessful, Is.True, read.Message);
+            if (packet is null)
+            {
+                return events;
+            }
+
+            using (packet)
+            {
+                OperationResult decoded = decoder.TryDecode(packet, out IReadOnlyList<SubtitleCue> cues);
+                Assert.That(decoded.IsSuccessful, Is.True, decoded.Message);
+                foreach (SubtitleCue cue in cues)
+                {
+                    using (cue)
+                    {
+                        events.Add((cue.Start, cue.Text ?? string.Empty));
+                    }
+                }
+            }
+        }
+    }
+
+    private static string CreateSubtitleFile()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"sineplayer-ffmpeg-{Guid.NewGuid():N}.srt");
+        File.WriteAllText(path, """
+            1
+            00:00:01,000 --> 00:00:02,000
+            First cue
+
+            2
+            00:00:05,000 --> 00:00:06,000
+            Second cue
+
+            3
+            00:00:09,000 --> 00:00:10,000
+            Third cue
+
+            """);
+
+        return path;
+    }
     private static string CreateWaveFile()
     {
         string path = Path.Combine(Path.GetTempPath(), $"sineplayer-ffmpeg-{Guid.NewGuid():N}.wav");

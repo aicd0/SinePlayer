@@ -28,6 +28,12 @@ internal static class FFmpegConstants
     /// <summary><c>AVERROR(EAGAIN)</c>: the call would block, try again after the other direction made progress.</summary>
     internal const int ErrorAgain = -11;
 
+    /// <summary>
+    /// <c>AVERROR(ERANGE)</c>: a seek target lies outside the window the demuxer was given, which for a subtitle queue
+    /// means its nearest event is on the far side of the target.
+    /// </summary>
+    internal const int ErrorRange = -34;
+
     /// <summary><c>AV_PKT_DATA_DISPLAYMATRIX</c>: nine 16.16 fixed point numbers giving how to turn the picture.</summary>
     internal const int SideDataTypeDisplayMatrix = 5;
 
