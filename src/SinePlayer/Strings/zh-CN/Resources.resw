@@ -567,6 +567,15 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="Folders" xml:space="preserve">
     <value>文件夹</value>
   </data>
+  <data name="Font" xml:space="preserve">
+    <value>字体</value>
+  </data>
+  <data name="FontFamily" xml:space="preserve">
+    <value>字体</value>
+  </data>
+  <data name="FontSize" xml:space="preserve">
+    <value>字号</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>帧率</value>
   </data>

@@ -565,6 +565,15 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="Folders" xml:space="preserve">
     <value>資料夾</value>
   </data>
+  <data name="Font" xml:space="preserve">
+    <value>字型</value>
+  </data>
+  <data name="FontFamily" xml:space="preserve">
+    <value>字型</value>
+  </data>
+  <data name="FontSize" xml:space="preserve">
+    <value>字型大小</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>影格率</value>
   </data>

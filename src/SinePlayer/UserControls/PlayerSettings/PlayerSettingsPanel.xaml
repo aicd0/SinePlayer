@@ -350,6 +350,52 @@
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Font}" SectionKey="Font">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleFontFamilyLabel, Mode=OneWay}" />
+                                    <ComboBox
+                                        x:Name="SubtitleFontFamilyComboBox"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        SelectionChanged="SubtitleFontFamilyComboBox_SelectionChanged" />
+                                </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleFontSizeLabel, Mode=OneWay}" />
+                                    <ComboBox
+                                        x:Name="SubtitleFontSizeComboBox"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        IsEditable="True"
+                                        SelectionChanged="SubtitleFontSizeComboBox_SelectionChanged"
+                                        TextSubmitted="SubtitleFontSizeComboBox_TextSubmitted" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Transform}" SectionKey="Transform">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">
@@ -368,7 +414,6 @@
                                     <NumberBox
                                         x:Name="SubtitlePanXNumberBox"
                                         Grid.Column="3"
-                                        Width="180"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Center"
                                         LargeChange="20"
@@ -393,7 +438,6 @@
                                     <NumberBox
                                         x:Name="SubtitlePanYNumberBox"
                                         Grid.Column="3"
-                                        Width="180"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Center"
                                         LargeChange="20"

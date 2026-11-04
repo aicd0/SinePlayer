@@ -190,6 +190,28 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleFontFamilyLabel = string.Empty;
+    public string SubtitleFontFamilyLabel
+    {
+        get => _subtitleFontFamilyLabel;
+        set
+        {
+            _subtitleFontFamilyLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleFontFamilyLabel)));
+        }
+    }
+
+    private string _subtitleFontSizeLabel = string.Empty;
+    public string SubtitleFontSizeLabel
+    {
+        get => _subtitleFontSizeLabel;
+        set
+        {
+            _subtitleFontSizeLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleFontSizeLabel)));
+        }
+    }
+
     private string _subtitlePanXLabel = string.Empty;
     public string SubtitlePanXLabel
     {

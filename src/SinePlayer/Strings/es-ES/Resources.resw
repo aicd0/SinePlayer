@@ -567,6 +567,15 @@ La evaluación se realizará en el siguiente orden:
   <data name="Folders" xml:space="preserve">
     <value>Carpetas</value>
   </data>
+  <data name="Font" xml:space="preserve">
+    <value>Fuente</value>
+  </data>
+  <data name="FontFamily" xml:space="preserve">
+    <value>Familia de fuentes</value>
+  </data>
+  <data name="FontSize" xml:space="preserve">
+    <value>Tamaño de fuente</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Frecuencia de fotogramas</value>
   </data>

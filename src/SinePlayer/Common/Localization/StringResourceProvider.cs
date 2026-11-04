@@ -137,6 +137,9 @@ public class StringResourceProvider
     public string FlipImage => GetResourceString("FlipImage");
     public string FlipVertically => GetResourceString("FlipVertically");
     public string Folders => GetResourceString("Folders");
+    public string Font => GetResourceString("Font");
+    public string FontFamily => GetResourceString("FontFamily");
+    public string FontSize => GetResourceString("FontSize");
     public string FrameRate => GetResourceString("FrameRate");
     public string FunctionAverage => GetResourceString("FunctionAverage");
     public string FunctionItemCount => GetResourceString("FunctionItemCount");

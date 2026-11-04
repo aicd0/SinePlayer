@@ -567,6 +567,15 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   <data name="Folders" xml:space="preserve">
     <value>Ordner</value>
   </data>
+  <data name="Font" xml:space="preserve">
+    <value>Schrift</value>
+  </data>
+  <data name="FontFamily" xml:space="preserve">
+    <value>Schriftart</value>
+  </data>
+  <data name="FontSize" xml:space="preserve">
+    <value>Schriftgröße</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Bildrate</value>
   </data>

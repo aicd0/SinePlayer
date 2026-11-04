@@ -47,7 +47,7 @@ internal sealed partial class CoreEngine : IDisposable
     private bool _hasSource = false;
     private PlaybackComponents _components = PlaybackComponents.Default;
     private VideoTransform _videoTransform = VideoTransform.Identity;
-    private SubtitlePlacement _subtitlePlacement = SubtitlePlacement.Identity;
+    private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
     private double _volume = 1.0;
     private bool _muted;
 
@@ -305,17 +305,17 @@ internal sealed partial class CoreEngine : IDisposable
         _pipeline?.VideoTransform = transform;
     }
 
-    public void SetSubtitlePlacement(SubtitlePlacement placement)
+    public void SetSubtitlePresentation(SubtitlePresentation presentation)
     {
-        if (_subtitlePlacement == placement)
+        if (_subtitlePresentation == presentation)
         {
             return;
         }
 
-        _subtitlePlacement = placement;
+        _subtitlePresentation = presentation;
         if (_pipeline is not null)
         {
-            _pipeline.SubtitlePlacement = placement;
+            _pipeline.SubtitlePresentation = presentation;
         }
     }
 
@@ -375,7 +375,7 @@ internal sealed partial class CoreEngine : IDisposable
 
         _components.Apply(pipeline);
         pipeline.VideoTransform = _videoTransform;
-        pipeline.SubtitlePlacement = _subtitlePlacement;
+        pipeline.SubtitlePresentation = _subtitlePresentation;
         pipeline.StateChanged += Pipeline_StateChanged;
 
         GainAudioFilter gainFilter = new();

@@ -84,7 +84,7 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         return EnsureRenderer();
     }
 
-    public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePlacement placement)
+    public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePresentation presentation)
     {
         ArgumentNullException.ThrowIfNull(cues);
 
@@ -126,11 +126,11 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 
         Composite(images, width, height);
 
-        // The placement's offsets are pixels of the surface's own coordinate space, so they are scaled by the composition
+        // The presentation's offsets are pixels of the surface's own coordinate space, so they are scaled by the composition
         // scale and nothing else: the frame is already the surface, so "ten pixels to the right" means ten of them.
         double scale = _surface.CompositionScale;
-        float offsetX = (float)(placement.OffsetX * scale);
-        float offsetY = (float)(placement.OffsetY * scale);
+        float offsetX = (float)(presentation.OffsetX * scale);
+        float offsetY = (float)(presentation.OffsetY * scale);
         return DrawPixels(offsetX, offsetY, width, height);
     }
 

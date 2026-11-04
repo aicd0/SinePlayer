@@ -55,6 +55,8 @@ internal class PlayerSettingsModel
             SubtitleRenderer = model.Subtitle?.Renderer ?? fallbackModel.SubtitleRenderer,
             SubtitlePanX = model.Subtitle?.PanX ?? fallbackModel.SubtitlePanX,
             SubtitlePanY = model.Subtitle?.PanY ?? fallbackModel.SubtitlePanY,
+            SubtitleFontFamily = model.Subtitle?.FontFamily ?? fallbackModel.SubtitleFontFamily,
+            SubtitleFontSize = model.Subtitle?.FontSize ?? fallbackModel.SubtitleFontSize,
             VideoPreferHardwareDecoding = model.VideoPreferHardwareDecoding ?? fallbackModel.VideoPreferHardwareDecoding,
             VideoPreferHdr = model.VideoPreferHdr ?? fallbackModel.VideoPreferHdr,
             VideoResizeMode = ParseResizeMode(model.VideoResizeMode, fallbackModel.VideoResizeMode),
@@ -196,6 +198,8 @@ internal class PlayerSettingsModel
     public string SubtitleRenderer { get; set; } = PlaybackComponents.AUTO;
     public int SubtitlePanX { get; set; }
     public int SubtitlePanY { get; set; }
+    public string SubtitleFontFamily { get; set; } = string.Empty;
+    public double SubtitleFontSize { get; set; }
     public bool VideoPreferHardwareDecoding { get; set; } = true;
     public bool VideoPreferHdr { get; set; } = true;
     public VideoResizeMode VideoResizeMode { get; set; } = VideoResizeMode.Fit;
@@ -227,6 +231,8 @@ internal class PlayerSettingsModel
                 Renderer = SubtitleRenderer,
                 PanX = SubtitlePanX,
                 PanY = SubtitlePanY,
+                FontFamily = SubtitleFontFamily,
+                FontSize = SubtitleFontSize,
             },
             VideoPreferHardwareDecoding = VideoPreferHardwareDecoding,
             VideoPreferHdr = VideoPreferHdr,
@@ -429,5 +435,11 @@ internal class PlayerSettingsModel
 
         [JsonPropertyName("PanY")]
         public int? PanY { get; set; }
+
+        [JsonPropertyName("FontFamily")]
+        public string? FontFamily { get; set; }
+
+        [JsonPropertyName("FontSize")]
+        public double? FontSize { get; set; }
     }
 }

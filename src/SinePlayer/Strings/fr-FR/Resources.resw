@@ -567,6 +567,15 @@ L'évaluation s'effectuera dans l'ordre suivant :
   <data name="Folders" xml:space="preserve">
     <value>Dossiers</value>
   </data>
+  <data name="Font" xml:space="preserve">
+    <value>Police</value>
+  </data>
+  <data name="FontFamily" xml:space="preserve">
+    <value>Famille de polices</value>
+  </data>
+  <data name="FontSize" xml:space="preserve">
+    <value>Taille de police</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Fréquence d’images</value>
   </data>

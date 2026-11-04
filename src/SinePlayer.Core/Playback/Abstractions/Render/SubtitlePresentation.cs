@@ -1,0 +1,16 @@
+// Copyright (c) aicd0. All rights reserved.
+// Licensed under the GNU General Public License v3.0 or later.
+
+namespace SinePlayer.Core.Playback.Abstractions.Render;
+
+public readonly record struct SubtitlePresentation(
+    double OffsetX,
+    double OffsetY,
+    SubtitleInsets Insets = default,
+    string? FontFamily = null,
+    double FontSize = 0.0)
+{
+    public static SubtitlePresentation Identity => default;
+
+    public bool IsIdentity => OffsetX == 0.0 && OffsetY == 0.0 && Insets.IsNone && string.IsNullOrEmpty(FontFamily) && FontSize <= 0.0;
+}
