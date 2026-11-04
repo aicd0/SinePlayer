@@ -1125,7 +1125,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 renderer = rendererResolved.Result;
                 if (renderer is not null)
                 {
-                    OperationResult configured = renderer.Component.Configure(subtitleStream, subtitleTarget);
+                    OperationResult configured = renderer.Component.Configure(subtitleStream, subtitleSource.Info.Attachments, subtitleTarget);
                     if (!configured.IsSuccessful)
                     {
                         return result.Failure(configured.Message);

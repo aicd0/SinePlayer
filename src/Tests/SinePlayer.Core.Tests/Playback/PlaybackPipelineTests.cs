@@ -8073,9 +8073,39 @@ public class PlaybackPipelineTests
         Assert.That(subtitleRenderer.Presentations, Is.All.EqualTo(presentation), "every drawing carries both where the words go and how they look");
     }
 
+    /// <summary>
+    /// A script may name a font the machine does not have and the file carries instead, so the renderer is built with what
+    /// the source it was selected from holds — not with whatever another source had.
+    /// </summary>
     [Test]
-    public void DrawsAgainWhenOnlyTheFontChanges()
+    public void GivesTheRendererTheAttachmentsOfTheSourceTheTrackCameFrom()
     {
+        MediaAttachment attachment = new()
+        {
+            Name = "fonts/Track.ttf",
+            MimeType = "application/x-truetype-font",
+            Data = new byte[] { 0x00, 0x01, 0x00, 0x00 },
+        };
+
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Attachments = [attachment],
+        };
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+
+        Assert.That(subtitleRenderer.ConfiguredAttachments, Has.Count.EqualTo(1), "the renderer is told what the file holds");
+        Assert.That(subtitleRenderer.ConfiguredAttachments[0].Name, Is.EqualTo("fonts/Track.ttf"));
+        Assert.That(subtitleRenderer.ConfiguredAttachments[0].Data.ToArray(), Is.EqualTo(attachment.Data.ToArray()));
+    }
+
+    [Test]
+    public void DrawsAgainWhenOnlyTheFontChanges()    {
         // The font travels with the drawing, so a change to it has to be drawn even though the cue, the position and the
         // surface are all the same. Without that a new size would only appear with the next cue.
         SyntheticMediaScript script = new()
@@ -8848,6 +8878,9 @@ public class PlaybackPipelineTests
 
         public SubtitleStreamInfo? ConfiguredStream { get; private set; }
 
+        /// <summary>The attachments the renderer was configured with, which is how a test reads what reached it.</summary>
+        public IReadOnlyList<MediaAttachment> ConfiguredAttachments { get; private set; } = [];
+
         public IVideoRenderTarget? Target { get; private set; }
 
         /// <summary>The text of the cues of the most recent drawing, which is the whole visible set.</summary>
@@ -8887,9 +8920,10 @@ public class PlaybackPipelineTests
 
         public bool Disposed { get; private set; }
 
-        public OperationResult Configure(SubtitleStreamInfo stream, IVideoRenderTarget target)
+        public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
         {
             ConfiguredStream = stream;
+            ConfiguredAttachments = [.. attachments];
             Target = target;
             return OperationResult.Success();
         }

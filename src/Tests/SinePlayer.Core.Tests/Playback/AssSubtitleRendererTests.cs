@@ -37,7 +37,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), target);
+        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -71,7 +71,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), target);
+        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -112,7 +112,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), target);
+        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -146,6 +146,76 @@ public class AssSubtitleRendererTests
         {
             cue.Dispose();
         }
+    }
+
+    /// <summary>
+    /// A file can carry the font its script names, and libass is given it before it builds the font provider that looks
+    /// fonts up: the renderer is told what the source holds, and the drawing must be unaffected in the process. No font
+    /// installed on the machine is needed — the bytes come from the system only so they are a real font — and a second
+    /// configuration with a different set is a different renderer's worth of fonts.
+    /// </summary>
+    [Test]
+    public void TakesTheFontsTheSourceCarries()
+    {
+        string? fontPath = FindSystemFont();
+        if (fontPath is null)
+        {
+            Assert.Ignore("This machine has no font to read an attachment from.");
+            return;
+        }
+
+        MediaAttachment attachment = new()
+        {
+            Name = Path.GetFileName(fontPath),
+            MimeType = "application/x-truetype-font",
+            Data = File.ReadAllBytes(fontPath),
+        };
+
+        using AssSubtitleRenderer renderer = new();
+        FakeTarget target = new(640, 360);
+
+        OperationResult configured = renderer.Configure(Stream("ass"), [attachment], target);
+        if (!configured.IsSuccessful)
+        {
+            Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
+            return;
+        }
+
+        using SubtitleCue cue = new()
+        {
+            Start = TimeSpan.Zero,
+            End = TimeSpan.FromSeconds(5),
+            Text = "0,Default,,0,0,0,,Visible words",
+        };
+
+        OperationResult drawn = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
+        Assert.That(drawn.IsSuccessful, Is.True, drawn.Message);
+        int withAttachment = InkHeight(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
+        Assert.That(withAttachment, Is.GreaterThan(0), "the cue is drawn with the attached font available");
+
+        // The same renderer, configured with a set of its own: libass keeps the fonts it was built with, so this rebuilds.
+        OperationResult reconfigured = renderer.Configure(Stream("ass"), [], target);
+        Assert.That(reconfigured.IsSuccessful, Is.True, reconfigured.Message);
+
+        OperationResult drawnAgain = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
+        Assert.That(drawnAgain.IsSuccessful, Is.True, drawnAgain.Message);
+        Assert.That(InkHeight(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight), Is.GreaterThan(0), "and drawn again without them");
+    }
+
+    /// <summary>A font every Windows installation has, as the bytes of a real face rather than a made-up payload.</summary>
+    private static string? FindSystemFont()
+    {
+        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Fonts");
+        foreach (string name in (string[])["arial.ttf", "segoeui.ttf", "tahoma.ttf"])
+        {
+            string path = Path.Combine(folder, name);
+            if (File.Exists(path))
+            {
+                return path;
+            }
+        }
+
+        return null;
     }
 
     private static int InkHeight(ReadOnlySpan<byte> frame, int width, int height)

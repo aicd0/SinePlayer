@@ -80,6 +80,9 @@ internal sealed class SyntheticMediaScript
     /// the file has no subtitle track at all, which is every script that does not ask for one.
     /// </summary>
     internal IReadOnlyList<ScriptedSubtitle> Subtitles { get; init; } = [];
+
+    /// <summary>What the file carries besides its streams, which for a real one is the fonts its script names.</summary>
+    internal IReadOnlyList<MediaAttachment> Attachments { get; init; } = [];
 }
 
 /// <summary>One subtitle event of a scripted file.</summary>
@@ -207,6 +210,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
             Streams = script.Subtitles.Count == 0
                 ? [video, audio]
                 : [video, audio, new SubtitleStreamInfo { Index = SubtitleStreamIndex, CodecId = "synthetic-subtitle", Duration = script.Duration }],
+            Attachments = script.Attachments,
         };
 
         int frameCount = (int)(script.Duration.TotalSeconds * script.FrameRate);

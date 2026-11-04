@@ -58,11 +58,8 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         _surface.Dispose();
     }
 
-    public OperationResult Configure(SubtitleStreamInfo stream, IVideoRenderTarget target)
+    public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
     {
-        ArgumentNullException.ThrowIfNull(stream);
-        ArgumentNullException.ThrowIfNull(target);
-
         if (_disposed)
         {
             return OperationResult.Failure("The subtitle renderer has already been disposed.");

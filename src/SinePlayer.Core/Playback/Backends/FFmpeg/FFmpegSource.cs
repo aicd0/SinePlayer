@@ -9,14 +9,20 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
+using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
 public sealed partial class FFmpegSource : IMediaSource
 {
+    private const string TAG = nameof(FFmpegSource);
+
     private const int DispositionDefault = 0x0001;
     private const int DispositionForced = 0x0040;
     private const int DispositionAttachedPicture = 0x0400;
+
+    private const int MaximumAttachmentBytes = 16 * 1024 * 1024;
+    private const long MaximumAttachmentTotalBytes = 64L * 1024 * 1024;
 
     private static readonly string[] sBitmapSubtitleCodecs =
     [
@@ -253,11 +259,26 @@ public sealed partial class FFmpegSource : IMediaSource
         var streamPointers = (AVStream**)context->Streams;
 
         List<MediaStreamInfo> streams = [];
+        List<MediaAttachment> attachments = [];
+        long attachmentBytes = 0;
         timeBases = new AVRational[context->StreamCount];
         for (uint i = 0; i < context->StreamCount; i++)
         {
             AVStream* stream = streamPointers[i];
             timeBases[i] = stream->TimeBase;
+
+            var parameters = (AVCodecParameters*)stream->CodecParameters;
+            if (parameters is not null && parameters->CodecType == FFmpegConstants.MediaTypeAttachment)
+            {
+                MediaAttachment? attachment = ReadAttachment(stream, parameters, attachmentBytes);
+                if (attachment is not null)
+                {
+                    attachments.Add(attachment);
+                    attachmentBytes += attachment.Data.Length;
+                }
+
+                continue;
+            }
 
             MediaStreamInfo? streamInfo = CreateStreamInfo(stream);
             if (streamInfo is not null)
@@ -275,7 +296,75 @@ public sealed partial class FFmpegSource : IMediaSource
             Duration = duration,
             Bitrate = context->BitRate,
             Streams = streams,
+            Attachments = attachments,
         };
+    }
+
+    private static unsafe MediaAttachment? ReadAttachment(AVStream* stream, AVCodecParameters* parameters, long readSoFar)
+    {
+        if (parameters->Extradata == 0 || parameters->ExtradataSize <= 0)
+        {
+            return null;
+        }
+
+        if (parameters->ExtradataSize > MaximumAttachmentBytes)
+        {
+            PlaybackLogger.W(TAG, $"An attachment of {parameters->ExtradataSize} bytes is too large to be read");
+            return null;
+        }
+
+        if (readSoFar + parameters->ExtradataSize > MaximumAttachmentTotalBytes)
+        {
+            PlaybackLogger.W(TAG, "The attachments of this file add up to more than can be held, so some were left behind");
+            return null;
+        }
+
+        byte[] data = new byte[parameters->ExtradataSize];
+        Marshal.Copy(parameters->Extradata, data, 0, data.Length);
+
+        string? name = FFmpegInterop.GetMetadata(stream->Metadata, "filename");
+        return new MediaAttachment
+        {
+            Name = string.IsNullOrWhiteSpace(name) ? $"attachment-{stream->Index}" : name,
+            MimeType = ResolveAttachmentMimeType(FFmpegInterop.GetMetadata(stream->Metadata, "mimetype"), name, data),
+            Data = data,
+        };
+    }
+
+    private static string? ResolveAttachmentMimeType(string? stated, string? name, byte[] data)
+    {
+        if (!string.IsNullOrWhiteSpace(stated))
+        {
+            return stated;
+        }
+
+        string? extension = Path.GetExtension(name)?.ToLowerInvariant();
+        switch (extension)
+        {
+            case ".ttf":
+                return "application/x-truetype-font";
+            case ".otf":
+                return "application/vnd.ms-opentype";
+            case ".ttc":
+            case ".otc":
+                return "application/x-truetype-font-collection";
+        }
+
+        if (data.Length >= 4)
+        {
+            uint tag = ((uint)data[0] << 24) | ((uint)data[1] << 16) | ((uint)data[2] << 8) | data[3];
+            switch (tag)
+            {
+                case 0x00010000:
+                case 0x74727565: // "true"
+                case 0x4F54544F: // "OTTO"
+                    return "application/x-truetype-font";
+                case 0x74746366: // "ttcf"
+                    return "application/x-truetype-font-collection";
+            }
+        }
+
+        return null;
     }
 
     private static unsafe MediaStreamInfo? CreateStreamInfo(AVStream* stream)

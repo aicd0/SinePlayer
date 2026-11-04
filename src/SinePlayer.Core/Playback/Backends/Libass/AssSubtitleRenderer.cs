@@ -11,54 +11,59 @@ using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Win2D;
+using SinePlayer.Core.Playback.Utils;
 
 using Windows.Foundation;
 using Windows.Graphics.DirectX;
 
 namespace SinePlayer.Core.Playback.Backends.Libass;
 
-/// <summary>
-/// Draws ASS and SSA subtitles with libass, composited into the same surface the other renderer draws into.
-/// <para>
-/// libass decides everything about the picture — styles, positions, collision between events, vector drawings, animation —
-/// and hands back one coverage bitmap per colour. This class does the two things libass cannot: it says what moment to
-/// draw (the pipeline's position, not libass's own idea of time, of which it has none), and it puts the bitmaps on the
-/// screen. That is the whole contract, and it is why the pipeline schedules redraws from the cue's own change windows
-/// rather than from anything libass reports.
-/// </para>
-/// <para>
-/// The script is rebuilt when the set of cues changes and not otherwise, so an animation running inside one cue costs a
-/// rasterisation rather than a parse and a new track.
-/// </para>
-/// </summary>
 public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 {
-    /// <summary>The family a script's missing font falls back to, which every Windows installation has.</summary>
+    #region Constructor
+
+    private const string TAG = nameof(AssSubtitleRenderer);
+
     private const string DefaultFontFamily = "Arial";
 
+    private bool _disposed;
     private readonly SubtitleSurface _surface = new();
 
     private IntPtr _library;
     private IntPtr _renderer;
     private IntPtr _track;
 
-    /// <summary>What the track was built from, so that the same cues are not parsed again on every redraw.</summary>
+    private List<MediaAttachment> _attachments = [];
+    private bool _fontsConfigured;
+
     private string? _builtScript;
     private string? _header;
     private byte[] _pixels = [];
-    private bool _disposed;
+
+    #endregion
+
+    #region Public API
 
     public string Name => "libass";
 
-    /// <summary>
-    /// The frame the last <see cref="Show"/> composited, before it went to the surface — what a test reads to say something
-    /// about the pixels without a window to read them back from.
-    /// </summary>
     internal ReadOnlySpan<byte> CompositedFrame => _pixels;
 
-    public OperationResult Configure(SubtitleStreamInfo stream, IVideoRenderTarget target)
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        ReleaseRenderer();
+        _surface.Dispose();
+    }
+
+    public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
     {
         ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(attachments);
         ArgumentNullException.ThrowIfNull(target);
 
         if (_disposed)
@@ -72,6 +77,14 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
             ReleaseTrack();
         }
 
+        // libass takes the fonts it is given when its font provider is built, once, as the renderer is created: a set that
+        // does not match the one this renderer holds means a renderer built for a different file.
+        if (!SameAttachments(attachments))
+        {
+            ReleaseRenderer();
+        }
+
+        _attachments = [.. attachments];
         _header = stream.ScriptHeader;
         _surface.BindTarget(target);
 
@@ -134,35 +147,14 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         return DrawPixels(offsetX, offsetY, width, height);
     }
 
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
+    #endregion
 
-        _disposed = true;
-        ReleaseTrack();
-
-        if (_renderer != IntPtr.Zero)
-        {
-            LibassNative.ass_renderer_done(_renderer);
-            _renderer = IntPtr.Zero;
-        }
-
-        if (_library != IntPtr.Zero)
-        {
-            LibassNative.ass_library_done(_library);
-            _library = IntPtr.Zero;
-        }
-
-        _surface.Dispose();
-    }
+    #region Libass
 
     /// <summary>
     /// Builds the library and renderer once, and tells libass where fonts come from. The provider is the system's own —
     /// DirectWrite — because the build shipped here has no fontconfig: the fonts installed on the machine are the ones a
-    /// script naming "Arial" is asking for.
+    /// script naming "Arial" is asking for, and the ones the file carries are added to the library before this is told.
     /// </summary>
     private OperationResult EnsureRenderer()
     {
@@ -183,6 +175,8 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
             return OperationResult.Failure("libass could not be initialised.");
         }
 
+        AddAttachedFonts();
+
         _renderer = LibassNative.ass_renderer_init(_library);
         if (_renderer == IntPtr.Zero)
         {
@@ -192,7 +186,28 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         }
 
         LibassNative.ass_set_fonts(_renderer, IntPtr.Zero, DefaultFontFamily, LibassNative.FontProviderDirectWrite, IntPtr.Zero, 1);
+        _fontsConfigured = true;
         return OperationResult.Success();
+    }
+
+    private void ReleaseRenderer()
+    {
+        ReleaseTrack();
+
+        if (_renderer != IntPtr.Zero)
+        {
+            LibassNative.ass_renderer_done(_renderer);
+            _renderer = IntPtr.Zero;
+        }
+
+        if (_library != IntPtr.Zero)
+        {
+            LibassNative.ass_library_done(_library);
+            _library = IntPtr.Zero;
+        }
+
+        _fontsConfigured = false;
+        _attachments = [];
     }
 
     /// <summary>
@@ -231,6 +246,10 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 
         _builtScript = null;
     }
+
+    #endregion
+
+    #region Draw
 
     /// <summary>
     /// Blends libass's bitmaps, in the order it gives them, onto a transparent premultiplied frame: source over
@@ -332,4 +351,89 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         Rect bounds = new(offsetX, offsetY, width, height);
         return _surface.DrawAndPresent(session => session.DrawImage(bitmap, bounds));
     }
+
+    #endregion
+
+    #region Attachment
+
+    /// <summary>
+    /// Hands libass the fonts the file carries, before it builds the font provider that will look them up: a font added
+    /// afterwards is one the provider never saw. The font a script asks for is the family inside the file, not the name it
+    /// is attached under, which is why the bytes matter rather than the name.
+    /// </summary>
+    private void AddAttachedFonts()
+    {
+        // A script may carry its own fonts in its [Fonts] section, which is the other half of "the file has what it needs".
+        LibassNative.ass_set_extract_fonts(_library, 1);
+
+        int added = 0;
+        foreach (MediaAttachment attachment in _attachments)
+        {
+            if (!IsFont(attachment))
+            {
+                PlaybackLogger.W(TAG, $"The attachment '{attachment.Name}' is not a font, so libass was not given it");
+                continue;
+            }
+
+            try
+            {
+                LibassNative.ass_add_font(_library, attachment.Name, attachment.Data.ToArray(), attachment.Data.Length);
+                added++;
+            }
+            catch (Exception ex)
+            {
+                PlaybackLogger.W(TAG, $"The attached font '{attachment.Name}' could not be given to libass: {ex.Message}");
+            }
+        }
+
+        if (added > 0)
+        {
+            PlaybackLogger.I(TAG, $"{added} attached font(s) are available to the script");
+        }
+    }
+
+    private static bool IsFont(MediaAttachment attachment)
+    {
+        string? mimeType = attachment.MimeType;
+        if (!string.IsNullOrEmpty(mimeType))
+        {
+            return mimeType.Contains("truetype", StringComparison.OrdinalIgnoreCase) ||
+                mimeType.Contains("opentype", StringComparison.OrdinalIgnoreCase) ||
+                mimeType.Contains("font", StringComparison.OrdinalIgnoreCase);
+        }
+
+        string extension = Path.GetExtension(attachment.Name);
+        return extension.Equals(".ttf", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".otf", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".ttc", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".otc", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Whether the renderer holds exactly the fonts it was built with, which is what makes it reusable.</summary>
+    private bool SameAttachments(IReadOnlyList<MediaAttachment> attachments)
+    {
+        if (!_fontsConfigured)
+        {
+            // Never built, so nothing was given anything yet and whatever arrives is what it will be built from.
+            return true;
+        }
+
+        if (_attachments.Count != attachments.Count)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < attachments.Count; i++)
+        {
+            if (!string.Equals(_attachments[i].Name, attachments[i].Name, StringComparison.Ordinal) ||
+                _attachments[i].Data.Length != attachments[i].Data.Length)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    #endregion
 }

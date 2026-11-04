@@ -25,6 +25,8 @@ public class FFmpegSourceTests
 
     private string _wavePath = string.Empty;
     private string _subtitlePath = string.Empty;
+    private string _matroskaPath = string.Empty;
+    private byte[] _attachment = [];
 
     [OneTimeSetUp]
     public void OneTimeSetUp()
@@ -33,6 +35,10 @@ public class FFmpegSourceTests
         FFmpegRuntime.EnsureInitialized();
         _wavePath = CreateWaveFile();
         _subtitlePath = CreateSubtitleFile();
+
+        // A font is a binary blob to everything that reads it here, so the payload only has to be recognisable.
+        _attachment = [0x00, 0x01, 0x00, 0x00, 0x53, 0x49, 0x4E, 0x45, 0x50, 0x4C, 0x41, 0x59];
+        _matroskaPath = CreateMatroskaFile(_attachment, "fonts/Attached-Font.ttf", "application/x-truetype-font");
     }
 
     [OneTimeTearDown]
@@ -46,6 +52,11 @@ public class FFmpegSourceTests
         if (File.Exists(_subtitlePath))
         {
             File.Delete(_subtitlePath);
+        }
+
+        if (File.Exists(_matroskaPath))
+        {
+            File.Delete(_matroskaPath);
         }
     }
 
@@ -70,9 +81,34 @@ public class FFmpegSourceTests
         }
     }
 
+    /// <summary>
+    /// A Matroska file can carry fonts beside its tracks, which is how a script asks for a family that is not installed.
+    /// They are not streams — nothing selects them — so they arrive as attachments with the bytes already read.
+    /// </summary>
     [Test]
-    public void ReadsPacketsUntilEndOfStream()
+    public void ExposesTheAttachmentsTheFileCarries()
     {
+        using FFmpegSource source = OpenSource(_matroskaPath);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(source.Info.Attachments, Has.Count.EqualTo(1), "the file carries one attachment");
+
+            MediaAttachment attachment = source.Info.Attachments[0];
+            Assert.That(attachment.Name, Is.EqualTo("fonts/Attached-Font.ttf"));
+            Assert.That(attachment.MimeType, Is.EqualTo("application/x-truetype-font"));
+            Assert.That(attachment.Data.ToArray(), Is.EqualTo(_attachment), "the bytes are the ones in the file");
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(source.Info.Streams, Has.Count.EqualTo(1), "an attachment is not a track to choose");
+            Assert.That(source.Info.Streams[0], Is.InstanceOf<SubtitleStreamInfo>(), "and the track the file does have is still read");
+        }
+    }
+
+    [Test]
+    public void ReadsPacketsUntilEndOfStream()    {
         using FFmpegSource source = OpenWaveFile();
 
         int packetCount = 0;
@@ -257,8 +293,13 @@ public class FFmpegSourceTests
 
     private FFmpegSource OpenWaveFile()
     {
+        return OpenSource(_wavePath);
+    }
+
+    private static FFmpegSource OpenSource(string path)
+    {
         FFmpegSourceProviderFactory factory = new();
-        OperationResult result = factory.TryOpen(MediaLocator.Parse(_wavePath), out IMediaSource? source);
+        OperationResult result = factory.TryOpen(MediaLocator.Parse(path), out IMediaSource? source);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
         Assert.That(source, Is.InstanceOf<FFmpegSource>());
 
@@ -343,5 +384,163 @@ public class FFmpegSourceTests
         }
 
         return path;
+    }
+
+    /// <summary>
+    /// A Matroska file holding one subtitle track and one attachment, and nothing to play: the metadata a container
+    /// states up front is what an attachment is read from, so a header without a single cluster is enough.
+    /// </summary>
+    private static string CreateMatroskaFile(byte[] attachment, string name, string mimeType)
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"sineplayer-ffmpeg-{Guid.NewGuid():N}.mkv");
+        using (BinaryWriter writer = new(File.Create(path)))
+        {
+            writer.Write(Element(0x1A45DFA3, Elements(
+                Element(0x4286, Bytes(1)),                 // EBMLVersion
+                Element(0x42F7, Bytes(1)),                 // EBMLReadVersion
+                Element(0x42F2, Bytes(4)),                 // EBMLMaxIDLength
+                Element(0x42F3, Bytes(8)),                 // EBMLMaxSizeLength
+                Element(0x4282, System.Text.Encoding.ASCII.GetBytes("matroska")),   // DocType
+                Element(0x4287, Bytes(4)),                 // DocTypeVersion
+                Element(0x4285, Bytes(2)))));              // DocTypeReadVersion
+
+            byte[] info = Element(
+                0x1549A966,
+                Elements(
+                    Element(0x2AD7B1, Bytes(1000000)),                    // TimecodeScale: one millisecond
+                    Element(0x4489, BigEndianDouble(3000.0))));           // Duration
+
+            byte[] track = Element(
+                0xAE,
+                Elements(
+                    Element(0xD7, Bytes(1)),                             // TrackNumber
+                    Element(0x73C5, Bytes(1)),                           // TrackUID
+                    Element(0x83, Bytes(0x11)),                          // TrackType: subtitle
+                    Element(0x86, System.Text.Encoding.ASCII.GetBytes("S_TEXT/UTF8"))));   // CodecID
+
+            byte[] tracks = Element(0x1654AE6B, track);
+
+            byte[] file = Element(
+                0x61A7,
+                Elements(
+                    Element(0x466E, System.Text.Encoding.UTF8.GetBytes(name)),
+                    Element(0x4660, System.Text.Encoding.UTF8.GetBytes(mimeType)),
+                    Element(0x465C, attachment)));
+
+            byte[] attachments = Element(0x1941A469, file);
+
+            // One block of text: a demuxer reads a cluster to tell what its streams are made of, so a file of metadata
+            // alone is one it cannot open.
+            byte[] block = Elements(
+                Bytes(1, 0x81),                                          // track 1, as a one-byte variable integer
+                Bytes(2, 0),                                             // block timecode
+                Bytes(1, 0x80),                                          // flags: a keyframe
+                System.Text.Encoding.ASCII.GetBytes("1\n00:00:00,000 --> 00:00:01,000\nAttached\n"));
+
+            byte[] cluster = Element(
+                0x1F43B675,
+                Elements(
+                    Element(0xE7, Bytes(0)),                             // cluster timecode
+                    Element(0xA3, block)));                              // simple block
+
+            writer.Write(Element(0x18538067, Elements(info, tracks, attachments, cluster)));   // Segment
+        }
+
+        return path;
+    }
+
+    private static byte[] Element(int id, byte[] payload)
+    {
+        return Elements(Identifier(id), Size(payload.LongLength), payload);
+    }
+
+    /// <summary>An EBML identifier, whose own length is part of its value, so it is written as it stands.</summary>
+    private static byte[] Identifier(int id)
+    {
+        if (id <= 0xFF)
+        {
+            return Bytes(1, id);
+        }
+
+        if (id <= 0xFFFF)
+        {
+            return Bytes(2, id);
+        }
+
+        // Three-byte identifiers are real — 0x2AD7B1, the time scale, is one — and writing one in four bytes puts a zero
+        // where a demuxer reads the length, which is what makes the file unreadable.
+        return id <= 0xFFFFFF ? Bytes(3, id) : Bytes(4, id);
+    }
+
+    /// <summary>
+    /// A size, written as the variable-length integer EBML asks for: the first byte carries a marker announcing how many
+    /// bytes the number occupies, which is what makes a bare number unreadable to a demuxer.
+    /// </summary>
+    private static byte[] Size(long value)
+    {
+        int width = 1;
+        while (width < 8 && value >= (1L << (7 * width)) - 1)
+        {
+            width++;
+        }
+
+        byte[] bytes = Bytes(width, value);
+        bytes[0] |= (byte)(1 << (8 - width));
+        return bytes;
+    }
+
+    private static byte[] Elements(params byte[][] parts)
+    {
+        int length = 0;
+        foreach (byte[] part in parts)
+        {
+            length += part.Length;
+        }
+
+        byte[] joined = new byte[length];
+        int offset = 0;
+        foreach (byte[] part in parts)
+        {
+            part.CopyTo(joined, offset);
+            offset += part.Length;
+        }
+
+        return joined;
+    }
+
+    private static byte[] BigEndianDouble(double value)
+    {
+        byte[] bytes = BitConverter.GetBytes(value);
+        if (BitConverter.IsLittleEndian)
+        {
+            Array.Reverse(bytes);
+        }
+
+        return bytes;
+    }
+
+    /// <summary>A big-endian integer of the given width, which is how an EBML identifier and size are written.</summary>
+    private static byte[] Bytes(int width, long value)
+    {
+        byte[] bytes = new byte[width];
+        for (int i = width - 1; i >= 0; i--)
+        {
+            bytes[i] = (byte)(value & 0xFF);
+            value >>= 8;
+        }
+
+        return bytes;
+    }
+
+    /// <summary>An unsigned integer in as few bytes as it needs, which is how an EBML element payload holds one.</summary>
+    private static byte[] Bytes(long value)
+    {
+        int width = 1;
+        while (width < 8 && value >= 1L << (8 * width))
+        {
+            width++;
+        }
+
+        return Bytes(width, value);
     }
 }
