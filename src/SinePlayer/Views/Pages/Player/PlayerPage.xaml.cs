@@ -1254,6 +1254,7 @@ internal sealed partial class PlayerPage : BasePage
             FontSize = settings.SubtitleFontSize,
             FontStyle = settings.ToFontStyle(),
             FontWeight = settings.ToFontWeight(),
+            OutlineWidth = settings.SubtitleOutlineWidth,
         };
         engine.SetSubtitlePresentation(_subtitlePresentation);
 

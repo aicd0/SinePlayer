@@ -886,6 +886,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="OriginalSize" xml:space="preserve">
     <value>Original size</value>
   </data>
+  <data name="Outline" xml:space="preserve">
+    <value>Outline</value>
+  </data>
   <data name="Output" xml:space="preserve">
     <value>Output</value>
   </data>

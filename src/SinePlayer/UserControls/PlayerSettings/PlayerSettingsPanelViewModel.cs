@@ -234,6 +234,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleOutlineLabel = string.Empty;
+    public string SubtitleOutlineLabel
+    {
+        get => _subtitleOutlineLabel;
+        set
+        {
+            _subtitleOutlineLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleOutlineLabel)));
+        }
+    }
+
     private string _subtitlePanXLabel = string.Empty;
     public string SubtitlePanXLabel
     {

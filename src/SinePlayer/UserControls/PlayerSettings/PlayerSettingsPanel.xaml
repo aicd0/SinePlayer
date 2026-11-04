@@ -431,6 +431,18 @@
                                         VerticalAlignment="Center"
                                         SelectionChanged="SubtitleFontWeightComboBox_SelectionChanged" />
                                 </Grid>
+                                <Rectangle
+                                    Height="1"
+                                    Margin="0,8"
+                                    Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+                                <settings:SliderSettingView
+                                    x:Name="SubtitleOutlineSlider"
+                                    DefaultValue="2"
+                                    Label="{x:Bind ViewModel.SubtitleOutlineLabel, Mode=OneWay}"
+                                    Maximum="10"
+                                    Minimum="0"
+                                    StepFrequency="0.1"
+                                    ValueChanged="SubtitleOutlineSlider_ValueChanged" />
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>

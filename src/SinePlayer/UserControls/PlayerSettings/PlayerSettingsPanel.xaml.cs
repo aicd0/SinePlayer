@@ -7,6 +7,7 @@ using System.Globalization;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
@@ -446,6 +447,20 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
+    private void SubtitleOutlineSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = e.NewValue;
+        if (_mediaSettings.SubtitleOutlineWidth != value)
+        {
+            Apply(settings => settings.SubtitleOutlineWidth = value);
+        }
+    }
+
     private void ApplySubtitleFontSize(double size)
     {
         double value = size <= 0.0 ? 0.0 : Math.Clamp(size, MinimumSubtitleFontSize, MaximumSubtitleFontSize);
@@ -713,6 +728,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 tabModified = tabModified || modified;
                 UpdateSubtitleFontWeight(settings);
                 ViewModel.SubtitleFontWeightLabel = GetLabel(StringResource.FontWeight, modified);
+            }
+
+            {
+                bool modified = settings.SubtitleOutlineWidth != presetSettings.SubtitleOutlineWidth;
+                tabModified = tabModified || modified;
+                UpdateSubtitleOutline(settings);
+                ViewModel.SubtitleOutlineLabel = GetLabel(StringResource.Outline, modified);
             }
 
             {
@@ -1062,6 +1084,15 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (SubtitleFontWeightComboBox.SelectedIndex != index)
         {
             SubtitleFontWeightComboBox.SelectedIndex = index;
+        }
+    }
+
+    private void UpdateSubtitleOutline(PlayerSettingsModel settings)
+    {
+        double value = settings.SubtitleOutlineWidth;
+        if (Math.Abs(SubtitleOutlineSlider.Value - value) > 0.001)
+        {
+            SubtitleOutlineSlider.Value = value;
         }
     }
 
