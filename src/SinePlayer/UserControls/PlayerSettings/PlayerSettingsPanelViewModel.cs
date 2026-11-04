@@ -212,6 +212,28 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleFontStyleLabel = string.Empty;
+    public string SubtitleFontStyleLabel
+    {
+        get => _subtitleFontStyleLabel;
+        set
+        {
+            _subtitleFontStyleLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleFontStyleLabel)));
+        }
+    }
+
+    private string _subtitleFontWeightLabel = string.Empty;
+    public string SubtitleFontWeightLabel
+    {
+        get => _subtitleFontWeightLabel;
+        set
+        {
+            _subtitleFontWeightLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleFontWeightLabel)));
+        }
+    }
+
     private string _subtitlePanXLabel = string.Empty;
     public string SubtitlePanXLabel
     {

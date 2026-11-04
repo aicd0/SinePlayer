@@ -576,6 +576,21 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="FontSize" xml:space="preserve">
     <value>字号</value>
   </data>
+  <data name="FontStyle" xml:space="preserve">
+    <value>字形</value>
+  </data>
+  <data name="FontStyleItalic" xml:space="preserve">
+    <value>斜体</value>
+  </data>
+  <data name="FontStyleNormal" xml:space="preserve">
+    <value>常规</value>
+  </data>
+  <data name="FontStyleOblique" xml:space="preserve">
+    <value>倾斜</value>
+  </data>
+  <data name="FontWeight" xml:space="preserve">
+    <value>字重</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>帧率</value>
   </data>

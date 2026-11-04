@@ -1252,6 +1252,8 @@ internal sealed partial class PlayerPage : BasePage
             OffsetY = settings.SubtitlePanY,
             FontFamily = settings.SubtitleFontFamily,
             FontSize = settings.SubtitleFontSize,
+            FontStyle = settings.ToFontStyle(),
+            FontWeight = settings.ToFontWeight(),
         };
         engine.SetSubtitlePresentation(_subtitlePresentation);
 

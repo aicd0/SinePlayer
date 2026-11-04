@@ -25,6 +25,8 @@ using SinePlayer.Core.Playback.Registry;
 using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Timing;
 
+using Windows.UI.Text;
+
 namespace SinePlayer.Core.Tests.Playback;
 
 /// <summary>
@@ -8061,7 +8063,7 @@ public class PlaybackPipelineTests
         using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
 
         // Set before anything is drawn, so the very first call has to carry it: a renderer is never told twice.
-        SubtitlePresentation presentation = new(0.25, -0.5, default, "Segoe UI", 32.0);
+        SubtitlePresentation presentation = new(0.25, -0.5, default, "Segoe UI", 32.0, FontStyle.Italic, new FontWeight { Weight = 700 });
         pipeline.SubtitlePresentation = presentation;
 
         Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
