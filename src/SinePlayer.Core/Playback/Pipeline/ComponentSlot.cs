@@ -67,6 +67,12 @@ internal sealed class ComponentSlot<T> where T : class, IDisposable
     {
         lock (_lock)
         {
+            if (PipelineVersion.IsBehind(versions, PipelineVersion.Max(_currentVersions, _pendingVersions)))
+            {
+                component?.Dispose();
+                return;
+            }
+
             PipelineComponent<T>? displaced = _published ? _pending : null;
 
             _published = true;

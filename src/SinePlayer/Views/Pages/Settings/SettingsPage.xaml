@@ -94,6 +94,7 @@
                     <settings:SettingExpander
                         x:Uid="LanguageExpander"
                         Glyph="&#xF2B7;"
+                        Header="{x:Bind StringResource.Language}"
                         IsExpanded="False">
                         <settings:SettingExpander.InnerContent>
                             <StackPanel Orientation="Vertical">

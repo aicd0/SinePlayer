@@ -685,11 +685,11 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="KeyboardShortcutsExpander.Header" xml:space="preserve">
     <value>Keyboard shortcuts</value>
   </data>
+  <data name="Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
   <data name="LanguageExpander.Detail" xml:space="preserve">
     <value>Select which language for the app to display</value>
-  </data>
-  <data name="LanguageExpander.Header" xml:space="preserve">
-    <value>Language</value>
   </data>
   <data name="LastVisitTime" xml:space="preserve">
     <value>Last visit time</value>
@@ -780,6 +780,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="Next" xml:space="preserve">
     <value>Next</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>No</value>
   </data>
   <data name="NoContent" xml:space="preserve">
     <value>No content to display</value>
@@ -1157,6 +1160,15 @@ Start in Safe Mode?</value>
   <data name="Subtitle" xml:space="preserve">
     <value>Subtitle</value>
   </data>
+  <data name="SubtitleForced" xml:space="preserve">
+    <value>Forced</value>
+  </data>
+  <data name="SubtitleTypeBitmap" xml:space="preserve">
+    <value>Bitmap</value>
+  </data>
+  <data name="SubtitleTypeText" xml:space="preserve">
+    <value>Text</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Tag</value>
   </data>
@@ -1209,6 +1221,9 @@ Category2: Tag4, Tag5</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Two-page mode</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>Type</value>
   </data>
   <data name="Unavailable" xml:space="preserve">
     <value>Unavailable</value>
@@ -1292,5 +1307,8 @@ $info</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>Window $n</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>Yes</value>
   </data>
 </root>

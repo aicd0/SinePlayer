@@ -685,11 +685,11 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="KeyboardShortcutsExpander.Header" xml:space="preserve">
     <value>热键</value>
   </data>
+  <data name="Language" xml:space="preserve">
+    <value>语言</value>
+  </data>
   <data name="LanguageExpander.Detail" xml:space="preserve">
     <value>选择应用显示的语言</value>
-  </data>
-  <data name="LanguageExpander.Header" xml:space="preserve">
-    <value>语言</value>
   </data>
   <data name="LastVisitTime" xml:space="preserve">
     <value>上次访问时间</value>
@@ -780,6 +780,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   </data>
   <data name="Next" xml:space="preserve">
     <value>下一个</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>否</value>
   </data>
   <data name="NoContent" xml:space="preserve">
     <value>暂无可显示内容</value>
@@ -1157,6 +1160,15 @@ $plugins</value>
   <data name="Subtitle" xml:space="preserve">
     <value>字幕</value>
   </data>
+  <data name="SubtitleForced" xml:space="preserve">
+    <value>强制</value>
+  </data>
+  <data name="SubtitleTypeBitmap" xml:space="preserve">
+    <value>位图</value>
+  </data>
+  <data name="SubtitleTypeText" xml:space="preserve">
+    <value>文本</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>标签</value>
   </data>
@@ -1209,6 +1221,9 @@ $plugins</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>双页模式</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>类型</value>
   </data>
   <data name="Unavailable" xml:space="preserve">
     <value>不可用</value>
@@ -1292,5 +1307,8 @@ $info</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>窗口 $n</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>是</value>
   </data>
 </root>

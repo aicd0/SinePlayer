@@ -685,11 +685,11 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="KeyboardShortcutsExpander.Header" xml:space="preserve">
     <value>Atajos de teclado</value>
   </data>
+  <data name="Language" xml:space="preserve">
+    <value>Idioma</value>
+  </data>
   <data name="LanguageExpander.Detail" xml:space="preserve">
     <value>Seleccione el idioma que desea que se muestre en la aplicación</value>
-  </data>
-  <data name="LanguageExpander.Header" xml:space="preserve">
-    <value>Idioma</value>
   </data>
   <data name="LastVisitTime" xml:space="preserve">
     <value>Última visita</value>
@@ -780,6 +780,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="Next" xml:space="preserve">
     <value>Siguiente</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>No</value>
   </data>
   <data name="NoContent" xml:space="preserve">
     <value>No hay contenido para mostrar</value>
@@ -1157,6 +1160,15 @@ $plugins</value>
   <data name="Subtitle" xml:space="preserve">
     <value>Subtítulo</value>
   </data>
+  <data name="SubtitleForced" xml:space="preserve">
+    <value>Forzado</value>
+  </data>
+  <data name="SubtitleTypeBitmap" xml:space="preserve">
+    <value>Mapa de bits</value>
+  </data>
+  <data name="SubtitleTypeText" xml:space="preserve">
+    <value>Texto</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Etiqueta</value>
   </data>
@@ -1209,6 +1221,9 @@ Categoría 2: Etiqueta 4, Etiqueta 5</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>Modo de doble página</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>Tipo</value>
   </data>
   <data name="Unavailable" xml:space="preserve">
     <value>No disponible</value>
@@ -1292,5 +1307,8 @@ $info</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>Ventana $n</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>Sí</value>
   </data>
 </root>

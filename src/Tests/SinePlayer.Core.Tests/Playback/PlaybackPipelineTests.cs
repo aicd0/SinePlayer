@@ -3000,12 +3000,11 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
-    /// A track that cannot be decoded is reported through the warning channel as well as to the caller. Without that, a
-    /// file whose sound cannot be decoded plays silently — indistinguishable from a file that has no sound — and the one
-    /// line saying which codec has no decoder never reaches a log or a listener.
+    /// A track that cannot be decoded is refused to the caller, and the file stays open with nothing playing: a chain that
+    /// cannot be built is the chain's own answer, and the reconcile itself happened.
     /// </summary>
     [Test]
-    public void WarnsWhenAnAudioChainCannotBePrepared()
+    public void RefusesAnAudioChainThatCannotBePrepared()
     {
         string path = CreateWaveFile();
         try
@@ -3015,13 +3014,9 @@ public class PlaybackPipelineTests
                 new FakeAudioRenderer(),
                 audioDecoders: new RefusesInsideTheCreator());
 
-            WarningLog warnings = new(pipeline);
-
             OperationResult opened = Open(pipeline, path);
 
             Assert.That(opened.IsSuccessful, Is.False, "nothing can be played without a decoder");
-
-            WaitForWarning(warnings);
         }
         finally
         {
@@ -3170,7 +3165,7 @@ public class PlaybackPipelineTests
 
             // The host says what it wants by changing the registry, then tells the pipeline to look again.
             pipeline.Components.Preferences = pipeline.Components.Preferences with { PreferHardwareDecoding = false };
-            OperationResult reconciled = Await(pipeline.Reconcile());
+            OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
 
@@ -3393,7 +3388,7 @@ public class PlaybackPipelineTests
             pipeline.Components.Register(new FailingVideoRendererFactory("broken"));
             pipeline.Components.Register(new FakeVideoRendererFactory(second));
 
-            OperationResult swapped = Await(pipeline.Reconcile());
+            OperationResult<ReconcileResult> swapped = Await(pipeline.Reconcile());
 
             Assert.That(swapped.IsSuccessful, Is.True, swapped.Message);
 
@@ -3432,11 +3427,11 @@ public class PlaybackPipelineTests
             // it cannot build: the reconcile has to say so and leave the running renderer alone.
             SwapVideoRenderer(pipeline, new FailingVideoRendererFactory("broken"));
 
-            OperationResult swapped = Await(pipeline.Reconcile());
+            OperationResult<ReconcileResult> swapped = Await(pipeline.Reconcile());
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(swapped.IsSuccessful, Is.False, "a renderer that cannot be made is the caller's failure to see");
+                Assert.That(swapped.Result.Video.IsSuccessful, Is.False, "a renderer that cannot be made is the caller's failure to see");
                 Assert.That(pipeline.VideoRendererName, Is.EqualTo("first"), "the running renderer is untouched");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
             }
@@ -3517,11 +3512,11 @@ public class PlaybackPipelineTests
             TimeSpan position = pipeline.Position;
             FakeAudioRenderer refuses = new() { CanConfigure = false, RefusalReason = "This device refuses the stream." };
             SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(refuses));
-            OperationResult swapped = Await(pipeline.Reconcile());
+            OperationResult<ReconcileResult> swapped = Await(pipeline.Reconcile());
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(swapped.IsSuccessful, Is.False, "a device that cannot be opened is the caller's failure to see");
+                Assert.That(swapped.Result.Audio.IsSuccessful, Is.False, "a device that cannot be opened is the caller's failure to see");
                 Assert.That(pipeline.AudioRendererName, Is.EqualTo("first"), "the playing device is untouched");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
             }
@@ -3577,7 +3572,7 @@ public class PlaybackPipelineTests
             pipeline.Components.Clear<IAudioDecoderFactory>();
             pipeline.Components.Register(second);
 
-            OperationResult reconciled = Await(pipeline.Reconcile());
+            OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
 
             // Each wait is on the thing that is asserted below, and in the order the pipeline does them: the
@@ -3628,7 +3623,7 @@ public class PlaybackPipelineTests
             SwapVideoRenderer(pipeline, new FakeVideoRendererFactory(secondVideo));
             SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(secondAudio));
 
-            OperationResult reconciled = Await(pipeline.Reconcile());
+            OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
 
@@ -3661,7 +3656,7 @@ public class PlaybackPipelineTests
 
             // Asking for what is already in force is not a change: the resolver is asked again, and because the
             // answer is the decoder that is running, nothing is built.
-            OperationResult reconciled = Await(pipeline.Reconcile());
+            OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
 
@@ -3699,11 +3694,11 @@ public class PlaybackPipelineTests
             pipeline.Components.Clear<IVideoDecoderFactory>();
             pipeline.Components.Register(new RefusingVideoDecoderFactory());
 
-            OperationResult reconciled = Await(pipeline.Reconcile());
+            OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(reconciled.IsSuccessful, Is.False, "a replacement that cannot be built is the caller's to see");
+                Assert.That(reconciled.Result.Video.IsSuccessful, Is.False, "a replacement that cannot be built is the caller's to see");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a failed replacement is not a playback failure");
             }
 
@@ -5040,7 +5035,11 @@ public class PlaybackPipelineTests
         }
     }
 
-    /// <summary>A track no decoder can take is refused, and the one playing keeps playing.</summary>
+    /// <summary>
+    /// A track no decoder can take is refused, and the one playing keeps playing — including when another chain is rebuilt in
+    /// the same reconcile. The source holder describes every selection at once, so a chain that publishes it while another
+    /// kind's selection could not be built replaces the picture that is playing with one nothing can decode.
+    /// </summary>
     [Test]
     public void KeepsThePlayingTrackWhenTheNewOneCannotBeDecoded()
     {
@@ -5053,7 +5052,7 @@ public class PlaybackPipelineTests
                 components.Register(refusing);
                 components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
                 components.Register(new FFmpegAudioDecoderFactory());
-                components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer { PlaysWhatItIsGiven = true }));
+                components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer { Name = "first", PlaysWhatItIsGiven = true }));
             });
 
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
@@ -5064,11 +5063,16 @@ public class PlaybackPipelineTests
             refusing.RefusedIndex = second.Index;   // the index the container gave it, not the position in the list
             long presented = pipeline.PresentedFrameCount;
 
-            OperationResult selected = Select(pipeline, MediaStreamKind.Video, second);
+            // The sound is given a new device in the same reconcile as the picture's new track, so the audio chain has
+            // something of its own to build while the video chain cannot build what was chosen.
+            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, second)).IsSuccessful, Is.True);
+            SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(new FakeAudioRenderer { Name = "second", PlaysWhatItIsGiven = true }));
+            OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(selected.IsSuccessful, Is.False, "a stream no decoder can take is the caller's failure to see");
+                Assert.That(reconciled.Result.Video.IsSuccessful, Is.False, "a stream no decoder can take is the caller's failure to see");
+                Assert.That(reconciled.Result.Audio.IsSuccessful, Is.True, "the sound has a device of its own to build");
                 Assert.That(pipeline.SelectedVideoStream?.Index, Is.EqualTo(second.Index), "the choice is recorded, refused or not");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the picture that is playing is untouched");
             }
@@ -6579,9 +6583,25 @@ public class PlaybackPipelineTests
         }
 
         // Choosing records the decision; reconciling is what builds what the choice needs, and it is the call that says a
-        // track cannot be played at all.
-        OperationResult reconciled = Await(pipeline.Reconcile());
-        return reconciled.IsSuccessful ? OperationResult.Success() : reconciled;
+        // track cannot be played at all. Which chain failed is that call's answer, so the kinds that were chosen decide it.
+        OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
+        if (!reconciled.IsSuccessful)
+        {
+            return OperationResult.Failure(reconciled);
+        }
+
+        ReconcileResult result = reconciled.Result;
+        if (info.VideoStreams.Count > 0 && !result.Video.IsSuccessful)
+        {
+            return result.Video;
+        }
+
+        if (info.AudioStreams.Count > 0 && !result.Audio.IsSuccessful)
+        {
+            return result.Audio;
+        }
+
+        return OperationResult.Success();
     }
 
     /// <summary>
@@ -6613,7 +6633,25 @@ public class PlaybackPipelineTests
     private static OperationResult Select(PlaybackPipeline pipeline, MediaStreamKind kind, MediaStreamInfo? stream)
     {
         OperationResult selected = Await(pipeline.SelectStream(kind, stream));
-        return selected.IsSuccessful ? Await(pipeline.Reconcile()) : selected;
+        if (!selected.IsSuccessful)
+        {
+            return selected;
+        }
+
+        OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
+        if (!reconciled.IsSuccessful)
+        {
+            return OperationResult.Failure(reconciled);
+        }
+
+        // The reconcile happened; what the chain for the chosen kind made of it is the answer about that kind.
+        ReconcileResult result = reconciled.Result;
+        return kind switch
+        {
+            MediaStreamKind.Video => result.Video,
+            MediaStreamKind.Audio => result.Audio,
+            _ => result.Subtitle,
+        };
     }
 
     private static OperationResult Await(Task<OperationResult> command)

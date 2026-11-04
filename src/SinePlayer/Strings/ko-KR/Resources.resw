@@ -685,11 +685,11 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="KeyboardShortcutsExpander.Header" xml:space="preserve">
     <value>단축키</value>
   </data>
+  <data name="Language" xml:space="preserve">
+    <value>언어</value>
+  </data>
   <data name="LanguageExpander.Detail" xml:space="preserve">
     <value>앱에 표시할 언어를 선택하세요</value>
-  </data>
-  <data name="LanguageExpander.Header" xml:space="preserve">
-    <value>언어</value>
   </data>
   <data name="LastVisitTime" xml:space="preserve">
     <value>마지막 방문 시간</value>
@@ -780,6 +780,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   </data>
   <data name="Next" xml:space="preserve">
     <value>다음</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>아니요</value>
   </data>
   <data name="NoContent" xml:space="preserve">
     <value>표시할 콘텐츠가 없습니다</value>
@@ -1157,6 +1160,15 @@ $plugins</value>
   <data name="Subtitle" xml:space="preserve">
     <value>자막</value>
   </data>
+  <data name="SubtitleForced" xml:space="preserve">
+    <value>강제</value>
+  </data>
+  <data name="SubtitleTypeBitmap" xml:space="preserve">
+    <value>비트맵</value>
+  </data>
+  <data name="SubtitleTypeText" xml:space="preserve">
+    <value>텍스트</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>꼬리표</value>
   </data>
@@ -1209,6 +1221,9 @@ $plugins</value>
   </data>
   <data name="TwoPageMode" xml:space="preserve">
     <value>양면 모드</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>종류</value>
   </data>
   <data name="Unavailable" xml:space="preserve">
     <value>사용할 수 없음</value>
@@ -1292,5 +1307,8 @@ $info</value>
   </data>
   <data name="WindowN" xml:space="preserve">
     <value>창 $n</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>예</value>
   </data>
 </root>

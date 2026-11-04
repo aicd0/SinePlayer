@@ -217,22 +217,22 @@ internal sealed partial class CoreEngine : IDisposable
         return OperationResult.Success();
     }
 
-    public async Task<OperationResult> Reconcile()
+    public async Task<OperationResult<ReconcileResult>> Reconcile()
     {
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is null)
         {
-            return OperationResultExt.Failure(TAG, "There is nothing open to build.");
+            return OperationResultExt.Failure<ReconcileResult>(TAG, "There is nothing open to build.");
         }
 
-        OperationResult reconciled = await pipeline.Reconcile();
+        OperationResult<ReconcileResult> reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
-            return OperationResultExt.Failure(TAG, $"What was chosen could not be played. {reconciled.Message}");
+            return OperationResultExt.Failure<ReconcileResult>(TAG, $"What was chosen could not be built. {reconciled.Message}");
         }
 
         RaisePositionChanged();
-        return OperationResult.Success();
+        return reconciled;
     }
 
     public void Play()
@@ -440,14 +440,16 @@ internal sealed partial class CoreEngine : IDisposable
             return;
         }
 
-        // What is active now is what may be offered now: a device that vanished leaves the list, one that arrived
-        // joins it, and the default is first in either case.
         _components.Apply(pipeline);
 
-        OperationResult reconciled = await pipeline.Reconcile();
+        OperationResult<ReconcileResult> reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
         {
             Logger.W(TAG, $"The audio output could not be re-resolved: {reconciled.Message}");
+        }
+        else if (!reconciled.Result.Audio.IsSuccessful)
+        {
+            Logger.W(TAG, $"The audio output could not be re-resolved: {reconciled.Result.Audio.Message}");
         }
     }
 

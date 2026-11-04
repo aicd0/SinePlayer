@@ -14,6 +14,7 @@ using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
+using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
@@ -126,15 +127,23 @@ internal sealed class PlayerMenuContext
         CoroutineUtils.Run(async () =>
         {
             OperationResult selected = await engine.SelectStream(kind, stream);
-
-            if (selected.IsSuccessful)
-            {
-                selected = await engine.Reconcile();
-            }
-
             if (!selected.IsSuccessful)
             {
                 PromptInfo?.Invoke(selected.Message);
+                return;
+            }
+
+            OperationResult<ReconcileResult> reconciled = await engine.Reconcile();
+            if (!reconciled.IsSuccessful)
+            {
+                PromptInfo?.Invoke(reconciled.Message);
+                return;
+            }
+
+            OperationResult built = reconciled.Result.For(kind);
+            if (!built.IsSuccessful)
+            {
+                PromptInfo?.Invoke(built.Message);
                 return;
             }
 

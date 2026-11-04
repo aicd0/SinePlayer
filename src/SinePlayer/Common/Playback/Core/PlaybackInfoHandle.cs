@@ -44,11 +44,15 @@ internal sealed class PlaybackInfoHandle
 
     public string? VideoDecoderName => _pipeline?.VideoDecoderName;
 
-    public string? AudioDecoderName => _pipeline?.AudioDecoderName;
-
     public string? VideoRendererName => _pipeline?.VideoRendererName;
 
+    public string? AudioDecoderName => _pipeline?.AudioDecoderName;
+
     public string? AudioRendererName => _pipeline?.AudioRendererName;
+
+    public string? SubtitleDecoderName => _pipeline?.SubtitleDecoderName;
+
+    public string? SubtitleRendererName => _pipeline?.SubtitleRendererName;
 
     public bool IsVideoHardwareAccelerated => _pipeline?.IsVideoHardwareAccelerated ?? false;
 

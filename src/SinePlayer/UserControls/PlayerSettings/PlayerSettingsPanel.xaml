@@ -108,6 +108,10 @@
                                         Grid.Column="3"
                                         HorizontalAlignment="Right" />
                                 </Grid>
+                                <Rectangle
+                                    Height="1"
+                                    Margin="0,8"
+                                    Fill="{ThemeResource MediaInfoSeparatorForeground}" />
                                 <Grid Style="{StaticResource CommonSettingRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -186,6 +190,10 @@
                                         Grid.Column="3"
                                         HorizontalAlignment="Right" />
                                 </Grid>
+                                <Rectangle
+                                    Height="1"
+                                    Margin="0,8"
+                                    Fill="{ThemeResource MediaInfoSeparatorForeground}" />
                                 <Grid Style="{StaticResource CommonSettingRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
