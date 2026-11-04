@@ -80,17 +80,18 @@ internal static class D3D11Interop
     }
 
     /// <summary>
-    /// Writes what the vertex shader needs to put a frame where it belongs: the texture coordinates the picture
-    /// occupies inside its texture — one where the two are the same size, less than one where a hardware decoder
-    /// padded the texture — and the two rows that place the unit square on the surface.
+    /// Writes what the vertex shader needs to put a frame where it belongs: the texture coordinates the picture occupies
+    /// inside its texture — one where the two are the same size, less than one where a hardware decoder padded the texture
+    /// — the half texel that moves the picture's edges onto its first and last texel centres, and the two rows that place
+    /// the unit square on the surface.
     /// </summary>
-    internal static unsafe void SetFrameTransform(ID3D11DeviceContext context, ID3D11Buffer buffer, float scaleX, float scaleY, Matrix3x2 placement)
+    internal static unsafe void SetFrameTransform(ID3D11DeviceContext context, ID3D11Buffer buffer, (float X, float Y) scale, (float X, float Y) bias, Matrix3x2 placement)
     {
         float* values = stackalloc float[12];
-        values[0] = scaleX;
-        values[1] = scaleY;
-        values[2] = 0.0f;
-        values[3] = 0.0f;
+        values[0] = scale.X;
+        values[1] = scale.Y;
+        values[2] = bias.X;
+        values[3] = bias.Y;
         values[4] = placement.M11;
         values[5] = placement.M21;
         values[6] = placement.M31;

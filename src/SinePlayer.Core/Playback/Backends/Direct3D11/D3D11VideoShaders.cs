@@ -41,7 +41,7 @@ internal sealed partial class D3D11VideoShaders : IDisposable
 cbuffer FrameTransform : register(b0)
 {
     float2 TexCoordScale;
-    float2 Unused;
+    float2 TexCoordBias;
     float4 QuadRow0;
     float4 QuadRow1;
 };
@@ -60,7 +60,7 @@ VSOutput VSMain(uint vertexId : SV_VertexID)
     float3 corner = float3(uv, 1.0);
     float2 placed = float2(dot(corner, QuadRow0.xyz), dot(corner, QuadRow1.xyz));
     output.Position = float4(placed.x * 2.0 - 1.0, 1.0 - placed.y * 2.0, 0.0, 1.0);
-    output.TexCoord = uv * TexCoordScale;
+    output.TexCoord = (uv * TexCoordScale) + TexCoordBias;
     return output;
 }
 

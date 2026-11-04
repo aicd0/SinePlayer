@@ -51,54 +51,26 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         return result.Success(new D3D11VideoRenderer(device, shaders.Result, surfacePreference));
     }
 
+    private bool _disposed;
+    private string _name;
+
+    private readonly object _deviceLock = new();
     private readonly D3D11Device _device;
     private readonly D3D11VideoShaders _shaders;
-    private readonly object _deviceLock = new();
-
-    /// <summary>The one number the vertex shader is given: where in its texture the picture lies.</summary>
     private readonly ID3D11Buffer _frameTransform;
 
-    private readonly VideoSurfacePreference _surfacePreference;
-
-    private IVideoRenderTarget? _target;
-    private IVideoSurface? _surface;
-    private VideoSurfaceKind _surfaceKind = VideoSurfaceKind.Sdr;
     private ID3D11RenderTargetView? _outputView;
     private int _outputWidth;
     private int _outputHeight;
-    private bool _needsResize;
-    private string _name;
 
-    /// <summary>How big the frame in hand is, which both ways of getting one use as the key to what they hold.</summary>
+    private PixelFormat _frameFormat = PixelFormat.Unknown;
     private int _frameWidth;
     private int _frameHeight;
-
-    private ID3D11ShaderResourceView[] _gpuViews = [];
-    private nint _gpuTexture;
-    private int _gpuSlice = -1;
-    private IGpuVideoBuffer? _retainedFrame;
-
-    /// <summary>How much of the texture the picture fills, which is less than all of it when it was padded.</summary>
-    private (float X, float Y) _gpuTexCoordScale = (1.0f, 1.0f);
-
-    private ID3D11Texture2D[] _planeTextures = [];
-    private ID3D11ShaderResourceView[] _planeViews = [];
-
-    /// <summary>
-    /// The layout of the textures <see cref="_planeTextures"/> were created for, which is what says whether an upload
-    /// can reuse them. It is therefore about the last frame <em>uploaded</em>, not the last one drawn: a hardware frame
-    /// is sampled from the decoder's own texture, which this cache has no part in and which says what it holds itself.
-    /// </summary>
-    private PixelFormat _frameFormat = PixelFormat.Unknown;
 
     private ID3D11PixelShader? _lastPixelShader;
     private ID3D11ShaderResourceView[] _lastViews = [];
     private uint _lastSlot;
-
-    /// <summary>The same transform the last draw used, so a redraw shows the same picture.</summary>
-    private (float X, float Y) _lastTexCoordScale = (1.0f, 1.0f);
-
-    private bool _disposed;
+    private FrameTexCoords _lastTexCoords = FrameTexCoords.Full;
 
     private D3D11VideoRenderer(D3D11Device device, D3D11VideoShaders shaders, VideoSurfacePreference surfacePreference)
     {
@@ -263,7 +235,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                     return OperationResult.Failure(resolvedShader);
                 }
 
-                return Draw(resolvedShader.Result, _gpuViews, GpuTextureSlot, _gpuTexCoordScale, transform);
+                return Draw(resolvedShader.Result, _gpuViews, GpuTextureSlot, _gpuTexCoords, transform);
             }
             else
             {
@@ -284,7 +256,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                     return upload;
                 }
 
-                return Draw(resolvedShader.Result, _planeViews, 0, (1.0f, 1.0f), transform);
+                return Draw(resolvedShader.Result, _planeViews, 0, FrameTexCoords.Full, transform);
             }
         }
     }
@@ -312,7 +284,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                 return OperationResult.Success();
             }
 
-            return Draw(_lastPixelShader, _lastViews, _lastSlot, _lastTexCoordScale, transform);
+            return Draw(_lastPixelShader, _lastViews, _lastSlot, _lastTexCoords, transform);
         }
     }
 
@@ -387,6 +359,12 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
     #region Hardware buffer
 
+    private ID3D11ShaderResourceView[] _gpuViews = [];
+    private FrameTexCoords _gpuTexCoords = FrameTexCoords.Full;
+    private IGpuVideoBuffer? _retainedFrame;
+    private nint _gpuTexture;
+    private int _gpuSlice = -1;
+
     private OperationResult BindGpuFrame(RawVideoFrame frame, IGpuVideoBuffer buffer)
     {
         // The views outlive the call, so the same slice of the same texture at the same picture size is already bound.
@@ -457,7 +435,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
             _retainedFrame = retained;
             _frameWidth = frame.Width;
             _frameHeight = frame.Height;
-            _gpuTexCoordScale = GetTexCoordScale(description, frame);
+            _gpuTexCoords = GetTexCoords((int)description.Width, (int)description.Height, frame.Width, frame.Height);
             return OperationResult.Success();
         }
         finally
@@ -489,26 +467,44 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     }
 
     /// <summary>
-    /// How much of the texture holds the picture. A hardware decoder decodes into a texture it aligned for
-    /// its own use, so a 1080-high picture can live in 1088 or 1152 rows: the rows below the picture were never
-    /// written, and sampling them puts a band of whatever they happen to contain — nothing, which converts to
-    /// green — along the bottom of the picture.
+    /// How the picture is read out of its texture. A hardware decoder decodes into a texture it aligned for its own use, so
+    /// a 1080-high picture can live in 1088 or 1152 rows: the rows below the picture were never written, and sampling them
+    /// puts a band of whatever they happen to contain — nothing, which converts to green — along the bottom of the picture.
+    /// The scale keeps the picture inside its own rows, and the half texel keeps the last of them off the edge between the
+    /// picture and what follows it, which bilinear filtering would otherwise blend in.
     /// </summary>
-    private static (float X, float Y) GetTexCoordScale(in D3D11_TEXTURE2D_DESC description, RawVideoFrame frame)
+    internal static FrameTexCoords GetTexCoords(int textureWidth, int textureHeight, int frameWidth, int frameHeight)
     {
-        if (description.Width <= 0 || description.Height <= 0)
+        if (textureWidth <= 0 || textureHeight <= 0)
         {
-            return (1.0f, 1.0f);
+            return FrameTexCoords.Full;
         }
 
-        float x = Math.Min(1.0f, frame.Width / (float)description.Width);
-        float y = Math.Min(1.0f, frame.Height / (float)description.Height);
-        return (x, y);
+        int width = Math.Clamp(frameWidth, 1, textureWidth);
+        int height = Math.Clamp(frameHeight, 1, textureHeight);
+        return new FrameTexCoords(
+            (width - 1) / (float)textureWidth,
+            (height - 1) / (float)textureHeight,
+            0.5f / textureWidth,
+            0.5f / textureHeight);
+    }
+
+    /// <summary>Where the picture lies in its texture: the span it covers, and the half texel that centres it.</summary>
+    internal readonly record struct FrameTexCoords(float ScaleX, float ScaleY, float BiasX, float BiasY)
+    {
+        internal static FrameTexCoords Full => new(1.0f, 1.0f, 0.0f, 0.0f);
+
+        internal (float X, float Y) Scale => (ScaleX, ScaleY);
+
+        internal (float X, float Y) Bias => (BiasX, BiasY);
     }
 
     #endregion
 
     #region Software buffer
+
+    private ID3D11Texture2D[] _planeTextures = [];
+    private ID3D11ShaderResourceView[] _planeViews = [];
 
     private OperationResult Upload(RawVideoFrame frame, IPlanarVideoBuffer buffer)
     {
@@ -634,14 +630,12 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         }
     }
 
-    #endregion
-
     /// <summary>
     /// Draws the planes of the last uploaded frame into the output surface and presents it. Kept apart
     /// from <see cref="Render"/> because the planes outlive the frame: they are what makes it possible to
     /// show the same picture again after the surface changed.
     /// </summary>
-    private OperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, (float X, float Y) texCoordScale, VideoTransform transform)
+    private OperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, FrameTexCoords texCoords, VideoTransform transform)
     {
         ID3D11DeviceContext context = _device.Context;
         context.OMSetRenderTargets(1, [_outputView], null);
@@ -661,7 +655,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         // Where the picture lies inside the texture it is drawn from: all of it for an uploaded frame, less
         // for one a hardware decoder padded. Where it lies on the surface is the placement beside it.
         Matrix3x2 placement = transform.GetPlacement(_frameWidth, _frameHeight, _outputWidth, _outputHeight);
-        D3D11Interop.SetFrameTransform(context, _frameTransform, texCoordScale.X, texCoordScale.Y, placement);
+        D3D11Interop.SetFrameTransform(context, _frameTransform, texCoords.Scale, texCoords.Bias, placement);
         D3D11Interop.SetVertexConstantBuffer(context, 0, _frameTransform);
 
         D3D11Interop.SetTextures(context, textureSlot, views, _shaders.GetSampler(transform.Scaling));
@@ -673,12 +667,20 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         _lastPixelShader = pixelShader;
         _lastViews = views;
         _lastSlot = textureSlot;
-        _lastTexCoordScale = texCoordScale;
+        _lastTexCoords = texCoords;
 
         return _surface is null ? OperationResult.Success() : _surface.Present();
     }
 
+    #endregion
+
     #region Surface
+
+    private readonly VideoSurfacePreference _surfacePreference;
+    private IVideoRenderTarget? _target;
+    private IVideoSurface? _surface;
+    private VideoSurfaceKind _surfaceKind = VideoSurfaceKind.Sdr;
+    private bool _needsResize;
 
     private OperationResult ApplyPendingResize()
     {
