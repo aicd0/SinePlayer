@@ -868,6 +868,12 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Cette opération écrasera les entrées existantes.</value>
   </data>
+  <data name="PanX" xml:space="preserve">
+    <value>Décalage X</value>
+  </data>
+  <data name="PanY" xml:space="preserve">
+    <value>Décalage Y</value>
+  </data>
   <data name="Pause" xml:space="preserve">
     <value>Pause</value>
   </data>

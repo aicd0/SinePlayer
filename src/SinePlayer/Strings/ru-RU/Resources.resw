@@ -868,6 +868,12 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Эта операция перезапишет существующие записи.</value>
   </data>
+  <data name="PanX" xml:space="preserve">
+    <value>Сдвиг X</value>
+  </data>
+  <data name="PanY" xml:space="preserve">
+    <value>Сдвиг Y</value>
+  </data>
   <data name="Pause" xml:space="preserve">
     <value>Пауза</value>
   </data>

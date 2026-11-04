@@ -350,6 +350,62 @@
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Transform}" SectionKey="Transform">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitlePanXLabel, Mode=OneWay}" />
+                                    <NumberBox
+                                        x:Name="SubtitlePanXNumberBox"
+                                        Grid.Column="3"
+                                        Width="180"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        LargeChange="20"
+                                        Maximum="2000"
+                                        Minimum="-2000"
+                                        SmallChange="5"
+                                        SpinButtonPlacementMode="Inline"
+                                        ValueChanged="SubtitlePanXNumberBox_ValueChanged" />
+                                </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitlePanYLabel, Mode=OneWay}" />
+                                    <NumberBox
+                                        x:Name="SubtitlePanYNumberBox"
+                                        Grid.Column="3"
+                                        Width="180"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        LargeChange="20"
+                                        Maximum="2000"
+                                        Minimum="-2000"
+                                        SmallChange="5"
+                                        SpinButtonPlacementMode="Inline"
+                                        ValueChanged="SubtitlePanYNumberBox_ValueChanged" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
                 </StackPanel>
             </Grid>
         </ScrollViewer>

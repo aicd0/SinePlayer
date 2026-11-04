@@ -868,6 +868,12 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>この操作により既存のエントリが上書きされます。</value>
   </data>
+  <data name="PanX" xml:space="preserve">
+    <value>X 移動</value>
+  </data>
+  <data name="PanY" xml:space="preserve">
+    <value>Y 移動</value>
+  </data>
   <data name="Pause" xml:space="preserve">
     <value>一時停止</value>
   </data>

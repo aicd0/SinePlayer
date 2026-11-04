@@ -60,7 +60,10 @@
                             <Setter Property="MaxWidth" Value="1000" />
                         </Style>
                     </Flyout.FlyoutPresenterStyle>
-                    <playersettings:PlayerSettingsPanel x:Name="MainPlayerSettingPanel" DataChanged="MainPlayerSettingPanel_DataChanged" />
+                    <playersettings:PlayerSettingsPanel
+                        x:Name="MainPlayerSettingPanel"
+                        AllowFocusOnInteraction="True"
+                        DataChanged="MainPlayerSettingPanel_DataChanged" />
                 </Flyout>
             </AppBarButton.Flyout>
         </AppBarButton>

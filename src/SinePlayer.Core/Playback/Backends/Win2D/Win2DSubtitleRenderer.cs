@@ -133,7 +133,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         {
             if (cue.Image is { } image)
             {
-                DrawImage(session, image, placement, area, width, height);
+                DrawImage(session, image, placement, area, width, height, scale);
                 continue;
             }
 
@@ -156,7 +156,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             // asked for, and the ones after it make room above or below rather than covering it.
             origin.Y += row == 2 ? stacked : -stacked;
 
-            origin += new Vector2((float)(placement.OffsetX * width), (float)(placement.OffsetY * height));
+            origin += new Vector2((float)(placement.OffsetX * scale), (float)(placement.OffsetY * scale));
             origin = KeepInsideArea(origin, layout, area);
 
             session.DrawTextLayout(layout, origin + new Vector2(ShadowOffset, ShadowOffset), Color.FromArgb(200, 0, 0, 0));
@@ -174,7 +174,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         return new SubtitleArea(left, top, Math.Max(1.0f, width - left - right), Math.Max(1.0f, height - top - bottom));
     }
 
-    private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePlacement placement, SubtitleArea area, int width, int height)
+    private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePlacement placement, SubtitleArea area, int width, int height, double scale)
     {
         ISubtitleImageBuffer buffer = image.Buffer;
         if (buffer.Width <= 0 || buffer.Height <= 0)
@@ -194,9 +194,10 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             96.0f,
             CanvasAlphaMode.Premultiplied);
 
-        // The image's own geometry is a fraction of the frame it was authored against, which is the whole surface.
-        double x = ((image.Left + placement.OffsetX) * width);
-        double y = ((image.Top + placement.OffsetY) * height);
+        // The image's own geometry is a fraction of the frame it was authored against, which is the whole surface; the
+        // placement's offset is in pixels, so it is added after that geometry is scaled.
+        double x = (image.Left * width) + (placement.OffsetX * scale);
+        double y = (image.Top * height) + (placement.OffsetY * scale);
         double scaledWidth = image.Width * width;
         double scaledHeight = image.Height * height;
 

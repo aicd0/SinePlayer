@@ -868,6 +868,12 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>This operation will overwrite existing entries.</value>
   </data>
+  <data name="PanX" xml:space="preserve">
+    <value>Pan X</value>
+  </data>
+  <data name="PanY" xml:space="preserve">
+    <value>Pan Y</value>
+  </data>
   <data name="Pause" xml:space="preserve">
     <value>Pause</value>
   </data>

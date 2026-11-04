@@ -190,6 +190,28 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitlePanXLabel = string.Empty;
+    public string SubtitlePanXLabel
+    {
+        get => _subtitlePanXLabel;
+        set
+        {
+            _subtitlePanXLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitlePanXLabel)));
+        }
+    }
+
+    private string _subtitlePanYLabel = string.Empty;
+    public string SubtitlePanYLabel
+    {
+        get => _subtitlePanYLabel;
+        set
+        {
+            _subtitlePanYLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitlePanYLabel)));
+        }
+    }
+
     public PlayerSettingsPanelViewModel()
     {
         SettingsChangedLiveData = new(_settingsChangedLiveData, 500);

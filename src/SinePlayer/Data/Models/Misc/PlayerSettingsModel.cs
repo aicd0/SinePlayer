@@ -51,8 +51,10 @@ internal class PlayerSettingsModel
             VideoRenderer = model.VideoRenderer ?? fallbackModel.VideoRenderer,
             AudioDecoder = model.AudioDecoder ?? fallbackModel.AudioDecoder,
             AudioRenderer = model.AudioRenderer ?? fallbackModel.AudioRenderer,
-            SubtitleDecoder = model.SubtitleDecoder ?? fallbackModel.SubtitleDecoder,
-            SubtitleRenderer = model.SubtitleRenderer ?? fallbackModel.SubtitleRenderer,
+            SubtitleDecoder = model.Subtitle?.Decoder ?? fallbackModel.SubtitleDecoder,
+            SubtitleRenderer = model.Subtitle?.Renderer ?? fallbackModel.SubtitleRenderer,
+            SubtitlePanX = model.Subtitle?.PanX ?? fallbackModel.SubtitlePanX,
+            SubtitlePanY = model.Subtitle?.PanY ?? fallbackModel.SubtitlePanY,
             VideoPreferHardwareDecoding = model.VideoPreferHardwareDecoding ?? fallbackModel.VideoPreferHardwareDecoding,
             VideoPreferHdr = model.VideoPreferHdr ?? fallbackModel.VideoPreferHdr,
             VideoResizeMode = ParseResizeMode(model.VideoResizeMode, fallbackModel.VideoResizeMode),
@@ -192,6 +194,8 @@ internal class PlayerSettingsModel
     public string AudioRenderer { get; set; } = PlaybackComponents.AUTO;
     public string SubtitleDecoder { get; set; } = PlaybackComponents.AUTO;
     public string SubtitleRenderer { get; set; } = PlaybackComponents.AUTO;
+    public int SubtitlePanX { get; set; }
+    public int SubtitlePanY { get; set; }
     public bool VideoPreferHardwareDecoding { get; set; } = true;
     public bool VideoPreferHdr { get; set; } = true;
     public VideoResizeMode VideoResizeMode { get; set; } = VideoResizeMode.Fit;
@@ -217,8 +221,13 @@ internal class PlayerSettingsModel
             VideoRenderer = VideoRenderer,
             AudioDecoder = AudioDecoder,
             AudioRenderer = AudioRenderer,
-            SubtitleDecoder = SubtitleDecoder,
-            SubtitleRenderer = SubtitleRenderer,
+            Subtitle = new()
+            {
+                Decoder = SubtitleDecoder,
+                Renderer = SubtitleRenderer,
+                PanX = SubtitlePanX,
+                PanY = SubtitlePanY,
+            },
             VideoPreferHardwareDecoding = VideoPreferHardwareDecoding,
             VideoPreferHdr = VideoPreferHdr,
             VideoResizeMode = VideoResizeMode.ToString(),
@@ -382,11 +391,8 @@ internal class PlayerSettingsModel
         [JsonPropertyName("AudioRenderer")]
         public string? AudioRenderer { get; set; }
 
-        [JsonPropertyName("SubtitleDecoder")]
-        public string? SubtitleDecoder { get; set; }
-
-        [JsonPropertyName("SubtitleRenderer")]
-        public string? SubtitleRenderer { get; set; }
+        [JsonPropertyName("Subtitle")]
+        public JsonSubtitleModel? Subtitle { get; set; }
 
         [JsonPropertyName("VideoPreferHardwareDecoding")]
         public bool? VideoPreferHardwareDecoding { get; set; }
@@ -408,5 +414,20 @@ internal class PlayerSettingsModel
 
         [JsonPropertyName("VideoFlipVertical")]
         public bool? VideoFlipVertical { get; set; }
+    }
+
+    public class JsonSubtitleModel
+    {
+        [JsonPropertyName("Decoder")]
+        public string? Decoder { get; set; }
+
+        [JsonPropertyName("Renderer")]
+        public string? Renderer { get; set; }
+
+        [JsonPropertyName("PanX")]
+        public int? PanX { get; set; }
+
+        [JsonPropertyName("PanY")]
+        public int? PanY { get; set; }
     }
 }

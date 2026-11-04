@@ -545,22 +545,16 @@ internal sealed partial class PlayerPage : BasePage
     private const string TAG = nameof(PlayerPage);
 
     private CoreEngine? _engine;
-    private PlaybackComponents _components = PlaybackComponents.Default;
-    private VideoTransform _videoTransform = VideoTransform.Identity;
 
     private async Task<OperationResult> OpenMedia(MediaModel media, long startPositionMs)
     {
         ViewModel.SavePosition();
 
         CoreEngine engine = EnsureEngine();
+        await engine.Reset();
 
         var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
-        _components = mediaSettings.ToComponents();
-        _videoTransform = mediaSettings.ToVideoTransform();
-
-        await engine.Reset();
-        engine.SetComponents(_components);
-        engine.SetVideoTransform(_videoTransform);
+        ApplyPlayerSettings(mediaSettings);
 
         OperationResult<MediaSource> loaded = await engine.AddSource(media.Location);
         if (!loaded.IsSuccessful)
@@ -1244,27 +1238,18 @@ internal sealed partial class PlayerPage : BasePage
 
     private async void ApplyPlayerSettings(PlayerSettingsModel settings)
     {
-        ApplyVideoTransform(settings);
-
-        PlaybackComponents components = settings.ToComponents();
-        if (components == _components)
-        {
-            return;
-        }
-
-        _components = components;
-
-        if (ViewModel.IsLoading)
-        {
-            return;
-        }
-
         CoreEngine? engine = _engine;
         if (engine is null)
         {
             return;
         }
 
+        engine.SetVideoTransform(settings.ToVideoTransform());
+
+        _subtitlePlacement = _subtitlePlacement with { OffsetX = settings.SubtitlePanX, OffsetY = settings.SubtitlePanY };
+        engine.SetSubtitlePlacement(_subtitlePlacement);
+
+        PlaybackComponents components = settings.ToComponents();
         engine.SetComponents(components);
 
         if (engine.State == MediaEngineState.None)
@@ -1295,18 +1280,6 @@ internal sealed partial class PlayerPage : BasePage
         {
             PromptTemporary(result.Subtitle.Message);
         }
-    }
-
-    private void ApplyVideoTransform(PlayerSettingsModel settings)
-    {
-        var transform = settings.ToVideoTransform();
-        if (transform == _videoTransform)
-        {
-            return;
-        }
-
-        _videoTransform = transform;
-        _engine?.SetVideoTransform(transform);
     }
 
     #endregion

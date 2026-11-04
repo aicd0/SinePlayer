@@ -868,6 +868,12 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Dieser Vorgang überschreibt vorhandene Einträge.</value>
   </data>
+  <data name="PanX" xml:space="preserve">
+    <value>X-Verschiebung</value>
+  </data>
+  <data name="PanY" xml:space="preserve">
+    <value>Y-Verschiebung</value>
+  </data>
   <data name="Pause" xml:space="preserve">
     <value>Pause</value>
   </data>
