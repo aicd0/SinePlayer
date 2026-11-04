@@ -75,6 +75,51 @@ public class D3D11VideoRendererTests
         }
     }
 
+    /// <summary>
+    /// A hardware decoder decodes into a texture it aligned, so the last row of the picture is not the last row of the
+    /// texture. Sampling must stay on the picture's own rows and on their centres: reach the row below and bilinear
+    /// filtering blends in a row the decoder never wrote, which converts to green and shows as a line along the bottom of
+    /// the picture — the reported symptom. Both edges are pinned here: the first sample on the first row's centre, the last
+    /// on the last row's.
+    /// </summary>
+    [Test]
+    public void ReadsOnlyThePicturesOwnRowsOfAPaddedTexture()
+    {
+        const int pictureWidth = 1920;
+        const int pictureHeight = 1080;
+        const int textureHeight = 1088;
+
+        D3D11VideoRenderer.FrameTexCoords coords = D3D11VideoRenderer.GetTexCoords(pictureWidth, textureHeight, pictureWidth, pictureHeight);
+
+        // Where in the texture the two ends of the quad sample, in texels.
+        float firstRow = coords.BiasY * textureHeight;
+        float lastRow = ((coords.ScaleY * 1.0f) + coords.BiasY) * textureHeight;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(firstRow, Is.EqualTo(0.5f).Within(0.001f), "the top edge samples the centre of the first row");
+            Assert.That(lastRow, Is.EqualTo(pictureHeight - 0.5f).Within(0.001f), "the bottom edge samples the centre of the last row of the picture");
+            Assert.That(lastRow, Is.LessThan(textureHeight), "and never reaches the rows the decoder left unwritten");
+        }
+    }
+
+    /// <summary>
+    /// A picture that fills its texture is still read from row centre to row centre, which is the same mapping with nothing
+    /// to clip: the half texel does not depend on the texture being padded.
+    /// </summary>
+    [Test]
+    public void ReadsAFrameThatFillsItsTextureFromRowCentreToRowCentre()
+    {
+        D3D11VideoRenderer.FrameTexCoords coords = D3D11VideoRenderer.GetTexCoords(640, 480, 640, 480);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(coords.BiasY * 480, Is.EqualTo(0.5f).Within(0.001f));
+            Assert.That(((coords.ScaleY * 1.0f) + coords.BiasY) * 480, Is.EqualTo(479.5f).Within(0.001f));
+            Assert.That(coords.ScaleX, Is.EqualTo(639 / 640.0f).Within(0.0001f));
+        }
+    }
+
     [Test]
     public void KeepsRowOrderTopDown()
     {
