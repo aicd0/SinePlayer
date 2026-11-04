@@ -223,6 +223,8 @@ public class StringResourceProvider
     public string OriginalSize => GetResourceString("OriginalSize");
     public string Output => GetResourceString("Output");
     public string OverwriteExistingEntries => GetResourceString("OverwriteExistingEntries");
+    public string PanX => GetResourceString("PanX");
+    public string PanY => GetResourceString("PanY");
     public string Pause => GetResourceString("Pause");
     public string PauseOnLeaveTab => GetResourceString("PauseOnLeaveTab");
     public string PictureLag => GetResourceString("PictureLag");

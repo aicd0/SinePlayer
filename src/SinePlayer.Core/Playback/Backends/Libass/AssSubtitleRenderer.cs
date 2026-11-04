@@ -126,8 +126,11 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 
         Composite(images, width, height);
 
-        float offsetX = (float)(placement.OffsetX * width);
-        float offsetY = (float)(placement.OffsetY * height);
+        // The placement's offsets are pixels of the surface's own coordinate space, so they are scaled by the composition
+        // scale and nothing else: the frame is already the surface, so "ten pixels to the right" means ten of them.
+        double scale = _surface.CompositionScale;
+        float offsetX = (float)(placement.OffsetX * scale);
+        float offsetY = (float)(placement.OffsetY * scale);
         return DrawPixels(offsetX, offsetY, width, height);
     }
 

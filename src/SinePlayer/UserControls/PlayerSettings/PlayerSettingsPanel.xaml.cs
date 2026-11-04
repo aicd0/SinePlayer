@@ -308,6 +308,56 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
+    private void SubtitlePanXNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (double.IsNaN(sender.Value))
+        {
+            sender.Value = 0;
+            if (_mediaSettings.SubtitlePanX != 0)
+            {
+                Apply(settings => settings.SubtitlePanX = 0);
+            }
+
+            return;
+        }
+
+        int value = (int)Math.Round(sender.Value);
+        if (_mediaSettings.SubtitlePanX != value)
+        {
+            Apply(settings => settings.SubtitlePanX = value);
+        }
+    }
+
+    private void SubtitlePanYNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (double.IsNaN(sender.Value))
+        {
+            sender.Value = 0;
+            if (_mediaSettings.SubtitlePanY != 0)
+            {
+                Apply(settings => settings.SubtitlePanY = 0);
+            }
+
+            return;
+        }
+
+        int value = (int)Math.Round(sender.Value);
+        if (_mediaSettings.SubtitlePanY != value)
+        {
+            Apply(settings => settings.SubtitlePanY = value);
+        }
+    }
+
     #endregion
 
     #region Section UI
@@ -539,6 +589,20 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 ViewModel.SubtitleRendererLabel = GetLabel(StringResource.Renderer, modified);
             }
 
+            {
+                bool modified = settings.SubtitlePanX != presetSettings.SubtitlePanX;
+                tabModified = tabModified || modified;
+                UpdateSubtitlePanX(settings);
+                ViewModel.SubtitlePanXLabel = GetLabel(StringResource.PanX, modified);
+            }
+
+            {
+                bool modified = settings.SubtitlePanY != presetSettings.SubtitlePanY;
+                tabModified = tabModified || modified;
+                UpdateSubtitlePanY(settings);
+                ViewModel.SubtitlePanYLabel = GetLabel(StringResource.PanY, modified);
+            }
+
             settingsModified = settingsModified || tabModified;
             ViewModel.SubtitleTabTitle = GetLabel(StringResource.Subtitle, tabModified);
         }
@@ -697,6 +761,26 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
         });
         SubtitleRendererDropDownButton.Content = choice.Label;
+    }
+
+    private void UpdateSubtitlePanX(PlayerSettingsModel settings)
+    {
+        double value = settings.SubtitlePanX;
+        double shown = SubtitlePanXNumberBox.Value;
+        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.5)
+        {
+            SubtitlePanXNumberBox.Value = value;
+        }
+    }
+
+    private void UpdateSubtitlePanY(PlayerSettingsModel settings)
+    {
+        double value = settings.SubtitlePanY;
+        double shown = SubtitlePanYNumberBox.Value;
+        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.5)
+        {
+            SubtitlePanYNumberBox.Value = value;
+        }
     }
 
     private MenuFlyout CreateChoiceMenu(IReadOnlyList<PlaybackComponentOption> options, string? selectedKey, Action<string> select)

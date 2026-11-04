@@ -866,6 +866,12 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>此操作將覆蓋現有條目。</value>
   </data>
+  <data name="PanX" xml:space="preserve">
+    <value>水平平移</value>
+  </data>
+  <data name="PanY" xml:space="preserve">
+    <value>垂直平移</value>
+  </data>
   <data name="Pause" xml:space="preserve">
     <value>暫停</value>
   </data>
