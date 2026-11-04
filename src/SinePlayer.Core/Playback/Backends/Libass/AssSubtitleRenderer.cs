@@ -127,23 +127,35 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
             return tracked;
         }
 
-        // The frame is the surface, and the host's chrome is not given to libass. Its margins do not mean "keep clear of
-        // this strip": they say the window is bigger than the video, and the script is scaled to what is left over —
-        // measured on 0.17.5, a 1080-high frame with a 200px bottom margin draws an 81px glyph 65px high, because
-        // 880/1080 is the scale it derives. An ASS script places its own events, so a bar passing over a line is a better
-        // answer than words that change size with the bar.
-        LibassNative.ass_set_frame_size(_renderer, width, height);
+        // A script places its own events, and it places them against the picture: a picture fitted into the surface leaves
+        // bars, and a script given the surface would spread its lines across them. So libass is told the picture's own box
+        // and its bitmaps are put down at that box's corner, which is the one thing the margins cannot say — they mean
+        // "the window is bigger than the video", and libass answers that by scaling the script down.
+        SubtitleFrame frame = presentation.Frame.IsEmpty ? SubtitleFrame.Full : presentation.Frame;
+        int frameX = (int)Math.Round(frame.Left * width);
+        int frameY = (int)Math.Round(frame.Top * height);
+        int frameWidth = Math.Clamp((int)Math.Round(frame.Width * width), 1, width);
+        int frameHeight = Math.Clamp((int)Math.Round(frame.Height * height), 1, height);
+
+        LibassNative.ass_set_frame_size(_renderer, frameWidth, frameHeight);
 
         long now = (long)position.TotalMilliseconds;
         IntPtr images = LibassNative.ass_render_frame(_renderer, _track, now, out _);
 
-        Composite(images, width, height);
+        Composite(images, width, height, frameX, frameY);
 
         // The presentation's offsets are pixels of the surface's own coordinate space, so they are scaled by the composition
-        // scale and nothing else: the frame is already the surface, so "ten pixels to the right" means ten of them.
+        // scale and nothing else.
         double scale = _surface.CompositionScale;
         float offsetX = (float)(presentation.OffsetX * scale);
         float offsetY = (float)(presentation.OffsetY * scale);
+
+        // Then the strips the host's chrome covers are kept clear of the words, by moving the picture rather than reshaping
+        // it: libass's own margins mean "the window is bigger than the video" and answer by scaling the script down, and a
+        // glyph that changes size with a bar is worse than one that sits higher.
+        (float shiftX, float shiftY) = SafeShift(presentation, frameX, frameY, frameWidth, frameHeight, width, height, scale);
+        ShiftPixels((int)Math.Round(shiftX), (int)Math.Round(shiftY), width, height);
+
         return DrawPixels(offsetX, offsetY, width, height);
     }
 
@@ -251,11 +263,7 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 
     #region Draw
 
-    /// <summary>
-    /// Blends libass's bitmaps, in the order it gives them, onto a transparent premultiplied frame: source over
-    /// destination, one coverage bitmap per colour. The frame is the surface, so nothing is scaled here.
-    /// </summary>
-    private void Composite(IntPtr images, int width, int height)
+    private void Composite(IntPtr images, int width, int height, int originX, int originY)
     {
         int length = width * height * 4;
         if (_pixels.Length != length)
@@ -296,7 +304,7 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 
             for (int y = 0; y < image.Height; y++)
             {
-                int destinationY = image.Top + y;
+                int destinationY = image.Top + originY + y;
                 if (destinationY < 0 || destinationY >= height)
                 {
                     continue;
@@ -304,13 +312,14 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 
                 Marshal.Copy(image.Bitmap + (y * image.Stride), row, 0, image.Width);
 
-                int startX = Math.Max(0, image.Left);
-                int endX = Math.Min(width, image.Left + image.Width);
+                int left = image.Left + originX;
+                int startX = Math.Max(0, left);
+                int endX = Math.Min(width, left + image.Width);
                 int index = ((destinationY * width) + startX) * 4;
 
                 for (int x = startX; x < endX; x++, index += 4)
                 {
-                    int coverage = row[x - image.Left];
+                    int coverage = row[x - left];
                     if (coverage == 0)
                     {
                         continue;
@@ -433,6 +442,146 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         }
 
         return true;
+    }
+
+    #endregion
+
+    #region Shift
+
+    private void ShiftPixels(int dx, int dy, int width, int height)
+    {
+        if (dx == 0 && dy == 0)
+        {
+            return;
+        }
+
+        int stride = width * 4;
+        if (dy != 0)
+        {
+            int rows = height - Math.Abs(dy);
+            if (rows <= 0)
+            {
+                Array.Clear(_pixels);
+                return;
+            }
+
+            int sourceRow = dy > 0 ? 0 : -dy;
+            int targetRow = dy > 0 ? dy : 0;
+            Array.Copy(_pixels, sourceRow * stride, _pixels, targetRow * stride, rows * stride);
+            if (dy > 0)
+            {
+                Array.Clear(_pixels, 0, dy * stride);
+            }
+            else
+            {
+                Array.Clear(_pixels, rows * stride, -dy * stride);
+            }
+        }
+
+        if (dx == 0)
+        {
+            return;
+        }
+
+        int bytes = (width - Math.Abs(dx)) * 4;
+        if (bytes <= 0)
+        {
+            Array.Clear(_pixels);
+            return;
+        }
+
+        for (int y = 0; y < height; y++)
+        {
+            int row = y * stride;
+            if (dx > 0)
+            {
+                Array.Copy(_pixels, row, _pixels, row + (dx * 4), bytes);
+                Array.Clear(_pixels, row, dx * 4);
+            }
+            else
+            {
+                Array.Copy(_pixels, row - (dx * 4), _pixels, row, bytes);
+                Array.Clear(_pixels, row + bytes, -dx * 4);
+            }
+        }
+    }
+
+    private (float X, float Y) SafeShift(SubtitlePresentation presentation, int frameX, int frameY, int frameWidth, int frameHeight, int width, int height, double scale)
+    {
+        SubtitleInsets insets = presentation.Insets;
+        if (insets.IsNone)
+        {
+            return (0.0f, 0.0f);
+        }
+
+        if (!TryGetInkBounds(width, height, out int inkLeft, out int inkTop, out int inkRight, out int inkBottom))
+        {
+            return (0.0f, 0.0f);
+        }
+
+        // The strips are measured from the surface's edges, because that is where the host's chrome is; only the part of a
+        // strip that overlaps the picture can push words anywhere.
+        int pictureRight = frameX + frameWidth;
+        int pictureBottom = frameY + frameHeight;
+        int left = Math.Max(frameX, (int)Math.Round(insets.Left * scale));
+        int top = Math.Max(frameY, (int)Math.Round(insets.Top * scale));
+        int right = Math.Min(pictureRight, width - (int)Math.Round(insets.Right * scale));
+        int bottom = Math.Min(pictureBottom, height - (int)Math.Round(insets.Bottom * scale));
+        if (right <= left || bottom <= top)
+        {
+            // Chrome that covers the whole picture cannot be kept clear of: the script's own placement is left alone.
+            return (0.0f, 0.0f);
+        }
+
+        float shiftX = ShiftFor(inkLeft, inkRight, left, right, frameX, pictureRight);
+        float shiftY = ShiftFor(inkTop, inkBottom, top, bottom, frameY, pictureBottom);
+        return (shiftX, shiftY);
+    }
+
+    private static float ShiftFor(int inkStart, int inkEnd, int allowedStart, int allowedEnd, int frameStart, int frameEnd)
+    {
+        float shift;
+        if (inkEnd > allowedEnd && inkStart >= allowedStart)
+        {
+            shift = allowedEnd - inkEnd;
+        }
+        else if (inkStart < allowedStart && inkEnd <= allowedEnd)
+        {
+            shift = allowedStart - inkStart;
+        }
+        else
+        {
+            return 0.0f;
+        }
+
+        float lowest = frameStart - inkStart;
+        float highest = frameEnd - inkEnd;
+        return Math.Clamp(shift, Math.Min(lowest, highest), Math.Max(lowest, highest));
+    }
+
+    private bool TryGetInkBounds(int width, int height, out int left, out int top, out int right, out int bottom)
+    {
+        left = int.MaxValue;
+        top = int.MaxValue;
+        right = -1;
+        bottom = -1;
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                if (_pixels[((y * width) + x) * 4 + 3] == 0)
+                {
+                    continue;
+                }
+
+                left = Math.Min(left, x);
+                right = Math.Max(right, x);
+                top = Math.Min(top, y);
+                bottom = Math.Max(bottom, y);
+            }
+        }
+
+        return right >= left && bottom >= top;
     }
 
     #endregion

@@ -237,6 +237,161 @@ public class AssSubtitleRendererTests
         return rows;
     }
 
+    /// <summary>
+    /// A script is laid out against the picture it sits on, so when the picture is a box inside the surface the words are
+    /// inside that box too: before this, libass was given the surface and put its lines in the bar under the picture.
+    /// </summary>
+    [Test]
+    public void DrawsInsideThePictureItIsGiven()
+    {
+        using AssSubtitleRenderer renderer = new();
+        FakeTarget target = new(640, 360);
+
+        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        if (!configured.IsSuccessful)
+        {
+            Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
+            return;
+        }
+
+        using SubtitleCue cue = new()
+        {
+            Start = TimeSpan.Zero,
+            End = TimeSpan.FromSeconds(5),
+            Text = "0,Default,,0,0,0,,Visible words",
+        };
+
+        SubtitleFrame picture = new(0.25, 0.25, 0.5, 0.5);
+        SubtitlePresentation presentation = SubtitlePresentation.Identity with { Frame = picture };
+
+        OperationResult drawn = renderer.Show([cue], TimeSpan.FromSeconds(1), presentation);
+        Assert.That(drawn.IsSuccessful, Is.True, drawn.Message);
+
+        (int top, int bottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
+        int frameTop = (int)Math.Floor(picture.Top * target.SurfaceHeight);
+        int frameBottom = (int)Math.Ceiling((picture.Top + picture.Height) * target.SurfaceHeight);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bottom, Is.GreaterThan(top), "the cue is drawn for this to say anything");
+            Assert.That(top, Is.GreaterThanOrEqualTo(frameTop), "no ink above the picture");
+            Assert.That(bottom, Is.LessThanOrEqualTo(frameBottom), "and none below it");
+        }
+    }
+
+    /// <summary>The first and the last row of the frame that carry ink.</summary>
+    private static (int Top, int Bottom) InkRows(ReadOnlySpan<byte> frame, int width, int height)
+    {
+        int top = int.MaxValue;
+        int bottom = -1;
+        for (int y = 0; y < height; y++)
+        {
+            ReadOnlySpan<byte> row = frame.Slice(y * width * 4, width * 4);
+            for (int x = 3; x < row.Length; x += 4)
+            {
+                if (row[x] == 0)
+                {
+                    continue;
+                }
+
+                top = Math.Min(top, y);
+                bottom = Math.Max(bottom, y);
+                break;
+            }
+        }
+
+        return (top, bottom);
+    }
+
+    /// <summary>
+    /// What covers the surface — the player's own chrome — must not cover the words, and libass's margins cannot say so
+    /// without shrinking the script. The picture is moved instead: the words end up clear of the strip, at exactly the size
+    /// they were laid out at.
+    /// </summary>
+    [Test]
+    public void MovesTheWordsClearOfWhatCoversTheSurface()
+    {
+        using AssSubtitleRenderer renderer = new();
+        FakeTarget target = new(640, 360);
+
+        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        if (!configured.IsSuccessful)
+        {
+            Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
+            return;
+        }
+
+        using SubtitleCue cue = new()
+        {
+            Start = TimeSpan.Zero,
+            End = TimeSpan.FromSeconds(5),
+            Text = "0,Default,,0,0,0,,Visible words",
+        };
+
+        OperationResult bare = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
+        Assert.That(bare.IsSuccessful, Is.True, bare.Message);
+        (int bareTop, int bareBottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
+
+        const int covered = 100;
+        SubtitlePresentation withChrome = SubtitlePresentation.Identity with { Insets = new SubtitleInsets(0.0, 0.0, 0.0, covered) };
+        OperationResult shifted = renderer.Show([cue], TimeSpan.FromSeconds(1), withChrome);
+        Assert.That(shifted.IsSuccessful, Is.True, shifted.Message);
+        (int shiftedTop, int shiftedBottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bareBottom, Is.GreaterThan(bareTop), "the cue is drawn for this to say anything");
+            Assert.That(shiftedBottom, Is.LessThanOrEqualTo(target.SurfaceHeight - covered), "the words are clear of the strip");
+            Assert.That(shiftedTop, Is.LessThanOrEqualTo(bareTop), "they moved up rather than down");
+            Assert.That(shiftedBottom - shiftedTop, Is.EqualTo(bareBottom - bareTop), "and they are the same size they were");
+        }
+    }
+
+    /// <summary>
+    /// The strips are where the host's chrome is, which is against the surface's edges, not the picture's: a bar along the
+    /// bottom of the surface has nothing to do with a picture that ends above it, and the words stay where the script put
+    /// them. Measured from the picture instead, this bar would have dragged them up by its whole height.
+    /// </summary>
+    [Test]
+    public void LeavesTheWordsAloneWhenTheStripIsOutsideThePicture()
+    {
+        using AssSubtitleRenderer renderer = new();
+        FakeTarget target = new(640, 360);
+
+        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        if (!configured.IsSuccessful)
+        {
+            Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
+            return;
+        }
+
+        using SubtitleCue cue = new()
+        {
+            Start = TimeSpan.Zero,
+            End = TimeSpan.FromSeconds(5),
+            Text = "0,Default,,0,0,0,,Visible words",
+        };
+
+        // A picture in the top half of the surface, and chrome along the bottom of the surface.
+        SubtitlePresentation presentation = SubtitlePresentation.Identity with
+        {
+            Frame = new SubtitleFrame(0.0, 0.0, 1.0, 0.5),
+            Insets = new SubtitleInsets(0.0, 0.0, 0.0, 100.0),
+        };
+
+        OperationResult drawn = renderer.Show([cue], TimeSpan.FromSeconds(1), presentation);
+        Assert.That(drawn.IsSuccessful, Is.True, drawn.Message);
+
+        (int top, int bottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(bottom, Is.GreaterThan(top), "the cue is drawn for this to say anything");
+            Assert.That(bottom, Is.LessThanOrEqualTo(180), "the words stay in the picture");
+            Assert.That(bottom, Is.GreaterThan(140), "and are not pulled up towards its top by a bar that is below it");
+        }
+    }
+
     private static IReadOnlyList<SubtitleChange> AssSubtitleChangesFor()
     {
         return [new SubtitleChange(TimeSpan.Zero, TimeSpan.FromSeconds(5), true)];

@@ -8070,7 +8070,11 @@ public class PlaybackPipelineTests
         Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
         WaitFor(() => subtitleRenderer.Texts.Length == 1, "the cue to be up");
 
-        Assert.That(subtitleRenderer.Presentations, Is.All.EqualTo(presentation), "every drawing carries both where the words go and how they look");
+        // The frame is the pipeline's own answer about where the picture is, so it is left out of what the setting carries.
+        Assert.That(
+            subtitleRenderer.Presentations.Select(drawn => drawn with { Frame = default }),
+            Is.All.EqualTo(presentation),
+            "every drawing carries both where the words go and how they look");
     }
 
     /// <summary>
@@ -8102,6 +8106,44 @@ public class PlaybackPipelineTests
         Assert.That(subtitleRenderer.ConfiguredAttachments, Has.Count.EqualTo(1), "the renderer is told what the file holds");
         Assert.That(subtitleRenderer.ConfiguredAttachments[0].Name, Is.EqualTo("fonts/Track.ttf"));
         Assert.That(subtitleRenderer.ConfiguredAttachments[0].Data.ToArray(), Is.EqualTo(attachment.Data.ToArray()));
+    }
+
+    /// <summary>
+    /// A picture fitted into the surface does not fill it: the words belong to the picture, so the presentation says where
+    /// the picture is and the renderer draws there. A 320×180 picture in a 320×240 surface leaves a bar of 30 pixels above
+    /// and below it, which is a quarter of the height in total.
+    /// </summary>
+    [Test]
+    public void LaysTheSubtitlesOutInThePictureRatherThanTheSurface()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        };
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+        Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+        WaitFor(() => subtitleRenderer.Texts.Length == 1, "the cue to be up");
+
+        SubtitleFrame frame = subtitleRenderer.Presentations[^1].Frame;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(frame.Left, Is.EqualTo(0.0).Within(0.001), "the picture is as wide as the surface");
+            Assert.That(frame.Width, Is.EqualTo(1.0).Within(0.001));
+            Assert.That(frame.Top, Is.EqualTo(0.125).Within(0.001), "and the bars above and below it are not its frame");
+            Assert.That(frame.Height, Is.EqualTo(0.75).Within(0.001));
+        }
+
+        // Stretched, the picture is the surface, and so is the frame.
+        pipeline.VideoTransform = VideoTransform.Identity with { ResizeMode = VideoResizeMode.Stretch };
+        WaitFor(() => subtitleRenderer.Presentations[^1].Frame.Height > 0.99, "the words to be laid out in the whole surface");
+
+        Assert.That(subtitleRenderer.Presentations[^1].Frame.Top, Is.EqualTo(0.0).Within(0.001));
     }
 
     [Test]
