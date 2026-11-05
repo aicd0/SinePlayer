@@ -11,7 +11,6 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
 using SinePlayer.Core.Playback.Selection;
-using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
@@ -26,22 +25,13 @@ public sealed partial class PlaybackPipeline : IDisposable
     private readonly AudioChain _audio;
 
     private volatile MediaSourceHolder _selection = new([], null, null, null);
-
     private readonly ComponentSlot<MediaSourceHolder> _source = new();
-
-    private Thread? _readerThread;
-    private Thread? _videoDecodeThread;
-    private Thread? _videoRenderThread;
-    private Thread? _audioRenderThread;
-    private Thread? _subtitleRenderThread;
-
+    private CoroutineHost? _host;
     private readonly IPipelineWakeTarget[] _wakeTargets;
     private readonly IChainFeed[] _feeds;
     private readonly MediaReader _reader;
 
     private bool _disposed;
-    private bool _threadsStarted;
-    private volatile bool _stopRequested;
 
     private long _videoRenderEndedEpoch = -1;
     private long _audioRenderEndedEpoch = -1;
@@ -460,15 +450,9 @@ public sealed partial class PlaybackPipeline : IDisposable
             _timeline.AdvanceEpoch(_timeline.Position, SeekMode.Precise);
             WakeAll();
 
-            if (!_threadsStarted)
+            if (_host is null)
             {
-                _threadsStarted = true;
-                _stopRequested = false;
-                StartReaderThread();
-                StartVideoDecodeThread();
-                StartVideoRenderThread();
-                StartAudioRenderThread();
-                StartSubtitleRenderThread();
+                StartThreads();
             }
         }
 
@@ -482,20 +466,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private OperationResult StopCore()
     {
-        _stopRequested = true;
-        WakeAll();
-
-        _readerThread?.Join();
-        _readerThread = null;
-        _videoDecodeThread?.Join();
-        _videoDecodeThread = null;
-        _videoRenderThread?.Join();
-        _videoRenderThread = null;
-        _audioRenderThread?.Join();
-        _audioRenderThread = null;
-        _subtitleRenderThread?.Join();
-        _subtitleRenderThread = null;
-        _threadsStarted = false;
+        StopThreads();
 
         _video.PacketQueue.Clear();
         _audio.PacketQueue.Clear();
@@ -555,114 +526,36 @@ public sealed partial class PlaybackPipeline : IDisposable
         return OperationResult.Success();
     }
 
-    private void StartReaderThread()
+    private void StartThreads()
     {
-        if (_readerThread is not null)
-        {
-            return;
-        }
+        CoroutineHost host = new("Pipeline - Reader", [
+            stop => _reader.Run(stop, NotifySourceEnded),
+            stop => _audio.Decode(stop, _reader.TryWake),
+            stop => _subtitle.Decode(stop, _reader.TryWake),
+        ]);
 
-        void ReaderThreadCore()
-        {
-            SingleThreadSynchronizationContext context = new();
-            SynchronizationContext? previousContext = SynchronizationContext.Current;
-            SynchronizationContext.SetSynchronizationContext(context);
-            try
-            {
-                async Task AsyncCore()
-                {
-                    try
-                    {
-                        await Task.WhenAll(
-                            _reader.Run(() => _stopRequested, NotifySourceEnded),
-                            _audio.Decode(() => _stopRequested, _reader.TryWake),
-                            _subtitle.Decode(() => _stopRequested, _reader.TryWake));
-                    }
-                    finally
-                    {
-                        context.Complete();
-                    }
-                }
-
-                Task task = AsyncCore();
-                context.RunOnCurrentThread();
-                task.Wait();
-            }
-            finally
-            {
-                SynchronizationContext.SetSynchronizationContext(previousContext);
-                context.Dispose();
-            }
-        }
-
-        _readerThread = new Thread(ReaderThreadCore)
-        {
-            IsBackground = true,
-            Name = "Pipeline - Reader",
-        };
-        _readerThread.Start();
+        host.Start();
+        _host = host;
+        _video.Start(_reader.TryWake, IsVideoStreamSpent, NotifyVideoRenderEnded);
+        _audio.Start(IsAudioStreamSpent, NotifyAudioRenderEnded);
+        _subtitle.Start();
     }
 
-    private void StartVideoDecodeThread()
+    private void StopThreads()
     {
-        if (_videoDecodeThread is not null)
-        {
-            return;
-        }
+        _host?.RequestStop();
+        _video.RequestStop();
+        _audio.RequestStop();
+        _subtitle.RequestStop();
 
-        _videoDecodeThread = new Thread(() => _video.Decode(() => _stopRequested, _reader.TryWake))
-        {
-            IsBackground = true,
-            Name = "Pipeline - Video decode",
-        };
-        _videoDecodeThread.Start();
+        WakeAll();
+
+        _host?.Join();
+        _host = null;
+        _video.Join();
+        _audio.Join();
+        _subtitle.Join();
     }
-
-    private void StartVideoRenderThread()
-    {
-        if (_videoRenderThread is not null)
-        {
-            return;
-        }
-
-        _videoRenderThread = new Thread(() => _video.Render(() => _stopRequested, IsVideoStreamSpent, NotifyVideoRenderEnded))
-        {
-            IsBackground = true,
-            Name = "Pipeline - Video render",
-        };
-        _videoRenderThread.Start();
-    }
-
-    private void StartAudioRenderThread()
-    {
-        if (_audioRenderThread is not null)
-        {
-            return;
-        }
-
-        _audioRenderThread = new Thread(() => _audio.Render(() => _stopRequested, IsAudioStreamSpent, NotifyAudioRenderEnded))
-        {
-            IsBackground = true,
-            Name = "Pipeline - Audio render",
-        };
-        _audioRenderThread.Start();
-    }
-
-    private void StartSubtitleRenderThread()
-    {
-        if (_subtitleRenderThread is not null)
-        {
-            return;
-        }
-
-        _subtitleRenderThread = new Thread(() => _subtitle.Render(() => _stopRequested))
-        {
-            IsBackground = true,
-            Name = "Pipeline - Subtitle render",
-        };
-        _subtitleRenderThread.Start();
-    }
-
     private void NotifySourceEnded(long epoch)
     {
         _timeline.EndingEpoch = epoch;
