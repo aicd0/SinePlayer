@@ -17,67 +17,27 @@ public sealed partial class PlaybackPipeline
     #region Components
 
     [Flags]
-    private enum ChainChanges
+    private enum ChainChange
     {
         None = 0,
         Source = 1,
-        VideoRenderer = 2,
-        VideoDecoder = 4,
-        AudioRenderer = 8,
-        AudioDecoder = 16,
-        SubtitleRenderer = 32,
-        SubtitleDecoder = 64,
+        Decoder = 2,
+        Renderer = 4,
     }
 
-    private ChainChanges DiffSource(MediaSourceHolder sourceHolder)
-    {
-        MediaSourceHolder? current = _source.Latest?.Component;
-        if (current is null)
-        {
-            return ChainChanges.Source
-                | ChainChanges.VideoDecoder | ChainChanges.VideoRenderer
-                | ChainChanges.AudioDecoder | ChainChanges.AudioRenderer
-                | ChainChanges.SubtitleDecoder | ChainChanges.SubtitleRenderer;
-        }
-
-        static bool SameStream(MediaSource? beforeSource, MediaStreamInfo? before, MediaSource? afterSource, MediaStreamInfo? after)
-        {
-            return beforeSource == afterSource && before == after;
-        }
-
-        ChainChanges changes = ChainChanges.None;
-
-        if (!SameStream(current.VideoSource, current.VideoStream, sourceHolder.VideoSource, sourceHolder.VideoStream))
-        {
-            changes |= ChainChanges.Source | ChainChanges.VideoDecoder | ChainChanges.VideoRenderer;
-        }
-
-        if (!SameStream(current.AudioSource, current.AudioStream, sourceHolder.AudioSource, sourceHolder.AudioStream))
-        {
-            changes |= ChainChanges.Source | ChainChanges.AudioDecoder | ChainChanges.AudioRenderer;
-        }
-
-        if (!SameStream(current.SubtitleSource, current.SubtitleStream, sourceHolder.SubtitleSource, sourceHolder.SubtitleStream))
-        {
-            changes |= ChainChanges.Source | ChainChanges.SubtitleDecoder | ChainChanges.SubtitleRenderer;
-        }
-
-        return changes;
-    }
-
-    private OperationResult<ChainChanges> BuildVideoChain(
+    private OperationResult<ChainChange> BuildVideoChain(
         ComponentResolver resolver,
-        MediaSourceHolder sourceHolder,
-        ChainChanges sourceChanges)
+        MediaSourceHolder desired)
     {
-        OperationResultCreator<ChainChanges> result = new();
+        OperationResultCreator<ChainChange> result = new();
 
-        ChainChanges changed = sourceChanges & ChainChanges.Source;
+        bool sourceChanged = !_video.Binding.Matches(desired.VideoSource, desired.VideoStream);
+        ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
         PipelineComponent<IVideoRenderer>? renderer = null;
         PipelineComponent<IVideoDecoder>? decoder = null;
         try
         {
-            if (sourceHolder.VideoSource is { } videoSource && sourceHolder.VideoStream is { } videoStream)
+            if (desired.VideoSource is { } videoSource && desired.VideoStream is { } videoStream)
             {
                 IVideoRenderTarget? videoTarget = _video.Target;
                 if (videoTarget is null)
@@ -86,7 +46,7 @@ public sealed partial class PlaybackPipeline
                 }
 
                 // Resolve video renderer
-                bool rebuildVideoRenderer = sourceChanges.HasFlag(ChainChanges.VideoRenderer);
+                bool rebuildVideoRenderer = sourceChanged;
                 PipelineComponent<IVideoRenderer>? latestRenderer = _video.Renderer.Latest;
                 OperationResult<PipelineComponent<IVideoRenderer>?> rendererResolved = ResolveComponent(
                     resolver.ResolveVideoRenderers(),
@@ -106,11 +66,11 @@ public sealed partial class PlaybackPipeline
                         return result.Failure(configured.Message);
                     }
 
-                    changed |= ChainChanges.VideoRenderer;
+                    changed |= ChainChange.Renderer;
                 }
 
                 // Resolve video decoder
-                bool rebuildVideoDecoder = renderer is not null || sourceChanges.HasFlag(ChainChanges.VideoDecoder);
+                bool rebuildVideoDecoder = renderer is not null || sourceChanged;
                 PipelineComponent<IVideoDecoder>? latestDecoder = _video.Decoder.Latest;
                 IGpuDevice? gpuDevice = (renderer ?? latestRenderer)?.Component?.GpuDevice;
                 OperationResult<PipelineComponent<IVideoDecoder>?> decoderResolved = ResolveComponent(
@@ -125,40 +85,40 @@ public sealed partial class PlaybackPipeline
                 decoder = decoderResolved.Result;
                 if (decoder is not null)
                 {
-                    changed |= ChainChanges.VideoDecoder;
+                    changed |= ChainChange.Decoder;
                 }
             }
             else
             {
                 if (_video.Decoder.HasComponent)
                 {
-                    changed |= sourceChanges & ChainChanges.VideoDecoder;
+                    changed |= sourceChanged ? ChainChange.Decoder : ChainChange.None;
                 }
 
                 if (_video.Renderer.HasComponent)
                 {
-                    changed |= sourceChanges & ChainChanges.VideoRenderer;
+                    changed |= sourceChanged ? ChainChange.Renderer : ChainChange.None;
                 }
             }
 
-            if (changed.HasFlag(ChainChanges.VideoDecoder) || changed.HasFlag(ChainChanges.VideoRenderer))
+            if (changed.HasFlag(ChainChange.Decoder) || changed.HasFlag(ChainChange.Renderer))
             {
-                PipelineVersion versions = BumpVersions(changed);
+                PipelineVersion versions = BumpVersions(changed, MediaStreamKind.Video);
 
-                if (changed.HasFlag(ChainChanges.Source))
+                if (changed.HasFlag(ChainChange.Source))
                 {
-                    MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(sourceHolder, MediaStreamKind.Video);
+                    MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(desired, MediaStreamKind.Video);
                     _source.Publish(new(newSourceHolder, "source"), versions);
                     _video.Binding = new(newSourceHolder.VideoSource, newSourceHolder.VideoStream);
                 }
 
-                if (changed.HasFlag(ChainChanges.VideoDecoder))
+                if (changed.HasFlag(ChainChange.Decoder))
                 {
                     _video.Decoder.Publish(decoder, versions);
                     decoder = null;
                 }
 
-                if (changed.HasFlag(ChainChanges.VideoRenderer))
+                if (changed.HasFlag(ChainChange.Renderer))
                 {
                     _video.Renderer.Publish(renderer, versions);
                     renderer = null;
@@ -174,23 +134,23 @@ public sealed partial class PlaybackPipeline
         }
     }
 
-    private OperationResult<ChainChanges> BuildAudioChain(
+    private OperationResult<ChainChange> BuildAudioChain(
         ComponentResolver resolver,
-        MediaSourceHolder sourceHolder,
-        ChainChanges sourceChanges)
+        MediaSourceHolder desired)
     {
-        OperationResultCreator<ChainChanges> result = new();
+        OperationResultCreator<ChainChange> result = new();
 
-        ChainChanges changed = sourceChanges & ChainChanges.Source;
+        bool sourceChanged = !_audio.Binding.Matches(desired.AudioSource, desired.AudioStream);
+        ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
         PipelineComponent<IAudioRenderer>? renderer = null;
         PipelineComponent<IAudioDecoder>? decoder = null;
         AudioStreamInfo? negotiatedFormat = null;
         try
         {
-            if (sourceHolder.AudioSource is { } audioSource && sourceHolder.AudioStream is { } audioStream)
+            if (desired.AudioSource is { } audioSource && desired.AudioStream is { } audioStream)
             {
                 // Resolve audio renderer
-                bool rebuildAudioRenderer = sourceChanges.HasFlag(ChainChanges.AudioRenderer);
+                bool rebuildAudioRenderer = sourceChanged;
                 PipelineComponent<IAudioRenderer>? latestRenderer = _audio.Renderer.Latest;
                 OperationResult<PipelineComponent<IAudioRenderer>?> rendererResolved = ResolveComponent(
                     resolver.ResolveAudioRenderers(),
@@ -211,11 +171,11 @@ public sealed partial class PlaybackPipeline
                     }
 
                     negotiatedFormat = negotiated.Result;
-                    changed |= ChainChanges.AudioRenderer;
+                    changed |= ChainChange.Renderer;
                 }
 
                 // Resolve audio decoder
-                bool rebuildAudioDecoder = sourceChanges.HasFlag(ChainChanges.AudioDecoder);
+                bool rebuildAudioDecoder = sourceChanged;
                 PipelineComponent<IAudioDecoder>? latestDecoder = _audio.Decoder.Latest;
                 OperationResult<PipelineComponent<IAudioDecoder>?> decoderResolved = ResolveComponent(
                     resolver.ResolveAudioDecoders(audioSource.Source, audioStream),
@@ -229,7 +189,7 @@ public sealed partial class PlaybackPipeline
                 decoder = decoderResolved.Result;
                 if (decoder is not null)
                 {
-                    changed |= ChainChanges.AudioDecoder;
+                    changed |= ChainChange.Decoder;
                 }
 
                 if (negotiatedFormat is not null)
@@ -241,33 +201,33 @@ public sealed partial class PlaybackPipeline
             {
                 if (_audio.Decoder.HasComponent)
                 {
-                    changed |= sourceChanges & ChainChanges.AudioDecoder;
+                    changed |= sourceChanged ? ChainChange.Decoder : ChainChange.None;
                 }
 
                 if (_audio.Renderer.HasComponent)
                 {
-                    changed |= sourceChanges & ChainChanges.AudioRenderer;
+                    changed |= sourceChanged ? ChainChange.Renderer : ChainChange.None;
                 }
             }
 
-            if (changed.HasFlag(ChainChanges.AudioDecoder) || changed.HasFlag(ChainChanges.AudioRenderer))
+            if (changed.HasFlag(ChainChange.Decoder) || changed.HasFlag(ChainChange.Renderer))
             {
-                PipelineVersion versions = BumpVersions(changed);
+                PipelineVersion versions = BumpVersions(changed, MediaStreamKind.Audio);
 
-                if (changed.HasFlag(ChainChanges.Source))
+                if (changed.HasFlag(ChainChange.Source))
                 {
-                    MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(sourceHolder, MediaStreamKind.Audio);
+                    MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(desired, MediaStreamKind.Audio);
                     _source.Publish(new(newSourceHolder, "source"), versions);
                     _audio.Binding = new(newSourceHolder.AudioSource, newSourceHolder.AudioStream);
                 }
 
-                if (changed.HasFlag(ChainChanges.AudioDecoder))
+                if (changed.HasFlag(ChainChange.Decoder))
                 {
                     _audio.Decoder.Publish(decoder, versions);
                     decoder = null;
                 }
 
-                if (changed.HasFlag(ChainChanges.AudioRenderer))
+                if (changed.HasFlag(ChainChange.Renderer))
                 {
                     _audio.Renderer.Publish(renderer, versions);
                     renderer = null;
@@ -283,19 +243,19 @@ public sealed partial class PlaybackPipeline
         }
     }
 
-    private OperationResult<ChainChanges> BuildSubtitleChain(
+    private OperationResult<ChainChange> BuildSubtitleChain(
         ComponentResolver resolver,
-        MediaSourceHolder sourceHolder,
-        ChainChanges sourceChanges)
+        MediaSourceHolder desired)
     {
-        OperationResultCreator<ChainChanges> result = new();
+        OperationResultCreator<ChainChange> result = new();
 
-        ChainChanges changed = sourceChanges & ChainChanges.Source;
+        bool sourceChanged = !_subtitle.Binding.Matches(desired.SubtitleSource, desired.SubtitleStream);
+        ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
         PipelineComponent<ISubtitleDecoder>? decoder = null;
         PipelineComponent<ISubtitleRenderer>? renderer = null;
         try
         {
-            if (sourceHolder.SubtitleSource is { } subtitleSource && sourceHolder.SubtitleStream is { } subtitleStream)
+            if (desired.SubtitleSource is { } subtitleSource && desired.SubtitleStream is { } subtitleStream)
             {
                 IVideoRenderTarget? subtitleTarget = _subtitle.Target;
                 if (subtitleTarget is null)
@@ -304,7 +264,7 @@ public sealed partial class PlaybackPipeline
                 }
 
                 // Resolve subtitle decoder
-                bool rebuildSubtitleDecoder = sourceChanges.HasFlag(ChainChanges.SubtitleDecoder);
+                bool rebuildSubtitleDecoder = sourceChanged;
                 PipelineComponent<ISubtitleDecoder>? latestDecoder = _subtitle.Decoder.Latest;
                 OperationResult<PipelineComponent<ISubtitleDecoder>?> decoderResolved = ResolveComponent(
                     resolver.ResolveSubtitleDecoders(subtitleSource.Source, subtitleStream),
@@ -318,7 +278,7 @@ public sealed partial class PlaybackPipeline
                 decoder = decoderResolved.Result;
                 if (decoder is not null)
                 {
-                    changed |= ChainChanges.SubtitleDecoder;
+                    changed |= ChainChange.Decoder;
                 }
 
                 // Resolve subtitle renderer
@@ -329,7 +289,7 @@ public sealed partial class PlaybackPipeline
                 }
 
                 SubtitleCueFormat format = runningDecoder.Component.CueFormat;
-                bool rebuildSubtitleRenderer = decoder is not null || sourceChanges.HasFlag(ChainChanges.SubtitleRenderer);
+                bool rebuildSubtitleRenderer = decoder is not null || sourceChanged;
                 PipelineComponent<ISubtitleRenderer>? latestRenderer = _subtitle.Renderer.Latest;
                 OperationResult<PipelineComponent<ISubtitleRenderer>?> rendererResolved = ResolveComponent(
                     resolver.ResolveSubtitleRenderers(subtitleStream, format),
@@ -349,40 +309,40 @@ public sealed partial class PlaybackPipeline
                         return result.Failure(configured.Message);
                     }
 
-                    changed |= ChainChanges.SubtitleRenderer;
+                    changed |= ChainChange.Renderer;
                 }
             }
             else
             {
                 if (_subtitle.Decoder.HasComponent)
                 {
-                    changed |= sourceChanges & ChainChanges.SubtitleDecoder;
+                    changed |= sourceChanged ? ChainChange.Decoder : ChainChange.None;
                 }
 
                 if (_subtitle.Renderer.HasComponent)
                 {
-                    changed |= sourceChanges & ChainChanges.SubtitleRenderer;
+                    changed |= sourceChanged ? ChainChange.Renderer : ChainChange.None;
                 }
             }
 
-            if (changed.HasFlag(ChainChanges.SubtitleDecoder) || changed.HasFlag(ChainChanges.SubtitleRenderer))
+            if (changed.HasFlag(ChainChange.Decoder) || changed.HasFlag(ChainChange.Renderer))
             {
-                PipelineVersion versions = BumpVersions(changed);
+                PipelineVersion versions = BumpVersions(changed, MediaStreamKind.Subtitle);
 
-                if (changed.HasFlag(ChainChanges.Source))
+                if (changed.HasFlag(ChainChange.Source))
                 {
-                    MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(sourceHolder, MediaStreamKind.Subtitle);
+                    MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(desired, MediaStreamKind.Subtitle);
                     _source.Publish(new(newSourceHolder, "source"), versions);
                     _subtitle.Binding = new(newSourceHolder.SubtitleSource, newSourceHolder.SubtitleStream);
                 }
 
-                if (changed.HasFlag(ChainChanges.SubtitleDecoder))
+                if (changed.HasFlag(ChainChange.Decoder))
                 {
                     _subtitle.Decoder.Publish(decoder, versions);
                     decoder = null;
                 }
 
-                if (changed.HasFlag(ChainChanges.SubtitleRenderer))
+                if (changed.HasFlag(ChainChange.Renderer))
                 {
                     _subtitle.Renderer.Publish(renderer, versions);
                     renderer = null;
@@ -451,19 +411,33 @@ public sealed partial class PlaybackPipeline
         return new([.. sources.OfType<MediaSource>().Distinct()], videoStream, audioStream, subtitleStream);
     }
 
-    private PipelineVersion BumpVersions(ChainChanges changed)
+    private PipelineVersion BumpVersions(ChainChange changed, MediaStreamKind kind)
     {
         PipelineVersion current = CurrentVersions();
-        long nextVersion = current.Next;
-        return new()
+        long next = current.Next;
+        bool source = changed.HasFlag(ChainChange.Source);
+        bool decoder = changed.HasFlag(ChainChange.Decoder);
+        bool renderer = changed.HasFlag(ChainChange.Renderer);
+        return kind switch
         {
-            Source = changed.HasFlag(ChainChanges.Source) ? nextVersion : current.Source,
-            VideoDecoder = changed.HasFlag(ChainChanges.VideoDecoder) ? nextVersion : current.VideoDecoder,
-            VideoRenderer = changed.HasFlag(ChainChanges.VideoRenderer) ? nextVersion : current.VideoRenderer,
-            AudioDecoder = changed.HasFlag(ChainChanges.AudioDecoder) ? nextVersion : current.AudioDecoder,
-            AudioRenderer = changed.HasFlag(ChainChanges.AudioRenderer) ? nextVersion : current.AudioRenderer,
-            SubtitleDecoder = changed.HasFlag(ChainChanges.SubtitleDecoder) ? nextVersion : current.SubtitleDecoder,
-            SubtitleRenderer = changed.HasFlag(ChainChanges.SubtitleRenderer) ? nextVersion : current.SubtitleRenderer,
+            MediaStreamKind.Video => current with
+            {
+                Source = source ? next : current.Source,
+                VideoDecoder = decoder ? next : current.VideoDecoder,
+                VideoRenderer = renderer ? next : current.VideoRenderer,
+            },
+            MediaStreamKind.Audio => current with
+            {
+                Source = source ? next : current.Source,
+                AudioDecoder = decoder ? next : current.AudioDecoder,
+                AudioRenderer = renderer ? next : current.AudioRenderer,
+            },
+            _ => current with
+            {
+                Source = source ? next : current.Source,
+                SubtitleDecoder = decoder ? next : current.SubtitleDecoder,
+                SubtitleRenderer = renderer ? next : current.SubtitleRenderer,
+            },
         };
     }
 

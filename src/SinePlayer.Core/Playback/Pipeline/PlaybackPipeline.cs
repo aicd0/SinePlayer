@@ -445,18 +445,17 @@ public sealed partial class PlaybackPipeline : IDisposable
             return result.Failure($"Cannot change the pipeline's components when the state is {state}.");
         }
 
-        MediaSourceHolder sourceHolder = CreateSourceHolderFromSelection();
-        ChainChanges sourceChanges = DiffSource(sourceHolder);
+        MediaSourceHolder desired = CreateSourceHolderFromSelection();
         ComponentResolver resolver = Components.Clone();
-        OperationResult<ChainChanges> video = BuildVideoChain(resolver, sourceHolder, sourceChanges);
-        OperationResult<ChainChanges> audio = BuildAudioChain(resolver, sourceHolder, sourceChanges);
-        OperationResult<ChainChanges> subtitle = BuildSubtitleChain(resolver, sourceHolder, sourceChanges);
-        ChainChanges changes = ChainChanges.None;
-        changes |= video.IsSuccessful ? video.Result : ChainChanges.None;
-        changes |= audio.IsSuccessful ? audio.Result : ChainChanges.None;
-        changes |= subtitle.IsSuccessful ? subtitle.Result : ChainChanges.None;
+        OperationResult<ChainChange> video = BuildVideoChain(resolver, desired);
+        OperationResult<ChainChange> audio = BuildAudioChain(resolver, desired);
+        OperationResult<ChainChange> subtitle = BuildSubtitleChain(resolver, desired);
 
-        if (changes != ChainChanges.None)
+        bool changed = (video.IsSuccessful && video.Result != ChainChange.None)
+            || (audio.IsSuccessful && audio.Result != ChainChange.None)
+            || (subtitle.IsSuccessful && subtitle.Result != ChainChange.None);
+
+        if (changed)
         {
             _timeline.AdvanceEpoch(_timeline.Position, SeekMode.Precise);
             WakeAll();

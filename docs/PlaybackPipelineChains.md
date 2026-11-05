@@ -1,6 +1,6 @@
 # PlaybackPipeline chain decomposition — v1 plan
 
-Status: in progress. Phases A–D done (A1–A6, B1–B4, C1–C6, D1–D6); next is Phase E.
+Status: in progress. Phases A–E done (A1–A6, B1–B4, C1–C6, D1–D6, E1–E5); next are F (threads per chain) and G (clock governance, ending).
 
 `PlaybackPipeline` was 3212 lines and held one video chain, one audio chain and one subtitle chain inline:
 their queues, their threads, their component slots, their statistics and their component reconciliation.
@@ -176,15 +176,30 @@ D4 and D5 were done as one step: `IsBuffered` and `IsStreamSpent` both read the 
 without the other. `IsStreamSpent` could not become a per-chain method either — it asks whether *some other*
 stream still has data past the position, which is why the pipeline passes the furthest tail in.
 
-## Phase E — reconciliation per chain
+## Phase E — reconciliation, without kind-shaped flags
 
-| # | Step | Size | Note |
+Done, but not as planned: reconciliation stayed in the pipeline. Building a chain is *assembly* policy — it needs
+a fresh `ComponentResolver`, `PipelineVersion` numbers that must stay globally monotonic, and the shared
+`MediaSourceHolder` published to the reader. Handing that to a chain would have dragged all three along with it,
+and the chain would have gained a dependency on its siblings through the holder.
+
+What did move is the kind-shape of the flags. `ChainChanges` had one flag per *kind and role* —
+`VideoDecoder`, `AudioDecoder`, `SubtitleDecoder` … — and every builder received the whole set and masked out its
+own bits. It is now `ChainChange { Source, Decoder, Renderer }`, and each builder works out its own
+`sourceChanged` by comparing its own binding with the desired state:
+
+```csharp
+bool sourceChanged = !_video.Binding.Matches(desired.VideoSource, desired.VideoStream);
+```
+
+`DiffSource`, the per-kind `SameStream` comparison and the flag juggling are gone; `BumpVersions` now takes the
+kind and bumps only that kind's version fields.
+
+| # | Step | Lands as | State |
 |---|---|---|---|
-| E1 | `DiffSource` → `chain.Matches(desired)` per chain | ~90 | |
-| E2 | `BuildVideoChain` → `VideoChain.Reconcile(resolver, desired, versions)` | ~120 | |
-| E3 | `BuildAudioChain` → `AudioChain.Reconcile` | ~110 | |
-| E4 | `BuildSubtitleChain` → `SubtitleChain.Reconcile` | ~140 | the most cross-chain dependencies in the file; depends on B5 |
-| E5 | `ChainChanges` per chain; `ReconcileCore` dispatches and merges; `ReconcileResult` keeps its shape | ~100 | the pipeline no longer knows how a chain is built |
+| E1 | `DiffSource` and the seven-flag enum | per-builder `sourceChanged`, `ChainChange` | done |
+| E2–E4 | Builders take `(resolver, desired)` instead of `(…, sourceChanges)` | `BuildVideoChain` / `BuildAudioChain` / `BuildSubtitleChain` | done |
+| E5 | `BumpVersions(change, kind)`; `ReconcileCore` merges three booleans | | done |
 
 ## Phase F — threads and lifecycle
 
@@ -219,3 +234,11 @@ Publish the model: chain collections, `AddVideoChain`/`AddAudioChain`/`AddSubtit
 typed `SelectStream`, per-chain `ReconcileResult`, per-chain warnings, `PlaybackChainId`. Then per-chain
 versions if they still look worth it, and the app layer rewritten against chains. Nothing in that milestone
 requires reopening Phases A–G — which is the test of whether this plan did its job.
+
+**Chain-wise versions.** `PipelineVersion` is one struct carrying all seven fields, and that is incidental:
+one chain's version has nothing to do with another chain's, by design. Splitting it into a `ChainVersion`
+(Source, Decoder, Renderer) per chain is the honest shape, and it is what would make per-chain version
+allocation safe — today `ComponentSlot.Publish` guards with `IsBehind`, which compares every field, so a
+chain publishing its own numbers would look stale against another chain's. A `ChainVersion` makes that guard
+compare only what the slot owns, and `CurrentVersions`/`BumpVersions` stop needing a global maximum. Worth
+doing when the chains multiply; not needed while there is one of each kind.

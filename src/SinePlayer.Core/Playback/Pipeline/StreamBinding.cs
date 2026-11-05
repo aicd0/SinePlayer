@@ -8,8 +8,13 @@ namespace SinePlayer.Core.Playback.Pipeline;
 
 internal readonly record struct StreamBinding<T>(MediaSource? Source, T? Stream) where T : MediaStreamInfo
 {
+    public bool Matches(MediaSource? source, T? stream)
+    {
+        return Source == source && Stream == stream;
+    }
+
     public bool Accepts(MediaSource source, int streamIndex)
     {
-        return Stream is not null && ReferenceEquals(Source, source) && Stream.Index == streamIndex;
+        return Stream is not null && Source == source && Stream.Index == streamIndex;
     }
 }
