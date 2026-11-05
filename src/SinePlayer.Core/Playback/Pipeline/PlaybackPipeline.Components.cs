@@ -295,7 +295,7 @@ public sealed partial class PlaybackPipeline
         {
             if (sourceHolder.SubtitleSource is { } subtitleSource && sourceHolder.SubtitleStream is { } subtitleStream)
             {
-                IVideoRenderTarget? subtitleTarget = _subtitleTarget;
+                IVideoRenderTarget? subtitleTarget = _subtitle.Target;
                 if (subtitleTarget is null)
                 {
                     return result.Failure("The file has a subtitle track but no subtitle surface was supplied.");
@@ -303,7 +303,7 @@ public sealed partial class PlaybackPipeline
 
                 // Resolve subtitle decoder
                 bool rebuildSubtitleDecoder = sourceChanges.HasFlag(ChainChanges.SubtitleDecoder);
-                PipelineComponent<ISubtitleDecoder>? latestDecoder = _subtitleDecoder.Latest;
+                PipelineComponent<ISubtitleDecoder>? latestDecoder = _subtitle.Decoder.Latest;
                 OperationResult<PipelineComponent<ISubtitleDecoder>?> decoderResolved = ResolveComponent(
                     resolver.ResolveSubtitleDecoders(subtitleSource.Source, subtitleStream),
                     rebuildSubtitleDecoder ? null : latestDecoder?.Signature,
@@ -328,7 +328,7 @@ public sealed partial class PlaybackPipeline
 
                 SubtitleCueFormat format = runningDecoder.Component.CueFormat;
                 bool rebuildSubtitleRenderer = decoder is not null || sourceChanges.HasFlag(ChainChanges.SubtitleRenderer);
-                PipelineComponent<ISubtitleRenderer>? latestRenderer = _subtitleRenderer.Latest;
+                PipelineComponent<ISubtitleRenderer>? latestRenderer = _subtitle.Renderer.Latest;
                 OperationResult<PipelineComponent<ISubtitleRenderer>?> rendererResolved = ResolveComponent(
                     resolver.ResolveSubtitleRenderers(subtitleStream, format),
                     rebuildSubtitleRenderer ? null : latestRenderer?.Signature,
@@ -352,12 +352,12 @@ public sealed partial class PlaybackPipeline
             }
             else
             {
-                if (_subtitleDecoder.HasComponent)
+                if (_subtitle.Decoder.HasComponent)
                 {
                     changed |= sourceChanges & ChainChanges.SubtitleDecoder;
                 }
 
-                if (_subtitleRenderer.HasComponent)
+                if (_subtitle.Renderer.HasComponent)
                 {
                     changed |= sourceChanges & ChainChanges.SubtitleRenderer;
                 }
@@ -375,13 +375,13 @@ public sealed partial class PlaybackPipeline
 
                 if (changed.HasFlag(ChainChanges.SubtitleDecoder))
                 {
-                    _subtitleDecoder.Publish(decoder, versions);
+                    _subtitle.Decoder.Publish(decoder, versions);
                     decoder = null;
                 }
 
                 if (changed.HasFlag(ChainChanges.SubtitleRenderer))
                 {
-                    _subtitleRenderer.Publish(renderer, versions);
+                    _subtitle.Renderer.Publish(renderer, versions);
                     renderer = null;
                 }
             }
@@ -472,8 +472,8 @@ public sealed partial class PlaybackPipeline
         versions = PipelineVersion.Max(versions, _audioDecoder.HighestVersions);
         versions = PipelineVersion.Max(versions, _videoRenderer.HighestVersions);
         versions = PipelineVersion.Max(versions, _audioRenderer.HighestVersions);
-        versions = PipelineVersion.Max(versions, _subtitleDecoder.HighestVersions);
-        versions = PipelineVersion.Max(versions, _subtitleRenderer.HighestVersions);
+        versions = PipelineVersion.Max(versions, _subtitle.Decoder.HighestVersions);
+        versions = PipelineVersion.Max(versions, _subtitle.Renderer.HighestVersions);
         return versions;
     }
 

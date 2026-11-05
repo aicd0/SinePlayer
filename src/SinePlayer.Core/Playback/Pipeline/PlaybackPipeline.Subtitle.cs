@@ -17,21 +17,21 @@ public sealed partial class PlaybackPipeline
 
     private void TryWakeSubtitleDecode()
     {
-        if (!_subtitlePacketQueue.IsEmpty)
+        if (!_subtitle.PacketQueue.IsEmpty)
         {
-            _subtitleDecodeNode.Wake();
+            _subtitle.DecodeNode.Wake();
         }
     }
 
     private async Task SubtitleDecodeCore()
     {
-        PacketQueue queue = _subtitlePacketQueue;
-        ComponentSlot<ISubtitleDecoder> subtitleDecoderSlot = _subtitleDecoder;
+        PacketQueue queue = _subtitle.PacketQueue;
+        ComponentSlot<ISubtitleDecoder> subtitleDecoderSlot = _subtitle.Decoder;
         long workingEpoch = -1;
 
         while (true)
         {
-            long stamp = _subtitleDecodeNode.Stamp;
+            long stamp = _subtitle.DecodeNode.Stamp;
             if (_stopRequested)
             {
                 return;
@@ -41,7 +41,7 @@ public sealed partial class PlaybackPipeline
             if (subtitleDecoderSlot.Update(out ISubtitleDecoder? oldSubtitleDecoder))
             {
                 oldSubtitleDecoder?.Dispose();
-                _cueWindow.Reset();
+                _subtitle.CueWindow.Reset();
             }
 
             // Bump epoch
@@ -60,13 +60,13 @@ public sealed partial class PlaybackPipeline
                     _events.PostWarning($"The subtitle decoder could not be flushed: {ex.Message}");
                 }
 
-                _cueWindow.SeekTo(epoch, epochGate.SeekPosition);
+                _subtitle.CueWindow.SeekTo(epoch, epochGate.SeekPosition);
                 continue;
             }
 
             if (!queue.TryPeek(out PacketEntry entry))
             {
-                await _subtitleDecodeNode.WaitAsync(stamp);
+                await _subtitle.DecodeNode.WaitAsync(stamp);
                 continue;
             }
 
@@ -74,13 +74,13 @@ public sealed partial class PlaybackPipeline
             VersionVerdict verdict = PipelineVersion.CompareSubtitleDecoder(entry.Versions, subtitleDecoderVersions);
             if (verdict == VersionVerdict.Block)
             {
-                await _subtitleDecodeNode.WaitAsync(stamp);
+                await _subtitle.DecodeNode.WaitAsync(stamp);
                 continue;
             }
 
             if (!queue.TryDequeue(out _))
             {
-                await _subtitleDecodeNode.WaitAsync(stamp);
+                await _subtitle.DecodeNode.WaitAsync(stamp);
                 continue;
             }
 
@@ -136,10 +136,10 @@ public sealed partial class PlaybackPipeline
             return OperationResult.Failure("The subtitle decoder returned no cues.");
         }
 
-        _cueWindow.Add(epoch, cues, _timeline.Position, discardStale: !_subtitleRenderer.HasComponent);
+        _subtitle.CueWindow.Add(epoch, cues, _timeline.Position, discardStale: !_subtitle.Renderer.HasComponent);
         if (cues.Count > 0)
         {
-            _subtitleRenderNode.Wake();
+            _subtitle.RenderNode.Wake();
         }
 
         return OperationResult.Success();
@@ -159,7 +159,7 @@ public sealed partial class PlaybackPipeline
             }
         }
 
-        ComponentSlot<ISubtitleRenderer> subtitleRendererSlot = _subtitleRenderer;
+        ComponentSlot<ISubtitleRenderer> subtitleRendererSlot = _subtitle.Renderer;
         bool drawnInvalidated = true;
         long workingEpoch = -1;
         long drawnSurfaceVersion = -1;
@@ -169,7 +169,7 @@ public sealed partial class PlaybackPipeline
 
         while (true)
         {
-            long stamp = _subtitleRenderNode.Stamp;
+            long stamp = _subtitle.RenderNode.Stamp;
             if (_stopRequested)
             {
                 break;
@@ -196,13 +196,13 @@ public sealed partial class PlaybackPipeline
             ISubtitleRenderer? renderer = subtitleRendererSlot.CurrentComponent;
             if (renderer is null)
             {
-                _subtitleRenderNode.Wait(stamp);
+                _subtitle.RenderNode.Wait(stamp);
                 continue;
             }
 
             if (!CheckState(out MediaEngineState state, MediaEngineState.Playing, MediaEngineState.Paused))
             {
-                _subtitleRenderNode.Wait(stamp);
+                _subtitle.RenderNode.Wait(stamp);
                 continue;
             }
 
@@ -217,7 +217,7 @@ public sealed partial class PlaybackPipeline
 
             // Show
             TimeSpan position = _timeline.Position;
-            SubtitleCueSnapshot cues = _cueWindow.GetVisibleCues(epoch, position);
+            SubtitleCueSnapshot cues = _subtitle.CueWindow.GetVisibleCues(epoch, position);
             long surfaceVersion = Interlocked.Read(ref _subtitleSurfaceVersion);
 
             SubtitlePresentation presentation = SubtitlePresentation with
@@ -249,7 +249,7 @@ public sealed partial class PlaybackPipeline
             int timeout = Timeout.Infinite;
             if (state == MediaEngineState.Playing)
             {
-                TimeSpan? next = _cueWindow.TimeUntilNextChange(position);
+                TimeSpan? next = _subtitle.CueWindow.TimeUntilNextChange(position);
                 if (next.HasValue)
                 {
                     timeout = next.Value <= TimeSpan.Zero
@@ -258,7 +258,7 @@ public sealed partial class PlaybackPipeline
                 }
             }
 
-            _subtitleRenderNode.Wait(stamp, timeout);
+            _subtitle.RenderNode.Wait(stamp, timeout);
         }
 
         drawnCues.Dispose();
