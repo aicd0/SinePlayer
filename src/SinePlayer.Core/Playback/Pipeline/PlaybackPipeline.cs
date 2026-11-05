@@ -5,7 +5,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 
 using SinePlayer.Core.Common.ErrorHandling;
-using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -49,7 +48,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     #region Variables
 
-    private readonly ITaskDispatcher _playbackQueue = TaskDispatcher.Factory.NewQueue("Pipeline - Playback");
+    private readonly PipelineEvents _events;
     private readonly SeqLock<VideoTransform> _videoTransform = new(VideoTransform.Identity);
     private readonly SeqLock<SubtitlePresentation> _subtitlePresentation = new(SubtitlePresentation.Identity);
 
@@ -79,6 +78,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private Thread? _audioRenderThread;
     private Thread? _subtitleRenderThread;
 
+    private readonly IPipelineWakeTarget[] _wakeTargets;
     private readonly PipelineNodeAsync _readerNode = new();
     private readonly PipelineNode _videoDecodeNode = new();
     private readonly PipelineNodeAsync _audioDecodeNode = new();
@@ -88,8 +88,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     private readonly PipelineNode _subtitleRenderNode = new();
 
     private bool _disposed;
-    private volatile MediaEngineState _state = MediaEngineState.None;
-    private volatile string? _error;
     private bool _threadsStarted;
     private volatile bool _stopRequested;
 
@@ -125,11 +123,37 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     #endregion
 
+    #region Construction
+
+    public PlaybackPipeline()
+    {
+        _wakeTargets = [
+            _readerNode,
+            _videoDecodeNode,
+            _audioDecodeNode,
+            _subtitleDecodeNode,
+            _videoRenderNode,
+            _audioRenderNode,
+            _subtitleRenderNode,
+        ];
+        _events = new PipelineEvents(WakeAll);
+    }
+
+    #endregion
+
     #region Public API
 
-    public event Action<MediaEngineState, string?>? StateChanged;
+    public event Action<MediaEngineState, string?>? StateChanged
+    {
+        add => _events.StateChanged += value;
+        remove => _events.StateChanged -= value;
+    }
 
-    public event Action<string>? WarningRaised;
+    public event Action<string>? WarningRaised
+    {
+        add => _events.WarningRaised += value;
+        remove => _events.WarningRaised -= value;
+    }
 
     public ComponentResolver Components { get; set; } = new();
 
@@ -170,9 +194,9 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
-    public MediaEngineState State => _state;
+    public MediaEngineState State => _events.State;
 
-    public string? Error => _error;
+    public string? Error => _events.Error;
 
     public IReadOnlyList<MediaSource> Sources => _selection.Sources;
 
@@ -252,7 +276,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public void Dispose()
     {
-        Task<OperationResult> teardown = Submit(() =>
+        Task<OperationResult> teardown = _events.Submit(() =>
         {
             if (_disposed)
             {
@@ -268,43 +292,43 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public Task<OperationResult> Reset(IVideoRenderTarget? videoTarget = null, IVideoRenderTarget? subtitleTarget = null)
     {
-        return SubmitAndLog(nameof(Reset), () => ResetCore(videoTarget, subtitleTarget));
+        return _events.SubmitAndLog(nameof(Reset), () => ResetCore(videoTarget, subtitleTarget));
     }
 
     public Task<OperationResult<MediaSource>> AddSource(MediaLocator locator)
     {
         ArgumentNullException.ThrowIfNull(locator);
-        return SubmitAndLog(nameof(AddSource), () => AddSourceCore(locator));
+        return _events.SubmitAndLog(nameof(AddSource), () => AddSourceCore(locator));
     }
 
     public Task<OperationResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)
     {
-        return SubmitAndLog(nameof(SelectStream), () => SelectStreamCore(kind, stream));
+        return _events.SubmitAndLog(nameof(SelectStream), () => SelectStreamCore(kind, stream));
     }
 
     public Task<OperationResult> Play()
     {
-        return SubmitAndLog(nameof(Play), PlayCore);
+        return _events.SubmitAndLog(nameof(Play), PlayCore);
     }
 
     public Task<OperationResult> Pause()
     {
-        return SubmitAndLog(nameof(Pause), PauseCore);
+        return _events.SubmitAndLog(nameof(Pause), PauseCore);
     }
 
     public Task<OperationResult> Seek(TimeSpan position, SeekMode mode = SeekMode.Fast)
     {
-        return SubmitAndLog(nameof(Seek), () => SeekCore(position, mode));
+        return _events.SubmitAndLog(nameof(Seek), () => SeekCore(position, mode));
     }
 
     public Task<OperationResult<ReconcileResult>> Reconcile()
     {
-        return SubmitAndLog(nameof(Reconcile), ReconcileCore);
+        return _events.SubmitAndLog(nameof(Reconcile), ReconcileCore);
     }
 
     public Task<OperationResult> Stop()
     {
-        return SubmitAndLog(nameof(Stop), () => ResetCore(null, null));
+        return _events.SubmitAndLog(nameof(Stop), () => ResetCore(null, null));
     }
 
     #endregion
@@ -326,7 +350,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
 
         AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
-        SetState(MediaEngineState.Paused);
+        _events.SetState(MediaEngineState.Paused);
         return OperationResult.Success();
     }
 
@@ -414,7 +438,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure($"Cannot play when the state is {state}.");
         }
 
-        SetState(MediaEngineState.Playing);
+        _events.SetState(MediaEngineState.Playing);
         WakeAll();
         return OperationResult.Success();
     }
@@ -431,7 +455,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure($"Cannot pause when the state is {state}.");
         }
 
-        SetState(MediaEngineState.Paused);
+        _events.SetState(MediaEngineState.Paused);
         WakeAll();
         return OperationResult.Success();
     }
@@ -464,7 +488,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         if (state == MediaEngineState.Ended)
         {
-            SetState(MediaEngineState.Paused);
+            _events.SetState(MediaEngineState.Paused);
         }
 
         AdvanceEpoch(position, mode);
@@ -605,7 +629,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         Interlocked.Exchange(ref _pictureTicks, -1);
 
         AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
-        SetState(MediaEngineState.None);
+        _events.SetState(MediaEngineState.None);
         return OperationResult.Success();
     }
 
@@ -760,7 +784,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return;
         }
 
-        SetState(MediaEngineState.Ended);
+        _events.SetState(MediaEngineState.Ended);
         WakeAll();
     }
 
@@ -772,34 +796,6 @@ public sealed partial class PlaybackPipeline : IDisposable
             SeekPosition = position,
             SeekMode = mode,
         });
-    }
-
-    private OperationResult Fail(string message, Exception? exception = null)
-    {
-        PlaybackLogger.E(TAG, message, exception);
-        SetState(MediaEngineState.Error, message);
-        WakeAll();
-        return OperationResult.Failure(message, exception);
-    }
-
-    private void SetState(MediaEngineState state, string? error = null)
-    {
-        bool changed = _state != state || _error != error;
-        _state = state;
-        _error = error;
-
-        if (!changed)
-        {
-            return;
-        }
-
-        StateChanged?.Invoke(state, error);
-    }
-
-    private void RaiseWarning(string warning)
-    {
-        PlaybackLogger.W(TAG, warning);
-        WarningRaised?.Invoke(warning);
     }
 
     #endregion
@@ -824,7 +820,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private bool CheckState(out MediaEngineState state, params MediaEngineState[] validStates)
     {
-        state = _state;
+        state = _events.State;
         if (validStates.Contains(state))
         {
             return true;
@@ -877,81 +873,9 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void WakeAll()
     {
-        _readerNode.Wake();
-        _videoDecodeNode.Wake();
-        _audioDecodeNode.Wake();
-        _subtitleDecodeNode.Wake();
-        _videoRenderNode.Wake();
-        _audioRenderNode.Wake();
-        _subtitleRenderNode.Wake();
-    }
-
-    private void PostWarning(string warning)
-    {
-        Submit(() => RaiseWarning(warning));
-    }
-
-    private void PostFailure(string message, Exception? exception = null)
-    {
-        Submit(() => Fail(message, exception));
-    }
-
-    private void PostFailure(OperationResult result)
-    {
-        PostFailure(result.Message, result.Exception);
-    }
-
-    private Task Submit(Action work)
-    {
-        return _playbackQueue.Submit(work);
-    }
-
-    private Task<T> Submit<T>(Func<T> work)
-    {
-        return _playbackQueue.Submit(work);
-    }
-
-    private Task<OperationResult> SubmitAndLog(string action, Func<OperationResult> func)
-    {
-        return Submit(() =>
+        foreach (IPipelineWakeTarget target in _wakeTargets)
         {
-            OperationResult result = func();
-            if (!result.IsSuccessful)
-            {
-                PlaybackLogger.E(TAG, $"{action}: {result.Message}", result.Exception);
-            }
-
-            return result;
-        });
-    }
-
-    private Task<OperationResult<T>> SubmitAndLog<T>(string action, Func<OperationResult<T>> func)
-    {
-        return Submit(() =>
-        {
-            OperationResult<T> result = func();
-            if (!result.IsSuccessful)
-            {
-                PlaybackLogger.E(TAG, $"{action}: {result.Message}", result.Exception);
-            }
-
-            return result;
-        });
-    }
-
-    #endregion
-
-    #region Utilities
-
-    private static OperationResult SafeInvoke(Func<OperationResult> action)
-    {
-        try
-        {
-            return action();
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Failure(ex);
+            target.Wake();
         }
     }
 

@@ -109,7 +109,7 @@ public sealed partial class PlaybackPipeline
                 }
                 else
                 {
-                    PostWarning(sought.Message);
+                    _events.PostWarning(sought.Message);
                 }
 
                 continue;
@@ -173,7 +173,7 @@ public sealed partial class PlaybackPipeline
                 TryWakeSubtitleDecode();
 
                 long endedEpoch = epoch;
-                _ = Submit(() => NotifySourceEnded(endedEpoch));
+                _ = _events.Submit(() => NotifySourceEnded(endedEpoch));
                 continue;
             }
 
@@ -190,7 +190,7 @@ public sealed partial class PlaybackPipeline
 
             if (!read.IsSuccessful)
             {
-                PostFailure(read);
+                _events.PostFailure(read);
                 break;
             }
 

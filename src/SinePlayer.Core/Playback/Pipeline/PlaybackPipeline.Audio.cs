@@ -56,7 +56,7 @@ public sealed partial class PlaybackPipeline
                 }
                 catch (Exception ex)
                 {
-                    PostWarning($"The audio decoder could not be flushed: {ex.Message}");
+                    _events.PostWarning($"The audio decoder could not be flushed: {ex.Message}");
                 }
 
                 continue;
@@ -100,7 +100,7 @@ public sealed partial class PlaybackPipeline
                     OperationResult drained = DrainAudioDecoder(audioDecoder, audioBufferVersions, packetEpoch);
                     if (!drained.IsSuccessful)
                     {
-                        PostWarning(drained.Message);
+                        _events.PostWarning(drained.Message);
                     }
 
                     _audioQueue.Enqueue(new AudioEntry(null, audioBufferVersions, epoch));
@@ -116,7 +116,7 @@ public sealed partial class PlaybackPipeline
                 OperationResult routed = DecodeAudio(audioDecoder, packet, audioBufferVersions, epoch);
                 if (!routed.IsSuccessful)
                 {
-                    PostFailure(routed);
+                    _events.PostFailure(routed);
                     return;
                 }
             }
@@ -298,7 +298,7 @@ public sealed partial class PlaybackPipeline
                     else
                     {
                         deviceFormat = null;
-                        PostWarning($"The audio device could not be opened: {opened.Message}");
+                        _events.PostWarning($"The audio device could not be opened: {opened.Message}");
                         if (AbandonFailedDevice(audioRenderer))
                         {
                             continue;
@@ -359,7 +359,7 @@ public sealed partial class PlaybackPipeline
                         }
                         catch (Exception ex)
                         {
-                            PostWarning(ex.Message);
+                            _events.PostWarning(ex.Message);
                             AbandonFailedDevice(audioRenderer);
                             continue;
                         }
@@ -382,7 +382,7 @@ public sealed partial class PlaybackPipeline
                 if (!reportedRunningAhead)
                 {
                     reportedRunningAhead = true;
-                    PostWarning("The audio device is not playing what it is given.");
+                    _events.PostWarning("The audio device is not playing what it is given.");
                 }
 
                 lock (_clockLock)
@@ -415,7 +415,7 @@ public sealed partial class PlaybackPipeline
 
                         if (!submitted.IsSuccessful)
                         {
-                            PostWarning(submitted.Message);
+                            _events.PostWarning(submitted.Message);
                             AbandonFailedDevice(audioRenderer);
                         }
 
@@ -443,7 +443,7 @@ public sealed partial class PlaybackPipeline
                     playedOutEpoch = endingEpoch;
 
                     long epochCopy = endingEpoch;
-                    Submit(() => NotifyAudioRenderEnded(epochCopy));
+                    _events.Submit(() => NotifyAudioRenderEnded(epochCopy));
                 }
 
                 _audioRenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
@@ -506,7 +506,7 @@ public sealed partial class PlaybackPipeline
             if (!filtersApplied.IsSuccessful)
             {
                 buffer.Dispose();
-                PostFailure(filtersApplied.Message, filtersApplied.Exception);
+                _events.PostFailure(filtersApplied.Message, filtersApplied.Exception);
                 return;
             }
 

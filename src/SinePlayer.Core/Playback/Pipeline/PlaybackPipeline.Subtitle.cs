@@ -57,7 +57,7 @@ public sealed partial class PlaybackPipeline
                 }
                 catch (Exception ex)
                 {
-                    PostWarning($"The subtitle decoder could not be flushed: {ex.Message}");
+                    _events.PostWarning($"The subtitle decoder could not be flushed: {ex.Message}");
                 }
 
                 _cueWindow.SeekTo(epoch, epochGate.SeekPosition);
@@ -104,7 +104,7 @@ public sealed partial class PlaybackPipeline
                 OperationResult routed = DecodeSubtitle(epoch, subtitleDecoder, packet);
                 if (!routed.IsSuccessful)
                 {
-                    PostFailure(routed);
+                    _events.PostFailure(routed);
                     return;
                 }
             }
@@ -155,7 +155,7 @@ public sealed partial class PlaybackPipeline
         {
             if (!result.IsSuccessful)
             {
-                PostWarning($"{message}: {result.Message}");
+                _events.PostWarning($"{message}: {result.Message}");
             }
         }
 
@@ -183,7 +183,7 @@ public sealed partial class PlaybackPipeline
                     if (subtitleRendererSlot.CurrentComponent is null)
                     {
                         ReportOnFailure("The subtitles could not be cleared",
-                            SafeInvoke(() => oldRenderer.Show([], TimeSpan.Zero, SubtitlePresentation.Identity)));
+                            PipelineEvents.SafeInvoke(() => oldRenderer.Show([], TimeSpan.Zero, SubtitlePresentation.Identity)));
                     }
 
                     oldRenderer.Dispose();
@@ -232,7 +232,7 @@ public sealed partial class PlaybackPipeline
                 !SameCues(cues, drawnCues))
             {
                 ReportOnFailure("The subtitles could not be drawn",
-                    SafeInvoke(() => renderer.Show(cues.Cues, position, presentation)));
+                    PipelineEvents.SafeInvoke(() => renderer.Show(cues.Cues, position, presentation)));
                 drawnCues.Dispose();
                 drawnCues = cues;
                 drawnInvalidated = false;
