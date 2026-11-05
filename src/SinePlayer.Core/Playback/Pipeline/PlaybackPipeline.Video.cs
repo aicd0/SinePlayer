@@ -66,7 +66,7 @@ public sealed partial class PlaybackPipeline
                 }
                 catch (Exception exception)
                 {
-                    PostFailure(exception.Message, exception);
+                    _events.PostFailure(exception.Message, exception);
                     return;
                 }
 
@@ -120,7 +120,7 @@ public sealed partial class PlaybackPipeline
                         OperationResult drained = DrainVideoDecoder(videoDecoder, videoFrameVersions, packetEpoch);
                         if (!drained.IsSuccessful)
                         {
-                            PostWarning(drained.Message);
+                            _events.PostWarning(drained.Message);
                         }
                     }
 
@@ -148,13 +148,13 @@ public sealed partial class PlaybackPipeline
                 OperationResult decoded = DecodeVideo(videoDecoder, packet, out IReadOnlyList<RawVideoFrame>? frames);
                 if (!decoded.IsSuccessful)
                 {
-                    PostFailure(decoded);
+                    _events.PostFailure(decoded);
                     return;
                 }
 
                 if (frames is null)
                 {
-                    PostFailure("The video decoder returned no frames.");
+                    _events.PostFailure("The video decoder returned no frames.");
                     return;
                 }
 
@@ -305,7 +305,7 @@ public sealed partial class PlaybackPipeline
 
                         if (!cleared.IsSuccessful)
                         {
-                            PostWarning(cleared.Message);
+                            _events.PostWarning(cleared.Message);
                         }
 
                         Interlocked.Exchange(ref _pictureTicks, -1);
@@ -355,7 +355,7 @@ public sealed partial class PlaybackPipeline
 
                 if (!refreshed.IsSuccessful)
                 {
-                    PostWarning(refreshed.Message);
+                    _events.PostWarning(refreshed.Message);
                     deviceAvailable = false;
                 }
             }
@@ -416,7 +416,7 @@ public sealed partial class PlaybackPipeline
                     endingEpoch = entry.Value.Epoch;
 
                     long epochCopy = entry.Value.Epoch;
-                    Submit(() => NotifyVideoRenderEnded(epochCopy));
+                    _events.Submit(() => NotifyVideoRenderEnded(epochCopy));
                 }
 
                 DequeueAndDispose();
@@ -486,7 +486,7 @@ public sealed partial class PlaybackPipeline
                     OperationResult shown = RenderVideoFrame(videoRenderer, frame, transform);
                     if (!shown.IsSuccessful)
                     {
-                        PostWarning(shown.Message);
+                        _events.PostWarning(shown.Message);
                         deviceAvailable = false;
                     }
                 }
