@@ -24,6 +24,17 @@ internal sealed class PipelineEvents(Action wakeAll)
 
     public string? Error => _error;
 
+    public bool CheckState(out MediaEngineState state, params MediaEngineState[] validStates)
+    {
+        state = _state;
+        if (validStates.Contains(state))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     public void SetState(MediaEngineState state, string? error = null)
     {
         bool changed = _state != state || _error != error;
