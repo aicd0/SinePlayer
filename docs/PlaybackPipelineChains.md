@@ -1,6 +1,6 @@
 # PlaybackPipeline chain decomposition — v1 plan
 
-Status: in progress. Phases A–E done (A1–A6, B1–B4, C1–C6, D1–D6, E1–E5); next are F (threads per chain) and G (clock governance, ending).
+Status: in progress. Phases A–F done (A1–A6, B1–B4, C1–C6, D1–D6, E1–E5, F1–F4); next is G (clock governance, ending).
 
 `PlaybackPipeline` was 3212 lines and held one video chain, one audio chain and one subtitle chain inline:
 their queues, their threads, their component slots, their statistics and their component reconciliation.
@@ -203,18 +203,30 @@ kind and bumps only that kind's version fields.
 
 ## Phase F — threads
 
-In progress: the pipeline owns one list of threads instead of five fields and a shared stop flag.
+Done. The pipeline owns one `CoroutineHost` and the chains own their own threads.
 
 | # | Step | Lands as | State |
 |---|---|---|---|
 | F1 | A thread with its own stop flag | `PipelineThread` | done |
-| F2 | The five starts collapse into one | `StartThreads`, `RunReaderThread` | done |
-| F3 | Stop and join walk the list | `_threads`, `RequestStop`/`Join`, `_threadsStarted` and the pipeline's `_stopRequested` gone | done |
-| F4 | Chains own their threads | `VideoChain` (decode + render), `AudioChain`/`SubtitleChain` (render) | next |
+| F2 | The coroutine thread becomes an object | `CoroutineHost` — pipeline-owned, with the reader registering like everyone else | done |
+| F3 | Stop and join get one owner each | `StartThreads`/`StopThreads`; `_threadsStarted` and the pipeline's `_stopRequested` gone | done |
+| F4 | Chains own their threads | `VideoChain` (decode + render), `AudioChain` (render), `SubtitleChain` (render) | done |
 
-F4 has one wrinkle worth recording: the coroutine thread is not exclusive to one chain. It hosts the reader plus
-the audio and subtitle decode coroutines, so it belongs to the reader, not to any chain — the four threads that
-belong to exactly one chain are video decode, video render, audio render and subtitle render.
+Ownership after this phase:
+
+| Thread | Owner | Stop flag |
+|---|---|---|
+| `Pipeline - Reader` (reader + audio decode + subtitle decode) | `CoroutineHost`, held by the pipeline | the host's |
+| `Pipeline - Video decode` / `- Video render` | `VideoChain` | each its own |
+| `Pipeline - Audio render` | `AudioChain` | its own |
+| `Pipeline - Subtitle render` | `SubtitleChain` | its own |
+
+**Recorded decision for the future.** v1 keeps one stop flag on the host for all three coroutines, so the
+coroutine *set* is a session constant: a chain cannot be stopped while its siblings keep decoding. When chains
+multiply, the coroutine's lifecycle must belong to the chain — its own flag, stopped by setting it and waking its
+own node — and `CoroutineHost.Run(Func<Task>)` must accept registrations instead of a fixed list, exiting when
+the last coroutine has returned. That is the one place where the single-source-of-truth rule is knowingly
+deferred, and it is deferred to a single object rather than spread across the chains.
 
 ## Phase G — clock governance and ending
 

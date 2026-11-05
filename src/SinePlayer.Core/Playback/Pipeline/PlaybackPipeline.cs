@@ -11,7 +11,6 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
 using SinePlayer.Core.Playback.Selection;
-using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
@@ -27,7 +26,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private volatile MediaSourceHolder _selection = new([], null, null, null);
     private readonly ComponentSlot<MediaSourceHolder> _source = new();
-    private readonly List<PipelineThread> _threads = [];
+    private CoroutineHost? _host;
     private readonly IPipelineWakeTarget[] _wakeTargets;
     private readonly IChainFeed[] _feeds;
     private readonly MediaReader _reader;
@@ -451,7 +450,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             _timeline.AdvanceEpoch(_timeline.Position, SeekMode.Precise);
             WakeAll();
 
-            if (_threads.Count == 0)
+            if (_host is null)
             {
                 StartThreads();
             }
@@ -467,19 +466,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private OperationResult StopCore()
     {
-        foreach (PipelineThread thread in _threads)
-        {
-            thread.RequestStop();
-        }
-
-        WakeAll();
-
-        foreach (PipelineThread thread in _threads)
-        {
-            thread.Join();
-        }
-
-        _threads.Clear();
+        StopThreads();
 
         _video.PacketQueue.Clear();
         _audio.PacketQueue.Clear();
@@ -541,49 +528,33 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void StartThreads()
     {
-        _threads.Add(new PipelineThread("Pipeline - Reader", RunReaderThread));
-        _threads.Add(new PipelineThread("Pipeline - Video decode", stop => _video.Decode(stop, _reader.TryWake)));
-        _threads.Add(new PipelineThread("Pipeline - Video render", stop => _video.Render(stop, IsVideoStreamSpent, NotifyVideoRenderEnded)));
-        _threads.Add(new PipelineThread("Pipeline - Audio render", stop => _audio.Render(stop, IsAudioStreamSpent, NotifyAudioRenderEnded)));
-        _threads.Add(new PipelineThread("Pipeline - Subtitle render", stop => _subtitle.Render(stop)));
+        CoroutineHost host = new("Pipeline - Reader", [
+            stop => _reader.Run(stop, NotifySourceEnded),
+            stop => _audio.Decode(stop, _reader.TryWake),
+            stop => _subtitle.Decode(stop, _reader.TryWake),
+        ]);
 
-        foreach (PipelineThread thread in _threads)
-        {
-            thread.Start();
-        }
+        host.Start();
+        _host = host;
+        _video.Start(_reader.TryWake, IsVideoStreamSpent, NotifyVideoRenderEnded);
+        _audio.Start(IsAudioStreamSpent, NotifyAudioRenderEnded);
+        _subtitle.Start();
     }
 
-    private void RunReaderThread(Func<bool> stopRequested)
+    private void StopThreads()
     {
-        SingleThreadSynchronizationContext context = new();
-        SynchronizationContext? previousContext = SynchronizationContext.Current;
-        SynchronizationContext.SetSynchronizationContext(context);
-        try
-        {
-            async Task AsyncCore()
-            {
-                try
-                {
-                    await Task.WhenAll(
-                        _reader.Run(stopRequested, NotifySourceEnded),
-                        _audio.Decode(stopRequested, _reader.TryWake),
-                        _subtitle.Decode(stopRequested, _reader.TryWake));
-                }
-                finally
-                {
-                    context.Complete();
-                }
-            }
+        _host?.RequestStop();
+        _video.RequestStop();
+        _audio.RequestStop();
+        _subtitle.RequestStop();
 
-            Task task = AsyncCore();
-            context.RunOnCurrentThread();
-            task.Wait();
-        }
-        finally
-        {
-            SynchronizationContext.SetSynchronizationContext(previousContext);
-            context.Dispose();
-        }
+        WakeAll();
+
+        _host?.Join();
+        _host = null;
+        _video.Join();
+        _audio.Join();
+        _subtitle.Join();
     }
     private void NotifySourceEnded(long epoch)
     {

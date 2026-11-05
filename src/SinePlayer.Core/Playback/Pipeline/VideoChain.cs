@@ -27,6 +27,8 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
     public const int DecoderBufferedFrames = FrameQueueCapacity + 4;
 
+    private PipelineThread? _decodeThread;
+    private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
     public ComponentSlot<IVideoDecoder> Decoder { get; } = new();
@@ -62,17 +64,26 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
     public long RenderTicks;
     public long PictureTicks = -1;
 
-    public void WakeDecode()
+    public void Start(Action wakeReader, Func<long, TimeSpan, bool> isStreamSpent, Action<long> reportEnded)
     {
-        if (!HasRoomForFrame())
-        {
-            return;
-        }
+        _decodeThread = new PipelineThread("Pipeline - Video decode", stop => Decode(stop, wakeReader));
+        _renderThread = new PipelineThread("Pipeline - Video render", stop => Render(stop, isStreamSpent, reportEnded));
+        _decodeThread.Start();
+        _renderThread.Start();
+    }
 
-        if (!PacketQueue.IsEmpty)
-        {
-            DecodeNode.Wake();
-        }
+    public void RequestStop()
+    {
+        _decodeThread?.RequestStop();
+        _renderThread?.RequestStop();
+    }
+
+    public void Join()
+    {
+        _decodeThread?.Join();
+        _decodeThread = null;
+        _renderThread?.Join();
+        _renderThread = null;
     }
 
     public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
@@ -93,26 +104,6 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
     {
         PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
         WakeDecode();
-    }
-
-    private TimeSpan SpanOf(MediaPacket packet, double frameRate)
-    {
-        if (packet.Duration > TimeSpan.Zero)
-        {
-            return packet.Duration;
-        }
-
-        if (_lastPacketSpan > TimeSpan.Zero)
-        {
-            return _lastPacketSpan;
-        }
-
-        if (!double.IsFinite(frameRate) || frameRate <= 0 || frameRate > 1000)
-        {
-            return TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
-        }
-
-        return TimeSpan.FromSeconds(1 / frameRate);
     }
 
     public void Decode(Func<bool> stopRequested, Action wakeReader)
@@ -239,96 +230,6 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
                 QueueFrames(frames, videoFrameVersions, epoch);
             }
-        }
-    }
-
-    private OperationResult DecodePacket(IVideoDecoder videoDecoder, MediaPacket packet, out IReadOnlyList<RawVideoFrame>? frames)
-    {
-        frames = null;
-
-        long startTicks = Stopwatch.GetTimestamp();
-        OperationResult decoded;
-        IReadOnlyList<RawVideoFrame>? produced = null;
-        try
-        {
-            decoded = videoDecoder.TryDecode(packet, out produced);
-        }
-        catch (Exception ex)
-        {
-            decoded = OperationResult.Failure(ex);
-        }
-
-        Interlocked.Add(ref DecodeTicks, Stopwatch.GetTimestamp() - startTicks);
-
-        if (!decoded.IsSuccessful || produced is null)
-        {
-            return decoded;
-        }
-
-        frames = produced;
-        Interlocked.Add(ref DecodedFrameCount, produced.Count);
-        return OperationResult.Success();
-    }
-
-    private OperationResult DrainDecoder(IVideoDecoder decoder, PipelineVersion versions, long epoch)
-    {
-        OperationResult drained;
-        IReadOnlyList<RawVideoFrame> frames;
-        try
-        {
-            drained = decoder.Drain(out frames);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Failure(ex.Message);
-        }
-
-        if (!drained.IsSuccessful)
-        {
-            return drained;
-        }
-
-        if (frames is null)
-        {
-            return OperationResult.Failure("The video decoder returned no frames.");
-        }
-
-        QueueFrames(frames, versions, epoch);
-        return OperationResult.Success();
-    }
-
-    private void QueueFrames(IReadOnlyList<RawVideoFrame> frames, PipelineVersion versions, long epoch)
-    {
-        bool fastExit = false;
-
-        foreach (RawVideoFrame frame in frames)
-        {
-            if (fastExit || timeline.Epoch != epoch)
-            {
-                fastExit = true;
-                frame.Dispose();
-                continue;
-            }
-
-            FrameQueue.Enqueue(new FrameEntry(frame, versions, epoch));
-        }
-
-        if (!fastExit)
-        {
-            WakeRender();
-        }
-    }
-
-    private bool HasRoomForFrame()
-    {
-        return FrameQueue.Count < FrameQueueCapacity;
-    }
-
-    private void WakeRender()
-    {
-        if (!FrameQueue.IsEmpty)
-        {
-            RenderNode.Wake();
         }
     }
 
@@ -564,6 +465,88 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         }
     }
 
+    private OperationResult DecodePacket(IVideoDecoder videoDecoder, MediaPacket packet, out IReadOnlyList<RawVideoFrame>? frames)
+    {
+        frames = null;
+
+        long startTicks = Stopwatch.GetTimestamp();
+        OperationResult decoded;
+        IReadOnlyList<RawVideoFrame>? produced = null;
+        try
+        {
+            decoded = videoDecoder.TryDecode(packet, out produced);
+        }
+        catch (Exception ex)
+        {
+            decoded = OperationResult.Failure(ex);
+        }
+
+        Interlocked.Add(ref DecodeTicks, Stopwatch.GetTimestamp() - startTicks);
+
+        if (!decoded.IsSuccessful || produced is null)
+        {
+            return decoded;
+        }
+
+        frames = produced;
+        Interlocked.Add(ref DecodedFrameCount, produced.Count);
+        return OperationResult.Success();
+    }
+
+    private OperationResult DrainDecoder(IVideoDecoder decoder, PipelineVersion versions, long epoch)
+    {
+        OperationResult drained;
+        IReadOnlyList<RawVideoFrame> frames;
+        try
+        {
+            drained = decoder.Drain(out frames);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Failure(ex.Message);
+        }
+
+        if (!drained.IsSuccessful)
+        {
+            return drained;
+        }
+
+        if (frames is null)
+        {
+            return OperationResult.Failure("The video decoder returned no frames.");
+        }
+
+        QueueFrames(frames, versions, epoch);
+        return OperationResult.Success();
+    }
+
+    private void QueueFrames(IReadOnlyList<RawVideoFrame> frames, PipelineVersion versions, long epoch)
+    {
+        bool fastExit = false;
+
+        foreach (RawVideoFrame frame in frames)
+        {
+            if (fastExit || timeline.Epoch != epoch)
+            {
+                fastExit = true;
+                frame.Dispose();
+                continue;
+            }
+
+            FrameQueue.Enqueue(new FrameEntry(frame, versions, epoch));
+        }
+
+        if (!fastExit)
+        {
+            WakeRender();
+        }
+    }
+
+    private bool HasRoomForFrame()
+    {
+        return FrameQueue.Count < FrameQueueCapacity;
+    }
+
     private OperationResult RenderFrame(IVideoRenderer renderer, RawVideoFrame frame, VideoTransform transform)
     {
         long startTicks = Stopwatch.GetTimestamp();
@@ -602,6 +585,47 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         return timeline.VideoStarved
             ? behind > TimeSpan.FromMilliseconds(VideoStarvationResumeMilliseconds)
             : behind > TimeSpan.FromMilliseconds(VideoStarvationMilliseconds);
+    }
+
+    private void WakeDecode()
+    {
+        if (!HasRoomForFrame())
+        {
+            return;
+        }
+
+        if (!PacketQueue.IsEmpty)
+        {
+            DecodeNode.Wake();
+        }
+    }
+
+    private void WakeRender()
+    {
+        if (!FrameQueue.IsEmpty)
+        {
+            RenderNode.Wake();
+        }
+    }
+
+    private TimeSpan SpanOf(MediaPacket packet, double frameRate)
+    {
+        if (packet.Duration > TimeSpan.Zero)
+        {
+            return packet.Duration;
+        }
+
+        if (_lastPacketSpan > TimeSpan.Zero)
+        {
+            return _lastPacketSpan;
+        }
+
+        if (!double.IsFinite(frameRate) || frameRate <= 0 || frameRate > 1000)
+        {
+            return TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
+        }
+
+        return TimeSpan.FromSeconds(1 / frameRate);
     }
 
     public SubtitleFrame Frame
