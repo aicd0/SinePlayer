@@ -332,7 +332,7 @@ public sealed partial class PlaybackPipeline
             }
 
             // Refresh surface
-            bool playing = CheckState(out MediaEngineState state, MediaEngineState.Playing);
+            bool playing = _events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
             VideoTransform transform = VideoTransform;
 
             VideoOrientation containerTransform = SelectedVideoStream?.Orientation ?? VideoOrientation.Identity;

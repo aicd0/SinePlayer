@@ -32,7 +32,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     private const int VideoStarvationResumeMilliseconds = 100;
     private const int VideoIdleTimeoutMilliseconds = 50;
     private const int AudioIdleTimeoutMilliseconds = 5;
-    private const int SubtitleChangeIntervalMilliseconds = 16;
     private const int AudioDeviceLeewayMilliseconds = 3000;
 
     private static readonly TimeSpan ReadAheadMin = TimeSpan.FromMilliseconds(ReadAheadMinMilliseconds);
@@ -51,7 +50,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private volatile MediaSourceHolder _selection = new([], null, null, null);
 
-    private long _subtitleSurfaceVersion;
     private readonly ComponentSlot<MediaSourceHolder> _source = new();
 
     private Thread? _readerThread;
@@ -81,9 +79,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public PlaybackPipeline()
     {
-        _subtitle = new SubtitleChain();
+        _events = new PipelineEvents(WakeAll);
+        _timeline = new PipelineTimeline(NotifyClockMoved);
         _video = new VideoChain();
         _audio = new AudioChain();
+        _subtitle = new SubtitleChain(_timeline, _events);
         _wakeTargets = [
             _readerNode,
             _video.DecodeNode,
@@ -93,8 +93,6 @@ public sealed partial class PlaybackPipeline : IDisposable
             _audio.RenderNode,
             _subtitle.RenderNode,
         ];
-        _events = new PipelineEvents(WakeAll);
-        _timeline = new PipelineTimeline(NotifyClockMoved);
     }
 
     #endregion
@@ -349,7 +347,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
-        if (!CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
+        if (!_events.CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
         {
             return OperationResult.Failure($"Cannot change tracks when the state is {state}.");
         }
@@ -389,7 +387,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure("No track is selected. Choose a video or audio track before playing.");
         }
 
-        if (!CheckState(out MediaEngineState state, MediaEngineState.Paused))
+        if (!_events.CheckState(out MediaEngineState state, MediaEngineState.Paused))
         {
             return OperationResult.Failure($"Cannot play when the state is {state}.");
         }
@@ -406,7 +404,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
-        if (!CheckState(out MediaEngineState state, MediaEngineState.Playing))
+        if (!_events.CheckState(out MediaEngineState state, MediaEngineState.Playing))
         {
             return OperationResult.Failure($"Cannot pause when the state is {state}.");
         }
@@ -428,7 +426,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure($"The seek mode {mode} is unknown.");
         }
 
-        if (!CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
+        if (!_events.CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
         {
             return OperationResult.Failure($"Cannot seek when the state is {state}.");
         }
@@ -463,7 +461,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return result.Failure("The pipeline has already been disposed.");
         }
 
-        if (!CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
+        if (!_events.CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
         {
             return result.Failure($"Cannot change the pipeline's components when the state is {state}.");
         }
@@ -594,7 +592,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 {
                     try
                     {
-                        await Task.WhenAll(ReaderCore(), AudioDecodeCore(), SubtitleDecodeCore());
+                        await Task.WhenAll(ReaderCore(), AudioDecodeCore(), _subtitle.Decode(() => _stopRequested, TryWakeReader));
                     }
                     finally
                     {
@@ -673,7 +671,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return;
         }
 
-        _subtitleRenderThread = new Thread(SubtitleRenderCore)
+        _subtitleRenderThread = new Thread(() => _subtitle.Render(() => _stopRequested))
         {
             IsBackground = true,
             Name = "Pipeline - Subtitle render",
@@ -701,7 +699,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void TryNotifyPlaybackEnded()
     {
-        if (!CheckState(out _, MediaEngineState.Playing, MediaEngineState.Paused))
+        if (!_events.CheckState(out _, MediaEngineState.Playing, MediaEngineState.Paused))
         {
             return;
         }
@@ -743,24 +741,13 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void SubtitleTarget_SurfaceSizeChanged()
     {
-        Interlocked.Increment(ref _subtitleSurfaceVersion);
+        Interlocked.Increment(ref _subtitle.SurfaceVersion);
         _subtitle.RenderNode.Wake();
     }
 
     #endregion
 
     #region Communication
-
-    private bool CheckState(out MediaEngineState state, params MediaEngineState[] validStates)
-    {
-        state = _events.State;
-        if (validStates.Contains(state))
-        {
-            return true;
-        }
-
-        return false;
-    }
 
     private void NotifyClockMoved()
     {
