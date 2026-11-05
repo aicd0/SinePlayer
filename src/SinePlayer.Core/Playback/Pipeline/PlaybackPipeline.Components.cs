@@ -114,7 +114,7 @@ public sealed partial class PlaybackPipeline
                 PipelineComponent<IVideoDecoder>? latestDecoder = _video.Decoder.Latest;
                 IGpuDevice? gpuDevice = (renderer ?? latestRenderer)?.Component?.GpuDevice;
                 OperationResult<PipelineComponent<IVideoDecoder>?> decoderResolved = ResolveComponent(
-                    resolver.ResolveVideoDecoders(videoSource.Source, videoStream, gpuDevice, DecoderBufferedFrames),
+                    resolver.ResolveVideoDecoders(videoSource.Source, videoStream, gpuDevice, VideoChain.DecoderBufferedFrames),
                     rebuildVideoDecoder ? null : latestDecoder?.Signature,
                     "video decoder");
                 if (!decoderResolved.IsSuccessful)
