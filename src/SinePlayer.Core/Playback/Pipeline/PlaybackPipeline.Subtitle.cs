@@ -4,7 +4,6 @@
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Render;
-using SinePlayer.Core.Playback.Abstractions.Source;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
@@ -18,128 +17,6 @@ public sealed partial class PlaybackPipeline
         {
             _subtitle.DecodeNode.Wake();
         }
-    }
-
-    private async Task SubtitleDecodeCore()
-    {
-        PacketQueue queue = _subtitle.PacketQueue;
-        ComponentSlot<ISubtitleDecoder> subtitleDecoderSlot = _subtitle.Decoder;
-        long workingEpoch = -1;
-
-        while (true)
-        {
-            long stamp = _subtitle.DecodeNode.Stamp;
-            if (_stopRequested)
-            {
-                return;
-            }
-
-            // Install subtitle decoder
-            if (subtitleDecoderSlot.Update(out ISubtitleDecoder? oldSubtitleDecoder))
-            {
-                oldSubtitleDecoder?.Dispose();
-                _subtitle.CueWindow.Reset();
-            }
-
-            // Bump epoch
-            EpochGate epochGate = _timeline.Gate;
-            long epoch = epochGate.Epoch;
-            if (workingEpoch != epoch)
-            {
-                workingEpoch = epoch;
-
-                try
-                {
-                    subtitleDecoderSlot.CurrentComponent?.Flush();
-                }
-                catch (Exception ex)
-                {
-                    _events.PostWarning($"The subtitle decoder could not be flushed: {ex.Message}");
-                }
-
-                _subtitle.CueWindow.SeekTo(epoch, epochGate.SeekPosition);
-                continue;
-            }
-
-            if (!queue.TryPeek(out PacketEntry entry))
-            {
-                await _subtitle.DecodeNode.WaitAsync(stamp);
-                continue;
-            }
-
-            PipelineVersion subtitleDecoderVersions = subtitleDecoderSlot.CurrentVersions;
-            VersionVerdict verdict = PipelineVersion.CompareSubtitleDecoder(entry.Versions, subtitleDecoderVersions);
-            if (verdict == VersionVerdict.Block)
-            {
-                await _subtitle.DecodeNode.WaitAsync(stamp);
-                continue;
-            }
-
-            if (!queue.TryDequeue(out _))
-            {
-                await _subtitle.DecodeNode.WaitAsync(stamp);
-                continue;
-            }
-
-            TryWakeReader();
-
-            MediaPacket? packet = entry.Packet;
-            long packetEpoch = entry.Epoch;
-            using (packet)
-            {
-                if (verdict == VersionVerdict.Drop || epoch != packetEpoch)
-                {
-                    continue;
-                }
-
-                ISubtitleDecoder? subtitleDecoder = subtitleDecoderSlot.CurrentComponent;
-                if (packet is null || subtitleDecoder is null)
-                {
-                    continue;
-                }
-
-                OperationResult routed = DecodeSubtitle(epoch, subtitleDecoder, packet);
-                if (!routed.IsSuccessful)
-                {
-                    _events.PostFailure(routed);
-                    return;
-                }
-            }
-
-            await Task.Yield();
-        }
-    }
-
-    private OperationResult DecodeSubtitle(long epoch, ISubtitleDecoder subtitleDecoder, MediaPacket packet)
-    {
-        OperationResult decoded;
-        IReadOnlyList<SubtitleCue> cues;
-        try
-        {
-            decoded = subtitleDecoder.TryDecode(packet, out cues);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Failure(ex.Message);
-        }
-
-        if (!decoded.IsSuccessful)
-        {
-            return decoded;
-        }
-
-        if (cues is null)
-        {
-            return OperationResult.Failure("The subtitle decoder returned no cues.");
-        }
-
-        _subtitle.CueWindow.Add(epoch, cues, _timeline.Position, discardStale: !_subtitle.Renderer.HasComponent);
-        if (cues.Count > 0)
-        {
-            _subtitle.RenderNode.Wake();
-        }
-
-        return OperationResult.Success();
     }
 
     #endregion

@@ -81,9 +81,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public PlaybackPipeline()
     {
-        _subtitle = new SubtitleChain();
+        _events = new PipelineEvents(WakeAll);
+        _timeline = new PipelineTimeline(NotifyClockMoved);
         _video = new VideoChain();
         _audio = new AudioChain();
+        _subtitle = new SubtitleChain(_timeline, _events);
         _wakeTargets = [
             _readerNode,
             _video.DecodeNode,
@@ -93,8 +95,6 @@ public sealed partial class PlaybackPipeline : IDisposable
             _audio.RenderNode,
             _subtitle.RenderNode,
         ];
-        _events = new PipelineEvents(WakeAll);
-        _timeline = new PipelineTimeline(NotifyClockMoved);
     }
 
     #endregion
@@ -594,7 +594,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 {
                     try
                     {
-                        await Task.WhenAll(ReaderCore(), AudioDecodeCore(), SubtitleDecodeCore());
+                        await Task.WhenAll(ReaderCore(), AudioDecodeCore(), _subtitle.Decode(() => _stopRequested, TryWakeReader));
                     }
                     finally
                     {
