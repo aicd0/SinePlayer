@@ -10,7 +10,7 @@ using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents events) : IChainFeed
+internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged) : IChainFeed
 {
     private const int SubtitleChangeIntervalMilliseconds = 16;
     private const int FallbackFrameMilliseconds = 40;
@@ -32,7 +32,17 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
 
     public SeqLock<SubtitlePresentation> Presentation { get; } = new(SubtitlePresentation.Identity);
 
-    public IVideoRenderTarget? Target { get; set; }
+    private IVideoRenderTarget? _target;
+    public IVideoRenderTarget? Target
+    {
+        get => _target;
+        set
+        {
+            _target?.SurfaceSizeChanged -= surfaceSizeChanged;
+            _target = value;
+            _target?.SurfaceSizeChanged += surfaceSizeChanged;
+        }
+    }
 
     public IPictureFrameSource? LayoutSource { get; set; }
 
@@ -59,6 +69,17 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
     {
         _renderThread?.Join();
         _renderThread = null;
+    }
+
+    public void Reset()
+    {
+        PacketQueue.Clear();
+
+        Decoder.Reset();
+        Renderer.Reset();
+        Target = null;
+        Binding = default;
+        Tail.Reset();
     }
 
     public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
