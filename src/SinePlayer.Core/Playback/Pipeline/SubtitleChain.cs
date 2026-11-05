@@ -24,4 +24,6 @@ internal sealed class SubtitleChain
     public SeqLock<SubtitlePresentation> Presentation { get; } = new(SubtitlePresentation.Identity);
 
     public IVideoRenderTarget? Target { get; set; }
+
+    public IPictureFrameSource? LayoutSource { get; set; }
 }
