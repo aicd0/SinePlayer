@@ -3,15 +3,19 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents events)
+internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents events) : IChainFeed
 {
     private const int SubtitleChangeIntervalMilliseconds = 16;
+    private const int FallbackFrameMilliseconds = 40;
+
+    private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
     public ComponentSlot<ISubtitleDecoder> Decoder { get; } = new();
 
@@ -32,6 +36,32 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
     public IPictureFrameSource? LayoutSource { get; set; }
 
     public long SurfaceVersion;
+
+    public StreamBinding<SubtitleStreamInfo> Binding { get; set; }
+
+    public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
+    {
+        if (!Binding.Accepts(source, packet.StreamIndex))
+        {
+            return false;
+        }
+
+        TimeSpan span = SpanOf(packet);
+        _lastPacketSpan = span;
+        PacketQueue.Enqueue(new PacketEntry(packet, versions, epoch, span));
+        WakeDecode();
+        return true;
+    }
+
+    private TimeSpan SpanOf(MediaPacket packet)
+    {
+        if (packet.Duration > TimeSpan.Zero)
+        {
+            return packet.Duration;
+        }
+
+        return _lastPacketSpan > TimeSpan.Zero ? _lastPacketSpan : TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
+    }
 
     public void WakeDecode()
     {

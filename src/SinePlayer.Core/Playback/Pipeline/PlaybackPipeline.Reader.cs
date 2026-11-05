@@ -22,33 +22,11 @@ public sealed partial class PlaybackPipeline
 
     private async Task ReaderCore()
     {
-        static TimeSpan SpanOf(MediaPacket? packet, TimeSpan previous, double frameRate)
-        {
-            if (packet is not null && packet.Duration > TimeSpan.Zero)
-            {
-                return packet.Duration;
-            }
-
-            if (previous > TimeSpan.Zero)
-            {
-                return previous;
-            }
-
-            if (!double.IsFinite(frameRate) || frameRate <= 0 || frameRate > 1000)
-            {
-                return TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
-            }
-
-            return TimeSpan.FromSeconds(1 / frameRate);
-        }
-
         ComponentSlot<MediaSourceHolder> sourceSlot = _source;
         bool pendingEpochChange = false;
         bool buffering = false;
         long workingEpoch = -1;
         long endingEpoch = -1;
-        TimeSpan lastAudioPacketSpan = TimeSpan.Zero;
-        TimeSpan lastSubtitlePacketSpan = TimeSpan.Zero;
         Dictionary<MediaSource, SourceTail> tails = [];
 
         while (true)
@@ -206,31 +184,21 @@ public sealed partial class PlaybackPipeline
 
             // Route packet
             bool handedOn = false;
-            AudioStreamInfo? audioStreamInfo = sourceHolder.AudioStream;
-            SubtitleStreamInfo? subtitleStreamInfo = sourceHolder.SubtitleStream;
 
             if (_video.TryAccept(chosenSource, packet, sourceVersions, epoch))
             {
                 AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailVideoTicks);
                 handedOn = true;
             }
-            else if (audioStreamInfo is not null && chosenSource == sourceHolder.AudioSource && packet.StreamIndex == audioStreamInfo.Index)
+            else if (_audio.TryAccept(chosenSource, packet, sourceVersions, epoch))
             {
                 AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailAudioTicks);
-                TimeSpan span = SpanOf(packet, lastAudioPacketSpan, 0);
-                lastAudioPacketSpan = span;
-                _audio.PacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
                 handedOn = true;
-                _audio.WakeDecode();
             }
-            else if (subtitleStreamInfo is not null && chosenSource == sourceHolder.SubtitleSource && packet.StreamIndex == subtitleStreamInfo.Index)
+            else if (_subtitle.TryAccept(chosenSource, packet, sourceVersions, epoch))
             {
                 AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailSubtitleTicks);
-                TimeSpan span = SpanOf(packet, lastSubtitlePacketSpan, 0);
-                lastSubtitlePacketSpan = span;
-                _subtitle.PacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
                 handedOn = true;
-                _subtitle.WakeDecode();
             }
 
             if (!handedOn)
