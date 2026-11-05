@@ -17,21 +17,21 @@ public sealed partial class PlaybackPipeline
 
     private void TryWakeAudioDecode()
     {
-        if (!_audioPacketQueue.IsEmpty)
+        if (!_audio.PacketQueue.IsEmpty)
         {
-            _audioDecodeNode.Wake();
+            _audio.DecodeNode.Wake();
         }
     }
 
     private async Task AudioDecodeCore()
     {
-        PacketQueue queue = _audioPacketQueue;
-        ComponentSlot<IAudioDecoder> audioDecoderSlot = _audioDecoder;
+        PacketQueue queue = _audio.PacketQueue;
+        ComponentSlot<IAudioDecoder> audioDecoderSlot = _audio.Decoder;
         long workingEpoch = -1;
 
         while (true)
         {
-            long stamp = _audioDecodeNode.Stamp;
+            long stamp = _audio.DecodeNode.Stamp;
             if (_stopRequested)
             {
                 return;
@@ -63,7 +63,7 @@ public sealed partial class PlaybackPipeline
 
             if (!queue.TryPeek(out PacketEntry entry))
             {
-                await _audioDecodeNode.WaitAsync(stamp);
+                await _audio.DecodeNode.WaitAsync(stamp);
                 continue;
             }
 
@@ -71,13 +71,13 @@ public sealed partial class PlaybackPipeline
             VersionVerdict verdict = PipelineVersion.CompareAudioDecoder(entry.Versions, audioDecoderVersions);
             if (verdict == VersionVerdict.Block)
             {
-                await _audioDecodeNode.WaitAsync(stamp);
+                await _audio.DecodeNode.WaitAsync(stamp);
                 continue;
             }
 
             if (!queue.TryDequeue(out _))
             {
-                await _audioDecodeNode.WaitAsync(stamp);
+                await _audio.DecodeNode.WaitAsync(stamp);
                 continue;
             }
 
@@ -102,7 +102,7 @@ public sealed partial class PlaybackPipeline
                         _events.PostWarning(drained.Message);
                     }
 
-                    _audioQueue.Enqueue(new AudioEntry(null, audioBufferVersions, epoch));
+                    _audio.BufferQueue.Enqueue(new AudioEntry(null, audioBufferVersions, epoch));
                     TryWakeAudioRender();
                     continue;
                 }
@@ -149,7 +149,7 @@ public sealed partial class PlaybackPipeline
 
         foreach (RawAudioBuffer buffer in buffers)
         {
-            _audioQueue.Enqueue(new AudioEntry(buffer, versions, epoch));
+            _audio.BufferQueue.Enqueue(new AudioEntry(buffer, versions, epoch));
         }
 
         if (buffers.Count > 0)
@@ -191,7 +191,7 @@ public sealed partial class PlaybackPipeline
         bool handedOver = false;
         foreach (RawAudioBuffer buffer in buffers)
         {
-            _audioQueue.Enqueue(new AudioEntry(buffer, versions, epoch));
+            _audio.BufferQueue.Enqueue(new AudioEntry(buffer, versions, epoch));
             handedOver = true;
         }
 
@@ -209,16 +209,16 @@ public sealed partial class PlaybackPipeline
 
     private void TryWakeAudioRender()
     {
-        if (!_audioQueue.IsEmpty)
+        if (!_audio.BufferQueue.IsEmpty)
         {
-            _audioRenderNode.Wake();
+            _audio.RenderNode.Wake();
         }
     }
 
     private void AudioRenderCore()
     {
-        AudioQueue queue = _audioQueue;
-        ComponentSlot<IAudioRenderer> audioRendererSlot = _audioRenderer;
+        AudioQueue queue = _audio.BufferQueue;
+        ComponentSlot<IAudioRenderer> audioRendererSlot = _audio.Renderer;
         bool deviceAvailable = false;
         bool reportedRunningAhead = false;
         long workingEpoch = -1;
@@ -256,7 +256,7 @@ public sealed partial class PlaybackPipeline
 
         while (true)
         {
-            long stamp = _audioRenderNode.Stamp;
+            long stamp = _audio.RenderNode.Stamp;
             if (_stopRequested)
             {
                 break;
@@ -279,9 +279,9 @@ public sealed partial class PlaybackPipeline
 
             IAudioRenderer? audioRenderer = audioRendererSlot.CurrentComponent;
 
-            if (filters is null || filters.Version != AudioFilters.Version)
+            if (filters is null || filters.Version != _audio.Filters.Version)
             {
-                filters = AudioFilters.Snapshot();
+                filters = _audio.Filters.Snapshot();
 
                 AudioStreamInfo? outputFormat = filters.OutputFormat;
                 if (audioRenderer is not null && outputFormat is not null && (deviceFormat is null || !AudioFilterChain.IsSameFormat(outputFormat, deviceFormat)))
@@ -369,7 +369,7 @@ public sealed partial class PlaybackPipeline
             // Idle on pause
             if (!playing)
             {
-                _audioRenderNode.Wait(stamp);
+                _audio.RenderNode.Wait(stamp);
                 continue;
             }
 
@@ -390,7 +390,7 @@ public sealed partial class PlaybackPipeline
                     _timeline.AudioStarved = false;
                 }
 
-                _audioRenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
+                _audio.RenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
                 continue;
             }
 
@@ -421,7 +421,7 @@ public sealed partial class PlaybackPipeline
                         continue;
                     }
 
-                    _audioRenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
+                    _audio.RenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
                     continue;
                 }
             }
@@ -445,14 +445,14 @@ public sealed partial class PlaybackPipeline
                     _events.Submit(() => NotifyAudioRenderEnded(epochCopy));
                 }
 
-                _audioRenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
+                _audio.RenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
                 continue;
             }
 
             // Idle on failing device if the clock is behind, since the device clock is no longer reliable
             if (!deviceAvailable && tailBufferPosition.HasValue && position < tailBufferPosition.Value)
             {
-                _audioRenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
+                _audio.RenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
                 continue;
             }
 
@@ -465,7 +465,7 @@ public sealed partial class PlaybackPipeline
             VersionVerdict verdict = PipelineVersion.CompareAudioRenderer(entry.Versions, audioRendererSlot.CurrentVersions);
             if (verdict == VersionVerdict.Block)
             {
-                _audioRenderNode.Wait(stamp);
+                _audio.RenderNode.Wait(stamp);
                 continue;
             }
 
