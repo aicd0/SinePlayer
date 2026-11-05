@@ -70,7 +70,9 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     private ID3D11PixelShader? _lastPixelShader;
     private ID3D11ShaderResourceView[] _lastViews = [];
     private uint _lastSlot;
-    private FrameTexCoords _lastTexCoords = FrameTexCoords.Full;
+    private (float X, float Y) _lastTexCoords = (1.0f, 1.0f);
+    private (float X, float Y) _lastTexCoordMax = (1.0f, 1.0f);
+    private (float X, float Y) _lastChromaTexCoordMax = (1.0f, 1.0f);
 
     private D3D11VideoRenderer(D3D11Device device, D3D11VideoShaders shaders, VideoSurfacePreference surfacePreference)
     {
@@ -235,7 +237,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                     return OperationResult.Failure(resolvedShader);
                 }
 
-                return Draw(resolvedShader.Result, _gpuViews, GpuTextureSlot, _gpuTexCoords, transform);
+                return Draw(resolvedShader.Result, _gpuViews, GpuTextureSlot, _gpuTexCoords, _gpuTexCoordMax, _gpuChromaTexCoordMax, transform);
             }
             else
             {
@@ -256,7 +258,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                     return upload;
                 }
 
-                return Draw(resolvedShader.Result, _planeViews, 0, FrameTexCoords.Full, transform);
+                return Draw(resolvedShader.Result, _planeViews, 0, (1.0f, 1.0f), (1.0f, 1.0f), (1.0f, 1.0f), transform);
             }
         }
     }
@@ -284,7 +286,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                 return OperationResult.Success();
             }
 
-            return Draw(_lastPixelShader, _lastViews, _lastSlot, _lastTexCoords, transform);
+            return Draw(_lastPixelShader, _lastViews, _lastSlot, _lastTexCoords, _lastTexCoordMax, _lastChromaTexCoordMax, transform);
         }
     }
 
@@ -360,7 +362,9 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     #region Hardware buffer
 
     private ID3D11ShaderResourceView[] _gpuViews = [];
-    private FrameTexCoords _gpuTexCoords = FrameTexCoords.Full;
+    private (float X, float Y) _gpuTexCoords = (1.0f, 1.0f);
+    private (float X, float Y) _gpuTexCoordMax = (1.0f, 1.0f);
+    private (float X, float Y) _gpuChromaTexCoordMax = (1.0f, 1.0f);
     private IGpuVideoBuffer? _retainedFrame;
     private nint _gpuTexture;
     private int _gpuSlice = -1;
@@ -435,7 +439,9 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
             _retainedFrame = retained;
             _frameWidth = frame.Width;
             _frameHeight = frame.Height;
-            _gpuTexCoords = GetTexCoords((int)description.Width, (int)description.Height, frame.Width, frame.Height);
+            _gpuTexCoords = GetTexCoordScale((int)description.Width, (int)description.Height, frame.Width, frame.Height);
+            _gpuTexCoordMax = GetTexCoordMax((int)description.Width, (int)description.Height, frame.Width, frame.Height);
+            _gpuChromaTexCoordMax = GetChromaTexCoordMax((int)description.Width, (int)description.Height, frame.Width, frame.Height);
             return OperationResult.Success();
         }
         finally
@@ -468,35 +474,62 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
     /// <summary>
     /// How the picture is read out of its texture. A hardware decoder decodes into a texture it aligned for its own use, so
-    /// a 1080-high picture can live in 1088 or 1152 rows: the rows below the picture were never written, and sampling them
-    /// puts a band of whatever they happen to contain — nothing, which converts to green — along the bottom of the picture.
-    /// The scale keeps the picture inside its own rows, and the half texel keeps the last of them off the edge between the
-    /// picture and what follows it, which bilinear filtering would otherwise blend in.
+    /// a 1080-high picture can live in 1088 or 1152 rows: the rows below the picture were never written, and reading them
+    /// would put a band of whatever they happen to contain — nothing, which converts to green — along the bottom.
+    /// <para>
+    /// The span is exact for the rows it covers: output pixel <c>i</c> of a picture <c>h</c> high reads
+    /// <c>(i + 0.5) / texture</c>, the centre of texel <c>i</c>, so nothing is resampled, and any inset at the vertex stage
+    /// would move every row to buy one. It does reach past the picture's own samples when the picture is drawn larger than
+    /// itself, which is what <see cref="GetTexCoordMax"/> stops at the sample.
+    /// </para>
     /// </summary>
-    internal static FrameTexCoords GetTexCoords(int textureWidth, int textureHeight, int frameWidth, int frameHeight)
+    internal static (float X, float Y) GetTexCoordScale(int textureWidth, int textureHeight, int frameWidth, int frameHeight)
     {
         if (textureWidth <= 0 || textureHeight <= 0)
         {
-            return FrameTexCoords.Full;
+            return (1.0f, 1.0f);
         }
 
-        int width = Math.Clamp(frameWidth, 1, textureWidth);
-        int height = Math.Clamp(frameHeight, 1, textureHeight);
-        return new FrameTexCoords(
-            (width - 1) / (float)textureWidth,
-            (height - 1) / (float)textureHeight,
-            0.5f / textureWidth,
-            0.5f / textureHeight);
+        return (
+            Math.Min(1.0f, frameWidth / (float)textureWidth),
+            Math.Min(1.0f, frameHeight / (float)textureHeight));
     }
 
-    /// <summary>Where the picture lies in its texture: the span it covers, and the half texel that centres it.</summary>
-    internal readonly record struct FrameTexCoords(float ScaleX, float ScaleY, float BiasX, float BiasY)
+    /// <summary>
+    /// The coordinate at which the picture's own samples end in its luma plane. A picture drawn larger than itself maps
+    /// its rows onto more rows of the surface than it has samples, so the line at its bottom edge falls past that
+    /// sample — every line above it lands inside — and there it blends in the rows the decoder padded the texture
+    /// with, which were never written. Stopping the coordinate keeps that line on the picture and leaves the rest of it
+    /// untouched: nothing that was already inside is changed.
+    /// </summary>
+    internal static (float X, float Y) GetTexCoordMax(int textureWidth, int textureHeight, int frameWidth, int frameHeight)
     {
-        internal static FrameTexCoords Full => new(1.0f, 1.0f, 0.0f, 0.0f);
+        if (textureWidth <= 0 || textureHeight <= 0 || frameWidth <= 0 || frameHeight <= 0)
+        {
+            return (1.0f, 1.0f);
+        }
 
-        internal (float X, float Y) Scale => (ScaleX, ScaleY);
+        return (
+            frameWidth >= textureWidth ? 1.0f : (frameWidth - 0.5f) / textureWidth,
+            frameHeight >= textureHeight ? 1.0f : (frameHeight - 0.5f) / textureHeight);
+    }
 
-        internal (float X, float Y) Bias => (BiasX, BiasY);
+    /// <summary>
+    /// The same, for the chroma plane, which ends one texel earlier: it has half the rows and half the columns, so the
+    /// coordinate of the picture's last luma sample is half a chroma sample past its last chroma sample. A picture drawn
+    /// at its own size is enough for the bottom line of the surface to fall between those two, and the padding it blends
+    /// in is zero — which is not a darker black but a saturated green, because chroma zero is the far end of both axes.
+    /// </summary>
+    internal static (float X, float Y) GetChromaTexCoordMax(int textureWidth, int textureHeight, int frameWidth, int frameHeight)
+    {
+        if (textureWidth <= 0 || textureHeight <= 0 || frameWidth <= 0 || frameHeight <= 0)
+        {
+            return (1.0f, 1.0f);
+        }
+
+        return (
+            frameWidth >= textureWidth ? 1.0f : (frameWidth - 1) / (float)textureWidth,
+            frameHeight >= textureHeight ? 1.0f : (frameHeight - 1) / (float)textureHeight);
     }
 
     #endregion
@@ -635,7 +668,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     /// from <see cref="Render"/> because the planes outlive the frame: they are what makes it possible to
     /// show the same picture again after the surface changed.
     /// </summary>
-    private OperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, FrameTexCoords texCoords, VideoTransform transform)
+    private OperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, (float X, float Y) texCoords, (float X, float Y) texCoordMax, (float X, float Y) chromaTexCoordMax, VideoTransform transform)
     {
         ID3D11DeviceContext context = _device.Context;
         context.OMSetRenderTargets(1, [_outputView], null);
@@ -653,10 +686,11 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         D3D11Interop.SetShaders(context, _shaders.VertexShader, pixelShader);
 
         // Where the picture lies inside the texture it is drawn from: all of it for an uploaded frame, less
-        // for one a hardware decoder padded. Where it lies on the surface is the placement beside it.
+        // for one a hardware decoder padded. Where it lies on the surface is the placement beside it. Beside the
+        // span is the coordinate past which the picture has no samples of its own.
         Matrix3x2 placement = transform.GetPlacement(_frameWidth, _frameHeight, _outputWidth, _outputHeight);
-        D3D11Interop.SetFrameTransform(context, _frameTransform, texCoords.Scale, texCoords.Bias, placement);
-        D3D11Interop.SetVertexConstantBuffer(context, 0, _frameTransform);
+        D3D11Interop.SetFrameTransform(context, _frameTransform, texCoords, texCoordMax, chromaTexCoordMax, placement);
+        D3D11Interop.SetFrameConstantBuffer(context, 0, _frameTransform);
 
         D3D11Interop.SetTextures(context, textureSlot, views, _shaders.GetSampler(transform.Scaling));
 
@@ -668,6 +702,8 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         _lastViews = views;
         _lastSlot = textureSlot;
         _lastTexCoords = texCoords;
+        _lastTexCoordMax = texCoordMax;
+        _lastChromaTexCoordMax = chromaTexCoordMax;
 
         return _surface is null ? OperationResult.Success() : _surface.Present();
     }

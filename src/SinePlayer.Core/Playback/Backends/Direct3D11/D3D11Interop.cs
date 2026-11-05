@@ -64,13 +64,13 @@ internal static class D3D11Interop
 
     /// <summary>
     /// A constant buffer holding one transform. Small and updated per frame, which is what a default-usage
-    /// buffer is for — and two vectors for the shader's own use plus the two rows that place the picture.
+    /// buffer is for — four vectors for the shader's own use plus the two rows that place the picture.
     /// </summary>
     internal static ID3D11Buffer CreateConstantBuffer(ID3D11Device device)
     {
         D3D11_BUFFER_DESC description = new()
         {
-            ByteWidth = 48,
+            ByteWidth = 64,
             Usage = D3D11_USAGE.D3D11_USAGE_DEFAULT,
             BindFlags = D3D11_BIND_FLAG.D3D11_BIND_CONSTANT_BUFFER,
         };
@@ -80,33 +80,42 @@ internal static class D3D11Interop
     }
 
     /// <summary>
-    /// Writes what the vertex shader needs to put a frame where it belongs: the texture coordinates the picture occupies
-    /// inside its texture — one where the two are the same size, less than one where a hardware decoder padded the texture
-    /// — the half texel that moves the picture's edges onto its first and last texel centres, and the two rows that place
-    /// the unit square on the surface.
+    /// Writes what the shaders need to put a frame where it belongs: the texture coordinates the picture occupies
+    /// inside its texture — one where the two are the same size, less than one where a hardware decoder padded the
+    /// texture — the coordinate at which its own samples end in each plane, and the two rows that place the unit
+    /// square on the surface.
     /// </summary>
-    internal static unsafe void SetFrameTransform(ID3D11DeviceContext context, ID3D11Buffer buffer, (float X, float Y) scale, (float X, float Y) bias, Matrix3x2 placement)
+    internal static unsafe void SetFrameTransform(ID3D11DeviceContext context, ID3D11Buffer buffer, (float X, float Y) scale, (float X, float Y) limit, (float X, float Y) chromaLimit, Matrix3x2 placement)
     {
-        float* values = stackalloc float[12];
+        float* values = stackalloc float[16];
         values[0] = scale.X;
         values[1] = scale.Y;
-        values[2] = bias.X;
-        values[3] = bias.Y;
-        values[4] = placement.M11;
-        values[5] = placement.M21;
-        values[6] = placement.M31;
+        values[2] = limit.X;
+        values[3] = limit.Y;
+        values[4] = chromaLimit.X;
+        values[5] = chromaLimit.Y;
+        values[6] = 0.0f;
         values[7] = 0.0f;
-        values[8] = placement.M12;
-        values[9] = placement.M22;
-        values[10] = placement.M32;
+        values[8] = placement.M11;
+        values[9] = placement.M21;
+        values[10] = placement.M31;
         values[11] = 0.0f;
+        values[12] = placement.M12;
+        values[13] = placement.M22;
+        values[14] = placement.M32;
+        values[15] = 0.0f;
 
         Graphics_Direct3D11_ID3D11DeviceContext_Extensions.UpdateSubresource(context, buffer, 0, null, values, 0, 0);
     }
 
-    internal static void SetVertexConstantBuffer(ID3D11DeviceContext context, uint slot, ID3D11Buffer buffer)
+    /// <summary>
+    /// Binds the frame's constants to both stages that read them: the vertex shader places the unit square with the
+    /// two rows and spans it with the scale, the pixel shader stops its samples with the limit.
+    /// </summary>
+    internal static void SetFrameConstantBuffer(ID3D11DeviceContext context, uint slot, ID3D11Buffer buffer)
     {
         context.VSSetConstantBuffers(slot, 1, [buffer]);
+        context.PSSetConstantBuffers(slot, 1, [buffer]);
     }
 
     /// <summary>

@@ -29,8 +29,9 @@ public sealed partial class PlaybackPipeline : IDisposable
     private const int FrameQueueCapacity = 8;
     private const int DecoderBufferedFrames = FrameQueueCapacity + 4;
 
-    private const int ReadAheadMilliseconds = 8000;
-    private const int ReadAheadWakeMilliseconds = ReadAheadMilliseconds / 2;
+    private const int ReadAheadMinMilliseconds = 8000;
+    private const int ReadAheadMaxMilliseconds = 10000;
+    private const int ReadAheadWakeMilliseconds = ReadAheadMinMilliseconds / 2;
     private const int FallbackFrameMilliseconds = 40;
 
     private const int VideoStarvationMilliseconds = 200;
@@ -41,7 +42,8 @@ public sealed partial class PlaybackPipeline : IDisposable
     private const int ClockSyncToleranceMilliseconds = 10;
     private const int AudioDeviceLeewayMilliseconds = 3000;
 
-    private static readonly TimeSpan ReadAhead = TimeSpan.FromMilliseconds(ReadAheadMilliseconds);
+    private static readonly TimeSpan ReadAheadMin = TimeSpan.FromMilliseconds(ReadAheadMinMilliseconds);
+    private static readonly TimeSpan ReadAheadMax = TimeSpan.FromMilliseconds(ReadAheadMaxMilliseconds);
     private static readonly TimeSpan ReadAheadWake = TimeSpan.FromMilliseconds(ReadAheadWakeMilliseconds);
 
     #endregion
@@ -106,6 +108,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private long _readerTailEpoch = -1;
     private long _readerTailVideoTicks = -1;
     private long _readerTailAudioTicks = -1;
+    private long _readerTailSubtitleTicks = -1;
 
     private long _presentedFrameCount;
     private long _droppedFrameCount;
@@ -201,6 +204,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     public long PresentedFrameCount => Interlocked.Read(ref _presentedFrameCount);
 
     public long DroppedFrameCount => Interlocked.Read(ref _droppedFrameCount);
+
     public string? StarvedFor => _videoStarved ? "video" : _audioStarved ? "audio" : null;
 
     internal TimeSpan LastPresentedTimestamp
@@ -592,6 +596,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         Volatile.Write(ref _readerTailEpoch, -1);
         Interlocked.Exchange(ref _readerTailVideoTicks, -1);
         Interlocked.Exchange(ref _readerTailAudioTicks, -1);
+        Interlocked.Exchange(ref _readerTailSubtitleTicks, -1);
 
         Interlocked.Exchange(ref _presentedFrameCount, 0);
         Interlocked.Exchange(ref _droppedFrameCount, 0);
@@ -1270,7 +1275,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private void TryWakeReader()
     {
         MediaSourceHolder? sourceHolder = _source.Latest?.Component;
-        if (sourceHolder is not null && NeedsBuffering(sourceHolder))
+        if (sourceHolder is not null && !IsBuffered(sourceHolder, ReadAheadWake))
         {
             _readerNode.Wake();
         }
@@ -1356,6 +1361,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 Volatile.Write(ref _readerTailEpoch, epoch);
                 Interlocked.Exchange(ref _readerTailVideoTicks, -1);
                 Interlocked.Exchange(ref _readerTailAudioTicks, -1);
+                Interlocked.Exchange(ref _readerTailSubtitleTicks, -1);
 
                 OperationResult sought = SeekSources(sourceHolder, epochGate.SeekPosition);
                 if (sought.IsSuccessful)
@@ -1379,7 +1385,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             // Buffering
             if (!buffering)
             {
-                if (!NeedsBuffering(sourceHolder))
+                if (IsBuffered(sourceHolder, ReadAheadWake))
                 {
                     await _readerNode.WaitAsync(stamp);
                     continue;
@@ -1387,7 +1393,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
                 buffering = true;
             }
-            else if (IsBuffered(sourceHolder))
+            else if (IsBuffered(sourceHolder, ReadAheadMin))
             {
                 buffering = false;
                 continue;
@@ -1486,6 +1492,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
             else if (subtitleStreamInfo is not null && chosenSource == sourceHolder.SubtitleSource && packet.StreamIndex == subtitleStreamInfo.Index)
             {
+                AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailSubtitleTicks);
                 TimeSpan span = SpanOf(packet, lastSubtitlePacketSpan, 0);
                 lastSubtitlePacketSpan = span;
                 _subtitlePacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
@@ -1562,44 +1569,53 @@ public sealed partial class PlaybackPipeline : IDisposable
         return video.Index;
     }
 
-    private bool IsBuffered(MediaSourceHolder holder)
+    private bool IsBuffered(MediaSourceHolder holder, TimeSpan minimumReadAhead)
     {
-        if (holder.VideoStream is not null && _videoDecoder.HasComponent && _videoPacketQueue.Queued < ReadAhead)
+        TimeSpan ReadAhead(ref long ticks, TimeSpan position)
+        {
+            long tail = Interlocked.Read(ref ticks);
+            if (tail < 0)
+            {
+                return TimeSpan.MinValue;
+            }
+
+            long ahead = tail - position.Ticks;
+            return ahead > 0 ? TimeSpan.FromTicks(ahead) : TimeSpan.Zero;
+        }
+
+        TimeSpan position = _clock.Position;
+
+        if (holder.VideoStream is not null && _videoDecoder.HasComponent && ReadAhead(ref _readerTailVideoTicks, position) >= ReadAheadMax)
+        {
+            return true;
+        }
+
+        if (holder.AudioStream is not null && _audioDecoder.HasComponent && ReadAhead(ref _readerTailAudioTicks, position) >= ReadAheadMax)
+        {
+            return true;
+        }
+
+        if (holder.SubtitleStream is not null && _subtitleDecoder.HasComponent && ReadAhead(ref _readerTailSubtitleTicks, position) >= ReadAheadMax)
+        {
+            return true;
+        }
+
+        if (holder.VideoStream is not null && _videoDecoder.HasComponent && ReadAhead(ref _readerTailVideoTicks, position) < minimumReadAhead)
         {
             return false;
         }
 
-        if (holder.AudioStream is not null && _audioDecoder.HasComponent && _audioPacketQueue.Queued < ReadAhead)
+        if (holder.AudioStream is not null && _audioDecoder.HasComponent && ReadAhead(ref _readerTailAudioTicks, position) < minimumReadAhead)
         {
             return false;
         }
 
-        if (holder.SubtitleStream is not null && _subtitleDecoder.HasComponent && _subtitlePacketQueue.Queued < ReadAhead)
+        if (holder.SubtitleStream is not null && _subtitleDecoder.HasComponent && ReadAhead(ref _readerTailSubtitleTicks, position) < minimumReadAhead)
         {
             return false;
         }
 
         return true;
-    }
-
-    private bool NeedsBuffering(MediaSourceHolder holder)
-    {
-        if (holder.VideoStream is not null && _videoDecoder.HasComponent && _videoPacketQueue.Queued < ReadAheadWake)
-        {
-            return true;
-        }
-
-        if (holder.AudioStream is not null && _audioDecoder.HasComponent && _audioPacketQueue.Queued < ReadAheadWake)
-        {
-            return true;
-        }
-
-        if (holder.SubtitleStream is not null && _subtitleDecoder.HasComponent && _subtitlePacketQueue.Queued < ReadAheadWake)
-        {
-            return true;
-        }
-
-        return false;
     }
 
     private void AdvanceReaderTail(long epoch, TimeSpan timestamp, ref long oldTicks)

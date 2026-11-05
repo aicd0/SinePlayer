@@ -393,11 +393,11 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>
-    /// A picture fitted into the surface does not fill it, and the words belong to the picture: given a frame, both the
-    /// text and a bitmap cue are laid out inside it rather than in the bars around it.
+    /// This renderer has no picture-relative coordinates: it lays lines out itself against the surface, so the frame a
+    /// script would be placed in changes nothing about where the words go.
     /// </summary>
     [Test]
-    public void DrawsInsideThePictureItIsGiven()
+    public void LaysTheWordsOutAgainstTheSurfaceWhateverThePictureIs()
     {
         using Win2DSubtitleRenderer renderer = new();
 
@@ -414,58 +414,19 @@ public class Win2DSubtitleRendererTests
 
         const int width = 480;
         const int height = 240;
-        SubtitlePresentation presentation = SubtitlePresentation.Identity with { Frame = new SubtitleFrame(0.25, 0.25, 0.5, 0.5) };
-
-        byte[] pixels = RenderInk(device, renderer, width, height, presentation);
-        (int left, int top, int right, int bottom) = InkBounds(pixels, width, height);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(right, Is.GreaterThanOrEqualTo(left), "the cue is drawn for this to say anything");
-            Assert.That(left, Is.GreaterThanOrEqualTo(120), "no ink left of the picture");
-            Assert.That(top, Is.GreaterThanOrEqualTo(60), "none above it");
-            Assert.That(right, Is.LessThanOrEqualTo(360), "none right of it");
-            Assert.That(bottom, Is.LessThanOrEqualTo(180), "and none below it");
-        }
-    }
-
-    /// <summary>
-    /// The strips are measured from the surface's edges, because that is where the host's chrome is: a bar along the bottom
-    /// of the surface does not reach a picture that ends above it, so the words keep the place the picture's own bottom
-    /// margin gives them instead of being dragged up by the bar's height.
-    /// </summary>
-    [Test]
-    public void KeepsTheWordsInThePictureWhenTheStripIsBelowIt()
-    {
-        using Win2DSubtitleRenderer renderer = new();
-
-        CanvasDevice device;
-        try
-        {
-            device = renderer.EnsureCanvasDevice();
-        }
-        catch (Exception exception)
-        {
-            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
-            return;
-        }
-
-        const int width = 480;
-        const int height = 240;
-        SubtitlePresentation presentation = SubtitlePresentation.Identity with
+        byte[] whole = RenderInk(device, renderer, width, height, SubtitlePresentation.Identity);
+        byte[] topHalf = RenderInk(device, renderer, width, height, SubtitlePresentation.Identity with
         {
             Frame = new SubtitleFrame(0.0, 0.0, 1.0, 0.5),
-            Insets = new SubtitleInsets(0.0, 0.0, 0.0, 100.0),
-        };
+        });
 
-        byte[] pixels = RenderInk(device, renderer, width, height, presentation);
-        (int left, int top, int right, int bottom) = InkBounds(pixels, width, height);
+        (int left, int top, int right, int bottom) = InkBounds(whole, width, height);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(right, Is.GreaterThanOrEqualTo(left), "the cue is drawn for this to say anything");
-            Assert.That(bottom, Is.LessThanOrEqualTo(120), "the words stay in the picture");
-            Assert.That(bottom, Is.GreaterThan(60), "and are not pulled up by a bar the picture does not reach");
+            Assert.That(bottom, Is.GreaterThan(height / 2), "the words sit at the surface's bottom, not the picture's");
+            Assert.That(topHalf, Is.EqualTo(whole), "and the picture's place changes nothing for this renderer");
         }
     }
 
