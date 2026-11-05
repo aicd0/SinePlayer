@@ -51,6 +51,10 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
     public StreamBinding<VideoStreamInfo> Binding { get; set; }
 
+    public ChainTail Tail { get; } = new();
+
+    public bool IsActive => Binding.Stream is not null && Decoder.HasComponent;
+
     public long PresentedFrameCount;
     public long DroppedFrameCount;
     public long DecodedFrameCount;

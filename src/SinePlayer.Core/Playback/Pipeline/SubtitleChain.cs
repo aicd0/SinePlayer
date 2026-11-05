@@ -39,6 +39,10 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
 
     public StreamBinding<SubtitleStreamInfo> Binding { get; set; }
 
+    public ChainTail Tail { get; } = new();
+
+    public bool IsActive => Binding.Stream is not null && Decoder.HasComponent;
+
     public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
     {
         if (!Binding.Accepts(source, packet.StreamIndex))
