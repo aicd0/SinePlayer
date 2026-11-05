@@ -1,6 +1,6 @@
 # PlaybackPipeline chain decomposition — v1 plan
 
-Status: in progress. Phases A–C done (steps A1–A6, B1–B4, C1–C6); next is Phase D.
+Status: in progress. Phases A–D done (A1–A6, B1–B4, C1–C6, D1–D6); next is Phase E.
 
 `PlaybackPipeline` was 3212 lines and held one video chain, one audio chain and one subtitle chain inline:
 their queues, their threads, their component slots, their statistics and their component reconciliation.
@@ -159,14 +159,22 @@ remove.
 
 ## Phase D — the reader becomes chain-driven
 
-| # | Step | Size | Review focus |
+Done. `IChainFeed` is what the reader knows of a chain — `IsActive`, `Tail`, `TryAccept`, `SignalEnd` — and the
+reader itself is now `MediaReader`, a class with its own node and its own read-ahead policy. The routing loop
+names no kind at all.
+
+| # | Step | Lands as | State |
 |---|---|---|---|
-| D1 | `IChainFeed` (`TryAccept`, `IsBuffered`, `IsSpent`, `SeekLanding`, `ReportTail`) implemented by `VideoChain`; the video branch of `ReaderCore` uses it | ~80 | the other two branches still work as before |
-| D2 | The audio branch uses its chain's feed | ~60 | |
-| D3 | The subtitle branch uses its chain's feed | ~60 | the reader no longer names a kind |
-| D4 | `IsBuffered` becomes a query over the chains: stop reading when any chain is at `ReadAheadMax`, keep reading until every chain is at `ReadAheadMin` | ~120 | the read-ahead policy is the same rule it was, applied to a list |
-| D5 | `AdvanceReaderTail` → `feed.ReportTail`; `IsStreamSpent` → `feed.IsSpent`; `ChooseSeekLanding` → `feed.SeekLanding` | ~80 | a seek still lands on the video stream when there is one |
-| D6 | `ReaderCore` and `SourceTail` → `Reader/MediaReader.cs` | ~350 | a pure move |
+| D1 | `IChainFeed`, `StreamBinding`, and the video branch of the reader | `VideoChain.TryAccept` + `Binding` | done |
+| D2 | The audio branch | `AudioChain.TryAccept` + `Binding` | done |
+| D3 | The subtitle branch | `SubtitleChain.TryAccept` + `Binding` | done |
+| D4 | Tails and read-ahead move to the chains | `ChainTail`, `IChainFeed.Tail`, `IsBuffered` over feeds | done |
+| D5 | Tails, spent and seek landing | `ChainTail.IsSpent`; `FurthestTailTicks` and `ChooseSeekLanding` stay in the pipeline | done |
+| D6 | The reader becomes a class | `MediaReader`, partial deleted | done |
+
+D4 and D5 were done as one step: `IsBuffered` and `IsStreamSpent` both read the tails, so a tail could not move
+without the other. `IsStreamSpent` could not become a per-chain method either — it asks whether *some other*
+stream still has data past the position, which is why the pipeline passes the furthest tail in.
 
 ## Phase E — reconciliation per chain
 
