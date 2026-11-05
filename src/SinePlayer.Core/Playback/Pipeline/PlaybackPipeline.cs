@@ -1,7 +1,6 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System.Collections.Concurrent;
 using System.Diagnostics;
 
 using SinePlayer.Core.Common.ErrorHandling;
@@ -48,21 +47,16 @@ public sealed partial class PlaybackPipeline : IDisposable
     private readonly PipelineEvents _events;
     private readonly PipelineTimeline _timeline;
     private readonly SubtitleChain _subtitle;
-    private readonly SeqLock<VideoTransform> _videoTransform = new(VideoTransform.Identity);
+    private readonly VideoChain _video;
 
     private volatile MediaSourceHolder _selection = new([], null, null, null);
 
-    private IVideoRenderTarget? _videoTarget;
     private long _subtitleSurfaceVersion;
     private readonly ComponentSlot<MediaSourceHolder> _source = new();
-    private readonly ComponentSlot<IVideoDecoder> _videoDecoder = new();
-    private readonly ComponentSlot<IVideoRenderer> _videoRenderer = new();
     private readonly ComponentSlot<IAudioDecoder> _audioDecoder = new();
     private readonly ComponentSlot<IAudioRenderer> _audioRenderer = new();
 
-    private readonly PacketQueue _videoPacketQueue = new();
     private readonly PacketQueue _audioPacketQueue = new();
-    private readonly ConcurrentQueue<FrameEntry> _frameQueue = new();
     private readonly AudioQueue _audioQueue = new();
 
     private Thread? _readerThread;
@@ -73,9 +67,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private readonly IPipelineWakeTarget[] _wakeTargets;
     private readonly PipelineNodeAsync _readerNode = new();
-    private readonly PipelineNode _videoDecodeNode = new();
     private readonly PipelineNodeAsync _audioDecodeNode = new();
-    private readonly PipelineNode _videoRenderNode = new();
     private readonly PipelineNode _audioRenderNode = new();
 
     private bool _disposed;
@@ -90,13 +82,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     private long _readerTailAudioTicks = -1;
     private long _readerTailSubtitleTicks = -1;
 
-    private long _presentedFrameCount;
-    private long _droppedFrameCount;
-    private long _decodedFrameCount;
-    private long _decodeTicks;
-    private long _renderTicks;
-    private long _pictureTicks = -1;
-
     #endregion
 
     #region Construction
@@ -104,12 +89,13 @@ public sealed partial class PlaybackPipeline : IDisposable
     public PlaybackPipeline()
     {
         _subtitle = new SubtitleChain();
+        _video = new VideoChain();
         _wakeTargets = [
             _readerNode,
-            _videoDecodeNode,
+            _video.DecodeNode,
             _audioDecodeNode,
             _subtitle.DecodeNode,
-            _videoRenderNode,
+            _video.RenderNode,
             _audioRenderNode,
             _subtitle.RenderNode,
         ];
@@ -143,16 +129,16 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public VideoTransform VideoTransform
     {
-        get => _videoTransform.Read();
+        get => _video.Transform.Read();
         set
         {
-            if (_videoTransform.Read() == value)
+            if (_video.Transform.Read() == value)
             {
                 return;
             }
 
-            _videoTransform.Write(_ => value);
-            _videoRenderNode.Wake();
+            _video.Transform.Write(_ => value);
+            _video.RenderNode.Wake();
             _subtitle.RenderNode.Wake();
         }
     }
@@ -184,11 +170,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public SubtitleStreamInfo? SelectedSubtitleStream => _selection.SubtitleStream;
 
-    public string? VideoDecoderName => _videoDecoder.CurrentComponent?.Name;
+    public string? VideoDecoderName => _video.Decoder.CurrentComponent?.Name;
 
     public string? AudioDecoderName => _audioDecoder.CurrentComponent?.Name;
 
-    public string? VideoRendererName => _videoRenderer.CurrentComponent?.Name;
+    public string? VideoRendererName => _video.Renderer.CurrentComponent?.Name;
 
     public string? AudioRendererName => _audioRenderer.CurrentComponent?.Name;
 
@@ -196,15 +182,15 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public string? SubtitleRendererName => _subtitle.Renderer.CurrentComponent?.Name;
 
-    public bool IsVideoHardwareAccelerated => _videoDecoder.CurrentComponent?.IsHardwareAccelerated ?? false;
+    public bool IsVideoHardwareAccelerated => _video.Decoder.CurrentComponent?.IsHardwareAccelerated ?? false;
 
     public bool IsAudioHardwareAccelerated => _audioDecoder.CurrentComponent?.IsHardwareAccelerated ?? false;
 
     public TimeSpan Position => _timeline.Position;
 
-    public long PresentedFrameCount => Interlocked.Read(ref _presentedFrameCount);
+    public long PresentedFrameCount => Interlocked.Read(ref _video.PresentedFrameCount);
 
-    public long DroppedFrameCount => Interlocked.Read(ref _droppedFrameCount);
+    public long DroppedFrameCount => Interlocked.Read(ref _video.DroppedFrameCount);
 
     public string? StarvedFor => _timeline.VideoStarved ? "video" : _timeline.AudioStarved ? "audio" : null;
 
@@ -212,7 +198,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         get
         {
-            long ticks = Interlocked.Read(ref _pictureTicks);
+            long ticks = Interlocked.Read(ref _video.PictureTicks);
             return ticks < 0 ? TimeSpan.Zero : TimeSpan.FromTicks(ticks);
         }
     }
@@ -221,8 +207,8 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         get
         {
-            long frames = Interlocked.Read(ref _decodedFrameCount);
-            return frames <= 0 ? 0 : Interlocked.Read(ref _decodeTicks) * 1000.0 / Stopwatch.Frequency / frames;
+            long frames = Interlocked.Read(ref _video.DecodedFrameCount);
+            return frames <= 0 ? 0 : Interlocked.Read(ref _video.DecodeTicks) * 1000.0 / Stopwatch.Frequency / frames;
         }
     }
 
@@ -230,8 +216,8 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         get
         {
-            long frames = Interlocked.Read(ref _presentedFrameCount);
-            return frames <= 0 ? 0 : Interlocked.Read(ref _renderTicks) * 1000.0 / Stopwatch.Frequency / frames;
+            long frames = Interlocked.Read(ref _video.PresentedFrameCount);
+            return frames <= 0 ? 0 : Interlocked.Read(ref _video.RenderTicks) * 1000.0 / Stopwatch.Frequency / frames;
         }
     }
 
@@ -241,7 +227,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         get
         {
-            long ticks = Interlocked.Read(ref _pictureTicks);
+            long ticks = Interlocked.Read(ref _video.PictureTicks);
             if (ticks < 0 || PresentedFrameCount == 0)
             {
                 return TimeSpan.Zero;
@@ -317,8 +303,8 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         StopCore();
 
-        _videoTarget = videoTarget;
-        _videoTarget?.SurfaceSizeChanged += VideoTarget_SurfaceSizeChanged;
+        _video.Target = videoTarget;
+        _video.Target?.SurfaceSizeChanged += VideoTarget_SurfaceSizeChanged;
         _subtitle.Target = subtitleTarget;
         _subtitle.Target?.SurfaceSizeChanged += SubtitleTarget_SurfaceSizeChanged;
 
@@ -540,11 +526,11 @@ public sealed partial class PlaybackPipeline : IDisposable
         _subtitleRenderThread = null;
         _threadsStarted = false;
 
-        _videoPacketQueue.Clear();
+        _video.PacketQueue.Clear();
         _audioPacketQueue.Clear();
         _subtitle.PacketQueue.Clear();
 
-        while (_frameQueue.TryDequeue(out FrameEntry frame))
+        while (_video.FrameQueue.TryDequeue(out FrameEntry frame))
         {
             frame.Frame?.Dispose();
         }
@@ -559,16 +545,16 @@ public sealed partial class PlaybackPipeline : IDisposable
         _selection = new MediaSourceHolder([], null, null, null);
 
         _source.Reset();
-        _videoDecoder.Reset();
+        _video.Decoder.Reset();
         _audioDecoder.Reset();
-        _videoRenderer.Reset();
+        _video.Renderer.Reset();
         _audioRenderer.CurrentComponent?.Flush();
         _audioRenderer.Reset();
         _subtitle.Decoder.Reset();
         _subtitle.Renderer.Reset();
 
-        _videoTarget?.SurfaceSizeChanged -= VideoTarget_SurfaceSizeChanged;
-        _videoTarget = null;
+        _video.Target?.SurfaceSizeChanged -= VideoTarget_SurfaceSizeChanged;
+        _video.Target = null;
         _subtitle.Target?.SurfaceSizeChanged -= SubtitleTarget_SurfaceSizeChanged;
         _subtitle.Target = null;
 
@@ -583,12 +569,12 @@ public sealed partial class PlaybackPipeline : IDisposable
         Interlocked.Exchange(ref _readerTailAudioTicks, -1);
         Interlocked.Exchange(ref _readerTailSubtitleTicks, -1);
 
-        Interlocked.Exchange(ref _presentedFrameCount, 0);
-        Interlocked.Exchange(ref _droppedFrameCount, 0);
-        Interlocked.Exchange(ref _decodedFrameCount, 0);
-        Interlocked.Exchange(ref _decodeTicks, 0);
-        Interlocked.Exchange(ref _renderTicks, 0);
-        Interlocked.Exchange(ref _pictureTicks, -1);
+        Interlocked.Exchange(ref _video.PresentedFrameCount, 0);
+        Interlocked.Exchange(ref _video.DroppedFrameCount, 0);
+        Interlocked.Exchange(ref _video.DecodedFrameCount, 0);
+        Interlocked.Exchange(ref _video.DecodeTicks, 0);
+        Interlocked.Exchange(ref _video.RenderTicks, 0);
+        Interlocked.Exchange(ref _video.PictureTicks, -1);
 
         _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
         _events.SetState(MediaEngineState.None);
@@ -756,7 +742,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void VideoTarget_SurfaceSizeChanged()
     {
-        _videoRenderNode.Wake();
+        _video.RenderNode.Wake();
         _subtitle.RenderNode.Wake();
     }
 
