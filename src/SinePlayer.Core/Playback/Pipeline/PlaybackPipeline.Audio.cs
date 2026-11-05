@@ -329,7 +329,7 @@ public sealed partial class PlaybackPipeline
             }
 
             // Pause the clock on pause or starvation
-            bool playing = CheckState(out MediaEngineState state, MediaEngineState.Playing);
+            bool playing = _events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
             lock (_timeline.ClockLock)
             {
                 if (epochChanged)
