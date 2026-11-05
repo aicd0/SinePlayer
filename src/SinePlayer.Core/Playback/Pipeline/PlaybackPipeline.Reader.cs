@@ -20,6 +20,14 @@ public sealed partial class PlaybackPipeline
         }
     }
 
+    private void TryWakeSubtitleDecode()
+    {
+        if (!_subtitle.PacketQueue.IsEmpty)
+        {
+            _subtitle.DecodeNode.Wake();
+        }
+    }
+
     private async Task ReaderCore()
     {
         static TimeSpan SpanOf(MediaPacket? packet, TimeSpan previous, double frameRate)
@@ -60,7 +68,7 @@ public sealed partial class PlaybackPipeline
                 break;
             }
 
-            if (!CheckState(out _, MediaEngineState.Playing, MediaEngineState.Paused))
+            if (!_events.CheckState(out _, MediaEngineState.Playing, MediaEngineState.Paused))
             {
                 await _readerNode.WaitAsync(stamp);
                 continue;
