@@ -11,7 +11,6 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
 using SinePlayer.Core.Playback.Selection;
-using SinePlayer.Core.Playback.Timing;
 using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
@@ -23,7 +22,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     private const int ReadAheadMinMilliseconds = 8000;
     private const int ReadAheadMaxMilliseconds = 10000;
     private const int ReadAheadWakeMilliseconds = ReadAheadMinMilliseconds / 2;
-    private const int FallbackFrameMilliseconds = 40;
 
     private static readonly TimeSpan ReadAheadMin = TimeSpan.FromMilliseconds(ReadAheadMinMilliseconds);
     private static readonly TimeSpan ReadAheadMax = TimeSpan.FromMilliseconds(ReadAheadMaxMilliseconds);
@@ -543,9 +541,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         _video.Target?.SurfaceSizeChanged -= VideoTarget_SurfaceSizeChanged;
         _video.Target = null;
-        _video.Binding = default;
         _subtitle.Target?.SurfaceSizeChanged -= SubtitleTarget_SurfaceSizeChanged;
         _subtitle.Target = null;
+        _video.Binding = default;
+        _audio.Binding = default;
+        _subtitle.Binding = default;
 
         _timeline.Stop();
 

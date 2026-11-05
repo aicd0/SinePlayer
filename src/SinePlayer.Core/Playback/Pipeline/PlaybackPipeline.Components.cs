@@ -258,6 +258,7 @@ public sealed partial class PlaybackPipeline
                 {
                     MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(sourceHolder, MediaStreamKind.Audio);
                     _source.Publish(new(newSourceHolder, "source"), versions);
+                    _audio.Binding = new(newSourceHolder.AudioSource, newSourceHolder.AudioStream);
                 }
 
                 if (changed.HasFlag(ChainChanges.AudioDecoder))
@@ -372,6 +373,7 @@ public sealed partial class PlaybackPipeline
                 {
                     MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(sourceHolder, MediaStreamKind.Subtitle);
                     _source.Publish(new(newSourceHolder, "source"), versions);
+                    _subtitle.Binding = new(newSourceHolder.SubtitleSource, newSourceHolder.SubtitleStream);
                 }
 
                 if (changed.HasFlag(ChainChanges.SubtitleDecoder))
