@@ -76,7 +76,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         _events = new PipelineEvents(WakeAll);
         _timeline = new PipelineTimeline(NotifyClockMoved);
         _video = new VideoChain(_timeline, _events);
-        _audio = new AudioChain();
+        _audio = new AudioChain(_timeline, _events);
         _subtitle = new SubtitleChain(_timeline, _events);
         _wakeTargets = [
             _readerNode,
@@ -591,7 +591,7 @@ public sealed partial class PlaybackPipeline : IDisposable
                 {
                     try
                     {
-                        await Task.WhenAll(ReaderCore(), AudioDecodeCore(), _subtitle.Decode(() => _stopRequested, TryWakeReader));
+                        await Task.WhenAll(ReaderCore(), _audio.Decode(() => _stopRequested, TryWakeReader), _subtitle.Decode(() => _stopRequested, TryWakeReader));
                     }
                     finally
                     {
