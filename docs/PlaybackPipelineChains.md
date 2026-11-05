@@ -1,8 +1,8 @@
 # PlaybackPipeline chain decomposition — v1 plan
 
-Status: planned, not started.
+Status: in progress. Phases A–C done (steps A1–A6, B1–B4, C1–C6); next is Phase D.
 
-`PlaybackPipeline` is 3212 lines and holds one video chain, one audio chain and one subtitle chain inline:
+`PlaybackPipeline` was 3212 lines and held one video chain, one audio chain and one subtitle chain inline:
 their queues, their threads, their component slots, their statistics and their component reconciliation.
 The goal of this plan is to make a chain a thing of its own, and to make the pipeline an orchestrator that
 happens to hold exactly one chain of each kind.
@@ -140,19 +140,22 @@ binding per kind.
 
 ## Phase C — loops move, one at a time
 
-| # | Step | Moves into | Size |
-|---|---|---|---|
-| C1 | `SubtitleDecodeCore`, `DecodeSubtitle` | `SubtitleChain` | ~140 |
-| C2 | `SubtitleRenderCore`, `ResolveSubtitleFrame`, `SameCues` | `SubtitleChain` | ~200 |
-| C3 | `VideoDecodeCore`, `DecodeVideo`, `DrainVideoDecoder`, `QueueFrames`, `HasRoomForVideoFrame` | `VideoChain` | ~220 |
-| C4 | `VideoRenderCore`, `RenderVideoFrame`, `IsVideoStarved`, the `DequeueAndDispose` closure | `VideoChain` | ~300 |
-| C5 | `AudioDecodeCore`, `DecodeAudio`, `DrainAudioDecoder` | `AudioChain` | ~190 |
-| C6 | `AudioRenderCore`, the `ReleaseInFlightAudio`/`AbandonFailedDevice` closures, `SyncClock` | `AudioChain` | ~370 |
+Done. Every loop now lives on its chain, and the pipeline's `.Video`, `.Audio` and `.Subtitle` partials are
+deleted; what is left is `PlaybackPipeline.cs`, `.Components` and `.Reader`.
 
-Order is deliberate: subtitles first (smallest, proves the seam for both a coroutine and a thread), audio
-last (the clock and the hand-off live there). C4 and C6 are the only steps where a move needs reshaping: both
-loops hold local functions that capture loop state, and those become chain methods holding the same state in
-fields. Everything else is a move plus an indirection.
+| # | Step | Moves into | Size | State |
+|---|---|---|---|---|
+| C1 | `SubtitleDecodeCore`, `DecodeSubtitle` | `SubtitleChain` | ~140 | done |
+| C2 | `SubtitleRenderCore`, `SameCues`, `SurfaceVersion`, `CheckState` → `PipelineEvents` | `SubtitleChain` | ~200 | done |
+| C3 | `VideoDecodeCore`, `DecodeVideo`, `DrainVideoDecoder`, `QueueFrames`, `HasRoomForVideoFrame`, `TryWakeVideoRender` | `VideoChain` | ~220 | done |
+| C4 | `VideoRenderCore`, `RenderVideoFrame`, `IsVideoStarved`, `DequeueAndDispose`, `Synchronizer`, `TryWakeVideoDecode` | `VideoChain` | ~300 | done |
+| C5 | `AudioDecodeCore`, `DecodeAudio`, `DrainAudioDecoder`, `TryWakeAudioRender` | `AudioChain` | ~190 | done |
+| C6 | `AudioRenderCore`, `ReleaseInFlightAudio`/`AbandonFailedDevice`, `TryWakeAudioDecode`, `TryWakeSubtitleDecode` | `AudioChain` | ~370 | done |
+
+Each chain now takes `(PipelineTimeline, PipelineEvents)` in its constructor and its loops take what is left
+from the pipeline as functions: `stopRequested` everywhere, plus `wakeReader` for the decode coroutines and
+`isStreamSpent`/`reportEnded` for the render loops. Those five delegates are the exact list of things D, F and G
+remove.
 
 ## Phase D — the reader becomes chain-driven
 

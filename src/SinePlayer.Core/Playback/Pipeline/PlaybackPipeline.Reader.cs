@@ -20,14 +20,6 @@ public sealed partial class PlaybackPipeline
         }
     }
 
-    private void TryWakeSubtitleDecode()
-    {
-        if (!_subtitle.PacketQueue.IsEmpty)
-        {
-            _subtitle.DecodeNode.Wake();
-        }
-    }
-
     private async Task ReaderCore()
     {
         static TimeSpan SpanOf(MediaPacket? packet, TimeSpan previous, double frameRate)
@@ -177,8 +169,8 @@ public sealed partial class PlaybackPipeline
                 _audio.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 _subtitle.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 _video.WakeDecode();
-                TryWakeAudioDecode();
-                TryWakeSubtitleDecode();
+                _audio.WakeDecode();
+                _subtitle.WakeDecode();
 
                 long endedEpoch = epoch;
                 _ = _events.Submit(() => NotifySourceEnded(endedEpoch));
@@ -235,7 +227,7 @@ public sealed partial class PlaybackPipeline
                 lastAudioPacketSpan = span;
                 _audio.PacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
                 handedOn = true;
-                TryWakeAudioDecode();
+                _audio.WakeDecode();
             }
             else if (subtitleStreamInfo is not null && chosenSource == sourceHolder.SubtitleSource && packet.StreamIndex == subtitleStreamInfo.Index)
             {
@@ -244,7 +236,7 @@ public sealed partial class PlaybackPipeline
                 lastSubtitlePacketSpan = span;
                 _subtitle.PacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
                 handedOn = true;
-                TryWakeSubtitleDecode();
+                _subtitle.WakeDecode();
             }
 
             if (!handedOn)

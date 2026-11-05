@@ -25,9 +25,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     private const int ReadAheadWakeMilliseconds = ReadAheadMinMilliseconds / 2;
     private const int FallbackFrameMilliseconds = 40;
 
-    private const int AudioIdleTimeoutMilliseconds = 5;
-    private const int AudioDeviceLeewayMilliseconds = 3000;
-
     private static readonly TimeSpan ReadAheadMin = TimeSpan.FromMilliseconds(ReadAheadMinMilliseconds);
     private static readonly TimeSpan ReadAheadMax = TimeSpan.FromMilliseconds(ReadAheadMaxMilliseconds);
     private static readonly TimeSpan ReadAheadWake = TimeSpan.FromMilliseconds(ReadAheadWakeMilliseconds);
@@ -655,7 +652,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return;
         }
 
-        _audioRenderThread = new Thread(AudioRenderCore)
+        _audioRenderThread = new Thread(() => _audio.Render(() => _stopRequested, IsAudioStreamSpent, NotifyAudioRenderEnded))
         {
             IsBackground = true,
             Name = "Pipeline - Audio render",
@@ -693,6 +690,11 @@ public sealed partial class PlaybackPipeline : IDisposable
     private bool IsVideoStreamSpent(long epoch, TimeSpan position)
     {
         return IsStreamSpent(epoch, position, ref _readerTailVideoTicks);
+    }
+
+    private bool IsAudioStreamSpent(long epoch, TimeSpan position)
+    {
+        return IsStreamSpent(epoch, position, ref _readerTailAudioTicks);
     }
 
     private void NotifyAudioRenderEnded(long epoch)
