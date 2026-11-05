@@ -543,7 +543,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         _video.Target?.SurfaceSizeChanged -= VideoTarget_SurfaceSizeChanged;
         _video.Target = null;
-        _video.Stream = null;
+        _video.Binding = default;
         _subtitle.Target?.SurfaceSizeChanged -= SubtitleTarget_SurfaceSizeChanged;
         _subtitle.Target = null;
 

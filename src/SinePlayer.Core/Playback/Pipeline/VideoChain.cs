@@ -17,14 +17,17 @@ using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents events) : IPictureFrameSource
+internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents events) : IPictureFrameSource, IChainFeed
 {
     private const int FrameQueueCapacity = 8;
     private const int VideoStarvationMilliseconds = 200;
     private const int VideoStarvationResumeMilliseconds = 100;
     private const int VideoIdleTimeoutMilliseconds = 50;
+    private const int FallbackFrameMilliseconds = 40;
 
     public const int DecoderBufferedFrames = FrameQueueCapacity + 4;
+
+    private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
     public ComponentSlot<IVideoDecoder> Decoder { get; } = new();
 
@@ -44,7 +47,9 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
     public IVideoRenderTarget? Target { get; set; }
 
-    public VideoStreamInfo? Stream { get; set; }
+    public VideoStreamInfo? Stream => Binding.Stream;
+
+    public StreamBinding<VideoStreamInfo> Binding { get; set; }
 
     public long PresentedFrameCount;
     public long DroppedFrameCount;
@@ -64,6 +69,40 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         {
             DecodeNode.Wake();
         }
+    }
+
+    public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
+    {
+        if (!Binding.Accepts(source, packet.StreamIndex))
+        {
+            return false;
+        }
+
+        TimeSpan span = SpanOf(packet, Binding.Stream?.FrameRate ?? 0);
+        _lastPacketSpan = span;
+        PacketQueue.Enqueue(new PacketEntry(packet, versions, epoch, span));
+        WakeDecode();
+        return true;
+    }
+
+    private TimeSpan SpanOf(MediaPacket packet, double frameRate)
+    {
+        if (packet.Duration > TimeSpan.Zero)
+        {
+            return packet.Duration;
+        }
+
+        if (_lastPacketSpan > TimeSpan.Zero)
+        {
+            return _lastPacketSpan;
+        }
+
+        if (!double.IsFinite(frameRate) || frameRate <= 0 || frameRate > 1000)
+        {
+            return TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
+        }
+
+        return TimeSpan.FromSeconds(1 / frameRate);
     }
 
     public void Decode(Func<bool> stopRequested, Action wakeReader)

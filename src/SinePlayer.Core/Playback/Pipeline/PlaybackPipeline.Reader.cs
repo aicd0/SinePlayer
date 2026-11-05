@@ -47,7 +47,6 @@ public sealed partial class PlaybackPipeline
         bool buffering = false;
         long workingEpoch = -1;
         long endingEpoch = -1;
-        TimeSpan lastVideoPacketSpan = TimeSpan.Zero;
         TimeSpan lastAudioPacketSpan = TimeSpan.Zero;
         TimeSpan lastSubtitlePacketSpan = TimeSpan.Zero;
         Dictionary<MediaSource, SourceTail> tails = [];
@@ -208,17 +207,12 @@ public sealed partial class PlaybackPipeline
             // Route packet
             bool handedOn = false;
             AudioStreamInfo? audioStreamInfo = sourceHolder.AudioStream;
-            VideoStreamInfo? videoStreamInfo = sourceHolder.VideoStream;
             SubtitleStreamInfo? subtitleStreamInfo = sourceHolder.SubtitleStream;
 
-            if (videoStreamInfo is not null && chosenSource == sourceHolder.VideoSource && packet.StreamIndex == videoStreamInfo.Index)
+            if (_video.TryAccept(chosenSource, packet, sourceVersions, epoch))
             {
                 AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailVideoTicks);
-                TimeSpan span = SpanOf(packet, lastVideoPacketSpan, videoStreamInfo.FrameRate);
-                lastVideoPacketSpan = span;
-                _video.PacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
                 handedOn = true;
-                _video.WakeDecode();
             }
             else if (audioStreamInfo is not null && chosenSource == sourceHolder.AudioSource && packet.StreamIndex == audioStreamInfo.Index)
             {
