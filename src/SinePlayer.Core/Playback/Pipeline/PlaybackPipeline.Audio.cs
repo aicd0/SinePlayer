@@ -8,7 +8,6 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
-using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
@@ -45,7 +44,7 @@ public sealed partial class PlaybackPipeline
             }
 
             // Bump epoch
-            long epoch = _epochGate.Read().Epoch;
+            long epoch = _timeline.Epoch;
             if (workingEpoch != epoch)
             {
                 workingEpoch = epoch;
@@ -310,7 +309,7 @@ public sealed partial class PlaybackPipeline
             }
 
             // Bump epoch
-            EpochGate epochGate = _epochGate.Read();
+            EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             bool epochChanged = workingEpoch != epoch;
 
@@ -331,19 +330,19 @@ public sealed partial class PlaybackPipeline
 
             // Pause the clock on pause or starvation
             bool playing = CheckState(out MediaEngineState state, MediaEngineState.Playing);
-            lock (_clockLock)
+            lock (_timeline.ClockLock)
             {
                 if (epochChanged)
                 {
-                    _audioStarved = true;
+                    _timeline.AudioStarved = true;
                 }
 
-                StartOrPauseClock(epoch, state);
+                _timeline.StartOrPause(epoch, state);
 
                 if (deviceAvailable && audioRenderer is not null)
                 {
                     IPlaybackClock deviceClock = audioRenderer.Clock;
-                    bool clockRunning = _clock.IsRunning;
+                    bool clockRunning = _timeline.IsRunning;
                     if (clockRunning != deviceClock.IsRunning)
                     {
                         try
@@ -375,7 +374,7 @@ public sealed partial class PlaybackPipeline
             }
 
             // Idle on leeway device
-            TimeSpan position = _clock.Position;
+            TimeSpan position = _timeline.Position;
             if (deviceAvailable && tailBufferPosition is TimeSpan consumed
                 && consumed - position > TimeSpan.FromMilliseconds(AudioDeviceLeewayMilliseconds))
             {
@@ -385,10 +384,10 @@ public sealed partial class PlaybackPipeline
                     _events.PostWarning("The audio device is not playing what it is given.");
                 }
 
-                lock (_clockLock)
+                lock (_timeline.ClockLock)
                 {
                     // A device that is running ahead of the clock is not starved.
-                    _audioStarved = false;
+                    _timeline.AudioStarved = false;
                 }
 
                 _audioRenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
@@ -403,7 +402,7 @@ public sealed partial class PlaybackPipeline
 
                 if (hasDeviceAudio && clockOffset is TimeSpan offset)
                 {
-                    SyncClock(_clock, deviceClock, offset);
+                    _timeline.SyncClock(deviceClock, offset);
                 }
 
                 if (inFlightSubmit is not null)
@@ -432,10 +431,10 @@ public sealed partial class PlaybackPipeline
             {
                 bool ending = endingEpoch == epoch;
                 bool starved = deviceAvailable && !hasDeviceAudio && !ending && !IsStreamSpent(epoch, position, ref _readerTailAudioTicks);
-                lock (_clockLock)
+                lock (_timeline.ClockLock)
                 {
-                    _audioStarved = starved;
-                    StartOrPauseClock(epoch, state);
+                    _timeline.AudioStarved = starved;
+                    _timeline.StartOrPause(epoch, state);
                 }
 
                 if (ending && !hasDeviceAudio && playedOutEpoch != endingEpoch)
@@ -515,17 +514,17 @@ public sealed partial class PlaybackPipeline
             // Ready to submit
             tailBufferPosition = buffer.Timestamp + buffer.Duration;
 
-            lock (_clockLock)
+            lock (_timeline.ClockLock)
             {
-                _audioStarved = false;
+                _timeline.AudioStarved = false;
 
-                bool clockChanged = AnchorClock(epoch, buffer.Timestamp);
+                bool clockChanged = _timeline.Anchor(epoch, buffer.Timestamp);
                 if (deviceAvailable && audioRenderer is not null && (clockChanged || clockOffset is null))
                 {
                     clockOffset = audioRenderer.Clock.Position - buffer.Timestamp;
                 }
 
-                StartOrPauseClock(epoch, state);
+                _timeline.StartOrPause(epoch, state);
             }
 
             if (deviceAvailable && audioRenderer is not null)
@@ -541,39 +540,6 @@ public sealed partial class PlaybackPipeline
 
         // Cleanup
         ReleaseInFlightAudio();
-    }
-
-    private void SyncClock(IPlaybackClock clock, IPlaybackClock deviceClock, TimeSpan offset)
-    {
-        TimeSpan deviceTime;
-        TimeSpan localTime;
-        try
-        {
-            deviceTime = deviceClock.Position;
-            localTime = clock.Position;
-        }
-        catch (Exception ex)
-        {
-            PlaybackLogger.E(TAG, ex);
-            return;
-        }
-
-        TimeSpan expected = deviceTime - offset;
-        if (Math.Abs((expected - localTime).TotalMilliseconds) <= ClockSyncToleranceMilliseconds)
-        {
-            return;
-        }
-
-        lock (_clockLock)
-        {
-            if (!clock.IsRunning || _anchoredEpoch != _epochGate.Read().Epoch)
-            {
-                return;
-            }
-
-            clock.SetPosition(expected);
-            NotifyClockMoved();
-        }
     }
 
     #endregion
