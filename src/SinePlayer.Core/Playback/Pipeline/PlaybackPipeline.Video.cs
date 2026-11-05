@@ -8,7 +8,6 @@ using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Render;
-using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
 
 namespace SinePlayer.Core.Playback.Pipeline;
@@ -19,7 +18,7 @@ public sealed partial class PlaybackPipeline
 
     private void TryWakeVideoDecode()
     {
-        if (!HasRoomForVideoFrame())
+        if (!_video.HasRoomForFrame())
         {
             return;
         }
@@ -30,232 +29,9 @@ public sealed partial class PlaybackPipeline
         }
     }
 
-    private void VideoDecodeCore()
-    {
-        PacketQueue queue = _video.PacketQueue;
-        ComponentSlot<IVideoDecoder> videoDecoderSlot = _video.Decoder;
-        bool awaitingKeyFrame = false;
-        long workingEpoch = -1;
-
-        while (true)
-        {
-            long stamp = _video.DecodeNode.Stamp;
-            if (_stopRequested)
-            {
-                return;
-            }
-
-            // Install video decoder
-            if (videoDecoderSlot.Update(out IVideoDecoder? oldVideoDecoder))
-            {
-                oldVideoDecoder?.Dispose();
-                awaitingKeyFrame = true;
-            }
-
-            IVideoDecoder? videoDecoder = videoDecoderSlot.CurrentComponent;
-
-            // Bump epoch
-            long epoch = _timeline.Epoch;
-            if (workingEpoch != epoch)
-            {
-                workingEpoch = epoch;
-
-                try
-                {
-                    videoDecoder?.Flush();
-                }
-                catch (Exception exception)
-                {
-                    _events.PostFailure(exception.Message, exception);
-                    return;
-                }
-
-                continue;
-            }
-
-            // Dequeue
-            if (!HasRoomForVideoFrame())
-            {
-                _video.DecodeNode.Wait(stamp);
-                continue;
-            }
-
-            if (!queue.TryPeek(out PacketEntry entry))
-            {
-                _video.DecodeNode.Wait(stamp);
-                continue;
-            }
-
-            PipelineVersion videoDecoderVersions = videoDecoderSlot.CurrentVersions;
-            VersionVerdict verdict = PipelineVersion.CompareVideoDecoder(entry.Versions, videoDecoderVersions);
-            if (verdict == VersionVerdict.Block)
-            {
-                _video.DecodeNode.Wait(stamp);
-                continue;
-            }
-
-            if (!queue.TryDequeue(out _))
-            {
-                _video.DecodeNode.Wait(stamp);
-                continue;
-            }
-
-            TryWakeReader();
-
-            // Decode
-            MediaPacket? packet = entry.Packet;
-            long packetEpoch = entry.Epoch;
-            using (packet)
-            {
-                if (verdict == VersionVerdict.Drop || epoch != packetEpoch)
-                {
-                    continue;
-                }
-
-                var videoFrameVersions = PipelineVersion.Max(entry.Versions, videoDecoderVersions);
-                if (packet is null)
-                {
-                    if (videoDecoder is not null)
-                    {
-                        OperationResult drained = DrainVideoDecoder(videoDecoder, videoFrameVersions, packetEpoch);
-                        if (!drained.IsSuccessful)
-                        {
-                            _events.PostWarning(drained.Message);
-                        }
-                    }
-
-                    _video.FrameQueue.Enqueue(new FrameEntry(null, videoFrameVersions, epoch));
-                    TryWakeVideoRender();
-                    _video.DecodeNode.Wait(stamp);
-                    continue;
-                }
-
-                if (awaitingKeyFrame)
-                {
-                    if (!packet.IsKeyFrame)
-                    {
-                        continue;
-                    }
-
-                    awaitingKeyFrame = false;
-                }
-
-                if (videoDecoder is null)
-                {
-                    continue;
-                }
-
-                OperationResult decoded = DecodeVideo(videoDecoder, packet, out IReadOnlyList<RawVideoFrame>? frames);
-                if (!decoded.IsSuccessful)
-                {
-                    _events.PostFailure(decoded);
-                    return;
-                }
-
-                if (frames is null)
-                {
-                    _events.PostFailure("The video decoder returned no frames.");
-                    return;
-                }
-
-                QueueFrames(frames, videoFrameVersions, epoch);
-            }
-        }
-    }
-
-    private OperationResult DecodeVideo(IVideoDecoder videoDecoder, MediaPacket packet, out IReadOnlyList<RawVideoFrame>? frames)
-    {
-        frames = null;
-
-        long startTicks = Stopwatch.GetTimestamp();
-        OperationResult decoded;
-        IReadOnlyList<RawVideoFrame>? produced = null;
-        try
-        {
-            decoded = videoDecoder.TryDecode(packet, out produced);
-        }
-        catch (Exception ex)
-        {
-            decoded = OperationResult.Failure(ex);
-        }
-
-        Interlocked.Add(ref _video.DecodeTicks, Stopwatch.GetTimestamp() - startTicks);
-
-        if (!decoded.IsSuccessful || produced is null)
-        {
-            return decoded;
-        }
-
-        frames = produced;
-        Interlocked.Add(ref _video.DecodedFrameCount, produced.Count);
-        return OperationResult.Success();
-    }
-
-    private OperationResult DrainVideoDecoder(IVideoDecoder decoder, PipelineVersion versions, long epoch)
-    {
-        OperationResult drained;
-        IReadOnlyList<RawVideoFrame> frames;
-        try
-        {
-            drained = decoder.Drain(out frames);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Failure(ex.Message);
-        }
-
-        if (!drained.IsSuccessful)
-        {
-            return drained;
-        }
-
-        if (frames is null)
-        {
-            return OperationResult.Failure("The video decoder returned no frames.");
-        }
-
-        QueueFrames(frames, versions, epoch);
-        return OperationResult.Success();
-    }
-
-    private void QueueFrames(IReadOnlyList<RawVideoFrame> frames, PipelineVersion versions, long epoch)
-    {
-        bool fastExit = false;
-
-        foreach (RawVideoFrame frame in frames)
-        {
-            if (fastExit || _timeline.Epoch != epoch)
-            {
-                fastExit = true;
-                frame.Dispose();
-                continue;
-            }
-
-            _video.FrameQueue.Enqueue(new FrameEntry(frame, versions, epoch));
-        }
-
-        if (!fastExit)
-        {
-            TryWakeVideoRender();
-        }
-    }
-
-    private bool HasRoomForVideoFrame()
-    {
-        return _video.FrameQueue.Count < FrameQueueCapacity;
-    }
-
     #endregion
 
     #region Video render
-
-    private void TryWakeVideoRender()
-    {
-        if (!_video.FrameQueue.IsEmpty)
-        {
-            _video.RenderNode.Wake();
-        }
-    }
 
     private void VideoRenderCore()
     {

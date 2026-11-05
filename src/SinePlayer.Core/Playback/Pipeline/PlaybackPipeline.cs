@@ -20,9 +20,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 {
     #region Constants
 
-    private const int FrameQueueCapacity = 8;
-    private const int DecoderBufferedFrames = FrameQueueCapacity + 4;
-
     private const int ReadAheadMinMilliseconds = 8000;
     private const int ReadAheadMaxMilliseconds = 10000;
     private const int ReadAheadWakeMilliseconds = ReadAheadMinMilliseconds / 2;
@@ -81,7 +78,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         _events = new PipelineEvents(WakeAll);
         _timeline = new PipelineTimeline(NotifyClockMoved);
-        _video = new VideoChain();
+        _video = new VideoChain(_timeline, _events);
         _audio = new AudioChain();
         _subtitle = new SubtitleChain(_timeline, _events);
         _wakeTargets = [
@@ -626,7 +623,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return;
         }
 
-        _videoDecodeThread = new Thread(VideoDecodeCore)
+        _videoDecodeThread = new Thread(() => _video.Decode(() => _stopRequested, TryWakeReader))
         {
             IsBackground = true,
             Name = "Pipeline - Video decode",
