@@ -166,7 +166,7 @@ public sealed partial class PlaybackPipeline
                 endingEpoch = epoch;
 
                 _video.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
-                _audioPacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
+                _audio.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 _subtitle.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 TryWakeVideoDecode();
                 TryWakeAudioDecode();
@@ -225,7 +225,7 @@ public sealed partial class PlaybackPipeline
                 AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailAudioTicks);
                 TimeSpan span = SpanOf(packet, lastAudioPacketSpan, 0);
                 lastAudioPacketSpan = span;
-                _audioPacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
+                _audio.PacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
                 handedOn = true;
                 TryWakeAudioDecode();
             }
@@ -329,7 +329,7 @@ public sealed partial class PlaybackPipeline
             return true;
         }
 
-        if (holder.AudioStream is not null && _audioDecoder.HasComponent && ReadAhead(ref _readerTailAudioTicks, position) >= ReadAheadMax)
+        if (holder.AudioStream is not null && _audio.Decoder.HasComponent && ReadAhead(ref _readerTailAudioTicks, position) >= ReadAheadMax)
         {
             return true;
         }
@@ -344,7 +344,7 @@ public sealed partial class PlaybackPipeline
             return false;
         }
 
-        if (holder.AudioStream is not null && _audioDecoder.HasComponent && ReadAhead(ref _readerTailAudioTicks, position) < minimumReadAhead)
+        if (holder.AudioStream is not null && _audio.Decoder.HasComponent && ReadAhead(ref _readerTailAudioTicks, position) < minimumReadAhead)
         {
             return false;
         }
