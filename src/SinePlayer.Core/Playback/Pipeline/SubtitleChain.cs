@@ -15,6 +15,7 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
     private const int SubtitleChangeIntervalMilliseconds = 16;
     private const int FallbackFrameMilliseconds = 40;
 
+    private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
     public ComponentSlot<ISubtitleDecoder> Decoder { get; } = new();
@@ -43,6 +44,23 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
 
     public bool IsActive => Binding.Stream is not null && Decoder.HasComponent;
 
+    public void Start()
+    {
+        _renderThread = new PipelineThread("Pipeline - Subtitle render", Render);
+        _renderThread.Start();
+    }
+
+    public void RequestStop()
+    {
+        _renderThread?.RequestStop();
+    }
+
+    public void Join()
+    {
+        _renderThread?.Join();
+        _renderThread = null;
+    }
+
     public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
     {
         if (!Binding.Accepts(source, packet.StreamIndex))
@@ -61,24 +79,6 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
     {
         PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
         WakeDecode();
-    }
-
-    private TimeSpan SpanOf(MediaPacket packet)
-    {
-        if (packet.Duration > TimeSpan.Zero)
-        {
-            return packet.Duration;
-        }
-
-        return _lastPacketSpan > TimeSpan.Zero ? _lastPacketSpan : TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
-    }
-
-    public void WakeDecode()
-    {
-        if (!PacketQueue.IsEmpty)
-        {
-            DecodeNode.Wake();
-        }
     }
 
     public async Task Decode(Func<bool> stopRequested, Action wakeReader)
@@ -165,38 +165,6 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
 
             await Task.Yield();
         }
-    }
-
-    private OperationResult DecodeCues(long epoch, ISubtitleDecoder subtitleDecoder, MediaPacket packet)
-    {
-        OperationResult decoded;
-        IReadOnlyList<SubtitleCue> cues;
-        try
-        {
-            decoded = subtitleDecoder.TryDecode(packet, out cues);
-        }
-        catch (Exception ex)
-        {
-            return OperationResult.Failure(ex.Message);
-        }
-
-        if (!decoded.IsSuccessful)
-        {
-            return decoded;
-        }
-
-        if (cues is null)
-        {
-            return OperationResult.Failure("The subtitle decoder returned no cues.");
-        }
-
-        CueWindow.Add(epoch, cues, timeline.Position, discardStale: !Renderer.HasComponent);
-        if (cues.Count > 0)
-        {
-            RenderNode.Wake();
-        }
-
-        return OperationResult.Success();
     }
 
     public void Render(Func<bool> stopRequested)
@@ -308,6 +276,38 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
         drawnCues.Dispose();
     }
 
+    private OperationResult DecodeCues(long epoch, ISubtitleDecoder subtitleDecoder, MediaPacket packet)
+    {
+        OperationResult decoded;
+        IReadOnlyList<SubtitleCue> cues;
+        try
+        {
+            decoded = subtitleDecoder.TryDecode(packet, out cues);
+        }
+        catch (Exception ex)
+        {
+            return OperationResult.Failure(ex.Message);
+        }
+
+        if (!decoded.IsSuccessful)
+        {
+            return decoded;
+        }
+
+        if (cues is null)
+        {
+            return OperationResult.Failure("The subtitle decoder returned no cues.");
+        }
+
+        CueWindow.Add(epoch, cues, timeline.Position, discardStale: !Renderer.HasComponent);
+        if (cues.Count > 0)
+        {
+            RenderNode.Wake();
+        }
+
+        return OperationResult.Success();
+    }
+
     private static bool SameCues(SubtitleCueSnapshot x, SubtitleCueSnapshot y)
     {
         IReadOnlyList<SubtitleCue> xCues = x.Cues;
@@ -326,5 +326,23 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
         }
 
         return true;
+    }
+
+    private void WakeDecode()
+    {
+        if (!PacketQueue.IsEmpty)
+        {
+            DecodeNode.Wake();
+        }
+    }
+
+    private TimeSpan SpanOf(MediaPacket packet)
+    {
+        if (packet.Duration > TimeSpan.Zero)
+        {
+            return packet.Duration;
+        }
+
+        return _lastPacketSpan > TimeSpan.Zero ? _lastPacketSpan : TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
     }
 }

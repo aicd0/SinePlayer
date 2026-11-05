@@ -17,6 +17,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
     private const int AudioDeviceLeewayMilliseconds = 3000;
     private const int FallbackFrameMilliseconds = 40;
 
+    private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
     public ComponentSlot<IAudioDecoder> Decoder { get; } = new();
@@ -39,6 +40,23 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
     public bool IsActive => Binding.Stream is not null && Decoder.HasComponent;
 
+    public void Start(Func<long, TimeSpan, bool> isStreamSpent, Action<long> reportEnded)
+    {
+        _renderThread = new PipelineThread("Pipeline - Audio render", stop => Render(stop, isStreamSpent, reportEnded));
+        _renderThread.Start();
+    }
+
+    public void RequestStop()
+    {
+        _renderThread?.RequestStop();
+    }
+
+    public void Join()
+    {
+        _renderThread?.Join();
+        _renderThread = null;
+    }
+
     public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
     {
         if (!Binding.Accepts(source, packet.StreamIndex))
@@ -57,16 +75,6 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
     {
         PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
         WakeDecode();
-    }
-
-    private TimeSpan SpanOf(MediaPacket packet)
-    {
-        if (packet.Duration > TimeSpan.Zero)
-        {
-            return packet.Duration;
-        }
-
-        return _lastPacketSpan > TimeSpan.Zero ? _lastPacketSpan : TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
     }
 
     public async Task Decode(Func<bool> stopRequested, Action wakeReader)
@@ -243,22 +251,6 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         }
 
         return OperationResult.Success();
-    }
-
-    private void WakeRender()
-    {
-        if (!BufferQueue.IsEmpty)
-        {
-            RenderNode.Wake();
-        }
-    }
-
-    public void WakeDecode()
-    {
-        if (!PacketQueue.IsEmpty)
-        {
-            DecodeNode.Wake();
-        }
     }
 
     public void Render(Func<bool> stopRequested, Func<long, TimeSpan, bool> isStreamSpent, Action<long> reportEnded)
@@ -574,5 +566,31 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         }
 
         ReleaseInFlightAudio();
+    }
+
+    private void WakeDecode()
+    {
+        if (!PacketQueue.IsEmpty)
+        {
+            DecodeNode.Wake();
+        }
+    }
+
+    private void WakeRender()
+    {
+        if (!BufferQueue.IsEmpty)
+        {
+            RenderNode.Wake();
+        }
+    }
+
+    private TimeSpan SpanOf(MediaPacket packet)
+    {
+        if (packet.Duration > TimeSpan.Zero)
+        {
+            return packet.Duration;
+        }
+
+        return _lastPacketSpan > TimeSpan.Zero ? _lastPacketSpan : TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
     }
 }
