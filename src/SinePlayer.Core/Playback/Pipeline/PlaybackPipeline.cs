@@ -48,6 +48,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private Thread? _subtitleRenderThread;
 
     private readonly IPipelineWakeTarget[] _wakeTargets;
+    private readonly IChainFeed[] _feeds;
     private readonly PipelineNodeAsync _readerNode = new();
 
     private bool _disposed;
@@ -56,11 +57,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private long _videoRenderEndedEpoch = -1;
     private long _audioRenderEndedEpoch = -1;
-
-    private long _readerTailEpoch = -1;
-    private long _readerTailVideoTicks = -1;
-    private long _readerTailAudioTicks = -1;
-    private long _readerTailSubtitleTicks = -1;
 
     #endregion
 
@@ -82,6 +78,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             _audio.RenderNode,
             _subtitle.RenderNode,
         ];
+        _feeds = [_video, _audio, _subtitle];
     }
 
     #endregion
@@ -553,10 +550,10 @@ public sealed partial class PlaybackPipeline : IDisposable
         _videoRenderEndedEpoch = -1;
         _audioRenderEndedEpoch = -1;
 
-        Volatile.Write(ref _readerTailEpoch, -1);
-        Interlocked.Exchange(ref _readerTailVideoTicks, -1);
-        Interlocked.Exchange(ref _readerTailAudioTicks, -1);
-        Interlocked.Exchange(ref _readerTailSubtitleTicks, -1);
+        foreach (IChainFeed feed in _feeds)
+        {
+            feed.Tail.Reset();
+        }
 
         Interlocked.Exchange(ref _video.PresentedFrameCount, 0);
         Interlocked.Exchange(ref _video.DroppedFrameCount, 0);
@@ -689,13 +686,15 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private bool IsVideoStreamSpent(long epoch, TimeSpan position)
     {
-        return IsStreamSpent(epoch, position, ref _readerTailVideoTicks);
+        return _video.Tail.IsSpent(epoch, position, FurthestTailTicks);
     }
 
     private bool IsAudioStreamSpent(long epoch, TimeSpan position)
     {
-        return IsStreamSpent(epoch, position, ref _readerTailAudioTicks);
+        return _audio.Tail.IsSpent(epoch, position, FurthestTailTicks);
     }
+
+    private long FurthestTailTicks => Math.Max(_video.Tail.Ticks, _audio.Tail.Ticks);
 
     private void NotifyAudioRenderEnded(long epoch)
     {

@@ -13,8 +13,7 @@ public sealed partial class PlaybackPipeline
 
     private void TryWakeReader()
     {
-        MediaSourceHolder? sourceHolder = _source.Latest?.Component;
-        if (sourceHolder is not null && !IsBuffered(sourceHolder, ReadAheadWake))
+        if (!IsBuffered(ReadAheadWake))
         {
             _readerNode.Wake();
         }
@@ -74,10 +73,10 @@ public sealed partial class PlaybackPipeline
                 pendingEpochChange = false;
                 tails.Clear();
 
-                Volatile.Write(ref _readerTailEpoch, epoch);
-                Interlocked.Exchange(ref _readerTailVideoTicks, -1);
-                Interlocked.Exchange(ref _readerTailAudioTicks, -1);
-                Interlocked.Exchange(ref _readerTailSubtitleTicks, -1);
+                foreach (IChainFeed feed in _feeds)
+                {
+                    feed.Tail.Reset();
+                }
 
                 OperationResult sought = SeekSources(sourceHolder, epochGate.SeekPosition);
                 if (sought.IsSuccessful)
@@ -101,7 +100,7 @@ public sealed partial class PlaybackPipeline
             // Buffering
             if (!buffering)
             {
-                if (IsBuffered(sourceHolder, ReadAheadWake))
+                if (IsBuffered(ReadAheadWake))
                 {
                     await _readerNode.WaitAsync(stamp);
                     continue;
@@ -109,7 +108,7 @@ public sealed partial class PlaybackPipeline
 
                 buffering = true;
             }
-            else if (IsBuffered(sourceHolder, ReadAheadMin))
+            else if (IsBuffered(ReadAheadMin))
             {
                 buffering = false;
                 continue;
@@ -187,17 +186,17 @@ public sealed partial class PlaybackPipeline
 
             if (_video.TryAccept(chosenSource, packet, sourceVersions, epoch))
             {
-                AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailVideoTicks);
+                _video.Tail.Report(epoch, packet.Timestamp);
                 handedOn = true;
             }
             else if (_audio.TryAccept(chosenSource, packet, sourceVersions, epoch))
             {
-                AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailAudioTicks);
+                _audio.Tail.Report(epoch, packet.Timestamp);
                 handedOn = true;
             }
             else if (_subtitle.TryAccept(chosenSource, packet, sourceVersions, epoch))
             {
-                AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailSubtitleTicks);
+                _subtitle.Tail.Report(epoch, packet.Timestamp);
                 handedOn = true;
             }
 
@@ -210,7 +209,7 @@ public sealed partial class PlaybackPipeline
         }
     }
 
-    private static OperationResult SeekSources(MediaSourceHolder sourceHolder, TimeSpan position)
+    private OperationResult SeekSources(MediaSourceHolder sourceHolder, TimeSpan position)
     {
         IReadOnlyList<MediaSource> sources = sourceHolder.Sources;
         foreach (MediaSource source in sources)
@@ -228,7 +227,7 @@ public sealed partial class PlaybackPipeline
             OperationResult sought;
             try
             {
-                sought = entry.Source.Seek(position, ChooseSeekLanding(sourceHolder, entry, position));
+                sought = entry.Source.Seek(position, ChooseSeekLanding(entry, position));
             }
             catch (Exception ex)
             {
@@ -244,10 +243,10 @@ public sealed partial class PlaybackPipeline
         return firstFailure;
     }
 
-    private static int ChooseSeekLanding(MediaSourceHolder sourceHolder, MediaSource source, TimeSpan position)
+    private int ChooseSeekLanding(MediaSource source, TimeSpan position)
     {
-        VideoStreamInfo? video = sourceHolder.VideoSource == source ? sourceHolder.VideoStream : null;
-        AudioStreamInfo? audio = sourceHolder.AudioSource == source ? sourceHolder.AudioStream : null;
+        VideoStreamInfo? video = _video.Binding.Source == source ? _video.Binding.Stream : null;
+        AudioStreamInfo? audio = _audio.Binding.Source == source ? _audio.Binding.Stream : null;
 
         if (video is null)
         {
@@ -270,85 +269,27 @@ public sealed partial class PlaybackPipeline
         return video.Index;
     }
 
-    private bool IsBuffered(MediaSourceHolder holder, TimeSpan minimumReadAhead)
+    private bool IsBuffered(TimeSpan minimumReadAhead)
     {
-        TimeSpan ReadAhead(ref long ticks, TimeSpan position)
-        {
-            long tail = Interlocked.Read(ref ticks);
-            if (tail < 0)
-            {
-                return TimeSpan.MinValue;
-            }
-
-            long ahead = tail - position.Ticks;
-            return ahead > 0 ? TimeSpan.FromTicks(ahead) : TimeSpan.Zero;
-        }
-
         TimeSpan position = _timeline.Position;
 
-        if (holder.VideoStream is not null && _video.Decoder.HasComponent && ReadAhead(ref _readerTailVideoTicks, position) >= ReadAheadMax)
+        foreach (IChainFeed feed in _feeds)
         {
-            return true;
+            if (feed.IsActive && feed.Tail.ReadAhead(position) >= ReadAheadMax)
+            {
+                return true;
+            }
         }
 
-        if (holder.AudioStream is not null && _audio.Decoder.HasComponent && ReadAhead(ref _readerTailAudioTicks, position) >= ReadAheadMax)
+        foreach (IChainFeed feed in _feeds)
         {
-            return true;
-        }
-
-        if (holder.SubtitleStream is not null && _subtitle.Decoder.HasComponent && ReadAhead(ref _readerTailSubtitleTicks, position) >= ReadAheadMax)
-        {
-            return true;
-        }
-
-        if (holder.VideoStream is not null && _video.Decoder.HasComponent && ReadAhead(ref _readerTailVideoTicks, position) < minimumReadAhead)
-        {
-            return false;
-        }
-
-        if (holder.AudioStream is not null && _audio.Decoder.HasComponent && ReadAhead(ref _readerTailAudioTicks, position) < minimumReadAhead)
-        {
-            return false;
-        }
-
-        if (holder.SubtitleStream is not null && _subtitle.Decoder.HasComponent && ReadAhead(ref _readerTailSubtitleTicks, position) < minimumReadAhead)
-        {
-            return false;
+            if (feed.IsActive && feed.Tail.ReadAhead(position) < minimumReadAhead)
+            {
+                return false;
+            }
         }
 
         return true;
-    }
-
-    private void AdvanceReaderTail(long epoch, TimeSpan timestamp, ref long oldTicks)
-    {
-        if (Volatile.Read(ref _readerTailEpoch) != epoch)
-        {
-            return;
-        }
-
-        long ticks = timestamp.Ticks;
-
-        if (ticks > Interlocked.Read(ref oldTicks))
-        {
-            Interlocked.Exchange(ref oldTicks, ticks);
-        }
-    }
-
-    private bool IsStreamSpent(long epoch, TimeSpan position, ref long ticks)
-    {
-        if (Volatile.Read(ref _readerTailEpoch) != epoch)
-        {
-            return false;
-        }
-
-        long ticksLocal = Interlocked.Read(ref ticks);
-        if (ticksLocal < 0 || ticksLocal >= position.Ticks)
-        {
-            return false;
-        }
-
-        long maxTicks = Math.Max(Interlocked.Read(ref _readerTailVideoTicks), Interlocked.Read(ref _readerTailAudioTicks));
-        return maxTicks >= position.Ticks;
     }
 
     private sealed class SourceTail
