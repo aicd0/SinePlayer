@@ -55,7 +55,7 @@ public sealed partial class PlaybackPipeline
             IVideoDecoder? videoDecoder = videoDecoderSlot.CurrentComponent;
 
             // Bump epoch
-            long epoch = _epochGate.Read().Epoch;
+            long epoch = _timeline.Epoch;
             if (workingEpoch != epoch)
             {
                 workingEpoch = epoch;
@@ -224,7 +224,7 @@ public sealed partial class PlaybackPipeline
 
         foreach (RawVideoFrame frame in frames)
         {
-            if (fastExit || _epochGate.Read().Epoch != epoch)
+            if (fastExit || _timeline.Epoch != epoch)
             {
                 fastExit = true;
                 frame.Dispose();
@@ -321,7 +321,7 @@ public sealed partial class PlaybackPipeline
             IVideoRenderer? videoRenderer = videoRendererSlot.CurrentComponent;
 
             // Bump epoch
-            EpochGate epochGate = _epochGate.Read();
+            EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             if (workingEpoch != epoch)
             {

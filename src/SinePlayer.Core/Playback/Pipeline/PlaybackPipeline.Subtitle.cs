@@ -45,7 +45,7 @@ public sealed partial class PlaybackPipeline
             }
 
             // Bump epoch
-            EpochGate epochGate = _epochGate.Read();
+            EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             if (workingEpoch != epoch)
             {
@@ -207,7 +207,7 @@ public sealed partial class PlaybackPipeline
             }
 
             // Bump epoch
-            EpochGate epochGate = _epochGate.Read();
+            EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             if (workingEpoch != epoch)
             {
