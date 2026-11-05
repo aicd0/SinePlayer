@@ -41,9 +41,9 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         _events = new PipelineEvents(WakeAll);
         _timeline = new PipelineTimeline(NotifyClockMoved, () => IsStarved);
-        _video = new VideoChain(_timeline, _events);
+        _video = new VideoChain(_timeline, _events, VideoTarget_SurfaceSizeChanged);
         _audio = new AudioChain(_timeline, _events);
-        _subtitle = new SubtitleChain(_timeline, _events);
+        _subtitle = new SubtitleChain(_timeline, _events, SubtitleTarget_SurfaceSizeChanged);
         _feeds = [_video, _audio, _subtitle];
         _reader = new MediaReader(_source, _feeds, _timeline, _events, ChooseSeekLanding);
         _wakeTargets = [
@@ -262,9 +262,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         StopCore();
 
         _video.Target = videoTarget;
-        _video.Target?.SurfaceSizeChanged += VideoTarget_SurfaceSizeChanged;
         _subtitle.Target = subtitleTarget;
-        _subtitle.Target?.SurfaceSizeChanged += SubtitleTarget_SurfaceSizeChanged;
         _subtitle.LayoutSource = _video;
 
         _timeline.SetPosition(TimeSpan.Zero);
@@ -465,16 +463,9 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         StopThreads();
 
-        _video.PacketQueue.Clear();
-        _audio.PacketQueue.Clear();
-        _subtitle.PacketQueue.Clear();
-
-        while (_video.FrameQueue.TryDequeue(out FrameEntry frame))
-        {
-            frame.Frame?.Dispose();
-        }
-
-        _audio.BufferQueue.Clear();
+        _video.Reset();
+        _audio.Reset();
+        _subtitle.Reset();
 
         foreach (MediaSource source in _selection.Sources)
         {
@@ -484,43 +475,11 @@ public sealed partial class PlaybackPipeline : IDisposable
         _selection = new MediaSourceHolder([], null, null, null);
 
         _source.Reset();
-        _video.Decoder.Reset();
-        _audio.Decoder.Reset();
-        _video.Renderer.Reset();
-        _audio.Renderer.CurrentComponent?.Flush();
-        _audio.Renderer.Reset();
-        _subtitle.Decoder.Reset();
-        _subtitle.Renderer.Reset();
-
-        _video.Target?.SurfaceSizeChanged -= VideoTarget_SurfaceSizeChanged;
-        _video.Target = null;
-        _subtitle.Target?.SurfaceSizeChanged -= SubtitleTarget_SurfaceSizeChanged;
-        _subtitle.Target = null;
-        _video.Binding = default;
-        _audio.Binding = default;
-        _subtitle.Binding = default;
 
         _timeline.Stop();
-        _video.Starved = false;
-        _audio.Starved = false;
-
         _timeline.EndingEpoch = -1;
-        _video.EndedEpoch = -1;
-        _audio.EndedEpoch = -1;
-
-        foreach (IChainFeed feed in _feeds)
-        {
-            feed.Tail.Reset();
-        }
-
-        Interlocked.Exchange(ref _video.PresentedFrameCount, 0);
-        Interlocked.Exchange(ref _video.DroppedFrameCount, 0);
-        Interlocked.Exchange(ref _video.DecodedFrameCount, 0);
-        Interlocked.Exchange(ref _video.DecodeTicks, 0);
-        Interlocked.Exchange(ref _video.RenderTicks, 0);
-        Interlocked.Exchange(ref _video.PictureTicks, -1);
-
         _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
+
         _events.SetState(MediaEngineState.None);
         return OperationResult.Success();
     }

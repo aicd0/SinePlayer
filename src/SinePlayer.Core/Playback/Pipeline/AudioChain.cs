@@ -66,6 +66,20 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         _renderThread = null;
     }
 
+    public void Reset()
+    {
+        PacketQueue.Clear();
+        BufferQueue.Clear();
+
+        Decoder.Reset();
+        Renderer.CurrentComponent?.Flush();
+        Renderer.Reset();
+        Binding = default;
+        Starved = false;
+        EndedEpoch = -1;
+        Tail.Reset();
+    }
+
     public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
     {
         if (!Binding.Accepts(source, packet.StreamIndex))
