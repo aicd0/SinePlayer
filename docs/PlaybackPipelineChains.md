@@ -54,6 +54,12 @@ names and the members they will have when published: the public-looking state on
 (`Reconcile`, `Start`, `StopAndJoin`, `WakeAll`, `TryAccept`, `IsBuffered`, `IsSpent`, `ReportEnded`) on a
 separate internal interface. Publishing later is a change of accessibility plus `Add`/`Remove`, not a move.
 
+The interface itself waits for its first user. While there is one chain per kind, a chain is a plain class and
+the pipeline holds it in a typed field; `IPlaybackChain`/`IPlaybackChainRuntime` and the chain list land in the
+step that needs to treat chains alike — the reader's feed and the reconcile dispatch — rather than before it.
+For the same reason a chain carries no identifier and overrides no equality: the reference is the identity,
+and an id arrives in the step that first has two chains of one kind to tell apart.
+
 ### 6. Deliberately not in v1
 
 - `PipelineVersion` stays as it is. Each `ComponentSlot<T>` already carries its own instance and every
@@ -115,16 +121,19 @@ src/SinePlayer.Core/Playback/Pipeline/
 
 A2–A6 are what make it possible for a chain to exist without a back-reference to the pipeline object.
 
-## Phase B — the internal chain model, with no loop moved
+## Phase B — the chain types, one state move at a time
+
+The chains are introduced in the order they will be finished in, and each one arrives holding real state its own
+loops already use, so nothing is a shell. The interfaces and the chain list arrive with their first user — the
+reader's feed (D) and the reconcile dispatch (E) — rather than before it.
 
 | # | Step | Size | Review focus |
 |---|---|---|---|
-| B1 | `IPlaybackChain`, `IPlaybackChainRuntime`, `PlaybackChainId`, `ChainStatus`, `StreamBinding`, the three chain classes with identity and name only, and the guard test that no chain type is reachable from a public signature | ~140 new | nothing runs yet; the guard test is what keeps "internal" true for the rest of the refactor |
-| B2 | `_chains` list plus per-kind lookups; `Reset` creates and removes chains instead of assigning `_videoTarget`/`_subtitleTarget`; a guard fails loudly if a kind is asked for twice | ~120 | `Reset`'s observable behaviour is identical, including target subscription and unsubscription |
-| B3 | `VideoChain` owns its state: two slots, packet queue, frame queue, tail, two nodes, counters, target, transform, starvation | ~150 touched | pure field relocation; no condition changes |
-| B4 | `AudioChain` owns its state: two slots, packet queue, audio queue, tail, two nodes, `AudioFilterChain`; `PlaybackPipeline.AudioFilters` forwards to it | ~120 | the audio loop's locals stay local until C5 |
-| B5 | `SubtitleChain` owns its state: two slots, packet queue, cue window, tail, two nodes, target, presentation, surface version, `LayoutSource` | ~100 | `LayoutSource` is the only new concept: it replaces the direct reads of the video target, video stream and transform in `ResolveSubtitleFrame` |
-| B6 | Selection becomes a source list plus one `StreamBinding` per chain; `MediaSourceHolder` shrinks to a published snapshot of sources and bindings | ~150 | `AddSource`, `SelectStream`, `DiffSource` and the reader's install path all still see what they saw before |
+| B1 | `SubtitleChain` owns its state: two slots, packet queue, cue window, two nodes, presentation, target. Loops stay in the pipeline and go through `_subtitle` | ~100 touched | pure field relocation; `_readerTailSubtitleTicks`, `_subtitleSurfaceVersion` and the thread stay behind, because their owners have not moved yet |
+| B2 | `VideoChain` owns its state: two slots, packet queue, frame queue, two nodes, counters, target, transform | ~150 touched | same; transform is the chain's now, which is what lets two videos crop differently later |
+| B3 | `AudioChain` owns its state: two slots, packet queue, audio queue, two nodes, `AudioFilterChain`; `PlaybackPipeline.AudioFilters` forwards to it | ~120 | the audio loop's locals stay local until C6 |
+| B4 | `SubtitleChain.LayoutSource` — the video target, video stream and transform that `ResolveSubtitlesFrame` reads, behind one seam | ~40 | the frame rectangle maths is copied verbatim; this is what keeps C2 from dragging the video chain along |
+| B5 | Selection becomes a source list plus one `StreamBinding` per chain; `MediaSourceHolder` shrinks to a published snapshot of sources and bindings | ~150 | `AddSource`, `SelectStream`, `DiffSource` and the reader's install path all still see what they saw before |
 
 B6 is the step that makes the reader's later generalisation possible; until D it still publishes exactly one
 binding per kind.
