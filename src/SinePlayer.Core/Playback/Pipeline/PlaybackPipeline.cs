@@ -17,18 +17,6 @@ namespace SinePlayer.Core.Playback.Pipeline;
 
 public sealed partial class PlaybackPipeline : IDisposable
 {
-    #region Constants
-
-    private const int ReadAheadMinMilliseconds = 8000;
-    private const int ReadAheadMaxMilliseconds = 10000;
-    private const int ReadAheadWakeMilliseconds = ReadAheadMinMilliseconds / 2;
-
-    private static readonly TimeSpan ReadAheadMin = TimeSpan.FromMilliseconds(ReadAheadMinMilliseconds);
-    private static readonly TimeSpan ReadAheadMax = TimeSpan.FromMilliseconds(ReadAheadMaxMilliseconds);
-    private static readonly TimeSpan ReadAheadWake = TimeSpan.FromMilliseconds(ReadAheadWakeMilliseconds);
-
-    #endregion
-
     #region Variables
 
     private readonly PipelineEvents _events;
@@ -49,7 +37,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private readonly IPipelineWakeTarget[] _wakeTargets;
     private readonly IChainFeed[] _feeds;
-    private readonly PipelineNodeAsync _readerNode = new();
+    private readonly MediaReader _reader;
 
     private bool _disposed;
     private bool _threadsStarted;
@@ -69,8 +57,10 @@ public sealed partial class PlaybackPipeline : IDisposable
         _video = new VideoChain(_timeline, _events);
         _audio = new AudioChain(_timeline, _events);
         _subtitle = new SubtitleChain(_timeline, _events);
+        _feeds = [_video, _audio, _subtitle];
+        _reader = new MediaReader(_source, _feeds, _timeline, _events, ChooseSeekLanding);
         _wakeTargets = [
-            _readerNode,
+            _reader,
             _video.DecodeNode,
             _audio.DecodeNode,
             _subtitle.DecodeNode,
@@ -78,7 +68,6 @@ public sealed partial class PlaybackPipeline : IDisposable
             _audio.RenderNode,
             _subtitle.RenderNode,
         ];
-        _feeds = [_video, _audio, _subtitle];
     }
 
     #endregion
@@ -585,7 +574,10 @@ public sealed partial class PlaybackPipeline : IDisposable
                 {
                     try
                     {
-                        await Task.WhenAll(ReaderCore(), _audio.Decode(() => _stopRequested, TryWakeReader), _subtitle.Decode(() => _stopRequested, TryWakeReader));
+                        await Task.WhenAll(
+                            _reader.Run(() => _stopRequested, NotifySourceEnded),
+                            _audio.Decode(() => _stopRequested, _reader.TryWake),
+                            _subtitle.Decode(() => _stopRequested, _reader.TryWake));
                     }
                     finally
                     {
@@ -619,7 +611,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return;
         }
 
-        _videoDecodeThread = new Thread(() => _video.Decode(() => _stopRequested, TryWakeReader))
+        _videoDecodeThread = new Thread(() => _video.Decode(() => _stopRequested, _reader.TryWake))
         {
             IsBackground = true,
             Name = "Pipeline - Video decode",
@@ -695,6 +687,32 @@ public sealed partial class PlaybackPipeline : IDisposable
     }
 
     private long FurthestTailTicks => Math.Max(_video.Tail.Ticks, _audio.Tail.Ticks);
+
+    private int ChooseSeekLanding(MediaSource source, TimeSpan position)
+    {
+        VideoStreamInfo? video = _video.Binding.Source == source ? _video.Binding.Stream : null;
+        AudioStreamInfo? audio = _audio.Binding.Source == source ? _audio.Binding.Stream : null;
+
+        if (video is null)
+        {
+            if (audio is null)
+            {
+                return -1;
+            }
+
+            return audio.Index;
+        }
+
+        if (audio is not null &&
+            video.Duration > TimeSpan.Zero &&
+            audio.Duration > video.Duration &&
+            position > video.Duration)
+        {
+            return audio.Index;
+        }
+
+        return video.Index;
+    }
 
     private void NotifyAudioRenderEnded(long epoch)
     {
