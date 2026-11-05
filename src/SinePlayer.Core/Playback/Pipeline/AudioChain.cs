@@ -11,10 +11,13 @@ using SinePlayer.Core.Playback.Abstractions.Timing;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents events)
+internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents events) : IChainFeed
 {
     private const int AudioIdleTimeoutMilliseconds = 5;
     private const int AudioDeviceLeewayMilliseconds = 3000;
+    private const int FallbackFrameMilliseconds = 40;
+
+    private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
     public ComponentSlot<IAudioDecoder> Decoder { get; } = new();
 
@@ -29,6 +32,32 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
     public PipelineNode RenderNode { get; } = new();
 
     public AudioFilterChain Filters { get; } = new();
+
+    public StreamBinding<AudioStreamInfo> Binding { get; set; }
+
+    public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
+    {
+        if (!Binding.Accepts(source, packet.StreamIndex))
+        {
+            return false;
+        }
+
+        TimeSpan span = SpanOf(packet);
+        _lastPacketSpan = span;
+        PacketQueue.Enqueue(new PacketEntry(packet, versions, epoch, span));
+        WakeDecode();
+        return true;
+    }
+
+    private TimeSpan SpanOf(MediaPacket packet)
+    {
+        if (packet.Duration > TimeSpan.Zero)
+        {
+            return packet.Duration;
+        }
+
+        return _lastPacketSpan > TimeSpan.Zero ? _lastPacketSpan : TimeSpan.FromMilliseconds(FallbackFrameMilliseconds);
+    }
 
     public async Task Decode(Func<bool> stopRequested, Action wakeReader)
     {
