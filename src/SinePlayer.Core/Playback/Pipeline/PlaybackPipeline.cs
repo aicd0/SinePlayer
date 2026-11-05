@@ -43,7 +43,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     public PlaybackPipeline()
     {
         _events = new PipelineEvents(WakeAll);
-        _timeline = new PipelineTimeline(NotifyClockMoved);
+        _timeline = new PipelineTimeline(NotifyClockMoved, () => IsStarved);
         _video = new VideoChain(_timeline, _events);
         _audio = new AudioChain(_timeline, _events);
         _subtitle = new SubtitleChain(_timeline, _events);
@@ -153,7 +153,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public long DroppedFrameCount => Interlocked.Read(ref _video.DroppedFrameCount);
 
-    public string? StarvedFor => _timeline.VideoStarved ? "video" : _timeline.AudioStarved ? "audio" : null;
+    public string? StarvedFor => _video.Starved ? "video" : _audio.Starved ? "audio" : null;
 
     internal TimeSpan LastPresentedTimestamp
     {
@@ -504,6 +504,8 @@ public sealed partial class PlaybackPipeline : IDisposable
         _subtitle.Binding = default;
 
         _timeline.Stop();
+        _video.Starved = false;
+        _audio.Starved = false;
 
         _timeline.EndingEpoch = -1;
         _videoRenderEndedEpoch = -1;
@@ -579,6 +581,8 @@ public sealed partial class PlaybackPipeline : IDisposable
     }
 
     private long FurthestTailTicks => Math.Max(_video.Tail.Ticks, _audio.Tail.Ticks);
+
+    private bool IsStarved => _video.Starved || _audio.Starved;
 
     private int ChooseSeekLanding(MediaSource source, TimeSpan position)
     {
