@@ -190,7 +190,7 @@ public sealed partial class PlaybackPipeline
             {
                 // Resolve audio renderer
                 bool rebuildAudioRenderer = sourceChanges.HasFlag(ChainChanges.AudioRenderer);
-                PipelineComponent<IAudioRenderer>? latestRenderer = _audioRenderer.Latest;
+                PipelineComponent<IAudioRenderer>? latestRenderer = _audio.Renderer.Latest;
                 OperationResult<PipelineComponent<IAudioRenderer>?> rendererResolved = ResolveComponent(
                     resolver.ResolveAudioRenderers(),
                     rebuildAudioRenderer ? null : latestRenderer?.Signature,
@@ -215,7 +215,7 @@ public sealed partial class PlaybackPipeline
 
                 // Resolve audio decoder
                 bool rebuildAudioDecoder = sourceChanges.HasFlag(ChainChanges.AudioDecoder);
-                PipelineComponent<IAudioDecoder>? latestDecoder = _audioDecoder.Latest;
+                PipelineComponent<IAudioDecoder>? latestDecoder = _audio.Decoder.Latest;
                 OperationResult<PipelineComponent<IAudioDecoder>?> decoderResolved = ResolveComponent(
                     resolver.ResolveAudioDecoders(audioSource.Source, audioStream),
                     rebuildAudioDecoder ? null : latestDecoder?.Signature,
@@ -233,17 +233,17 @@ public sealed partial class PlaybackPipeline
 
                 if (negotiatedFormat is not null)
                 {
-                    AudioFilters.Configure(audioStream, negotiatedFormat);
+                    _audio.Filters.Configure(audioStream, negotiatedFormat);
                 }
             }
             else
             {
-                if (_audioDecoder.HasComponent)
+                if (_audio.Decoder.HasComponent)
                 {
                     changed |= sourceChanges & ChainChanges.AudioDecoder;
                 }
 
-                if (_audioRenderer.HasComponent)
+                if (_audio.Renderer.HasComponent)
                 {
                     changed |= sourceChanges & ChainChanges.AudioRenderer;
                 }
@@ -261,13 +261,13 @@ public sealed partial class PlaybackPipeline
 
                 if (changed.HasFlag(ChainChanges.AudioDecoder))
                 {
-                    _audioDecoder.Publish(decoder, versions);
+                    _audio.Decoder.Publish(decoder, versions);
                     decoder = null;
                 }
 
                 if (changed.HasFlag(ChainChanges.AudioRenderer))
                 {
-                    _audioRenderer.Publish(renderer, versions);
+                    _audio.Renderer.Publish(renderer, versions);
                     renderer = null;
                 }
             }
@@ -469,9 +469,9 @@ public sealed partial class PlaybackPipeline
         PipelineVersion versions = default;
         versions = PipelineVersion.Max(versions, _source.HighestVersions);
         versions = PipelineVersion.Max(versions, _video.Decoder.HighestVersions);
-        versions = PipelineVersion.Max(versions, _audioDecoder.HighestVersions);
+        versions = PipelineVersion.Max(versions, _audio.Decoder.HighestVersions);
         versions = PipelineVersion.Max(versions, _video.Renderer.HighestVersions);
-        versions = PipelineVersion.Max(versions, _audioRenderer.HighestVersions);
+        versions = PipelineVersion.Max(versions, _audio.Renderer.HighestVersions);
         versions = PipelineVersion.Max(versions, _subtitle.Decoder.HighestVersions);
         versions = PipelineVersion.Max(versions, _subtitle.Renderer.HighestVersions);
         return versions;

@@ -48,16 +48,12 @@ public sealed partial class PlaybackPipeline : IDisposable
     private readonly PipelineTimeline _timeline;
     private readonly SubtitleChain _subtitle;
     private readonly VideoChain _video;
+    private readonly AudioChain _audio;
 
     private volatile MediaSourceHolder _selection = new([], null, null, null);
 
     private long _subtitleSurfaceVersion;
     private readonly ComponentSlot<MediaSourceHolder> _source = new();
-    private readonly ComponentSlot<IAudioDecoder> _audioDecoder = new();
-    private readonly ComponentSlot<IAudioRenderer> _audioRenderer = new();
-
-    private readonly PacketQueue _audioPacketQueue = new();
-    private readonly AudioQueue _audioQueue = new();
 
     private Thread? _readerThread;
     private Thread? _videoDecodeThread;
@@ -67,8 +63,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private readonly IPipelineWakeTarget[] _wakeTargets;
     private readonly PipelineNodeAsync _readerNode = new();
-    private readonly PipelineNodeAsync _audioDecodeNode = new();
-    private readonly PipelineNode _audioRenderNode = new();
 
     private bool _disposed;
     private bool _threadsStarted;
@@ -90,13 +84,14 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         _subtitle = new SubtitleChain();
         _video = new VideoChain();
+        _audio = new AudioChain();
         _wakeTargets = [
             _readerNode,
             _video.DecodeNode,
-            _audioDecodeNode,
+            _audio.DecodeNode,
             _subtitle.DecodeNode,
             _video.RenderNode,
-            _audioRenderNode,
+            _audio.RenderNode,
             _subtitle.RenderNode,
         ];
         _events = new PipelineEvents(WakeAll);
@@ -121,7 +116,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public ComponentResolver Components { get; set; } = new();
 
-    public AudioFilterChain AudioFilters { get; } = new();
+    public AudioFilterChain AudioFilters => _audio.Filters;
 
     public ISourceProviderFactory? SourceFactory { get; set; }
 
@@ -172,11 +167,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public string? VideoDecoderName => _video.Decoder.CurrentComponent?.Name;
 
-    public string? AudioDecoderName => _audioDecoder.CurrentComponent?.Name;
+    public string? AudioDecoderName => _audio.Decoder.CurrentComponent?.Name;
 
     public string? VideoRendererName => _video.Renderer.CurrentComponent?.Name;
 
-    public string? AudioRendererName => _audioRenderer.CurrentComponent?.Name;
+    public string? AudioRendererName => _audio.Renderer.CurrentComponent?.Name;
 
     public string? SubtitleDecoderName => _subtitle.Decoder.CurrentComponent?.Name;
 
@@ -184,7 +179,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public bool IsVideoHardwareAccelerated => _video.Decoder.CurrentComponent?.IsHardwareAccelerated ?? false;
 
-    public bool IsAudioHardwareAccelerated => _audioDecoder.CurrentComponent?.IsHardwareAccelerated ?? false;
+    public bool IsAudioHardwareAccelerated => _audio.Decoder.CurrentComponent?.IsHardwareAccelerated ?? false;
 
     public TimeSpan Position => _timeline.Position;
 
@@ -221,7 +216,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
     }
 
-    public long AudioUnderruns => _audioRenderer.CurrentComponent?.UnderrunCount ?? 0;
+    public long AudioUnderruns => _audio.Renderer.CurrentComponent?.UnderrunCount ?? 0;
 
     public TimeSpan PictureLag
     {
@@ -527,7 +522,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         _threadsStarted = false;
 
         _video.PacketQueue.Clear();
-        _audioPacketQueue.Clear();
+        _audio.PacketQueue.Clear();
         _subtitle.PacketQueue.Clear();
 
         while (_video.FrameQueue.TryDequeue(out FrameEntry frame))
@@ -535,7 +530,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             frame.Frame?.Dispose();
         }
 
-        _audioQueue.Clear();
+        _audio.BufferQueue.Clear();
 
         foreach (MediaSource source in _selection.Sources)
         {
@@ -546,10 +541,10 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         _source.Reset();
         _video.Decoder.Reset();
-        _audioDecoder.Reset();
+        _audio.Decoder.Reset();
         _video.Renderer.Reset();
-        _audioRenderer.CurrentComponent?.Flush();
-        _audioRenderer.Reset();
+        _audio.Renderer.CurrentComponent?.Flush();
+        _audio.Renderer.Reset();
         _subtitle.Decoder.Reset();
         _subtitle.Renderer.Reset();
 
