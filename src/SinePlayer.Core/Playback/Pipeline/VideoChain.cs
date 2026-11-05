@@ -17,7 +17,7 @@ using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents events) : IPictureFrameSource, IChainFeed
+internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged) : IPictureFrameSource, IChainFeed
 {
     private const int FrameQueueCapacity = 8;
     private const int VideoStarvationMilliseconds = 200;
@@ -47,7 +47,17 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
     public ISynchronizer Synchronizer { get; set; } = new DefaultSynchronizer();
 
-    public IVideoRenderTarget? Target { get; set; }
+    private IVideoRenderTarget? _target;
+    public IVideoRenderTarget? Target
+    {
+        get => _target;
+        set
+        {
+            _target?.SurfaceSizeChanged -= surfaceSizeChanged;
+            _target = value;
+            _target?.SurfaceSizeChanged += surfaceSizeChanged;
+        }
+    }
 
     public VideoStreamInfo? Stream => Binding.Stream;
 
@@ -93,6 +103,31 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         _decodeThread = null;
         _renderThread?.Join();
         _renderThread = null;
+    }
+
+    public void Reset()
+    {
+        PacketQueue.Clear();
+
+        while (FrameQueue.TryDequeue(out FrameEntry entry))
+        {
+            entry.Frame?.Dispose();
+        }
+
+        Decoder.Reset();
+        Renderer.Reset();
+        Target = null;
+        Binding = default;
+        Starved = false;
+        EndedEpoch = -1;
+        Tail.Reset();
+
+        Interlocked.Exchange(ref PresentedFrameCount, 0);
+        Interlocked.Exchange(ref DroppedFrameCount, 0);
+        Interlocked.Exchange(ref DecodedFrameCount, 0);
+        Interlocked.Exchange(ref DecodeTicks, 0);
+        Interlocked.Exchange(ref RenderTicks, 0);
+        Interlocked.Exchange(ref PictureTicks, -1);
     }
 
     public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)

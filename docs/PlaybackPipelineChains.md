@@ -236,6 +236,7 @@ deferred, and it is deferred to a single object rather than spread across the ch
 | G1a | Starvation belongs to the chain that starves | `VideoChain.Starved` / `AudioChain.Starved`; `PipelineTimeline` takes a `Func<bool> starved` and asks it instead of holding two flags | done |
 | G1b | `ClockGovernor`: one owner (first live audio chain, else first video chain) anchors and alone corrects the clock, and only the owner pauses playback for starving | | deferred to the multi-chain milestone: with one chain of each kind, "only the owner pauses" would stop a starving *video* chain from pausing the clock, which `HoldsTheClockBackUntilThePictureHasSomethingToShow` relies on. v1 keeps "any starving chain pauses" |
 | G2 | `chain.ReportEnded(epoch)` replaces `NotifyVideoRenderEnded`/`NotifyAudioRenderEnded`; playback ends when every active video and audio chain has reported; subtitles never gate it | `VideoChain.EndedEpoch` / `AudioChain.EndedEpoch`; the report delegate carries no epoch, the chain records it; `TryNotifyPlaybackEnded` reads the chains' bindings | done |
+| G3 | Each chain cleans up after itself | `chain.Reset()` clears the queues, resets the slots, drops the binding, clears starvation and the end report, resets the tail and the statistics; the chain subscribes to and unsubscribes from its own target's `SurfaceSizeChanged`. `StopCore` keeps only the assembly state: sources, source holder, timeline | done |
 
 ## Definition of done for v1
 
