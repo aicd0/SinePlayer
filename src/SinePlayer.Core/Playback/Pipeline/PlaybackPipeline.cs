@@ -33,9 +33,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private bool _disposed;
 
-    private long _videoRenderEndedEpoch = -1;
-    private long _audioRenderEndedEpoch = -1;
-
     #endregion
 
     #region Construction
@@ -508,8 +505,8 @@ public sealed partial class PlaybackPipeline : IDisposable
         _audio.Starved = false;
 
         _timeline.EndingEpoch = -1;
-        _videoRenderEndedEpoch = -1;
-        _audioRenderEndedEpoch = -1;
+        _video.EndedEpoch = -1;
+        _audio.EndedEpoch = -1;
 
         foreach (IChainFeed feed in _feeds)
         {
@@ -538,8 +535,8 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         host.Start();
         _host = host;
-        _video.Start(_reader.TryWake, IsVideoStreamSpent, NotifyVideoRenderEnded);
-        _audio.Start(IsAudioStreamSpent, NotifyAudioRenderEnded);
+        _video.Start(_reader.TryWake, IsVideoStreamSpent, TryNotifyPlaybackEnded);
+        _audio.Start(IsAudioStreamSpent, TryNotifyPlaybackEnded);
         _subtitle.Start();
     }
 
@@ -561,12 +558,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     private void NotifySourceEnded(long epoch)
     {
         _timeline.EndingEpoch = epoch;
-        TryNotifyPlaybackEnded();
-    }
-
-    private void NotifyVideoRenderEnded(long epoch)
-    {
-        _videoRenderEndedEpoch = epoch;
         TryNotifyPlaybackEnded();
     }
 
@@ -610,12 +601,6 @@ public sealed partial class PlaybackPipeline : IDisposable
         return video.Index;
     }
 
-    private void NotifyAudioRenderEnded(long epoch)
-    {
-        _audioRenderEndedEpoch = epoch;
-        TryNotifyPlaybackEnded();
-    }
-
     private void TryNotifyPlaybackEnded()
     {
         if (!_events.CheckState(out _, MediaEngineState.Playing, MediaEngineState.Paused))
@@ -623,23 +608,18 @@ public sealed partial class PlaybackPipeline : IDisposable
             return;
         }
 
-        if (_timeline.EndingEpoch != _timeline.Epoch)
+        long endingEpoch = _timeline.EndingEpoch;
+        if (endingEpoch != _timeline.Epoch)
         {
             return;
         }
 
-        MediaSourceHolder? sourceHolder = _source.Latest?.Component;
-        if (sourceHolder is null)
+        if (_video.Binding.Stream is not null && _video.EndedEpoch != endingEpoch)
         {
             return;
         }
 
-        if (sourceHolder.VideoStream is not null && _videoRenderEndedEpoch != _timeline.EndingEpoch)
-        {
-            return;
-        }
-
-        if (sourceHolder.AudioStream is not null && _audioRenderEndedEpoch != _timeline.EndingEpoch)
+        if (_audio.Binding.Stream is not null && _audio.EndedEpoch != endingEpoch)
         {
             return;
         }

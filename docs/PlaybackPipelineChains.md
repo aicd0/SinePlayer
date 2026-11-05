@@ -1,6 +1,7 @@
 # PlaybackPipeline chain decomposition — v1 plan
 
-Status: in progress. Phases A–F done (A1–A6, B1–B4, C1–C6, D1–D6, E1–E5, F1–F4); next is G (clock governance, ending).
+Status: in progress. Phases A–F done (A1–A6, B1–B4, C1–C6, D1–D6, E1–E5, F1–F4); Phase G is done except
+for the clock governor (G1b), which belongs to the multi-chain milestone.
 
 `PlaybackPipeline` was 3212 lines and held one video chain, one audio chain and one subtitle chain inline:
 their queues, their threads, their component slots, their statistics and their component reconciliation.
@@ -230,10 +231,11 @@ deferred, and it is deferred to a single object rather than spread across the ch
 
 ## Phase G — clock governance and ending
 
-| # | Step | Size | Note |
+| # | Step | Lands as | State |
 |---|---|---|---|
-| G1 | `ClockGovernor`: one owner (first live audio chain, else first video chain) anchors and alone corrects the clock; starvation is per chain and only the owner pauses playback; `StarvedFor` names the chain | ~120 | with one chain of each kind this reproduces today's behaviour exactly |
-| G2 | `chain.ReportEnded(epoch)` replaces `NotifyVideoRenderEnded`/`NotifyAudioRenderEnded`; playback ends when every active video and audio chain has reported; subtitles never gate it | ~90 | same rule as today, stated per chain |
+| G1a | Starvation belongs to the chain that starves | `VideoChain.Starved` / `AudioChain.Starved`; `PipelineTimeline` takes a `Func<bool> starved` and asks it instead of holding two flags | done |
+| G1b | `ClockGovernor`: one owner (first live audio chain, else first video chain) anchors and alone corrects the clock, and only the owner pauses playback for starving | | deferred to the multi-chain milestone: with one chain of each kind, "only the owner pauses" would stop a starving *video* chain from pausing the clock, which `HoldsTheClockBackUntilThePictureHasSomethingToShow` relies on. v1 keeps "any starving chain pauses" |
+| G2 | `chain.ReportEnded(epoch)` replaces `NotifyVideoRenderEnded`/`NotifyAudioRenderEnded`; playback ends when every active video and audio chain has reported; subtitles never gate it | `VideoChain.EndedEpoch` / `AudioChain.EndedEpoch`; the report delegate carries no epoch, the chain records it; `TryNotifyPlaybackEnded` reads the chains' bindings | done |
 
 ## Definition of done for v1
 
