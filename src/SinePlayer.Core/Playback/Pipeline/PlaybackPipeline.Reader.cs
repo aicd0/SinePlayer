@@ -165,7 +165,7 @@ public sealed partial class PlaybackPipeline
             {
                 endingEpoch = epoch;
 
-                _videoPacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
+                _video.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 _audioPacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 _subtitle.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 TryWakeVideoDecode();
@@ -216,7 +216,7 @@ public sealed partial class PlaybackPipeline
                 AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailVideoTicks);
                 TimeSpan span = SpanOf(packet, lastVideoPacketSpan, videoStreamInfo.FrameRate);
                 lastVideoPacketSpan = span;
-                _videoPacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
+                _video.PacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
                 handedOn = true;
                 TryWakeVideoDecode();
             }
@@ -324,7 +324,7 @@ public sealed partial class PlaybackPipeline
 
         TimeSpan position = _timeline.Position;
 
-        if (holder.VideoStream is not null && _videoDecoder.HasComponent && ReadAhead(ref _readerTailVideoTicks, position) >= ReadAheadMax)
+        if (holder.VideoStream is not null && _video.Decoder.HasComponent && ReadAhead(ref _readerTailVideoTicks, position) >= ReadAheadMax)
         {
             return true;
         }
@@ -339,7 +339,7 @@ public sealed partial class PlaybackPipeline
             return true;
         }
 
-        if (holder.VideoStream is not null && _videoDecoder.HasComponent && ReadAhead(ref _readerTailVideoTicks, position) < minimumReadAhead)
+        if (holder.VideoStream is not null && _video.Decoder.HasComponent && ReadAhead(ref _readerTailVideoTicks, position) < minimumReadAhead)
         {
             return false;
         }
