@@ -47,28 +47,23 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private readonly PipelineEvents _events;
     private readonly PipelineTimeline _timeline;
+    private readonly SubtitleChain _subtitle;
     private readonly SeqLock<VideoTransform> _videoTransform = new(VideoTransform.Identity);
-    private readonly SeqLock<SubtitlePresentation> _subtitlePresentation = new(SubtitlePresentation.Identity);
 
     private volatile MediaSourceHolder _selection = new([], null, null, null);
 
     private IVideoRenderTarget? _videoTarget;
-    private IVideoRenderTarget? _subtitleTarget;
     private long _subtitleSurfaceVersion;
     private readonly ComponentSlot<MediaSourceHolder> _source = new();
     private readonly ComponentSlot<IVideoDecoder> _videoDecoder = new();
     private readonly ComponentSlot<IVideoRenderer> _videoRenderer = new();
     private readonly ComponentSlot<IAudioDecoder> _audioDecoder = new();
     private readonly ComponentSlot<IAudioRenderer> _audioRenderer = new();
-    private readonly ComponentSlot<ISubtitleDecoder> _subtitleDecoder = new();
-    private readonly ComponentSlot<ISubtitleRenderer> _subtitleRenderer = new();
 
     private readonly PacketQueue _videoPacketQueue = new();
     private readonly PacketQueue _audioPacketQueue = new();
-    private readonly PacketQueue _subtitlePacketQueue = new();
     private readonly ConcurrentQueue<FrameEntry> _frameQueue = new();
     private readonly AudioQueue _audioQueue = new();
-    private readonly SubtitleCueWindow _cueWindow = new();
 
     private Thread? _readerThread;
     private Thread? _videoDecodeThread;
@@ -80,10 +75,8 @@ public sealed partial class PlaybackPipeline : IDisposable
     private readonly PipelineNodeAsync _readerNode = new();
     private readonly PipelineNode _videoDecodeNode = new();
     private readonly PipelineNodeAsync _audioDecodeNode = new();
-    private readonly PipelineNodeAsync _subtitleDecodeNode = new();
     private readonly PipelineNode _videoRenderNode = new();
     private readonly PipelineNode _audioRenderNode = new();
-    private readonly PipelineNode _subtitleRenderNode = new();
 
     private bool _disposed;
     private bool _threadsStarted;
@@ -110,14 +103,15 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public PlaybackPipeline()
     {
+        _subtitle = new SubtitleChain();
         _wakeTargets = [
             _readerNode,
             _videoDecodeNode,
             _audioDecodeNode,
-            _subtitleDecodeNode,
+            _subtitle.DecodeNode,
             _videoRenderNode,
             _audioRenderNode,
-            _subtitleRenderNode,
+            _subtitle.RenderNode,
         ];
         _events = new PipelineEvents(WakeAll);
         _timeline = new PipelineTimeline(NotifyClockMoved);
@@ -159,22 +153,22 @@ public sealed partial class PlaybackPipeline : IDisposable
 
             _videoTransform.Write(_ => value);
             _videoRenderNode.Wake();
-            _subtitleRenderNode.Wake();
+            _subtitle.RenderNode.Wake();
         }
     }
 
     public SubtitlePresentation SubtitlePresentation
     {
-        get => _subtitlePresentation.Read();
+        get => _subtitle.Presentation.Read();
         set
         {
-            if (_subtitlePresentation.Read() == value)
+            if (_subtitle.Presentation.Read() == value)
             {
                 return;
             }
 
-            _subtitlePresentation.Write(_ => value);
-            _subtitleRenderNode.Wake();
+            _subtitle.Presentation.Write(_ => value);
+            _subtitle.RenderNode.Wake();
         }
     }
 
@@ -198,9 +192,9 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public string? AudioRendererName => _audioRenderer.CurrentComponent?.Name;
 
-    public string? SubtitleDecoderName => _subtitleDecoder.CurrentComponent?.Name;
+    public string? SubtitleDecoderName => _subtitle.Decoder.CurrentComponent?.Name;
 
-    public string? SubtitleRendererName => _subtitleRenderer.CurrentComponent?.Name;
+    public string? SubtitleRendererName => _subtitle.Renderer.CurrentComponent?.Name;
 
     public bool IsVideoHardwareAccelerated => _videoDecoder.CurrentComponent?.IsHardwareAccelerated ?? false;
 
@@ -325,8 +319,8 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         _videoTarget = videoTarget;
         _videoTarget?.SurfaceSizeChanged += VideoTarget_SurfaceSizeChanged;
-        _subtitleTarget = subtitleTarget;
-        _subtitleTarget?.SurfaceSizeChanged += SubtitleTarget_SurfaceSizeChanged;
+        _subtitle.Target = subtitleTarget;
+        _subtitle.Target?.SurfaceSizeChanged += SubtitleTarget_SurfaceSizeChanged;
 
         _timeline.SetPosition(TimeSpan.Zero);
 
@@ -548,7 +542,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         _videoPacketQueue.Clear();
         _audioPacketQueue.Clear();
-        _subtitlePacketQueue.Clear();
+        _subtitle.PacketQueue.Clear();
 
         while (_frameQueue.TryDequeue(out FrameEntry frame))
         {
@@ -570,13 +564,13 @@ public sealed partial class PlaybackPipeline : IDisposable
         _videoRenderer.Reset();
         _audioRenderer.CurrentComponent?.Flush();
         _audioRenderer.Reset();
-        _subtitleDecoder.Reset();
-        _subtitleRenderer.Reset();
+        _subtitle.Decoder.Reset();
+        _subtitle.Renderer.Reset();
 
         _videoTarget?.SurfaceSizeChanged -= VideoTarget_SurfaceSizeChanged;
         _videoTarget = null;
-        _subtitleTarget?.SurfaceSizeChanged -= SubtitleTarget_SurfaceSizeChanged;
-        _subtitleTarget = null;
+        _subtitle.Target?.SurfaceSizeChanged -= SubtitleTarget_SurfaceSizeChanged;
+        _subtitle.Target = null;
 
         _timeline.Stop();
 
@@ -763,13 +757,13 @@ public sealed partial class PlaybackPipeline : IDisposable
     private void VideoTarget_SurfaceSizeChanged()
     {
         _videoRenderNode.Wake();
-        _subtitleRenderNode.Wake();
+        _subtitle.RenderNode.Wake();
     }
 
     private void SubtitleTarget_SurfaceSizeChanged()
     {
         Interlocked.Increment(ref _subtitleSurfaceVersion);
-        _subtitleRenderNode.Wake();
+        _subtitle.RenderNode.Wake();
     }
 
     #endregion
@@ -790,7 +784,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private void NotifyClockMoved()
     {
         // Subtitle might be changed
-        _subtitleRenderNode.Wake();
+        _subtitle.RenderNode.Wake();
     }
 
     private void WakeAll()
