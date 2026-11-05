@@ -36,6 +36,13 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
     public StreamBinding<AudioStreamInfo> Binding { get; set; }
 
+    private volatile bool _starved;
+    public bool Starved
+    {
+        get => _starved;
+        set => _starved = value;
+    }
+
     public ChainTail Tail { get; } = new();
 
     public bool IsActive => Binding.Stream is not null && Decoder.HasComponent;
@@ -367,7 +374,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
             {
                 if (epochChanged)
                 {
-                    timeline.AudioStarved = true;
+                    Starved = true;
                 }
 
                 timeline.StartOrPause(epoch, state);
@@ -418,7 +425,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                 lock (timeline.ClockLock)
                 {
                     // A device that is running ahead of the clock is not starved.
-                    timeline.AudioStarved = false;
+                    Starved = false;
                 }
 
                 RenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);
@@ -462,7 +469,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                 bool starved = deviceAvailable && !hasDeviceAudio && !ending && !isStreamSpent(epoch, position);
                 lock (timeline.ClockLock)
                 {
-                    timeline.AudioStarved = starved;
+                    Starved = starved;
                     timeline.StartOrPause(epoch, state);
                 }
 
@@ -543,7 +550,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
             lock (timeline.ClockLock)
             {
-                timeline.AudioStarved = false;
+                Starved = false;
 
                 bool clockChanged = timeline.Anchor(epoch, buffer.Timestamp);
                 if (deviceAvailable && audioRenderer is not null && (clockChanged || clockOffset is null))
