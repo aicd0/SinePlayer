@@ -7,5 +7,9 @@ namespace SinePlayer.Core.Playback.Pipeline;
 
 internal interface IChainFeed
 {
+    bool IsActive { get; }
+
+    ChainTail Tail { get; }
+
     bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch);
 }
