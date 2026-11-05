@@ -57,6 +57,12 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
         return true;
     }
 
+    public void SignalEnd(PipelineVersion versions, long epoch)
+    {
+        PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
+        WakeDecode();
+    }
+
     private TimeSpan SpanOf(MediaPacket packet)
     {
         if (packet.Duration > TimeSpan.Zero)

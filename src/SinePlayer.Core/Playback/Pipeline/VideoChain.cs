@@ -89,6 +89,12 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         return true;
     }
 
+    public void SignalEnd(PipelineVersion versions, long epoch)
+    {
+        PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
+        WakeDecode();
+    }
+
     private TimeSpan SpanOf(MediaPacket packet, double frameRate)
     {
         if (packet.Duration > TimeSpan.Zero)

@@ -2,26 +2,38 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Common.ErrorHandling;
-using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-public sealed partial class PlaybackPipeline
+internal sealed class MediaReader(
+    ComponentSlot<MediaSourceHolder> source,
+    IReadOnlyList<IChainFeed> feeds,
+    PipelineTimeline timeline,
+    PipelineEvents events,
+    Func<MediaSource, TimeSpan, int> chooseSeekLanding) : IPipelineWakeTarget
 {
-    #region Reader
+    private static readonly TimeSpan ReadAheadMin = TimeSpan.FromMilliseconds(8000);
+    private static readonly TimeSpan ReadAheadMax = TimeSpan.FromMilliseconds(10000);
+    private static readonly TimeSpan ReadAheadWake = TimeSpan.FromMilliseconds(4000);
 
-    private void TryWakeReader()
+    private readonly PipelineNodeAsync _node = new();
+
+    public void Wake()
+    {
+        _node.Wake();
+    }
+
+    public void TryWake()
     {
         if (!IsBuffered(ReadAheadWake))
         {
-            _readerNode.Wake();
+            _node.Wake();
         }
     }
 
-    private async Task ReaderCore()
+    public async Task Run(Func<bool> stopRequested, Action<long> reportSourceEnded)
     {
-        ComponentSlot<MediaSourceHolder> sourceSlot = _source;
         bool pendingEpochChange = false;
         bool buffering = false;
         long workingEpoch = -1;
@@ -30,42 +42,42 @@ public sealed partial class PlaybackPipeline
 
         while (true)
         {
-            long stamp = _readerNode.Stamp;
-            if (_stopRequested)
+            long stamp = _node.Stamp;
+            if (stopRequested())
             {
                 break;
             }
 
-            if (!_events.CheckState(out _, MediaEngineState.Playing, MediaEngineState.Paused))
+            if (!events.CheckState(out _, MediaEngineState.Playing, MediaEngineState.Paused))
             {
-                await _readerNode.WaitAsync(stamp);
+                await _node.WaitAsync(stamp);
                 continue;
             }
 
             // Install source
-            if (sourceSlot.Update(out MediaSourceHolder? oldSourceHolder))
+            if (source.Update(out MediaSourceHolder? oldSourceHolder))
             {
                 oldSourceHolder?.Dispose();
                 pendingEpochChange = true;
                 tails.Clear();
             }
 
-            MediaSourceHolder? sourceHolder = sourceSlot.CurrentComponent;
+            MediaSourceHolder? sourceHolder = source.CurrentComponent;
             if (sourceHolder is null)
             {
-                await _readerNode.WaitAsync(stamp);
+                await _node.WaitAsync(stamp);
                 continue;
             }
 
             IReadOnlyList<MediaSource> sources = sourceHolder.Sources;
             if (sources.Count == 0)
             {
-                await _readerNode.WaitAsync(stamp);
+                await _node.WaitAsync(stamp);
                 continue;
             }
 
             // Bump epoch
-            EpochGate epochGate = _timeline.Gate;
+            EpochGate epochGate = timeline.Gate;
             long epoch = epochGate.Epoch;
             if (epoch != workingEpoch)
             {
@@ -73,7 +85,7 @@ public sealed partial class PlaybackPipeline
                 pendingEpochChange = false;
                 tails.Clear();
 
-                foreach (IChainFeed feed in _feeds)
+                foreach (IChainFeed feed in feeds)
                 {
                     feed.Tail.Reset();
                 }
@@ -85,7 +97,7 @@ public sealed partial class PlaybackPipeline
                 }
                 else
                 {
-                    _events.PostWarning(sought.Message);
+                    events.PostWarning(sought.Message);
                 }
 
                 continue;
@@ -93,7 +105,7 @@ public sealed partial class PlaybackPipeline
 
             if (pendingEpochChange || endingEpoch == epoch)
             {
-                await _readerNode.WaitAsync(stamp);
+                await _node.WaitAsync(stamp);
                 continue;
             }
 
@@ -102,7 +114,7 @@ public sealed partial class PlaybackPipeline
             {
                 if (IsBuffered(ReadAheadWake))
                 {
-                    await _readerNode.WaitAsync(stamp);
+                    await _node.WaitAsync(stamp);
                     continue;
                 }
 
@@ -116,12 +128,12 @@ public sealed partial class PlaybackPipeline
 
             MediaSource? chosenSource = null;
             SourceTail? chosenTail = null;
-            foreach (MediaSource source in sources)
+            foreach (MediaSource candidate in sources)
             {
-                if (!tails.TryGetValue(source, out SourceTail? tail))
+                if (!tails.TryGetValue(candidate, out SourceTail? tail))
                 {
                     tail = new SourceTail { Tail = epochGate.SeekPosition };
-                    tails[source] = tail;
+                    tails[candidate] = tail;
                 }
 
                 if (tail.Ended)
@@ -131,25 +143,23 @@ public sealed partial class PlaybackPipeline
 
                 if (chosenTail is null || tail.Tail < chosenTail.Tail)
                 {
-                    chosenSource = source;
+                    chosenSource = candidate;
                     chosenTail = tail;
                 }
             }
 
-            PipelineVersion sourceVersions = sourceSlot.CurrentVersions;
+            PipelineVersion sourceVersions = source.CurrentVersions;
             if (chosenSource is null || chosenTail is null)
             {
                 endingEpoch = epoch;
 
-                _video.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
-                _audio.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
-                _subtitle.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
-                _video.WakeDecode();
-                _audio.WakeDecode();
-                _subtitle.WakeDecode();
+                foreach (IChainFeed feed in feeds)
+                {
+                    feed.SignalEnd(sourceVersions, epoch);
+                }
 
                 long endedEpoch = epoch;
-                _ = _events.Submit(() => NotifySourceEnded(endedEpoch));
+                _ = events.Submit(() => reportSourceEnded(endedEpoch));
                 continue;
             }
 
@@ -166,7 +176,7 @@ public sealed partial class PlaybackPipeline
 
             if (!read.IsSuccessful)
             {
-                _events.PostFailure(read);
+                events.PostFailure(read);
                 break;
             }
 
@@ -181,23 +191,15 @@ public sealed partial class PlaybackPipeline
                 chosenTail.Tail = packet.Timestamp;
             }
 
-            // Route packet
             bool handedOn = false;
-
-            if (_video.TryAccept(chosenSource, packet, sourceVersions, epoch))
+            foreach (IChainFeed feed in feeds)
             {
-                _video.Tail.Report(epoch, packet.Timestamp);
-                handedOn = true;
-            }
-            else if (_audio.TryAccept(chosenSource, packet, sourceVersions, epoch))
-            {
-                _audio.Tail.Report(epoch, packet.Timestamp);
-                handedOn = true;
-            }
-            else if (_subtitle.TryAccept(chosenSource, packet, sourceVersions, epoch))
-            {
-                _subtitle.Tail.Report(epoch, packet.Timestamp);
-                handedOn = true;
+                if (feed.TryAccept(chosenSource, packet, sourceVersions, epoch))
+                {
+                    feed.Tail.Report(epoch, packet.Timestamp);
+                    handedOn = true;
+                    break;
+                }
             }
 
             if (!handedOn)
@@ -227,7 +229,7 @@ public sealed partial class PlaybackPipeline
             OperationResult sought;
             try
             {
-                sought = entry.Source.Seek(position, ChooseSeekLanding(entry, position));
+                sought = entry.Source.Seek(position, chooseSeekLanding(entry, position));
             }
             catch (Exception ex)
             {
@@ -243,37 +245,11 @@ public sealed partial class PlaybackPipeline
         return firstFailure;
     }
 
-    private int ChooseSeekLanding(MediaSource source, TimeSpan position)
-    {
-        VideoStreamInfo? video = _video.Binding.Source == source ? _video.Binding.Stream : null;
-        AudioStreamInfo? audio = _audio.Binding.Source == source ? _audio.Binding.Stream : null;
-
-        if (video is null)
-        {
-            if (audio is null)
-            {
-                return -1;
-            }
-
-            return audio.Index;
-        }
-
-        if (audio is not null &&
-            video.Duration > TimeSpan.Zero &&
-            audio.Duration > video.Duration &&
-            position > video.Duration)
-        {
-            return audio.Index;
-        }
-
-        return video.Index;
-    }
-
     private bool IsBuffered(TimeSpan minimumReadAhead)
     {
-        TimeSpan position = _timeline.Position;
+        TimeSpan position = timeline.Position;
 
-        foreach (IChainFeed feed in _feeds)
+        foreach (IChainFeed feed in feeds)
         {
             if (feed.IsActive && feed.Tail.ReadAhead(position) >= ReadAheadMax)
             {
@@ -281,7 +257,7 @@ public sealed partial class PlaybackPipeline
             }
         }
 
-        foreach (IChainFeed feed in _feeds)
+        foreach (IChainFeed feed in feeds)
         {
             if (feed.IsActive && feed.Tail.ReadAhead(position) < minimumReadAhead)
             {
@@ -298,6 +274,4 @@ public sealed partial class PlaybackPipeline
 
         public bool Ended { get; set; }
     }
-
-    #endregion
 }
