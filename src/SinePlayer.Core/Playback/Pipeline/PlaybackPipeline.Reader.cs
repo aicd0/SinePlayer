@@ -167,7 +167,7 @@ public sealed partial class PlaybackPipeline
 
                 _videoPacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 _audioPacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
-                _subtitlePacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
+                _subtitle.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 TryWakeVideoDecode();
                 TryWakeAudioDecode();
                 TryWakeSubtitleDecode();
@@ -234,7 +234,7 @@ public sealed partial class PlaybackPipeline
                 AdvanceReaderTail(epoch, packet.Timestamp, ref _readerTailSubtitleTicks);
                 TimeSpan span = SpanOf(packet, lastSubtitlePacketSpan, 0);
                 lastSubtitlePacketSpan = span;
-                _subtitlePacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
+                _subtitle.PacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
                 handedOn = true;
                 TryWakeSubtitleDecode();
             }
@@ -334,7 +334,7 @@ public sealed partial class PlaybackPipeline
             return true;
         }
 
-        if (holder.SubtitleStream is not null && _subtitleDecoder.HasComponent && ReadAhead(ref _readerTailSubtitleTicks, position) >= ReadAheadMax)
+        if (holder.SubtitleStream is not null && _subtitle.Decoder.HasComponent && ReadAhead(ref _readerTailSubtitleTicks, position) >= ReadAheadMax)
         {
             return true;
         }
@@ -349,7 +349,7 @@ public sealed partial class PlaybackPipeline
             return false;
         }
 
-        if (holder.SubtitleStream is not null && _subtitleDecoder.HasComponent && ReadAhead(ref _readerTailSubtitleTicks, position) < minimumReadAhead)
+        if (holder.SubtitleStream is not null && _subtitle.Decoder.HasComponent && ReadAhead(ref _readerTailSubtitleTicks, position) < minimumReadAhead)
         {
             return false;
         }
