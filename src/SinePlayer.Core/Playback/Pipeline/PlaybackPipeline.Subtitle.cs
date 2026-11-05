@@ -45,7 +45,7 @@ public sealed partial class PlaybackPipeline
             }
 
             // Bump epoch
-            EpochGate epochGate = _epochGate.Read();
+            EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             if (workingEpoch != epoch)
             {
@@ -136,7 +136,7 @@ public sealed partial class PlaybackPipeline
             return OperationResult.Failure("The subtitle decoder returned no cues.");
         }
 
-        _cueWindow.Add(epoch, cues, _clock.Position, discardStale: !_subtitleRenderer.HasComponent);
+        _cueWindow.Add(epoch, cues, _timeline.Position, discardStale: !_subtitleRenderer.HasComponent);
         if (cues.Count > 0)
         {
             _subtitleRenderNode.Wake();
@@ -207,7 +207,7 @@ public sealed partial class PlaybackPipeline
             }
 
             // Bump epoch
-            EpochGate epochGate = _epochGate.Read();
+            EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             if (workingEpoch != epoch)
             {
@@ -216,7 +216,7 @@ public sealed partial class PlaybackPipeline
             }
 
             // Show
-            TimeSpan position = _clock.Position;
+            TimeSpan position = _timeline.Position;
             SubtitleCueSnapshot cues = _cueWindow.GetVisibleCues(epoch, position);
             long surfaceVersion = Interlocked.Read(ref _subtitleSurfaceVersion);
 

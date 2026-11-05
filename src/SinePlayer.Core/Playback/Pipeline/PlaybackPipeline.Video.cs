@@ -55,7 +55,7 @@ public sealed partial class PlaybackPipeline
             IVideoDecoder? videoDecoder = videoDecoderSlot.CurrentComponent;
 
             // Bump epoch
-            long epoch = _epochGate.Read().Epoch;
+            long epoch = _timeline.Epoch;
             if (workingEpoch != epoch)
             {
                 workingEpoch = epoch;
@@ -224,7 +224,7 @@ public sealed partial class PlaybackPipeline
 
         foreach (RawVideoFrame frame in frames)
         {
-            if (fastExit || _epochGate.Read().Epoch != epoch)
+            if (fastExit || _timeline.Epoch != epoch)
             {
                 fastExit = true;
                 frame.Dispose();
@@ -321,7 +321,7 @@ public sealed partial class PlaybackPipeline
             IVideoRenderer? videoRenderer = videoRendererSlot.CurrentComponent;
 
             // Bump epoch
-            EpochGate epochGate = _epochGate.Read();
+            EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             if (workingEpoch != epoch)
             {
@@ -362,17 +362,17 @@ public sealed partial class PlaybackPipeline
 
             // Pause the clock on pause or starvation
             FrameEntry? entry = queue.TryPeek(out FrameEntry head) ? head : null;
-            TimeSpan position = _clock.Position;
+            TimeSpan position = _timeline.Position;
             bool offeringTheStill = state == MediaEngineState.Paused && !firstFrameTime.HasValue && endingEpoch != epoch;
 
             bool starved = _videoDecoder.HasComponent && endingEpoch != epoch && entry is null;
             starved = starved && !IsStreamSpent(epoch, position, ref _readerTailVideoTicks);
             starved = starved && (!firstFrameTime.HasValue || IsVideoStarved(position));
 
-            lock (_clockLock)
+            lock (_timeline.ClockLock)
             {
-                _videoStarved = starved;
-                StartOrPauseClock(epoch, state);
+                _timeline.VideoStarved = starved;
+                _timeline.StartOrPause(epoch, state);
             }
 
             // Idle on pause or starvation
@@ -436,15 +436,15 @@ public sealed partial class PlaybackPipeline
             {
                 TimeSpan anchor = firstFrameTime ?? frame.Timestamp;
 
-                lock (_clockLock)
+                lock (_timeline.ClockLock)
                 {
-                    if (AnchorClock(epoch, anchor))
+                    if (_timeline.Anchor(epoch, anchor))
                     {
-                        position = _clock.Position;
+                        position = _timeline.Position;
                         syncAction = Synchronizer.Evaluate(frame.Timestamp, position);
                     }
 
-                    StartOrPauseClock(epoch, state);
+                    _timeline.StartOrPause(epoch, state);
                 }
             }
 
@@ -534,7 +534,7 @@ public sealed partial class PlaybackPipeline
         }
 
         TimeSpan behind = position - TimeSpan.FromTicks(presentedTicks);
-        return _videoStarved
+        return _timeline.VideoStarved
             ? behind > TimeSpan.FromMilliseconds(VideoStarvationResumeMilliseconds)
             : behind > TimeSpan.FromMilliseconds(VideoStarvationMilliseconds);
     }
