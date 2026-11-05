@@ -53,6 +53,13 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
     public StreamBinding<VideoStreamInfo> Binding { get; set; }
 
+    private volatile bool _starved;
+    public bool Starved
+    {
+        get => _starved;
+        set => _starved = value;
+    }
+
     public ChainTail Tail { get; } = new();
 
     public bool IsActive => Binding.Stream is not null && Decoder.HasComponent;
@@ -341,7 +348,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
             lock (timeline.ClockLock)
             {
-                timeline.VideoStarved = starved;
+                Starved = starved;
                 timeline.StartOrPause(epoch, state);
             }
 
@@ -582,7 +589,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         }
 
         TimeSpan behind = position - TimeSpan.FromTicks(presentedTicks);
-        return timeline.VideoStarved
+        return Starved
             ? behind > TimeSpan.FromMilliseconds(VideoStarvationResumeMilliseconds)
             : behind > TimeSpan.FromMilliseconds(VideoStarvationMilliseconds);
     }

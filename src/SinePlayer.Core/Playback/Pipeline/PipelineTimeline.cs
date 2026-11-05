@@ -8,7 +8,7 @@ using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class PipelineTimeline(Action clockMoved)
+internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
 {
     private const string TAG = nameof(PlaybackPipeline);
 
@@ -20,8 +20,6 @@ internal sealed class PipelineTimeline(Action clockMoved)
 
     private long _endingEpoch = -1;
     private long _anchoredEpoch = -1;
-    private volatile bool _videoStarved;
-    private volatile bool _audioStarved;
 
     public Lock ClockLock => _clockLock;
 
@@ -37,18 +35,6 @@ internal sealed class PipelineTimeline(Action clockMoved)
     {
         get => Interlocked.Read(ref _endingEpoch);
         set => Interlocked.Exchange(ref _endingEpoch, value);
-    }
-
-    public bool VideoStarved
-    {
-        get => _videoStarved;
-        set => _videoStarved = value;
-    }
-
-    public bool AudioStarved
-    {
-        get => _audioStarved;
-        set => _audioStarved = value;
     }
 
     public void AdvanceEpoch(TimeSpan position, SeekMode mode)
@@ -88,8 +74,6 @@ internal sealed class PipelineTimeline(Action clockMoved)
         {
             _clock.Pause();
             _anchoredEpoch = -1;
-            _videoStarved = false;
-            _audioStarved = false;
         }
     }
 
@@ -97,7 +81,7 @@ internal sealed class PipelineTimeline(Action clockMoved)
     {
         lock (_clockLock)
         {
-            bool start = state == MediaEngineState.Playing && !_videoStarved && !_audioStarved;
+            bool start = state == MediaEngineState.Playing && !starved();
             if (start == _clock.IsRunning)
             {
                 return;
