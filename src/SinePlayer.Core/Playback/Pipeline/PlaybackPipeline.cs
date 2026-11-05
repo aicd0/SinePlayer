@@ -25,9 +25,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     private const int ReadAheadWakeMilliseconds = ReadAheadMinMilliseconds / 2;
     private const int FallbackFrameMilliseconds = 40;
 
-    private const int VideoStarvationMilliseconds = 200;
-    private const int VideoStarvationResumeMilliseconds = 100;
-    private const int VideoIdleTimeoutMilliseconds = 50;
     private const int AudioIdleTimeoutMilliseconds = 5;
     private const int AudioDeviceLeewayMilliseconds = 3000;
 
@@ -114,7 +111,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public ISourceProviderFactory? SourceFactory { get; set; }
 
-    public ISynchronizer Synchronizer { get; set; } = new DefaultSynchronizer();
+    public ISynchronizer Synchronizer
+    {
+        get => _video.Synchronizer;
+        set => _video.Synchronizer = value;
+    }
 
     public VideoTransform VideoTransform
     {
@@ -545,6 +546,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         _video.Target?.SurfaceSizeChanged -= VideoTarget_SurfaceSizeChanged;
         _video.Target = null;
+        _video.Stream = null;
         _subtitle.Target?.SurfaceSizeChanged -= SubtitleTarget_SurfaceSizeChanged;
         _subtitle.Target = null;
 
@@ -638,7 +640,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return;
         }
 
-        _videoRenderThread = new Thread(VideoRenderCore)
+        _videoRenderThread = new Thread(() => _video.Render(() => _stopRequested, IsVideoStreamSpent, NotifyVideoRenderEnded))
         {
             IsBackground = true,
             Name = "Pipeline - Video render",
@@ -686,6 +688,11 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         _videoRenderEndedEpoch = epoch;
         TryNotifyPlaybackEnded();
+    }
+
+    private bool IsVideoStreamSpent(long epoch, TimeSpan position)
+    {
+        return IsStreamSpent(epoch, position, ref _readerTailVideoTicks);
     }
 
     private void NotifyAudioRenderEnded(long epoch)

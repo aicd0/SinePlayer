@@ -176,7 +176,7 @@ public sealed partial class PlaybackPipeline
                 _video.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 _audio.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
                 _subtitle.PacketQueue.Enqueue(new PacketEntry(null, sourceVersions, epoch, TimeSpan.Zero));
-                TryWakeVideoDecode();
+                _video.WakeDecode();
                 TryWakeAudioDecode();
                 TryWakeSubtitleDecode();
 
@@ -226,7 +226,7 @@ public sealed partial class PlaybackPipeline
                 lastVideoPacketSpan = span;
                 _video.PacketQueue.Enqueue(new PacketEntry(packet, sourceVersions, epoch, span));
                 handedOn = true;
-                TryWakeVideoDecode();
+                _video.WakeDecode();
             }
             else if (audioStreamInfo is not null && chosenSource == sourceHolder.AudioSource && packet.StreamIndex == audioStreamInfo.Index)
             {
