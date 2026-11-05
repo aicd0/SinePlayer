@@ -33,6 +33,14 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
 
     public long SurfaceVersion;
 
+    public void WakeDecode()
+    {
+        if (!PacketQueue.IsEmpty)
+        {
+            DecodeNode.Wake();
+        }
+    }
+
     public async Task Decode(Func<bool> stopRequested, Action wakeReader)
     {
         long workingEpoch = -1;
