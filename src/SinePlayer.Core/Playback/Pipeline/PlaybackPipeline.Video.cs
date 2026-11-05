@@ -24,22 +24,22 @@ public sealed partial class PlaybackPipeline
             return;
         }
 
-        if (!_videoPacketQueue.IsEmpty)
+        if (!_video.PacketQueue.IsEmpty)
         {
-            _videoDecodeNode.Wake();
+            _video.DecodeNode.Wake();
         }
     }
 
     private void VideoDecodeCore()
     {
-        PacketQueue queue = _videoPacketQueue;
-        ComponentSlot<IVideoDecoder> videoDecoderSlot = _videoDecoder;
+        PacketQueue queue = _video.PacketQueue;
+        ComponentSlot<IVideoDecoder> videoDecoderSlot = _video.Decoder;
         bool awaitingKeyFrame = false;
         long workingEpoch = -1;
 
         while (true)
         {
-            long stamp = _videoDecodeNode.Stamp;
+            long stamp = _video.DecodeNode.Stamp;
             if (_stopRequested)
             {
                 return;
@@ -76,13 +76,13 @@ public sealed partial class PlaybackPipeline
             // Dequeue
             if (!HasRoomForVideoFrame())
             {
-                _videoDecodeNode.Wait(stamp);
+                _video.DecodeNode.Wait(stamp);
                 continue;
             }
 
             if (!queue.TryPeek(out PacketEntry entry))
             {
-                _videoDecodeNode.Wait(stamp);
+                _video.DecodeNode.Wait(stamp);
                 continue;
             }
 
@@ -90,13 +90,13 @@ public sealed partial class PlaybackPipeline
             VersionVerdict verdict = PipelineVersion.CompareVideoDecoder(entry.Versions, videoDecoderVersions);
             if (verdict == VersionVerdict.Block)
             {
-                _videoDecodeNode.Wait(stamp);
+                _video.DecodeNode.Wait(stamp);
                 continue;
             }
 
             if (!queue.TryDequeue(out _))
             {
-                _videoDecodeNode.Wait(stamp);
+                _video.DecodeNode.Wait(stamp);
                 continue;
             }
 
@@ -124,9 +124,9 @@ public sealed partial class PlaybackPipeline
                         }
                     }
 
-                    _frameQueue.Enqueue(new FrameEntry(null, videoFrameVersions, epoch));
+                    _video.FrameQueue.Enqueue(new FrameEntry(null, videoFrameVersions, epoch));
                     TryWakeVideoRender();
-                    _videoDecodeNode.Wait(stamp);
+                    _video.DecodeNode.Wait(stamp);
                     continue;
                 }
 
@@ -179,7 +179,7 @@ public sealed partial class PlaybackPipeline
             decoded = OperationResult.Failure(ex);
         }
 
-        Interlocked.Add(ref _decodeTicks, Stopwatch.GetTimestamp() - startTicks);
+        Interlocked.Add(ref _video.DecodeTicks, Stopwatch.GetTimestamp() - startTicks);
 
         if (!decoded.IsSuccessful || produced is null)
         {
@@ -187,7 +187,7 @@ public sealed partial class PlaybackPipeline
         }
 
         frames = produced;
-        Interlocked.Add(ref _decodedFrameCount, produced.Count);
+        Interlocked.Add(ref _video.DecodedFrameCount, produced.Count);
         return OperationResult.Success();
     }
 
@@ -231,7 +231,7 @@ public sealed partial class PlaybackPipeline
                 continue;
             }
 
-            _frameQueue.Enqueue(new FrameEntry(frame, versions, epoch));
+            _video.FrameQueue.Enqueue(new FrameEntry(frame, versions, epoch));
         }
 
         if (!fastExit)
@@ -242,7 +242,7 @@ public sealed partial class PlaybackPipeline
 
     private bool HasRoomForVideoFrame()
     {
-        return _frameQueue.Count < FrameQueueCapacity;
+        return _video.FrameQueue.Count < FrameQueueCapacity;
     }
 
     #endregion
@@ -251,16 +251,16 @@ public sealed partial class PlaybackPipeline
 
     private void TryWakeVideoRender()
     {
-        if (!_frameQueue.IsEmpty)
+        if (!_video.FrameQueue.IsEmpty)
         {
-            _videoRenderNode.Wake();
+            _video.RenderNode.Wake();
         }
     }
 
     private void VideoRenderCore()
     {
-        ConcurrentQueue<FrameEntry> queue = _frameQueue;
-        ComponentSlot<IVideoRenderer> videoRendererSlot = _videoRenderer;
+        ConcurrentQueue<FrameEntry> queue = _video.FrameQueue;
+        ComponentSlot<IVideoRenderer> videoRendererSlot = _video.Renderer;
         bool deviceAvailable = false;
         long workingEpoch = -1;
         long endingEpoch = -1;
@@ -280,7 +280,7 @@ public sealed partial class PlaybackPipeline
 
         while (true)
         {
-            long stamp = _videoRenderNode.Stamp;
+            long stamp = _video.RenderNode.Stamp;
             if (_stopRequested)
             {
                 return;
@@ -308,7 +308,7 @@ public sealed partial class PlaybackPipeline
                             _events.PostWarning(cleared.Message);
                         }
 
-                        Interlocked.Exchange(ref _pictureTicks, -1);
+                        Interlocked.Exchange(ref _video.PictureTicks, -1);
                     }
 
                     oldVideoRenderer.Dispose();
@@ -328,7 +328,7 @@ public sealed partial class PlaybackPipeline
                 workingEpoch = epoch;
                 startTime = epochGate.SeekMode == SeekMode.Precise ? epochGate.SeekPosition : null;
                 firstFrameTime = null;
-                Interlocked.Exchange(ref _pictureTicks, -1);
+                Interlocked.Exchange(ref _video.PictureTicks, -1);
             }
 
             // Refresh surface
@@ -365,7 +365,7 @@ public sealed partial class PlaybackPipeline
             TimeSpan position = _timeline.Position;
             bool offeringTheStill = state == MediaEngineState.Paused && !firstFrameTime.HasValue && endingEpoch != epoch;
 
-            bool starved = _videoDecoder.HasComponent && endingEpoch != epoch && entry is null;
+            bool starved = _video.Decoder.HasComponent && endingEpoch != epoch && entry is null;
             starved = starved && !IsStreamSpent(epoch, position, ref _readerTailVideoTicks);
             starved = starved && (!firstFrameTime.HasValue || IsVideoStarved(position));
 
@@ -378,13 +378,13 @@ public sealed partial class PlaybackPipeline
             // Idle on pause or starvation
             if (!playing && !offeringTheStill)
             {
-                _videoRenderNode.Wait(stamp);
+                _video.RenderNode.Wait(stamp);
                 continue;
             }
 
             if (entry is null)
             {
-                _videoRenderNode.Wait(stamp, playing ? VideoIdleTimeoutMilliseconds : Timeout.Infinite);
+                _video.RenderNode.Wait(stamp, playing ? VideoIdleTimeoutMilliseconds : Timeout.Infinite);
                 continue;
             }
 
@@ -398,7 +398,7 @@ public sealed partial class PlaybackPipeline
             VersionVerdict verdict = PipelineVersion.CompareVideoRenderer(entry.Value.Versions, videoRendererSlot.CurrentVersions);
             if (verdict == VersionVerdict.Block)
             {
-                _videoRenderNode.Wait(stamp);
+                _video.RenderNode.Wait(stamp);
                 continue;
             }
 
@@ -451,7 +451,7 @@ public sealed partial class PlaybackPipeline
             if (playing && syncAction == FrameSyncAction.Wait)
             {
                 int remaining = (int)Math.Clamp((frame.Timestamp - position).TotalMilliseconds, 1, VideoIdleTimeoutMilliseconds);
-                _videoRenderNode.Wait(stamp, remaining);
+                _video.RenderNode.Wait(stamp, remaining);
                 continue;
             }
 
@@ -471,7 +471,7 @@ public sealed partial class PlaybackPipeline
                     && closer.Frame is not null
                     && closer.Epoch == epoch)
                 {
-                    Interlocked.Increment(ref _droppedFrameCount);
+                    Interlocked.Increment(ref _video.DroppedFrameCount);
                     continue;
                 }
 
@@ -479,7 +479,7 @@ public sealed partial class PlaybackPipeline
                 {
                     if (playing && firstFrameTime.HasValue && !videoRenderer.TryAcquireFrameSlot())
                     {
-                        Interlocked.Increment(ref _droppedFrameCount);
+                        Interlocked.Increment(ref _video.DroppedFrameCount);
                         continue;
                     }
 
@@ -512,22 +512,22 @@ public sealed partial class PlaybackPipeline
             rendered = OperationResult.Failure(ex.Message);
         }
 
-        Interlocked.Add(ref _renderTicks, Stopwatch.GetTimestamp() - startTicks);
+        Interlocked.Add(ref _video.RenderTicks, Stopwatch.GetTimestamp() - startTicks);
 
         if (!rendered.IsSuccessful)
         {
             return rendered;
         }
 
-        Interlocked.Increment(ref _presentedFrameCount);
-        Interlocked.Exchange(ref _pictureTicks, frame.Timestamp.Ticks);
+        Interlocked.Increment(ref _video.PresentedFrameCount);
+        Interlocked.Exchange(ref _video.PictureTicks, frame.Timestamp.Ticks);
 
         return OperationResult.Success();
     }
 
     private bool IsVideoStarved(TimeSpan position)
     {
-        long presentedTicks = Interlocked.Read(ref _pictureTicks);
+        long presentedTicks = Interlocked.Read(ref _video.PictureTicks);
         if (presentedTicks < 0)
         {
             return false;
