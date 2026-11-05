@@ -1,7 +1,7 @@
 # PlaybackPipeline chain decomposition — v1 plan
 
-Status: in progress. Phases A–F done (A1–A6, B1–B4, C1–C6, D1–D6, E1–E5, F1–F4); Phase G is done except
-for the clock governor (G1b), which belongs to the multi-chain milestone.
+Status: v1 complete. Phases A–G done (A1–A6, B1–B4, C1–C6, D1–D6, E1–E5, F1–F4, G1a/G2/G3), except the clock
+governor (G1b), which belongs to the multi-chain milestone. The definition of done is checked off below.
 
 `PlaybackPipeline` was 3212 lines and held one video chain, one audio chain and one subtitle chain inline:
 their queues, their threads, their component slots, their statistics and their component reconciliation.
@@ -240,14 +240,24 @@ deferred, and it is deferred to a single object rather than spread across the ch
 
 ## Definition of done for v1
 
-1. `PlaybackPipeline.cs` holds no decode or render loop, no queue, no component slot, and no thread field.
-2. Chains live in `_chains` and are looked up by kind; no six-field-per-kind state remains.
-3. The reader routes by chain, not by kind.
-4. Threads, stop flags and wake nodes belong to chains.
+1. `PlaybackPipeline.cs` holds no decode or render loop, no queue at all, and no thread field of its own. Done: 625
+   lines; no `while` is left in it, and the only component slot is `_source` (the assembly's held source, not a
+   chain's). `_host` is the coroutine host, which the pipeline owns by decision.
+2. Chains are objects held by the pipeline; no per-kind field block remains. Done: `_video`, `_audio`, `_subtitle`,
+   `_feeds`. They stay as three fields rather than a list because v1 has exactly one of each kind.
+3. The reader routes by chain, not by kind. Done: `IChainFeed.TryAccept` / `Accept` / `Tail`.
+4. Threads, stop flags and wake nodes belong to chains. Done, with one knowing exception: the coroutine thread is
+   owned by `CoroutineHost`, which the pipeline owns; the chains' coroutines still live on it.
 5. The public surface of `PlaybackPipeline` is byte-for-byte what it is today; `src/SinePlayer` has no diff;
-   `PlaybackPipelineTests` is green with no edits.
-6. A guard test fails if a chain type starts appearing in a public signature (added in the same step that
-   creates the first chain type).
+   `PlaybackPipelineTests` is green with no edits. Done: no public member was added, removed or re-signed, the app
+   has no diff, and the 152 pipeline tests pass unedited.
+6. A guard test fails if a chain type starts appearing in a public signature. Done: `PipelineSurfaceTests`
+   (`KeepsEveryChainInternal`) scans every type implementing `IChainFeed` and fails if one of them is visible
+   outside the assembly, so the chain the reader feeds is what the guard follows rather than a list of names; the
+   two abilities a chain is reached through (`IChainFeed`, `IPictureFrameSource`) are held to the same rule and are
+   named, because a rename there has to be noticed. C# already refuses a public signature that mentions an internal
+   type, so what the guard really holds is the half the compiler cannot: that the chain vocabulary never becomes
+   public itself.
 
 ## The next milestone (out of scope here)
 
