@@ -5,7 +5,6 @@ using System.Diagnostics;
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
-using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -302,10 +301,11 @@ public sealed partial class PlaybackPipeline : IDisposable
         _video.Target?.SurfaceSizeChanged += VideoTarget_SurfaceSizeChanged;
         _subtitle.Target = subtitleTarget;
         _subtitle.Target?.SurfaceSizeChanged += SubtitleTarget_SurfaceSizeChanged;
+        _subtitle.LayoutSource = _video;
 
         _timeline.SetPosition(TimeSpan.Zero);
-
         _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
+
         _events.SetState(MediaEngineState.Paused);
         return OperationResult.Success();
     }

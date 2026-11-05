@@ -1,11 +1,8 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System.Numerics;
-
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
-using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 
@@ -222,7 +219,7 @@ public sealed partial class PlaybackPipeline
 
             SubtitlePresentation presentation = SubtitlePresentation with
             {
-                Frame = ResolveSubtitleFrame()
+                Frame = _subtitle.LayoutSource?.Frame ?? SubtitleFrame.Full
             };
 
             if (drawnInvalidated ||
@@ -262,41 +259,6 @@ public sealed partial class PlaybackPipeline
         }
 
         drawnCues.Dispose();
-    }
-
-    private SubtitleFrame ResolveSubtitleFrame()
-    {
-        IVideoRenderTarget? videoTarget = _video.Target;
-        VideoStreamInfo? stream = _source.Latest?.Component?.VideoStream;
-        if (videoTarget is null || stream is null || stream.Width <= 0 || stream.Height <= 0)
-        {
-            return SubtitleFrame.Full;
-        }
-
-        int surfaceWidth = videoTarget.SurfaceWidth;
-        int surfaceHeight = videoTarget.SurfaceHeight;
-        if (surfaceWidth <= 0 || surfaceHeight <= 0)
-        {
-            return SubtitleFrame.Full;
-        }
-
-        // The placement maps the picture's own square onto the surface, so its four corners say where the picture ends:
-        // the bounding box of that is the frame, whatever turning, zooming or mirroring was asked for.
-        Matrix3x2 placement = _video.Transform.Read().GetPlacement(stream.Width, stream.Height, surfaceWidth, surfaceHeight);
-        var zero = Vector2.Transform(Vector2.Zero, placement);
-        var unitX = Vector2.Transform(Vector2.UnitX, placement);
-        var unitY = Vector2.Transform(Vector2.UnitY, placement);
-        var one = Vector2.Transform(Vector2.One, placement);
-
-        float left = Math.Clamp(MathF.Min(MathF.Min(zero.X, unitX.X), MathF.Min(unitY.X, one.X)), 0.0f, 1.0f);
-        float top = Math.Clamp(MathF.Min(MathF.Min(zero.Y, unitX.Y), MathF.Min(unitY.Y, one.Y)), 0.0f, 1.0f);
-        float right = Math.Clamp(MathF.Max(MathF.Max(zero.X, unitX.X), MathF.Max(unitY.X, one.X)), 0.0f, 1.0f);
-        float bottom = Math.Clamp(MathF.Max(MathF.Max(zero.Y, unitX.Y), MathF.Max(unitY.Y, one.Y)), 0.0f, 1.0f);
-
-        // A picture larger than the surface is cropped by it, so what is left of it is the whole surface.
-        return right > left && bottom > top
-            ? new SubtitleFrame(left, top, right - left, bottom - top)
-            : SubtitleFrame.Full;
     }
 
     private static bool SameCues(SubtitleCueSnapshot x, SubtitleCueSnapshot y)
