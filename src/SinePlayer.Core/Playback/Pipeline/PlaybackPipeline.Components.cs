@@ -79,7 +79,7 @@ public sealed partial class PlaybackPipeline
         {
             if (sourceHolder.VideoSource is { } videoSource && sourceHolder.VideoStream is { } videoStream)
             {
-                IVideoRenderTarget? videoTarget = _videoTarget;
+                IVideoRenderTarget? videoTarget = _video.Target;
                 if (videoTarget is null)
                 {
                     return result.Failure("The file has video but no presentation surface was supplied.");
@@ -87,7 +87,7 @@ public sealed partial class PlaybackPipeline
 
                 // Resolve video renderer
                 bool rebuildVideoRenderer = sourceChanges.HasFlag(ChainChanges.VideoRenderer);
-                PipelineComponent<IVideoRenderer>? latestRenderer = _videoRenderer.Latest;
+                PipelineComponent<IVideoRenderer>? latestRenderer = _video.Renderer.Latest;
                 OperationResult<PipelineComponent<IVideoRenderer>?> rendererResolved = ResolveComponent(
                     resolver.ResolveVideoRenderers(),
                     rebuildVideoRenderer ? null : latestRenderer?.Signature,
@@ -111,7 +111,7 @@ public sealed partial class PlaybackPipeline
 
                 // Resolve video decoder
                 bool rebuildVideoDecoder = renderer is not null || sourceChanges.HasFlag(ChainChanges.VideoDecoder);
-                PipelineComponent<IVideoDecoder>? latestDecoder = _videoDecoder.Latest;
+                PipelineComponent<IVideoDecoder>? latestDecoder = _video.Decoder.Latest;
                 IGpuDevice? gpuDevice = (renderer ?? latestRenderer)?.Component?.GpuDevice;
                 OperationResult<PipelineComponent<IVideoDecoder>?> decoderResolved = ResolveComponent(
                     resolver.ResolveVideoDecoders(videoSource.Source, videoStream, gpuDevice, DecoderBufferedFrames),
@@ -130,12 +130,12 @@ public sealed partial class PlaybackPipeline
             }
             else
             {
-                if (_videoDecoder.HasComponent)
+                if (_video.Decoder.HasComponent)
                 {
                     changed |= sourceChanges & ChainChanges.VideoDecoder;
                 }
 
-                if (_videoRenderer.HasComponent)
+                if (_video.Renderer.HasComponent)
                 {
                     changed |= sourceChanges & ChainChanges.VideoRenderer;
                 }
@@ -153,13 +153,13 @@ public sealed partial class PlaybackPipeline
 
                 if (changed.HasFlag(ChainChanges.VideoDecoder))
                 {
-                    _videoDecoder.Publish(decoder, versions);
+                    _video.Decoder.Publish(decoder, versions);
                     decoder = null;
                 }
 
                 if (changed.HasFlag(ChainChanges.VideoRenderer))
                 {
-                    _videoRenderer.Publish(renderer, versions);
+                    _video.Renderer.Publish(renderer, versions);
                     renderer = null;
                 }
             }
@@ -468,9 +468,9 @@ public sealed partial class PlaybackPipeline
     {
         PipelineVersion versions = default;
         versions = PipelineVersion.Max(versions, _source.HighestVersions);
-        versions = PipelineVersion.Max(versions, _videoDecoder.HighestVersions);
+        versions = PipelineVersion.Max(versions, _video.Decoder.HighestVersions);
         versions = PipelineVersion.Max(versions, _audioDecoder.HighestVersions);
-        versions = PipelineVersion.Max(versions, _videoRenderer.HighestVersions);
+        versions = PipelineVersion.Max(versions, _video.Renderer.HighestVersions);
         versions = PipelineVersion.Max(versions, _audioRenderer.HighestVersions);
         versions = PipelineVersion.Max(versions, _subtitle.Decoder.HighestVersions);
         versions = PipelineVersion.Max(versions, _subtitle.Renderer.HighestVersions);

@@ -266,7 +266,7 @@ public sealed partial class PlaybackPipeline
 
     private SubtitleFrame ResolveSubtitleFrame()
     {
-        IVideoRenderTarget? videoTarget = _videoTarget;
+        IVideoRenderTarget? videoTarget = _video.Target;
         VideoStreamInfo? stream = _source.Latest?.Component?.VideoStream;
         if (videoTarget is null || stream is null || stream.Width <= 0 || stream.Height <= 0)
         {
@@ -282,7 +282,7 @@ public sealed partial class PlaybackPipeline
 
         // The placement maps the picture's own square onto the surface, so its four corners say where the picture ends:
         // the bounding box of that is the frame, whatever turning, zooming or mirroring was asked for.
-        Matrix3x2 placement = _videoTransform.Read().GetPlacement(stream.Width, stream.Height, surfaceWidth, surfaceHeight);
+        Matrix3x2 placement = _video.Transform.Read().GetPlacement(stream.Width, stream.Height, surfaceWidth, surfaceHeight);
         var zero = Vector2.Transform(Vector2.Zero, placement);
         var unitX = Vector2.Transform(Vector2.UnitX, placement);
         var unitY = Vector2.Transform(Vector2.UnitY, placement);
