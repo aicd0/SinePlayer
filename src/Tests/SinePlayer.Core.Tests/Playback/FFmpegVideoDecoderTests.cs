@@ -566,12 +566,19 @@ public class FFmpegVideoDecoderTests
     /// 1088- or 1152-high texture. The rows below the picture were never written, and drawing them puts a band
     /// of nothing — which converts to green — along the bottom. The picture has to be drawn from the part of
     /// the texture it occupies, which is what makes it match the CPU path at this size and not at 64x64.
+    /// <para>
+    /// The span alone is not enough once the picture is drawn larger than itself: its rows are then mapped onto
+    /// more rows of the surface than it has samples, and the row at the bottom edge lands between the picture's
+    /// last texel and the first row of padding — up to half of the line, which is where the green line along the
+    /// bottom of an enlarged video comes from. The same comparison has to hold at a surface taller than the picture.
+    /// </para>
     /// </summary>
     [Test]
     public void DrawsAPaddedHardwareTextureWithoutShowingThePadding()
     {
         const int width = 1920;
         const int height = 1080;
+        const int enlargedHeight = 1440;
 
         OperationResult<D3D11Device> created = D3D11Device.Create();
         Assert.That(created.IsSuccessful, Is.True, created.Message);
@@ -601,13 +608,22 @@ public class FFmpegVideoDecoderTests
                 Assert.Ignore("This machine has no H.264 hardware decoder, so there is no texture to draw.");
             }
 
+            using RawVideoFrame software = DecodeFirstFrame(path, hardwareDecoding: false, out _);
+
             using var target = D3D11RenderTarget.CreateOffscreen(device, width, height);
             byte[] hardwarePixels = RenderFrame(renderer, device, target, frame!);
-
-            using RawVideoFrame software = DecodeFirstFrame(path, hardwareDecoding: false, out _);
             byte[] softwarePixels = RenderFrame(renderer, device, target, software);
 
-            Assert.That(IsSamePixels(hardwarePixels, softwarePixels), Is.True, "the padding rows must not be drawn");
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(IsSamePixels(hardwarePixels, softwarePixels), Is.True, "the padding rows must not be drawn");
+
+                using var enlarged = D3D11RenderTarget.CreateOffscreen(device, width, enlargedHeight);
+                byte[] enlargedHardwarePixels = RenderFrame(renderer, device, enlarged, frame);
+                byte[] enlargedSoftwarePixels = RenderFrame(renderer, device, enlarged, software);
+
+                Assert.That(IsSamePixels(enlargedHardwarePixels, enlargedSoftwarePixels), Is.True, "nor be blended into the line drawn at the bottom of an enlarged picture");
+            }
         }
         finally
         {
@@ -618,7 +634,7 @@ public class FFmpegVideoDecoderTests
     /// <summary>Draws a frame into the target and reads the result back.</summary>
     private static byte[] RenderFrame(D3D11VideoRenderer renderer, D3D11Device device, D3D11RenderTarget target, RawVideoFrame frame)
     {
-        renderer.SetOutput(target.View, frame.Width, frame.Height);
+        renderer.SetOutput(target.View, target.Width, target.Height);
 
         OperationResult result = renderer.Render(frame, VideoTransform.Identity);
         Assert.That(result.IsSuccessful, Is.True, result.Message);

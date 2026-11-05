@@ -114,7 +114,6 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             : Math.Clamp(height * FontSizeFraction, MinimumFontSize, MaximumFontSize);
         float margin = height * MarginFraction;
         float gap = fontSize * StackGapFraction;
-        SubtitleArea picture = PictureAreaOf(presentation, width, height);
         SubtitleArea area = AreaOf(presentation, scale, width, height);
 
         // How much of each band is taken, by the alignment's row: bottom, middle, top. Several events can be up at once —
@@ -136,7 +135,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         {
             if (cue.Image is { } image)
             {
-                DrawImage(session, image, presentation, picture, area, width, height, scale);
+                DrawImage(session, image, presentation, area, width, height, scale);
                 continue;
             }
 
@@ -182,7 +181,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
     #region Bitmap
 
-    private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePresentation presentation, SubtitleArea picture, SubtitleArea area, int width, int height, double scale)
+    private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePresentation presentation, SubtitleArea area, int width, int height, double scale)
     {
         ISubtitleImageBuffer buffer = image.Buffer;
         if (buffer.Width <= 0 || buffer.Height <= 0)
@@ -202,13 +201,12 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             96.0f,
             CanvasAlphaMode.Premultiplied);
 
-        // The image's own geometry is a fraction of the picture it was authored against, which is the picture's place in
-        // the surface rather than the surface itself: a fitted picture is smaller, and its subtitles are placed on it. The
+        // The image's own geometry is a fraction of the frame it was authored against, which is the whole surface here; the
         // presentation's offset is in pixels, so it is added after that geometry is scaled.
-        double x = picture.Left + (image.Left * picture.Width) + (presentation.OffsetX * scale);
-        double y = picture.Top + (image.Top * picture.Height) + (presentation.OffsetY * scale);
-        double scaledWidth = image.Width * picture.Width;
-        double scaledHeight = image.Height * picture.Height;
+        double x = (image.Left * width) + (presentation.OffsetX * scale);
+        double y = (image.Top * height) + (presentation.OffsetY * scale);
+        double scaledWidth = image.Width * width;
+        double scaledHeight = image.Height * height;
 
         // Kept in the free part of the surface for the same reason the text is: an adjustment that pushes a cue out of it
         // is cut back rather than obeyed, and a surface that later changes must not strand it.
@@ -290,44 +288,19 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
     #region Area calculation
 
-    /// <summary>The picture's own place in the surface, which is what a bitmap cue's geometry is a fraction of.</summary>
-    private static SubtitleArea PictureAreaOf(SubtitlePresentation presentation, int width, int height)
-    {
-        SubtitleFrame frame = presentation.Frame.IsEmpty ? SubtitleFrame.Full : presentation.Frame;
-        return new SubtitleArea(
-            (float)(frame.Left * width),
-            (float)(frame.Top * height),
-            Math.Max(1.0f, (float)(frame.Width * width)),
-            Math.Max(1.0f, (float)(frame.Height * height)));
-    }
-
     /// <summary>
-    /// The box the words may be laid out in: the picture's own place in the surface, less whatever covers the surface. The
-    /// strips are measured from the surface's edges, because that is where the host's chrome is — the picture may well end
-    /// above a strip, in which case there is nothing to keep clear of.
+    /// The box the words may be laid out in: the surface, less whatever covers it. This renderer is not a script
+    /// interpreter — it lays lines out itself — so it has no picture-relative coordinates to honour, and the chrome is
+    /// measured from the surface's edges, which is where it is.
     /// </summary>
     private static SubtitleArea AreaOf(SubtitlePresentation presentation, double scale, int width, int height)
     {
-        SubtitleArea picture = PictureAreaOf(presentation, width, height);
-
         float left = (float)Math.Clamp(presentation.Insets.Left * scale, 0.0, width * MaximumInsetFraction);
         float top = (float)Math.Clamp(presentation.Insets.Top * scale, 0.0, height * MaximumInsetFraction);
         float right = (float)Math.Clamp(presentation.Insets.Right * scale, 0.0, width * MaximumInsetFraction);
         float bottom = (float)Math.Clamp(presentation.Insets.Bottom * scale, 0.0, height * MaximumInsetFraction);
 
-        float areaLeft = Math.Max(picture.Left, left);
-        float areaTop = Math.Max(picture.Top, top);
-        float areaRight = Math.Min(picture.Left + picture.Width, width - right);
-        float areaBottom = Math.Min(picture.Top + picture.Height, height - bottom);
-
-        // Chrome that covers the picture entirely leaves nowhere to anchor: the picture is the better answer, since words
-        // drawn in it are at least in the right place.
-        if (areaRight <= areaLeft || areaBottom <= areaTop)
-        {
-            return picture;
-        }
-
-        return new SubtitleArea(areaLeft, areaTop, areaRight - areaLeft, areaBottom - areaTop);
+        return new SubtitleArea(left, top, Math.Max(1.0f, width - left - right), Math.Max(1.0f, height - top - bottom));
     }
 
     /// <summary>

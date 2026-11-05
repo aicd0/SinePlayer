@@ -76,47 +76,84 @@ public class D3D11VideoRendererTests
     }
 
     /// <summary>
-    /// A hardware decoder decodes into a texture it aligned, so the last row of the picture is not the last row of the
-    /// texture. Sampling must stay on the picture's own rows and on their centres: reach the row below and bilinear
-    /// filtering blends in a row the decoder never wrote, which converts to green and shows as a line along the bottom of
-    /// the picture — the reported symptom. Both edges are pinned here: the first sample on the first row's centre, the last
-    /// on the last row's.
+    /// A hardware decoder decodes into a texture it aligned, so a 1080-high picture can live in 1088 rows, and the rows
+    /// below the picture were never written: reading them puts a band of whatever they hold — nothing, which converts to
+    /// green — along the bottom. The span is what keeps the picture on its own rows, and it has to be the span alone. Nudge
+    /// its ends inwards and the picture is rescaled, so every row is read between two texels and blended with its
+    /// neighbour; the whole picture is then wrong in exchange for one row. Pinned here: the drawn row centres land on the
+    /// texture's row centres, and a padded texture reads only the picture's own rows.
     /// </summary>
     [Test]
-    public void ReadsOnlyThePicturesOwnRowsOfAPaddedTexture()
+    public void ReadsATexturesRowsFromTheirCentres()
     {
         const int pictureWidth = 1920;
         const int pictureHeight = 1080;
         const int textureHeight = 1088;
 
-        D3D11VideoRenderer.FrameTexCoords coords = D3D11VideoRenderer.GetTexCoords(pictureWidth, textureHeight, pictureWidth, pictureHeight);
-
-        // Where in the texture the two ends of the quad sample, in texels.
-        float firstRow = coords.BiasY * textureHeight;
-        float lastRow = ((coords.ScaleY * 1.0f) + coords.BiasY) * textureHeight;
+        (float X, float Y) padded = D3D11VideoRenderer.GetTexCoordScale(pictureWidth, textureHeight, pictureWidth, pictureHeight);
+        (float X, float Y) exact = D3D11VideoRenderer.GetTexCoordScale(pictureWidth, pictureHeight, pictureWidth, pictureHeight);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(firstRow, Is.EqualTo(0.5f).Within(0.001f), "the top edge samples the centre of the first row");
-            Assert.That(lastRow, Is.EqualTo(pictureHeight - 0.5f).Within(0.001f), "the bottom edge samples the centre of the last row of the picture");
-            Assert.That(lastRow, Is.LessThan(textureHeight), "and never reaches the rows the decoder left unwritten");
+            Assert.That(exact.X, Is.EqualTo(1.0f), "a picture that fills its texture is read whole");
+            Assert.That(exact.Y, Is.EqualTo(1.0f));
+            Assert.That(padded.Y, Is.EqualTo(pictureHeight / (float)textureHeight).Within(0.0001f), "a padded one stops at its last row");
+            Assert.That(padded.Y, Is.LessThan(1.0f), "and never reaches the rows the decoder left unwritten");
+
+            // The row centres of the picture, for the first few rows and the last, as the shader reads them.
+            for (int row = 0; row < 4; row++)
+            {
+                float sampled = (row + 0.5f) / pictureHeight * padded.Y * textureHeight;
+                Assert.That(sampled, Is.EqualTo(row + 0.5f).Within(0.001f), $"row {row} has to read its own centre");
+            }
+
+            float lastSampled = (pictureHeight - 0.5f) / pictureHeight * padded.Y * textureHeight;
+            Assert.That(lastSampled, Is.EqualTo(pictureHeight - 0.5f).Within(0.001f), "so does the last row");
         }
     }
 
     /// <summary>
-    /// A picture that fills its texture is still read from row centre to row centre, which is the same mapping with nothing
-    /// to clip: the half texel does not depend on the texture being padded.
+    /// A picture is sampled no further than its last sample in each plane, and the chroma plane's comes first: it has half
+    /// the rows and columns, so the coordinate of the picture's last luma sample is half a chroma sample past its last
+    /// chroma sample. A picture drawn at its own size is enough for the line at its bottom edge to land between the two,
+    /// and what it blends in there is the padding a hardware decoder never wrote — zero, which is not a darker black but a
+    /// saturated green, because zero is the far end of both chroma axes.
     /// </summary>
     [Test]
-    public void ReadsAFrameThatFillsItsTextureFromRowCentreToRowCentre()
+    public void StopsSamplesWhereEachPlaneEnds()
     {
-        D3D11VideoRenderer.FrameTexCoords coords = D3D11VideoRenderer.GetTexCoords(640, 480, 640, 480);
+        const int pictureWidth = 1920;
+        const int pictureHeight = 1080;
+        const int textureWidth = 1920;
+        const int textureHeight = 1152;
+
+        (float X, float Y) scale = D3D11VideoRenderer.GetTexCoordScale(textureWidth, textureHeight, pictureWidth, pictureHeight);
+        (float X, float Y) limit = D3D11VideoRenderer.GetTexCoordMax(textureWidth, textureHeight, pictureWidth, pictureHeight);
+        (float X, float Y) chroma = D3D11VideoRenderer.GetChromaTexCoordMax(textureWidth, textureHeight, pictureWidth, pictureHeight);
+        (float X, float Y) exact = D3D11VideoRenderer.GetTexCoordMax(pictureWidth, pictureHeight, pictureWidth, pictureHeight);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(coords.BiasY * 480, Is.EqualTo(0.5f).Within(0.001f));
-            Assert.That(((coords.ScaleY * 1.0f) + coords.BiasY) * 480, Is.EqualTo(479.5f).Within(0.001f));
-            Assert.That(coords.ScaleX, Is.EqualTo(639 / 640.0f).Within(0.0001f));
+            Assert.That(limit.Y * textureHeight - 0.5f, Is.EqualTo(pictureHeight - 1).Within(0.001f), "the luma plane stops at its last row");
+
+            Assert.That(chroma.Y * (textureHeight / 2) - 0.5f, Is.EqualTo(pictureHeight / 2 - 1).Within(0.001f), "the chroma plane stops at its own last row");
+            Assert.That(chroma.Y * (textureHeight / 2) + 0.5f, Is.EqualTo(pictureHeight / 2).Within(0.001f), "past which only padding begins");
+            Assert.That(chroma.Y, Is.LessThan(limit.Y), "which is inside where the luma plane ends");
+
+            Assert.That(exact.Y, Is.EqualTo(1.0f), "a picture that fills its texture is read whole");
+            Assert.That(exact.X, Is.EqualTo(1.0f));
+
+            foreach (int surfaceHeight in new[] { 1080, 1200, 1440, 2160 })
+            {
+                float bottom = (surfaceHeight - 0.5f) / surfaceHeight * scale.Y;
+
+                Assert.That(bottom, Is.GreaterThanOrEqualTo(chroma.Y), $"the bottom line of a {surfaceHeight}-high surface has to be stopped");
+            }
+
+            // A picture drawn well below its own size keeps every line inside it, so nothing is pulled back: the clamp
+            // only ever changes a coordinate that has already gone past the last sample.
+            float small = (500 - 0.5f) / 500 * scale.Y;
+            Assert.That(small, Is.LessThan(chroma.Y), "a small surface needs no stopping");
         }
     }
 

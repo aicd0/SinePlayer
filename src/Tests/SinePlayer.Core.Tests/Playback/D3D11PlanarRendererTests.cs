@@ -11,6 +11,7 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.Direct3D11.Surfaces;
 
+using Windows.Win32;
 using Windows.Win32.Graphics.Direct3D11;
 using Windows.Win32.Graphics.Dxgi.Common;
 
@@ -562,6 +563,103 @@ public class D3D11PlanarRendererTests
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         return target.ReadPixels(_device);
+    }
+
+    /// <summary>
+    /// A hardware decoder decodes into a texture it aligned for its own use, so a 1080-high picture can live in a
+    /// 1152-row one — which is what AV1 gets on this machine — and every row and column below and right of the picture
+    /// is left at zero. Zero is not a colour: luma 0 with chroma 0 is a saturated green, which is the line along the
+    /// bottom of a black frame.
+    /// <para>
+    /// The chroma plane is the one that loses it first. It has half the rows and half the columns, so the coordinate of
+    /// the picture's last luma sample is half a chroma sample past its last chroma sample, and the edge of a picture drawn
+    /// at its own size — let alone larger — lands between the two: every sample there is a quarter or more of padding.
+    /// </para>
+    /// </summary>
+    [Test]
+    public void DrawsNothingFromThePaddingAHardwareDecoderAdded()
+    {
+        const int pictureWidth = 64;
+        const int pictureHeight = 36;
+        const int textureWidth = 80;
+        const int textureHeight = 40;
+
+        // The picture is black in limited range — luma 16, neutral chroma — and the padding is untouched, which is what
+        // a decoder leaves behind.
+        byte[] data = new byte[textureWidth * textureHeight + textureWidth * (textureHeight / 2)];
+        for (int row = 0; row < pictureHeight; row++)
+        {
+            data.AsSpan(row * textureWidth, pictureWidth).Fill(16);
+        }
+
+        int chroma = textureWidth * textureHeight;
+        for (int row = 0; row < pictureHeight / 2; row++)
+        {
+            data.AsSpan(chroma + row * textureWidth, pictureWidth).Fill(128);
+        }
+
+        D3D11_TEXTURE2D_DESC description = new()
+        {
+            Width = textureWidth,
+            Height = textureHeight,
+            MipLevels = 1,
+            ArraySize = 2,
+            Format = DXGI_FORMAT.DXGI_FORMAT_NV12,
+            SampleDesc = new DXGI_SAMPLE_DESC { Count = 1 },
+            Usage = D3D11_USAGE.D3D11_USAGE_DEFAULT,
+            BindFlags = D3D11_BIND_FLAG.D3D11_BIND_SHADER_RESOURCE,
+        };
+
+        ID3D11Texture2D texture = D3D11Interop.CreateTexture2D(_device.Device, description);
+        nint native = Marshal.GetIUnknownForObject(texture);
+        try
+        {
+            unsafe
+            {
+                fixed (byte* source = data)
+                {
+                    Graphics_Direct3D11_ID3D11DeviceContext_Extensions.UpdateSubresource(_device.Context, texture, 1, null, source, (uint)textureWidth, 0);
+                }
+            }
+
+            using FakeGpuBuffer buffer = new(native);
+            using RawVideoFrame frame = new()
+            {
+                Timestamp = TimeSpan.Zero,
+                Duration = TimeSpan.FromMilliseconds(40),
+                Width = pictureWidth,
+                Height = pictureHeight,
+                Format = PixelFormat.Nv12,
+                Buffer = buffer,
+                IsHardwareBacked = true,
+            };
+
+            foreach ((int width, int height) in new[] { (pictureWidth, pictureHeight), (pictureWidth * 3 / 2, pictureHeight * 3 / 2), (pictureWidth * 2, pictureHeight * 2), (pictureWidth * 4, pictureHeight * 4) })
+            {
+                using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
+                _renderer.SetOutput(target.View, width, height);
+                OperationResult rendered = _renderer.Render(frame, new VideoTransform(VideoOrientation.Identity, VideoResizeMode.Stretch, 1.0, 0.0, 0.0));
+                Assert.That(rendered.IsSuccessful, Is.True, rendered.Message);
+
+                byte[] pixels = target.ReadPixels(_device);
+                int greenest = 0;
+                for (int index = 1; index < pixels.Length; index += 4)
+                {
+                    greenest = Math.Max(greenest, pixels[index]);
+                }
+
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(pixels[^1], Is.EqualTo(255), "the surface has to be painted");
+                    Assert.That(greenest, Is.LessThanOrEqualTo(1), $"nothing of the {width}x{height} picture may come from the padding, which is green");
+                }
+            }
+        }
+        finally
+        {
+            Marshal.Release(native);
+            D3D11Interop.Release(texture);
+        }
     }
 
     private static RawVideoFrame CreateFrame(PixelFormat format, IMediaBuffer buffer)

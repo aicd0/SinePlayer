@@ -41,7 +41,9 @@ internal sealed partial class D3D11VideoShaders : IDisposable
 cbuffer FrameTransform : register(b0)
 {
     float2 TexCoordScale;
-    float2 TexCoordBias;
+    float2 TexCoordMax;
+    float2 ChromaTexCoordMax;
+    float2 Unused;
     float4 QuadRow0;
     float4 QuadRow1;
 };
@@ -60,8 +62,28 @@ VSOutput VSMain(uint vertexId : SV_VertexID)
     float3 corner = float3(uv, 1.0);
     float2 placed = float2(dot(corner, QuadRow0.xyz), dot(corner, QuadRow1.xyz));
     output.Position = float4(placed.x * 2.0 - 1.0, 1.0 - placed.y * 2.0, 0.0, 1.0);
-    output.TexCoord = (uv * TexCoordScale) + TexCoordBias;
+    output.TexCoord = uv * TexCoordScale;
     return output;
+}
+
+// The coordinate a sample is taken at: the span the picture occupies, stopped at the last sample of the plane it comes
+// from. A picture drawn larger than its own size puts the last line of the surface past that sample — every line above it
+// lands inside — and there it would blend in what a hardware decoder padded the texture with, which was never written and
+// converts to green along the bottom edge. Stopping the coordinate is the only place this can be done: pulling the span in
+// at the vertex stage would move every line and rescale the picture instead.
+//
+// The two planes end half a texel apart. A chroma plane has half the rows and columns of the picture, so the coordinate of
+// the picture's last luma sample is half a chroma sample past its last chroma sample, and a picture drawn at its own size
+// is enough for the bottom line to fall between the two. Chroma is a quarter of the samples but two thirds of the green:
+// zero chroma with black luma is a saturated green, not a darker black.
+float2 PictureCoordinate(float2 texCoord)
+{
+    return min(texCoord, TexCoordMax);
+}
+
+float2 ChromaCoordinate(float2 texCoord)
+{
+    return min(texCoord, ChromaTexCoordMax);
 }
 
 // ==============================================================================================================================
@@ -260,36 +282,36 @@ float3 ConvertHlgToPq(float3 rgb)
 
 float4 PSMainPacked(VSOutput input) : SV_TARGET
 {
-    return FirstTexture.Sample(VideoSampler, input.TexCoord);
+    return FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord));
 }
 
 float4 PSMainSemiPlanar(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r;
-    float2 chroma = SecondTexture.Sample(VideoSampler, input.TexCoord).rg;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
+    float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
     return float4(ConvertYuvToRgb(luma, chroma), 1.0);
 }
 
 float4 PSMainPlanar(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r;
-    float cb = SecondTexture.Sample(VideoSampler, input.TexCoord).r;
-    float cr = ThirdTexture.Sample(VideoSampler, input.TexCoord).r;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
+    float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r;
+    float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r;
     return float4(ConvertYuvToRgb(luma, float2(cb, cr)), 1.0);
 }
 
 float4 PSMainPlanarTenBit(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cb = SecondTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cr = ThirdTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
+    float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
+    float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     return float4(ConvertYuvToRgb(luma, float2(cb, cr)), 1.0);
 }
 
 float4 PSMainSemiPlanarArray(VSOutput input) : SV_TARGET
 {
-    float luma = FirstPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).r;
-    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).rg;
+    float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
+    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
     return float4(ConvertYuvToRgb(luma, chroma), 1.0);
 }
 
@@ -303,45 +325,45 @@ float4 PSMainSemiPlanarArray(VSOutput input) : SV_TARGET
 
 float4 PSMainSemiPlanarPqToSdr(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r;
-    float2 chroma = SecondTexture.Sample(VideoSampler, input.TexCoord).rg;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
+    float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
     return float4(ConvertPqToDisplay(ConvertBt2020ToRgb(luma, chroma)), 1.0);
 }
 
 float4 PSMainPlanarTenBitPqToSdr(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cb = SecondTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cr = ThirdTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
+    float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
+    float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     return float4(ConvertPqToDisplay(ConvertBt2020ToRgb(luma, float2(cb, cr))), 1.0);
 }
 
 float4 PSMainSemiPlanarArrayPqToSdr(VSOutput input) : SV_TARGET
 {
-    float luma = FirstPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).r;
-    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).rg;
+    float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
+    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
     return float4(ConvertPqToDisplay(ConvertBt2020ToRgb(luma, chroma)), 1.0);
 }
 
 float4 PSMainSemiPlanarHlgToSdr(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r;
-    float2 chroma = SecondTexture.Sample(VideoSampler, input.TexCoord).rg;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
+    float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
     return float4(ConvertHlgToDisplay(ConvertBt2020ToRgb(luma, chroma)), 1.0);
 }
 
 float4 PSMainPlanarTenBitHlgToSdr(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cb = SecondTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cr = ThirdTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
+    float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
+    float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     return float4(ConvertHlgToDisplay(ConvertBt2020ToRgb(luma, float2(cb, cr))), 1.0);
 }
 
 float4 PSMainSemiPlanarArrayHlgToSdr(VSOutput input) : SV_TARGET
 {
-    float luma = FirstPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).r;
-    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).rg;
+    float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
+    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
     return float4(ConvertHlgToDisplay(ConvertBt2020ToRgb(luma, chroma)), 1.0);
 }
 
@@ -355,23 +377,23 @@ float4 PSMainSemiPlanarArrayHlgToSdr(VSOutput input) : SV_TARGET
 
 float4 PSMainSemiPlanarPqPassthrough(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r;
-    float2 chroma = SecondTexture.Sample(VideoSampler, input.TexCoord).rg;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
+    float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
     return float4(ConvertBt2020ToRgb(luma, chroma), 1.0);
 }
 
 float4 PSMainPlanarTenBitPqPassthrough(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cb = SecondTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cr = ThirdTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
+    float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
+    float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     return float4(ConvertBt2020ToRgb(luma, float2(cb, cr)), 1.0);
 }
 
 float4 PSMainSemiPlanarArrayPqPassthrough(VSOutput input) : SV_TARGET
 {
-    float luma = FirstPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).r;
-    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).rg;
+    float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
+    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
     return float4(ConvertBt2020ToRgb(luma, chroma), 1.0);
 }
 
@@ -384,23 +406,23 @@ float4 PSMainSemiPlanarArrayPqPassthrough(VSOutput input) : SV_TARGET
 
 float4 PSMainSemiPlanarHlgToPq(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r;
-    float2 chroma = SecondTexture.Sample(VideoSampler, input.TexCoord).rg;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
+    float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
     return float4(ConvertHlgToPq(ConvertBt2020ToRgb(luma, chroma)), 1.0);
 }
 
 float4 PSMainPlanarTenBitHlgToPq(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cb = SecondTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cr = ThirdTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
+    float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
+    float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     return float4(ConvertHlgToPq(ConvertBt2020ToRgb(luma, float2(cb, cr))), 1.0);
 }
 
 float4 PSMainSemiPlanarArrayHlgToPq(VSOutput input) : SV_TARGET
 {
-    float luma = FirstPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).r;
-    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).rg;
+    float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
+    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
     return float4(ConvertHlgToPq(ConvertBt2020ToRgb(luma, chroma)), 1.0);
 }
 
@@ -414,36 +436,36 @@ float4 PSMainSemiPlanarArrayHlgToPq(VSOutput input) : SV_TARGET
 
 float4 PSMainPackedSdrToPq(VSOutput input) : SV_TARGET
 {
-    return float4(ConvertSdrToPq(FirstTexture.Sample(VideoSampler, input.TexCoord).rgb), 1.0);
+    return float4(ConvertSdrToPq(FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).rgb), 1.0);
 }
 
 float4 PSMainSemiPlanarSdrToPq(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r;
-    float2 chroma = SecondTexture.Sample(VideoSampler, input.TexCoord).rg;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
+    float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
     return float4(ConvertSdrToPq(ConvertYuvToRgb(luma, chroma)), 1.0);
 }
 
 float4 PSMainPlanarSdrToPq(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r;
-    float cb = SecondTexture.Sample(VideoSampler, input.TexCoord).r;
-    float cr = ThirdTexture.Sample(VideoSampler, input.TexCoord).r;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
+    float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r;
+    float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r;
     return float4(ConvertSdrToPq(ConvertYuvToRgb(luma, float2(cb, cr))), 1.0);
 }
 
 float4 PSMainPlanarTenBitSdrToPq(VSOutput input) : SV_TARGET
 {
-    float luma = FirstTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cb = SecondTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
-    float cr = ThirdTexture.Sample(VideoSampler, input.TexCoord).r * 64.0;
+    float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
+    float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
+    float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     return float4(ConvertSdrToPq(ConvertYuvToRgb(luma, float2(cb, cr))), 1.0);
 }
 
 float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
 {
-    float luma = FirstPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).r;
-    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(input.TexCoord, 0.0)).rg;
+    float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
+    float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
     return float4(ConvertSdrToPq(ConvertYuvToRgb(luma, chroma)), 1.0);
 }
 """;
