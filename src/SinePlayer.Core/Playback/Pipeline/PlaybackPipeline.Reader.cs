@@ -322,7 +322,7 @@ public sealed partial class PlaybackPipeline
             return ahead > 0 ? TimeSpan.FromTicks(ahead) : TimeSpan.Zero;
         }
 
-        TimeSpan position = _clock.Position;
+        TimeSpan position = _timeline.Position;
 
         if (holder.VideoStream is not null && _videoDecoder.HasComponent && ReadAhead(ref _readerTailVideoTicks, position) >= ReadAheadMax)
         {

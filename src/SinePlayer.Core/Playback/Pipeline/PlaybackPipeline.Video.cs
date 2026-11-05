@@ -362,17 +362,17 @@ public sealed partial class PlaybackPipeline
 
             // Pause the clock on pause or starvation
             FrameEntry? entry = queue.TryPeek(out FrameEntry head) ? head : null;
-            TimeSpan position = _clock.Position;
+            TimeSpan position = _timeline.Position;
             bool offeringTheStill = state == MediaEngineState.Paused && !firstFrameTime.HasValue && endingEpoch != epoch;
 
             bool starved = _videoDecoder.HasComponent && endingEpoch != epoch && entry is null;
             starved = starved && !IsStreamSpent(epoch, position, ref _readerTailVideoTicks);
             starved = starved && (!firstFrameTime.HasValue || IsVideoStarved(position));
 
-            lock (_clockLock)
+            lock (_timeline.ClockLock)
             {
-                _videoStarved = starved;
-                StartOrPauseClock(epoch, state);
+                _timeline.VideoStarved = starved;
+                _timeline.StartOrPause(epoch, state);
             }
 
             // Idle on pause or starvation
@@ -436,15 +436,15 @@ public sealed partial class PlaybackPipeline
             {
                 TimeSpan anchor = firstFrameTime ?? frame.Timestamp;
 
-                lock (_clockLock)
+                lock (_timeline.ClockLock)
                 {
-                    if (AnchorClock(epoch, anchor))
+                    if (_timeline.Anchor(epoch, anchor))
                     {
-                        position = _clock.Position;
+                        position = _timeline.Position;
                         syncAction = Synchronizer.Evaluate(frame.Timestamp, position);
                     }
 
-                    StartOrPauseClock(epoch, state);
+                    _timeline.StartOrPause(epoch, state);
                 }
             }
 
@@ -534,7 +534,7 @@ public sealed partial class PlaybackPipeline
         }
 
         TimeSpan behind = position - TimeSpan.FromTicks(presentedTicks);
-        return _videoStarved
+        return _timeline.VideoStarved
             ? behind > TimeSpan.FromMilliseconds(VideoStarvationResumeMilliseconds)
             : behind > TimeSpan.FromMilliseconds(VideoStarvationMilliseconds);
     }
