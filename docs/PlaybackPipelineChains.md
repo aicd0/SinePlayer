@@ -201,14 +201,20 @@ kind and bumps only that kind's version fields.
 | E2–E4 | Builders take `(resolver, desired)` instead of `(…, sourceChanges)` | `BuildVideoChain` / `BuildAudioChain` / `BuildSubtitleChain` | done |
 | E5 | `BumpVersions(change, kind)`; `ReconcileCore` merges three booleans | | done |
 
-## Phase F — threads and lifecycle
+## Phase F — threads
 
-| # | Step | Size |
-|---|---|---|
-| F1 | `PipelineThread`: name, stop flag, node, `SingleThreadSynchronizationContext` host, `Join` | ~90 |
-| F2 | The video render thread uses it | ~30 |
-| F3 | The other four threads use it | ~80 |
-| F4 | `Start`/`StopAndJoin` per chain; `_stopRequested` and `_threadsStarted` disappear; `StopCore` iterates the chains | ~120 |
+In progress: the pipeline owns one list of threads instead of five fields and a shared stop flag.
+
+| # | Step | Lands as | State |
+|---|---|---|---|
+| F1 | A thread with its own stop flag | `PipelineThread` | done |
+| F2 | The five starts collapse into one | `StartThreads`, `RunReaderThread` | done |
+| F3 | Stop and join walk the list | `_threads`, `RequestStop`/`Join`, `_threadsStarted` and the pipeline's `_stopRequested` gone | done |
+| F4 | Chains own their threads | `VideoChain` (decode + render), `AudioChain`/`SubtitleChain` (render) | next |
+
+F4 has one wrinkle worth recording: the coroutine thread is not exclusive to one chain. It hosts the reader plus
+the audio and subtitle decode coroutines, so it belongs to the reader, not to any chain — the four threads that
+belong to exactly one chain are video decode, video render, audio render and subtitle render.
 
 ## Phase G — clock governance and ending
 
