@@ -12,4 +12,6 @@ internal interface IChainFeed
     ChainTail Tail { get; }
 
     bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch);
+
+    void SignalEnd(PipelineVersion versions, long epoch);
 }
