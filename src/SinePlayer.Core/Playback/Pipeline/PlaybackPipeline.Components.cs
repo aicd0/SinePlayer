@@ -149,7 +149,7 @@ public sealed partial class PlaybackPipeline
                 {
                     MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(sourceHolder, MediaStreamKind.Video);
                     _source.Publish(new(newSourceHolder, "source"), versions);
-                    _video.Stream = newSourceHolder.VideoStream;
+                    _video.Binding = new(newSourceHolder.VideoSource, newSourceHolder.VideoStream);
                 }
 
                 if (changed.HasFlag(ChainChanges.VideoDecoder))
