@@ -36,6 +36,8 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
     public StreamBinding<AudioStreamInfo> Binding { get; set; }
 
+    public long EndedEpoch { get; set; } = -1;
+
     private volatile bool _starved;
     public bool Starved
     {
@@ -47,7 +49,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
     public bool IsActive => Binding.Stream is not null && Decoder.HasComponent;
 
-    public void Start(Func<long, TimeSpan, bool> isStreamSpent, Action<long> reportEnded)
+    public void Start(Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
         _renderThread = new PipelineThread("Pipeline - Audio render", stop => Render(stop, isStreamSpent, reportEnded));
         _renderThread.Start();
@@ -260,7 +262,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         return OperationResult.Success();
     }
 
-    public void Render(Func<bool> stopRequested, Func<long, TimeSpan, bool> isStreamSpent, Action<long> reportEnded)
+    public void Render(Func<bool> stopRequested, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
         bool deviceAvailable = false;
         bool reportedRunningAhead = false;
@@ -478,7 +480,11 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                     playedOutEpoch = endingEpoch;
 
                     long epochCopy = endingEpoch;
-                    events.Submit(() => reportEnded(epochCopy));
+                    events.Submit(() =>
+                    {
+                        EndedEpoch = epochCopy;
+                        reportEnded();
+                    });
                 }
 
                 RenderNode.Wait(stamp, AudioIdleTimeoutMilliseconds);

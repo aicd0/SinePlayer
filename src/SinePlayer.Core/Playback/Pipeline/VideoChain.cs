@@ -53,6 +53,8 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
     public StreamBinding<VideoStreamInfo> Binding { get; set; }
 
+    public long EndedEpoch { get; set; } = -1;
+
     private volatile bool _starved;
     public bool Starved
     {
@@ -71,7 +73,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
     public long RenderTicks;
     public long PictureTicks = -1;
 
-    public void Start(Action wakeReader, Func<long, TimeSpan, bool> isStreamSpent, Action<long> reportEnded)
+    public void Start(Action wakeReader, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
         _decodeThread = new PipelineThread("Pipeline - Video decode", stop => Decode(stop, wakeReader));
         _renderThread = new PipelineThread("Pipeline - Video render", stop => Render(stop, isStreamSpent, reportEnded));
@@ -240,7 +242,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         }
     }
 
-    public void Render(Func<bool> stopRequested, Func<long, TimeSpan, bool> isStreamSpent, Action<long> reportEnded)
+    public void Render(Func<bool> stopRequested, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
         bool deviceAvailable = false;
         long workingEpoch = -1;
@@ -391,7 +393,11 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
                     endingEpoch = entry.Value.Epoch;
 
                     long epochCopy = entry.Value.Epoch;
-                    events.Submit(() => reportEnded(epochCopy));
+                    events.Submit(() =>
+                    {
+                        EndedEpoch = epochCopy;
+                        reportEnded();
+                    });
                 }
 
                 DequeueAndDispose();
