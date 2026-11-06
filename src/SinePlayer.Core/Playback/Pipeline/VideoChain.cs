@@ -31,6 +31,8 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
+    public ComponentSlot<MediaSource> Source { get; } = new();
+
     public ComponentSlot<IVideoDecoder> Decoder { get; } = new();
 
     public ComponentSlot<IVideoRenderer> Renderer { get; } = new();
@@ -59,16 +61,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         }
     }
 
-    public VideoStreamInfo? Stream => Binding.Stream;
-
     public StreamBinding<VideoStreamInfo> Selected { get; set; }
-
-    private readonly SeqLock<StreamBinding<VideoStreamInfo>> _binding = new(default);
-    public StreamBinding<VideoStreamInfo> Binding
-    {
-        get => _binding.Read();
-        set => _binding.Write(_ => value);
-    }
 
     public long EndedEpoch { get; set; } = -1;
 
@@ -79,9 +72,9 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         set => _starved = value;
     }
 
-    public ChainTail Tail { get; } = new();
+    public ChainTail ReadTail { get; } = new();
 
-    public bool IsActive => Binding.Stream is not null && Decoder.HasComponent;
+    public bool IsConsuming => Decoder.HasComponent;
 
     public long PresentedFrameCount;
     public long DroppedFrameCount;
@@ -121,14 +114,14 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
             entry.Frame?.Dispose();
         }
 
+        Source.Reset();
         Decoder.Reset();
         Renderer.Reset();
         Target = null;
         Selected = default;
-        Binding = default;
         Starved = false;
         EndedEpoch = -1;
-        Tail.Reset();
+        ReadTail.Reset();
 
         Interlocked.Exchange(ref PresentedFrameCount, 0);
         Interlocked.Exchange(ref DroppedFrameCount, 0);
@@ -138,21 +131,16 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         Interlocked.Exchange(ref PictureTicks, -1);
     }
 
-    public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
+    public void Accept(MediaStreamInfo stream, MediaPacket packet, ChainVersion versions, long epoch)
     {
-        if (!Binding.Accepts(source, packet.StreamIndex))
-        {
-            return false;
-        }
-
-        TimeSpan span = SpanOf(packet, Binding.Stream?.FrameRate ?? 0);
+        var videoStream = (VideoStreamInfo)stream;
+        TimeSpan span = SpanOf(packet, videoStream.FrameRate);
         _lastPacketSpan = span;
         PacketQueue.Enqueue(new PacketEntry(packet, versions, epoch, span));
         WakeDecode();
-        return true;
     }
 
-    public void SignalEnd(PipelineVersion versions, long epoch)
+    public void SignalEnd(ChainVersion versions, long epoch)
     {
         PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
         WakeDecode();
@@ -209,8 +197,8 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
                 continue;
             }
 
-            PipelineVersion videoDecoderVersions = Decoder.CurrentVersions;
-            VersionVerdict verdict = PipelineVersion.CompareVideoDecoder(entry.Versions, videoDecoderVersions);
+            ChainVersion videoDecoderVersions = Decoder.CurrentVersions;
+            VersionVerdict verdict = ChainVersion.CompareDecoder(entry.Versions, videoDecoderVersions);
             if (verdict == VersionVerdict.Block)
             {
                 DecodeNode.Wait(stamp);
@@ -234,7 +222,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
                     continue;
                 }
 
-                var videoFrameVersions = PipelineVersion.Max(entry.Versions, videoDecoderVersions);
+                var videoFrameVersions = ChainVersion.Max(entry.Versions, videoDecoderVersions);
                 if (packet is null)
                 {
                     if (videoDecoder is not null)
@@ -358,7 +346,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
             bool playing = events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
             VideoTransform transform = Transform.Read();
 
-            VideoOrientation containerTransform = Stream?.Orientation ?? VideoOrientation.Identity;
+            VideoOrientation containerTransform = ((VideoStreamInfo?)Renderer.CurrentStream)?.Orientation ?? VideoOrientation.Identity;
             if (!containerTransform.IsIdentity)
             {
                 transform = transform with { Orientation = transform.Orientation.Combine(containerTransform) };
@@ -415,7 +403,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
                 continue;
             }
 
-            VersionVerdict verdict = PipelineVersion.CompareVideoRenderer(entry.Value.Versions, Renderer.CurrentVersions);
+            VersionVerdict verdict = ChainVersion.CompareRenderer(entry.Value.Versions, Renderer.CurrentVersions);
             if (verdict == VersionVerdict.Block)
             {
                 RenderNode.Wait(stamp);
@@ -549,7 +537,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         return OperationResult.Success();
     }
 
-    private OperationResult DrainDecoder(IVideoDecoder decoder, PipelineVersion versions, long epoch)
+    private OperationResult DrainDecoder(IVideoDecoder decoder, ChainVersion versions, long epoch)
     {
         OperationResult drained;
         IReadOnlyList<RawVideoFrame> frames;
@@ -576,7 +564,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         return OperationResult.Success();
     }
 
-    private void QueueFrames(IReadOnlyList<RawVideoFrame> frames, PipelineVersion versions, long epoch)
+    private void QueueFrames(IReadOnlyList<RawVideoFrame> frames, ChainVersion versions, long epoch)
     {
         bool fastExit = false;
 
@@ -689,7 +677,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         get
         {
             IVideoRenderTarget? target = Target;
-            VideoStreamInfo? stream = Stream;
+            var stream = (VideoStreamInfo?)Source.CurrentStream;
             if (target is null || stream is null || stream.Width <= 0 || stream.Height <= 0)
             {
                 return SubtitleFrame.Full;

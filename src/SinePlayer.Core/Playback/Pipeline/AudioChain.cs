@@ -8,7 +8,6 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
-using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
@@ -20,6 +19,8 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
+
+    public ComponentSlot<MediaSource> Source { get; } = new();
 
     public ComponentSlot<IAudioDecoder> Decoder { get; } = new();
 
@@ -37,13 +38,6 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
     public StreamBinding<AudioStreamInfo> Selected { get; set; }
 
-    private readonly SeqLock<StreamBinding<AudioStreamInfo>> _binding = new(default);
-    public StreamBinding<AudioStreamInfo> Binding
-    {
-        get => _binding.Read();
-        set => _binding.Write(_ => value);
-    }
-
     public long EndedEpoch { get; set; } = -1;
 
     private volatile bool _starved;
@@ -53,9 +47,9 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         set => _starved = value;
     }
 
-    public ChainTail Tail { get; } = new();
+    public ChainTail ReadTail { get; } = new();
 
-    public bool IsActive => Binding.Stream is not null && Decoder.HasComponent;
+    public bool IsConsuming => Decoder.HasComponent;
 
     public void Start(Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
@@ -79,31 +73,25 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         PacketQueue.Clear();
         BufferQueue.Clear();
 
+        Source.Reset();
         Decoder.Reset();
         Renderer.CurrentComponent?.Flush();
         Renderer.Reset();
         Selected = default;
-        Binding = default;
         Starved = false;
         EndedEpoch = -1;
-        Tail.Reset();
+        ReadTail.Reset();
     }
 
-    public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
+    public void Accept(MediaStreamInfo stream, MediaPacket packet, ChainVersion versions, long epoch)
     {
-        if (!Binding.Accepts(source, packet.StreamIndex))
-        {
-            return false;
-        }
-
         TimeSpan span = SpanOf(packet);
         _lastPacketSpan = span;
         PacketQueue.Enqueue(new PacketEntry(packet, versions, epoch, span));
         WakeDecode();
-        return true;
     }
 
-    public void SignalEnd(PipelineVersion versions, long epoch)
+    public void SignalEnd(ChainVersion versions, long epoch)
     {
         PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
         WakeDecode();
@@ -149,8 +137,8 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                 continue;
             }
 
-            PipelineVersion audioDecoderVersions = Decoder.CurrentVersions;
-            VersionVerdict verdict = PipelineVersion.CompareAudioDecoder(entry.Versions, audioDecoderVersions);
+            ChainVersion audioDecoderVersions = Decoder.CurrentVersions;
+            VersionVerdict verdict = ChainVersion.CompareDecoder(entry.Versions, audioDecoderVersions);
             if (verdict == VersionVerdict.Block)
             {
                 await DecodeNode.WaitAsync(stamp);
@@ -174,7 +162,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                     continue;
                 }
 
-                var audioBufferVersions = PipelineVersion.Max(entry.Versions, audioDecoderVersions);
+                var audioBufferVersions = ChainVersion.Max(entry.Versions, audioDecoderVersions);
                 IAudioDecoder? audioDecoder = Decoder.CurrentComponent;
                 if (packet is null)
                 {
@@ -206,7 +194,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         }
     }
 
-    private OperationResult DecodePacket(IAudioDecoder audioDecoder, MediaPacket packet, PipelineVersion versions, long epoch)
+    private OperationResult DecodePacket(IAudioDecoder audioDecoder, MediaPacket packet, ChainVersion versions, long epoch)
     {
         OperationResult decoded;
         IReadOnlyList<RawAudioBuffer> buffers;
@@ -242,7 +230,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         return OperationResult.Success();
     }
 
-    private OperationResult DrainDecoder(IAudioDecoder? decoder, PipelineVersion versions, long epoch)
+    private OperationResult DrainDecoder(IAudioDecoder? decoder, ChainVersion versions, long epoch)
     {
         if (decoder is null)
         {
@@ -526,7 +514,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                 continue;
             }
 
-            VersionVerdict verdict = PipelineVersion.CompareAudioRenderer(entry.Versions, Renderer.CurrentVersions);
+            VersionVerdict verdict = ChainVersion.CompareRenderer(entry.Versions, Renderer.CurrentVersions);
             if (verdict == VersionVerdict.Block)
             {
                 RenderNode.Wait(stamp);
