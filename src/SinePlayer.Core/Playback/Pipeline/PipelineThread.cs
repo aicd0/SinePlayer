@@ -17,6 +17,8 @@ internal sealed class PipelineThread
         };
     }
 
+    public bool StopRequested => _stopRequested;
+
     public void Start()
     {
         _thread.Start();

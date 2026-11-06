@@ -480,17 +480,14 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void StartThreads()
     {
-        CoroutineHost host = new("Pipeline - Reader", [
-            stop => _reader.Run(stop, NotifySourceEnded),
-            stop => _audio.Decode(stop, _reader.Wake),
-            stop => _subtitle.Decode(stop, _reader.Wake),
-        ]);
-
+        CoroutineHost host = new("Pipeline - Reader");
+        host.Register(stop => _reader.Run(stop, NotifySourceEnded));
         host.Start();
         _host = host;
+
         _video.Start(_reader.Wake, IsVideoStreamSpent, TryNotifyPlaybackEnded);
-        _audio.Start(IsAudioStreamSpent, TryNotifyPlaybackEnded);
-        _subtitle.Start();
+        _audio.Start(host, _reader.Wake, IsAudioStreamSpent, TryNotifyPlaybackEnded);
+        _subtitle.Start(host, _reader.Wake);
     }
 
     private void StopThreads()
@@ -499,8 +496,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         _video.RequestStop();
         _audio.RequestStop();
         _subtitle.RequestStop();
-
-        WakeAll();
+        _reader.Wake();
 
         _host?.Join();
         _host = null;

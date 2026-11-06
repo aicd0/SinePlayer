@@ -7,12 +7,17 @@ namespace SinePlayer.Core.Playback.Pipeline;
 
 internal sealed class CoroutineHost
 {
-    private readonly IReadOnlyList<Func<Func<bool>, Task>> _coroutines;
+    private readonly Lock _lock = new();
+    private readonly List<PipelineCoroutine> _coroutines = [];
     private readonly PipelineThread _thread;
 
-    public CoroutineHost(string name, IReadOnlyList<Func<Func<bool>, Task>> coroutines)
+    private SingleThreadSynchronizationContext? _context;
+    private int _outstanding;
+    private bool _closing;
+    private Exception? _failure;
+
+    public CoroutineHost(string name)
     {
-        _coroutines = coroutines;
         _thread = new PipelineThread(name, Run);
     }
 
@@ -21,9 +26,42 @@ internal sealed class CoroutineHost
         _thread.Start();
     }
 
+    public PipelineCoroutine Register(Func<Func<bool>, Task> body)
+    {
+        PipelineCoroutine coroutine = new(body);
+
+        SingleThreadSynchronizationContext? running;
+        lock (_lock)
+        {
+            _coroutines.Add(coroutine);
+            _outstanding++;
+            running = _context;
+        }
+
+        running?.Post(_ => Begin(coroutine, () => _thread.StopRequested), null);
+        return coroutine;
+    }
+
     public void RequestStop()
     {
-        _thread.RequestStop();
+        SingleThreadSynchronizationContext? context;
+        bool finished;
+        lock (_lock)
+        {
+            _closing = true;
+            foreach (PipelineCoroutine coroutine in _coroutines)
+            {
+                coroutine.RequestStop();
+            }
+
+            finished = _outstanding == 0;
+            context = _context;
+        }
+
+        if (finished)
+        {
+            context?.Complete();
+        }
     }
 
     public void Join()
@@ -36,29 +74,75 @@ internal sealed class CoroutineHost
         SingleThreadSynchronizationContext context = new();
         SynchronizationContext? previousContext = SynchronizationContext.Current;
         SynchronizationContext.SetSynchronizationContext(context);
+
+        PipelineCoroutine[] initial;
+        lock (_lock)
+        {
+            _context = context;
+            initial = [.. _coroutines];
+        }
+
         try
         {
-            async Task AsyncCore()
+            foreach (PipelineCoroutine coroutine in initial)
             {
-                try
-                {
-                    Task[] tasks = [.. _coroutines.Select(coroutine => coroutine(stopRequested))];
-                    await Task.WhenAll(tasks);
-                }
-                finally
-                {
-                    context.Complete();
-                }
+                Begin(coroutine, stopRequested);
             }
 
-            Task task = AsyncCore();
             context.RunOnCurrentThread();
-            task.Wait();
+
+            if (_failure is { } failure)
+            {
+                throw failure;
+            }
         }
         finally
         {
+            lock (_lock)
+            {
+                _context = null;
+            }
+
             SynchronizationContext.SetSynchronizationContext(previousContext);
             context.Dispose();
+        }
+    }
+
+    private void Begin(PipelineCoroutine coroutine, Func<bool> stopRequested)
+    {
+        if (!coroutine.TryBegin())
+        {
+            return;
+        }
+
+        _ = RunCore(coroutine, () => stopRequested() || coroutine.IsStopRequested);
+    }
+
+    private async Task RunCore(PipelineCoroutine coroutine, Func<bool> stopRequested)
+    {
+        try
+        {
+            await coroutine.Body(stopRequested);
+        }
+        catch (Exception exception)
+        {
+            _failure ??= exception;
+        }
+        finally
+        {
+            bool finished;
+            SingleThreadSynchronizationContext? context;
+            lock (_lock)
+            {
+                _outstanding--;
+                finished = _closing && _outstanding == 0;
+                context = _context;
+            }
+
+            if (finished)
+            {
+                context?.Complete();
+            }
         }
     }
 }
