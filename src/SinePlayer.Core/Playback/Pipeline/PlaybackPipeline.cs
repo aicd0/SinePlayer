@@ -46,15 +46,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         _reader.VideoSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [_video] = _video.Source });
         _reader.AudioSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [_audio] = _audio.Source });
         _reader.SubtitleSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [_subtitle] = _subtitle.Source });
-        _wakeTargets = [
-            _reader,
-            _video.DecodeNode,
-            _audio.DecodeNode,
-            _subtitle.DecodeNode,
-            _video.RenderNode,
-            _audio.RenderNode,
-            _subtitle.RenderNode,
-        ];
+        _wakeTargets = [_reader, _video, _audio, _subtitle];
     }
 
     #endregion
