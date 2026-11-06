@@ -7,5 +7,5 @@ namespace SinePlayer.Core.Playback.Pipeline;
 
 internal readonly record struct FrameEntry(
     RawVideoFrame? Frame,
-    PipelineVersion Versions,
+    ChainVersion Versions,
     long Epoch);

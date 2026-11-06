@@ -7,6 +7,6 @@ namespace SinePlayer.Core.Playback.Pipeline;
 
 internal readonly record struct PacketEntry(
     MediaPacket? Packet,
-    PipelineVersion Versions,
+    ChainVersion Versions,
     long Epoch,
     TimeSpan Span);
