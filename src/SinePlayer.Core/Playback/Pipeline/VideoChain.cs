@@ -45,7 +45,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
     public PipelineNode RenderNode { get; } = new();
 
-    public SeqLock<VideoTransform> Transform { get; } = new(VideoTransform.Identity);
+    public AtomicCell<VideoTransform> Transform { get; } = new(VideoTransform.Identity);
 
     public ISynchronizer Synchronizer { get; set; } = new DefaultSynchronizer();
 
