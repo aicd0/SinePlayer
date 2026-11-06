@@ -33,7 +33,7 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
 
     public PipelineNode RenderNode { get; } = new();
 
-    public SeqLock<SubtitlePresentation> Presentation { get; } = new(SubtitlePresentation.Identity);
+    public AtomicCell<SubtitlePresentation> Presentation { get; } = new(SubtitlePresentation.Identity);
 
     private IVideoRenderTarget? _target;
     public IVideoRenderTarget? Target
