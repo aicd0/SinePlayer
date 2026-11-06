@@ -18,6 +18,8 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
+    public ComponentSlot<MediaSource> Source { get; } = new();
+
     public ComponentSlot<ISubtitleDecoder> Decoder { get; } = new();
 
     public ComponentSlot<ISubtitleRenderer> Renderer { get; } = new();
@@ -50,16 +52,9 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
 
     public StreamBinding<SubtitleStreamInfo> Selected { get; set; }
 
-    private readonly SeqLock<StreamBinding<SubtitleStreamInfo>> _binding = new(default);
-    public StreamBinding<SubtitleStreamInfo> Binding
-    {
-        get => _binding.Read();
-        set => _binding.Write(_ => value);
-    }
+    public ChainTail ReadTail { get; } = new();
 
-    public ChainTail Tail { get; } = new();
-
-    public bool IsActive => Binding.Stream is not null && Decoder.HasComponent;
+    public bool IsConsuming => Decoder.HasComponent;
 
     public void Start()
     {
@@ -82,29 +77,23 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
     {
         PacketQueue.Clear();
 
+        Source.Reset();
         Decoder.Reset();
         Renderer.Reset();
         Target = null;
         Selected = default;
-        Binding = default;
-        Tail.Reset();
+        ReadTail.Reset();
     }
 
-    public bool TryAccept(MediaSource source, MediaPacket packet, PipelineVersion versions, long epoch)
+    public void Accept(MediaStreamInfo stream, MediaPacket packet, ChainVersion versions, long epoch)
     {
-        if (!Binding.Accepts(source, packet.StreamIndex))
-        {
-            return false;
-        }
-
         TimeSpan span = SpanOf(packet);
         _lastPacketSpan = span;
         PacketQueue.Enqueue(new PacketEntry(packet, versions, epoch, span));
         WakeDecode();
-        return true;
     }
 
-    public void SignalEnd(PipelineVersion versions, long epoch)
+    public void SignalEnd(ChainVersion versions, long epoch)
     {
         PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
         WakeDecode();
@@ -153,8 +142,7 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
                 continue;
             }
 
-            PipelineVersion subtitleDecoderVersions = Decoder.CurrentVersions;
-            VersionVerdict verdict = PipelineVersion.CompareSubtitleDecoder(entry.Versions, subtitleDecoderVersions);
+            VersionVerdict verdict = ChainVersion.CompareDecoder(entry.Versions, Decoder.CurrentVersions);
             if (verdict == VersionVerdict.Block)
             {
                 await DecodeNode.WaitAsync(stamp);

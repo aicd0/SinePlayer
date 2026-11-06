@@ -24,11 +24,9 @@ public sealed partial class PlaybackPipeline : IDisposable
     private readonly VideoChain _video;
     private readonly AudioChain _audio;
 
-    private volatile MediaSourceHolder _selection = new([]);
-    private readonly ComponentSlot<MediaSourceHolder> _source = new();
+    private volatile MediaSource[] _sources = [];
     private CoroutineHost? _host;
     private readonly IPipelineWakeTarget[] _wakeTargets;
-    private readonly IChainFeed[] _feeds;
     private readonly MediaReader _reader;
 
     private bool _disposed;
@@ -44,8 +42,10 @@ public sealed partial class PlaybackPipeline : IDisposable
         _video = new VideoChain(_timeline, _events, VideoTarget_SurfaceSizeChanged);
         _audio = new AudioChain(_timeline, _events);
         _subtitle = new SubtitleChain(_timeline, _events, SubtitleTarget_SurfaceSizeChanged);
-        _feeds = [_video, _audio, _subtitle];
-        _reader = new MediaReader(_source, _feeds, _timeline, _events, ChooseSeekLanding);
+        _reader = new MediaReader(_timeline, _events, ChooseSeekLanding);
+        _reader.VideoSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [_video] = _video.Source });
+        _reader.AudioSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [_audio] = _audio.Source });
+        _reader.SubtitleSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [_subtitle] = _subtitle.Source });
         _wakeTargets = [
             _reader,
             _video.DecodeNode,
@@ -120,7 +120,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public string? Error => _events.Error;
 
-    public IReadOnlyList<MediaSource> Sources => _selection.Sources;
+    public IReadOnlyList<MediaSource> Sources => _sources;
 
     public VideoStreamInfo? SelectedVideoStream => _video.Selected.Stream;
 
@@ -299,8 +299,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
 
         MediaSource added = new(source, locator);
-        MediaSourceHolder selection = _selection;
-        _selection = new MediaSourceHolder([.. selection.Sources, added]);
+        _sources = [.. _sources, added];
         return result.Success(added);
     }
 
@@ -318,7 +317,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         if (stream is not null)
         {
-            if (_selection.TryGetSourceOf(stream) is null)
+            if (FindSource(stream) is null)
             {
                 return OperationResult.Failure($"Stream {stream.Index} is not part of anything the pipeline was given.");
             }
@@ -329,7 +328,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
         }
 
-        MediaSource? source = _selection.TryGetSourceOf(stream);
+        MediaSource? source = FindSource(stream);
         switch (kind)
         {
             case MediaStreamKind.Video:
@@ -353,7 +352,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
-        if (_video.Binding.Stream is null && _audio.Binding.Stream is null)
+        if (_video.Source.Latest?.Stream is null && _audio.Source.Latest?.Stream is null)
         {
             return OperationResult.Failure("No track is selected. Choose a video or audio track before playing.");
         }
@@ -442,19 +441,9 @@ public sealed partial class PlaybackPipeline : IDisposable
         OperationResult<ChainChange> audio = BuildAudioChain(resolver);
         OperationResult<ChainChange> subtitle = BuildSubtitleChain(resolver);
 
-        bool sourceChanged = (video.IsSuccessful && video.Result.HasFlag(ChainChange.Source))
-            || (audio.IsSuccessful && audio.Result.HasFlag(ChainChange.Source))
-            || (subtitle.IsSuccessful && subtitle.Result.HasFlag(ChainChange.Source));
-        if (sourceChanged)
-        {
-            PipelineVersion current = CurrentVersions();
-            _source.Publish(new(CreateSourceHolder(), "source"), current with { Source = current.Next });
-        }
-
         bool changed = (video.IsSuccessful && video.Result != ChainChange.None)
             || (audio.IsSuccessful && audio.Result != ChainChange.None)
             || (subtitle.IsSuccessful && subtitle.Result != ChainChange.None);
-
         if (changed)
         {
             _timeline.AdvanceEpoch(_timeline.Position, SeekMode.Precise);
@@ -482,14 +471,12 @@ public sealed partial class PlaybackPipeline : IDisposable
         _audio.Reset();
         _subtitle.Reset();
 
-        foreach (MediaSource source in _selection.Sources)
+        foreach (MediaSource source in _sources)
         {
             source.Source.Dispose();
         }
 
-        _selection = new MediaSourceHolder([]);
-
-        _source.Reset();
+        _sources = [];
 
         _timeline.Stop();
         _timeline.EndingEpoch = -1;
@@ -503,13 +490,13 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         CoroutineHost host = new("Pipeline - Reader", [
             stop => _reader.Run(stop, NotifySourceEnded),
-            stop => _audio.Decode(stop, _reader.TryWake),
-            stop => _subtitle.Decode(stop, _reader.TryWake),
+            stop => _audio.Decode(stop, _reader.Wake),
+            stop => _subtitle.Decode(stop, _reader.Wake),
         ]);
 
         host.Start();
         _host = host;
-        _video.Start(_reader.TryWake, IsVideoStreamSpent, TryNotifyPlaybackEnded);
+        _video.Start(_reader.Wake, IsVideoStreamSpent, TryNotifyPlaybackEnded);
         _audio.Start(IsAudioStreamSpent, TryNotifyPlaybackEnded);
         _subtitle.Start();
     }
@@ -537,22 +524,22 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private bool IsVideoStreamSpent(long epoch, TimeSpan position)
     {
-        return _video.Tail.IsSpent(epoch, position, FurthestTailTicks);
+        return _video.ReadTail.IsSpent(epoch, position, FurthestTailTicks);
     }
 
     private bool IsAudioStreamSpent(long epoch, TimeSpan position)
     {
-        return _audio.Tail.IsSpent(epoch, position, FurthestTailTicks);
+        return _audio.ReadTail.IsSpent(epoch, position, FurthestTailTicks);
     }
 
-    private long FurthestTailTicks => Math.Max(_video.Tail.Ticks, _audio.Tail.Ticks);
+    private long FurthestTailTicks => Math.Max(_video.ReadTail.Ticks, _audio.ReadTail.Ticks);
 
     private bool IsStarved => _video.Starved || _audio.Starved;
 
     private int ChooseSeekLanding(MediaSource source, TimeSpan position)
     {
-        VideoStreamInfo? video = _video.Binding.Source == source ? _video.Binding.Stream : null;
-        AudioStreamInfo? audio = _audio.Binding.Source == source ? _audio.Binding.Stream : null;
+        VideoStreamInfo? video = _video.Source.CurrentComponent == source ? (VideoStreamInfo?)_video.Source.CurrentStream : null;
+        AudioStreamInfo? audio = _audio.Source.CurrentComponent == source ? (AudioStreamInfo?)_audio.Source.CurrentStream : null;
 
         if (video is null)
         {
@@ -588,12 +575,12 @@ public sealed partial class PlaybackPipeline : IDisposable
             return;
         }
 
-        if (_video.Binding.Stream is not null && _video.EndedEpoch != endingEpoch)
+        if (_video.Source.Latest?.Stream is not null && _video.EndedEpoch != endingEpoch)
         {
             return;
         }
 
-        if (_audio.Binding.Stream is not null && _audio.EndedEpoch != endingEpoch)
+        if (_audio.Source.Latest?.Stream is not null && _audio.EndedEpoch != endingEpoch)
         {
             return;
         }
@@ -621,6 +608,27 @@ public sealed partial class PlaybackPipeline : IDisposable
     #endregion
 
     #region Communication
+
+    private MediaSource? FindSource(MediaStreamInfo? stream)
+    {
+        if (stream is null)
+        {
+            return null;
+        }
+
+        foreach (MediaSource source in _sources)
+        {
+            foreach (MediaStreamInfo candidate in source.Info.Streams)
+            {
+                if (candidate == stream)
+                {
+                    return source;
+                }
+            }
+        }
+
+        return null;
+    }
 
     private void NotifyClockMoved()
     {

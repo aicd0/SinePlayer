@@ -1,28 +1,29 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class ComponentSlot<T> where T : class, IDisposable
+internal sealed class ComponentSlot<T> where T : class
 {
     private readonly Lock _lock = new();
 
     private bool _published;
     private PipelineComponent<T>? _current;
-    private PipelineVersion _currentVersions;
+    private ChainVersion _currentVersions;
     private PipelineComponent<T>? _pending;
-    private PipelineVersion _pendingVersions;
+    private ChainVersion _pendingVersions;
     private readonly SeqLock<Snapshot> _snapshot = new(new());
 
     private class Snapshot
     {
         public bool Published { get; init; }
         public PipelineComponent<T>? Current { get; init; }
-        public PipelineVersion CurrentVersions { get; init; }
+        public ChainVersion CurrentVersions { get; init; }
         public PipelineComponent<T>? Pending { get; init; }
-        public PipelineVersion PendingVersions { get; init; }
+        public ChainVersion PendingVersions { get; init; }
     }
 
     public PipelineComponent<T>? Latest
@@ -43,7 +44,25 @@ internal sealed class ComponentSlot<T> where T : class, IDisposable
         }
     }
 
-    public PipelineVersion CurrentVersions
+    public MediaStreamInfo? CurrentStream
+    {
+        get
+        {
+            Snapshot snapshot = _snapshot.Read();
+            return snapshot.Current?.Stream;
+        }
+    }
+
+    public ChainVersion LastestVersions
+    {
+        get
+        {
+            Snapshot snapshot = _snapshot.Read();
+            return ChainVersion.Max(snapshot.CurrentVersions, snapshot.PendingVersions);
+        }
+    }
+
+    public ChainVersion CurrentVersions
     {
         get
         {
@@ -52,22 +71,13 @@ internal sealed class ComponentSlot<T> where T : class, IDisposable
         }
     }
 
-    public PipelineVersion HighestVersions
-    {
-        get
-        {
-            Snapshot snapshot = _snapshot.Read();
-            return PipelineVersion.Max(snapshot.CurrentVersions, snapshot.PendingVersions);
-        }
-    }
-
     public bool HasComponent => Latest is not null;
 
-    public void Publish(PipelineComponent<T>? component, PipelineVersion versions)
+    public void Publish(PipelineComponent<T>? component, ChainVersion versions)
     {
         lock (_lock)
         {
-            if (PipelineVersion.IsBehind(versions, PipelineVersion.Max(_currentVersions, _pendingVersions)))
+            if (ChainVersion.IsBehind(versions, ChainVersion.Max(_currentVersions, _pendingVersions)))
             {
                 component?.Dispose();
                 return;

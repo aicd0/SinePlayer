@@ -3,12 +3,11 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Source;
+using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
 internal sealed class MediaReader(
-    ComponentSlot<MediaSourceHolder> source,
-    IReadOnlyList<IChainFeed> feeds,
     PipelineTimeline timeline,
     PipelineEvents events,
     Func<MediaSource, TimeSpan, int> chooseSeekLanding) : IPipelineWakeTarget
@@ -19,17 +18,15 @@ internal sealed class MediaReader(
 
     private readonly PipelineNodeAsync _node = new();
 
+    public SeqLock<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> VideoSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+
+    public SeqLock<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> AudioSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+
+    public SeqLock<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> SubtitleSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+
     public void Wake()
     {
         _node.Wake();
-    }
-
-    public void TryWake()
-    {
-        if (!IsBuffered(ReadAheadWake))
-        {
-            _node.Wake();
-        }
     }
 
     public async Task Run(Func<bool> stopRequested, Action<long> reportSourceEnded)
@@ -39,6 +36,7 @@ internal sealed class MediaReader(
         long workingEpoch = -1;
         long endingEpoch = -1;
         Dictionary<MediaSource, SourceTail> tails = [];
+        List<MediaSource> sources = [];
 
         while (true)
         {
@@ -54,22 +52,32 @@ internal sealed class MediaReader(
                 continue;
             }
 
-            // Install source
-            if (source.Update(out MediaSourceHolder? oldSourceHolder))
+            // Install sources
+            IReadOnlyList<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> bindings = ReadSources();
+            bool installed = false;
+            foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
             {
-                oldSourceHolder?.Dispose();
+                if (entry.Value.Update(out _))
+                {
+                    installed = true;
+                }
+            }
+
+            if (installed)
+            {
                 pendingEpochChange = true;
                 tails.Clear();
+                sources.Clear();
+
+                foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
+                {
+                    if (entry.Value.CurrentComponent is { } source && !sources.Contains(source))
+                    {
+                        sources.Add(source);
+                    }
+                }
             }
 
-            MediaSourceHolder? sourceHolder = source.CurrentComponent;
-            if (sourceHolder is null)
-            {
-                await _node.WaitAsync(stamp);
-                continue;
-            }
-
-            IReadOnlyList<MediaSource> sources = sourceHolder.Sources;
             if (sources.Count == 0)
             {
                 await _node.WaitAsync(stamp);
@@ -85,12 +93,12 @@ internal sealed class MediaReader(
                 pendingEpochChange = false;
                 tails.Clear();
 
-                foreach (IChainFeed feed in feeds)
+                foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
                 {
-                    feed.Tail.Reset();
+                    entry.Key.ReadTail.Reset();
                 }
 
-                OperationResult sought = SeekSources(sourceHolder, epochGate.SeekPosition);
+                OperationResult sought = SeekSources(sources, epochGate.SeekPosition);
                 if (sought.IsSuccessful)
                 {
                     endingEpoch = -1;
@@ -112,7 +120,7 @@ internal sealed class MediaReader(
             // Buffering
             if (!buffering)
             {
-                if (IsBuffered(ReadAheadWake))
+                if (IsBuffered(bindings, ReadAheadWake))
                 {
                     await _node.WaitAsync(stamp);
                     continue;
@@ -120,7 +128,7 @@ internal sealed class MediaReader(
 
                 buffering = true;
             }
-            else if (IsBuffered(ReadAheadMin))
+            else if (IsBuffered(bindings, ReadAheadMin))
             {
                 buffering = false;
                 continue;
@@ -148,14 +156,13 @@ internal sealed class MediaReader(
                 }
             }
 
-            PipelineVersion sourceVersions = source.CurrentVersions;
             if (chosenSource is null || chosenTail is null)
             {
                 endingEpoch = epoch;
 
-                foreach (IChainFeed feed in feeds)
+                foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
                 {
-                    feed.SignalEnd(sourceVersions, epoch);
+                    entry.Key.SignalEnd(entry.Value.CurrentVersions, epoch);
                 }
 
                 long endedEpoch = epoch;
@@ -192,14 +199,17 @@ internal sealed class MediaReader(
             }
 
             bool handedOn = false;
-            foreach (IChainFeed feed in feeds)
+            foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
             {
-                if (feed.TryAccept(chosenSource, packet, sourceVersions, epoch))
+                if (entry.Value.CurrentComponent != chosenSource || entry.Value.CurrentStream?.Index != packet.StreamIndex)
                 {
-                    feed.Tail.Report(epoch, packet.Timestamp);
-                    handedOn = true;
-                    break;
+                    continue;
                 }
+
+                entry.Key.Accept(entry.Value.CurrentStream!, packet, entry.Value.CurrentVersions, epoch);
+                entry.Key.ReadTail.Report(epoch, packet.Timestamp);
+                handedOn = true;
+                break;
             }
 
             if (!handedOn)
@@ -211,9 +221,8 @@ internal sealed class MediaReader(
         }
     }
 
-    private OperationResult SeekSources(MediaSourceHolder sourceHolder, TimeSpan position)
+    private OperationResult SeekSources(IReadOnlyList<MediaSource> sources, TimeSpan position)
     {
-        IReadOnlyList<MediaSource> sources = sourceHolder.Sources;
         foreach (MediaSource source in sources)
         {
             if (!source.Source.CanSeek)
@@ -245,27 +254,38 @@ internal sealed class MediaReader(
         return firstFailure;
     }
 
-    private bool IsBuffered(TimeSpan minimumReadAhead)
+    private bool IsBuffered(IReadOnlyList<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> bindings, TimeSpan minimumReadAhead)
     {
+        static bool IsConsuming(KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry)
+        {
+            return entry.Value.CurrentStream is not null && entry.Key.IsConsuming;
+        }
+
         TimeSpan position = timeline.Position;
 
-        foreach (IChainFeed feed in feeds)
+        foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
         {
-            if (feed.IsActive && feed.Tail.ReadAhead(position) >= ReadAheadMax)
+            if (IsConsuming(entry) && entry.Key.ReadTail.ReadAhead(position) >= ReadAheadMax)
             {
                 return true;
             }
         }
 
-        foreach (IChainFeed feed in feeds)
+        foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
         {
-            if (feed.IsActive && feed.Tail.ReadAhead(position) < minimumReadAhead)
+            if (IsConsuming(entry) && entry.Key.ReadTail.ReadAhead(position) < minimumReadAhead)
             {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private IReadOnlyList<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> ReadSources()
+    {
+        List<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> entries = [.. VideoSources.Read(), .. AudioSources.Read(), .. SubtitleSources.Read()];
+        return entries;
     }
 
     private sealed class SourceTail
