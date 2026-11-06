@@ -17,7 +17,7 @@ using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged) : IPictureFrameSource, IChainFeed
+internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged) : IPictureFrameSource, IChainFeed, IPipelineWakeTarget
 {
     private const int FrameQueueCapacity = 8;
     private const int VideoStarvationMilliseconds = 200;
@@ -129,6 +129,12 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         Interlocked.Exchange(ref DecodeTicks, 0);
         Interlocked.Exchange(ref RenderTicks, 0);
         Interlocked.Exchange(ref PictureTicks, -1);
+    }
+
+    public void Wake()
+    {
+        DecodeNode.Wake();
+        RenderNode.Wake();
     }
 
     public void Accept(MediaStreamInfo stream, MediaPacket packet, ChainVersion versions, long epoch)

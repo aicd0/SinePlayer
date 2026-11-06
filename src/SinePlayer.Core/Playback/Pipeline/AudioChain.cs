@@ -11,7 +11,7 @@ using SinePlayer.Core.Playback.Abstractions.Timing;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents events) : IChainFeed
+internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents events) : IChainFeed, IPipelineWakeTarget
 {
     private const int AudioIdleTimeoutMilliseconds = 5;
     private const int AudioDeviceLeewayMilliseconds = 3000;
@@ -81,6 +81,12 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         Starved = false;
         EndedEpoch = -1;
         ReadTail.Reset();
+    }
+
+    public void Wake()
+    {
+        DecodeNode.Wake();
+        RenderNode.Wake();
     }
 
     public void Accept(MediaStreamInfo stream, MediaPacket packet, ChainVersion versions, long epoch)
