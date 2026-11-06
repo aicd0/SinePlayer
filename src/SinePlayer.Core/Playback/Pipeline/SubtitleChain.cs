@@ -10,7 +10,7 @@ using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged) : IChainFeed
+internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged) : IChainFeed, IPipelineWakeTarget
 {
     private const int SubtitleChangeIntervalMilliseconds = 16;
     private const int FallbackFrameMilliseconds = 40;
@@ -55,6 +55,12 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
     public ChainTail ReadTail { get; } = new();
 
     public bool IsConsuming => Decoder.HasComponent;
+
+    public void Wake()
+    {
+        DecodeNode.Wake();
+        RenderNode.Wake();
+    }
 
     public void Start()
     {
