@@ -15,7 +15,7 @@ internal sealed class ComponentSlot<T> where T : class
     private ChainVersion _currentVersions;
     private PipelineComponent<T>? _pending;
     private ChainVersion _pendingVersions;
-    private readonly SeqLock<Snapshot> _snapshot = new(new());
+    private readonly AtomicCell<Snapshot> _snapshot = new(new());
 
     private class Snapshot
     {

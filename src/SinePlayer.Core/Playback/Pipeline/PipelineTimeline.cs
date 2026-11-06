@@ -14,7 +14,8 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
 
     private const int ClockSyncToleranceMilliseconds = 10;
 
-    private readonly SeqLock<EpochGate> _epochGate = new(new());
+    private readonly AtomicCell<EpochGate> _epochGate = new(new());
+    private readonly AtomicCell<IChainFeed?> _deviceOwner = new(null);
     private readonly Lock _clockLock = new();
     private readonly IPlaybackClock _clock = new StopwatchClock();
 
@@ -22,6 +23,12 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
     private long _anchoredEpoch = -1;
 
     public Lock ClockLock => _clockLock;
+
+    public IChainFeed? DeviceOwner
+    {
+        get => _deviceOwner.Read();
+        set => _deviceOwner.Write(_ => value);
+    }
 
     public EpochGate Gate => _epochGate.Read();
 
@@ -119,8 +126,13 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
         }
     }
 
-    public void SyncClock(IPlaybackClock deviceClock, TimeSpan offset)
+    public void SyncClock(IChainFeed chain, IPlaybackClock deviceClock, TimeSpan offset)
     {
+        if (chain != DeviceOwner)
+        {
+            return;
+        }
+
         TimeSpan deviceTime;
         TimeSpan localTime;
         try
