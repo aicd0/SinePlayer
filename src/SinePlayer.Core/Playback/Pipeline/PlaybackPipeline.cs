@@ -24,7 +24,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private readonly VideoChain _video;
     private readonly AudioChain _audio;
 
-    private volatile MediaSourceHolder _selection = new([], null, null, null);
+    private volatile MediaSourceHolder _selection = new([]);
     private readonly ComponentSlot<MediaSourceHolder> _source = new();
     private CoroutineHost? _host;
     private readonly IPipelineWakeTarget[] _wakeTargets;
@@ -122,11 +122,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public IReadOnlyList<MediaSource> Sources => _selection.Sources;
 
-    public VideoStreamInfo? SelectedVideoStream => _selection.VideoStream;
+    public VideoStreamInfo? SelectedVideoStream => _video.Selected.Stream;
 
-    public AudioStreamInfo? SelectedAudioStream => _selection.AudioStream;
+    public AudioStreamInfo? SelectedAudioStream => _audio.Selected.Stream;
 
-    public SubtitleStreamInfo? SelectedSubtitleStream => _selection.SubtitleStream;
+    public SubtitleStreamInfo? SelectedSubtitleStream => _subtitle.Selected.Stream;
 
     public string? VideoDecoderName => _video.Decoder.CurrentComponent?.Name;
 
@@ -300,7 +300,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         MediaSource added = new(source, locator);
         MediaSourceHolder selection = _selection;
-        _selection = new MediaSourceHolder([.. selection.Sources, added], selection.VideoStream, selection.AudioStream, selection.SubtitleStream);
+        _selection = new MediaSourceHolder([.. selection.Sources, added]);
         return result.Success(added);
     }
 
@@ -329,12 +329,20 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
         }
 
-        MediaSourceHolder selection = _selection;
-        _selection = new MediaSourceHolder(
-            selection.Sources,
-            kind == MediaStreamKind.Video ? (VideoStreamInfo?)stream : selection.VideoStream,
-            kind == MediaStreamKind.Audio ? (AudioStreamInfo?)stream : selection.AudioStream,
-            kind == MediaStreamKind.Subtitle ? (SubtitleStreamInfo?)stream : selection.SubtitleStream);
+        MediaSource? source = _selection.TryGetSourceOf(stream);
+        switch (kind)
+        {
+            case MediaStreamKind.Video:
+                _video.Selected = new(source, (VideoStreamInfo?)stream);
+                break;
+            case MediaStreamKind.Audio:
+                _audio.Selected = new(source, (AudioStreamInfo?)stream);
+                break;
+            default:
+                _subtitle.Selected = new(source, (SubtitleStreamInfo?)stream);
+                break;
+        }
+
         return OperationResult.Success();
     }
 
@@ -345,8 +353,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
-        MediaSourceHolder? sourceHolder = _source.Latest?.Component;
-        if (sourceHolder?.VideoStream is null && sourceHolder?.AudioStream is null)
+        if (_video.Binding.Stream is null && _audio.Binding.Stream is null)
         {
             return OperationResult.Failure("No track is selected. Choose a video or audio track before playing.");
         }
@@ -395,7 +402,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure($"Cannot seek when the state is {state}.");
         }
 
-        MediaSource?[] sources = [_selection.VideoSource, _selection.AudioSource, _selection.SubtitleSource];
+        MediaSource?[] sources = [_video.Selected.Source, _audio.Selected.Source, _subtitle.Selected.Source];
         foreach (MediaSource source in sources.OfType<MediaSource>())
         {
             if (!source.Source.CanSeek)
@@ -430,11 +437,19 @@ public sealed partial class PlaybackPipeline : IDisposable
             return result.Failure($"Cannot change the pipeline's components when the state is {state}.");
         }
 
-        MediaSourceHolder desired = CreateSourceHolderFromSelection();
         ComponentResolver resolver = Components.Clone();
-        OperationResult<ChainChange> video = BuildVideoChain(resolver, desired);
-        OperationResult<ChainChange> audio = BuildAudioChain(resolver, desired);
-        OperationResult<ChainChange> subtitle = BuildSubtitleChain(resolver, desired);
+        OperationResult<ChainChange> video = BuildVideoChain(resolver);
+        OperationResult<ChainChange> audio = BuildAudioChain(resolver);
+        OperationResult<ChainChange> subtitle = BuildSubtitleChain(resolver);
+
+        bool sourceChanged = (video.IsSuccessful && video.Result.HasFlag(ChainChange.Source))
+            || (audio.IsSuccessful && audio.Result.HasFlag(ChainChange.Source))
+            || (subtitle.IsSuccessful && subtitle.Result.HasFlag(ChainChange.Source));
+        if (sourceChanged)
+        {
+            PipelineVersion current = CurrentVersions();
+            _source.Publish(new(CreateSourceHolder(), "source"), current with { Source = current.Next });
+        }
 
         bool changed = (video.IsSuccessful && video.Result != ChainChange.None)
             || (audio.IsSuccessful && audio.Result != ChainChange.None)
@@ -472,7 +487,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             source.Source.Dispose();
         }
 
-        _selection = new MediaSourceHolder([], null, null, null);
+        _selection = new MediaSourceHolder([]);
 
         _source.Reset();
 

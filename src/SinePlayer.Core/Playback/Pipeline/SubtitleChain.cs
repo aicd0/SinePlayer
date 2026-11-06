@@ -48,7 +48,14 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
 
     public long SurfaceVersion;
 
-    public StreamBinding<SubtitleStreamInfo> Binding { get; set; }
+    public StreamBinding<SubtitleStreamInfo> Selected { get; set; }
+
+    private readonly SeqLock<StreamBinding<SubtitleStreamInfo>> _binding = new(default);
+    public StreamBinding<SubtitleStreamInfo> Binding
+    {
+        get => _binding.Read();
+        set => _binding.Write(_ => value);
+    }
 
     public ChainTail Tail { get; } = new();
 
@@ -78,6 +85,7 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
         Decoder.Reset();
         Renderer.Reset();
         Target = null;
+        Selected = default;
         Binding = default;
         Tail.Reset();
     }

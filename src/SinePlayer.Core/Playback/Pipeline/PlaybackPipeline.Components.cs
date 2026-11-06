@@ -25,19 +25,18 @@ public sealed partial class PlaybackPipeline
         Renderer = 4,
     }
 
-    private OperationResult<ChainChange> BuildVideoChain(
-        ComponentResolver resolver,
-        MediaSourceHolder desired)
+    private OperationResult<ChainChange> BuildVideoChain(ComponentResolver resolver)
     {
         OperationResultCreator<ChainChange> result = new();
 
-        bool sourceChanged = !_video.Binding.Matches(desired.VideoSource, desired.VideoStream);
+        StreamBinding<VideoStreamInfo> selected = _video.Selected;
+        bool sourceChanged = !_video.Binding.Matches(selected.Source, selected.Stream);
         ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
         PipelineComponent<IVideoRenderer>? renderer = null;
         PipelineComponent<IVideoDecoder>? decoder = null;
         try
         {
-            if (desired.VideoSource is { } videoSource && desired.VideoStream is { } videoStream)
+            if (selected.Source is { } videoSource && selected.Stream is { } videoStream)
             {
                 IVideoRenderTarget? videoTarget = _video.Target;
                 if (videoTarget is null)
@@ -107,9 +106,7 @@ public sealed partial class PlaybackPipeline
 
                 if (changed.HasFlag(ChainChange.Source))
                 {
-                    MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(desired, MediaStreamKind.Video);
-                    _source.Publish(new(newSourceHolder, "source"), versions);
-                    _video.Binding = new(newSourceHolder.VideoSource, newSourceHolder.VideoStream);
+                    _video.Binding = _video.Selected;
                 }
 
                 if (changed.HasFlag(ChainChange.Decoder))
@@ -134,20 +131,19 @@ public sealed partial class PlaybackPipeline
         }
     }
 
-    private OperationResult<ChainChange> BuildAudioChain(
-        ComponentResolver resolver,
-        MediaSourceHolder desired)
+    private OperationResult<ChainChange> BuildAudioChain(ComponentResolver resolver)
     {
         OperationResultCreator<ChainChange> result = new();
 
-        bool sourceChanged = !_audio.Binding.Matches(desired.AudioSource, desired.AudioStream);
+        StreamBinding<AudioStreamInfo> selected = _audio.Selected;
+        bool sourceChanged = !_audio.Binding.Matches(selected.Source, selected.Stream);
         ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
         PipelineComponent<IAudioRenderer>? renderer = null;
         PipelineComponent<IAudioDecoder>? decoder = null;
         AudioStreamInfo? negotiatedFormat = null;
         try
         {
-            if (desired.AudioSource is { } audioSource && desired.AudioStream is { } audioStream)
+            if (selected.Source is { } audioSource && selected.Stream is { } audioStream)
             {
                 // Resolve audio renderer
                 bool rebuildAudioRenderer = sourceChanged;
@@ -216,9 +212,7 @@ public sealed partial class PlaybackPipeline
 
                 if (changed.HasFlag(ChainChange.Source))
                 {
-                    MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(desired, MediaStreamKind.Audio);
-                    _source.Publish(new(newSourceHolder, "source"), versions);
-                    _audio.Binding = new(newSourceHolder.AudioSource, newSourceHolder.AudioStream);
+                    _audio.Binding = _audio.Selected;
                 }
 
                 if (changed.HasFlag(ChainChange.Decoder))
@@ -243,19 +237,18 @@ public sealed partial class PlaybackPipeline
         }
     }
 
-    private OperationResult<ChainChange> BuildSubtitleChain(
-        ComponentResolver resolver,
-        MediaSourceHolder desired)
+    private OperationResult<ChainChange> BuildSubtitleChain(ComponentResolver resolver)
     {
         OperationResultCreator<ChainChange> result = new();
 
-        bool sourceChanged = !_subtitle.Binding.Matches(desired.SubtitleSource, desired.SubtitleStream);
+        StreamBinding<SubtitleStreamInfo> selected = _subtitle.Selected;
+        bool sourceChanged = !_subtitle.Binding.Matches(selected.Source, selected.Stream);
         ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
         PipelineComponent<ISubtitleDecoder>? decoder = null;
         PipelineComponent<ISubtitleRenderer>? renderer = null;
         try
         {
-            if (desired.SubtitleSource is { } subtitleSource && desired.SubtitleStream is { } subtitleStream)
+            if (selected.Source is { } subtitleSource && selected.Stream is { } subtitleStream)
             {
                 IVideoRenderTarget? subtitleTarget = _subtitle.Target;
                 if (subtitleTarget is null)
@@ -331,9 +324,7 @@ public sealed partial class PlaybackPipeline
 
                 if (changed.HasFlag(ChainChange.Source))
                 {
-                    MediaSourceHolder newSourceHolder = CreateSourceHolderFromChange(desired, MediaStreamKind.Subtitle);
-                    _source.Publish(new(newSourceHolder, "source"), versions);
-                    _subtitle.Binding = new(newSourceHolder.SubtitleSource, newSourceHolder.SubtitleStream);
+                    _subtitle.Binding = _subtitle.Selected;
                 }
 
                 if (changed.HasFlag(ChainChange.Decoder))
@@ -385,30 +376,10 @@ public sealed partial class PlaybackPipeline
         return result.Failure(error);
     }
 
-    private MediaSourceHolder CreateSourceHolderFromSelection()
+    private MediaSourceHolder CreateSourceHolder()
     {
-        MediaSourceHolder selection = _selection;
-        VideoStreamInfo? videoStream = selection.VideoStream;
-        AudioStreamInfo? audioStream = selection.AudioStream;
-        SubtitleStreamInfo? subtitleStream = selection.SubtitleStream;
-        MediaSource?[] sources = [selection.VideoSource, selection.AudioSource, selection.SubtitleSource];
-        return new([.. sources.OfType<MediaSource>().Distinct()], videoStream, audioStream, subtitleStream);
-    }
-
-    private MediaSourceHolder CreateSourceHolderFromChange(MediaSourceHolder desired, MediaStreamKind kind)
-    {
-        MediaSourceHolder? previous = _source.Latest?.Component;
-
-        VideoStreamInfo? videoStream = kind == MediaStreamKind.Video ? desired.VideoStream : previous?.VideoStream;
-        AudioStreamInfo? audioStream = kind == MediaStreamKind.Audio ? desired.AudioStream : previous?.AudioStream;
-        SubtitleStreamInfo? subtitleStream = kind == MediaStreamKind.Subtitle ? desired.SubtitleStream : previous?.SubtitleStream;
-
-        MediaSource? videoSource = kind == MediaStreamKind.Video ? desired.VideoSource : previous?.VideoSource;
-        MediaSource? audioSource = kind == MediaStreamKind.Audio ? desired.AudioSource : previous?.AudioSource;
-        MediaSource? subtitleSource = kind == MediaStreamKind.Subtitle ? desired.SubtitleSource : previous?.SubtitleSource;
-
-        MediaSource?[] sources = [videoSource, audioSource, subtitleSource];
-        return new([.. sources.OfType<MediaSource>().Distinct()], videoStream, audioStream, subtitleStream);
+        MediaSource?[] sources = [_video.Binding.Source, _audio.Binding.Source, _subtitle.Binding.Source];
+        return new([.. sources.OfType<MediaSource>().Distinct()]);
     }
 
     private PipelineVersion BumpVersions(ChainChange changed, MediaStreamKind kind)
