@@ -61,7 +61,14 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
     public VideoStreamInfo? Stream => Binding.Stream;
 
-    public StreamBinding<VideoStreamInfo> Binding { get; set; }
+    public StreamBinding<VideoStreamInfo> Selected { get; set; }
+
+    private readonly SeqLock<StreamBinding<VideoStreamInfo>> _binding = new(default);
+    public StreamBinding<VideoStreamInfo> Binding
+    {
+        get => _binding.Read();
+        set => _binding.Write(_ => value);
+    }
 
     public long EndedEpoch { get; set; } = -1;
 
@@ -117,6 +124,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         Decoder.Reset();
         Renderer.Reset();
         Target = null;
+        Selected = default;
         Binding = default;
         Starved = false;
         EndedEpoch = -1;
