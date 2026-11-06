@@ -41,6 +41,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         _timeline = new PipelineTimeline(NotifyClockMoved, () => IsStarved);
         _video = new VideoChain(_timeline, _events, VideoTarget_SurfaceSizeChanged);
         _audio = new AudioChain(_timeline, _events);
+        _timeline.DeviceOwner = _audio;
         _subtitle = new SubtitleChain(_timeline, _events, SubtitleTarget_SurfaceSizeChanged);
         _reader = new MediaReader(_timeline, _events, ChooseSeekLanding);
         _reader.VideoSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [_video] = _video.Source });

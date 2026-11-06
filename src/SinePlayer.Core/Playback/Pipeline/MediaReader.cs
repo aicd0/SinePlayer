@@ -18,11 +18,11 @@ internal sealed class MediaReader(
 
     private readonly PipelineNodeAsync _node = new();
 
-    public SeqLock<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> VideoSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+    public AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> VideoSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
 
-    public SeqLock<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> AudioSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+    public AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> AudioSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
 
-    public SeqLock<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> SubtitleSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+    public AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> SubtitleSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
 
     public void Wake()
     {

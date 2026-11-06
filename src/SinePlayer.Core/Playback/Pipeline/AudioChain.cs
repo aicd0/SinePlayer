@@ -464,7 +464,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
                 if (hasDeviceAudio && clockOffset is TimeSpan offset)
                 {
-                    timeline.SyncClock(deviceClock, offset);
+                    timeline.SyncClock(this, deviceClock, offset);
                 }
 
                 if (inFlightSubmit is not null)
