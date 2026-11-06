@@ -8,6 +8,7 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
+using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
@@ -34,7 +35,14 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
     public AudioFilterChain Filters { get; } = new();
 
-    public StreamBinding<AudioStreamInfo> Binding { get; set; }
+    public StreamBinding<AudioStreamInfo> Selected { get; set; }
+
+    private readonly SeqLock<StreamBinding<AudioStreamInfo>> _binding = new(default);
+    public StreamBinding<AudioStreamInfo> Binding
+    {
+        get => _binding.Read();
+        set => _binding.Write(_ => value);
+    }
 
     public long EndedEpoch { get; set; } = -1;
 
@@ -74,6 +82,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         Decoder.Reset();
         Renderer.CurrentComponent?.Flush();
         Renderer.Reset();
+        Selected = default;
         Binding = default;
         Starved = false;
         EndedEpoch = -1;

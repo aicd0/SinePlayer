@@ -6,11 +6,7 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed partial class MediaSourceHolder(
-    IReadOnlyList<MediaSource> sources,
-    VideoStreamInfo? videoStream,
-    AudioStreamInfo? audioStream,
-    SubtitleStreamInfo? subtitleStream) : IDisposable
+internal sealed partial class MediaSourceHolder(IReadOnlyList<MediaSource> sources) : IDisposable
 {
     private static MediaSource? FindSource(IEnumerable<MediaSource> sources, MediaStreamInfo stream)
     {
@@ -29,21 +25,6 @@ internal sealed partial class MediaSourceHolder(
     }
 
     public IReadOnlyList<MediaSource> Sources { get; } = sources;
-
-    public VideoStreamInfo? VideoStream { get; } = videoStream;
-
-    public MediaSource? VideoSource { get; } = videoStream is null ? null :
-        (FindSource(sources, videoStream) ?? throw new ArgumentException($"Stream {videoStream.Index} is not part of any source."));
-
-    public AudioStreamInfo? AudioStream { get; } = audioStream;
-
-    public MediaSource? AudioSource { get; } = audioStream is null ? null :
-        (FindSource(sources, audioStream) ?? throw new ArgumentException($"Stream {audioStream.Index} is not part of any source."));
-
-    public SubtitleStreamInfo? SubtitleStream { get; } = subtitleStream;
-
-    public MediaSource? SubtitleSource { get; } = subtitleStream is null ? null :
-        (FindSource(sources, subtitleStream) ?? throw new ArgumentException($"Stream {subtitleStream.Index} is not part of any source."));
 
     public MediaSource? TryGetSourceOf(MediaStreamInfo? stream)
     {

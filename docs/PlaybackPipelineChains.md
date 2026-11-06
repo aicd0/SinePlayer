@@ -261,6 +261,9 @@ deferred, and it is deferred to a single object rather than spread across the ch
 
 ## The next milestone (out of scope here)
 
+See [PlaybackPipelineChainsV2.md](./PlaybackPipelineChainsV2.md): the API that publishes the model, the subtitle
+surface question, and phases H–K.
+
 Publish the model: chain collections, `AddVideoChain`/`AddAudioChain`/`AddSubtitleChain`, `RemoveChain`,
 typed `SelectStream`, per-chain `ReconcileResult`, per-chain warnings, `PlaybackChainId`. Then per-chain
 versions if they still look worth it, and the app layer rewritten against chains. Nothing in that milestone
