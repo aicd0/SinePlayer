@@ -15,6 +15,7 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
     private const int SubtitleChangeIntervalMilliseconds = 16;
     private const int FallbackFrameMilliseconds = 40;
 
+    private PipelineCoroutine? _decodeCoroutine;
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
@@ -62,19 +63,24 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
         RenderNode.Wake();
     }
 
-    public void Start()
+    public void Start(CoroutineHost host, Action wakeReader)
     {
+        _decodeCoroutine = host.Register(stop => Decode(stop, wakeReader));
         _renderThread = new PipelineThread("Pipeline - Subtitle render", Render);
         _renderThread.Start();
     }
 
     public void RequestStop()
     {
+        _decodeCoroutine?.RequestStop();
         _renderThread?.RequestStop();
+        DecodeNode.Wake();
+        RenderNode.Wake();
     }
 
     public void Join()
     {
+        _decodeCoroutine = null;
         _renderThread?.Join();
         _renderThread = null;
     }

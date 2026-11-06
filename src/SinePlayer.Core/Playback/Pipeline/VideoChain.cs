@@ -95,6 +95,8 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
     {
         _decodeThread?.RequestStop();
         _renderThread?.RequestStop();
+        DecodeNode.Wake();
+        RenderNode.Wake();
     }
 
     public void Join()
