@@ -17,6 +17,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
     private const int AudioDeviceLeewayMilliseconds = 3000;
     private const int FallbackFrameMilliseconds = 40;
 
+    private PipelineCoroutine? _decodeCoroutine;
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
@@ -51,19 +52,24 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
     public bool IsConsuming => Decoder.HasComponent;
 
-    public void Start(Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
+    public void Start(CoroutineHost host, Action wakeReader, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
+        _decodeCoroutine = host.Register(stop => Decode(stop, wakeReader));
         _renderThread = new PipelineThread("Pipeline - Audio render", stop => Render(stop, isStreamSpent, reportEnded));
         _renderThread.Start();
     }
 
     public void RequestStop()
     {
+        _decodeCoroutine?.RequestStop();
         _renderThread?.RequestStop();
+        DecodeNode.Wake();
+        RenderNode.Wake();
     }
 
     public void Join()
     {
+        _decodeCoroutine = null;
         _renderThread?.Join();
         _renderThread = null;
     }
