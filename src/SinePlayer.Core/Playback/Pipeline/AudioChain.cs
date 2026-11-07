@@ -120,7 +120,7 @@ internal sealed class AudioChain : IPlaybackChain, IChainFeed, IPipelineWakeTarg
         ReadTail.Reset();
     }
 
-    public OperationResult<ChainChange> Reconcile(ComponentResolver resolver)
+    public OperationResult<ChainChange> Reconcile(AudioComponentResolver resolver)
     {
         OperationResultCreator<ChainChange> result = new();
 
@@ -138,7 +138,7 @@ internal sealed class AudioChain : IPlaybackChain, IChainFeed, IPipelineWakeTarg
                 bool rebuildAudioRenderer = sourceChanged;
                 PipelineComponent<IAudioRenderer>? latestRenderer = Renderer.Latest;
                 OperationResult<PipelineComponent<IAudioRenderer>?> rendererResolved = ComponentResolution.Resolve(
-                    resolver.ResolveAudioRenderers(),
+                    resolver.ResolveRenderers(),
                     rebuildAudioRenderer ? null : latestRenderer?.Signature,
                     audioStream,
                     "audio renderer");
@@ -164,7 +164,7 @@ internal sealed class AudioChain : IPlaybackChain, IChainFeed, IPipelineWakeTarg
                 bool rebuildAudioDecoder = sourceChanged;
                 PipelineComponent<IAudioDecoder>? latestDecoder = Decoder.Latest;
                 OperationResult<PipelineComponent<IAudioDecoder>?> decoderResolved = ComponentResolution.Resolve(
-                    resolver.ResolveAudioDecoders(audioSource.Source, audioStream),
+                    resolver.ResolveDecoders(audioSource.Source, audioStream),
                     rebuildAudioDecoder ? null : latestDecoder?.Signature,
                     audioStream,
                     "audio decoder");
