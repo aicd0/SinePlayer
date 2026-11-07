@@ -10,10 +10,6 @@ public interface IPlaybackChain
 {
     MediaStreamKind Kind { get; }
 
-    MediaStreamInfo? SelectedStream { get; }
-
-    MediaStreamInfo? PlayingStream { get; }
-
     bool IsActive { get; }
 
     string? DecoderName { get; }
@@ -21,4 +17,11 @@ public interface IPlaybackChain
     string? RendererName { get; }
 
     bool IsHardwareAccelerated { get; }
+}
+
+public interface IPlaybackChain<out TStream> : IPlaybackChain where TStream : MediaStreamInfo
+{
+    TStream? SelectedStream { get; }
+
+    TStream? PlayingStream { get; }
 }

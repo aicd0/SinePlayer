@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
@@ -16,7 +17,7 @@ internal sealed class PlaybackInfoHandle
 
     public MediaInfo? Media => Sources is [MediaSource first, ..] ? first.Info : null;
 
-    public VideoStreamInfo? SelectedVideoStream => _pipeline?.SelectedVideoStream;
+    public VideoStreamInfo? SelectedVideoStream => Video?.SelectedStream;
 
     public AudioStreamInfo? SelectedAudioStream => _pipeline?.SelectedAudioStream;
 
@@ -30,21 +31,21 @@ internal sealed class PlaybackInfoHandle
 
     public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;
 
-    public long PresentedFrames => _pipeline?.PresentedFrameCount ?? 0;
+    public long PresentedFrames => Video?.PresentedFrameCount ?? 0;
 
-    public long DroppedFrames => _pipeline?.DroppedFrameCount ?? 0;
+    public long DroppedFrames => Video?.DroppedFrameCount ?? 0;
 
-    public TimeSpan PictureLag => _pipeline?.PictureLag ?? TimeSpan.Zero;
+    public TimeSpan PictureLag => Video?.PictureLag ?? TimeSpan.Zero;
 
-    public double AverageVideoDecodeMilliseconds => _pipeline?.AverageVideoDecodeMilliseconds ?? 0;
+    public double AverageVideoDecodeMilliseconds => Video?.AverageDecodeMilliseconds ?? 0;
 
-    public double AverageVideoRenderMilliseconds => _pipeline?.AverageVideoRenderMilliseconds ?? 0;
+    public double AverageVideoRenderMilliseconds => Video?.AverageRenderMilliseconds ?? 0;
 
     public long AudioUnderruns => _pipeline?.AudioUnderruns ?? 0;
 
-    public string? VideoDecoderName => _pipeline?.VideoDecoderName;
+    public string? VideoDecoderName => Video?.DecoderName;
 
-    public string? VideoRendererName => _pipeline?.VideoRendererName;
+    public string? VideoRendererName => Video?.RendererName;
 
     public string? AudioDecoderName => _pipeline?.AudioDecoderName;
 
@@ -54,9 +55,11 @@ internal sealed class PlaybackInfoHandle
 
     public string? SubtitleRendererName => _pipeline?.SubtitleRendererName;
 
-    public bool IsVideoHardwareAccelerated => _pipeline?.IsVideoHardwareAccelerated ?? false;
+    public bool IsVideoHardwareAccelerated => Video?.IsHardwareAccelerated ?? false;
 
     public bool IsAudioHardwareAccelerated => _pipeline?.IsAudioHardwareAccelerated ?? false;
+
+    private IVideoChain? Video => _pipeline?.VideoChains.FirstOrDefault();
 
     internal void Attach(PlaybackPipeline pipeline)
     {

@@ -80,12 +80,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public ISourceProviderFactory? SourceFactory { get; set; }
 
-    public ISynchronizer Synchronizer
-    {
-        get => Video.Synchronizer;
-        set => Video.Synchronizer = value;
-    }
-
     public VideoTransform VideoTransform
     {
         get => Video.Transform.Read();
@@ -123,17 +117,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public IReadOnlyList<MediaSource> Sources => _sources;
 
-    public VideoStreamInfo? SelectedVideoStream => Video.Selected.Stream;
-
     public AudioStreamInfo? SelectedAudioStream => Audio.Selected.Stream;
 
     public SubtitleStreamInfo? SelectedSubtitleStream => Subtitle.Selected.Stream;
 
-    public string? VideoDecoderName => Video.Decoder.CurrentComponent?.Name;
-
     public string? AudioDecoderName => Audio.Decoder.CurrentComponent?.Name;
-
-    public string? VideoRendererName => Video.Renderer.CurrentComponent?.Name;
 
     public string? AudioRendererName => Audio.Renderer.CurrentComponent?.Name;
 
@@ -141,27 +129,13 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public string? SubtitleRendererName => Subtitle.Renderer.CurrentComponent?.Name;
 
-    public bool IsVideoHardwareAccelerated => Video.Decoder.CurrentComponent?.IsHardwareAccelerated ?? false;
-
     public bool IsAudioHardwareAccelerated => Audio.Decoder.CurrentComponent?.IsHardwareAccelerated ?? false;
 
     public TimeSpan Position => _timeline.Position;
 
-    public long PresentedFrameCount => Video.PresentedFrameCount;
-
-    public long DroppedFrameCount => Video.DroppedFrameCount;
-
     public string? StarvedFor => Video.Starved ? "video" : Audio.Starved ? "audio" : null;
 
-    public TimeSpan LastPresentedTimestamp => Video.LastPresentedTimestamp;
-
-    public double AverageVideoDecodeMilliseconds => Video.AverageDecodeMilliseconds;
-
-    public double AverageVideoRenderMilliseconds => Video.AverageRenderMilliseconds;
-
     public long AudioUnderruns => Audio.Underruns;
-
-    public TimeSpan PictureLag => Video.PictureLag;
 
     public void Dispose()
     {

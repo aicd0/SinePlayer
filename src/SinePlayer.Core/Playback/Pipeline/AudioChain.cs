@@ -35,9 +35,9 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
     public MediaStreamKind Kind => MediaStreamKind.Audio;
 
-    public MediaStreamInfo? SelectedStream => Selected.Stream;
+    public AudioStreamInfo? SelectedStream => Selected.Stream;
 
-    public MediaStreamInfo? PlayingStream => Source.CurrentStream;
+    public AudioStreamInfo? PlayingStream => (AudioStreamInfo?)Source.CurrentStream;
 
     public bool IsActive => Decoder.HasComponent;
 
