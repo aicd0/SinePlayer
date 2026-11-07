@@ -14,7 +14,6 @@ namespace SinePlayer.Core.Playback.Selection;
 public sealed class SubtitleComponentResolver
 {
     private readonly IComponentRegistry _components;
-    private PlaybackPreferences _preferences = PlaybackPreferences.Default;
 
     public SubtitleComponentResolver() : this(new ComponentRegistry())
     {
@@ -26,19 +25,9 @@ public sealed class SubtitleComponentResolver
         _components = registry;
     }
 
-    public PlaybackPreferences Preferences
-    {
-        get => Volatile.Read(ref _preferences);
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            Volatile.Write(ref _preferences, value);
-        }
-    }
-
     public SubtitleComponentResolver Clone()
     {
-        return new SubtitleComponentResolver(_components.Clone()) { Preferences = Preferences };
+        return new SubtitleComponentResolver(_components.Clone());
     }
 
     public void Register(ISubtitleDecoderFactory factory)

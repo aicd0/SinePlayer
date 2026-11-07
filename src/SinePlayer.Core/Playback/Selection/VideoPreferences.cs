@@ -3,9 +3,9 @@
 
 namespace SinePlayer.Core.Playback.Selection;
 
-public sealed record PlaybackPreferences
+public sealed record VideoPreferences
 {
-    public static PlaybackPreferences Default { get; } = new();
+    public static VideoPreferences Default { get; } = new();
 
     public bool PreferHardwareDecoding { get; init; } = true;
 }

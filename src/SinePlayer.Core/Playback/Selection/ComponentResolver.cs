@@ -29,15 +29,10 @@ public sealed class ComponentResolver
 
     public SubtitleComponentResolver Subtitle { get; }
 
-    public PlaybackPreferences Preferences
+    public VideoPreferences Preferences
     {
         get => Video.Preferences;
-        set
-        {
-            Video.Preferences = value;
-            Audio.Preferences = value;
-            Subtitle.Preferences = value;
-        }
+        set => Video.Preferences = value;
     }
 
     public ComponentResolver Clone()
