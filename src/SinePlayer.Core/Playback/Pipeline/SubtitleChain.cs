@@ -3,16 +3,16 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
-using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
+using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class SubtitleChain : IPlaybackChain, IChainFeed, IPipelineWakeTarget
+internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeTarget
 {
     private const int SubtitleChangeIntervalMilliseconds = 16;
     private const int FallbackFrameMilliseconds = 40;
