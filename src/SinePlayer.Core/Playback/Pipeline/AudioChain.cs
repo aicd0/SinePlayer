@@ -3,16 +3,16 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
-using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
+using SinePlayer.Core.Playback.Selection;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class AudioChain : IPlaybackChain, IChainFeed, IPipelineWakeTarget
+internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 {
     private const int AudioIdleTimeoutMilliseconds = 5;
     private const int AudioDeviceLeewayMilliseconds = 3000;

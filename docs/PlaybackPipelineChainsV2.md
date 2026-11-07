@@ -68,64 +68,66 @@ and no resolution.
 
 ### The chains
 
+A chain is reached through an interface of its kind. The chain types themselves are internal, exactly as in v1: a
+host holds a `IVideoChain` and cannot reach its queues, nodes or coroutines, and the implementation can grow
+without that becoming API.
+
 ```csharp
-public abstract class PlaybackChain
+public interface IPlaybackChain
 {
-    public MediaStreamKind Kind { get; }
-    public MediaStreamInfo? SelectedStream { get; }   // what the host asked for
-    public MediaStreamInfo? PlayingStream { get; }    // what Reconcile built; null until reconciled
-    public bool IsActive { get; }
-    public bool Starved { get; }
-    public bool Ended { get; }
-    public string? DecoderName { get; }
-    public string? RendererName { get; }
-    public bool IsHardwareAccelerated { get; }
+    MediaStreamKind Kind { get; }
+    MediaStreamInfo? SelectedStream { get; }   // what the host asked for
+    MediaStreamInfo? PlayingStream { get; }    // what Reconcile built; null until reconciled
+    bool IsActive { get; }
+    string? DecoderName { get; }
+    string? RendererName { get; }
+    bool IsHardwareAccelerated { get; }
 }
 
-public sealed class VideoChain : PlaybackChain
+public interface IVideoChain : IPlaybackChain
 {
-    public IVideoRenderTarget Target { get; }
-    public VideoComponentResolver Components { get; set; }   // this chain's own, created with the chain
-    public VideoTransform Transform { get; set; }
-    public ISynchronizer Synchronizer { get; set; }
-    public long PresentedFrameCount { get; }
-    public long DroppedFrameCount { get; }
-    public long DecodedFrameCount { get; }
-    public double AverageDecodeMilliseconds { get; }
-    public double AverageRenderMilliseconds { get; }
-    public TimeSpan PictureLag { get; }
+    IVideoRenderTarget? Target { get; }
+    VideoComponentResolver Components { get; }   // this chain's own, created with the chain
+    VideoTransform Transform { get; set; }
+    ISynchronizer Synchronizer { get; set; }
+    long PresentedFrameCount { get; }
+    long DroppedFrameCount { get; }
+    long DecodedFrameCount { get; }
+    double AverageDecodeMilliseconds { get; }
+    double AverageRenderMilliseconds { get; }
+    TimeSpan PictureLag { get; }
+    TimeSpan LastPresentedTimestamp { get; }
 }
 
-public sealed class AudioChain : PlaybackChain
+public interface IAudioChain : IPlaybackChain
 {
-    public AudioComponentResolver Components { get; set; }
-    public AudioFilterChain Filters { get; }
-    public long Underruns { get; }
-    public bool OwnsClock { get; }                    // the chain that anchors and corrects the clock
+    AudioComponentResolver Components { get; }
+    AudioFilterChain Filters { get; }
+    long Underruns { get; }
+    bool OwnsClock { get; }                    // the chain that anchors and corrects the clock
 }
 
-public sealed class SubtitleChain : PlaybackChain
+public interface ISubtitleChain : IPlaybackChain
 {
-    public IVideoRenderTarget Target { get; }
-    public SubtitleComponentResolver Components { get; set; }
-    public SubtitlePresentation Presentation { get; set; }
-    public VideoChain? LayoutSource { get; set; }
+    IVideoRenderTarget? Target { get; }
+    SubtitleComponentResolver Components { get; }
+    SubtitlePresentation Presentation { get; set; }
 }
 ```
 
-Each of these is a public class with an internal constructor and an internal `IPlaybackChainRuntime`
-implementation (`Reconcile`, `Start`, `RequestStop`, `Join`, `Wake`, `TryAccept`, `SignalEnd`, `Reset`,
-`ReportEnded`). Publishing was a change of accessibility plus `Add`/`Remove` — not a move — exactly as v1
-planned.
+`Target` is read-only here and fixed at `Add`, because a surface is not something a playing chain can swap; the
+implementation keeps the setter for the pipeline to install it with. `Components` is read-only for the same reason:
+the chain creates its resolver, and the host registers into it.
 
+Publishing was a change of accessibility plus `Add`/`Remove` — not a move — exactly as v1 planned.
 ### `Reconcile()` answers per chain
 
 ```csharp
 public sealed class ReconcileResult
 {
-    public IReadOnlyDictionary<VideoChain, OperationResult> VideoResults { get; }
-    public IReadOnlyDictionary<AudioChain, OperationResult> AudioResults { get; }
-    public IReadOnlyDictionary<SubtitleChain, OperationResult> SubtitleResults { get; }
+    public IReadOnlyDictionary<IVideoChain, OperationResult> VideoResults { get; }
+    public IReadOnlyDictionary<IAudioChain, OperationResult> AudioResults { get; }
+    public IReadOnlyDictionary<ISubtitleChain, OperationResult> SubtitleResults { get; }
 }
 ```
 
@@ -378,7 +380,9 @@ outside.
 |---|---|---|---|
 | I1 | `IPlaybackChain` published; the chains themselves stay internal; machinery internal | `IPlaybackChain` (7 members: `Kind`, `SelectedStream`, `PlayingStream`, `IsActive`, `DecoderName`, `RendererName`, `IsHardwareAccelerated`), `ChainVersion`, `ChainTail`, `PipelineCoroutine` | what is public is exactly the table in section 1; every `IPlaybackChain` implementor is invisible |
 | I2 | Resolution moves onto the chains (`chain.Reconcile()`), and `ComponentResolver` splits into `VideoComponentResolver` / `AudioComponentResolver` / `SubtitleComponentResolver` — one per kind, each owning only its kind's roles | `PlaybackPipeline.Components.cs` deleted; `ChainChange` and `ComponentResolution` extracted; each `Reconcile` takes its own kind's resolver, so a video chain cannot ask for an audio factory. The type is now `VideoPreferences` and hangs off the video resolver; audio and subtitle resolution never read it. `ComponentResolver` survives **only as the host's registration surface** and dies in I3, when `chain.Components` becomes the channel | a resolver of one kind cannot be asked another kind's question; a role registered into the wrong chain does not compile |
-| I3 | `AddVideoChain(target)` / `AddAudioChain()` / `AddSubtitleChain(target)` / `RemoveChain` / `VideoChains` / `AudioChains` / `SubtitleChains`; the constructor stops creating chains and the per-kind fields go | the lists become the API's, and they are how a host reaches each chain's resolver; the pipeline keeps one list per kind rather than three fields | a fresh pipeline has none; add-then-reconcile starts exactly one new set of threads |
+| I3a | The three kind interfaces are published: `IVideoChain` / `IAudioChain` / `ISubtitleChain : IPlaybackChain`, the chain types stay internal | each chain implements its kind's interface with the members it already has; nothing moves and nothing is constructed differently | a host can name a chain of a kind without naming its implementation; the guard test lists exactly three chain interfaces |
+| I3b | `AddVideoChain(target)` / `AddAudioChain()` / `AddSubtitleChain(target)` / `RemoveChain` / `VideoChains` / `AudioChains` / `SubtitleChains`; a chain owns its resolver (`chain.Components`), so `Reconcile()` takes no resolver and `ComponentResolver` (the aggregate) goes | the lists become the API's, and they are how a host reaches each chain's resolver | a chain is added, reconciled and removed through one path; a resolver handed to one chain cannot serve another |
+| I3c | The constructor stops creating chains, the per-kind fields become "the first chain of its kind, if any", and the kind-shaped pipeline members learn the empty case | the temporary defaults go only after the app adds its own chains, so no step leaves the app with a pipeline that cannot play | a fresh pipeline has none; add-then-reconcile starts exactly one new set of threads |
 | I4 | `SelectStream(chain, stream)`; `ReconcileResult` becomes three dictionaries; warnings carry the chain | | a failure is looked up by the chain that failed |
 | I5 | `Reset()` loses its targets and absorbs `Stop()`; teardown per chain; a chain's target is fixed at `Add` | | new surface = `Remove` + `Add`, and the old chain's threads are joined first |
 | I6 | Kind-shaped properties removed; `PlaybackPipelineTests` ported | ~150 mechanical edits, helpers first | **no assertion changes** — a test that has to change its expectation is evidence of a behaviour change |

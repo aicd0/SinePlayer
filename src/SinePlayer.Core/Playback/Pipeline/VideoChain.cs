@@ -7,18 +7,18 @@ using System.Numerics;
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
-using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
+using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Timing;
 using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class VideoChain : IPlaybackChain, IPictureFrameSource, IChainFeed, IPipelineWakeTarget
+internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed, IPipelineWakeTarget
 {
     private const int FrameQueueCapacity = 8;
     private const int VideoStarvationMilliseconds = 200;
