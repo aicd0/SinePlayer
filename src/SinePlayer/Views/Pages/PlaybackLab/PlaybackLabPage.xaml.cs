@@ -398,7 +398,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         // What the transform controls say is what the file is opened with, so a picture that is turned stays
         // turned across files rather than snapping back on every open.
-        pipeline.VideoTransform = CreateTransform();
+        pipeline.VideoChains[0].Transform = CreateTransform();
 
         pipeline.StateChanged += Pipeline_StateChanged;
         pipeline.WarningRaised += Pipeline_WarningRaised;
@@ -582,7 +582,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         // No reconcile and no new frame: the picture that is already there is drawn again through the new
         // transform, which is the whole of what turning it costs.
-        pipeline.VideoTransform = CreateTransform();
+        pipeline.VideoChains[0].Transform = CreateTransform();
         RefreshStatus();
     }
 
@@ -873,7 +873,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             ? "no audio filters"
             : $"filters {string.Join(", ", pipeline.AudioChains[0].Filters.Filters.Select(filter => filter.Name))}";
         string pace = $" decode {video.AverageDecodeMilliseconds:0.0} ms {decoding}, render {video.AverageRenderMilliseconds:0.0} ms by {renderer}{sound}, {chain}.";
-        string transform = DescribeTransform(pipeline.VideoTransform);
+        string transform = DescribeTransform(pipeline.VideoChains[0].Transform);
         string tracks = DescribeTracks(pipeline);
 
         string media = Describe(pipeline);

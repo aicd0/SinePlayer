@@ -24,6 +24,8 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     private PipelineCoroutine? _decodeCoroutine;
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
+
+    private readonly AtomicCell<SubtitlePresentation> _presentation = new(SubtitlePresentation.Identity);
     private IVideoRenderTarget? _target;
     private volatile bool _starved;
     private long _endedEpoch = -1;
@@ -80,7 +82,20 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
 
     public PipelineNode RenderNode { get; } = new();
 
-    public AtomicCell<SubtitlePresentation> Presentation { get; } = new(SubtitlePresentation.Identity);
+    public SubtitlePresentation Presentation
+    {
+        get => _presentation.Read();
+        set
+        {
+            if (_presentation.Read() == value)
+            {
+                return;
+            }
+
+            _presentation.Write(_ => value);
+            RenderNode.Wake();
+        }
+    }
 
     public IPictureFrameSource? LayoutSource { get; set; }
 
@@ -431,7 +446,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
             SubtitleCueSnapshot cues = CueWindow.GetVisibleCues(epoch, position);
             long surfaceVersion = Interlocked.Read(ref SurfaceVersion);
 
-            SubtitlePresentation presentation = Presentation.Read() with
+            SubtitlePresentation presentation = _presentation.Read() with
             {
                 Frame = LayoutSource?.Frame ?? SubtitleFrame.Full
             };

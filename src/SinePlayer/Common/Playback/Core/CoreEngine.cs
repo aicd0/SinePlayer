@@ -316,7 +316,7 @@ internal sealed partial class CoreEngine : IDisposable
         }
 
         _videoTransform = transform;
-        _pipeline?.VideoTransform = transform;
+        _pipeline?.VideoChains[0].Transform = transform;
     }
 
     public void SetSubtitlePresentation(SubtitlePresentation presentation)
@@ -327,10 +327,7 @@ internal sealed partial class CoreEngine : IDisposable
         }
 
         _subtitlePresentation = presentation;
-        if (_pipeline is not null)
-        {
-            _pipeline.SubtitlePresentation = presentation;
-        }
+        _pipeline?.SubtitleChains[0].Presentation = presentation;
     }
 
     public void SetVolume(double volume)
@@ -388,8 +385,8 @@ internal sealed partial class CoreEngine : IDisposable
         };
 
         _components.Apply(pipeline);
-        pipeline.VideoTransform = _videoTransform;
-        pipeline.SubtitlePresentation = _subtitlePresentation;
+        pipeline.VideoChains[0].Transform = _videoTransform;
+        pipeline.SubtitleChains[0].Presentation = _subtitlePresentation;
         pipeline.StateChanged += Pipeline_StateChanged;
 
         GainAudioFilter gainFilter = new();

@@ -3,8 +3,8 @@
 
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
-using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Abstractions.Timing;
+using SinePlayer.Core.Playback.Selection;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
@@ -13,6 +13,8 @@ public interface IVideoChain : IPlaybackChain<VideoStreamInfo>
     VideoComponentResolver Components { get; }
 
     IVideoRenderTarget? Target { get; }
+
+    VideoTransform Transform { get; set; }
 
     ISynchronizer Synchronizer { get; set; }
 
