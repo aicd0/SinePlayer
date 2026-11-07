@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Core.Tests.Playback;
@@ -68,5 +69,39 @@ public class PipelineSurfaceTests
             interfaces.Select(type => type.Name).Order(),
             Is.EqualTo(new[] { nameof(IAudioChain), nameof(IPlaybackChain), nameof(ISubtitleChain), nameof(IVideoChain) }.Order()),
             "a kind of chain is reached through its own interface and through nothing else");
+    }
+
+    /// <summary>
+    /// The pipeline holds chains rather than three fields named after them: a fresh pipeline has one of each kind, and
+    /// what the pipeline-wide members describe is the first chain of that kind.
+    /// </summary>
+    [Test]
+    public void AFreshPipelineHoldsOneChainOfEachKind()
+    {
+        using PlaybackPipeline pipeline = new();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(pipeline.VideoChains.Select(chain => chain.Kind), Is.EqualTo(new[] { MediaStreamKind.Video }));
+            Assert.That(pipeline.AudioChains.Select(chain => chain.Kind), Is.EqualTo(new[] { MediaStreamKind.Audio }));
+            Assert.That(pipeline.SubtitleChains.Select(chain => chain.Kind), Is.EqualTo(new[] { MediaStreamKind.Subtitle }));
+        }
+    }
+
+    /// <summary>
+    /// A chain owns its resolver, so the pipeline's per-kind resolver is that chain's — not a second registration
+    /// surface over the same thing.
+    /// </summary>
+    [Test]
+    public void AChainsResolverIsTheOneTheHostRegistersInto()
+    {
+        using PlaybackPipeline pipeline = new();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(pipeline.VideoChains[0].Components, Is.SameAs(pipeline.VideoComponents));
+            Assert.That(pipeline.AudioChains[0].Components, Is.SameAs(pipeline.AudioComponents));
+            Assert.That(pipeline.SubtitleChains[0].Components, Is.SameAs(pipeline.SubtitleComponents));
+        }
     }
 }

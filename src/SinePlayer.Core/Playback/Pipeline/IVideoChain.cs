@@ -2,12 +2,15 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Playback.Abstractions.Render;
+using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Abstractions.Timing;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
 public interface IVideoChain : IPlaybackChain
 {
+    VideoComponentResolver Components { get; }
+
     IVideoRenderTarget? Target { get; }
 
     ISynchronizer Synchronizer { get; set; }
