@@ -30,11 +30,11 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     private volatile bool _starved;
     private long _endedEpoch = -1;
 
-    public SubtitleChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged)
+    public SubtitleChain(PipelineTimeline timeline, PipelineEvents events, Action<SubtitleChain> surfaceSizeChanged)
     {
         _timeline = timeline;
         _events = events;
-        _surfaceSizeChanged = surfaceSizeChanged;
+        _surfaceSizeChanged = () => surfaceSizeChanged(this);
     }
 
     public MediaStreamKind Kind => MediaStreamKind.Subtitle;
