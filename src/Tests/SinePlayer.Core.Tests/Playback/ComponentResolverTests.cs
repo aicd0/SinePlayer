@@ -100,7 +100,7 @@ public class ComponentResolverTests
     [Test]
     public void ACloneCarriesThePreferences()
     {
-        ComponentResolver original = new() { Preferences = new PlaybackPreferences { PreferHardwareDecoding = false } };
+        ComponentResolver original = new() { Preferences = new VideoPreferences { PreferHardwareDecoding = false } };
 
         ComponentResolver clone = original.Clone();
         clone.Preferences = clone.Preferences with { PreferHardwareDecoding = true };
@@ -120,7 +120,7 @@ public class ComponentResolverTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(Renderers(resolver), Is.Empty);
-            Assert.That(resolver.Preferences, Is.SameAs(PlaybackPreferences.Default));
+            Assert.That(resolver.Preferences, Is.SameAs(VideoPreferences.Default));
         }
     }
 
@@ -168,7 +168,7 @@ public class ComponentResolverTests
     [Test]
     public void AVideoDecoderSequenceAsksForHardwareFirstAndThenWithout()
     {
-        ComponentResolver resolver = new() { Preferences = new PlaybackPreferences { PreferHardwareDecoding = true } };
+        ComponentResolver resolver = new() { Preferences = new VideoPreferences { PreferHardwareDecoding = true } };
         resolver.Register(new RecordingVideoDecoderFactory());
 
         using SyntheticMediaSource source = new(new SyntheticMediaScript());
