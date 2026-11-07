@@ -13,4 +13,6 @@ public interface IAudioChain : IPlaybackChain<AudioStreamInfo>
     AudioFilterChain Filters { get; }
 
     long Underruns { get; }
+
+    bool OwnsClock { get; }
 }

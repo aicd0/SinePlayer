@@ -18,6 +18,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     private readonly PipelineTimeline _timeline;
     private readonly MediaReader _reader;
 
+    private readonly List<IPlaybackChain> _removedChains = [];
     private volatile VideoChain[] _videoChains = [];
     private volatile AudioChain[] _audioChains = [];
     private volatile SubtitleChain[] _subtitleChains = [];
@@ -112,71 +113,29 @@ public sealed partial class PlaybackPipeline : IDisposable
         return _events.SubmitAndLog(nameof(AddSource), () => AddSourceCore(locator));
     }
 
-    public IVideoChain AddVideoChain(IVideoRenderTarget target)
+    public Task<IVideoChain> AddVideoChain(IVideoRenderTarget target)
     {
-        return AddVideoChainCore(target);
+        return _events.Submit<IVideoChain>(() => AddVideoChainCore(target));
     }
 
-    public IAudioChain AddAudioChain()
+    public Task<IAudioChain> AddAudioChain()
     {
-        return AddAudioChainCore();
+        return _events.Submit<IAudioChain>(AddAudioChainCore);
     }
 
-    public ISubtitleChain AddSubtitleChain(IVideoRenderTarget target)
+    public Task<ISubtitleChain> AddSubtitleChain(IVideoRenderTarget target)
     {
-        return AddSubtitleChainCore(target);
+        return _events.Submit<ISubtitleChain>(() => AddSubtitleChainCore(target));
     }
 
-    public OperationResult RemoveChain(IPlaybackChain chain)
+    public Task<OperationResult> RemoveChain(IPlaybackChain chain)
     {
-        if (_host is not null)
-        {
-            return OperationResult.Failure("A chain cannot be removed while playback is running. Stop first.");
-        }
-
-        if (chain is VideoChain video && Array.IndexOf(_videoChains, video) >= 0)
-        {
-            _videoChains = [.. _videoChains.Where(existing => !ReferenceEquals(existing, video))];
-            _reader.RemoveSource(video);
-            video.Reset();
-        }
-        else if (chain is AudioChain audio && Array.IndexOf(_audioChains, audio) >= 0)
-        {
-            _audioChains = [.. _audioChains.Where(existing => !ReferenceEquals(existing, audio))];
-            _reader.RemoveSource(audio);
-            audio.Reset();
-            ReleaseClockOwner(audio);
-        }
-        else if (chain is SubtitleChain subtitle && Array.IndexOf(_subtitleChains, subtitle) >= 0)
-        {
-            _subtitleChains = [.. _subtitleChains.Where(existing => !ReferenceEquals(existing, subtitle))];
-            _reader.RemoveSource(subtitle);
-            subtitle.Reset();
-        }
-        else
-        {
-            return OperationResult.Failure("The chain is not one of this pipeline's.");
-        }
-
-        RebuildWakeTargets();
-        return OperationResult.Success();
+        return _events.SubmitAndLog(nameof(RemoveChain), () => RemoveChainCore(chain));
     }
 
     public Task<OperationResult> SelectStream(IPlaybackChain chain, MediaStreamInfo? stream)
     {
-        ArgumentNullException.ThrowIfNull(chain);
         return _events.SubmitAndLog(nameof(SelectStream), () => SelectStreamCore(chain, stream));
-    }
-
-    public Task<OperationResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)
-    {
-        return _events.SubmitAndLog(nameof(SelectStream), () =>
-        {
-            IPlaybackChain? chain = FirstChainOf(kind);
-            return chain is null
-                ? OperationResult.Failure($"The pipeline has no {kind} chain to choose a stream for.")
-                : SelectStreamCore(chain, stream);
-        });
     }
 
     public Task<OperationResult> Play()
@@ -206,75 +165,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     #endregion
 
-    #region Chains
-
-    private VideoChain AddVideoChainCore(IVideoRenderTarget target)
-    {
-        VideoChain chain = new(_timeline, _events, VideoTarget_SurfaceSizeChanged)
-        {
-            Target = target,
-            LayoutChanged = NotifyLayoutChanged,
-        };
-
-        _videoChains = [.. _videoChains, chain];
-        _reader.AddVideoSource(chain, chain.Source);
-        RebuildWakeTargets();
-        return chain;
-    }
-
-    private AudioChain AddAudioChainCore()
-    {
-        AudioChain chain = new(_timeline, _events);
-
-        _audioChains = [.. _audioChains, chain];
-        _reader.AddAudioSource(chain, chain.Source);
-        RebuildWakeTargets();
-
-        _timeline.DeviceOwner ??= chain;
-        return chain;
-    }
-
-    private SubtitleChain AddSubtitleChainCore(IVideoRenderTarget target)
-    {
-        SubtitleChain chain = new(_timeline, _events, SubtitleTarget_SurfaceSizeChanged)
-        {
-            Target = target,
-        };
-
-        _subtitleChains = [.. _subtitleChains, chain];
-        _reader.AddSubtitleSource(chain, chain.Source);
-        RebuildWakeTargets();
-        return chain;
-    }
-
-    private IPlaybackChain? FirstChainOf(MediaStreamKind kind)
-    {
-        return kind switch
-        {
-            MediaStreamKind.Video => _videoChains.FirstOrDefault(),
-            MediaStreamKind.Audio => _audioChains.FirstOrDefault(),
-            _ => _subtitleChains.FirstOrDefault(),
-        };
-    }
-
-    private void RebuildWakeTargets()
-    {
-        _wakeTargets = [_reader, .. _videoChains, .. _audioChains, .. _subtitleChains];
-    }
-
-    private void ReleaseClockOwner(AudioChain removed)
-    {
-        if (!ReferenceEquals(_timeline.DeviceOwner, removed))
-        {
-            return;
-        }
-
-        _timeline.DeviceOwner = _audioChains.Length > 0 ? _audioChains[0] : null;
-    }
-
-    #endregion
-
-    #region Playback
+    #region Queue workers
 
     private OperationResult ResetCore()
     {
@@ -321,6 +212,64 @@ public sealed partial class PlaybackPipeline : IDisposable
         MediaSource added = new(source, locator);
         _sources = [.. _sources, added];
         return result.Success(added);
+    }
+
+    private VideoChain AddVideoChainCore(IVideoRenderTarget target)
+    {
+        VideoChain chain = new(_timeline, _events, VideoTarget_SurfaceSizeChanged)
+        {
+            Target = target,
+            LayoutChanged = NotifyLayoutChanged,
+        };
+
+        _videoChains = [.. _videoChains, chain];
+        return chain;
+    }
+
+    private AudioChain AddAudioChainCore()
+    {
+        AudioChain chain = new(_timeline, _events);
+        _audioChains = [.. _audioChains, chain];
+        return chain;
+    }
+
+    private SubtitleChain AddSubtitleChainCore(IVideoRenderTarget target)
+    {
+        SubtitleChain chain = new(_timeline, _events, SubtitleTarget_SurfaceSizeChanged)
+        {
+            Target = target,
+        };
+
+        _subtitleChains = [.. _subtitleChains, chain];
+        return chain;
+    }
+
+    private OperationResult RemoveChainCore(IPlaybackChain chain)
+    {
+        bool present =
+            (chain is VideoChain heldVideo && Array.IndexOf(_videoChains, heldVideo) >= 0) ||
+            (chain is AudioChain heldAudio && Array.IndexOf(_audioChains, heldAudio) >= 0) ||
+            (chain is SubtitleChain heldSubtitle && Array.IndexOf(_subtitleChains, heldSubtitle) >= 0);
+        if (!present)
+        {
+            return OperationResult.Failure("The chain is not one of this pipeline's.");
+        }
+
+        switch (chain)
+        {
+            case VideoChain video:
+                _videoChains = [.. _videoChains.Where(existing => existing != video)];
+                break;
+            case AudioChain audio:
+                _audioChains = [.. _audioChains.Where(existing => existing != audio)];
+                break;
+            case SubtitleChain subtitle:
+                _subtitleChains = [.. _subtitleChains.Where(existing => existing != subtitle)];
+                break;
+        }
+
+        _removedChains.Add(chain);
+        return OperationResult.Success();
     }
 
     private OperationResult SelectStreamCore(IPlaybackChain chain, MediaStreamInfo? stream)
@@ -451,6 +400,15 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private OperationResult<ReconcileResult> ReconcileCore()
     {
+        static bool Reconcile<TChain>(
+            TChain chain,
+            OperationResult<ChainChange> reconciled,
+            Dictionary<TChain, OperationResult> results) where TChain : class, IPlaybackChain
+        {
+            results[chain] = reconciled.IsSuccessful ? OperationResult.Success() : OperationResult.Failure(reconciled);
+            return reconciled.IsSuccessful && reconciled.Result != ChainChange.None;
+        }
+
         OperationResultCreator<ReconcileResult> result = new();
 
         if (_disposed)
@@ -462,6 +420,11 @@ public sealed partial class PlaybackPipeline : IDisposable
         {
             return result.Failure($"Cannot change the pipeline's components when the state is {state}.");
         }
+
+        FlushChainRemoval();
+        InstallSources();
+        RebuildWakeTargets();
+        ReconcileClockOwner();
 
         Dictionary<IVideoChain, OperationResult> videoResults = [];
         Dictionary<IAudioChain, OperationResult> audioResults = [];
@@ -487,11 +450,11 @@ public sealed partial class PlaybackPipeline : IDisposable
         {
             _timeline.AdvanceEpoch(_timeline.Position, SeekMode.Precise);
             WakeAll();
+        }
 
-            if (_host is null)
-            {
-                StartThreads();
-            }
+        if (_videoChains.Length + _audioChains.Length + _subtitleChains.Length > 0)
+        {
+            StartThreads();
         }
 
         return result.Success(new ReconcileResult
@@ -502,13 +465,100 @@ public sealed partial class PlaybackPipeline : IDisposable
         });
     }
 
-    private static bool Reconcile<TChain>(
-        TChain chain,
-        OperationResult<ChainChange> reconciled,
-        Dictionary<TChain, OperationResult> results) where TChain : class, IPlaybackChain
+    private void FlushChainRemoval()
     {
-        results[chain] = reconciled.IsSuccessful ? OperationResult.Success() : OperationResult.Failure(reconciled);
-        return reconciled.IsSuccessful && reconciled.Result != ChainChange.None;
+        if (_removedChains.Count == 0)
+        {
+            return;
+        }
+
+        IPlaybackChain[] removed = [.. _removedChains];
+        _removedChains.Clear();
+
+        foreach (IPlaybackChain chain in removed)
+        {
+            RequestStopChain(chain);
+            _reader.RemoveSource((IChainFeed)chain);
+        }
+
+        _reader.Wake();
+
+        foreach (IPlaybackChain chain in removed)
+        {
+            JoinChain(chain);
+            ResetChain(chain);
+
+            if (chain is VideoChain video)
+            {
+                foreach (SubtitleChain subtitle in _subtitleChains)
+                {
+                    if (subtitle.LayoutSource == video)
+                    {
+                        subtitle.LayoutSource = _videoChains.Length > 0 ? _videoChains[0] : null;
+                        subtitle.RenderNode.Wake();
+                    }
+                }
+            }
+        }
+    }
+
+    private void InstallSources()
+    {
+        foreach (VideoChain chain in _videoChains)
+        {
+            _reader.AddVideoSource(chain, chain.Source);
+        }
+
+        foreach (AudioChain chain in _audioChains)
+        {
+            _reader.AddAudioSource(chain, chain.Source);
+        }
+
+        foreach (SubtitleChain chain in _subtitleChains)
+        {
+            _reader.AddSubtitleSource(chain, chain.Source);
+        }
+    }
+
+    private void RebuildWakeTargets()
+    {
+        _wakeTargets = [_reader, .. _videoChains, .. _audioChains, .. _subtitleChains];
+    }
+
+    private void ReconcileClockOwner()
+    {
+        if (_timeline.DeviceOwner is AudioChain owner && Array.IndexOf(_audioChains, owner) >= 0)
+        {
+            return;
+        }
+
+        _timeline.DeviceOwner = _audioChains.Length > 0 ? _audioChains[0] : null;
+    }
+
+    private void StartThreads()
+    {
+        if (_host is null)
+        {
+            CoroutineHost host = new("Pipeline - Reader");
+            host.Register(stop => _reader.Run(stop, NotifySourceEnded));
+            host.Start();
+            _host = host;
+        }
+
+        foreach (VideoChain chain in _videoChains)
+        {
+            StartChain(chain);
+        }
+
+        foreach (AudioChain chain in _audioChains)
+        {
+            StartChain(chain);
+        }
+
+        foreach (SubtitleChain chain in _subtitleChains)
+        {
+            StartChain(chain);
+        }
     }
 
     private OperationResult StopCore()
@@ -545,31 +595,103 @@ public sealed partial class PlaybackPipeline : IDisposable
         return OperationResult.Success();
     }
 
-    private void StartThreads()
+    #endregion
+
+    #region Chains
+
+    private void StartChain(IPlaybackChain chain)
     {
-        CoroutineHost host = new("Pipeline - Reader");
-        host.Register(stop => _reader.Run(stop, NotifySourceEnded));
-        host.Start();
-        _host = host;
-
-        foreach (VideoChain chain in _videoChains)
+        if (_host is not { } host || IsChainRunning(chain))
         {
-            chain.Start(_reader.Wake, (epoch, position) => chain.ReadTail.IsSpent(epoch, position, FurthestTailTicks), TryNotifyPlaybackEnded);
+            return;
         }
 
-        foreach (AudioChain chain in _audioChains)
+        switch (chain)
         {
-            chain.Start(host, _reader.Wake, (epoch, position) => chain.ReadTail.IsSpent(epoch, position, FurthestTailTicks), TryNotifyPlaybackEnded);
-        }
-
-        foreach (SubtitleChain subtitle in _subtitleChains)
-        {
-            subtitle.Start(host, _reader.Wake);
+            case VideoChain video:
+                video.Start(_reader.Wake, (epoch, position) => video.ReadTail.IsSpent(epoch, position, FurthestTailTicks), TryNotifyPlaybackEnded);
+                break;
+            case AudioChain audio:
+                audio.Start(host, _reader.Wake, (epoch, position) => audio.ReadTail.IsSpent(epoch, position, FurthestTailTicks), TryNotifyPlaybackEnded);
+                break;
+            case SubtitleChain subtitle:
+                subtitle.Start(host, _reader.Wake);
+                break;
         }
     }
 
+    private static void RequestStopChain(IPlaybackChain chain)
+    {
+        switch (chain)
+        {
+            case VideoChain video:
+                video.RequestStop();
+                break;
+            case AudioChain audio:
+                audio.RequestStop();
+                break;
+            case SubtitleChain subtitle:
+                subtitle.RequestStop();
+                break;
+        }
+    }
+
+    private static void JoinChain(IPlaybackChain chain)
+    {
+        switch (chain)
+        {
+            case VideoChain video:
+                video.Join();
+                break;
+            case AudioChain audio:
+                audio.Join();
+                break;
+            case SubtitleChain subtitle:
+                subtitle.Join();
+                break;
+        }
+    }
+
+    private static void ResetChain(IPlaybackChain chain)
+    {
+        switch (chain)
+        {
+            case VideoChain video:
+                video.Reset();
+                break;
+            case AudioChain audio:
+                audio.Reset();
+                break;
+            case SubtitleChain subtitle:
+                subtitle.Reset();
+                break;
+        }
+    }
+
+    private static bool IsChainRunning(IPlaybackChain chain)
+    {
+        return chain switch
+        {
+            VideoChain video => video.IsRunning,
+            AudioChain audio => audio.IsRunning,
+            SubtitleChain subtitle => subtitle.IsRunning,
+            _ => false,
+        };
+    }
+
+    #endregion
+
+    #region Playback
+
     private void StopThreads()
     {
+        IPlaybackChain[] removed = [.. _removedChains];
+        _removedChains.Clear();
+        foreach (IPlaybackChain chain in removed)
+        {
+            RequestStopChain(chain);
+        }
+
         _host?.RequestStop();
 
         foreach (VideoChain video in _videoChains)
@@ -606,6 +728,12 @@ public sealed partial class PlaybackPipeline : IDisposable
         {
             subtitle.Join();
         }
+
+        foreach (IPlaybackChain chain in removed)
+        {
+            JoinChain(chain);
+            ResetChain(chain);
+        }
     }
 
     private void NotifySourceEnded(long epoch)
@@ -638,7 +766,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         VideoStreamInfo? video = null;
         foreach (VideoChain chain in _videoChains)
         {
-            if (ReferenceEquals(chain.Source.CurrentComponent, source))
+            if (chain.Source.CurrentComponent == source)
             {
                 video = (VideoStreamInfo?)chain.Source.CurrentStream;
                 break;
@@ -648,7 +776,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         AudioStreamInfo? audio = null;
         foreach (AudioChain chain in _audioChains)
         {
-            if (ReferenceEquals(chain.Source.CurrentComponent, source))
+            if (chain.Source.CurrentComponent == source)
             {
                 audio = (AudioStreamInfo?)chain.Source.CurrentStream;
                 break;
@@ -744,7 +872,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         foreach (SubtitleChain subtitle in _subtitleChains)
         {
-            if (ReferenceEquals(subtitle.LayoutSource, picture))
+            if (subtitle.LayoutSource == picture)
             {
                 subtitle.RenderNode.Wake();
             }

@@ -2,8 +2,10 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System.Reflection;
+using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Core.Tests.Playback;
@@ -84,6 +86,37 @@ public class PipelineSurfaceTests
     }
 
     /// <summary>
+    /// A surface that draws nothing. These tests are about which chains exist, so the surface only has to exist: what
+    /// it is asked to show is never looked at.
+    /// </summary>
+    private static OperationResult Await(Task<OperationResult> command)
+    {
+        return command.GetAwaiter().GetResult();
+    }
+
+    private static T Await<T>(Task<T> command)
+    {
+        return command.GetAwaiter().GetResult();
+    }
+
+    private sealed class NoTarget : IVideoRenderTarget
+    {
+        public int SurfaceWidth => 320;
+
+        public int SurfaceHeight => 240;
+
+        public double RasterizationScale => 1.0;
+
+        public event Action? SurfaceSizeChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public void AttachPresentationSurface(nint swapChain) { }
+    }
+
+    /// <summary>
     /// The stream type a chain interface declares, which is what spares every caller a conversion: a video chain's
     /// stream is a video stream, always.
     /// </summary>
@@ -94,20 +127,60 @@ public class PipelineSurfaceTests
     }
 
     /// <summary>
-    /// The pipeline holds chains rather than three fields named after them: a fresh pipeline has one of each kind, and
-    /// what the pipeline-wide members describe is the first chain of that kind.
+    /// A chain arrives with its surface, so the constructor cannot make one: a fresh pipeline has no chain of any kind
+    /// and holds no surface, and the host adds what it wants to play. The kinds it does add are the kinds it gets.
     /// </summary>
     [Test]
-    public void AFreshPipelineHoldsOneChainOfEachKind()
+    public void AFreshPipelineHoldsNoChain()
     {
         using PlaybackPipeline pipeline = new();
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(pipeline.VideoChains.Select(chain => chain.Kind), Is.EqualTo(new[] { MediaStreamKind.Video }));
-            Assert.That(pipeline.AudioChains.Select(chain => chain.Kind), Is.EqualTo(new[] { MediaStreamKind.Audio }));
-            Assert.That(pipeline.SubtitleChains.Select(chain => chain.Kind), Is.EqualTo(new[] { MediaStreamKind.Subtitle }));
+            Assert.That(pipeline.VideoChains, Is.Empty, "nothing is created behind the host's back");
+            Assert.That(pipeline.AudioChains, Is.Empty);
+            Assert.That(pipeline.SubtitleChains, Is.Empty);
         }
+    }
+
+    /// <summary>What a host is given back is the chain that was added, and it is reachable from the list.</summary>
+    [Test]
+    public void AddingAChainHandsBackTheChainThatWasAdded()
+    {
+        using PlaybackPipeline pipeline = new();
+
+        IVideoChain video = Await(pipeline.AddVideoChain(new NoTarget()));
+        IAudioChain audio = Await(pipeline.AddAudioChain());
+        ISubtitleChain subtitle = Await(pipeline.AddSubtitleChain(new NoTarget()));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(pipeline.VideoChains, Is.EqualTo(new[] { video }));
+            Assert.That(pipeline.AudioChains, Is.EqualTo(new[] { audio }));
+            Assert.That(pipeline.SubtitleChains, Is.EqualTo(new[] { subtitle }));
+            Assert.That(video.Kind, Is.EqualTo(MediaStreamKind.Video));
+            Assert.That(audio.Kind, Is.EqualTo(MediaStreamKind.Audio));
+            Assert.That(subtitle.Kind, Is.EqualTo(MediaStreamKind.Subtitle));
+        }
+    }
+
+    /// <summary>
+    /// A chain that came out is not in the lists any more, and one that never went in is refused rather than quietly
+    /// ignored.
+    /// </summary>
+    [Test]
+    public void RemovedChainsLeaveTheListsAndForeignOnesAreRefused()
+    {
+        using PlaybackPipeline pipeline = new();
+        using PlaybackPipeline other = new();
+
+        IVideoChain video = Await(pipeline.AddVideoChain(new NoTarget()));
+        Assert.That(Await(pipeline.RemoveChain(video)).IsSuccessful, Is.True);
+        Assert.That(pipeline.VideoChains, Is.Empty);
+
+        IVideoChain foreign = Await(other.AddVideoChain(new NoTarget()));
+        Assert.That(Await(pipeline.RemoveChain(foreign)).IsSuccessful, Is.False, "another pipeline's chain is not this one's to remove");
+        Assert.That(other.VideoChains, Is.EqualTo(new[] { foreign }), "and it stays where it is");
     }
 
     /// <summary>

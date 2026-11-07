@@ -59,7 +59,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
 
     public VideoStreamInfo? PlayingStream => (VideoStreamInfo?)Source.CurrentStream;
 
-    public bool IsActive => Decoder.HasComponent;
+    public bool IsRunning => _decodeThread is not null || _renderThread is not null;
 
     public string? DecoderName => Decoder.CurrentComponent?.Name;
 
@@ -216,7 +216,6 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
         Source.Reset();
         Decoder.Reset();
         Renderer.Reset();
-        Target = null;
         Selected = default;
         Starved = false;
         EndedEpoch = -1;
