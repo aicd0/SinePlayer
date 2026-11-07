@@ -8933,6 +8933,58 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// Two chains may pick the same stream, and both are fed: the reader hands the packet to every chain that wants it
+    /// rather than to the first one, so the second chain has a decoder of its own reading the same bytes. The packet
+    /// carries a count rather than a copy, so a second chain costs an owner and not a payload.
+    /// </summary>
+    [Test]
+    public void FeedsBothChainsThatSelectOneStream()
+    {
+        string playing = SyntheticPath("one-stream");
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(playing, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        });
+
+        FakeSubtitleRenderer firstRenderer = new();
+        FakeSubtitleRenderer secondRenderer = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IVideoChain video = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            ISubtitleChain first = Await(pipeline.AddSubtitleChain(new SubtitleSurface()));
+            ISubtitleChain second = Await(pipeline.AddSubtitleChain(new SubtitleSurface()));
+
+            video.Components.Register(new SyntheticVideoDecoderFactory());
+            video.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+            first.Components.Register(new SyntheticSubtitleDecoderFactory());
+            first.Components.Register(new FakeSubtitleRendererFactory(firstRenderer));
+            second.Components.Register(new SyntheticSubtitleDecoderFactory());
+            second.Components.Register(new FakeSubtitleRendererFactory(secondRenderer));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
+
+            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            string cue = SyntheticSubtitleDecoderFactory.TextAt(TimeSpan.FromSeconds(0.2));
+            WaitFor(() => firstRenderer.Texts.Contains(cue), "one chain on the stream to be fed");
+            WaitFor(() => secondRenderer.Texts.Contains(cue), "the other chain on the same stream to be fed too");
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Adding a file while something plays is not a jump: the track that was playing keeps playing, the picture keeps
     /// coming, and only the list of files that may be read has grown.
     /// </summary>
