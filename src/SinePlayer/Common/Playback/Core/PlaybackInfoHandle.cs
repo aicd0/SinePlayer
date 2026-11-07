@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
@@ -14,14 +13,17 @@ namespace SinePlayer.Common.Playback.Core;
 internal sealed class PlaybackInfoHandle
 {
     private volatile PlaybackPipeline? _pipeline;
+    private volatile IVideoChain? _video;
+    private volatile IAudioChain? _audio;
+    private volatile ISubtitleChain? _subtitle;
 
     public MediaInfo? Media => Sources is [MediaSource first, ..] ? first.Info : null;
 
-    public VideoStreamInfo? SelectedVideoStream => Video?.SelectedStream;
+    public VideoStreamInfo? SelectedVideoStream => _video?.SelectedStream;
 
-    public AudioStreamInfo? SelectedAudioStream => Audio?.SelectedStream;
+    public AudioStreamInfo? SelectedAudioStream => _audio?.SelectedStream;
 
-    public SubtitleStreamInfo? SelectedSubtitleStream => Subtitle?.SelectedStream;
+    public SubtitleStreamInfo? SelectedSubtitleStream => _subtitle?.SelectedStream;
 
     public IReadOnlyList<MediaSource> Sources => _pipeline?.Sources ?? [];
 
@@ -31,47 +33,47 @@ internal sealed class PlaybackInfoHandle
 
     public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;
 
-    public long PresentedFrames => Video?.PresentedFrameCount ?? 0;
+    public long PresentedFrames => _video?.PresentedFrameCount ?? 0;
 
-    public long DroppedFrames => Video?.DroppedFrameCount ?? 0;
+    public long DroppedFrames => _video?.DroppedFrameCount ?? 0;
 
-    public TimeSpan PictureLag => Video?.PictureLag ?? TimeSpan.Zero;
+    public TimeSpan PictureLag => _video?.PictureLag ?? TimeSpan.Zero;
 
-    public double AverageVideoDecodeMilliseconds => Video?.AverageDecodeMilliseconds ?? 0;
+    public double AverageVideoDecodeMilliseconds => _video?.AverageDecodeMilliseconds ?? 0;
 
-    public double AverageVideoRenderMilliseconds => Video?.AverageRenderMilliseconds ?? 0;
+    public double AverageVideoRenderMilliseconds => _video?.AverageRenderMilliseconds ?? 0;
 
-    public long AudioUnderruns => Audio?.Underruns ?? 0;
+    public long AudioUnderruns => _audio?.Underruns ?? 0;
 
-    public string? VideoDecoderName => Video?.DecoderName;
+    public string? VideoDecoderName => _video?.DecoderName;
 
-    public string? VideoRendererName => Video?.RendererName;
+    public string? VideoRendererName => _video?.RendererName;
 
-    public string? AudioDecoderName => Audio?.DecoderName;
+    public string? AudioDecoderName => _audio?.DecoderName;
 
-    public string? AudioRendererName => Audio?.RendererName;
+    public string? AudioRendererName => _audio?.RendererName;
 
-    public string? SubtitleDecoderName => Subtitle?.DecoderName;
+    public string? SubtitleDecoderName => _subtitle?.DecoderName;
 
-    public string? SubtitleRendererName => Subtitle?.RendererName;
+    public string? SubtitleRendererName => _subtitle?.RendererName;
 
-    public bool IsVideoHardwareAccelerated => Video?.IsHardwareAccelerated ?? false;
+    public bool IsVideoHardwareAccelerated => _video?.IsHardwareAccelerated ?? false;
 
-    public bool IsAudioHardwareAccelerated => Audio?.IsHardwareAccelerated ?? false;
+    public bool IsAudioHardwareAccelerated => _audio?.IsHardwareAccelerated ?? false;
 
-    private IVideoChain? Video => _pipeline?.VideoChains.FirstOrDefault();
-
-    private IAudioChain? Audio => _pipeline?.AudioChains.FirstOrDefault();
-
-    private ISubtitleChain? Subtitle => _pipeline?.SubtitleChains.FirstOrDefault();
-
-    internal void Attach(PlaybackPipeline pipeline)
+    internal void Attach(PlaybackPipeline pipeline, IVideoChain video, IAudioChain audio, ISubtitleChain subtitle)
     {
+        _video = video;
+        _audio = audio;
+        _subtitle = subtitle;
         _pipeline = pipeline;
     }
 
     internal void Detach()
     {
         _pipeline = null;
+        _video = null;
+        _audio = null;
+        _subtitle = null;
     }
 }

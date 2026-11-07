@@ -141,7 +141,7 @@ internal sealed record PlaybackComponents(
                 break;
         }
 
-        pipeline.VideoComponents.Preferences = pipeline.VideoComponents.Preferences with { PreferHardwareDecoding = VideoPreferHardwareDecoding };
+        pipeline.VideoChains[0].Components.Preferences = pipeline.VideoChains[0].Components.Preferences with { PreferHardwareDecoding = VideoPreferHardwareDecoding };
     }
 
     private void ApplyVideoRenderer(PlaybackPipeline pipeline, string key)
@@ -265,55 +265,55 @@ internal sealed record PlaybackComponents(
 
     private static void SetVideoDecoders(PlaybackPipeline pipeline, IEnumerable<IVideoDecoderFactory> factories)
     {
-        pipeline.VideoComponents.ClearDecoders();
+        pipeline.VideoChains[0].Components.ClearDecoders();
         foreach (IVideoDecoderFactory factory in factories)
         {
-            pipeline.VideoComponents.Register(factory);
+            pipeline.VideoChains[0].Components.Register(factory);
         }
     }
 
     private static void SetVideoRenderers(PlaybackPipeline pipeline, IEnumerable<IVideoRendererFactory> factories)
     {
-        pipeline.VideoComponents.ClearRenderers();
+        pipeline.VideoChains[0].Components.ClearRenderers();
         foreach (IVideoRendererFactory factory in factories)
         {
-            pipeline.VideoComponents.Register(factory);
+            pipeline.VideoChains[0].Components.Register(factory);
         }
     }
 
     private static void SetAudioDecoders(PlaybackPipeline pipeline, IEnumerable<IAudioDecoderFactory> factories)
     {
-        pipeline.AudioComponents.ClearDecoders();
+        pipeline.AudioChains[0].Components.ClearDecoders();
         foreach (IAudioDecoderFactory factory in factories)
         {
-            pipeline.AudioComponents.Register(factory);
+            pipeline.AudioChains[0].Components.Register(factory);
         }
     }
 
     private static void SetAudioRenderers(PlaybackPipeline pipeline, IEnumerable<IAudioRendererFactory> factories)
     {
-        pipeline.AudioComponents.ClearRenderers();
+        pipeline.AudioChains[0].Components.ClearRenderers();
         foreach (IAudioRendererFactory factory in factories)
         {
-            pipeline.AudioComponents.Register(factory);
+            pipeline.AudioChains[0].Components.Register(factory);
         }
     }
 
     private static void SetSubtitleDecoders(PlaybackPipeline pipeline, IEnumerable<ISubtitleDecoderFactory> factories)
     {
-        pipeline.SubtitleComponents.ClearDecoders();
+        pipeline.SubtitleChains[0].Components.ClearDecoders();
         foreach (ISubtitleDecoderFactory factory in factories)
         {
-            pipeline.SubtitleComponents.Register(factory);
+            pipeline.SubtitleChains[0].Components.Register(factory);
         }
     }
 
     private static void SetSubtitleRenderers(PlaybackPipeline pipeline, IEnumerable<ISubtitleRendererFactory> factories)
     {
-        pipeline.SubtitleComponents.ClearRenderers();
+        pipeline.SubtitleChains[0].Components.ClearRenderers();
         foreach (ISubtitleRendererFactory factory in factories)
         {
-            pipeline.SubtitleComponents.Register(factory);
+            pipeline.SubtitleChains[0].Components.Register(factory);
         }
     }
 }

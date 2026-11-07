@@ -111,23 +111,6 @@ public class PipelineSurfaceTests
     }
 
     /// <summary>
-    /// A chain owns its resolver, so the pipeline's per-kind resolver is that chain's — not a second registration
-    /// surface over the same thing.
-    /// </summary>
-    [Test]
-    public void AChainsResolverIsTheOneTheHostRegistersInto()
-    {
-        using PlaybackPipeline pipeline = new();
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(pipeline.VideoChains[0].Components, Is.SameAs(pipeline.VideoComponents));
-            Assert.That(pipeline.AudioChains[0].Components, Is.SameAs(pipeline.AudioComponents));
-            Assert.That(pipeline.SubtitleChains[0].Components, Is.SameAs(pipeline.SubtitleComponents));
-        }
-    }
-
-    /// <summary>
     /// The pipeline describes playback, not one chain of each kind: what is per kind belongs to the chain, and the only
     /// per-kind names left on the pipeline are the ways to reach a chain — its list, and the resolver it owns.
     /// </summary>
@@ -149,9 +132,6 @@ public class PipelineSurfaceTests
                 nameof(PlaybackPipeline.VideoChains),
                 nameof(PlaybackPipeline.AudioChains),
                 nameof(PlaybackPipeline.SubtitleChains),
-                nameof(PlaybackPipeline.VideoComponents),
-                nameof(PlaybackPipeline.AudioComponents),
-                nameof(PlaybackPipeline.SubtitleComponents),
             }.Order()),
             "a per-kind member on the pipeline is a second place to describe a chain");
     }

@@ -7,7 +7,6 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
-using SinePlayer.Core.Playback.Selection;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
@@ -39,12 +38,6 @@ public sealed partial class PlaybackPipeline : IDisposable
         _timeline = new PipelineTimeline(NotifyClockMoved, () => IsStarved);
         _reader = new MediaReader(_timeline, _events, ChooseSeekLanding);
         _wakeTargets = [_reader];
-
-        AddVideoChainCore(null);
-        AddAudioChainCore();
-        AddSubtitleChainCore(null);
-
-        _timeline.DeviceOwner = _audioChains.Length > 0 ? _audioChains[0] : null;
     }
 
     #endregion
@@ -68,12 +61,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     public IReadOnlyList<IAudioChain> AudioChains => _audioChains;
 
     public IReadOnlyList<ISubtitleChain> SubtitleChains => _subtitleChains;
-
-    public VideoComponentResolver VideoComponents => _videoChains[0].Components;
-
-    public AudioComponentResolver AudioComponents => _audioChains[0].Components;
-
-    public SubtitleComponentResolver SubtitleComponents => _subtitleChains[0].Components;
 
     public ISourceProviderFactory? SourceFactory { get; set; }
 
@@ -114,15 +101,65 @@ public sealed partial class PlaybackPipeline : IDisposable
         teardown.Wait();
     }
 
-    public Task<OperationResult> Reset(IVideoRenderTarget? videoTarget = null, IVideoRenderTarget? subtitleTarget = null)
+    public Task<OperationResult> Reset()
     {
-        return _events.SubmitAndLog(nameof(Reset), () => ResetCore(videoTarget, subtitleTarget));
+        return _events.SubmitAndLog(nameof(Reset), ResetCore);
     }
 
     public Task<OperationResult<MediaSource>> AddSource(MediaLocator locator)
     {
         ArgumentNullException.ThrowIfNull(locator);
         return _events.SubmitAndLog(nameof(AddSource), () => AddSourceCore(locator));
+    }
+
+    public IVideoChain AddVideoChain(IVideoRenderTarget target)
+    {
+        return AddVideoChainCore(target);
+    }
+
+    public IAudioChain AddAudioChain()
+    {
+        return AddAudioChainCore();
+    }
+
+    public ISubtitleChain AddSubtitleChain(IVideoRenderTarget target)
+    {
+        return AddSubtitleChainCore(target);
+    }
+
+    public OperationResult RemoveChain(IPlaybackChain chain)
+    {
+        if (_host is not null)
+        {
+            return OperationResult.Failure("A chain cannot be removed while playback is running. Stop first.");
+        }
+
+        if (chain is VideoChain video && Array.IndexOf(_videoChains, video) >= 0)
+        {
+            _videoChains = [.. _videoChains.Where(existing => !ReferenceEquals(existing, video))];
+            _reader.RemoveSource(video);
+            video.Reset();
+        }
+        else if (chain is AudioChain audio && Array.IndexOf(_audioChains, audio) >= 0)
+        {
+            _audioChains = [.. _audioChains.Where(existing => !ReferenceEquals(existing, audio))];
+            _reader.RemoveSource(audio);
+            audio.Reset();
+            ReleaseClockOwner(audio);
+        }
+        else if (chain is SubtitleChain subtitle && Array.IndexOf(_subtitleChains, subtitle) >= 0)
+        {
+            _subtitleChains = [.. _subtitleChains.Where(existing => !ReferenceEquals(existing, subtitle))];
+            _reader.RemoveSource(subtitle);
+            subtitle.Reset();
+        }
+        else
+        {
+            return OperationResult.Failure("The chain is not one of this pipeline's.");
+        }
+
+        RebuildWakeTargets();
+        return OperationResult.Success();
     }
 
     public Task<OperationResult> SelectStream(IPlaybackChain chain, MediaStreamInfo? stream)
@@ -133,7 +170,13 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public Task<OperationResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)
     {
-        return SelectStream(FirstChainOf(kind), stream);
+        return _events.SubmitAndLog(nameof(SelectStream), () =>
+        {
+            IPlaybackChain? chain = FirstChainOf(kind);
+            return chain is null
+                ? OperationResult.Failure($"The pipeline has no {kind} chain to choose a stream for.")
+                : SelectStreamCore(chain, stream);
+        });
     }
 
     public Task<OperationResult> Play()
@@ -158,14 +201,14 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public Task<OperationResult> Stop()
     {
-        return _events.SubmitAndLog(nameof(Stop), () => ResetCore(null, null));
+        return _events.SubmitAndLog(nameof(Stop), ResetCore);
     }
 
     #endregion
 
     #region Chains
 
-    private VideoChain AddVideoChainCore(IVideoRenderTarget? target)
+    private VideoChain AddVideoChainCore(IVideoRenderTarget target)
     {
         VideoChain chain = new(_timeline, _events, VideoTarget_SurfaceSizeChanged)
         {
@@ -186,10 +229,12 @@ public sealed partial class PlaybackPipeline : IDisposable
         _audioChains = [.. _audioChains, chain];
         _reader.AddAudioSource(chain, chain.Source);
         RebuildWakeTargets();
+
+        _timeline.DeviceOwner ??= chain;
         return chain;
     }
 
-    private SubtitleChain AddSubtitleChainCore(IVideoRenderTarget? target)
+    private SubtitleChain AddSubtitleChainCore(IVideoRenderTarget target)
     {
         SubtitleChain chain = new(_timeline, _events, SubtitleTarget_SurfaceSizeChanged)
         {
@@ -202,13 +247,13 @@ public sealed partial class PlaybackPipeline : IDisposable
         return chain;
     }
 
-    private IPlaybackChain FirstChainOf(MediaStreamKind kind)
+    private IPlaybackChain? FirstChainOf(MediaStreamKind kind)
     {
         return kind switch
         {
-            MediaStreamKind.Video => _videoChains[0],
-            MediaStreamKind.Audio => _audioChains[0],
-            _ => _subtitleChains[0],
+            MediaStreamKind.Video => _videoChains.FirstOrDefault(),
+            MediaStreamKind.Audio => _audioChains.FirstOrDefault(),
+            _ => _subtitleChains.FirstOrDefault(),
         };
     }
 
@@ -217,22 +262,26 @@ public sealed partial class PlaybackPipeline : IDisposable
         _wakeTargets = [_reader, .. _videoChains, .. _audioChains, .. _subtitleChains];
     }
 
+    private void ReleaseClockOwner(AudioChain removed)
+    {
+        if (!ReferenceEquals(_timeline.DeviceOwner, removed))
+        {
+            return;
+        }
+
+        _timeline.DeviceOwner = _audioChains.Length > 0 ? _audioChains[0] : null;
+    }
+
     #endregion
 
     #region Playback
 
-    private OperationResult ResetCore(IVideoRenderTarget? videoTarget, IVideoRenderTarget? subtitleTarget)
+    private OperationResult ResetCore()
     {
         StopCore();
 
-        foreach (VideoChain video in _videoChains)
-        {
-            video.Target = videoTarget;
-        }
-
         foreach (SubtitleChain subtitle in _subtitleChains)
         {
-            subtitle.Target = subtitleTarget;
             subtitle.LayoutSource = _videoChains.Length > 0 ? _videoChains[0] : null;
         }
 
