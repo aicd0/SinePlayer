@@ -1,8 +1,6 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System.Diagnostics;
-
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -139,55 +137,21 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public TimeSpan Position => _timeline.Position;
 
-    public long PresentedFrameCount => Interlocked.Read(ref _video.PresentedFrameCount);
+    public long PresentedFrameCount => _video.PresentedFrameCount;
 
-    public long DroppedFrameCount => Interlocked.Read(ref _video.DroppedFrameCount);
+    public long DroppedFrameCount => _video.DroppedFrameCount;
 
     public string? StarvedFor => _video.Starved ? "video" : _audio.Starved ? "audio" : null;
 
-    internal TimeSpan LastPresentedTimestamp
-    {
-        get
-        {
-            long ticks = Interlocked.Read(ref _video.PictureTicks);
-            return ticks < 0 ? TimeSpan.Zero : TimeSpan.FromTicks(ticks);
-        }
-    }
+    public TimeSpan LastPresentedTimestamp => _video.LastPresentedTimestamp;
 
-    public double AverageVideoDecodeMilliseconds
-    {
-        get
-        {
-            long frames = Interlocked.Read(ref _video.DecodedFrameCount);
-            return frames <= 0 ? 0 : Interlocked.Read(ref _video.DecodeTicks) * 1000.0 / Stopwatch.Frequency / frames;
-        }
-    }
+    public double AverageVideoDecodeMilliseconds => _video.AverageDecodeMilliseconds;
 
-    public double AverageVideoRenderMilliseconds
-    {
-        get
-        {
-            long frames = Interlocked.Read(ref _video.PresentedFrameCount);
-            return frames <= 0 ? 0 : Interlocked.Read(ref _video.RenderTicks) * 1000.0 / Stopwatch.Frequency / frames;
-        }
-    }
+    public double AverageVideoRenderMilliseconds => _video.AverageRenderMilliseconds;
 
-    public long AudioUnderruns => _audio.Renderer.CurrentComponent?.UnderrunCount ?? 0;
+    public long AudioUnderruns => _audio.Underruns;
 
-    public TimeSpan PictureLag
-    {
-        get
-        {
-            long ticks = Interlocked.Read(ref _video.PictureTicks);
-            if (ticks < 0 || PresentedFrameCount == 0)
-            {
-                return TimeSpan.Zero;
-            }
-
-            TimeSpan lag = Position - TimeSpan.FromTicks(ticks);
-            return lag > TimeSpan.Zero ? lag : TimeSpan.Zero;
-        }
-    }
+    public TimeSpan PictureLag => _video.PictureLag;
 
     public void Dispose()
     {

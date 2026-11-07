@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -10,14 +11,57 @@ using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged) : IChainFeed, IPipelineWakeTarget
+internal sealed class SubtitleChain : IPlaybackChain, IChainFeed, IPipelineWakeTarget
 {
     private const int SubtitleChangeIntervalMilliseconds = 16;
     private const int FallbackFrameMilliseconds = 40;
 
+    private readonly PipelineTimeline _timeline;
+    private readonly PipelineEvents _events;
+    private readonly Action _surfaceSizeChanged;
+
     private PipelineCoroutine? _decodeCoroutine;
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
+    private IVideoRenderTarget? _target;
+    private volatile bool _starved;
+    private long _endedEpoch = -1;
+
+    public SubtitleChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged)
+    {
+        _timeline = timeline;
+        _events = events;
+        _surfaceSizeChanged = surfaceSizeChanged;
+    }
+
+    public MediaStreamKind Kind => MediaStreamKind.Subtitle;
+
+    public MediaStreamInfo? SelectedStream => Selected.Stream;
+
+    public MediaStreamInfo? PlayingStream => Source.CurrentStream;
+
+    public bool IsActive => Decoder.HasComponent;
+
+    public string? DecoderName => Decoder.CurrentComponent?.Name;
+
+    public string? RendererName => Renderer.CurrentComponent?.Name;
+
+    public bool IsHardwareAccelerated => Decoder.CurrentComponent?.IsHardwareAccelerated ?? false;
+
+    public ChainTail ReadTail { get; } = new();
+
+    public bool IsConsuming => Decoder.HasComponent;
+
+    public IVideoRenderTarget? Target
+    {
+        get => _target;
+        set
+        {
+            _target?.SurfaceSizeChanged -= _surfaceSizeChanged;
+            _target = value;
+            _target?.SurfaceSizeChanged += _surfaceSizeChanged;
+        }
+    }
 
     public ComponentSlot<MediaSource> Source { get; } = new();
 
@@ -35,32 +79,22 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
 
     public AtomicCell<SubtitlePresentation> Presentation { get; } = new(SubtitlePresentation.Identity);
 
-    private IVideoRenderTarget? _target;
-    public IVideoRenderTarget? Target
-    {
-        get => _target;
-        set
-        {
-            _target?.SurfaceSizeChanged -= surfaceSizeChanged;
-            _target = value;
-            _target?.SurfaceSizeChanged += surfaceSizeChanged;
-        }
-    }
-
     public IPictureFrameSource? LayoutSource { get; set; }
 
     public long SurfaceVersion;
 
     public StreamBinding<SubtitleStreamInfo> Selected { get; set; }
 
-    public ChainTail ReadTail { get; } = new();
-
-    public bool IsConsuming => Decoder.HasComponent;
-
-    public void Wake()
+    public bool Starved
     {
-        DecodeNode.Wake();
-        RenderNode.Wake();
+        get => _starved;
+        set => _starved = value;
+    }
+
+    public long EndedEpoch
+    {
+        get => Interlocked.Read(ref _endedEpoch);
+        set => Interlocked.Exchange(ref _endedEpoch, value);
     }
 
     public void Start(CoroutineHost host, Action wakeReader)
@@ -97,6 +131,12 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
         ReadTail.Reset();
     }
 
+    public void Wake()
+    {
+        DecodeNode.Wake();
+        RenderNode.Wake();
+    }
+
     public void Accept(MediaStreamInfo stream, MediaPacket packet, ChainVersion versions, long epoch)
     {
         TimeSpan span = SpanOf(packet);
@@ -111,7 +151,7 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
         WakeDecode();
     }
 
-    public async Task Decode(Func<bool> stopRequested, Action wakeReader)
+    private async Task Decode(Func<bool> stopRequested, Action wakeReader)
     {
         long workingEpoch = -1;
 
@@ -129,7 +169,7 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
                 CueWindow.Reset();
             }
 
-            EpochGate epochGate = timeline.Gate;
+            EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             if (workingEpoch != epoch)
             {
@@ -141,7 +181,7 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
                 }
                 catch (Exception ex)
                 {
-                    events.PostWarning($"The subtitle decoder could not be flushed: {ex.Message}");
+                    _events.PostWarning($"The subtitle decoder could not be flushed: {ex.Message}");
                 }
 
                 CueWindow.SeekTo(epoch, epochGate.SeekPosition);
@@ -187,7 +227,7 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
                 OperationResult routed = DecodeCues(epoch, subtitleDecoder, packet);
                 if (!routed.IsSuccessful)
                 {
-                    events.PostFailure(routed);
+                    _events.PostFailure(routed);
                     return;
                 }
             }
@@ -196,13 +236,13 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
         }
     }
 
-    public void Render(Func<bool> stopRequested)
+    private void Render(Func<bool> stopRequested)
     {
         void ReportOnFailure(string message, OperationResult result)
         {
             if (!result.IsSuccessful)
             {
-                events.PostWarning($"{message}: {result.Message}");
+                _events.PostWarning($"{message}: {result.Message}");
             }
         }
 
@@ -245,20 +285,20 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
                 continue;
             }
 
-            if (!events.CheckState(out MediaEngineState state, MediaEngineState.Playing, MediaEngineState.Paused))
+            if (!_events.CheckState(out MediaEngineState state, MediaEngineState.Playing, MediaEngineState.Paused))
             {
                 RenderNode.Wait(stamp);
                 continue;
             }
 
-            long epoch = timeline.Epoch;
+            long epoch = _timeline.Epoch;
             if (workingEpoch != epoch)
             {
                 workingEpoch = epoch;
                 drawnInvalidated = true;
             }
 
-            TimeSpan position = timeline.Position;
+            TimeSpan position = _timeline.Position;
             SubtitleCueSnapshot cues = CueWindow.GetVisibleCues(epoch, position);
             long surfaceVersion = Interlocked.Read(ref SurfaceVersion);
 
@@ -328,7 +368,7 @@ internal sealed class SubtitleChain(PipelineTimeline timeline, PipelineEvents ev
             return OperationResult.Failure("The subtitle decoder returned no cues.");
         }
 
-        CueWindow.Add(epoch, cues, timeline.Position, discardStale: !Renderer.HasComponent);
+        CueWindow.Add(epoch, cues, _timeline.Position, discardStale: !Renderer.HasComponent);
         if (cues.Count > 0)
         {
             RenderNode.Wake();

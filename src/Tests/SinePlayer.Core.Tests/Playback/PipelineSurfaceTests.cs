@@ -6,28 +6,50 @@ using SinePlayer.Core.Playback.Pipeline;
 namespace SinePlayer.Core.Tests.Playback;
 
 /// <summary>
-/// A chain is the pipeline's own business. The day one of them is public, its per-stream shape is part of the
-/// API, and a second chain of a kind would have to be expressed there as well. The scan follows
-/// <see cref="IChainFeed"/>, which is what the reader feeds, so a chain introduced later is covered without
-/// this test having to name it.
+/// A chain is the pipeline's own business. What a host sees of one is <see cref="IPlaybackChain"/>: the stream it is
+/// for and what it is playing it with. The chain types themselves, and everything they are built from — slots,
+/// queues, nodes, tails, versions, the reader's feed — stay inside the assembly, so a type that becomes visible by
+/// accident fails here rather than quietly becoming API.
 /// </summary>
 [TestFixture]
 public class PipelineSurfaceTests
 {
+    private static readonly string sNamespace = typeof(PlaybackPipeline).Namespace!;
+
+    private static readonly string[] sPublished =
+    [
+        nameof(AudioFilterChain),
+        nameof(AudioFilterChainSnapshot),
+        nameof(MediaEngineState),
+        nameof(IPlaybackChain),
+        nameof(PlaybackPipeline),
+        nameof(ReconcileResult),
+    ];
+
     [Test]
-    public void KeepsEveryChainInternal()
+    public void PublishesTheChainInterfaceAndNothingElse()
+    {
+        string[] visible = [.. typeof(PlaybackPipeline).Assembly
+            .GetTypes()
+            .Where(type => type is { IsVisible: true } && type.Namespace == sNamespace)
+            .Select(type => type.Name)];
+
+        Assert.That(visible.Order(), Is.EqualTo(sPublished.Order()));
+    }
+
+    [Test]
+    public void KeepsEveryChainTypeInternal()
     {
         Type[] chains = [.. typeof(PlaybackPipeline).Assembly
             .GetTypes()
-            .Where(type => type is { IsInterface: false } && typeof(IChainFeed).IsAssignableFrom(type))];
-        Type[] guarded = [.. chains, typeof(IChainFeed), typeof(IPictureFrameSource)];
+            .Where(type => type is { IsInterface: false } && typeof(IPlaybackChain).IsAssignableFrom(type))];
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(chains, Is.Not.Empty, $"No chain implements {nameof(IChainFeed)} any more, so nothing was guarded.");
-            foreach (Type type in guarded)
+            Assert.That(chains, Is.Not.Empty, $"No type implements {nameof(IPlaybackChain)}, so nothing was guarded.");
+            foreach (Type chain in chains)
             {
-                Assert.That(type.IsVisible, Is.False, $"{type.Name} is part of a chain and is visible outside the assembly.");
+                Assert.That(chain.IsVisible, Is.False, $"{chain.Name} is a chain and is visible outside the assembly.");
             }
         }
     }
