@@ -1012,14 +1012,14 @@ public class PlaybackPipelineTests
 
             VideoTransform turned = VideoTransform.Identity with { Orientation = new VideoOrientation(1, false) };
             long presented = videoRenderer.RenderedFrames;
-            pipeline.VideoTransform = turned;
+            pipeline.VideoChains[0].Transform = turned;
 
             WaitFor(() => videoRenderer.LastRefreshedTransform == turned, "the turned picture is offered to the renderer");
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(videoRenderer.RenderedFrames, Is.EqualTo(presented), "turning the picture presents no frame");
-                Assert.That(pipeline.VideoTransform, Is.EqualTo(turned), "the pipeline keeps what the host set");
+                Assert.That(pipeline.VideoChains[0].Transform, Is.EqualTo(turned), "the pipeline keeps what the host set");
             }
         }
         finally
@@ -1049,13 +1049,13 @@ public class PlaybackPipelineTests
             Assert.That(videoRenderer.LastRenderedTransform.Orientation, Is.EqualTo(recorded), "the turn the recording was made at is applied");
 
             var asked = new VideoOrientation(1, false);
-            pipeline.VideoTransform = VideoTransform.Identity with { Orientation = asked };
+            pipeline.VideoChains[0].Transform = VideoTransform.Identity with { Orientation = asked };
             WaitFor(() => videoRenderer.LastRefreshedTransform.Orientation == asked.Combine(recorded), "the viewer's turn is added to the recording's");
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(videoRenderer.LastRefreshedTransform.Orientation, Is.EqualTo(VideoOrientation.Identity), "a quarter turn against the recording's three quarters is upright");
-                Assert.That(pipeline.VideoTransform.Orientation, Is.EqualTo(asked), "the pipeline keeps what the host set");
+                Assert.That(pipeline.VideoChains[0].Transform.Orientation, Is.EqualTo(asked), "the pipeline keeps what the host set");
             }
         }
         finally
@@ -1086,7 +1086,7 @@ public class PlaybackPipelineTests
             Assert.That(videoRenderer.LastRenderedTransform, Is.EqualTo(VideoTransform.Identity), "nothing is turned until the host says so");
 
             VideoTransform mirrored = VideoTransform.Identity with { Orientation = new VideoOrientation(0, true) };
-            pipeline.VideoTransform = mirrored;
+            pipeline.VideoChains[0].Transform = mirrored;
 
             // Frames drawn from here on must carry it: the count is taken so that the picture the paused position
             // already showed cannot answer for the playing one.
@@ -8133,7 +8133,7 @@ public class PlaybackPipelineTests
 
         // Set before anything is drawn, so the very first call has to carry it: a renderer is never told twice.
         SubtitlePresentation presentation = new(0.25, -0.5, default, "Segoe UI", 32.0, FontStyle.Italic, new FontWeight { Weight = 700 }, 3.0);
-        pipeline.SubtitlePresentation = presentation;
+        pipeline.SubtitleChains[0].Presentation = presentation;
 
         Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
         Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -8209,7 +8209,7 @@ public class PlaybackPipelineTests
         }
 
         // Stretched, the picture is the surface, and so is the frame.
-        pipeline.VideoTransform = VideoTransform.Identity with { ResizeMode = VideoResizeMode.Stretch };
+        pipeline.VideoChains[0].Transform = VideoTransform.Identity with { ResizeMode = VideoResizeMode.Stretch };
         WaitFor(() => subtitleRenderer.Presentations[^1].Frame.Height > 0.99, "the words to be laid out in the whole surface");
 
         Assert.That(subtitleRenderer.Presentations[^1].Frame.Top, Is.EqualTo(0.0).Within(0.001));
@@ -8234,7 +8234,7 @@ public class PlaybackPipelineTests
         Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
 
         long drawn = subtitleRenderer.ShowCount;
-        pipeline.SubtitlePresentation = SubtitlePresentation.Identity with { FontFamily = "Segoe UI", FontSize = 32.0 };
+        pipeline.SubtitleChains[0].Presentation = SubtitlePresentation.Identity with { FontFamily = "Segoe UI", FontSize = 32.0 };
 
         WaitFor(() => subtitleRenderer.ShowCount > drawn, "the new font to be drawn");
         Assert.That(subtitleRenderer.Presentations[^1].FontSize, Is.EqualTo(32.0), "and the drawing carries it");

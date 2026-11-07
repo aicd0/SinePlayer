@@ -7,7 +7,6 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
-using SinePlayer.Core.Playback.Abstractions.Timing;
 using SinePlayer.Core.Playback.Selection;
 
 namespace SinePlayer.Core.Playback.Pipeline;
@@ -77,37 +76,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     public SubtitleComponentResolver SubtitleComponents => Subtitle.Components;
 
     public ISourceProviderFactory? SourceFactory { get; set; }
-
-    public VideoTransform VideoTransform
-    {
-        get => Video.Transform.Read();
-        set
-        {
-            if (Video.Transform.Read() == value)
-            {
-                return;
-            }
-
-            Video.Transform.Write(_ => value);
-            Video.RenderNode.Wake();
-            Subtitle.RenderNode.Wake();
-        }
-    }
-
-    public SubtitlePresentation SubtitlePresentation
-    {
-        get => Subtitle.Presentation.Read();
-        set
-        {
-            if (Subtitle.Presentation.Read() == value)
-            {
-                return;
-            }
-
-            Subtitle.Presentation.Write(_ => value);
-            Subtitle.RenderNode.Wake();
-        }
-    }
 
     public MediaEngineState State => _events.State;
 
@@ -197,10 +165,11 @@ public sealed partial class PlaybackPipeline : IDisposable
         VideoChain chain = new(_timeline, _events, VideoTarget_SurfaceSizeChanged)
         {
             Target = target,
+            LayoutChanged = NotifyLayoutChanged,
         };
 
         _videoChains = [.. _videoChains, chain];
-        _reader.VideoSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [chain] = chain.Source });
+        _reader.AddVideoSource(chain, chain.Source);
         RebuildWakeTargets();
         return chain;
     }
@@ -210,7 +179,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         AudioChain chain = new(_timeline, _events);
 
         _audioChains = [.. _audioChains, chain];
-        _reader.AudioSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [chain] = chain.Source });
+        _reader.AddAudioSource(chain, chain.Source);
         RebuildWakeTargets();
         return chain;
     }
@@ -223,7 +192,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         };
 
         _subtitleChains = [.. _subtitleChains, chain];
-        _reader.SubtitleSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [chain] = chain.Source });
+        _reader.AddSubtitleSource(chain, chain.Source);
         RebuildWakeTargets();
         return chain;
     }
@@ -682,6 +651,17 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
 
         return null;
+    }
+
+    private void NotifyLayoutChanged(IPictureFrameSource picture)
+    {
+        foreach (SubtitleChain subtitle in _subtitleChains)
+        {
+            if (ReferenceEquals(subtitle.LayoutSource, picture))
+            {
+                subtitle.RenderNode.Wake();
+            }
+        }
     }
 
     private void NotifyClockMoved()

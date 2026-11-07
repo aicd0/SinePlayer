@@ -18,11 +18,24 @@ internal sealed class MediaReader(
 
     private readonly PipelineNodeAsync _node = new();
 
-    public AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> VideoSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+    private readonly AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> _videoSources = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+    private readonly AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> _audioSources = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+    private readonly AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> _subtitleSources = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
 
-    public AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> AudioSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+    public void AddVideoSource(IChainFeed feed, ComponentSlot<MediaSource> slot)
+    {
+        _videoSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [feed] = slot });
+    }
 
-    public AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> SubtitleSources { get; } = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+    public void AddAudioSource(IChainFeed feed, ComponentSlot<MediaSource> slot)
+    {
+        _audioSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [feed] = slot });
+    }
+
+    public void AddSubtitleSource(IChainFeed feed, ComponentSlot<MediaSource> slot)
+    {
+        _subtitleSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [feed] = slot });
+    }
 
     public void Wake()
     {
@@ -284,7 +297,7 @@ internal sealed class MediaReader(
 
     private IReadOnlyList<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> ReadSources()
     {
-        List<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> entries = [.. VideoSources.Read(), .. AudioSources.Read(), .. SubtitleSources.Read()];
+        List<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> entries = [.. _videoSources.Read(), .. _audioSources.Read(), .. _subtitleSources.Read()];
         return entries;
     }
 

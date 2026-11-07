@@ -31,6 +31,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
     private readonly PipelineTimeline _timeline;
     private readonly PipelineEvents _events;
     private readonly Action _surfaceSizeChanged;
+    private readonly AtomicCell<VideoTransform> _transform = new(VideoTransform.Identity);
 
     private IVideoRenderTarget? _target;
     private volatile bool _starved;
@@ -134,7 +135,23 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
 
     public PipelineNode RenderNode { get; } = new();
 
-    public AtomicCell<VideoTransform> Transform { get; } = new(VideoTransform.Identity);
+    public VideoTransform Transform
+    {
+        get => _transform.Read();
+        set
+        {
+            if (_transform.Read() == value)
+            {
+                return;
+            }
+
+            _transform.Write(_ => value);
+            RenderNode.Wake();
+            LayoutChanged?.Invoke(this);
+        }
+    }
+
+    public Action<IPictureFrameSource>? LayoutChanged { get; set; }
 
     public StreamBinding<VideoStreamInfo> Selected { get; set; }
 
@@ -553,7 +570,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
             }
 
             bool playing = _events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
-            VideoTransform transform = Transform.Read();
+            VideoTransform transform = _transform.Read();
 
             VideoOrientation containerTransform = ((VideoStreamInfo?)Renderer.CurrentStream)?.Orientation ?? VideoOrientation.Identity;
             if (!containerTransform.IsIdentity)
@@ -901,7 +918,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
 
             // The placement maps the picture's own square onto the surface, so its four corners say where the picture ends:
             // the bounding box of that is the frame, whatever turning, zooming or mirroring was asked for.
-            Matrix3x2 placement = Transform.Read().GetPlacement(stream.Width, stream.Height, surfaceWidth, surfaceHeight);
+            Matrix3x2 placement = _transform.Read().GetPlacement(stream.Width, stream.Height, surfaceWidth, surfaceHeight);
             var zero = Vector2.Transform(Vector2.Zero, placement);
             var unitX = Vector2.Transform(Vector2.UnitX, placement);
             var unitY = Vector2.Transform(Vector2.UnitY, placement);
