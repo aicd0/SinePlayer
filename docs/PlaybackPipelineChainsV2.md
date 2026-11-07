@@ -341,21 +341,26 @@ per-chain structure:
 ### One packet, several chains
 
 Two chains may select the same stream, so the reader's fan-out changes: today it hands each packet to the first
-feed that accepts it and stops; in v2 it hands it to *every* accepting feed. Each chain has its own decoder, so
-each needs its own copy of the compressed payload, and the copy has to be cheap because it happens per packet:
+feed that accepts it and stops; in v2 it hands it to *every* accepting feed. A packet is owned by whoever queues
+it — a chain disposes it once it has decoded it — so one instance handed to two chains would be freed by whichever
+of them finished first. The packet therefore carries a count:
 
-- `IMediaBuffer` gains `Retain()`: another buffer over the same payload, released independently. It has a default
-  implementation returning `null` — "this payload cannot be shared" — so existing implementations keep compiling
-  and the ones that can share opt in. `FFmpegPacketBuffer` opts in with `av_packet_ref`, which is a reference
-  count on the `AVBufferRef`, not a copy of the data.
-- `MediaPacket.Retain()` follows from it, and the reader retains once per consumer after the first and disposes its
-  own reference at the end.
-- A buffer that returns `null` sends the packet to the first accepting chain only, and the reader posts one warning
-  per source saying so. Silent starvation of a duplicate chain would be far worse than a warning.
+- `MediaPacket.Dispose()` releases this owner's share and frees the payload when it was the last one;
+  `MediaPacket.Ref()` takes another share. Every accepting feed refs the packet before it is handed over — the share
+  exists before the chain could release one — and the reader disposes its own share after routing, which frees the
+  packet when no chain wanted it. The count is therefore `1 + chains that took it`, always.
+- The count is on the **packet**, not on the buffer. The bytes were already copied out of the demuxer when the
+  packet was read, so sharing them costs a count and never a copy, and a source written later is shareable without
+  knowing that sharing exists. Counting on the payload instead would put that obligation on every source backend;
+  the one place a payload really owns a native count is decoded frames, and `IGpuVideoBuffer.Retain()` already
+  does that on its own terms.
 - Every accepting feed reports its tail, so read-ahead is still driven by the slowest consumer.
+- The one rule it imposes on a decoder: read the packet it is handed, do not release it beyond its own share and do
+  not keep it past that share. Both FFmpeg decoders only call `avcodec_send_packet`, which takes its own reference,
+  so two chains can read one packet at the same time.
 
-This is also why the same-stream case is cheap for the *sources*: one demuxer position, one read, one packet
-refcount per extra chain — not a second `IMediaSource` per chain.
+This is also why the same-stream case is cheap for the *sources*: one demuxer position, one read, one packet shared
+by both chains — not a second `IMediaSource` per chain.
 
 ## 4. Phases
 
@@ -413,7 +418,7 @@ Each step adds tests rather than moving code; this is the phase that finds the b
 | J2 | Two audio chains — **done**: `PlaysTwoAudioChainsOfWhichOnlyTheFirstKeepsTheClock`. `IAudioChain` gained `OwnsClock` (it was in the sketch); the first audio chain added takes the clock and keeps it, a second only plays. Each chain hands its own samples to its own device, filters are per chain, and one device jamming stops only the chain in front of it | `OwnsClock` is read as `_timeline.DeviceOwner == this`, so ownership is the timeline's answer rather than a second flag to keep in step. Both chains sit on different sources, for the J1 reason | a starving chain is the one whose device is stuck, and it does not take the other chain's picture or sound with it |
 | J3 | Two video chains, two targets — **done**: `PlaysTwoPicturesOnTheirOwnSurfaces` (each chain decodes and presents into its own surface; pointing one chain at another file rebuilds only that chain, the other keeps drawing and playback never pauses) and `GivesEachVideoChainItsOwnDecoderPreference` (`PreferHardwareDecoding = false` on one chain's resolver means that chain never asks for hardware at all, while the other tries the machine's decoder first) | the preference is asked of the chain's own resolver, so "hardware or not" is answered per chain and the machine-dependent part is never asserted; switching a stream is `SelectStream` + `Reconcile` on the one chain | two chains of a kind differ where their chains differ — stream, surface, decoder, and what they draw — and a rebuild of one is invisible to the other |
 | J4 | `RemoveChain` while playing, including the clock owner — **done**: `RemovesTheChainThatKeepsTheClockWhileTheOtherPlaysOn` and `LaysTheWordsOutAgainstTheNextPictureWhenTheirsIsRemoved` | Principle 2 holds down to the reader and the clock: `Add` appends to the list and nothing else, `Remove` asks that chain to stop and drops it from the list, and **`Reconcile()` is the only place that changes what runs** — `FinishRemovals` joins the gone chains and hands the words to the picture that is left, `InstallSources` gives the reader a row for every chain it should feed, `ReconcileClockOwner` keeps the clock with a sound that is still here, and `StartThreads` starts the reader once and every held chain that is not already running (the chain answers for itself: `IsRunning` is its own threads, so the pipeline keeps no shadow list). Both commands are queued, so a removal cannot race the reconcile that acts on it, and the lists need no lock because the queue is their only writer | a command records intent; the reconcile is the single place that joins, installs, owns and starts |
-| J5 | A packet fans out to every accepting chain | `IMediaBuffer.Retain()`, `MediaPacket.Retain()`, `av_packet_ref`; one warning per source when a buffer cannot share |
+| J5 | A packet fans out to every accepting chain — **done**: `FeedsBothChainsThatSelectOneStream`, `ReleasesThePayloadWhenTheLastOwnerLetsGo`, `ReleasesThePayloadOfAPacketNobodyTook` | The reader hands the packet to every matching feed instead of the first, and the packet carries a share count: `MediaPacket.Dispose()` releases one share and frees the payload with the last, `Ref()` takes another, so every accepting chain gets a share of its own and the reader releases its own after routing. A packet is owned by whoever queues it, so one instance shared by two chains is freed once, by the one that outlasts them both. The count is on the packet and not on the buffer — the bytes were copied out of the demuxer already, so there is nothing to copy and a source backend added later owes nothing to support sharing | one share per accepting chain, released exactly once; a packet no chain wanted is released by the reader; the decoders only send the packet, so two chains may read it at once |
 | J6 | Two chains on the same stream | both decode the same payload with their own decoder, both keep their read-ahead, and removing one leaves the other untouched |
 | J7 | N-chain seek, end and read-ahead | `ChooseSeekLanding` prefers the first video chain; playback ends when every active video/audio chain has reported; the reader reads enough for every chain on a source |
 | J8 | Threads are a resource — **done**: `HandsBackEveryThreadItTook` and `StopsAChainRemovedButNeverReconciled`, plus a `[SetUp]`/`[TearDown]` pair that counts `PipelineThread.Live` around **every** test in the fixture | `PipelineThread.Live` counts pipeline threads from the moment a thread begins to the moment its body returns, so "a removed chain costs no thread" and "dispose hands every thread back" are assertions rather than hopes; a chain removed and never reconciled is still stopped by the pipeline's stop path. The fixture counts the threads running before each test and fails it if any of the threads it started is still there afterwards, so a leak in a test that is about something else is caught where it happens rather than by a profiler | six threads for video + audio + two sets of words (reader 1, picture 2, sound 1, words 1 each), five after removing one subtitle chain, baseline after dispose; the removal tests count mid-test as well: six to four when a picture goes, three to two when a sound goes |
