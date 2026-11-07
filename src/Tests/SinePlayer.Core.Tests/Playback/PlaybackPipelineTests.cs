@@ -53,7 +53,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { CanConfigure = false };
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
 
-            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path);
 
             using (Assert.EnterMultipleScope())
             {
@@ -136,7 +136,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path);
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
 
             pipeline.Play();
@@ -172,9 +172,10 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(
                 videoRenderer,
                 new FakeAudioRenderer(),
-                new ThrottledVideoDecoderFactory { DecodeMilliseconds = 1300, FastPackets = 1 });
+                new ThrottledVideoDecoderFactory { DecodeMilliseconds = 1300, FastPackets = 1 },
+                videoTarget: target);
 
-            Assert.That(Open(pipeline, path, target).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitForPresentedFrames(pipeline, 1);
 
@@ -213,7 +214,7 @@ public class PlaybackPipelineTests
                 // Slow enough that the decoder cannot rescue the thread inside the window this checks.
                 new ThrottledVideoDecoderFactory { DecodeMilliseconds = 3000, FastPackets = 1 });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitForPresentedFrames(pipeline, 1);
 
@@ -251,7 +252,7 @@ public class PlaybackPipelineTests
                 audioRenderer,
                 new SlowFirstDecodeVideoDecoderFactory { FirstDecodeMilliseconds = 400 });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             // The sound has something to hand over almost at once; the picture takes four hundred
@@ -294,7 +295,7 @@ public class PlaybackPipelineTests
                 audioRenderer,
                 new SlowFirstDecodeVideoDecoderFactory { FirstDecodeMilliseconds = 400 });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             // Far enough in that the decoded tail is ahead of where the seek will go back to.
@@ -337,7 +338,7 @@ public class PlaybackPipelineTests
                 audioRenderer,
                 videoDecoders);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(500), "playback has to get past the position the seek goes back to");
 
@@ -621,7 +622,7 @@ public class PlaybackPipelineTests
                 audioRenderer,
                 new ThrottledVideoDecoderFactory { DecodeMilliseconds = 80 });
 
-            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path);
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             pipeline.Play();
 
@@ -686,7 +687,7 @@ public class PlaybackPipelineTests
                 new ThrottledVideoDecoderFactory { DecodeMilliseconds = 1500, FastPackets = 1 },
                 audioDecoders: new PacedAudioDecoderFactory { DecodeMilliseconds = 150 });
 
-            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path);
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, 1);
@@ -746,7 +747,7 @@ public class PlaybackPipelineTests
                 // still, which claims nothing — and then quiet for 1300 ms with the clock level with it.
                 new SlowFirstDecodeVideoDecoderFactory { FirstDecodeMilliseconds = 400, SubsequentDecodeMilliseconds = 1300 });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitForPresentedFrames(pipeline, 1);
@@ -793,7 +794,7 @@ public class PlaybackPipelineTests
                 audioRenderer,
                 new ThrottledVideoDecoderFactory { DecodeMilliseconds = 200 });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitFor(() => pipeline.StarvedFor == "video", "the picture has to fall behind for the clock to be held");
@@ -877,7 +878,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { SubmitDelayMilliseconds = 30 };
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
 
-            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path);
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             pipeline.Play();
 
@@ -925,7 +926,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { SubmitDelayMilliseconds = 30 };
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
 
-            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path);
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -960,7 +961,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { SubmitDelayMilliseconds = 30 });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitForPresentedFrames(pipeline, 2);
             pipeline.Pause();
@@ -1004,7 +1005,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { SubmitDelayMilliseconds = 30 });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitForPresentedFrames(pipeline, 2);
             pipeline.Pause();
@@ -1042,7 +1043,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             WaitFor(() => videoRenderer.RenderedFrames > 0, "the paused picture to be drawn once");
 
             var recorded = new VideoOrientation(3, false);
@@ -1078,7 +1079,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
 
             // The paused picture is drawn by the presentation thread, so the first one is waited for rather than
             // assumed: what is asserted here is how it was drawn, not whether the thread has had its turn yet.
@@ -1118,9 +1119,9 @@ public class PlaybackPipelineTests
         {
             FakeRenderTarget target = new();
             FakeVideoRenderer videoRenderer = new();
-            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { SubmitDelayMilliseconds = 30 });
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { SubmitDelayMilliseconds = 30 }, videoTarget: target);
 
-            Assert.That(Open(pipeline, path, target).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitForPresentedFrames(pipeline, 1);
             pipeline.Pause();
@@ -1292,7 +1293,7 @@ public class PlaybackPipelineTests
         {
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, 2);
             Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
@@ -1336,7 +1337,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, 1);
             Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
@@ -1390,7 +1391,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, 2);
 
@@ -1427,7 +1428,7 @@ public class PlaybackPipelineTests
         {
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             WaitForState(pipeline, MediaEngineState.Ended);
         }
         finally
@@ -1451,7 +1452,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPlaybackToFinish(pipeline);
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
@@ -1482,7 +1483,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitForPlaybackToFinish(pipeline);
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
@@ -1521,7 +1522,7 @@ public class PlaybackPipelineTests
                 new FakeAudioRenderer(),
                 new ThrottledVideoDecoderFactory { DecodeMilliseconds = 80 });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, 2);
 
@@ -1603,7 +1604,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
 
             // The first frame is due straight away, and the second one is two seconds away, so the thread
@@ -1670,7 +1671,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
             WarningLog warnings = new(pipeline);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitFor(() => warnings.Messages.Count > 0, "the device to be found out");
@@ -1727,7 +1728,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             // The fixture is 60 frames at 30 fps with 44.1 kHz sound, so a device that has been handed this
@@ -1770,7 +1771,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             const int totalSamples = SampleRate * 60 / 30;
@@ -1815,7 +1816,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitForPlaybackToFinish(pipeline);
@@ -1850,7 +1851,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path);
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -1897,7 +1898,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            OperationResult opened = Open(pipeline, SyntheticPath(), new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, SyntheticPath());
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -1949,7 +1950,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            OperationResult opened = Open(pipeline, SyntheticPath(), new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, SyntheticPath());
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -2005,7 +2006,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
 
             var played = Stopwatch.StartNew();
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -2041,15 +2042,15 @@ public class PlaybackPipelineTests
         {
             using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                p.VideoComponents.Register(new FFmpegVideoDecoderFactory());
-                p.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                p.VideoChains[0].Components.Register(new FFmpegVideoDecoderFactory());
+                p.VideoChains[0].Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
 
                 // The file has sound, and nothing registered here can decode or play it.
             });
 
             // The picture is what this host can play, so it is what it chooses; the file still has sound, and that is
             // what the ending has to account for.
-            Assert.That(OpenWithoutSound(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(OpenWithoutSound(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitForState(pipeline, MediaEngineState.Ended);
@@ -2143,7 +2144,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             // The device has to have played something first, or there is nothing for the seek to let go of
@@ -2200,7 +2201,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitForPresentedFrames(pipeline, 2);
 
@@ -2263,7 +2264,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitForPresentedFrames(pipeline, 2);
 
@@ -2318,7 +2319,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitForPresentedFrames(pipeline, 2);
 
@@ -2381,7 +2382,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitFor(() => audioRenderer.SubmittedBuffers > 5, "the device has to have taken some audio first");
 
@@ -2476,7 +2477,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
 
-            OperationResult opened = OpenWithoutSound(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = OpenWithoutSound(pipeline, path);
 
             using (Assert.EnterMultipleScope())
             {
@@ -2547,7 +2548,7 @@ public class PlaybackPipelineTests
 
             // The surface is a fact about the host, and it is what a picture is drawn through: the file opens
             // without one, and choosing a video track is what cannot happen.
-            OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(path), null, null);
+            OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(path));
             OperationResult selected = SelectDefaultStreams(pipeline);
 
             using (Assert.EnterMultipleScope())
@@ -2595,7 +2596,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            OperationResult opened = Open(pipeline, SyntheticPath(), new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, SyntheticPath());
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
 
             // Nothing is played: the reader reads while the open's state is still paused, which is what paces the
@@ -2670,7 +2671,7 @@ public class PlaybackPipelineTests
         using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
         using LogCapture logs = new();
 
-        OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(Path.Combine(Path.GetTempPath(), "sineplayer-missing-file.mkv")), null, null);
+        OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(Path.Combine(Path.GetTempPath(), "sineplayer-missing-file.mkv")));
         OperationResult played = Await(pipeline.Play());
         OperationResult paused = Await(pipeline.Pause());
         OperationResult selected = Select(pipeline, MediaStreamKind.Video, new VideoStreamInfo { Index = 99, CodecId = "h264", Width = 1, Height = 1, FrameRate = 25.0, PixelFormat = PixelFormat.Yuv420P });
@@ -2747,7 +2748,7 @@ public class PlaybackPipelineTests
                 sourceFactory: new LiveRefusingSourceFactory(refusesInAdvance));
             WarningLog warnings = new(pipeline);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForState(pipeline, MediaEngineState.Playing);
 
@@ -2811,7 +2812,7 @@ public class PlaybackPipelineTests
         {
             // The file that refuses is the one the picture comes from, so it is the first the reader reaches and the
             // file behind it is the one a refusal must not take with it.
-            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(refusing))).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(subtitles))).IsSuccessful, Is.True);
 
@@ -2857,7 +2858,7 @@ public class PlaybackPipelineTests
                 new FakeAudioRenderer(),
                 videoDecoders: new ThrowingVideoDecoderFactory { PacketsBeforeThrow = 1 });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
 
             // The decoder fails on its own, without anything being played: the reader reads and the decode
             // thread decodes while the open's state is still paused, so there is nothing for a play to add —
@@ -2900,7 +2901,7 @@ public class PlaybackPipelineTests
                 new FakeAudioRenderer { CanConfigure = false },
                 videoDecoders: new DelayedVideoDecoderFactory());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             pipeline.Play();
             WaitForPlaybackToFinish(pipeline);
 
@@ -2928,7 +2929,7 @@ public class PlaybackPipelineTests
                 new FakeAudioRenderer(),
                 videoDecoders: new FailingVideoDecoderFactory { PacketsBeforeFailure = 1 });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
 
             // Whether this play is accepted is a coin toss (see below), so what is asserted about it is nothing:
             // the test is about the failure being reported, not about the command that raced it.
@@ -2966,11 +2967,11 @@ public class PlaybackPipelineTests
         try
         {
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
-            pipeline.VideoComponents.ClearDecoders();
-            pipeline.VideoComponents.Register(new RefusingVideoDecoderFactory());
-            pipeline.VideoComponents.Register(silent);
+            pipeline.VideoChains[0].Components.ClearDecoders();
+            pipeline.VideoChains[0].Components.Register(new RefusingVideoDecoderFactory());
+            pipeline.VideoChains[0].Components.Register(silent);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True, pipeline.Error);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True, pipeline.Error);
             Assert.That(silent.Options, Is.Not.Null, "the second decoder has to be the one that was created");
         }
         finally
@@ -3037,10 +3038,10 @@ public class PlaybackPipelineTests
         {
             using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                p.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
-                p.AudioComponents.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
-                p.AudioComponents.Register(new RefusingAudioDecoderFactory());
-                p.AudioComponents.Register(new FFmpegAudioDecoderFactory());
+                p.VideoChains[0].Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                p.AudioChains[0].Components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
+                p.AudioChains[0].Components.Register(new RefusingAudioDecoderFactory());
+                p.AudioChains[0].Components.Register(new FFmpegAudioDecoderFactory());
             });
 
             OperationResult opened = Open(pipeline, path);
@@ -3070,10 +3071,10 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                p.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
-                p.AudioComponents.Register(new RefusingAudioRendererFactory());
-                p.AudioComponents.Register(new FixedAudioRendererFactory(audioRenderer));
-                p.AudioComponents.Register(new FFmpegAudioDecoderFactory());
+                p.VideoChains[0].Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                p.AudioChains[0].Components.Register(new RefusingAudioRendererFactory());
+                p.AudioChains[0].Components.Register(new FixedAudioRendererFactory(audioRenderer));
+                p.AudioChains[0].Components.Register(new FFmpegAudioDecoderFactory());
             });
 
             OperationResult opened = Open(pipeline, path);
@@ -3101,13 +3102,13 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                p.VideoComponents.Register(new RefusingVideoRendererFactory());
-                p.VideoComponents.Register(new FakeVideoRendererFactory(videoRenderer));
-                p.VideoComponents.Register(new FFmpegVideoDecoderFactory());
-                p.AudioComponents.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
+                p.VideoChains[0].Components.Register(new RefusingVideoRendererFactory());
+                p.VideoChains[0].Components.Register(new FakeVideoRendererFactory(videoRenderer));
+                p.VideoChains[0].Components.Register(new FFmpegVideoDecoderFactory());
+                p.AudioChains[0].Components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
             });
 
-            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path);
 
             using (Assert.EnterMultipleScope())
             {
@@ -3129,10 +3130,10 @@ public class PlaybackPipelineTests
         try
         {
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
-            pipeline.VideoComponents.ClearDecoders();
-            pipeline.VideoComponents.Register(new RefusingVideoDecoderFactory());
+            pipeline.VideoChains[0].Components.ClearDecoders();
+            pipeline.VideoChains[0].Components.Register(new RefusingVideoDecoderFactory());
 
-            OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
+            OperationResult opened = Open(pipeline, path);
 
             Assert.That(opened.IsSuccessful, Is.False);
         }
@@ -3153,10 +3154,10 @@ public class PlaybackPipelineTests
         try
         {
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
-            pipeline.VideoComponents.ClearDecoders();
-            pipeline.VideoComponents.Register(new RefusingVideoDecoderFactory());
+            pipeline.VideoChains[0].Components.ClearDecoders();
+            pipeline.VideoChains[0].Components.Register(new RefusingVideoDecoderFactory());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.False);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.False);
 
             OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
@@ -3192,7 +3193,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer(), videoDecoders: decoders);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way", 5000);
 
@@ -3200,7 +3201,7 @@ public class PlaybackPipelineTests
             TimeSpan position = pipeline.Position;
 
             // The host says what it wants by changing the registry, then tells the pipeline to look again.
-            pipeline.VideoComponents.Preferences = pipeline.VideoComponents.Preferences with { PreferHardwareDecoding = false };
+            pipeline.VideoChains[0].Components.Preferences = pipeline.VideoChains[0].Components.Preferences with { PreferHardwareDecoding = false };
             OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
@@ -3239,10 +3240,10 @@ public class PlaybackPipelineTests
         {
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
-            pipeline.VideoComponents.ClearDecoders();
-            pipeline.VideoComponents.Register(new FlaggedVideoDecoderFactory(hardware: true, "flagged:hardware"));
+            pipeline.VideoChains[0].Components.ClearDecoders();
+            pipeline.VideoChains[0].Components.Register(new FlaggedVideoDecoderFactory(hardware: true, "flagged:hardware"));
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
 
             // The decoder is taken over by the decode thread, so what is running is reported once it has it.
             WaitFor(() => pipeline.VideoChains[0].IsHardwareAccelerated, "the decoder that says it runs on hardware");
@@ -3251,8 +3252,8 @@ public class PlaybackPipelineTests
             WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way", 5000);
 
             long rendered = videoRenderer.RenderedFrames;
-            pipeline.VideoComponents.ClearDecoders();
-            pipeline.VideoComponents.Register(new FlaggedVideoDecoderFactory(hardware: false, "flagged:software"));
+            pipeline.VideoChains[0].Components.ClearDecoders();
+            pipeline.VideoChains[0].Components.Register(new FlaggedVideoDecoderFactory(hardware: false, "flagged:software"));
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             WaitFor(() => !pipeline.VideoChains[0].IsHardwareAccelerated, "the replacement to be reported");
 
@@ -3280,7 +3281,7 @@ public class PlaybackPipelineTests
             RecordingOptionsVideoDecoderFactory decoders = new();
             using PlaybackPipeline pipeline = CreatePipeline(first, new FakeAudioRenderer(), videoDecoders: decoders);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
             Assert.That(pipeline.VideoChains[0].RendererName, Is.EqualTo("first"));
@@ -3307,7 +3308,7 @@ public class PlaybackPipelineTests
             WaitFor(() => second.RenderedFrames > rendered, "frames to keep coming through the new renderer");
 
             // The choice outlives the file, like the decoder's: the next one is drawn by the same factory.
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             WaitFor(() => pipeline.VideoChains[0].RendererName == "second", "the next file to be taken up by the chosen renderer");
         }
         finally
@@ -3335,7 +3336,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(first, audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
             WaitFor(() => audioRenderer.SubmittedSamples > 0, "the sound to be playing");
@@ -3381,7 +3382,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer second = new() { Name = "second" };
             using PlaybackPipeline pipeline = CreatePipeline(first, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
             Await(pipeline.Pause());
@@ -3414,14 +3415,14 @@ public class PlaybackPipelineTests
             FakeVideoRenderer second = new() { Name = "second" };
             using PlaybackPipeline pipeline = CreatePipeline(first, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
 
             // The registration that promises a renderer it cannot build comes first; the one that can comes second.
-            pipeline.VideoComponents.ClearRenderers();
-            pipeline.VideoComponents.Register(new FailingVideoRendererFactory("broken"));
-            pipeline.VideoComponents.Register(new FakeVideoRendererFactory(second));
+            pipeline.VideoChains[0].Components.ClearRenderers();
+            pipeline.VideoChains[0].Components.Register(new FailingVideoRendererFactory("broken"));
+            pipeline.VideoChains[0].Components.Register(new FakeVideoRendererFactory(second));
 
             OperationResult<ReconcileResult> swapped = Await(pipeline.Reconcile());
 
@@ -3452,7 +3453,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer first = new() { Name = "first" };
             using PlaybackPipeline pipeline = CreatePipeline(first, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
 
@@ -3587,9 +3588,9 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                p.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
-                p.AudioComponents.Register(new FixedAudioRendererFactory(audioRenderer));
-                p.AudioComponents.Register(new PacedAudioDecoderFactory());
+                p.VideoChains[0].Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                p.AudioChains[0].Components.Register(new FixedAudioRendererFactory(audioRenderer));
+                p.AudioChains[0].Components.Register(new PacedAudioDecoderFactory());
             });
 
             OperationResult opened = Open(pipeline, path);
@@ -3604,8 +3605,8 @@ public class PlaybackPipelineTests
             TimeSpan position = pipeline.Position;
 
             NamedAudioDecoderFactory second = new("audio-second");
-            pipeline.AudioComponents.ClearDecoders();
-            pipeline.AudioComponents.Register(second);
+            pipeline.AudioChains[0].Components.ClearDecoders();
+            pipeline.AudioChains[0].Components.Register(second);
 
             OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
@@ -3651,7 +3652,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer secondAudio = new() { Name = "second-audio", QueuedSampleCount = SampleRate };
 
             using PlaybackPipeline pipeline = CreatePipeline(firstVideo, firstAudio);
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => firstVideo.RenderedFrames > 2, "playback to be under way");
 
@@ -3683,7 +3684,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer(), videoDecoders: decoders);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => decoders.RequestCount >= 1, "the decoder to be created");
 
@@ -3718,7 +3719,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer(), videoDecoders: decoders);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way", 5000);
 
@@ -3726,8 +3727,8 @@ public class PlaybackPipelineTests
 
             // A decoder that refuses is the only one left, so nothing can be built to replace the running one — the
             // reconcile says so, and because nothing was published the picture never stops.
-            pipeline.VideoComponents.ClearDecoders();
-            pipeline.VideoComponents.Register(new RefusingVideoDecoderFactory());
+            pipeline.VideoChains[0].Components.ClearDecoders();
+            pipeline.VideoChains[0].Components.Register(new RefusingVideoDecoderFactory());
 
             OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
@@ -3761,7 +3762,7 @@ public class PlaybackPipelineTests
         {
             using PlaybackPipeline pipeline = CreatePipeline(renderer, new FakeAudioRenderer(), videoDecoders: decoders);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             WaitFor(() => decoders.Options is not null, "the decoder to be created");
 
             // The whole thing, not just the handle: the lock that guards the device is what keeps the decode
@@ -3783,28 +3784,32 @@ public class PlaybackPipelineTests
         ISourceProviderFactory? sourceFactory = null,
         IAudioDecoderFactory? audioDecoders = null,
         ISubtitleDecoderFactory? subtitleDecoders = null,
-        ISubtitleRendererFactory? subtitleRenderers = null)
+        ISubtitleRendererFactory? subtitleRenderers = null,
+        IVideoRenderTarget? videoTarget = null,
+        IVideoRenderTarget? subtitleTarget = null)
     {
         PlaybackPipeline pipeline = new()
         {
             SourceFactory = sourceFactory ?? new FFmpegSourceProviderFactory(),
         };
 
-        pipeline.VideoComponents.Register(videoDecoders ?? new FFmpegVideoDecoderFactory());
-        pipeline.VideoComponents.Register(new FakeVideoRendererFactory(videoRenderer));
-        pipeline.AudioComponents.Register(audioDecoders ?? new FFmpegAudioDecoderFactory());
-        pipeline.AudioComponents.Register(new FixedAudioRendererFactory(audioRenderer));
+        AddChains(pipeline, videoTarget, subtitleTarget);
+
+        pipeline.VideoChains[0].Components.Register(videoDecoders ?? new FFmpegVideoDecoderFactory());
+        pipeline.VideoChains[0].Components.Register(new FakeVideoRendererFactory(videoRenderer));
+        pipeline.AudioChains[0].Components.Register(audioDecoders ?? new FFmpegAudioDecoderFactory());
+        pipeline.AudioChains[0].Components.Register(new FixedAudioRendererFactory(audioRenderer));
 
         // A pipeline with no subtitle factory of its own has no subtitle support at all, which is what every test that
         // is not about subtitles wants: the kind stays unreachable rather than half-wired.
         if (subtitleDecoders is not null)
         {
-            pipeline.SubtitleComponents.Register(subtitleDecoders);
+            pipeline.SubtitleChains[0].Components.Register(subtitleDecoders);
         }
 
         if (subtitleRenderers is not null)
         {
-            pipeline.SubtitleComponents.Register(subtitleRenderers);
+            pipeline.SubtitleChains[0].Components.Register(subtitleRenderers);
         }
 
         return pipeline;
@@ -3817,11 +3822,12 @@ public class PlaybackPipelineTests
     private static PlaybackPipeline CreatePipeline(IAudioRendererFactory audioRendererFactory)
     {
         PlaybackPipeline pipeline = new() { SourceFactory = new FFmpegSourceProviderFactory() };
+        AddChains(pipeline, null, null);
 
-        pipeline.VideoComponents.Register(new FFmpegVideoDecoderFactory());
-        pipeline.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
-        pipeline.AudioComponents.Register(new FFmpegAudioDecoderFactory());
-        pipeline.AudioComponents.Register(audioRendererFactory);
+        pipeline.VideoChains[0].Components.Register(new FFmpegVideoDecoderFactory());
+        pipeline.VideoChains[0].Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+        pipeline.AudioChains[0].Components.Register(new FFmpegAudioDecoderFactory());
+        pipeline.AudioChains[0].Components.Register(audioRendererFactory);
         return pipeline;
     }
 
@@ -3844,22 +3850,35 @@ public class PlaybackPipelineTests
     /// </summary>
     private static void SwapVideoRenderer(PlaybackPipeline pipeline, IVideoRendererFactory factory)
     {
-        pipeline.VideoComponents.ClearRenderers();
-        pipeline.VideoComponents.Register(factory);
+        pipeline.VideoChains[0].Components.ClearRenderers();
+        pipeline.VideoChains[0].Components.Register(factory);
     }
 
     private static void SwapAudioRenderer(PlaybackPipeline pipeline, IAudioRendererFactory factory)
     {
-        pipeline.AudioComponents.ClearRenderers();
-        pipeline.AudioComponents.Register(factory);
+        pipeline.AudioChains[0].Components.ClearRenderers();
+        pipeline.AudioChains[0].Components.Register(factory);
     }
 
     /// <summary>A pipeline whose registrations are made by the test, which is what a host does.</summary>
     private static PlaybackPipeline CreatePipeline(Action<PlaybackPipeline> register)
     {
         PlaybackPipeline pipeline = new() { SourceFactory = new FFmpegSourceProviderFactory() };
+        AddChains(pipeline, null, null);
         register(pipeline);
         return pipeline;
+    }
+
+    /// <summary>
+    /// The three chains every test gets unless it says otherwise: a picture surface to draw into, the sound, and a
+    /// surface of its own for the words. A surface belongs to a chain for its whole life, so it is chosen here rather
+    /// than at open time.
+    /// </summary>
+    private static void AddChains(PlaybackPipeline pipeline, IVideoRenderTarget? videoTarget, IVideoRenderTarget? subtitleTarget)
+    {
+        pipeline.AddVideoChain(videoTarget ?? new FakeRenderTarget());
+        pipeline.AddAudioChain();
+        pipeline.AddSubtitleChain(subtitleTarget ?? SubtitleSurfaceTarget);
     }
 
     /// <summary>
@@ -4104,7 +4123,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(failed, new FakeAudioRenderer());
             WarningLog warnings = new(pipeline);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitForPlaybackToFinish(pipeline);
@@ -4136,7 +4155,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(failed, new FakeAudioRenderer());
             WarningLog warnings = new(pipeline);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitForPlaybackToFinish(pipeline);
@@ -4174,7 +4193,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(failed, new FakeAudioRenderer());
             WarningLog warnings = new(pipeline);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitFor(() => warnings.Messages.Count > 0, "the failed device to be reported");
@@ -4343,7 +4362,7 @@ public class PlaybackPipelineTests
         try
         {
             pipeline.AudioChains[0].Filters.Add(new DownmixAudioFilter());
-            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Video, pipeline.Sources[0].Info.VideoStreams[0]).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -4388,7 +4407,7 @@ public class PlaybackPipelineTests
         try
         {
             pipeline.AudioChains[0].Filters.Add(new DownmixAudioFilter());
-            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
@@ -4423,7 +4442,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
             WarningLog warnings = new(pipeline);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True, "the choice was answered before anything was opened");
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -4468,7 +4487,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
@@ -4520,7 +4539,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
@@ -4790,7 +4809,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer(), videoDecoders: new BrokenDrainVideoDecoderFactory(returnsNothing: false));
             WarningLog warnings = new(pipeline);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitForPlaybackToFinish(pipeline);
@@ -4823,7 +4842,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer(), videoDecoders: new BrokenDrainVideoDecoderFactory(returnsNothing: true));
             WarningLog warnings = new(pipeline);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitForPlaybackToFinish(pipeline);
@@ -4942,7 +4961,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
 
@@ -4990,7 +5009,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { PlaysWhatItIsGiven = true });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, 2);
 
@@ -5033,7 +5052,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
 
@@ -5065,7 +5084,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
 
@@ -5106,13 +5125,13 @@ public class PlaybackPipelineTests
             RefusingIndexVideoDecoderFactory refusing = new();
             using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                p.VideoComponents.Register(refusing);
-                p.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
-                p.AudioComponents.Register(new FFmpegAudioDecoderFactory());
-                p.AudioComponents.Register(new FixedAudioRendererFactory(new FakeAudioRenderer { Name = "first", PlaysWhatItIsGiven = true }));
+                p.VideoChains[0].Components.Register(refusing);
+                p.VideoChains[0].Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                p.AudioChains[0].Components.Register(new FFmpegAudioDecoderFactory());
+                p.AudioChains[0].Components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer { Name = "first", PlaysWhatItIsGiven = true }));
             });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, 2);
 
@@ -5156,7 +5175,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { PlaysWhatItIsGiven = true });
 
-            Assert.That(OpenFirstSource(pipeline, MediaLocator.Parse(path), new FakeRenderTarget(), null).IsSuccessful, Is.True);
+            Assert.That(OpenFirstSource(pipeline, MediaLocator.Parse(path)).IsSuccessful, Is.True);
 
             using (Assert.EnterMultipleScope())
             {
@@ -5191,7 +5210,7 @@ public class PlaybackPipelineTests
         try
         {
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer { PlaysWhatItIsGiven = true });
-            Assert.That(OpenFirstSource(pipeline, MediaLocator.Parse(path), new FakeRenderTarget(), null).IsSuccessful, Is.True);
+            Assert.That(OpenFirstSource(pipeline, MediaLocator.Parse(path)).IsSuccessful, Is.True);
 
             OperationResult refused = Await(pipeline.Play());
             using (Assert.EnterMultipleScope())
@@ -5224,7 +5243,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { PlaysWhatItIsGiven = true });
 
-            Assert.That(OpenFirstSource(pipeline, MediaLocator.Parse(path), new FakeRenderTarget(), null).IsSuccessful, Is.True);
+            Assert.That(OpenFirstSource(pipeline, MediaLocator.Parse(path)).IsSuccessful, Is.True);
 
             VideoStreamInfo second = pipeline.Sources[0].Info.VideoStreams[1];
             AudioStreamInfo audio = pipeline.Sources[0].Info.AudioStreams[0];
@@ -5265,7 +5284,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, 2);
             WaitFor(() => audioRenderer.SubmittedBuffers > 2, "the sound to be playing");
@@ -5317,7 +5336,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer second = new() { Name = "second" };
             using PlaybackPipeline pipeline = CreatePipeline(first, new FakeAudioRenderer());
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
 
@@ -5350,7 +5369,7 @@ public class PlaybackPipelineTests
             FakeVideoRenderer videoRenderer = new();
             using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer { PlaysWhatItIsGiven = true });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Video, pipeline.Sources[0].Info.VideoStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way", 5000);
@@ -5380,7 +5399,7 @@ public class PlaybackPipelineTests
         {
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer { PlaysWhatItIsGiven = true });
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(300), "playback to be under way");
 
@@ -5422,7 +5441,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
 
@@ -5461,7 +5480,7 @@ public class PlaybackPipelineTests
         try
         {
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer { PlaysWhatItIsGiven = true });
-            Assert.That(OpenFirstSource(pipeline, MediaLocator.Parse(path), new FakeRenderTarget(), null).IsSuccessful, Is.True);
+            Assert.That(OpenFirstSource(pipeline, MediaLocator.Parse(path)).IsSuccessful, Is.True);
 
             VideoStreamInfo video = pipeline.Sources[0].Info.VideoStreams[1];
             AudioStreamInfo audio = pipeline.Sources[0].Info.AudioStreams[1];
@@ -5531,7 +5550,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.5), "playback to be under way");
 
@@ -5578,7 +5597,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Video, pipeline.Sources[0].Info.VideoStreams[0]).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -5625,7 +5644,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Video, pipeline.Sources[0].Info.VideoStreams[0]).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -5670,7 +5689,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Video, pipeline.Sources[0].Info.VideoStreams[0]).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -5720,7 +5739,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Video, pipeline.Sources[0].Info.VideoStreams[0]).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -5792,7 +5811,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer late = new() { Name = "late" };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), refusing);
 
-            Assert.That(OpenWithoutSound(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True, "the picture still plays without a device");
+            Assert.That(OpenWithoutSound(pipeline, path).IsSuccessful, Is.True, "the picture still plays without a device");
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(300), "playback to be under way");
 
@@ -5828,7 +5847,7 @@ public class PlaybackPipelineTests
             FakeAudioRenderer late = new() { Name = "late", ClockRate = 3.0 };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), refusing);
 
-            Assert.That(OpenWithoutSound(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True, "the picture still plays without a device");
+            Assert.That(OpenWithoutSound(pipeline, path).IsSuccessful, Is.True, "the picture still plays without a device");
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(300), "playback to be under way");
 
@@ -5946,7 +5965,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer, audioDecoders: new BrokenDrainAudioDecoderFactory());
             WarningLog warnings = new(pipeline);
 
-            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitForPlaybackToFinish(pipeline);
@@ -6582,9 +6601,9 @@ public class PlaybackPipelineTests
     /// Opens a file and waits for the answer, because whoever opens a file has to know whether it opened. The surfaces
     /// come first, as a host does it, and the file is added to what the reset left behind.
     /// </summary>
-    private static OperationResult Open(PlaybackPipeline pipeline, string path, IVideoRenderTarget? target = null)
+    private static OperationResult Open(PlaybackPipeline pipeline, string path)
     {
-        OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(path), target, null);
+        OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(path));
         if (!opened.IsSuccessful)
         {
             return opened;
@@ -6595,9 +6614,9 @@ public class PlaybackPipelineTests
         return SelectDefaultStreams(pipeline);
     }
 
-    private static OperationResult OpenFirstSource(PlaybackPipeline pipeline, MediaLocator locator, IVideoRenderTarget? videoTarget, IVideoRenderTarget? subtitleTarget)
+    private static OperationResult OpenFirstSource(PlaybackPipeline pipeline, MediaLocator locator)
     {
-        OperationResult reset = pipeline.Reset(videoTarget, subtitleTarget).GetAwaiter().GetResult();
+        OperationResult reset = pipeline.Reset().GetAwaiter().GetResult();
         if (!reset.IsSuccessful)
         {
             return reset;
@@ -6666,9 +6685,9 @@ public class PlaybackPipelineTests
     /// play: choosing a track is the host's decision, and reconciling what was chosen is what says a track cannot be
     /// played at all.
     /// </summary>
-    private static OperationResult OpenWithoutSound(PlaybackPipeline pipeline, string path, IVideoRenderTarget? target = null)
+    private static OperationResult OpenWithoutSound(PlaybackPipeline pipeline, string path)
     {
-        OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(path), target, null);
+        OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(path));
         if (!opened.IsSuccessful)
         {
             return opened;
@@ -8087,8 +8106,8 @@ public class PlaybackPipelineTests
         WaitFor(() => renderer.ShowCount > 1, "the renderer to be drawing");
 
         long drawn = renderer.ShowCount;
-        pipeline.SubtitleComponents.ClearDecoders();
-        pipeline.SubtitleComponents.Register(new NullSubtitleDecoderFactory());
+        pipeline.SubtitleChains[0].Components.ClearDecoders();
+        pipeline.SubtitleChains[0].Components.Register(new NullSubtitleDecoderFactory());
         Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
         // The null decoder produces no cues, so the last thing drawn is an empty set: the words that were up have to go,
@@ -8322,7 +8341,7 @@ public class PlaybackPipelineTests
         PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, subtitleRenderer);
         try
         {
-            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
 
             MediaInfo info = pipeline.Sources[0].Info;
@@ -8376,7 +8395,7 @@ public class PlaybackPipelineTests
         PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, subtitleRenderer, videoRenderer, audioRenderer);
         try
         {
-            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
 
             MediaInfo info = pipeline.Sources[0].Info;
@@ -8429,7 +8448,7 @@ public class PlaybackPipelineTests
         PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, subtitleRenderer);
         try
         {
-            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Video, pipeline.Sources[0].Info.VideoStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -8475,7 +8494,7 @@ public class PlaybackPipelineTests
         PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, subtitleRenderer);
         try
         {
-            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
 
             MediaInfo info = pipeline.Sources[0].Info;
@@ -8528,7 +8547,7 @@ public class PlaybackPipelineTests
         PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, subtitleRenderer);
         try
         {
-            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
 
             MediaInfo info = pipeline.Sources[0].Info;
@@ -8580,7 +8599,7 @@ public class PlaybackPipelineTests
         PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, subtitleRenderer);
         try
         {
-            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
 
             OperationResult<MediaSource> added = Await(pipeline.AddSource(MediaLocator.Parse(plain)));
@@ -8621,7 +8640,7 @@ public class PlaybackPipelineTests
         PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, subtitleRenderer, videoRenderer);
         try
         {
-            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(longFile))).IsSuccessful, Is.True);
 
             OperationResult<MediaSource> added = Await(pipeline.AddSource(MediaLocator.Parse(shortFile)));
@@ -8670,7 +8689,7 @@ public class PlaybackPipelineTests
         PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, subtitleRenderer);
         try
         {
-            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
 
             OperationResult<MediaSource> added = Await(pipeline.AddSource(MediaLocator.Parse(wordsOnly)));
             using (Assert.EnterMultipleScope())
@@ -8715,7 +8734,7 @@ public class PlaybackPipelineTests
         PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, subtitleRenderer);
         try
         {
-            Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
 
             Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
@@ -8755,7 +8774,7 @@ public class PlaybackPipelineTests
                 subtitleDecoders: new FFmpegSubtitleDecoderFactory(),
                 subtitleRenderers: new FakeSubtitleRendererFactory(subtitleRenderer)))
             {
-                Assert.That(Await(pipeline.Reset(new FakeRenderTarget(), SubtitleSurfaceTarget)).IsSuccessful, Is.True);
+                Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
                 Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(path))).IsSuccessful, Is.True);
 
                 MediaInfo info = pipeline.Sources[0].Info;
@@ -8843,7 +8862,7 @@ public class PlaybackPipelineTests
     /// </summary>
     private static OperationResult OpenForSubtitles(PlaybackPipeline pipeline, bool selectTheTrack = true)
     {
-        OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(SyntheticPath()), new FakeRenderTarget(), SubtitleSurfaceTarget);
+        OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(SyntheticPath()));
         if (!opened.IsSuccessful || !selectTheTrack)
         {
             return opened;
