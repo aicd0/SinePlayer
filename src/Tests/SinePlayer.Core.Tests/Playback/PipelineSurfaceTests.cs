@@ -20,6 +20,9 @@ public class PipelineSurfaceTests
     [
         nameof(AudioFilterChain),
         nameof(AudioFilterChainSnapshot),
+        nameof(IAudioChain),
+        nameof(ISubtitleChain),
+        nameof(IVideoChain),
         nameof(MediaEngineState),
         nameof(IPlaybackChain),
         nameof(PlaybackPipeline),
@@ -52,5 +55,18 @@ public class PipelineSurfaceTests
                 Assert.That(chain.IsVisible, Is.False, $"{chain.Name} is a chain and is visible outside the assembly.");
             }
         }
+    }
+
+    [Test]
+    public void EachKindPublishesItsOwnChainInterface()
+    {
+        Type[] interfaces = [.. typeof(PlaybackPipeline).Assembly
+            .GetTypes()
+            .Where(type => type is { IsInterface: true } && typeof(IPlaybackChain).IsAssignableFrom(type))];
+
+        Assert.That(
+            interfaces.Select(type => type.Name).Order(),
+            Is.EqualTo(new[] { nameof(IAudioChain), nameof(IPlaybackChain), nameof(ISubtitleChain), nameof(IVideoChain) }.Order()),
+            "a kind of chain is reached through its own interface and through nothing else");
     }
 }
