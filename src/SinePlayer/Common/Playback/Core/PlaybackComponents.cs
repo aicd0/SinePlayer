@@ -131,17 +131,17 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case FFMPEG:
-                SetFactories<IVideoDecoderFactory>(pipeline, [new FFmpegVideoDecoderFactory()]);
+                SetVideoDecoders(pipeline, [new FFmpegVideoDecoderFactory()]);
                 break;
             case NONE:
-                SetFactories<IVideoDecoderFactory>(pipeline, [new NullVideoDecoderFactory()]);
+                SetVideoDecoders(pipeline, [new NullVideoDecoderFactory()]);
                 break;
             default:
-                SetFactories<IVideoDecoderFactory>(pipeline, [new FFmpegVideoDecoderFactory()]);
+                SetVideoDecoders(pipeline, [new FFmpegVideoDecoderFactory()]);
                 break;
         }
 
-        pipeline.Components.Preferences = pipeline.Components.Preferences with { PreferHardwareDecoding = VideoPreferHardwareDecoding };
+        pipeline.VideoComponents.Preferences = pipeline.VideoComponents.Preferences with { PreferHardwareDecoding = VideoPreferHardwareDecoding };
     }
 
     private void ApplyVideoRenderer(PlaybackPipeline pipeline, string key)
@@ -151,13 +151,13 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case DIRECT3D11:
-                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory(surface)]);
+                SetVideoRenderers(pipeline, [new D3D11VideoRendererFactory(surface)]);
                 break;
             case NONE:
-                SetFactories<IVideoRendererFactory>(pipeline, [new NullVideoRendererFactory()]);
+                SetVideoRenderers(pipeline, [new NullVideoRendererFactory()]);
                 break;
             default:
-                SetFactories<IVideoRendererFactory>(pipeline, [new D3D11VideoRendererFactory(surface)]);
+                SetVideoRenderers(pipeline, [new D3D11VideoRendererFactory(surface)]);
                 break;
         }
     }
@@ -167,13 +167,13 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case FFMPEG:
-                SetFactories<IAudioDecoderFactory>(pipeline, [new FFmpegAudioDecoderFactory()]);
+                SetAudioDecoders(pipeline, [new FFmpegAudioDecoderFactory()]);
                 break;
             case NONE:
-                SetFactories<IAudioDecoderFactory>(pipeline, [new NullAudioDecoderFactory()]);
+                SetAudioDecoders(pipeline, [new NullAudioDecoderFactory()]);
                 break;
             default:
-                SetFactories<IAudioDecoderFactory>(pipeline, [new FFmpegAudioDecoderFactory()]);
+                SetAudioDecoders(pipeline, [new FFmpegAudioDecoderFactory()]);
                 break;
         }
     }
@@ -190,7 +190,7 @@ internal sealed record PlaybackComponents(
                 {
                     if (endpoint.Id == endpointId)
                     {
-                        SetFactories<IAudioRendererFactory>(pipeline, [WasapiAudioRendererFactory.For(endpoint)]);
+                        SetAudioRenderers(pipeline, [WasapiAudioRendererFactory.For(endpoint)]);
                         return;
                     }
                 }
@@ -202,12 +202,12 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case NONE:
-                SetFactories<IAudioRendererFactory>(pipeline, [new NullAudioRendererFactory()]);
+                SetAudioRenderers(pipeline, [new NullAudioRendererFactory()]);
                 return;
             case AUTO:
             default:
                 {
-                    List<IComponentFactory> factories = [];
+                    List<IAudioRendererFactory> factories = [];
                     OperationResult<IReadOnlyList<WasapiAudioEndpoint>> endpoints = WasapiAudioEndpoints.TryGetRenderEndpoints();
                     if (endpoints.IsSuccessful)
                     {
@@ -222,7 +222,7 @@ internal sealed record PlaybackComponents(
                         factories.Add(new WasapiAudioRendererFactory());
                     }
 
-                    SetFactories<IAudioRendererFactory>(pipeline, factories);
+                    SetAudioRenderers(pipeline, factories);
                     return;
                 }
         }
@@ -233,13 +233,13 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case FFMPEG:
-                SetFactories<ISubtitleDecoderFactory>(pipeline, [new FFmpegSubtitleDecoderFactory()]);
+                SetSubtitleDecoders(pipeline, [new FFmpegSubtitleDecoderFactory()]);
                 break;
             case NONE:
-                SetFactories<ISubtitleDecoderFactory>(pipeline, [new NullSubtitleDecoderFactory()]);
+                SetSubtitleDecoders(pipeline, [new NullSubtitleDecoderFactory()]);
                 break;
             default:
-                SetFactories<ISubtitleDecoderFactory>(pipeline, [new FFmpegSubtitleDecoderFactory()]);
+                SetSubtitleDecoders(pipeline, [new FFmpegSubtitleDecoderFactory()]);
                 break;
         }
     }
@@ -249,26 +249,71 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case WIN2D:
-                SetFactories<ISubtitleRendererFactory>(pipeline, [new Win2DSubtitleRendererFactory()]);
+                SetSubtitleRenderers(pipeline, [new Win2DSubtitleRendererFactory()]);
                 break;
             case LIBASS:
-                SetFactories<ISubtitleRendererFactory>(pipeline, [new AssSubtitleRendererFactory()]);
+                SetSubtitleRenderers(pipeline, [new AssSubtitleRendererFactory()]);
                 break;
             case NONE:
-                SetFactories<ISubtitleRendererFactory>(pipeline, [new NullSubtitleRendererFactory()]);
+                SetSubtitleRenderers(pipeline, [new NullSubtitleRendererFactory()]);
                 break;
             default:
-                SetFactories<ISubtitleRendererFactory>(pipeline, [new AssSubtitleRendererFactory(), new Win2DSubtitleRendererFactory()]);
+                SetSubtitleRenderers(pipeline, [new AssSubtitleRendererFactory(), new Win2DSubtitleRendererFactory()]);
                 break;
         }
     }
 
-    private static void SetFactories<TFactory>(PlaybackPipeline pipeline, IEnumerable<IComponentFactory> factories) where TFactory : class, IComponentFactory
+    private static void SetVideoDecoders(PlaybackPipeline pipeline, IEnumerable<IVideoDecoderFactory> factories)
     {
-        pipeline.Components.Clear<TFactory>();
-        foreach (IComponentFactory factory in factories)
+        pipeline.VideoComponents.ClearDecoders();
+        foreach (IVideoDecoderFactory factory in factories)
         {
-            pipeline.Components.Register(factory);
+            pipeline.VideoComponents.Register(factory);
+        }
+    }
+
+    private static void SetVideoRenderers(PlaybackPipeline pipeline, IEnumerable<IVideoRendererFactory> factories)
+    {
+        pipeline.VideoComponents.ClearRenderers();
+        foreach (IVideoRendererFactory factory in factories)
+        {
+            pipeline.VideoComponents.Register(factory);
+        }
+    }
+
+    private static void SetAudioDecoders(PlaybackPipeline pipeline, IEnumerable<IAudioDecoderFactory> factories)
+    {
+        pipeline.AudioComponents.ClearDecoders();
+        foreach (IAudioDecoderFactory factory in factories)
+        {
+            pipeline.AudioComponents.Register(factory);
+        }
+    }
+
+    private static void SetAudioRenderers(PlaybackPipeline pipeline, IEnumerable<IAudioRendererFactory> factories)
+    {
+        pipeline.AudioComponents.ClearRenderers();
+        foreach (IAudioRendererFactory factory in factories)
+        {
+            pipeline.AudioComponents.Register(factory);
+        }
+    }
+
+    private static void SetSubtitleDecoders(PlaybackPipeline pipeline, IEnumerable<ISubtitleDecoderFactory> factories)
+    {
+        pipeline.SubtitleComponents.ClearDecoders();
+        foreach (ISubtitleDecoderFactory factory in factories)
+        {
+            pipeline.SubtitleComponents.Register(factory);
+        }
+    }
+
+    private static void SetSubtitleRenderers(PlaybackPipeline pipeline, IEnumerable<ISubtitleRendererFactory> factories)
+    {
+        pipeline.SubtitleComponents.ClearRenderers();
+        foreach (ISubtitleRendererFactory factory in factories)
+        {
+            pipeline.SubtitleComponents.Register(factory);
         }
     }
 }

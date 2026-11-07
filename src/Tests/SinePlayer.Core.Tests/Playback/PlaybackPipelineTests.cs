@@ -2039,10 +2039,10 @@ public class PlaybackPipelineTests
         string path = RawAudioVideoFixtureFile.Create(frameCount: 30);
         try
         {
-            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                components.Register(new FFmpegVideoDecoderFactory());
-                components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                p.VideoComponents.Register(new FFmpegVideoDecoderFactory());
+                p.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
 
                 // The file has sound, and nothing registered here can decode or play it.
             });
@@ -2965,11 +2965,10 @@ public class PlaybackPipelineTests
         string path = CreateBitmapFile();
         try
         {
-            IComponentRegistry registry = new ComponentRegistry();
-            registry.Register(new RefusingVideoDecoderFactory());
-            registry.Register(silent);
-
-            using PlaybackPipeline pipeline = CreatePipeline(registry, new FakeVideoRenderer(), new FakeAudioRenderer());
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
+            pipeline.VideoComponents.ClearDecoders();
+            pipeline.VideoComponents.Register(new RefusingVideoDecoderFactory());
+            pipeline.VideoComponents.Register(silent);
 
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True, pipeline.Error);
             Assert.That(silent.Options, Is.Not.Null, "the second decoder has to be the one that was created");
@@ -3036,12 +3035,12 @@ public class PlaybackPipelineTests
         string path = CreateWaveFile();
         try
         {
-            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
-                components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
-                components.Register(new RefusingAudioDecoderFactory());
-                components.Register(new FFmpegAudioDecoderFactory());
+                p.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                p.AudioComponents.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
+                p.AudioComponents.Register(new RefusingAudioDecoderFactory());
+                p.AudioComponents.Register(new FFmpegAudioDecoderFactory());
             });
 
             OperationResult opened = Open(pipeline, path);
@@ -3069,12 +3068,12 @@ public class PlaybackPipelineTests
         try
         {
             FakeAudioRenderer audioRenderer = new();
-            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
-                components.Register(new RefusingAudioRendererFactory());
-                components.Register(new FixedAudioRendererFactory(audioRenderer));
-                components.Register(new FFmpegAudioDecoderFactory());
+                p.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                p.AudioComponents.Register(new RefusingAudioRendererFactory());
+                p.AudioComponents.Register(new FixedAudioRendererFactory(audioRenderer));
+                p.AudioComponents.Register(new FFmpegAudioDecoderFactory());
             });
 
             OperationResult opened = Open(pipeline, path);
@@ -3100,12 +3099,12 @@ public class PlaybackPipelineTests
         try
         {
             FakeVideoRenderer videoRenderer = new();
-            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                components.Register(new RefusingVideoRendererFactory());
-                components.Register(new FakeVideoRendererFactory(videoRenderer));
-                components.Register(new FFmpegVideoDecoderFactory());
-                components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
+                p.VideoComponents.Register(new RefusingVideoRendererFactory());
+                p.VideoComponents.Register(new FakeVideoRendererFactory(videoRenderer));
+                p.VideoComponents.Register(new FFmpegVideoDecoderFactory());
+                p.AudioComponents.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
             });
 
             OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
@@ -3129,10 +3128,9 @@ public class PlaybackPipelineTests
         string path = CreateBitmapFile();
         try
         {
-            IComponentRegistry registry = new ComponentRegistry();
-            registry.Register(new RefusingVideoDecoderFactory());
-
-            using PlaybackPipeline pipeline = CreatePipeline(registry, new FakeVideoRenderer(), new FakeAudioRenderer());
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
+            pipeline.VideoComponents.ClearDecoders();
+            pipeline.VideoComponents.Register(new RefusingVideoDecoderFactory());
 
             OperationResult opened = Open(pipeline, path, new FakeRenderTarget());
 
@@ -3166,7 +3164,7 @@ public class PlaybackPipelineTests
             TimeSpan position = pipeline.Position;
 
             // The host says what it wants by changing the registry, then tells the pipeline to look again.
-            pipeline.Components.Preferences = pipeline.Components.Preferences with { PreferHardwareDecoding = false };
+            pipeline.VideoComponents.Preferences = pipeline.VideoComponents.Preferences with { PreferHardwareDecoding = false };
             OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
@@ -3203,11 +3201,10 @@ public class PlaybackPipelineTests
         string path = CreateY4mFile(frameCount: 60, frameRate: "30:1");
         try
         {
-            IComponentRegistry registry = new ComponentRegistry();
-            registry.Register(new FlaggedVideoDecoderFactory(hardware: true, "flagged:hardware"));
-
             FakeVideoRenderer videoRenderer = new();
-            using PlaybackPipeline pipeline = CreatePipeline(registry, videoRenderer, new FakeAudioRenderer());
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
+            pipeline.VideoComponents.ClearDecoders();
+            pipeline.VideoComponents.Register(new FlaggedVideoDecoderFactory(hardware: true, "flagged:hardware"));
 
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
 
@@ -3218,8 +3215,8 @@ public class PlaybackPipelineTests
             WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way", 5000);
 
             long rendered = videoRenderer.RenderedFrames;
-            pipeline.Components.Clear<IVideoDecoderFactory>();
-            pipeline.Components.Register(new FlaggedVideoDecoderFactory(hardware: false, "flagged:software"));
+            pipeline.VideoComponents.ClearDecoders();
+            pipeline.VideoComponents.Register(new FlaggedVideoDecoderFactory(hardware: false, "flagged:software"));
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             WaitFor(() => !pipeline.IsVideoHardwareAccelerated, "the replacement to be reported");
 
@@ -3386,9 +3383,9 @@ public class PlaybackPipelineTests
             WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
 
             // The registration that promises a renderer it cannot build comes first; the one that can comes second.
-            pipeline.Components.Clear<IVideoRendererFactory>();
-            pipeline.Components.Register(new FailingVideoRendererFactory("broken"));
-            pipeline.Components.Register(new FakeVideoRendererFactory(second));
+            pipeline.VideoComponents.ClearRenderers();
+            pipeline.VideoComponents.Register(new FailingVideoRendererFactory("broken"));
+            pipeline.VideoComponents.Register(new FakeVideoRendererFactory(second));
 
             OperationResult<ReconcileResult> swapped = Await(pipeline.Reconcile());
 
@@ -3552,11 +3549,11 @@ public class PlaybackPipelineTests
             // is slow on purpose, so the reader is still reading when the swap lands — which is the state where a
             // new decoder has something left to decode.
             FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
-            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
-                components.Register(new FixedAudioRendererFactory(audioRenderer));
-                components.Register(new PacedAudioDecoderFactory());
+                p.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                p.AudioComponents.Register(new FixedAudioRendererFactory(audioRenderer));
+                p.AudioComponents.Register(new PacedAudioDecoderFactory());
             });
 
             OperationResult opened = Open(pipeline, path);
@@ -3571,8 +3568,8 @@ public class PlaybackPipelineTests
             TimeSpan position = pipeline.Position;
 
             NamedAudioDecoderFactory second = new("audio-second");
-            pipeline.Components.Clear<IAudioDecoderFactory>();
-            pipeline.Components.Register(second);
+            pipeline.AudioComponents.ClearDecoders();
+            pipeline.AudioComponents.Register(second);
 
             OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
             Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
@@ -3693,8 +3690,8 @@ public class PlaybackPipelineTests
 
             // A decoder that refuses is the only one left, so nothing can be built to replace the running one — the
             // reconcile says so, and because nothing was published the picture never stops.
-            pipeline.Components.Clear<IVideoDecoderFactory>();
-            pipeline.Components.Register(new RefusingVideoDecoderFactory());
+            pipeline.VideoComponents.ClearDecoders();
+            pipeline.VideoComponents.Register(new RefusingVideoDecoderFactory());
 
             OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
@@ -3757,21 +3754,21 @@ public class PlaybackPipelineTests
             SourceFactory = sourceFactory ?? new FFmpegSourceProviderFactory(),
         };
 
-        pipeline.Components.Register(videoDecoders ?? new FFmpegVideoDecoderFactory());
-        pipeline.Components.Register(new FakeVideoRendererFactory(videoRenderer));
-        pipeline.Components.Register(audioDecoders ?? new FFmpegAudioDecoderFactory());
-        pipeline.Components.Register(new FixedAudioRendererFactory(audioRenderer));
+        pipeline.VideoComponents.Register(videoDecoders ?? new FFmpegVideoDecoderFactory());
+        pipeline.VideoComponents.Register(new FakeVideoRendererFactory(videoRenderer));
+        pipeline.AudioComponents.Register(audioDecoders ?? new FFmpegAudioDecoderFactory());
+        pipeline.AudioComponents.Register(new FixedAudioRendererFactory(audioRenderer));
 
         // A pipeline with no subtitle factory of its own has no subtitle support at all, which is what every test that
         // is not about subtitles wants: the kind stays unreachable rather than half-wired.
         if (subtitleDecoders is not null)
         {
-            pipeline.Components.Register(subtitleDecoders);
+            pipeline.SubtitleComponents.Register(subtitleDecoders);
         }
 
         if (subtitleRenderers is not null)
         {
-            pipeline.Components.Register(subtitleRenderers);
+            pipeline.SubtitleComponents.Register(subtitleRenderers);
         }
 
         return pipeline;
@@ -3785,10 +3782,10 @@ public class PlaybackPipelineTests
     {
         PlaybackPipeline pipeline = new() { SourceFactory = new FFmpegSourceProviderFactory() };
 
-        pipeline.Components.Register(new FFmpegVideoDecoderFactory());
-        pipeline.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
-        pipeline.Components.Register(new FFmpegAudioDecoderFactory());
-        pipeline.Components.Register(audioRendererFactory);
+        pipeline.VideoComponents.Register(new FFmpegVideoDecoderFactory());
+        pipeline.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+        pipeline.AudioComponents.Register(new FFmpegAudioDecoderFactory());
+        pipeline.AudioComponents.Register(audioRendererFactory);
         return pipeline;
     }
 
@@ -3811,36 +3808,22 @@ public class PlaybackPipelineTests
     /// </summary>
     private static void SwapVideoRenderer(PlaybackPipeline pipeline, IVideoRendererFactory factory)
     {
-        pipeline.Components.Clear<IVideoRendererFactory>();
-        pipeline.Components.Register(factory);
+        pipeline.VideoComponents.ClearRenderers();
+        pipeline.VideoComponents.Register(factory);
     }
 
     private static void SwapAudioRenderer(PlaybackPipeline pipeline, IAudioRendererFactory factory)
     {
-        pipeline.Components.Clear<IAudioRendererFactory>();
-        pipeline.Components.Register(factory);
+        pipeline.AudioComponents.ClearRenderers();
+        pipeline.AudioComponents.Register(factory);
     }
 
     /// <summary>A pipeline whose registrations are made by the test, which is what a host does.</summary>
-    private static PlaybackPipeline CreatePipeline(Action<ComponentResolver> register)
+    private static PlaybackPipeline CreatePipeline(Action<PlaybackPipeline> register)
     {
         PlaybackPipeline pipeline = new() { SourceFactory = new FFmpegSourceProviderFactory() };
-        register(pipeline.Components);
+        register(pipeline);
         return pipeline;
-    }
-
-    /// <summary>A pipeline over an explicit registry, for the tests that are about selection itself.</summary>
-    private static PlaybackPipeline CreatePipeline(IComponentRegistry registry, IVideoRenderer videoRenderer, FakeAudioRenderer audioRenderer)
-    {
-        registry.Register(new FakeVideoRendererFactory(videoRenderer));
-        registry.Register(new FFmpegAudioDecoderFactory());
-        registry.Register(new FixedAudioRendererFactory(audioRenderer));
-
-        return new PlaybackPipeline
-        {
-            SourceFactory = new FFmpegSourceProviderFactory(),
-            Components = new ComponentResolver(registry),
-        };
     }
 
     /// <summary>
@@ -5049,12 +5032,12 @@ public class PlaybackPipelineTests
         try
         {
             RefusingIndexVideoDecoderFactory refusing = new();
-            using PlaybackPipeline pipeline = CreatePipeline(components =>
+            using PlaybackPipeline pipeline = CreatePipeline(p =>
             {
-                components.Register(refusing);
-                components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
-                components.Register(new FFmpegAudioDecoderFactory());
-                components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer { Name = "first", PlaysWhatItIsGiven = true }));
+                p.VideoComponents.Register(refusing);
+                p.VideoComponents.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+                p.AudioComponents.Register(new FFmpegAudioDecoderFactory());
+                p.AudioComponents.Register(new FixedAudioRendererFactory(new FakeAudioRenderer { Name = "first", PlaysWhatItIsGiven = true }));
             });
 
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
@@ -8018,8 +8001,8 @@ public class PlaybackPipelineTests
         WaitFor(() => renderer.ShowCount > 1, "the renderer to be drawing");
 
         long drawn = renderer.ShowCount;
-        pipeline.Components.Clear<ISubtitleDecoderFactory>();
-        pipeline.Components.Register(new NullSubtitleDecoderFactory());
+        pipeline.SubtitleComponents.ClearDecoders();
+        pipeline.SubtitleComponents.Register(new NullSubtitleDecoderFactory());
         Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
         // The null decoder produces no cues, so the last thing drawn is an empty set: the words that were up have to go,

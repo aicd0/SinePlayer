@@ -79,6 +79,8 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
         }
     }
 
+    public VideoComponentResolver Components { get; } = new();
+
     public long PresentedFrameCount => Interlocked.Read(ref _presentedFrameCount);
 
     public long DroppedFrameCount => Interlocked.Read(ref _droppedFrameCount);
@@ -211,8 +213,10 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
         Interlocked.Exchange(ref _pictureTicks, -1);
     }
 
-    public OperationResult<ChainChange> Reconcile(VideoComponentResolver resolver)
+    public OperationResult<ChainChange> Reconcile()
     {
+        VideoComponentResolver resolver = Components.Clone();
+
         OperationResultCreator<ChainChange> result = new();
 
         StreamBinding<VideoStreamInfo> selected = Selected;

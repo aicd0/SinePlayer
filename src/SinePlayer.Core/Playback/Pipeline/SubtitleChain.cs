@@ -53,6 +53,8 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
 
     public bool IsConsuming => Decoder.HasComponent;
 
+    public SubtitleComponentResolver Components { get; } = new();
+
     public IVideoRenderTarget? Target
     {
         get => _target;
@@ -132,8 +134,10 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
         ReadTail.Reset();
     }
 
-    public OperationResult<ChainChange> Reconcile(SubtitleComponentResolver resolver)
+    public OperationResult<ChainChange> Reconcile()
     {
+        SubtitleComponentResolver resolver = Components.Clone();
+
         OperationResultCreator<ChainChange> result = new();
 
         StreamBinding<SubtitleStreamInfo> selected = Selected;
