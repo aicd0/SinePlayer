@@ -76,8 +76,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public SubtitleComponentResolver SubtitleComponents => Subtitle.Components;
 
-    public AudioFilterChain AudioFilters => Audio.Filters;
-
     public ISourceProviderFactory? SourceFactory { get; set; }
 
     public VideoTransform VideoTransform
@@ -117,25 +115,15 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public IReadOnlyList<MediaSource> Sources => _sources;
 
-    public AudioStreamInfo? SelectedAudioStream => Audio.Selected.Stream;
-
     public SubtitleStreamInfo? SelectedSubtitleStream => Subtitle.Selected.Stream;
-
-    public string? AudioDecoderName => Audio.Decoder.CurrentComponent?.Name;
-
-    public string? AudioRendererName => Audio.Renderer.CurrentComponent?.Name;
 
     public string? SubtitleDecoderName => Subtitle.Decoder.CurrentComponent?.Name;
 
     public string? SubtitleRendererName => Subtitle.Renderer.CurrentComponent?.Name;
 
-    public bool IsAudioHardwareAccelerated => Audio.Decoder.CurrentComponent?.IsHardwareAccelerated ?? false;
-
     public TimeSpan Position => _timeline.Position;
 
     public string? StarvedFor => Video.Starved ? "video" : Audio.Starved ? "audio" : null;
-
-    public long AudioUnderruns => Audio.Underruns;
 
     public void Dispose()
     {

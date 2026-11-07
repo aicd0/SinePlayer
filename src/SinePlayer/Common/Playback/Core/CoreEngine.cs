@@ -394,11 +394,11 @@ internal sealed partial class CoreEngine : IDisposable
 
         GainAudioFilter gainFilter = new();
         gainFilter.SetLevel(_volume, _muted);
-        pipeline.AudioFilters.Add(gainFilter);
+        pipeline.AudioChains[0].Filters.Add(gainFilter);
         _gainFilter = gainFilter;
 
         DownmixAudioFilter downmixFilter = new();
-        pipeline.AudioFilters.Add(downmixFilter);
+        pipeline.AudioChains[0].Filters.Add(downmixFilter);
         _downmixFilter = downmixFilter;
 
         // Warnings are heard as they happen — during the open for something left out of it, and later for a
@@ -446,7 +446,7 @@ internal sealed partial class CoreEngine : IDisposable
         }
 
         PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is null || pipeline.SelectedAudioStream is null)
+        if (pipeline is null || pipeline.AudioChains[0].SelectedStream is null)
         {
             return;
         }
