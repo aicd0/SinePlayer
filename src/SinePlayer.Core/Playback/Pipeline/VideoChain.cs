@@ -211,7 +211,7 @@ internal sealed class VideoChain : IPlaybackChain, IPictureFrameSource, IChainFe
         Interlocked.Exchange(ref _pictureTicks, -1);
     }
 
-    public OperationResult<ChainChange> Reconcile(ComponentResolver resolver)
+    public OperationResult<ChainChange> Reconcile(VideoComponentResolver resolver)
     {
         OperationResultCreator<ChainChange> result = new();
 
@@ -235,7 +235,7 @@ internal sealed class VideoChain : IPlaybackChain, IPictureFrameSource, IChainFe
                 bool rebuildVideoRenderer = sourceChanged;
                 PipelineComponent<IVideoRenderer>? latestRenderer = Renderer.Latest;
                 OperationResult<PipelineComponent<IVideoRenderer>?> rendererResolved = ComponentResolution.Resolve(
-                    resolver.ResolveVideoRenderers(),
+                    resolver.ResolveRenderers(),
                     rebuildVideoRenderer ? null : latestRenderer?.Signature,
                     videoStream,
                     "video renderer");
@@ -261,7 +261,7 @@ internal sealed class VideoChain : IPlaybackChain, IPictureFrameSource, IChainFe
                 PipelineComponent<IVideoDecoder>? latestDecoder = Decoder.Latest;
                 IGpuDevice? gpuDevice = (renderer ?? latestRenderer)?.Component?.GpuDevice;
                 OperationResult<PipelineComponent<IVideoDecoder>?> decoderResolved = ComponentResolution.Resolve(
-                    resolver.ResolveVideoDecoders(videoSource.Source, videoStream, gpuDevice, DecoderBufferedFrames),
+                    resolver.ResolveDecoders(videoSource.Source, videoStream, gpuDevice, DecoderBufferedFrames),
                     rebuildVideoDecoder ? null : latestDecoder?.Signature,
                     videoStream,
                     "video decoder");

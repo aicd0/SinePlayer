@@ -135,7 +135,7 @@ public class ComponentResolverTests
         resolver.Register(new DecliningVideoRendererFactory("declines"));
         resolver.Register(new NullVideoRendererFactory());
 
-        List<IComponentCreator<IVideoRenderer>> creators = [.. resolver.ResolveVideoRenderers()];
+        List<IComponentCreator<IVideoRenderer>> creators = [.. resolver.Video.ResolveRenderers()];
 
         using (Assert.EnterMultipleScope())
         {
@@ -157,7 +157,7 @@ public class ComponentResolverTests
         resolver.Register(new NullVideoRendererFactory());
         resolver.Register(new NullVideoRendererFactory("null:second"));
 
-        Assert.That(resolver.ResolveVideoRenderers().Select(creator => creator.Signature), Is.EqualTo(new[] { "null:video-renderer", "null:second" }));
+        Assert.That(resolver.Video.ResolveRenderers().Select(creator => creator.Signature), Is.EqualTo(new[] { "null:video-renderer", "null:second" }));
     }
 
     /// <summary>
@@ -172,7 +172,7 @@ public class ComponentResolverTests
         resolver.Register(new RecordingVideoDecoderFactory());
 
         using SyntheticMediaSource source = new(new SyntheticMediaScript());
-        List<IComponentCreator<IVideoDecoder>> creators = [.. resolver.ResolveVideoDecoders(source, source.Info.VideoStreams[0], gpuDevice: null, bufferedFrames: 4)];
+        List<IComponentCreator<IVideoDecoder>> creators = [.. resolver.Video.ResolveDecoders(source, source.Info.VideoStreams[0], gpuDevice: null, bufferedFrames: 4)];
 
         using (Assert.EnterMultipleScope())
         {
