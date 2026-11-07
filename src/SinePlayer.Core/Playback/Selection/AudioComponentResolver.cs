@@ -14,7 +14,6 @@ namespace SinePlayer.Core.Playback.Selection;
 public sealed class AudioComponentResolver
 {
     private readonly IComponentRegistry _components;
-    private PlaybackPreferences _preferences = PlaybackPreferences.Default;
 
     public AudioComponentResolver() : this(new ComponentRegistry())
     {
@@ -26,19 +25,9 @@ public sealed class AudioComponentResolver
         _components = registry;
     }
 
-    public PlaybackPreferences Preferences
-    {
-        get => Volatile.Read(ref _preferences);
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            Volatile.Write(ref _preferences, value);
-        }
-    }
-
     public AudioComponentResolver Clone()
     {
-        return new AudioComponentResolver(_components.Clone()) { Preferences = Preferences };
+        return new AudioComponentResolver(_components.Clone());
     }
 
     public void Register(IAudioDecoderFactory factory)

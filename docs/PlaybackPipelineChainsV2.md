@@ -167,7 +167,8 @@ The cost is that the host configures each chain — a registration loop over `Vi
 shape: what a chain decodes with is that chain's business, and a pipeline-wide registry would be a second place to
 say it.
 
-`PlaybackPreferences` currently holds one knob (`PreferHardwareDecoding`), so per-chain preferences is a small
+`VideoPreferences` currently holds one knob (`PreferHardwareDecoding`) and only video decoder resolution reads it, so
+it lives on the video resolver and the audio and subtitle resolvers have none. Per-chain preferences is a small
 feature on its own; what it buys immediately is that the mechanism exists before the second chain of a kind
 arrives, and the knob is the one that already means something per chain.
 
@@ -375,8 +376,8 @@ outside.
 
 | # | Step | Lands as | Review focus |
 |---|---|---|---|
-| I1 | `PlaybackChain` base, chains public, machinery internal | `PlaybackChain`, `IPlaybackChainRuntime` (explicit implementation) | what is public is exactly the table in section 1 |
-| I2 | `ComponentResolver` splits into `VideoComponentResolver` / `AudioComponentResolver` / `SubtitleComponentResolver`, each chain owns one as `chain.Components`, `pipeline.Components` deleted; resolution moves onto the chains (`chain.Reconcile(ComponentResolver)`) | the shared registry handling behind three typed façades; `BuildVideoChain`/`BuildAudioChain`/`BuildSubtitleChain`/`ResolveComponent` leave the pipeline | a resolver of one kind cannot be asked another kind's question; a role registered into the wrong chain does not compile |
+| I1 | `IPlaybackChain` published; the chains themselves stay internal; machinery internal | `IPlaybackChain` (7 members: `Kind`, `SelectedStream`, `PlayingStream`, `IsActive`, `DecoderName`, `RendererName`, `IsHardwareAccelerated`), `ChainVersion`, `ChainTail`, `PipelineCoroutine` | what is public is exactly the table in section 1; every `IPlaybackChain` implementor is invisible |
+| I2 | Resolution moves onto the chains (`chain.Reconcile()`), and `ComponentResolver` splits into `VideoComponentResolver` / `AudioComponentResolver` / `SubtitleComponentResolver` — one per kind, each owning only its kind's roles | `PlaybackPipeline.Components.cs` deleted; `ChainChange` and `ComponentResolution` extracted; each `Reconcile` takes its own kind's resolver, so a video chain cannot ask for an audio factory. The type is now `VideoPreferences` and hangs off the video resolver; audio and subtitle resolution never read it. `ComponentResolver` survives **only as the host's registration surface** and dies in I3, when `chain.Components` becomes the channel | a resolver of one kind cannot be asked another kind's question; a role registered into the wrong chain does not compile |
 | I3 | `AddVideoChain(target)` / `AddAudioChain()` / `AddSubtitleChain(target)` / `RemoveChain` / `VideoChains` / `AudioChains` / `SubtitleChains`; the constructor stops creating chains and the per-kind fields go | the lists become the API's, and they are how a host reaches each chain's resolver; the pipeline keeps one list per kind rather than three fields | a fresh pipeline has none; add-then-reconcile starts exactly one new set of threads |
 | I4 | `SelectStream(chain, stream)`; `ReconcileResult` becomes three dictionaries; warnings carry the chain | | a failure is looked up by the chain that failed |
 | I5 | `Reset()` loses its targets and absorbs `Stop()`; teardown per chain; a chain's target is fixed at `Add` | | new surface = `Remove` + `Add`, and the old chain's threads are joined first |

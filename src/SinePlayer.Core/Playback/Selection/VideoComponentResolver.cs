@@ -15,7 +15,7 @@ namespace SinePlayer.Core.Playback.Selection;
 public sealed class VideoComponentResolver
 {
     private readonly IComponentRegistry _components;
-    private PlaybackPreferences _preferences = PlaybackPreferences.Default;
+    private VideoPreferences _preferences = VideoPreferences.Default;
 
     public VideoComponentResolver() : this(new ComponentRegistry())
     {
@@ -27,7 +27,7 @@ public sealed class VideoComponentResolver
         _components = registry;
     }
 
-    public PlaybackPreferences Preferences
+    public VideoPreferences Preferences
     {
         get => Volatile.Read(ref _preferences);
         set
