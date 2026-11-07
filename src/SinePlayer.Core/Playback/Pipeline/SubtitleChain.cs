@@ -3,6 +3,7 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -129,6 +130,130 @@ internal sealed class SubtitleChain : IPlaybackChain, IChainFeed, IPipelineWakeT
         Target = null;
         Selected = default;
         ReadTail.Reset();
+    }
+
+    public OperationResult<ChainChange> Reconcile(ComponentResolver resolver)
+    {
+        OperationResultCreator<ChainChange> result = new();
+
+        StreamBinding<SubtitleStreamInfo> selected = Selected;
+        bool sourceChanged = !selected.Matches(Source.Latest?.Component, (SubtitleStreamInfo?)Source.Latest?.Stream);
+        ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
+        PipelineComponent<ISubtitleDecoder>? decoder = null;
+        PipelineComponent<ISubtitleRenderer>? renderer = null;
+        try
+        {
+            if (selected.Source is { } subtitleSource && selected.Stream is { } subtitleStream)
+            {
+                IVideoRenderTarget? subtitleTarget = Target;
+                if (subtitleTarget is null)
+                {
+                    return result.Failure("The file has a subtitle track but no subtitle surface was supplied.");
+                }
+
+                // Resolve subtitle decoder
+                bool rebuildSubtitleDecoder = sourceChanged;
+                PipelineComponent<ISubtitleDecoder>? latestDecoder = Decoder.Latest;
+                OperationResult<PipelineComponent<ISubtitleDecoder>?> decoderResolved = ComponentResolution.Resolve(
+                    resolver.ResolveSubtitleDecoders(subtitleSource.Source, subtitleStream),
+                    rebuildSubtitleDecoder ? null : latestDecoder?.Signature,
+                    subtitleStream,
+                    "subtitle decoder");
+                if (!decoderResolved.IsSuccessful)
+                {
+                    return result.Failure(decoderResolved.Message);
+                }
+
+                decoder = decoderResolved.Result;
+                if (decoder is not null)
+                {
+                    changed |= ChainChange.Decoder;
+                }
+
+                // Resolve subtitle renderer
+                PipelineComponent<ISubtitleDecoder>? runningDecoder = decoder ?? latestDecoder;
+                if (runningDecoder is null)
+                {
+                    return result.Failure("The track has no decoder to say what its cues are made of.");
+                }
+
+                SubtitleCueFormat format = runningDecoder.Component.CueFormat;
+                bool rebuildSubtitleRenderer = decoder is not null || sourceChanged;
+                PipelineComponent<ISubtitleRenderer>? latestRenderer = Renderer.Latest;
+                OperationResult<PipelineComponent<ISubtitleRenderer>?> rendererResolved = ComponentResolution.Resolve(
+                    resolver.ResolveSubtitleRenderers(subtitleStream, format),
+                    rebuildSubtitleRenderer ? null : latestRenderer?.Signature,
+                    subtitleStream,
+                    "subtitle renderer");
+                if (!rendererResolved.IsSuccessful)
+                {
+                    return result.Failure(rendererResolved.Message);
+                }
+
+                renderer = rendererResolved.Result;
+                if (renderer is not null)
+                {
+                    OperationResult configured = renderer.Component.Configure(subtitleStream, subtitleSource.Info.Attachments, subtitleTarget);
+                    if (!configured.IsSuccessful)
+                    {
+                        return result.Failure(configured.Message);
+                    }
+
+                    changed |= ChainChange.Renderer;
+                }
+            }
+            else
+            {
+                if (Decoder.HasComponent)
+                {
+                    changed |= sourceChanged ? ChainChange.Decoder : ChainChange.None;
+                }
+
+                if (Renderer.HasComponent)
+                {
+                    changed |= sourceChanged ? ChainChange.Renderer : ChainChange.None;
+                }
+            }
+
+            if (changed != ChainChange.None)
+            {
+                ChainVersion current = new(
+                    Source.LastestVersions.Source,
+                    Decoder.LastestVersions.Decoder,
+                    Renderer.LastestVersions.Renderer);
+                long next = Math.Max(current.Source, Math.Max(current.Decoder, current.Renderer)) + 1;
+                ChainVersion versions = current with
+                {
+                    Source = changed.HasFlag(ChainChange.Source) ? next : current.Source,
+                    Decoder = changed.HasFlag(ChainChange.Decoder) ? next : current.Decoder,
+                    Renderer = changed.HasFlag(ChainChange.Renderer) ? next : current.Renderer,
+                };
+
+                if (changed.HasFlag(ChainChange.Source))
+                {
+                    Source.Publish(selected.Source is { } source && selected.Stream is { } stream ? new(source, stream, "source") : null, versions);
+                }
+
+                if (changed.HasFlag(ChainChange.Decoder))
+                {
+                    Decoder.Publish(decoder, versions);
+                    decoder = null;
+                }
+
+                if (changed.HasFlag(ChainChange.Renderer))
+                {
+                    Renderer.Publish(renderer, versions);
+                    renderer = null;
+                }
+            }
+
+            return result.Success(changed);
+        }
+        finally
+        {
+            decoder?.Dispose();
+            renderer?.Dispose();
+        }
     }
 
     public void Wake()
