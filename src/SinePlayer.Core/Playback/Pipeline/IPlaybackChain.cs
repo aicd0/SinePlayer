@@ -10,8 +10,6 @@ public interface IPlaybackChain
 {
     MediaStreamKind Kind { get; }
 
-    bool IsActive { get; }
-
     string? DecoderName { get; }
 
     string? RendererName { get; }

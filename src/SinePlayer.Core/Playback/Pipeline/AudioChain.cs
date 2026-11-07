@@ -39,7 +39,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
     public AudioStreamInfo? PlayingStream => (AudioStreamInfo?)Source.CurrentStream;
 
-    public bool IsActive => Decoder.HasComponent;
+    public bool IsRunning => _decodeCoroutine is not null || _renderThread is not null;
 
     public string? DecoderName => Decoder.CurrentComponent?.Name;
 
@@ -52,6 +52,8 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     public AudioFilterChain Filters { get; } = new();
 
     public long Underruns => Renderer.CurrentComponent?.UnderrunCount ?? 0;
+
+    public bool OwnsClock => _timeline.DeviceOwner == this;
 
     public ChainTail ReadTail { get; } = new();
 

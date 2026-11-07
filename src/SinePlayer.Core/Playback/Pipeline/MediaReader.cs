@@ -311,7 +311,7 @@ internal sealed class MediaReader(
             return current;
         }
 
-        List<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> kept = [.. current.Where(entry => !ReferenceEquals(entry.Key, feed))];
+        List<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> kept = [.. current.Where(entry => entry.Key != feed)];
         return new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(kept);
     }
 
