@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Core.Tests.Playback;
@@ -17,17 +18,18 @@ public class PipelineSurfaceTests
 {
     private static readonly string sNamespace = typeof(PlaybackPipeline).Namespace!;
 
-    private static readonly string[] sPublished =
+    private static readonly Type[] sPublished =
     [
-        nameof(AudioFilterChain),
-        nameof(AudioFilterChainSnapshot),
-        nameof(IAudioChain),
-        nameof(ISubtitleChain),
-        nameof(IVideoChain),
-        nameof(MediaEngineState),
-        nameof(IPlaybackChain),
-        nameof(PlaybackPipeline),
-        nameof(ReconcileResult),
+        typeof(AudioFilterChain),
+        typeof(AudioFilterChainSnapshot),
+        typeof(IAudioChain),
+        typeof(IPlaybackChain),
+        typeof(IPlaybackChain<>),
+        typeof(ISubtitleChain),
+        typeof(IVideoChain),
+        typeof(MediaEngineState),
+        typeof(PlaybackPipeline),
+        typeof(ReconcileResult),
     ];
 
     [Test]
@@ -38,7 +40,7 @@ public class PipelineSurfaceTests
             .Where(type => type is { IsVisible: true } && type.Namespace == sNamespace)
             .Select(type => type.Name)];
 
-        Assert.That(visible.Order(), Is.EqualTo(sPublished.Order()));
+        Assert.That(visible.Order(), Is.EqualTo(sPublished.Select(type => type.Name).Order()));
     }
 
     [Test]
@@ -65,10 +67,29 @@ public class PipelineSurfaceTests
             .GetTypes()
             .Where(type => type is { IsInterface: true } && typeof(IPlaybackChain).IsAssignableFrom(type))];
 
-        Assert.That(
-            interfaces.Select(type => type.Name).Order(),
-            Is.EqualTo(new[] { nameof(IAudioChain), nameof(IPlaybackChain), nameof(ISubtitleChain), nameof(IVideoChain) }.Order()),
-            "a kind of chain is reached through its own interface and through nothing else");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                interfaces.Select(type => type.Name).Order(),
+                Is.EqualTo(new[] { typeof(IAudioChain), typeof(IPlaybackChain), typeof(IPlaybackChain<>), typeof(ISubtitleChain), typeof(IVideoChain) }
+                    .Select(type => type.Name)
+                    .Order()),
+                "a kind of chain is reached through its own interface and through nothing else");
+
+            Assert.That(StreamOf(typeof(IVideoChain)), Is.EqualTo(typeof(VideoStreamInfo)), "a video chain says it plays video streams");
+            Assert.That(StreamOf(typeof(IAudioChain)), Is.EqualTo(typeof(AudioStreamInfo)), "an audio chain says it plays audio streams");
+            Assert.That(StreamOf(typeof(ISubtitleChain)), Is.EqualTo(typeof(SubtitleStreamInfo)), "a subtitle chain says it plays subtitle streams");
+        }
+    }
+
+    /// <summary>
+    /// The stream type a chain interface declares, which is what spares every caller a conversion: a video chain's
+    /// stream is a video stream, always.
+    /// </summary>
+    private static Type? StreamOf(Type chain)
+    {
+        Type? typed = Array.Find(chain.GetInterfaces(), type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IPlaybackChain<>));
+        return typed?.GetGenericArguments()[0];
     }
 
     /// <summary>
