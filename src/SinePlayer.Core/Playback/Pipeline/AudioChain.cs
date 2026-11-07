@@ -11,15 +11,48 @@ using SinePlayer.Core.Playback.Abstractions.Timing;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents events) : IChainFeed, IPipelineWakeTarget
+internal sealed class AudioChain : IPlaybackChain, IChainFeed, IPipelineWakeTarget
 {
     private const int AudioIdleTimeoutMilliseconds = 5;
     private const int AudioDeviceLeewayMilliseconds = 3000;
     private const int FallbackFrameMilliseconds = 40;
 
+    private readonly PipelineTimeline _timeline;
+    private readonly PipelineEvents _events;
+
     private PipelineCoroutine? _decodeCoroutine;
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
+    private volatile bool _starved;
+    private long _endedEpoch = -1;
+
+    public AudioChain(PipelineTimeline timeline, PipelineEvents events)
+    {
+        _timeline = timeline;
+        _events = events;
+    }
+
+    public MediaStreamKind Kind => MediaStreamKind.Audio;
+
+    public MediaStreamInfo? SelectedStream => Selected.Stream;
+
+    public MediaStreamInfo? PlayingStream => Source.CurrentStream;
+
+    public bool IsActive => Decoder.HasComponent;
+
+    public string? DecoderName => Decoder.CurrentComponent?.Name;
+
+    public string? RendererName => Renderer.CurrentComponent?.Name;
+
+    public bool IsHardwareAccelerated => Decoder.CurrentComponent?.IsHardwareAccelerated ?? false;
+
+    public AudioFilterChain Filters { get; } = new();
+
+    public long Underruns => Renderer.CurrentComponent?.UnderrunCount ?? 0;
+
+    public ChainTail ReadTail { get; } = new();
+
+    public bool IsConsuming => Decoder.HasComponent;
 
     public ComponentSlot<MediaSource> Source { get; } = new();
 
@@ -35,22 +68,19 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
     public PipelineNode RenderNode { get; } = new();
 
-    public AudioFilterChain Filters { get; } = new();
-
     public StreamBinding<AudioStreamInfo> Selected { get; set; }
 
-    public long EndedEpoch { get; set; } = -1;
-
-    private volatile bool _starved;
     public bool Starved
     {
         get => _starved;
         set => _starved = value;
     }
 
-    public ChainTail ReadTail { get; } = new();
-
-    public bool IsConsuming => Decoder.HasComponent;
+    public long EndedEpoch
+    {
+        get => Interlocked.Read(ref _endedEpoch);
+        set => Interlocked.Exchange(ref _endedEpoch, value);
+    }
 
     public void Start(CoroutineHost host, Action wakeReader, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
@@ -109,7 +139,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         WakeDecode();
     }
 
-    public async Task Decode(Func<bool> stopRequested, Action wakeReader)
+    private async Task Decode(Func<bool> stopRequested, Action wakeReader)
     {
         long workingEpoch = -1;
 
@@ -126,7 +156,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                 oldAudioDecoder?.Dispose();
             }
 
-            long epoch = timeline.Epoch;
+            long epoch = _timeline.Epoch;
             if (workingEpoch != epoch)
             {
                 workingEpoch = epoch;
@@ -137,7 +167,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                 }
                 catch (Exception ex)
                 {
-                    events.PostWarning($"The audio decoder could not be flushed: {ex.Message}");
+                    _events.PostWarning($"The audio decoder could not be flushed: {ex.Message}");
                 }
 
                 continue;
@@ -181,7 +211,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                     OperationResult drained = DrainDecoder(audioDecoder, audioBufferVersions, packetEpoch);
                     if (!drained.IsSuccessful)
                     {
-                        events.PostWarning(drained.Message);
+                        _events.PostWarning(drained.Message);
                     }
 
                     BufferQueue.Enqueue(new AudioEntry(null, audioBufferVersions, epoch));
@@ -197,7 +227,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                 OperationResult routed = DecodePacket(audioDecoder, packet, audioBufferVersions, epoch);
                 if (!routed.IsSuccessful)
                 {
-                    events.PostFailure(routed);
+                    _events.PostFailure(routed);
                     return;
                 }
             }
@@ -285,7 +315,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
         return OperationResult.Success();
     }
 
-    public void Render(Func<bool> stopRequested, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
+    private void Render(Func<bool> stopRequested, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
         bool deviceAvailable = false;
         bool reportedRunningAhead = false;
@@ -364,7 +394,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                     else
                     {
                         deviceFormat = null;
-                        events.PostWarning($"The audio device could not be opened: {opened.Message}");
+                        _events.PostWarning($"The audio device could not be opened: {opened.Message}");
                         if (AbandonFailedDevice(audioRenderer))
                         {
                             continue;
@@ -375,7 +405,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                 }
             }
 
-            EpochGate epochGate = timeline.Gate;
+            EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             bool epochChanged = workingEpoch != epoch;
 
@@ -394,20 +424,20 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                 ReleaseInFlightAudio();
             }
 
-            bool playing = events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
-            lock (timeline.ClockLock)
+            bool playing = _events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
+            lock (_timeline.ClockLock)
             {
                 if (epochChanged)
                 {
                     Starved = true;
                 }
 
-                timeline.StartOrPause(epoch, state);
+                _timeline.StartOrPause(epoch, state);
 
                 if (deviceAvailable && audioRenderer is not null)
                 {
                     IPlaybackClock deviceClock = audioRenderer.Clock;
-                    bool clockRunning = timeline.IsRunning;
+                    bool clockRunning = _timeline.IsRunning;
                     if (clockRunning != deviceClock.IsRunning)
                     {
                         try
@@ -423,7 +453,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                         }
                         catch (Exception ex)
                         {
-                            events.PostWarning(ex.Message);
+                            _events.PostWarning(ex.Message);
                             AbandonFailedDevice(audioRenderer);
                             continue;
                         }
@@ -437,17 +467,17 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                 continue;
             }
 
-            TimeSpan position = timeline.Position;
+            TimeSpan position = _timeline.Position;
             if (deviceAvailable && tailBufferPosition is TimeSpan consumed
                 && consumed - position > TimeSpan.FromMilliseconds(AudioDeviceLeewayMilliseconds))
             {
                 if (!reportedRunningAhead)
                 {
                     reportedRunningAhead = true;
-                    events.PostWarning("The audio device is not playing what it is given.");
+                    _events.PostWarning("The audio device is not playing what it is given.");
                 }
 
-                lock (timeline.ClockLock)
+                lock (_timeline.ClockLock)
                 {
                     // A device that is running ahead of the clock is not starved.
                     Starved = false;
@@ -464,7 +494,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
                 if (hasDeviceAudio && clockOffset is TimeSpan offset)
                 {
-                    timeline.SyncClock(this, deviceClock, offset);
+                    _timeline.SyncClock(this, deviceClock, offset);
                 }
 
                 if (inFlightSubmit is not null)
@@ -476,7 +506,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
                         if (!submitted.IsSuccessful)
                         {
-                            events.PostWarning(submitted.Message);
+                            _events.PostWarning(submitted.Message);
                             AbandonFailedDevice(audioRenderer);
                         }
 
@@ -492,10 +522,10 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
             {
                 bool ending = endingEpoch == epoch;
                 bool starved = deviceAvailable && !hasDeviceAudio && !ending && !isStreamSpent(epoch, position);
-                lock (timeline.ClockLock)
+                lock (_timeline.ClockLock)
                 {
                     Starved = starved;
-                    timeline.StartOrPause(epoch, state);
+                    _timeline.StartOrPause(epoch, state);
                 }
 
                 if (ending && !hasDeviceAudio && playedOutEpoch != endingEpoch)
@@ -503,7 +533,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
                     playedOutEpoch = endingEpoch;
 
                     long epochCopy = endingEpoch;
-                    events.Submit(() =>
+                    _events.Submit(() =>
                     {
                         EndedEpoch = epochCopy;
                         reportEnded();
@@ -569,7 +599,7 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
             if (!filtersApplied.IsSuccessful)
             {
                 buffer.Dispose();
-                events.PostFailure(filtersApplied.Message, filtersApplied.Exception);
+                _events.PostFailure(filtersApplied.Message, filtersApplied.Exception);
                 return;
             }
 
@@ -577,17 +607,17 @@ internal sealed class AudioChain(PipelineTimeline timeline, PipelineEvents event
 
             tailBufferPosition = buffer.Timestamp + buffer.Duration;
 
-            lock (timeline.ClockLock)
+            lock (_timeline.ClockLock)
             {
                 Starved = false;
 
-                bool clockChanged = timeline.Anchor(epoch, buffer.Timestamp);
+                bool clockChanged = _timeline.Anchor(epoch, buffer.Timestamp);
                 if (deviceAvailable && audioRenderer is not null && (clockChanged || clockOffset is null))
                 {
                     clockOffset = audioRenderer.Clock.Position - buffer.Timestamp;
                 }
 
-                timeline.StartOrPause(epoch, state);
+                _timeline.StartOrPause(epoch, state);
             }
 
             if (deviceAvailable && audioRenderer is not null)

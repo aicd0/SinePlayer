@@ -1,6 +1,6 @@
 # PlaybackPipeline chains — v2 (multi-chain)
 
-Status: plan, not started. v1 (phases A–G) is complete: the pipeline is an orchestrator over three chain
+Status: Phase H done (H1–H4, H6–H8; H5 folded into I3 and H9 into I2, where `Add*Chain` and `chain.Components` make them possible), Phase I next. v1 (phases A–G) is complete: the pipeline is an orchestrator over three chain
 objects, but only ever one of each kind. This plan publishes the model and makes a second (and third) chain of a
 kind actually work.
 
@@ -363,23 +363,21 @@ outside.
 
 | # | Step | Lands as | Review focus |
 |---|---|---|---|
-| H1 | The selection stops being a triple | `MediaSourceHolder` carries sources only; each chain gains `SelectedStream` (asked) beside `Binding` (built); `CreateSourceHolderFromChange`/`FromSelection` deleted | `SelectedVideoStream` still reports the same thing |
+| H1 | The selection stops being a triple | `MediaSourceHolder` deleted; each chain carries `Selected` (what the host asked for) beside a `Source` component slot (what it is bound to), published by the builder that owns it and installed by the reader; `CreateSourceHolderFromChange`/`FromSelection` deleted | `SelectedVideoStream` still reports the same thing |
 | H2 | `ChainVersion` introduced; the video comparisons move to it | `ChainVersion`, `ComponentSlot` keeps both for one step | old packets still dropped after a switch |
 | H3 | Audio comparisons moved | | as above |
 | H4 | Subtitle comparisons moved; `PipelineVersion`, `BumpVersions`, `CurrentVersions` deleted; slots hold one `long` | `ComponentSlot<T>` | a stream switch still drops queued packets and keeps the new ones |
-| H5 | The pipeline holds a list per kind; the reader's feeds and the reconcile dispatch are derived from them | `_videoChains`, `_audioChains`, `_subtitleChains`, `_feeds`; `_video`/`_audio`/`_subtitle` stay as the first of each list, so no public member changes in this step | reconcile order is still video, audio, subtitle |
 | H6 | `CoroutineHost` accepts registrations after start; each chain registers and stops its own decode coroutine | `CoroutineHost.Register`, `IChainFeed` gains `RequestStopCoroutine` | stop still joins, and a chain that ends does not take the host down |
 | H7 | The clock's owner is decided, not raced: `PipelineTimeline.DeviceOwner` names the chain whose device may correct the clock, and `SyncClock` refuses any other chain. Anchor stays first-come-per-epoch and starvation still pauses the clock from any chain (the video-hold tests depend on it) | `DeviceOwner`; `SyncClock(chain, …)`; the governor type and `OwnsClock` wait until two chains of a kind exist, when there is something to observe | with one chain of each kind, the clock moves exactly as before |
 | H8 | Chains become wake targets | `IPipelineWakeTarget` on the chains; `_wakeTargets` = reader + chains | no wake lost; the four direct node wakes go through the chain |
-| H9 | Resolution moves onto the chains | `VideoChain.Reconcile(snapshot)` / `AudioChain.Reconcile` / `SubtitleChain.Reconcile` replace `BuildVideoChain`/`BuildAudioChain`/`BuildSubtitleChain`/`ResolveComponent`; the pipeline passes `Components.Clone()` and keeps the source publish and the epoch advance | one component set resolved per reconcile, in the same order as before; the resolver is still one class for now |
 
 ### Phase I — publish the model
 
 | # | Step | Lands as | Review focus |
 |---|---|---|---|
 | I1 | `PlaybackChain` base, chains public, machinery internal | `PlaybackChain`, `IPlaybackChainRuntime` (explicit implementation) | what is public is exactly the table in section 1 |
-| I2 | `ComponentResolver` splits into `VideoComponentResolver` / `AudioComponentResolver` / `SubtitleComponentResolver`, each chain owns one as `chain.Components`, `pipeline.Components` deleted | the shared registry handling behind three typed façades | a resolver of one kind cannot be asked another kind's question; a role registered into the wrong chain does not compile |
-| I3 | `AddVideoChain(target)` / `AddAudioChain()` / `AddSubtitleChain(target)` / `RemoveChain` / `VideoChains` / `AudioChains` / `SubtitleChains`; the constructor stops creating chains and the per-kind fields go | the derived lists become the API's, and they are how a host reaches each chain's resolver | a fresh pipeline has none; add-then-reconcile starts exactly one new set of threads |
+| I2 | `ComponentResolver` splits into `VideoComponentResolver` / `AudioComponentResolver` / `SubtitleComponentResolver`, each chain owns one as `chain.Components`, `pipeline.Components` deleted; resolution moves onto the chains (`chain.Reconcile(ComponentResolver)`) | the shared registry handling behind three typed façades; `BuildVideoChain`/`BuildAudioChain`/`BuildSubtitleChain`/`ResolveComponent` leave the pipeline | a resolver of one kind cannot be asked another kind's question; a role registered into the wrong chain does not compile |
+| I3 | `AddVideoChain(target)` / `AddAudioChain()` / `AddSubtitleChain(target)` / `RemoveChain` / `VideoChains` / `AudioChains` / `SubtitleChains`; the constructor stops creating chains and the per-kind fields go | the lists become the API's, and they are how a host reaches each chain's resolver; the pipeline keeps one list per kind rather than three fields | a fresh pipeline has none; add-then-reconcile starts exactly one new set of threads |
 | I4 | `SelectStream(chain, stream)`; `ReconcileResult` becomes three dictionaries; warnings carry the chain | | a failure is looked up by the chain that failed |
 | I5 | `Reset()` loses its targets and absorbs `Stop()`; teardown per chain; a chain's target is fixed at `Add` | | new surface = `Remove` + `Add`, and the old chain's threads are joined first |
 | I6 | Kind-shaped properties removed; `PlaybackPipelineTests` ported | ~150 mechanical edits, helpers first | **no assertion changes** — a test that has to change its expectation is evidence of a behaviour change |
