@@ -310,7 +310,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                 }
                 catch (Exception ex)
                 {
-                    _events.PostWarning($"The subtitle decoder could not be flushed: {ex.Message}");
+                    _events.PostWarning($"The subtitle decoder could not be flushed: {ex.Message}", this);
                 }
 
                 CueWindow.SeekTo(epoch, epochGate.SeekPosition);
@@ -371,7 +371,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
         {
             if (!result.IsSuccessful)
             {
-                _events.PostWarning($"{message}: {result.Message}");
+                _events.PostWarning($"{message}: {result.Message}", this);
             }
         }
 
