@@ -290,7 +290,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 }
                 catch (Exception ex)
                 {
-                    _events.PostWarning($"The audio decoder could not be flushed: {ex.Message}");
+                    _events.PostWarning($"The audio decoder could not be flushed: {ex.Message}", this);
                 }
 
                 continue;
@@ -334,7 +334,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                     OperationResult drained = DrainDecoder(audioDecoder, audioBufferVersions, packetEpoch);
                     if (!drained.IsSuccessful)
                     {
-                        _events.PostWarning(drained.Message);
+                        _events.PostWarning(drained.Message, this);
                     }
 
                     BufferQueue.Enqueue(new AudioEntry(null, audioBufferVersions, epoch));
@@ -517,7 +517,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                     else
                     {
                         deviceFormat = null;
-                        _events.PostWarning($"The audio device could not be opened: {opened.Message}");
+                        _events.PostWarning($"The audio device could not be opened: {opened.Message}", this);
                         if (AbandonFailedDevice(audioRenderer))
                         {
                             continue;
@@ -576,7 +576,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                         }
                         catch (Exception ex)
                         {
-                            _events.PostWarning(ex.Message);
+                            _events.PostWarning(ex.Message, this);
                             AbandonFailedDevice(audioRenderer);
                             continue;
                         }
@@ -597,7 +597,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 if (!reportedRunningAhead)
                 {
                     reportedRunningAhead = true;
-                    _events.PostWarning("The audio device is not playing what it is given.");
+                    _events.PostWarning("The audio device is not playing what it is given.", this);
                 }
 
                 lock (_timeline.ClockLock)
@@ -629,7 +629,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
                         if (!submitted.IsSuccessful)
                         {
-                            _events.PostWarning(submitted.Message);
+                            _events.PostWarning(submitted.Message, this);
                             AbandonFailedDevice(audioRenderer);
                         }
 

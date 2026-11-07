@@ -411,9 +411,10 @@ internal sealed partial class CoreEngine : IDisposable
         return pipeline;
     }
 
-    private void Pipeline_WarningRaised(string warning)
+    private void Pipeline_WarningRaised(IPlaybackChain? chain, string warning)
     {
-        Logger.W(TAG, $"Playback warning: {warning}");
+        string source = chain is null ? string.Empty : $" ({chain.Kind})";
+        Logger.W(TAG, $"Playback warning{source}: {warning}");
     }
 
     private void Pipeline_StateChanged(MediaEngineState state, string? error)

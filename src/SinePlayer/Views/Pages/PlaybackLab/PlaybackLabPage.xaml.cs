@@ -596,9 +596,10 @@ internal sealed partial class PlaybackLabPage : BasePage
         CoroutineUtils.PostInMainThread(RefreshStatus);
     }
 
-    private void Pipeline_WarningRaised(string warning)
+    private void Pipeline_WarningRaised(IPlaybackChain? chain, string warning)
     {
-        Logger.W(TAG, warning);
+        string source = chain is null ? string.Empty : $" ({chain.Kind})";
+        Logger.W(TAG, $"{warning}{source}");
     }
 
     private async Task ReconcileAndLog(PlaybackPipeline pipeline, string what, MediaStreamKind kind)
