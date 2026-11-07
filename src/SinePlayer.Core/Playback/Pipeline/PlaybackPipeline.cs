@@ -171,11 +171,6 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         StopCore();
 
-        foreach (SubtitleChain subtitle in _subtitleChains)
-        {
-            subtitle.LayoutSource = _videoChains.Length > 0 ? _videoChains[0] : null;
-        }
-
         _timeline.SetPosition(TimeSpan.Zero);
         _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
 
@@ -424,6 +419,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         FlushChainRemoval();
         InstallSources();
         RebuildWakeTargets();
+        ReconcileLayoutSources();
         ReconcileClockOwner();
 
         Dictionary<IVideoChain, OperationResult> videoResults = [];
@@ -487,18 +483,6 @@ public sealed partial class PlaybackPipeline : IDisposable
         {
             JoinChain(chain);
             ResetChain(chain);
-
-            if (chain is VideoChain video)
-            {
-                foreach (SubtitleChain subtitle in _subtitleChains)
-                {
-                    if (subtitle.LayoutSource == video)
-                    {
-                        subtitle.LayoutSource = _videoChains.Length > 0 ? _videoChains[0] : null;
-                        subtitle.RenderNode.Wake();
-                    }
-                }
-            }
         }
     }
 
@@ -523,6 +507,21 @@ public sealed partial class PlaybackPipeline : IDisposable
     private void RebuildWakeTargets()
     {
         _wakeTargets = [_reader, .. _videoChains, .. _audioChains, .. _subtitleChains];
+    }
+
+    private void ReconcileLayoutSources()
+    {
+        VideoChain? picture = _videoChains.Length > 0 ? _videoChains[0] : null;
+        foreach (SubtitleChain subtitle in _subtitleChains)
+        {
+            if (subtitle.LayoutSource == picture)
+            {
+                continue;
+            }
+
+            subtitle.LayoutSource = picture;
+            subtitle.RenderNode.Wake();
+        }
     }
 
     private void ReconcileClockOwner()
