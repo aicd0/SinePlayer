@@ -18,7 +18,7 @@ internal sealed class PipelineEvents(Action wakeAll)
 
     public event Action<MediaEngineState, string?>? StateChanged;
 
-    public event Action<string>? WarningRaised;
+    public event Action<IPlaybackChain?, string>? WarningRaised;
 
     public MediaEngineState State => _state;
 
@@ -49,15 +49,19 @@ internal sealed class PipelineEvents(Action wakeAll)
         StateChanged?.Invoke(state, error);
     }
 
-    public void RaiseWarning(string warning)
+    /// <summary>
+    /// Tells the host something it should know but that did not fail. <paramref name="chain"/> is the chain that ran
+    /// into it, or null when it was the pipeline itself — a seek that could not reach the sources, say.
+    /// </summary>
+    public void RaiseWarning(string warning, IPlaybackChain? chain = null)
     {
         PlaybackLogger.W(TAG, warning);
-        WarningRaised?.Invoke(warning);
+        WarningRaised?.Invoke(chain, warning);
     }
 
-    public void PostWarning(string warning)
+    public void PostWarning(string warning, IPlaybackChain? chain = null)
     {
-        Submit(() => RaiseWarning(warning));
+        Submit(() => RaiseWarning(warning, chain));
     }
 
     public void PostFailure(string message, Exception? exception = null)

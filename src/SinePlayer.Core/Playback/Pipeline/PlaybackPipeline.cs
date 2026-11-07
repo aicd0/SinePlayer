@@ -58,7 +58,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         remove => _events.StateChanged -= value;
     }
 
-    public event Action<string>? WarningRaised
+    public event Action<IPlaybackChain?, string>? WarningRaised
     {
         add => _events.WarningRaised += value;
         remove => _events.WarningRaised -= value;
@@ -190,9 +190,15 @@ public sealed partial class PlaybackPipeline : IDisposable
         return _events.SubmitAndLog(nameof(AddSource), () => AddSourceCore(locator));
     }
 
+    public Task<OperationResult> SelectStream(IPlaybackChain chain, MediaStreamInfo? stream)
+    {
+        ArgumentNullException.ThrowIfNull(chain);
+        return _events.SubmitAndLog(nameof(SelectStream), () => SelectStreamCore(chain, stream));
+    }
+
     public Task<OperationResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)
     {
-        return _events.SubmitAndLog(nameof(SelectStream), () => SelectStreamCore(kind, stream));
+        return SelectStream(FirstChainOf(kind), stream);
     }
 
     public Task<OperationResult> Play()
@@ -266,6 +272,16 @@ public sealed partial class PlaybackPipeline : IDisposable
         return chain;
     }
 
+    private IPlaybackChain FirstChainOf(MediaStreamKind kind)
+    {
+        return kind switch
+        {
+            MediaStreamKind.Video => Video,
+            MediaStreamKind.Audio => Audio,
+            _ => Subtitle,
+        };
+    }
+
     private void RebuildWakeTargets()
     {
         _wakeTargets = [_reader, .. _videoChains, .. _audioChains, .. _subtitleChains];
@@ -321,7 +337,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         return result.Success(added);
     }
 
-    private OperationResult SelectStreamCore(MediaStreamKind kind, MediaStreamInfo? stream)
+    private OperationResult SelectStreamCore(IPlaybackChain chain, MediaStreamInfo? stream)
     {
         if (_disposed)
         {
@@ -340,27 +356,27 @@ public sealed partial class PlaybackPipeline : IDisposable
                 return OperationResult.Failure($"Stream {stream.Index} is not part of anything the pipeline was given.");
             }
 
-            if (stream.Kind != kind)
+            if (stream.Kind != chain.Kind)
             {
-                return OperationResult.Failure($"Stream {stream.Index} is a {stream.Kind} stream, not a {kind} stream.");
+                return OperationResult.Failure($"Stream {stream.Index} is a {stream.Kind} stream, not a {chain.Kind} stream.");
             }
         }
 
         MediaSource? source = FindSource(stream);
-        switch (kind)
+        switch (chain)
         {
-            case MediaStreamKind.Video:
-                Video.Selected = new(source, (VideoStreamInfo?)stream);
-                break;
-            case MediaStreamKind.Audio:
-                Audio.Selected = new(source, (AudioStreamInfo?)stream);
-                break;
+            case VideoChain video:
+                video.Selected = new(source, (VideoStreamInfo?)stream);
+                return OperationResult.Success();
+            case AudioChain audio:
+                audio.Selected = new(source, (AudioStreamInfo?)stream);
+                return OperationResult.Success();
+            case SubtitleChain subtitle:
+                subtitle.Selected = new(source, (SubtitleStreamInfo?)stream);
+                return OperationResult.Success();
             default:
-                Subtitle.Selected = new(source, (SubtitleStreamInfo?)stream);
-                break;
+                return OperationResult.Failure("The chain is not one of this pipeline's.");
         }
-
-        return OperationResult.Success();
     }
 
     private OperationResult PlayCore()
@@ -454,13 +470,26 @@ public sealed partial class PlaybackPipeline : IDisposable
             return result.Failure($"Cannot change the pipeline's components when the state is {state}.");
         }
 
-        OperationResult<ChainChange> video = Video.Reconcile();
-        OperationResult<ChainChange> audio = Audio.Reconcile();
-        OperationResult<ChainChange> subtitle = Subtitle.Reconcile();
+        Dictionary<IVideoChain, OperationResult> videoResults = [];
+        Dictionary<IAudioChain, OperationResult> audioResults = [];
+        Dictionary<ISubtitleChain, OperationResult> subtitleResults = [];
 
-        bool changed = (video.IsSuccessful && video.Result != ChainChange.None)
-            || (audio.IsSuccessful && audio.Result != ChainChange.None)
-            || (subtitle.IsSuccessful && subtitle.Result != ChainChange.None);
+        bool changed = false;
+        foreach (VideoChain chain in _videoChains)
+        {
+            changed |= Reconcile(chain, chain.Reconcile(), videoResults);
+        }
+
+        foreach (AudioChain chain in _audioChains)
+        {
+            changed |= Reconcile(chain, chain.Reconcile(), audioResults);
+        }
+
+        foreach (SubtitleChain chain in _subtitleChains)
+        {
+            changed |= Reconcile(chain, chain.Reconcile(), subtitleResults);
+        }
+
         if (changed)
         {
             _timeline.AdvanceEpoch(_timeline.Position, SeekMode.Precise);
@@ -474,10 +503,19 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         return result.Success(new ReconcileResult
         {
-            Video = video.IsSuccessful ? OperationResult.Success() : OperationResult.Failure(video),
-            Audio = audio.IsSuccessful ? OperationResult.Success() : OperationResult.Failure(audio),
-            Subtitle = subtitle.IsSuccessful ? OperationResult.Success() : OperationResult.Failure(subtitle),
+            VideoResults = videoResults,
+            AudioResults = audioResults,
+            SubtitleResults = subtitleResults,
         });
+    }
+
+    private static bool Reconcile<TChain>(
+        TChain chain,
+        OperationResult<ChainChange> reconciled,
+        Dictionary<TChain, OperationResult> results) where TChain : class, IPlaybackChain
+    {
+        results[chain] = reconciled.IsSuccessful ? OperationResult.Success() : OperationResult.Failure(reconciled);
+        return reconciled.IsSuccessful && reconciled.Result != ChainChange.None;
     }
 
     private OperationResult StopCore()

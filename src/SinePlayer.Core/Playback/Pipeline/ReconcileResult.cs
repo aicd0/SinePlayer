@@ -8,11 +8,17 @@ namespace SinePlayer.Core.Playback.Pipeline;
 
 public sealed class ReconcileResult
 {
-    public required OperationResult Video { get; init; }
+    public required IReadOnlyDictionary<IVideoChain, OperationResult> VideoResults { get; init; }
 
-    public required OperationResult Audio { get; init; }
+    public required IReadOnlyDictionary<IAudioChain, OperationResult> AudioResults { get; init; }
 
-    public required OperationResult Subtitle { get; init; }
+    public required IReadOnlyDictionary<ISubtitleChain, OperationResult> SubtitleResults { get; init; }
+
+    public OperationResult Video => Single(VideoResults);
+
+    public OperationResult Audio => Single(AudioResults);
+
+    public OperationResult Subtitle => Single(SubtitleResults);
 
     public OperationResult For(MediaStreamKind kind)
     {
@@ -21,6 +27,17 @@ public sealed class ReconcileResult
             MediaStreamKind.Video => Video,
             MediaStreamKind.Audio => Audio,
             _ => Subtitle,
+        };
+    }
+
+    private static OperationResult Single<TChain>(IReadOnlyDictionary<TChain, OperationResult> results) where TChain : notnull
+    {
+        return results.Count switch
+        {
+            0 => OperationResult.Success(),
+            1 => results.Values.First(),
+            _ => throw new InvalidOperationException(
+                $"There are {results.Count} chains of this kind, so there is no single result. Ask the chain you mean."),
         };
     }
 }

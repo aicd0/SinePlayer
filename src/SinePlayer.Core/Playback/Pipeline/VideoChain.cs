@@ -439,7 +439,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
                         OperationResult drained = DrainDecoder(videoDecoder, videoFrameVersions, packetEpoch);
                         if (!drained.IsSuccessful)
                         {
-                            _events.PostWarning(drained.Message);
+                            _events.PostWarning(drained.Message, this);
                         }
                     }
 
@@ -527,7 +527,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
 
                         if (!cleared.IsSuccessful)
                         {
-                            _events.PostWarning(cleared.Message);
+                            _events.PostWarning(cleared.Message, this);
                         }
 
                         Interlocked.Exchange(ref _pictureTicks, -1);
@@ -575,7 +575,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
 
                 if (!refreshed.IsSuccessful)
                 {
-                    _events.PostWarning(refreshed.Message);
+                    _events.PostWarning(refreshed.Message, this);
                     deviceAvailable = false;
                 }
             }
@@ -705,7 +705,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
                     OperationResult shown = RenderFrame(videoRenderer, frame, transform);
                     if (!shown.IsSuccessful)
                     {
-                        _events.PostWarning(shown.Message);
+                        _events.PostWarning(shown.Message, this);
                         deviceAvailable = false;
                     }
                 }

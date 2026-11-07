@@ -3143,6 +3143,42 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// A reconcile answers per chain, keyed by the chain itself, so a failure is looked up by the chain that failed
+    /// rather than by its kind — and a chain of another kind is not dragged into it.
+    /// </summary>
+    [Test]
+    public void ReportsEachChainsResultUnderThatChain()
+    {
+        string path = CreateBitmapFile();
+        try
+        {
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
+            pipeline.VideoComponents.ClearDecoders();
+            pipeline.VideoComponents.Register(new RefusingVideoDecoderFactory());
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.False);
+
+            OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
+            Assert.That(reconciled.IsSuccessful, Is.True, reconciled.Message);
+
+            ReconcileResult result = reconciled.Result;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.VideoResults.Keys, Is.EqualTo(pipeline.VideoChains), "one entry per video chain, keyed by the chain");
+                Assert.That(result.AudioResults.Keys, Is.EqualTo(pipeline.AudioChains), "one entry per audio chain, keyed by the chain");
+                Assert.That(result.SubtitleResults.Keys, Is.EqualTo(pipeline.SubtitleChains), "one entry per subtitle chain, keyed by the chain");
+                Assert.That(result.VideoResults[pipeline.VideoChains[0]].IsSuccessful, Is.False, "the chain that could not be built says so");
+                Assert.That(result.Audio.IsSuccessful, Is.True, "another kind's chain is untouched by it");
+                Assert.That(result.Video.Message, Is.Not.Empty, "the failure carries the reason the decoder gave");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
     /// The video decoder can be replaced while a file plays. It has to be a replacement and not a restart: the
     /// state stays playing, the position stays where it was, and frames keep coming — from the new decoder.
     /// </summary>
@@ -4078,6 +4114,42 @@ public class PlaybackPipelineTests
                 Assert.That(warnings.Messages, Is.Not.Empty, "the failure is still reported");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), "the frames were spent, so the file still ended");
                 Assert.That(pipeline.Error, Is.Null, "a failed device is not a failed playback");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A warning names the chain that raised it, so a host holding more than one chain of a kind can tell whose device
+    /// spoke. What the pipeline itself warns about — a seek that could not reach the sources — names no chain.
+    /// </summary>
+    [Test]
+    public void NamesTheChainThatRaisedAWarning()
+    {
+        string path = CreateY4mFile(frameCount: 15, frameRate: "30:1");
+        try
+        {
+            FakeVideoRenderer failed = new() { Name = "failed", RenderFailure = "The device was removed." };
+            using PlaybackPipeline pipeline = CreatePipeline(failed, new FakeAudioRenderer());
+            WarningLog warnings = new(pipeline);
+
+            Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitForPlaybackToFinish(pipeline);
+
+            IReadOnlyList<WarningEntry> entries = warnings.Entries;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(entries, Is.Not.Empty, "the failed device is still reported");
+                Assert.That(
+                    entries.Select(entry => entry.Chain).Distinct(),
+                    Is.EqualTo(new[] { pipeline.VideoChains[0] }),
+                    "a picture device's trouble belongs to the video chain, not to the pipeline");
             }
         }
         finally
@@ -6925,11 +6997,22 @@ public class PlaybackPipelineTests
     private sealed class WarningLog
     {
         private readonly object _lock = new();
-        private readonly List<string> _messages = [];
+        private readonly List<WarningEntry> _entries = [];
 
         internal WarningLog(PlaybackPipeline pipeline)
         {
             pipeline.WarningRaised += Record;
+        }
+
+        internal IReadOnlyList<WarningEntry> Entries
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return [.. _entries];
+                }
+            }
         }
 
         internal IReadOnlyList<string> Messages
@@ -6938,7 +7021,7 @@ public class PlaybackPipelineTests
             {
                 lock (_lock)
                 {
-                    return [.. _messages];
+                    return [.. _entries.Select(entry => entry.Message)];
                 }
             }
         }
@@ -6949,19 +7032,22 @@ public class PlaybackPipelineTests
             {
                 lock (_lock)
                 {
-                    return _messages.Count == 0 ? null : _messages[^1];
+                    return _entries.Count == 0 ? null : _entries[^1].Message;
                 }
             }
         }
 
-        private void Record(string warning)
+        private void Record(IPlaybackChain? chain, string warning)
         {
             lock (_lock)
             {
-                _messages.Add(warning);
+                _entries.Add(new WarningEntry(chain, warning));
             }
         }
     }
+
+    /// <summary>A warning as it was raised, with the chain it came from — null when it came from the pipeline itself.</summary>
+    private sealed record WarningEntry(IPlaybackChain? Chain, string Message);
 
     /// <summary>
     /// Hears what the logger is told, which is the only place a refused call leaves a trace: a warning is raised on
