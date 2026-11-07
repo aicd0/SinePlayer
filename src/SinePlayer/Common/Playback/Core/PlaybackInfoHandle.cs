@@ -19,7 +19,7 @@ internal sealed class PlaybackInfoHandle
 
     public VideoStreamInfo? SelectedVideoStream => Video?.SelectedStream;
 
-    public AudioStreamInfo? SelectedAudioStream => _pipeline?.SelectedAudioStream;
+    public AudioStreamInfo? SelectedAudioStream => Audio?.SelectedStream;
 
     public SubtitleStreamInfo? SelectedSubtitleStream => _pipeline?.SelectedSubtitleStream;
 
@@ -41,15 +41,15 @@ internal sealed class PlaybackInfoHandle
 
     public double AverageVideoRenderMilliseconds => Video?.AverageRenderMilliseconds ?? 0;
 
-    public long AudioUnderruns => _pipeline?.AudioUnderruns ?? 0;
+    public long AudioUnderruns => Audio?.Underruns ?? 0;
 
     public string? VideoDecoderName => Video?.DecoderName;
 
     public string? VideoRendererName => Video?.RendererName;
 
-    public string? AudioDecoderName => _pipeline?.AudioDecoderName;
+    public string? AudioDecoderName => Audio?.DecoderName;
 
-    public string? AudioRendererName => _pipeline?.AudioRendererName;
+    public string? AudioRendererName => Audio?.RendererName;
 
     public string? SubtitleDecoderName => _pipeline?.SubtitleDecoderName;
 
@@ -57,9 +57,11 @@ internal sealed class PlaybackInfoHandle
 
     public bool IsVideoHardwareAccelerated => Video?.IsHardwareAccelerated ?? false;
 
-    public bool IsAudioHardwareAccelerated => _pipeline?.IsAudioHardwareAccelerated ?? false;
+    public bool IsAudioHardwareAccelerated => Audio?.IsHardwareAccelerated ?? false;
 
     private IVideoChain? Video => _pipeline?.VideoChains.FirstOrDefault();
+
+    private IAudioChain? Audio => _pipeline?.AudioChains.FirstOrDefault();
 
     internal void Attach(PlaybackPipeline pipeline)
     {
