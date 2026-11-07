@@ -3,6 +3,7 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -117,6 +118,124 @@ internal sealed class AudioChain : IPlaybackChain, IChainFeed, IPipelineWakeTarg
         Starved = false;
         EndedEpoch = -1;
         ReadTail.Reset();
+    }
+
+    public OperationResult<ChainChange> Reconcile(ComponentResolver resolver)
+    {
+        OperationResultCreator<ChainChange> result = new();
+
+        StreamBinding<AudioStreamInfo> selected = Selected;
+        bool sourceChanged = !selected.Matches(Source.Latest?.Component, (AudioStreamInfo?)Source.Latest?.Stream);
+        ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
+        PipelineComponent<IAudioRenderer>? renderer = null;
+        PipelineComponent<IAudioDecoder>? decoder = null;
+        AudioStreamInfo? negotiatedFormat = null;
+        try
+        {
+            if (selected.Source is { } audioSource && selected.Stream is { } audioStream)
+            {
+                // Resolve audio renderer
+                bool rebuildAudioRenderer = sourceChanged;
+                PipelineComponent<IAudioRenderer>? latestRenderer = Renderer.Latest;
+                OperationResult<PipelineComponent<IAudioRenderer>?> rendererResolved = ComponentResolution.Resolve(
+                    resolver.ResolveAudioRenderers(),
+                    rebuildAudioRenderer ? null : latestRenderer?.Signature,
+                    audioStream,
+                    "audio renderer");
+                if (!rendererResolved.IsSuccessful)
+                {
+                    return result.Failure(rendererResolved.Message);
+                }
+
+                renderer = rendererResolved.Result;
+                if (renderer is not null)
+                {
+                    OperationResult<AudioStreamInfo> negotiated = renderer.Component.Negotiate(audioStream);
+                    if (!negotiated.IsSuccessful)
+                    {
+                        return result.Failure(negotiated.Message);
+                    }
+
+                    negotiatedFormat = negotiated.Result;
+                    changed |= ChainChange.Renderer;
+                }
+
+                // Resolve audio decoder
+                bool rebuildAudioDecoder = sourceChanged;
+                PipelineComponent<IAudioDecoder>? latestDecoder = Decoder.Latest;
+                OperationResult<PipelineComponent<IAudioDecoder>?> decoderResolved = ComponentResolution.Resolve(
+                    resolver.ResolveAudioDecoders(audioSource.Source, audioStream),
+                    rebuildAudioDecoder ? null : latestDecoder?.Signature,
+                    audioStream,
+                    "audio decoder");
+                if (!decoderResolved.IsSuccessful)
+                {
+                    return result.Failure(decoderResolved.Message);
+                }
+
+                decoder = decoderResolved.Result;
+                if (decoder is not null)
+                {
+                    changed |= ChainChange.Decoder;
+                }
+
+                if (negotiatedFormat is not null)
+                {
+                    Filters.Configure(audioStream, negotiatedFormat);
+                }
+            }
+            else
+            {
+                if (Decoder.HasComponent)
+                {
+                    changed |= sourceChanged ? ChainChange.Decoder : ChainChange.None;
+                }
+
+                if (Renderer.HasComponent)
+                {
+                    changed |= sourceChanged ? ChainChange.Renderer : ChainChange.None;
+                }
+            }
+
+            if (changed != ChainChange.None)
+            {
+                ChainVersion current = new(
+                    Source.LastestVersions.Source,
+                    Decoder.LastestVersions.Decoder,
+                    Renderer.LastestVersions.Renderer);
+                long next = Math.Max(current.Source, Math.Max(current.Decoder, current.Renderer)) + 1;
+                ChainVersion versions = current with
+                {
+                    Source = changed.HasFlag(ChainChange.Source) ? next : current.Source,
+                    Decoder = changed.HasFlag(ChainChange.Decoder) ? next : current.Decoder,
+                    Renderer = changed.HasFlag(ChainChange.Renderer) ? next : current.Renderer,
+                };
+
+                if (changed.HasFlag(ChainChange.Source))
+                {
+                    Source.Publish(selected.Source is { } source && selected.Stream is { } stream ? new(source, stream, "source") : null, versions);
+                }
+
+                if (changed.HasFlag(ChainChange.Decoder))
+                {
+                    Decoder.Publish(decoder, versions);
+                    decoder = null;
+                }
+
+                if (changed.HasFlag(ChainChange.Renderer))
+                {
+                    Renderer.Publish(renderer, versions);
+                    renderer = null;
+                }
+            }
+
+            return result.Success(changed);
+        }
+        finally
+        {
+            renderer?.Dispose();
+            decoder?.Dispose();
+        }
     }
 
     public void Wake()

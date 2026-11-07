@@ -7,6 +7,7 @@ using System.Numerics;
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
@@ -208,6 +209,125 @@ internal sealed class VideoChain : IPlaybackChain, IPictureFrameSource, IChainFe
         Interlocked.Exchange(ref _decodeTicks, 0);
         Interlocked.Exchange(ref _renderTicks, 0);
         Interlocked.Exchange(ref _pictureTicks, -1);
+    }
+
+    public OperationResult<ChainChange> Reconcile(ComponentResolver resolver)
+    {
+        OperationResultCreator<ChainChange> result = new();
+
+        StreamBinding<VideoStreamInfo> selected = Selected;
+        bool sourceChanged = !selected.Matches(
+            Source.Latest?.Component, (VideoStreamInfo?)Source.Latest?.Stream);
+        ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
+        PipelineComponent<IVideoRenderer>? renderer = null;
+        PipelineComponent<IVideoDecoder>? decoder = null;
+        try
+        {
+            if (selected.Source is { } videoSource && selected.Stream is { } videoStream)
+            {
+                IVideoRenderTarget? videoTarget = Target;
+                if (videoTarget is null)
+                {
+                    return result.Failure("The file has video but no presentation surface was supplied.");
+                }
+
+                // Resolve video renderer
+                bool rebuildVideoRenderer = sourceChanged;
+                PipelineComponent<IVideoRenderer>? latestRenderer = Renderer.Latest;
+                OperationResult<PipelineComponent<IVideoRenderer>?> rendererResolved = ComponentResolution.Resolve(
+                    resolver.ResolveVideoRenderers(),
+                    rebuildVideoRenderer ? null : latestRenderer?.Signature,
+                    videoStream,
+                    "video renderer");
+                if (!rendererResolved.IsSuccessful)
+                {
+                    return result.Failure(rendererResolved.Message);
+                }
+
+                renderer = rendererResolved.Result;
+                if (renderer is not null)
+                {
+                    OperationResult configured = renderer.Component.Configure(videoStream, videoTarget);
+                    if (!configured.IsSuccessful)
+                    {
+                        return result.Failure(configured.Message);
+                    }
+
+                    changed |= ChainChange.Renderer;
+                }
+
+                // Resolve video decoder
+                bool rebuildVideoDecoder = renderer is not null || sourceChanged;
+                PipelineComponent<IVideoDecoder>? latestDecoder = Decoder.Latest;
+                IGpuDevice? gpuDevice = (renderer ?? latestRenderer)?.Component?.GpuDevice;
+                OperationResult<PipelineComponent<IVideoDecoder>?> decoderResolved = ComponentResolution.Resolve(
+                    resolver.ResolveVideoDecoders(videoSource.Source, videoStream, gpuDevice, DecoderBufferedFrames),
+                    rebuildVideoDecoder ? null : latestDecoder?.Signature,
+                    videoStream,
+                    "video decoder");
+                if (!decoderResolved.IsSuccessful)
+                {
+                    return result.Failure(decoderResolved.Message);
+                }
+
+                decoder = decoderResolved.Result;
+                if (decoder is not null)
+                {
+                    changed |= ChainChange.Decoder;
+                }
+            }
+            else
+            {
+                if (Decoder.HasComponent)
+                {
+                    changed |= sourceChanged ? ChainChange.Decoder : ChainChange.None;
+                }
+
+                if (Renderer.HasComponent)
+                {
+                    changed |= sourceChanged ? ChainChange.Renderer : ChainChange.None;
+                }
+            }
+
+            if (changed != ChainChange.None)
+            {
+                ChainVersion current = new(
+                    Source.LastestVersions.Source,
+                    Decoder.LastestVersions.Decoder,
+                    Renderer.LastestVersions.Renderer);
+                long next = Math.Max(current.Source, Math.Max(current.Decoder, current.Renderer)) + 1;
+                ChainVersion versions = current with
+                {
+                    Source = changed.HasFlag(ChainChange.Source) ? next : current.Source,
+                    Decoder = changed.HasFlag(ChainChange.Decoder) ? next : current.Decoder,
+                    Renderer = changed.HasFlag(ChainChange.Renderer) ? next : current.Renderer,
+                };
+
+                if (changed.HasFlag(ChainChange.Source))
+                {
+                    Source.Publish(selected.Source is { } source && selected.Stream is { } stream ? new(source, stream, "source") : null, versions);
+                }
+
+                if (changed.HasFlag(ChainChange.Decoder))
+                {
+                    Decoder.Publish(decoder, versions);
+                    decoder = null;
+                }
+
+                if (changed.HasFlag(ChainChange.Renderer))
+                {
+                    Renderer.Publish(renderer, versions);
+                    renderer = null;
+                }
+            }
+
+            return result.Success(changed);
+        }
+        finally
+        {
+            renderer?.Dispose();
+            decoder?.Dispose();
+        }
     }
 
     public void Wake()
