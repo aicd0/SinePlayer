@@ -394,9 +394,9 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
 
         ComponentResolver resolver = Components.Clone();
-        OperationResult<ChainChange> video = BuildVideoChain(resolver);
-        OperationResult<ChainChange> audio = BuildAudioChain(resolver);
-        OperationResult<ChainChange> subtitle = BuildSubtitleChain(resolver);
+        OperationResult<ChainChange> video = _video.Reconcile(resolver);
+        OperationResult<ChainChange> audio = _audio.Reconcile(resolver);
+        OperationResult<ChainChange> subtitle = _subtitle.Reconcile(resolver);
 
         bool changed = (video.IsSuccessful && video.Result != ChainChange.None)
             || (audio.IsSuccessful && audio.Result != ChainChange.None)
