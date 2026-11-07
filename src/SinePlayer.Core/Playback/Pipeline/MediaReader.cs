@@ -218,7 +218,6 @@ internal sealed class MediaReader(
                 chosenTail.Tail = packet.Timestamp;
             }
 
-            bool handedOn = false;
             foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
             {
                 if (entry.Value.CurrentComponent != chosenSource || entry.Value.CurrentStream?.Index != packet.StreamIndex)
@@ -226,17 +225,12 @@ internal sealed class MediaReader(
                     continue;
                 }
 
-                entry.Key.Accept(entry.Value.CurrentStream!, packet, entry.Value.CurrentVersions, epoch);
+                packet.Ref();
+                entry.Key.Accept(entry.Value.CurrentStream, packet, entry.Value.CurrentVersions, epoch);
                 entry.Key.ReadTail.Report(epoch, packet.Timestamp);
-                handedOn = true;
-                break;
             }
 
-            if (!handedOn)
-            {
-                packet.Dispose();
-            }
-
+            packet.Dispose();
             await Task.Yield();
         }
     }

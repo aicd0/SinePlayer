@@ -3,12 +3,10 @@
 
 namespace SinePlayer.Core.Playback.Abstractions.Source;
 
-/// <summary>
-/// One encoded packet read from a stream, with timestamps already converted to the engine's time
-/// base. The packet owns <see cref="Buffer"/> and releases it when disposed.
-/// </summary>
-public sealed class MediaPacket : IDisposable
+public sealed partial class MediaPacket : IDisposable
 {
+    private int _refCount = 1;
+
     public required int StreamIndex { get; init; }
 
     public required TimeSpan Timestamp { get; init; }
@@ -19,8 +17,16 @@ public sealed class MediaPacket : IDisposable
 
     public required IMediaBuffer Buffer { get; init; }
 
+    internal void Ref()
+    {
+        Interlocked.Increment(ref _refCount);
+    }
+
     public void Dispose()
     {
-        Buffer.Dispose();
+        if (Interlocked.Decrement(ref _refCount) == 0)
+        {
+            Buffer.Dispose();
+        }
     }
 }
