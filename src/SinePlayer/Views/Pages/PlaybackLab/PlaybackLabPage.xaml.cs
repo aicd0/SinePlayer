@@ -813,7 +813,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             AudioTrackPicker.SelectedIndex = IndexOf(AudioTrackPicker, SourceOf(sources, pipeline?.AudioChains[0].SelectedStream), pipeline?.AudioChains[0].SelectedStream);
 
             SubtitleTrackPicker.ItemsSource = Choose(sources, source => source.Info.SubtitleStreams);
-            SubtitleTrackPicker.SelectedIndex = IndexOf(SubtitleTrackPicker, SourceOf(sources, pipeline?.SelectedSubtitleStream), pipeline?.SelectedSubtitleStream);
+            SubtitleTrackPicker.SelectedIndex = IndexOf(SubtitleTrackPicker, SourceOf(sources, pipeline?.SubtitleChains[0].SelectedStream), pipeline?.SubtitleChains[0].SelectedStream);
         }
         finally
         {

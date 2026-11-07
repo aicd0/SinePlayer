@@ -115,12 +115,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public IReadOnlyList<MediaSource> Sources => _sources;
 
-    public SubtitleStreamInfo? SelectedSubtitleStream => Subtitle.Selected.Stream;
-
-    public string? SubtitleDecoderName => Subtitle.Decoder.CurrentComponent?.Name;
-
-    public string? SubtitleRendererName => Subtitle.Renderer.CurrentComponent?.Name;
-
     public TimeSpan Position => _timeline.Position;
 
     public string? StarvedFor => Video.Starved ? "video" : Audio.Starved ? "audio" : null;
