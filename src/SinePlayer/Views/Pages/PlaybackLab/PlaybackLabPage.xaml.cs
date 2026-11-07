@@ -58,16 +58,57 @@ internal sealed partial class PlaybackLabPage : BasePage
             return;
         }
 
-        pipeline.Components.Clear<TFactory>();
+        switch (typeof(TFactory).Name)
+        {
+            case nameof(IVideoDecoderFactory):
+                pipeline.VideoComponents.ClearDecoders();
+                break;
+            case nameof(IVideoRendererFactory):
+                pipeline.VideoComponents.ClearRenderers();
+                break;
+            case nameof(IAudioDecoderFactory):
+                pipeline.AudioComponents.ClearDecoders();
+                break;
+            case nameof(IAudioRendererFactory):
+                pipeline.AudioComponents.ClearRenderers();
+                break;
+            case nameof(ISubtitleDecoderFactory):
+                pipeline.SubtitleComponents.ClearDecoders();
+                break;
+            case nameof(ISubtitleRendererFactory):
+                pipeline.SubtitleComponents.ClearRenderers();
+                break;
+        }
+
         foreach (IComponentFactory factory in choice.Factories)
         {
-            pipeline.Components.Register(factory);
+            switch (factory)
+            {
+                case IVideoDecoderFactory decoder:
+                    pipeline.VideoComponents.Register(decoder);
+                    break;
+                case IVideoRendererFactory renderer:
+                    pipeline.VideoComponents.Register(renderer);
+                    break;
+                case IAudioDecoderFactory decoder:
+                    pipeline.AudioComponents.Register(decoder);
+                    break;
+                case IAudioRendererFactory renderer:
+                    pipeline.AudioComponents.Register(renderer);
+                    break;
+                case ISubtitleDecoderFactory decoder:
+                    pipeline.SubtitleComponents.Register(decoder);
+                    break;
+                case ISubtitleRendererFactory renderer:
+                    pipeline.SubtitleComponents.Register(renderer);
+                    break;
+            }
         }
 
         if (choice.HardwareDecoding is bool hardwareDecoding)
         {
             // Choosing a software decoder is a different request, not just a different registration.
-            pipeline.Components.Preferences = pipeline.Components.Preferences with { PreferHardwareDecoding = hardwareDecoding };
+            pipeline.VideoComponents.Preferences = pipeline.VideoComponents.Preferences with { PreferHardwareDecoding = hardwareDecoding };
         }
     }
 

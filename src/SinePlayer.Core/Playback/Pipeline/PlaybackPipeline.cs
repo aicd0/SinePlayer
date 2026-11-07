@@ -64,7 +64,11 @@ public sealed partial class PlaybackPipeline : IDisposable
         remove => _events.WarningRaised -= value;
     }
 
-    public ComponentResolver Components { get; set; } = new();
+    public VideoComponentResolver VideoComponents => _video.Components;
+
+    public AudioComponentResolver AudioComponents => _audio.Components;
+
+    public SubtitleComponentResolver SubtitleComponents => _subtitle.Components;
 
     public AudioFilterChain AudioFilters => _audio.Filters;
 
@@ -393,10 +397,9 @@ public sealed partial class PlaybackPipeline : IDisposable
             return result.Failure($"Cannot change the pipeline's components when the state is {state}.");
         }
 
-        ComponentResolver resolver = Components.Clone();
-        OperationResult<ChainChange> video = _video.Reconcile(resolver.Video);
-        OperationResult<ChainChange> audio = _audio.Reconcile(resolver.Audio);
-        OperationResult<ChainChange> subtitle = _subtitle.Reconcile(resolver.Subtitle);
+        OperationResult<ChainChange> video = _video.Reconcile();
+        OperationResult<ChainChange> audio = _audio.Reconcile();
+        OperationResult<ChainChange> subtitle = _subtitle.Reconcile();
 
         bool changed = (video.IsSuccessful && video.Result != ChainChange.None)
             || (audio.IsSuccessful && audio.Result != ChainChange.None)

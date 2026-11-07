@@ -47,6 +47,8 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
     public bool IsHardwareAccelerated => Decoder.CurrentComponent?.IsHardwareAccelerated ?? false;
 
+    public AudioComponentResolver Components { get; } = new();
+
     public AudioFilterChain Filters { get; } = new();
 
     public long Underruns => Renderer.CurrentComponent?.UnderrunCount ?? 0;
@@ -120,8 +122,10 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
         ReadTail.Reset();
     }
 
-    public OperationResult<ChainChange> Reconcile(AudioComponentResolver resolver)
+    public OperationResult<ChainChange> Reconcile()
     {
+        AudioComponentResolver resolver = Components.Clone();
+
         OperationResultCreator<ChainChange> result = new();
 
         StreamBinding<AudioStreamInfo> selected = Selected;
