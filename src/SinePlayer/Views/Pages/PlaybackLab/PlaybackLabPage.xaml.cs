@@ -405,10 +405,10 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         GainAudioFilter gain = new();
         gain.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
-        pipeline.AudioFilters.Add(gain);
+        pipeline.AudioChains[0].Filters.Add(gain);
 
         DownmixAudioFilter downmix = new();
-        pipeline.AudioFilters.Add(downmix);
+        pipeline.AudioChains[0].Filters.Add(downmix);
 
         OperationResult reset = await pipeline.Reset(_videoRenderTarget, _subtitleRenderTarget);
         string? failure = reset.IsSuccessful ? null : reset.Message;
@@ -810,7 +810,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             VideoTrackPicker.SelectedIndex = IndexOf(VideoTrackPicker, SourceOf(sources, pipeline?.VideoChains[0].SelectedStream), pipeline?.VideoChains[0].SelectedStream);
 
             AudioTrackPicker.ItemsSource = Choose(sources, source => source.Info.AudioStreams);
-            AudioTrackPicker.SelectedIndex = IndexOf(AudioTrackPicker, SourceOf(sources, pipeline?.SelectedAudioStream), pipeline?.SelectedAudioStream);
+            AudioTrackPicker.SelectedIndex = IndexOf(AudioTrackPicker, SourceOf(sources, pipeline?.AudioChains[0].SelectedStream), pipeline?.AudioChains[0].SelectedStream);
 
             SubtitleTrackPicker.ItemsSource = Choose(sources, source => source.Info.SubtitleStreams);
             SubtitleTrackPicker.SelectedIndex = IndexOf(SubtitleTrackPicker, SourceOf(sources, pipeline?.SelectedSubtitleStream), pipeline?.SelectedSubtitleStream);
@@ -860,7 +860,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             ? string.Empty
             : $" Surface {_videoRenderTarget.SurfaceWidth}x{_videoRenderTarget.SurfaceHeight} at {_videoRenderTarget.RasterizationScale:0.##}x.";
         string waiting = pipeline.StarvedFor is null ? string.Empty : $" waiting for {pipeline.StarvedFor}.";
-        long underruns = pipeline.AudioUnderruns;
+        long underruns = pipeline.AudioChains[0].Underruns;
         string health = $" dropped {video.DroppedFrameCount}, underruns {underruns}, lag {video.PictureLag.TotalMilliseconds:0} ms.{waiting}";
         long presented = video.PresentedFrameCount;
         // Decode and render are the two candidates for whatever limits playback, so the line names both rather
@@ -868,10 +868,10 @@ internal sealed partial class PlaybackLabPage : BasePage
         // and "the Direct3D renderer" are requests the machine may have answered differently.
         string decoding = video.IsHardwareAccelerated ? "on the GPU" : "on the CPU";
         string renderer = video.RendererName ?? "no renderer";
-        string sound = pipeline.AudioRendererName is null ? string.Empty : $", sound by {pipeline.AudioRendererName}";
-        string chain = pipeline.AudioFilters.Count == 0
+        string sound = pipeline.AudioChains[0].RendererName is null ? string.Empty : $", sound by {pipeline.AudioChains[0].RendererName}";
+        string chain = pipeline.AudioChains[0].Filters.Count == 0
             ? "no audio filters"
-            : $"filters {string.Join(", ", pipeline.AudioFilters.Filters.Select(filter => filter.Name))}";
+            : $"filters {string.Join(", ", pipeline.AudioChains[0].Filters.Filters.Select(filter => filter.Name))}";
         string pace = $" decode {video.AverageDecodeMilliseconds:0.0} ms {decoding}, render {video.AverageRenderMilliseconds:0.0} ms by {renderer}{sound}, {chain}.";
         string transform = DescribeTransform(pipeline.VideoTransform);
         string tracks = DescribeTracks(pipeline);
@@ -890,7 +890,8 @@ internal sealed partial class PlaybackLabPage : BasePage
     private string DescribeTracks(PlaybackPipeline pipeline)
     {
         VideoStreamInfo? video = pipeline.VideoChains[0].SelectedStream;
-        if (video is null && pipeline.SelectedAudioStream is null)
+        AudioStreamInfo? audio = pipeline.AudioChains[0].SelectedStream;
+        if (video is null && audio is null)
         {
             return " No track is chosen: pick a video or audio track to play this file.";
         }
@@ -902,7 +903,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             parts.Add($"video {DescribeTrack(SourceOf(sources, video), video)}");
         }
 
-        if (sources.Sum(source => source.Info.AudioStreams.Count) > 1 && pipeline.SelectedAudioStream is { } audio)
+        if (sources.Sum(source => source.Info.AudioStreams.Count) > 1 && audio is not null)
         {
             parts.Add($"audio {DescribeTrack(SourceOf(sources, audio), audio)}");
         }
@@ -924,7 +925,7 @@ internal sealed partial class PlaybackLabPage : BasePage
     private static TimeSpan ReachableDuration(PlaybackPipeline pipeline)
     {
         TimeSpan video = pipeline.VideoChains[0].SelectedStream?.Duration ?? TimeSpan.Zero;
-        TimeSpan audio = pipeline.SelectedAudioStream?.Duration ?? TimeSpan.Zero;
+        TimeSpan audio = pipeline.AudioChains[0].SelectedStream?.Duration ?? TimeSpan.Zero;
         return video > audio ? video : audio;
     }
 

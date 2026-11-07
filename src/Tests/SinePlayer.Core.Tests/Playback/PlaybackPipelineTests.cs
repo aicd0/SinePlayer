@@ -2484,7 +2484,7 @@ public class PlaybackPipelineTests
                 Assert.That(pipeline.State, Is.Not.EqualTo(MediaEngineState.Error));
                 Assert.That(pipeline.Sources[0].Info.AudioStreams, Is.Not.Empty, "the file's audio stream does not stop existing because no device would take it");
                 Assert.That(pipeline.VideoChains[0].SelectedStream, Is.Not.Null, "the picture is what is playing");
-                Assert.That(pipeline.AudioDecoderName, Is.Null, "and the sound has no chain");
+                Assert.That(pipeline.AudioChains[0].DecoderName, Is.Null, "and the sound has no chain");
             }
 
             // The refusal is the answer to the choice, and it names the device.
@@ -2492,7 +2492,7 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(audio.IsSuccessful, Is.False);
-                Assert.That(pipeline.AudioDecoderName, Is.Null, "a refused choice publishes nothing");
+                Assert.That(pipeline.AudioChains[0].DecoderName, Is.Null, "a refused choice publishes nothing");
             }
 
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -2525,8 +2525,8 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(pipeline.SelectedAudioStream, Is.Not.Null, "the choice is recorded even though nothing could be built for it");
-                Assert.That(pipeline.AudioRendererName, Is.Null, "nothing was published for it");
+                Assert.That(pipeline.AudioChains[0].SelectedStream, Is.Not.Null, "the choice is recorded even though nothing could be built for it");
+                Assert.That(pipeline.AudioChains[0].RendererName, Is.Null, "nothing was published for it");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "the file is still open, and nothing is playing");
                 Assert.That(Await(pipeline.Play()).IsSuccessful, Is.False, "there is no chain to play");
             }
@@ -3502,7 +3502,7 @@ public class PlaybackPipelineTests
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => first.SubmitsStarted > 0, "the pipeline to be handing the device audio");
-            Assert.That(pipeline.AudioRendererName, Is.EqualTo("first"));
+            Assert.That(pipeline.AudioChains[0].RendererName, Is.EqualTo("first"));
 
             TimeSpan position = pipeline.Position;
             SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(second));
@@ -3511,7 +3511,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(pipeline.AudioRendererName, Is.EqualTo("second"));
+                Assert.That(pipeline.AudioChains[0].RendererName, Is.EqualTo("second"));
                 Assert.That(first.DisposeCount, Is.EqualTo(1), "the device that was replaced has to be released");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "changing the device is not a pause");
                 Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position - TimeSpan.FromSeconds(1)), "the stream has to pick up where it was");
@@ -3552,7 +3552,7 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(swapped.Result.Audio.IsSuccessful, Is.False, "a device that cannot be opened is the caller's failure to see");
-                Assert.That(pipeline.AudioRendererName, Is.EqualTo("first"), "the playing device is untouched");
+                Assert.That(pipeline.AudioChains[0].RendererName, Is.EqualTo("first"), "the playing device is untouched");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
             }
 
@@ -4297,7 +4297,7 @@ public class PlaybackPipelineTests
         {
             RecordingAudioFilter filter = new("record");
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
-            pipeline.AudioFilters.Add(filter);
+            pipeline.AudioChains[0].Filters.Add(filter);
 
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -4307,7 +4307,7 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(filter.ConfiguredStream, Is.Not.Null, "a filter is configured for the stream before a block reaches it");
-                Assert.That(pipeline.AudioFilters.Filters, Is.EqualTo(new IAudioFilter[] { filter }));
+                Assert.That(pipeline.AudioChains[0].Filters.Filters, Is.EqualTo(new IAudioFilter[] { filter }));
             }
         }
         finally
@@ -4342,7 +4342,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            pipeline.AudioFilters.Add(new DownmixAudioFilter());
+            pipeline.AudioChains[0].Filters.Add(new DownmixAudioFilter());
             Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Video, pipeline.Sources[0].Info.VideoStreams[0]).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
@@ -4387,7 +4387,7 @@ public class PlaybackPipelineTests
 
         try
         {
-            pipeline.AudioFilters.Add(new DownmixAudioFilter());
+            pipeline.AudioChains[0].Filters.Add(new DownmixAudioFilter());
             Assert.That(Open(pipeline, SyntheticPath(), new FakeRenderTarget()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -4474,7 +4474,7 @@ public class PlaybackPipelineTests
             WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
             Assert.That(renderer.ConfiguredStream?.ChannelCount, Is.EqualTo(6), "with no filter, the device is opened for the stream");
 
-            pipeline.AudioFilters.Add(new DownmixAudioFilter());
+            pipeline.AudioChains[0].Filters.Add(new DownmixAudioFilter());
 
             WaitFor(() => renderer.SubmittedChannelCounts.Contains(2), "the device to be reopened for the folded shape");
 
@@ -4555,7 +4555,7 @@ public class PlaybackPipelineTests
             WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
 
             RecordingAudioFilter late = new("late");
-            pipeline.AudioFilters.Add(late);
+            pipeline.AudioChains[0].Filters.Add(late);
 
             WaitFor(() => late.AppliedBlocks > 0, "the new filter to take part without a reconcile");
 
@@ -4584,13 +4584,13 @@ public class PlaybackPipelineTests
             FakeAudioRenderer renderer = new();
             RecordingAudioFilter filter = new("record");
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), renderer);
-            pipeline.AudioFilters.Add(filter);
+            pipeline.AudioChains[0].Filters.Add(filter);
 
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => filter.AppliedBlocks > 0, "the chain to see the sound");
 
-            Assert.That(pipeline.AudioFilters.Remove(filter), Is.True);
+            Assert.That(pipeline.AudioChains[0].Filters.Remove(filter), Is.True);
 
             // A block already on its way may still carry the filter, so the count is taken once the device has
             // taken a block that was queued after the removal.
@@ -4628,7 +4628,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), renderer);
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
 
-            Assert.That(pipeline.AudioUnderruns, Is.EqualTo(3));
+            Assert.That(pipeline.AudioChains[0].Underruns, Is.EqualTo(3));
         }
         finally
         {
@@ -4651,7 +4651,7 @@ public class PlaybackPipelineTests
 
             GainAudioFilter gain = new();
             gain.SetLevel(0.25, false);
-            pipeline.AudioFilters.Add(gain);
+            pipeline.AudioChains[0].Filters.Add(gain);
 
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -4688,7 +4688,7 @@ public class PlaybackPipelineTests
 
             GainAudioFilter gain = new();
             gain.SetLevel(0.5, false);
-            pipeline.AudioFilters.Add(gain);
+            pipeline.AudioChains[0].Filters.Add(gain);
 
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -4957,7 +4957,7 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(selected.IsSuccessful, Is.True, selected.Message);
-                Assert.That(pipeline.SelectedAudioStream?.Index, Is.EqualTo(second.Index));
+                Assert.That(pipeline.AudioChains[0].SelectedStream?.Index, Is.EqualTo(second.Index));
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "changing a track is not a pause");
                 Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position - TrackSwitchSlack), "the switch resumes where playback stands, not at the start of the file");
             }
@@ -5038,7 +5038,7 @@ public class PlaybackPipelineTests
             WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
 
             int flushed = audioRenderer.FlushCount;
-            AudioStreamInfo playing = pipeline.SelectedAudioStream!;
+            AudioStreamInfo playing = pipeline.AudioChains[0].SelectedStream!;
 
             OperationResult selected = Select(pipeline, MediaStreamKind.Audio, playing);
 
@@ -5046,7 +5046,7 @@ public class PlaybackPipelineTests
             {
                 Assert.That(selected.IsSuccessful, Is.True, selected.Message);
                 Assert.That(audioRenderer.FlushCount, Is.EqualTo(flushed), "nothing is restarted for the track that is already playing");
-                Assert.That(pipeline.SelectedAudioStream?.Index, Is.EqualTo(playing.Index));
+                Assert.That(pipeline.AudioChains[0].SelectedStream?.Index, Is.EqualTo(playing.Index));
             }
         }
         finally
@@ -5070,7 +5070,7 @@ public class PlaybackPipelineTests
             WaitFor(() => audioRenderer.SubmittedBuffers > 2, "playback to be under way");
 
             int flushed = audioRenderer.FlushCount;
-            AudioStreamInfo playing = pipeline.SelectedAudioStream!;
+            AudioStreamInfo playing = pipeline.AudioChains[0].SelectedStream!;
 
             using (Assert.EnterMultipleScope())
             {
@@ -5081,7 +5081,7 @@ public class PlaybackPipelineTests
                 Assert.That(Select(pipeline, MediaStreamKind.Subtitle, playing).IsSuccessful, Is.False, "a stream of the other kind is not this kind's");
                 Assert.That(Select(pipeline, MediaStreamKind.Video, playing).IsSuccessful, Is.False, "a stream of the other kind is not this kind's");
 
-                Assert.That(pipeline.SelectedAudioStream?.Index, Is.EqualTo(playing.Index), "a refusal leaves the track that was playing");
+                Assert.That(pipeline.AudioChains[0].SelectedStream?.Index, Is.EqualTo(playing.Index), "a refusal leaves the track that was playing");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
                 Assert.That(audioRenderer.FlushCount, Is.EqualTo(flushed), "a refusal restarts nothing");
             }
@@ -5162,11 +5162,11 @@ public class PlaybackPipelineTests
             {
                 Assert.That(pipeline.Sources[0].Info.VideoStreams, Is.Not.Empty, "the file can be read, which is how a host chooses");
                 Assert.That(pipeline.VideoChains[0].SelectedStream, Is.Null, "nothing is chosen for the host");
-                Assert.That(pipeline.SelectedAudioStream, Is.Null);
+                Assert.That(pipeline.AudioChains[0].SelectedStream, Is.Null);
                 Assert.That(pipeline.VideoChains[0].DecoderName, Is.Null, "no decoder was created");
-                Assert.That(pipeline.AudioDecoderName, Is.Null);
+                Assert.That(pipeline.AudioChains[0].DecoderName, Is.Null);
                 Assert.That(pipeline.VideoChains[0].RendererName, Is.Null, "no device was opened");
-                Assert.That(pipeline.AudioRendererName, Is.Null);
+                Assert.That(pipeline.AudioChains[0].RendererName, Is.Null);
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused));
             }
 
@@ -5278,7 +5278,7 @@ public class PlaybackPipelineTests
             {
                 Assert.That(turnedOff.IsSuccessful, Is.True, turnedOff.Message);
                 Assert.That(pipeline.VideoChains[0].SelectedStream, Is.Null, "the kind is off");
-                Assert.That(pipeline.SelectedAudioStream, Is.Not.Null, "the other kind is untouched");
+                Assert.That(pipeline.AudioChains[0].SelectedStream, Is.Not.Null, "the other kind is untouched");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "turning a kind off is not a pause while one is left");
             }
 
@@ -5475,11 +5475,11 @@ public class PlaybackPipelineTests
             }
 
             Assert.That(Select(pipeline, MediaStreamKind.Audio, audio).IsSuccessful, Is.True);
-            Assert.That(pipeline.SelectedAudioStream?.Index, Is.EqualTo(audio.Index));
+            Assert.That(pipeline.AudioChains[0].SelectedStream?.Index, Is.EqualTo(audio.Index));
 
             // The owners adopt what was published, which is a moment after the answer.
             WaitFor(() => pipeline.VideoChains[0].DecoderName is not null, "both chains were built");
-            WaitFor(() => pipeline.AudioDecoderName is not null, "both chains were built");
+            WaitFor(() => pipeline.AudioChains[0].DecoderName is not null, "both chains were built");
 
             // Naming nothing at all is how both kinds are switched off, and it leaves the file open with nothing to
             // play — the state an opened file is in.
@@ -5489,13 +5489,13 @@ public class PlaybackPipelineTests
             {
                 Assert.That(nothing.IsSuccessful, Is.True, nothing.Message);
                 Assert.That(pipeline.VideoChains[0].SelectedStream, Is.Null);
-                Assert.That(pipeline.SelectedAudioStream, Is.Null);
+                Assert.That(pipeline.AudioChains[0].SelectedStream, Is.Null);
                 Assert.That(Await(pipeline.Play()).IsSuccessful, Is.False, "there is nothing to play");
             }
 
             // The chains are let go of by the threads that held them, so this is waited for as well.
             WaitFor(() => pipeline.VideoChains[0].DecoderName is null, "the video chain to be let go of");
-            WaitFor(() => pipeline.AudioDecoderName is null, "the audio chain to be let go of");
+            WaitFor(() => pipeline.AudioChains[0].DecoderName is null, "the audio chain to be let go of");
         }
         finally
         {
@@ -5803,7 +5803,7 @@ public class PlaybackPipelineTests
             Assert.That(chosen.IsSuccessful, Is.True, chosen.Message);
 
             WaitFor(() => late.SubmittedBuffers > 0, "the device that arrived to be given sound");
-            Assert.That(pipeline.AudioRendererName, Is.EqualTo("late"));
+            Assert.That(pipeline.AudioChains[0].RendererName, Is.EqualTo("late"));
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the picture never stopped");
         }
         finally
@@ -8393,7 +8393,7 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "adding a file is not a pause");
-                Assert.That(pipeline.SelectedAudioStream?.Index, Is.EqualTo(info.AudioStreams[0].Index), "the track that was playing keeps playing");
+                Assert.That(pipeline.AudioChains[0].SelectedStream?.Index, Is.EqualTo(info.AudioStreams[0].Index), "the track that was playing keeps playing");
             }
 
             WaitFor(() => videoRenderer.RenderedFrames > rendered, "the picture to keep coming");
