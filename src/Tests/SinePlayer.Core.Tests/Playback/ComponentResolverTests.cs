@@ -14,9 +14,9 @@ using SinePlayer.Core.Playback.Selection;
 namespace SinePlayer.Core.Tests.Playback;
 
 /// <summary>
-/// The resolver is what the pipeline reads and what the host writes. It does not decide eligibility — a factory
-/// says what it can offer, and what it offers is what gets offered to the caller — so what is left to pin is that
-/// the order is the host's, that a clone is a copy, and that what is offered is a sequence to be walked.
+/// A resolver is one kind's: what its chain reads and what the host writes. It does not decide eligibility — a
+/// factory says what it can offer, and what it offers is what gets offered to the caller — so what is left to pin is
+/// that the order is the host's, that a clone is a copy, and that what is offered is a sequence to be walked.
 /// </summary>
 [TestFixture]
 public class ComponentResolverTests
@@ -25,16 +25,13 @@ public class ComponentResolverTests
     public void KeepsTheRegistrationOrder()
     {
         ComponentRegistry registry = new();
-        NullVideoRendererFactory first = new();
-        NullVideoRendererFactory second = new("null:second");
-        NullVideoRendererFactory third = new("null:third");
-        registry.Register(first);
-        registry.Register(second);
-        registry.Register(third);
+        registry.Register(new NullVideoRendererFactory("null:first"));
+        registry.Register(new NullVideoRendererFactory("null:second"));
+        registry.Register(new NullVideoRendererFactory("null:third"));
 
-        ComponentResolver resolver = new(registry);
+        VideoComponentResolver resolver = new(registry);
 
-        Assert.That(Renderers(resolver), Is.EqualTo(new[] { first, second, third }));
+        Assert.That(Signatures(resolver.ResolveRenderers()), Is.EqualTo(new[] { "null:first", "null:second", "null:third" }));
     }
 
     /// <summary>
@@ -45,32 +42,30 @@ public class ComponentResolverTests
     public void ReadingTheLiveRegistryFollowsIt()
     {
         ComponentRegistry registry = new();
-        ComponentResolver resolver = new(registry);
+        AudioComponentResolver resolver = new(registry);
 
-        NullAudioRendererFactory device = new();
-        registry.Register(device);
+        registry.Register(new NullAudioRendererFactory("null:live"));
 
-        Assert.That(resolver.GetComponents<IAudioRendererFactory>(), Is.EqualTo(new[] { device }));
+        Assert.That(Signatures(resolver.ResolveRenderers()), Is.EqualTo(new[] { "null:live" }));
     }
 
     [Test]
     public void ACloneReadsWhatItCopied()
     {
         ComponentRegistry registry = new();
-        NullAudioRendererFactory first = new();
+        NullAudioRendererFactory first = new("null:first");
         registry.Register(first);
 
-        ComponentResolver live = new(registry);
-        ComponentResolver clone = live.Clone();
+        AudioComponentResolver live = new(registry);
+        AudioComponentResolver clone = live.Clone();
 
         registry.Register(new NullAudioRendererFactory("null:second"));
         registry.Remove(first);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(clone.GetComponents<IAudioRendererFactory>(), Is.EqualTo(new[] { first }), "a clone is a copy");
-            Assert.That(live.GetComponents<IAudioRendererFactory>().Count, Is.EqualTo(1), "the live registry moved on");
-            Assert.That(live.GetComponents<IAudioRendererFactory>()[0], Is.Not.SameAs(first));
+            Assert.That(Signatures(clone.ResolveRenderers()), Is.EqualTo(new[] { "null:first" }), "a clone is a copy");
+            Assert.That(Signatures(live.ResolveRenderers()), Is.EqualTo(new[] { "null:second" }), "the live registry moved on");
         }
     }
 
@@ -81,28 +76,26 @@ public class ComponentResolverTests
     [Test]
     public void ACloneCanBeChangedWithoutReachingTheOriginal()
     {
-        ComponentResolver original = new();
-        NullVideoRendererFactory renderer = new();
-        original.Register(renderer);
+        VideoComponentResolver original = new();
+        original.Register(new NullVideoRendererFactory("null:original"));
 
-        ComponentResolver clone = original.Clone();
-        clone.Clear<IVideoRendererFactory>();
+        VideoComponentResolver clone = original.Clone();
+        clone.ClearRenderers();
         clone.Register(new NullVideoRendererFactory("null:clone"));
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(Renderers(original), Is.EqualTo(new[] { renderer }), "the original kept what it had");
-            Assert.That(Renderers(clone).Count, Is.EqualTo(1));
-            Assert.That(Renderers(clone)[0], Is.Not.SameAs(renderer));
+            Assert.That(Signatures(original.ResolveRenderers()), Is.EqualTo(new[] { "null:original" }), "the original kept what it had");
+            Assert.That(Signatures(clone.ResolveRenderers()), Is.EqualTo(new[] { "null:clone" }));
         }
     }
 
     [Test]
     public void ACloneCarriesThePreferences()
     {
-        ComponentResolver original = new() { Preferences = new VideoPreferences { PreferHardwareDecoding = false } };
+        VideoComponentResolver original = new() { Preferences = new VideoPreferences { PreferHardwareDecoding = false } };
 
-        ComponentResolver clone = original.Clone();
+        VideoComponentResolver clone = original.Clone();
         clone.Preferences = clone.Preferences with { PreferHardwareDecoding = true };
 
         using (Assert.EnterMultipleScope())
@@ -115,11 +108,11 @@ public class ComponentResolverTests
     [Test]
     public void AResolverThatOwnsItsRegistryStartsEmpty()
     {
-        ComponentResolver resolver = new();
+        VideoComponentResolver resolver = new();
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(Renderers(resolver), Is.Empty);
+            Assert.That(resolver.ResolveRenderers(), Is.Empty);
             Assert.That(resolver.Preferences, Is.SameAs(VideoPreferences.Default));
         }
     }
@@ -131,11 +124,11 @@ public class ComponentResolverTests
     [Test]
     public void AFactoryThatOffersNothingAddsNoCreator()
     {
-        ComponentResolver resolver = new();
+        VideoComponentResolver resolver = new();
         resolver.Register(new DecliningVideoRendererFactory("declines"));
         resolver.Register(new NullVideoRendererFactory());
 
-        List<IComponentCreator<IVideoRenderer>> creators = [.. resolver.Video.ResolveRenderers()];
+        List<IComponentCreator<IVideoRenderer>> creators = [.. resolver.ResolveRenderers()];
 
         using (Assert.EnterMultipleScope())
         {
@@ -147,20 +140,6 @@ public class ComponentResolverTests
     }
 
     /// <summary>
-    /// Everything that offers something is offered, in the order the host registered it: which one is worth taking
-    /// is the caller's decision, not the resolver's.
-    /// </summary>
-    [Test]
-    public void EveryOfferIsInTheSequenceInRegistrationOrder()
-    {
-        ComponentResolver resolver = new();
-        resolver.Register(new NullVideoRendererFactory());
-        resolver.Register(new NullVideoRendererFactory("null:second"));
-
-        Assert.That(resolver.Video.ResolveRenderers().Select(creator => creator.Signature), Is.EqualTo(new[] { "null:video-renderer", "null:second" }));
-    }
-
-    /// <summary>
     /// Hardware decoding is a requirement, so the sequence is the field asked twice: what the registrations would
     /// make with it, and then — because a file that plays in software beats one that does not play — the same
     /// registrations asked without it.
@@ -168,11 +147,11 @@ public class ComponentResolverTests
     [Test]
     public void AVideoDecoderSequenceAsksForHardwareFirstAndThenWithout()
     {
-        ComponentResolver resolver = new() { Preferences = new VideoPreferences { PreferHardwareDecoding = true } };
+        VideoComponentResolver resolver = new() { Preferences = new VideoPreferences { PreferHardwareDecoding = true } };
         resolver.Register(new RecordingVideoDecoderFactory());
 
         using SyntheticMediaSource source = new(new SyntheticMediaScript());
-        List<IComponentCreator<IVideoDecoder>> creators = [.. resolver.Video.ResolveDecoders(source, source.Info.VideoStreams[0], gpuDevice: null, bufferedFrames: 4)];
+        List<IComponentCreator<IVideoDecoder>> creators = [.. resolver.ResolveDecoders(source, source.Info.VideoStreams[0], gpuDevice: null, bufferedFrames: 4)];
 
         using (Assert.EnterMultipleScope())
         {
@@ -182,9 +161,23 @@ public class ComponentResolverTests
         }
     }
 
-    private static IReadOnlyList<IVideoRendererFactory> Renderers(ComponentResolver resolver)
+    /// <summary>
+    /// A chain resolves only what its own kind can be built from: the subtitle resolver is asked with a subtitle
+    /// stream and a cue format, and answers with subtitle renderers.
+    /// </summary>
+    [Test]
+    public void ASubtitleResolverOffersRenderersForTheFormatItIsAskedAbout()
     {
-        return resolver.GetComponents<IVideoRendererFactory>();
+        SubtitleComponentResolver resolver = new();
+        resolver.Register(new NullSubtitleRendererFactory("null:subtitles"));
+
+        SubtitleStreamInfo stream = new() { Index = 0, CodecId = "subrip" };
+        Assert.That(Signatures(resolver.ResolveRenderers(stream, SubtitleCueFormat.Ass)), Is.EqualTo(new[] { "null:subtitles" }));
+    }
+
+    private static IEnumerable<string> Signatures<TComponent>(IEnumerable<IComponentCreator<TComponent>> creators) where TComponent : class
+    {
+        return creators.Select(creator => creator.Signature);
     }
 
     /// <summary>A factory that cannot serve whatever it is asked about, and says so by offering nothing.</summary>
