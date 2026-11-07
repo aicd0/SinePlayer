@@ -54,9 +54,9 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
 
     public MediaStreamKind Kind => MediaStreamKind.Video;
 
-    public MediaStreamInfo? SelectedStream => Selected.Stream;
+    public VideoStreamInfo? SelectedStream => Selected.Stream;
 
-    public MediaStreamInfo? PlayingStream => Source.CurrentStream;
+    public VideoStreamInfo? PlayingStream => (VideoStreamInfo?)Source.CurrentStream;
 
     public bool IsActive => Decoder.HasComponent;
 

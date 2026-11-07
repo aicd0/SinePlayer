@@ -37,9 +37,9 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
 
     public MediaStreamKind Kind => MediaStreamKind.Subtitle;
 
-    public MediaStreamInfo? SelectedStream => Selected.Stream;
+    public SubtitleStreamInfo? SelectedStream => Selected.Stream;
 
-    public MediaStreamInfo? PlayingStream => Source.CurrentStream;
+    public SubtitleStreamInfo? PlayingStream => (SubtitleStreamInfo?)Source.CurrentStream;
 
     public bool IsActive => Decoder.HasComponent;
 

@@ -73,7 +73,7 @@ public class PlaybackPipelineTests
                 Assert.That(videoRenderer.ConfiguredStream?.Width, Is.EqualTo(Width));
                 Assert.That(videoRenderer.ConfiguredStream?.Height, Is.EqualTo(Height));
                 Assert.That(videoRenderer.Target, Is.Not.Null, "the renderer must be given the host's surface");
-                Assert.That(pipeline.PresentedFrameCount, Is.GreaterThan(0));
+                Assert.That(pipeline.VideoChains[0].PresentedFrameCount, Is.GreaterThan(0));
                 Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(TimeSpan.Zero));
             }
         }
@@ -266,12 +266,12 @@ public class PlaybackPipelineTests
             WaitFor(() => audioRenderer.ClockIsRunning, "the first frame is what lets time pass");
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(pipeline.DroppedFrameCount, Is.Zero, "the first frames of a position are not late when the clock waited for them");
+                Assert.That(pipeline.VideoChains[0].DroppedFrameCount, Is.Zero, "the first frames of a position are not late when the clock waited for them");
                 Assert.That(pipeline.Position, Is.LessThan(TimeSpan.FromMilliseconds(300)), "and the picture starts at the start of the file, not past it");
             }
 
             WaitForPresentedFrames(pipeline, 3);
-            Assert.That(pipeline.DroppedFrameCount, Is.Zero, "and nothing after it is dropped either");
+            Assert.That(pipeline.VideoChains[0].DroppedFrameCount, Is.Zero, "and nothing after it is dropped either");
         }
         finally
         {
@@ -307,7 +307,7 @@ public class PlaybackPipelineTests
             WaitFor(() => pipeline.StarvedFor == "video", "a position that has produced nothing holds the clock", 150);
             WaitFor(() => !audioRenderer.ClockIsRunning, "the clock is held, so the sound is stopped with it");
 
-            long shown = pipeline.PresentedFrameCount;
+            long shown = pipeline.VideoChains[0].PresentedFrameCount;
             WaitForPresentedFrames(pipeline, shown + 1);
             WaitFor(() => audioRenderer.ClockIsRunning, "the first frame of the position lets time pass");
         }
@@ -352,7 +352,7 @@ public class PlaybackPipelineTests
             WaitFor(() => !audioRenderer.ClockIsRunning, "the old position's tail is not a fact about this one");
 
             videoDecoders.Open();
-            long shown = pipeline.PresentedFrameCount;
+            long shown = pipeline.VideoChains[0].PresentedFrameCount;
             WaitForPresentedFrames(pipeline, shown + 1);
             WaitFor(() => audioRenderer.ClockIsRunning, "the first frame of the position lets time pass");
         }
@@ -631,7 +631,7 @@ public class PlaybackPipelineTests
             for (int attempt = 0; attempt < 40; attempt++)
             {
                 Thread.Sleep(50);
-                worstLag = Math.Max(worstLag, pipeline.PictureLag.TotalMilliseconds);
+                worstLag = Math.Max(worstLag, pipeline.VideoChains[0].PictureLag.TotalMilliseconds);
                 heldForThePicture |= pipeline.StarvedFor == "video";
                 if (attempt == 19)
                 {
@@ -643,7 +643,7 @@ public class PlaybackPipelineTests
             {
                 Assert.That(pipeline.Error, Is.Null);
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the file is nowhere near its end");
-                Assert.That(pipeline.PresentedFrameCount, Is.GreaterThan(0), "the picture keeps being shown");
+                Assert.That(pipeline.VideoChains[0].PresentedFrameCount, Is.GreaterThan(0), "the picture keeps being shown");
                 Assert.That(audioRenderer.SubmittedSamples, Is.GreaterThan(samplesHalfway), "the sound keeps arriving while the decoder is behind");
                 Assert.That(heldForThePicture, Is.True, "a picture that cannot keep up is what has to hold the clock");
                 Assert.That(worstLag, Is.LessThan(700), "the picture is never left far behind the sound");
@@ -700,7 +700,7 @@ public class PlaybackPipelineTests
             // up: a picture left behind for the whole of the decoder's quiet shows as a gap of about that
             // length between the clock and the last frame the picture showed.
             TimeSpan held = pipeline.Position;
-            Assert.That(pipeline.PictureLag, Is.LessThan(TimeSpan.FromMilliseconds(700)),
+            Assert.That(pipeline.VideoChains[0].PictureLag, Is.LessThan(TimeSpan.FromMilliseconds(700)),
                 "the hold is what keeps the clock from running away from a picture that has nothing to show");
 
             // A held clock is a clock that does not move: the sound waits for the picture rather than leaving
@@ -756,7 +756,7 @@ public class PlaybackPipelineTests
             WaitFor(() => pipeline.StarvedFor == "video", "the clock has run past a picture that has nothing more to show", 1800);
 
             TimeSpan held = pipeline.Position;
-            Assert.That(pipeline.PictureLag, Is.LessThan(TimeSpan.FromMilliseconds(700)),
+            Assert.That(pipeline.VideoChains[0].PictureLag, Is.LessThan(TimeSpan.FromMilliseconds(700)),
                 "the hold is what keeps the clock from running away from a picture that has nothing to show");
 
             Thread.Sleep(300);
@@ -883,14 +883,14 @@ public class PlaybackPipelineTests
 
             Thread.Sleep(1500);
 
-            long presented = pipeline.PresentedFrameCount;
+            long presented = pipeline.VideoChains[0].PresentedFrameCount;
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(pipeline.Error, Is.Null);
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "falling behind is not failing");
                 Assert.That(presented, Is.GreaterThan(0), "something has to be shown");
-                Assert.That(pipeline.DroppedFrameCount, Is.GreaterThan(0), "a picture that cannot keep up has to give up on frames");
-                Assert.That(pipeline.PictureLag, Is.LessThan(TimeSpan.FromMilliseconds(400)), "and what it gives up on is what keeps it in step");
+                Assert.That(pipeline.VideoChains[0].DroppedFrameCount, Is.GreaterThan(0), "a picture that cannot keep up has to give up on frames");
+                Assert.That(pipeline.VideoChains[0].PictureLag, Is.LessThan(TimeSpan.FromMilliseconds(400)), "and what it gives up on is what keeps it in step");
                 Assert.That(audioRenderer.SubmittedSamples, Is.GreaterThan(0), "the sound is not what pays for the picture");
             }
 
@@ -929,13 +929,13 @@ public class PlaybackPipelineTests
             Assert.That(opened.IsSuccessful, Is.True, opened.Message);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
-            WaitFor(() => pipeline.DroppedFrameCount > 0, "a frame the display cannot take has to be given up");
+            WaitFor(() => pipeline.VideoChains[0].DroppedFrameCount > 0, "a frame the display cannot take has to be given up");
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(videoRenderer.RenderedFrames, Is.EqualTo(1), "only the frame that anchors the clock is drawn");
-                Assert.That(pipeline.PresentedFrameCount, Is.EqualTo(1), "and it is the only presentation");
-                Assert.That(pipeline.DroppedFrameCount, Is.GreaterThan(0), "the frames after it are given up, not drawn");
+                Assert.That(pipeline.VideoChains[0].PresentedFrameCount, Is.EqualTo(1), "and it is the only presentation");
+                Assert.That(pipeline.VideoChains[0].DroppedFrameCount, Is.GreaterThan(0), "the frames after it are given up, not drawn");
                 Assert.That(pipeline.Error, Is.Null, "a display that is behind is not a failure");
             }
         }
@@ -1310,7 +1310,7 @@ public class PlaybackPipelineTests
             // decoder was released and told to take the position up, and the reader is reading it rather than
             // sitting on the old position's queue. Nothing but the reset can put either of them there, which
             // is what this asserts — the old position cannot reach 50 s.
-            WaitFor(() => pipeline.LastPresentedTimestamp >= TimeSpan.FromSeconds(50),
+            WaitFor(() => pipeline.VideoChains[0].LastPresentedTimestamp >= TimeSpan.FromSeconds(50),
                 "the picture of the position a paused seek asked for must have been shown");
 
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused), "seeking must not start playback");
@@ -1356,7 +1356,7 @@ public class PlaybackPipelineTests
                 // make the next frame, due at 20 s, two seconds early on resume, and the picture would wait
                 // that out.
                 Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(TimeSpan.FromSeconds(19)), "a still must not move the clock");
-                Assert.That(pipeline.DroppedFrameCount, Is.Zero, "a still is not a presentation, so nothing about it is late");
+                Assert.That(pipeline.VideoChains[0].DroppedFrameCount, Is.Zero, "a still is not a presentation, so nothing about it is late");
                 Assert.That(videoRenderer.RenderedFrames, Is.EqualTo(shownBefore + 1), "one frame is offered, not several");
             }
 
@@ -1487,7 +1487,7 @@ public class PlaybackPipelineTests
             WaitForPlaybackToFinish(pipeline);
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
 
-            long once = pipeline.PresentedFrameCount;
+            long once = pipeline.VideoChains[0].PresentedFrameCount;
             Assert.That(once, Is.GreaterThan(0), "the frame should have been shown once");
 
             // A seek from the end is posted like everything else, and the play after it is queued behind it,
@@ -1613,9 +1613,9 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(pipeline.PresentedFrameCount, Is.EqualTo(1), "the second frame must not be due yet");
+                Assert.That(pipeline.VideoChains[0].PresentedFrameCount, Is.EqualTo(1), "the second frame must not be due yet");
                 Assert.That(videoRenderer.RenderedFrames, Is.EqualTo(1));
-                Assert.That(pipeline.DroppedFrameCount, Is.Zero, "waiting two seconds for a frame is not a reason to give up on it");
+                Assert.That(pipeline.VideoChains[0].DroppedFrameCount, Is.Zero, "waiting two seconds for a frame is not a reason to give up on it");
             }
 
             // The reader is now waiting for room that only that frame's moment can free, and it holds the
@@ -1823,7 +1823,7 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
-                Assert.That(pipeline.PresentedFrameCount, Is.GreaterThan(0), "the picture is shown, including its tail");
+                Assert.That(pipeline.VideoChains[0].PresentedFrameCount, Is.GreaterThan(0), "the picture is shown, including its tail");
             }
         }
         finally
@@ -2204,7 +2204,7 @@ public class PlaybackPipelineTests
             pipeline.Play();
             WaitForPresentedFrames(pipeline, 2);
 
-            long presented = pipeline.PresentedFrameCount;
+            long presented = pipeline.VideoChains[0].PresentedFrameCount;
             SeekAndWait(pipeline, target);
 
             // The seek did not pause, so the picture carries on from where the file resumed by itself.
@@ -2217,8 +2217,8 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(pipeline.Position, Is.LessThan(target), "the clock has to follow where playback resumed");
-                Assert.That(pipeline.PictureLag, Is.LessThan(TimeSpan.FromSeconds(1)), "the picture has to stay in step with the clock");
-                Assert.That(pipeline.DroppedFrameCount, Is.LessThan(5), "frames from the resume point are not late");
+                Assert.That(pipeline.VideoChains[0].PictureLag, Is.LessThan(TimeSpan.FromSeconds(1)), "the picture has to stay in step with the clock");
+                Assert.That(pipeline.VideoChains[0].DroppedFrameCount, Is.LessThan(5), "frames from the resume point are not late");
             }
         }
         finally
@@ -2325,12 +2325,12 @@ public class PlaybackPipelineTests
             SeekAndWait(pipeline, target, SeekMode.Precise);
 
             // The still of the new position is the first frame at or after it, not the keyframe behind it.
-            WaitFor(() => pipeline.LastPresentedTimestamp >= target,
-                $"a precise seek offered the still of {pipeline.LastPresentedTimestamp:g}, before the position it asked for ({target:g})");
+            WaitFor(() => pipeline.VideoChains[0].LastPresentedTimestamp >= target,
+                $"a precise seek offered the still of {pipeline.VideoChains[0].LastPresentedTimestamp:g}, before the position it asked for ({target:g})");
 
             int marker = videoRenderer.RenderedTimestamps.Count;
 
-            WaitForPresentedFrames(pipeline, pipeline.PresentedFrameCount + 2);
+            WaitForPresentedFrames(pipeline, pipeline.VideoChains[0].PresentedFrameCount + 2);
 
             IReadOnlyList<TimeSpan> rendered = videoRenderer.RenderedTimestamps;
             using (Assert.EnterMultipleScope())
@@ -2483,7 +2483,7 @@ public class PlaybackPipelineTests
                 Assert.That(opened.IsSuccessful, Is.True, opened.Message);
                 Assert.That(pipeline.State, Is.Not.EqualTo(MediaEngineState.Error));
                 Assert.That(pipeline.Sources[0].Info.AudioStreams, Is.Not.Empty, "the file's audio stream does not stop existing because no device would take it");
-                Assert.That(pipeline.SelectedVideoStream, Is.Not.Null, "the picture is what is playing");
+                Assert.That(pipeline.VideoChains[0].SelectedStream, Is.Not.Null, "the picture is what is playing");
                 Assert.That(pipeline.AudioDecoderName, Is.Null, "and the sound has no chain");
             }
 
@@ -2557,8 +2557,8 @@ public class PlaybackPipelineTests
 
                 // A refused choice leaves nothing published rather than an error state: the caller that asked is
                 // the one holding the reason.
-                Assert.That(pipeline.SelectedVideoStream?.Index, Is.EqualTo(pipeline.Sources[0].Info.VideoStreams[0].Index), "the choice is recorded");
-                Assert.That(pipeline.VideoRendererName, Is.Null, "nothing is published for it");
+                Assert.That(pipeline.VideoChains[0].SelectedStream?.Index, Is.EqualTo(pipeline.Sources[0].Info.VideoStreams[0].Index), "the choice is recorded");
+                Assert.That(pipeline.VideoChains[0].RendererName, Is.Null, "nothing is published for it");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused));
             }
         }
@@ -3245,7 +3245,7 @@ public class PlaybackPipelineTests
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
 
             // The decoder is taken over by the decode thread, so what is running is reported once it has it.
-            WaitFor(() => pipeline.IsVideoHardwareAccelerated, "the decoder that says it runs on hardware");
+            WaitFor(() => pipeline.VideoChains[0].IsHardwareAccelerated, "the decoder that says it runs on hardware");
 
             Await(pipeline.Play());
             WaitFor(() => videoRenderer.RenderedFrames > 2, "playback to be under way", 5000);
@@ -3254,7 +3254,7 @@ public class PlaybackPipelineTests
             pipeline.VideoComponents.ClearDecoders();
             pipeline.VideoComponents.Register(new FlaggedVideoDecoderFactory(hardware: false, "flagged:software"));
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
-            WaitFor(() => !pipeline.IsVideoHardwareAccelerated, "the replacement to be reported");
+            WaitFor(() => !pipeline.VideoChains[0].IsHardwareAccelerated, "the replacement to be reported");
 
             WaitFor(() => videoRenderer.RenderedFrames > rendered, "the new decoder to keep the picture coming");
         }
@@ -3283,7 +3283,7 @@ public class PlaybackPipelineTests
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
             Await(pipeline.Play());
             WaitFor(() => first.RenderedFrames > 2, "playback to be under way");
-            Assert.That(pipeline.VideoRendererName, Is.EqualTo("first"));
+            Assert.That(pipeline.VideoChains[0].RendererName, Is.EqualTo("first"));
             Assert.That(decoders.RequestCount, Is.EqualTo(1), "the decoder was created for the first renderer");
 
             TimeSpan position = pipeline.Position;
@@ -3293,7 +3293,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(pipeline.VideoRendererName, Is.EqualTo("second"));
+                Assert.That(pipeline.VideoChains[0].RendererName, Is.EqualTo("second"));
                 Assert.That(first.DisposeCount, Is.EqualTo(1), "the renderer that was replaced has to be released");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "changing the renderer is not a pause");
                 Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position - TimeSpan.FromSeconds(1)), "the stream has to pick up where it was");
@@ -3308,7 +3308,7 @@ public class PlaybackPipelineTests
 
             // The choice outlives the file, like the decoder's: the next one is drawn by the same factory.
             Assert.That(Open(pipeline, path, new FakeRenderTarget()).IsSuccessful, Is.True);
-            WaitFor(() => pipeline.VideoRendererName == "second", "the next file to be taken up by the chosen renderer");
+            WaitFor(() => pipeline.VideoChains[0].RendererName == "second", "the next file to be taken up by the chosen renderer");
         }
         finally
         {
@@ -3345,7 +3345,7 @@ public class PlaybackPipelineTests
 
             SwapVideoRenderer(pipeline, new FakeVideoRendererFactory(second));
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
-            WaitFor(() => pipeline.VideoRendererName == "second", "the new renderer to take over");
+            WaitFor(() => pipeline.VideoChains[0].RendererName == "second", "the new renderer to take over");
             WaitFor(() => second.RenderedFrames > 0, "the new renderer to draw");
 
             // Long enough that a device which was going to be let go of would have been let go of by now.
@@ -3388,7 +3388,7 @@ public class PlaybackPipelineTests
 
             SwapVideoRenderer(pipeline, new FakeVideoRendererFactory(second));
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
-            WaitFor(() => pipeline.VideoRendererName == "second", "the swap to happen while the picture is still");
+            WaitFor(() => pipeline.VideoChains[0].RendererName == "second", "the swap to happen while the picture is still");
 
             Await(pipeline.Play());
             WaitFor(() => second.RenderedFrames > 0, "the new renderer to draw once playback resumes");
@@ -3429,7 +3429,7 @@ public class PlaybackPipelineTests
 
             // The swap is published by the reconcile and taken up by the render thread, so the name changes a beat
             // after the command returns.
-            WaitFor(() => pipeline.VideoRendererName == "second", "the registration that could deliver to be the one running");
+            WaitFor(() => pipeline.VideoChains[0].RendererName == "second", "the registration that could deliver to be the one running");
 
             WaitFor(() => second.RenderedFrames > 0, "the second renderer to draw");
         }
@@ -3467,7 +3467,7 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(swapped.Result.Video.IsSuccessful, Is.False, "a renderer that cannot be made is the caller's failure to see");
-                Assert.That(pipeline.VideoRendererName, Is.EqualTo("first"), "the running renderer is untouched");
+                Assert.That(pipeline.VideoChains[0].RendererName, Is.EqualTo("first"), "the running renderer is untouched");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
             }
 
@@ -5003,7 +5003,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(pipeline.SelectedVideoStream?.Index, Is.EqualTo(second.Index));
+                Assert.That(pipeline.VideoChains[0].SelectedStream?.Index, Is.EqualTo(second.Index));
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
                 Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(position - TrackSwitchSlack), "the switch resumes where playback stands, not at the start of the file");
             }
@@ -5012,7 +5012,7 @@ public class PlaybackPipelineTests
             WaitFor(() => videoRenderer.ConfiguredStream?.Width == second.Width, "the renderer to be configured for the stream that was asked for");
 
             int marker = videoRenderer.RenderedWidths.Count;
-            WaitForPresentedFrames(pipeline, pipeline.PresentedFrameCount + 2);
+            WaitForPresentedFrames(pipeline, pipeline.VideoChains[0].PresentedFrameCount + 2);
 
             IReadOnlyList<int> widths = videoRenderer.RenderedWidths;
             Assert.That(widths.Skip(marker), Is.Not.Empty.And.All.EqualTo(second.Width), "the frames after the switch are the new stream's, and the old stream's are not shown");
@@ -5118,7 +5118,7 @@ public class PlaybackPipelineTests
 
             VideoStreamInfo second = pipeline.Sources[0].Info.VideoStreams[1];
             refusing.RefusedIndex = second.Index;   // the index the container gave it, not the position in the list
-            long presented = pipeline.PresentedFrameCount;
+            long presented = pipeline.VideoChains[0].PresentedFrameCount;
 
             // The sound is given a new device in the same reconcile as the picture's new track, so the audio chain has
             // something of its own to build while the video chain cannot build what was chosen.
@@ -5130,7 +5130,7 @@ public class PlaybackPipelineTests
             {
                 Assert.That(reconciled.Result.Video.IsSuccessful, Is.False, "a stream no decoder can take is the caller's failure to see");
                 Assert.That(reconciled.Result.Audio.IsSuccessful, Is.True, "the sound has a device of its own to build");
-                Assert.That(pipeline.SelectedVideoStream?.Index, Is.EqualTo(second.Index), "the choice is recorded, refused or not");
+                Assert.That(pipeline.VideoChains[0].SelectedStream?.Index, Is.EqualTo(second.Index), "the choice is recorded, refused or not");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the picture that is playing is untouched");
             }
 
@@ -5161,17 +5161,17 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(pipeline.Sources[0].Info.VideoStreams, Is.Not.Empty, "the file can be read, which is how a host chooses");
-                Assert.That(pipeline.SelectedVideoStream, Is.Null, "nothing is chosen for the host");
+                Assert.That(pipeline.VideoChains[0].SelectedStream, Is.Null, "nothing is chosen for the host");
                 Assert.That(pipeline.SelectedAudioStream, Is.Null);
-                Assert.That(pipeline.VideoDecoderName, Is.Null, "no decoder was created");
+                Assert.That(pipeline.VideoChains[0].DecoderName, Is.Null, "no decoder was created");
                 Assert.That(pipeline.AudioDecoderName, Is.Null);
-                Assert.That(pipeline.VideoRendererName, Is.Null, "no device was opened");
+                Assert.That(pipeline.VideoChains[0].RendererName, Is.Null, "no device was opened");
                 Assert.That(pipeline.AudioRendererName, Is.Null);
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused));
             }
 
             Thread.Sleep(150);
-            Assert.That(pipeline.PresentedFrameCount, Is.Zero, "nothing was decoded, so nothing was shown");
+            Assert.That(pipeline.VideoChains[0].PresentedFrameCount, Is.Zero, "nothing was decoded, so nothing was shown");
             Assert.That(videoRenderer.RenderedFrames, Is.Zero, "and no thread was reading for a picture nobody asked for");
         }
         finally
@@ -5239,7 +5239,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(pipeline.SelectedVideoStream?.Index, Is.EqualTo(second.Index));
+                Assert.That(pipeline.VideoChains[0].SelectedStream?.Index, Is.EqualTo(second.Index));
                 Assert.That(videoRenderer.ConfiguredStream?.Width, Is.EqualTo(second.Width), "the renderer was configured for the chosen stream");
                 Assert.That(videoRenderer.RenderedWidths, Is.Not.Empty.And.All.EqualTo(second.Width), "every frame shown is the chosen stream's");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
@@ -5277,12 +5277,12 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(turnedOff.IsSuccessful, Is.True, turnedOff.Message);
-                Assert.That(pipeline.SelectedVideoStream, Is.Null, "the kind is off");
+                Assert.That(pipeline.VideoChains[0].SelectedStream, Is.Null, "the kind is off");
                 Assert.That(pipeline.SelectedAudioStream, Is.Not.Null, "the other kind is untouched");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "turning a kind off is not a pause while one is left");
             }
 
-            WaitFor(() => pipeline.VideoRendererName is null, "the video chain to be let go of", 5000);
+            WaitFor(() => pipeline.VideoChains[0].RendererName is null, "the video chain to be let go of", 5000);
             WaitFor(() => audioRenderer.SubmittedBuffers > submitted, "the sound to keep playing without the picture");
 
             // The surface belongs to the host, so a renderer that is let go of empties it: the last frame standing
@@ -5357,7 +5357,7 @@ public class PlaybackPipelineTests
 
             VideoStreamInfo second = pipeline.Sources[0].Info.VideoStreams[1];
             Assert.That(Select(pipeline, MediaStreamKind.Video, second).IsSuccessful, Is.True);
-            WaitFor(() => pipeline.SelectedVideoStream?.Index == second.Index, "the other track to be playing", 5000);
+            WaitFor(() => pipeline.VideoChains[0].SelectedStream?.Index == second.Index, "the other track to be playing", 5000);
 
             Assert.That(videoRenderer.ClearedSurfaces, Is.Zero, "a new track draws over the last frame rather than emptying it");
         }
@@ -5440,7 +5440,7 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(again.IsSuccessful, Is.True, again.Message);
-                Assert.That(pipeline.SelectedVideoStream, Is.Null);
+                Assert.That(pipeline.VideoChains[0].SelectedStream, Is.Null);
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
             }
 
@@ -5471,14 +5471,14 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(chosen.IsSuccessful, Is.True, chosen.Message);
-                Assert.That(pipeline.SelectedVideoStream?.Index, Is.EqualTo(video.Index));
+                Assert.That(pipeline.VideoChains[0].SelectedStream?.Index, Is.EqualTo(video.Index));
             }
 
             Assert.That(Select(pipeline, MediaStreamKind.Audio, audio).IsSuccessful, Is.True);
             Assert.That(pipeline.SelectedAudioStream?.Index, Is.EqualTo(audio.Index));
 
             // The owners adopt what was published, which is a moment after the answer.
-            WaitFor(() => pipeline.VideoDecoderName is not null, "both chains were built");
+            WaitFor(() => pipeline.VideoChains[0].DecoderName is not null, "both chains were built");
             WaitFor(() => pipeline.AudioDecoderName is not null, "both chains were built");
 
             // Naming nothing at all is how both kinds are switched off, and it leaves the file open with nothing to
@@ -5488,13 +5488,13 @@ public class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(nothing.IsSuccessful, Is.True, nothing.Message);
-                Assert.That(pipeline.SelectedVideoStream, Is.Null);
+                Assert.That(pipeline.VideoChains[0].SelectedStream, Is.Null);
                 Assert.That(pipeline.SelectedAudioStream, Is.Null);
                 Assert.That(Await(pipeline.Play()).IsSuccessful, Is.False, "there is nothing to play");
             }
 
             // The chains are let go of by the threads that held them, so this is waited for as well.
-            WaitFor(() => pipeline.VideoDecoderName is null, "the video chain to be let go of");
+            WaitFor(() => pipeline.VideoChains[0].DecoderName is null, "the video chain to be let go of");
             WaitFor(() => pipeline.AudioDecoderName is null, "the audio chain to be let go of");
         }
         finally
@@ -5539,9 +5539,9 @@ public class PlaybackPipelineTests
             var target = TimeSpan.FromMilliseconds(1510);
             Assert.That(Await(pipeline.Seek(target, SeekMode.Precise)).IsSuccessful, Is.True);
 
-            long shown = pipeline.PresentedFrameCount;
+            long shown = pipeline.VideoChains[0].PresentedFrameCount;
             WaitFor(() => pipeline.Position > target, "a position whose first frame is ahead of it still has to run", 4000);
-            WaitFor(() => pipeline.PresentedFrameCount > shown, "the picture carries on from where it was moved to");
+            WaitFor(() => pipeline.VideoChains[0].PresentedFrameCount > shown, "the picture carries on from where it was moved to");
             Assert.That(pipeline.StarvedFor, Is.Null, "nothing is behind: the picture simply had to claim the position");
         }
         finally
@@ -6786,7 +6786,7 @@ public class PlaybackPipelineTests
         // the second frame needs more than the frame interval and nothing else.
         for (int attempt = 0; attempt < 500; attempt++)
         {
-            if (pipeline.PresentedFrameCount >= count)
+            if (pipeline.VideoChains[0].PresentedFrameCount >= count)
             {
                 return;
             }
@@ -6794,7 +6794,7 @@ public class PlaybackPipelineTests
             Thread.Sleep(10);
         }
 
-        Assert.Fail($"The pipeline showed {pipeline.PresentedFrameCount} frame(s) where {count} were expected; it is {pipeline.State} at {pipeline.Position:mm\\:ss\\.fff} with the picture at {pipeline.LastPresentedTimestamp:mm\\:ss\\.fff}, starved for {pipeline.StarvedFor ?? "nothing"}, {pipeline.DroppedFrameCount} dropped and a lag of {pipeline.PictureLag.TotalMilliseconds:0} ms. {pipeline.Error}");
+        Assert.Fail($"The pipeline showed {pipeline.VideoChains[0].PresentedFrameCount} frame(s) where {count} were expected; it is {pipeline.State} at {pipeline.Position:mm\\:ss\\.fff} with the picture at {pipeline.VideoChains[0].LastPresentedTimestamp:mm\\:ss\\.fff}, starved for {pipeline.StarvedFor ?? "nothing"}, {pipeline.VideoChains[0].DroppedFrameCount} dropped and a lag of {pipeline.VideoChains[0].PictureLag.TotalMilliseconds:0} ms. {pipeline.Error}");
     }
 
     /// <summary>

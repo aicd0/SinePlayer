@@ -76,15 +76,19 @@ without that becoming API.
 public interface IPlaybackChain
 {
     MediaStreamKind Kind { get; }
-    MediaStreamInfo? SelectedStream { get; }   // what the host asked for
-    MediaStreamInfo? PlayingStream { get; }    // what Reconcile built; null until reconciled
     bool IsActive { get; }
     string? DecoderName { get; }
     string? RendererName { get; }
     bool IsHardwareAccelerated { get; }
 }
 
-public interface IVideoChain : IPlaybackChain
+public interface IPlaybackChain<out TStream> : IPlaybackChain where TStream : MediaStreamInfo
+{
+    TStream? SelectedStream { get; }   // what the host asked for
+    TStream? PlayingStream { get; }    // what Reconcile built; null until reconciled
+}
+
+public interface IVideoChain : IPlaybackChain<VideoStreamInfo>
 {
     IVideoRenderTarget? Target { get; }
     VideoComponentResolver Components { get; }   // this chain's own, created with the chain
@@ -99,7 +103,7 @@ public interface IVideoChain : IPlaybackChain
     TimeSpan LastPresentedTimestamp { get; }
 }
 
-public interface IAudioChain : IPlaybackChain
+public interface IAudioChain : IPlaybackChain<AudioStreamInfo>
 {
     AudioComponentResolver Components { get; }
     AudioFilterChain Filters { get; }
@@ -107,7 +111,7 @@ public interface IAudioChain : IPlaybackChain
     bool OwnsClock { get; }                    // the chain that anchors and corrects the clock
 }
 
-public interface ISubtitleChain : IPlaybackChain
+public interface ISubtitleChain : IPlaybackChain<SubtitleStreamInfo>
 {
     IVideoRenderTarget? Target { get; }
     SubtitleComponentResolver Components { get; }
@@ -378,9 +382,9 @@ outside.
 
 | # | Step | Lands as | Review focus |
 |---|---|---|---|
-| I1 | `IPlaybackChain` published; the chains themselves stay internal; machinery internal | `IPlaybackChain` (7 members: `Kind`, `SelectedStream`, `PlayingStream`, `IsActive`, `DecoderName`, `RendererName`, `IsHardwareAccelerated`), `ChainVersion`, `ChainTail`, `PipelineCoroutine` | what is public is exactly the table in section 1; every `IPlaybackChain` implementor is invisible |
+| I1 | `IPlaybackChain` published; the chains themselves stay internal; machinery internal | `IPlaybackChain` (5 members: `Kind`, `IsActive`, `DecoderName`, `RendererName`, `IsHardwareAccelerated`) plus `IPlaybackChain<TStream>` (`SelectedStream`, `PlayingStream`), typed by kind in I6a, `ChainVersion`, `ChainTail`, `PipelineCoroutine` | what is public is exactly the table in section 1; every `IPlaybackChain` implementor is invisible |
 | I2 | Resolution moves onto the chains (`chain.Reconcile()`), and `ComponentResolver` splits into `VideoComponentResolver` / `AudioComponentResolver` / `SubtitleComponentResolver` — one per kind, each owning only its kind's roles | `PlaybackPipeline.Components.cs` deleted; `ChainChange` and `ComponentResolution` extracted; each `Reconcile` takes its own kind's resolver, so a video chain cannot ask for an audio factory. The type is now `VideoPreferences` and hangs off the video resolver; audio and subtitle resolution never read it. `ComponentResolver` survives **only as the host's registration surface** and dies in I3, when `chain.Components` becomes the channel | a resolver of one kind cannot be asked another kind's question; a role registered into the wrong chain does not compile |
-| I3a | The three kind interfaces are published: `IVideoChain` / `IAudioChain` / `ISubtitleChain : IPlaybackChain`, the chain types stay internal | each chain implements its kind's interface with the members it already has; nothing moves and nothing is constructed differently | a host can name a chain of a kind without naming its implementation; the guard test lists exactly three chain interfaces |
+| I3a | The three kind interfaces are published: `IVideoChain` / `IAudioChain` / `ISubtitleChain : IPlaybackChain<XxxStreamInfo>` (the stream type was added to the base in I6a), the chain types stay internal | each chain implements its kind's interface with the members it already has; nothing moves and nothing is constructed differently | a host can name a chain of a kind without naming its implementation; the guard test lists exactly three chain interfaces |
 | I3b | A chain owns its resolver (`chain.Components`), so `Reconcile()` takes no resolver, the aggregate `ComponentResolver` is deleted, and the pipeline forwards `VideoComponents` / `AudioComponents` / `SubtitleComponents` to the three chains' own resolvers | each chain creates a `Video`/`Audio`/`SubtitleComponentResolver` with its own registry, so a factory can only ever reach the kind it belongs to; the app's `SetFactories<TFactory>` becomes six typed `Set*` helpers and the lab page's generic picker handler routes by role. The three forwarding properties are transitional — they die with the kind-shaped members | two chains cannot be built from one registry; nothing in the app names a chain type |
 | I3b2 | The pipeline holds `VideoChains` / `AudioChains` / `SubtitleChains` (one array per kind, `IReadOnlyList<IXxxChain>` outside) instead of three fields; the constructor adds its three chains through the same `Add*ChainCore` path that `Add*Chain` will expose, and start/stop/reset walk the lists. `chain.Components` joins the three chain interfaces | the fields became `Video`/`Audio`/`Subtitle` = the first chain of its kind, which is what the pipeline-wide members still describe | a fresh pipeline holds one chain of each kind, and the pipeline's resolver is that chain's own |
 | I3b3 | `AddVideoChain(target)` / `AddAudioChain()` / `AddSubtitleChain(target)` / `RemoveChain` become public, with the per-kind cap that is v1 lifted in Phase J | publishing them before the pipeline can serve a second chain of a kind would promise multi-chain; the internal path is already the one used | a chain is added, reconciled and removed through one path |
@@ -389,7 +393,10 @@ outside.
 | I4b | `ReconcileResult` is three dictionaries keyed by the chain; `Video`/`Audio`/`Subtitle`/`For(kind)` survive as transitional views over them | the dictionaries are the only state a result has, so the kind-shaped views cannot disagree with them; each is `Single` over its dictionary and throws once a kind holds two chains, which is the reminder that Phase J cannot come before I6 | a failure is looked up by the chain that failed, and one chain's failure says nothing about another's |
 | I4c | Warnings carry the chain: `WarningRaised` is `Action<IPlaybackChain?, string>` and every warning a chain raises is attributed to it; null means the pipeline itself (a seek that could not reach the sources) | the attribution is the call site's, not a lookup: a chain passes `this`, so nothing has to guess which chain a message came from | a warning names the chain it came from |
 | I5 | `Reset()` loses its targets and absorbs `Stop()`; teardown per chain; a chain's target is fixed at `Add` | | new surface = `Remove` + `Add`, and the old chain's threads are joined first |
-| I6 | Kind-shaped properties removed; `PlaybackPipelineTests` ported | ~150 mechanical edits, helpers first | **no assertion changes** — a test that has to change its expectation is evidence of a behaviour change |
+| I6a | The video-shaped members leave the pipeline: `SelectedVideoStream`, `VideoDecoderName`/`VideoRendererName`, `IsVideoHardwareAccelerated`, `PresentedFrameCount`/`DroppedFrameCount`, `AverageVideoDecodeMilliseconds`/`AverageVideoRenderMilliseconds`, `PictureLag`, `LastPresentedTimestamp`, `Synchronizer`. Every one of them already existed on `IVideoChain`/`IPlaybackChain`, so nothing had to be invented | 63 test reads became `pipeline.VideoChains[0].…` with the interface's own names (`SelectedStream`, `RendererName`, `AverageDecodeMilliseconds`); the app's single read surface `PlaybackInfoHandle` gained one private `Video => _pipeline?.VideoChains.FirstOrDefault()` and the rest of the app kept its shape | **no assertion changes**; the app still speaks in its own property names, and only one file knows about "the first video chain" |
+| I6b | The audio-shaped members leave: `SelectedAudioStream`, `AudioDecoderName`/`AudioRendererName`, `IsAudioHardwareAccelerated`, `AudioUnderruns`, `AudioFilters` | same shape as I6a, over `IAudioChain` | as I6a |
+| I6c | The subtitle-shaped members leave: `SelectedSubtitleStream`, `SubtitleDecoderName`/`SubtitleRendererName` | same shape, over `ISubtitleChain` | as I6a |
+| I6d | `VideoTransform` and `SubtitlePresentation` move to their chains, and starvation gets a home | **needs a decision**: setting a transform today also wakes the subtitle chain, so the chain must own that wake; and `StarvedFor` is a pipeline-level question (`IVideoChain` deliberately does not carry `Starved`) | a transform change still repaints the words |
 | I7 | The app ported | `CoreEngine`, `PlaybackLabPage` and `PlaybackComponents` reach the chains themselves — targets, statistics, transform, presentation — instead of the pipeline's kind-shaped members; registration already went over in I3b | the app never mentions an internal type |
 | I8 | Guard test extended | `PipelineSurfaceTests` | the public surface mentions no chain machinery |
 
