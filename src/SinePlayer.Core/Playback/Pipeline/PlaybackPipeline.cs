@@ -44,7 +44,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         AddAudioChainCore();
         AddSubtitleChainCore(null);
 
-        _timeline.DeviceOwner = Audio;
+        _timeline.DeviceOwner = _audioChains.Length > 0 ? _audioChains[0] : null;
     }
 
     #endregion
@@ -69,11 +69,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public IReadOnlyList<ISubtitleChain> SubtitleChains => _subtitleChains;
 
-    public VideoComponentResolver VideoComponents => Video.Components;
+    public VideoComponentResolver VideoComponents => _videoChains[0].Components;
 
-    public AudioComponentResolver AudioComponents => Audio.Components;
+    public AudioComponentResolver AudioComponents => _audioChains[0].Components;
 
-    public SubtitleComponentResolver SubtitleComponents => Subtitle.Components;
+    public SubtitleComponentResolver SubtitleComponents => _subtitleChains[0].Components;
 
     public ISourceProviderFactory? SourceFactory { get; set; }
 
@@ -85,7 +85,18 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     public TimeSpan Position => _timeline.Position;
 
-    public string? StarvedFor => Video.Starved ? "video" : Audio.Starved ? "audio" : null;
+    public string? StarvedFor
+    {
+        get
+        {
+            if (_videoChains.Any(chain => chain.Starved))
+            {
+                return "video";
+            }
+
+            return _audioChains.Any(chain => chain.Starved) ? "audio" : null;
+        }
+    }
 
     public void Dispose()
     {
@@ -154,12 +165,6 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     #region Chains
 
-    private VideoChain Video => _videoChains[0];
-
-    private AudioChain Audio => _audioChains[0];
-
-    private SubtitleChain Subtitle => _subtitleChains[0];
-
     private VideoChain AddVideoChainCore(IVideoRenderTarget? target)
     {
         VideoChain chain = new(_timeline, _events, VideoTarget_SurfaceSizeChanged)
@@ -201,9 +206,9 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         return kind switch
         {
-            MediaStreamKind.Video => Video,
-            MediaStreamKind.Audio => Audio,
-            _ => Subtitle,
+            MediaStreamKind.Video => _videoChains[0],
+            MediaStreamKind.Audio => _audioChains[0],
+            _ => _subtitleChains[0],
         };
     }
 
@@ -220,9 +225,16 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         StopCore();
 
-        Video.Target = videoTarget;
-        Subtitle.Target = subtitleTarget;
-        Subtitle.LayoutSource = Video;
+        foreach (VideoChain video in _videoChains)
+        {
+            video.Target = videoTarget;
+        }
+
+        foreach (SubtitleChain subtitle in _subtitleChains)
+        {
+            subtitle.Target = subtitleTarget;
+            subtitle.LayoutSource = _videoChains.Length > 0 ? _videoChains[0] : null;
+        }
 
         _timeline.SetPosition(TimeSpan.Zero);
         _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
@@ -311,7 +323,9 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
-        if (Video.Source.Latest?.Stream is null && Audio.Source.Latest?.Stream is null)
+        bool chosen = _videoChains.Any(chain => chain.Source.Latest?.Stream is not null)
+            || _audioChains.Any(chain => chain.Source.Latest?.Stream is not null);
+        if (!chosen)
         {
             return OperationResult.Failure("No track is selected. Choose a video or audio track before playing.");
         }
@@ -360,7 +374,12 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure($"Cannot seek when the state is {state}.");
         }
 
-        MediaSource?[] sources = [Video.Selected.Source, Audio.Selected.Source, Subtitle.Selected.Source];
+        MediaSource?[] sources =
+        [
+            .. _videoChains.Select(chain => chain.Selected.Source),
+            .. _audioChains.Select(chain => chain.Selected.Source),
+            .. _subtitleChains.Select(chain => chain.Selected.Source),
+        ];
         foreach (MediaSource source in sources.OfType<MediaSource>())
         {
             if (!source.Source.CanSeek)
@@ -484,14 +503,14 @@ public sealed partial class PlaybackPipeline : IDisposable
         host.Start();
         _host = host;
 
-        foreach (VideoChain video in _videoChains)
+        foreach (VideoChain chain in _videoChains)
         {
-            video.Start(_reader.Wake, IsVideoStreamSpent, TryNotifyPlaybackEnded);
+            chain.Start(_reader.Wake, (epoch, position) => chain.ReadTail.IsSpent(epoch, position, FurthestTailTicks), TryNotifyPlaybackEnded);
         }
 
-        foreach (AudioChain audio in _audioChains)
+        foreach (AudioChain chain in _audioChains)
         {
-            audio.Start(host, _reader.Wake, IsAudioStreamSpent, TryNotifyPlaybackEnded);
+            chain.Start(host, _reader.Wake, (epoch, position) => chain.ReadTail.IsSpent(epoch, position, FurthestTailTicks), TryNotifyPlaybackEnded);
         }
 
         foreach (SubtitleChain subtitle in _subtitleChains)
@@ -539,30 +558,53 @@ public sealed partial class PlaybackPipeline : IDisposable
             subtitle.Join();
         }
     }
+
     private void NotifySourceEnded(long epoch)
     {
         _timeline.EndingEpoch = epoch;
         TryNotifyPlaybackEnded();
     }
 
-    private bool IsVideoStreamSpent(long epoch, TimeSpan position)
+    private long FurthestTailTicks
     {
-        return Video.ReadTail.IsSpent(epoch, position, FurthestTailTicks);
+        get
+        {
+            return _videoChains.Select(chain => chain.ReadTail.Ticks)
+                .Concat(_audioChains.Select(chain => chain.ReadTail.Ticks))
+                .DefaultIfEmpty(0)
+                .Max();
+        }
     }
 
-    private bool IsAudioStreamSpent(long epoch, TimeSpan position)
+    private bool IsStarved
     {
-        return Audio.ReadTail.IsSpent(epoch, position, FurthestTailTicks);
+        get
+        {
+            return _videoChains.Any(chain => chain.Starved) || _audioChains.Any(chain => chain.Starved);
+        }
     }
-
-    private long FurthestTailTicks => Math.Max(Video.ReadTail.Ticks, Audio.ReadTail.Ticks);
-
-    private bool IsStarved => Video.Starved || Audio.Starved;
 
     private int ChooseSeekLanding(MediaSource source, TimeSpan position)
     {
-        VideoStreamInfo? video = Video.Source.CurrentComponent == source ? (VideoStreamInfo?)Video.Source.CurrentStream : null;
-        AudioStreamInfo? audio = Audio.Source.CurrentComponent == source ? (AudioStreamInfo?)Audio.Source.CurrentStream : null;
+        VideoStreamInfo? video = null;
+        foreach (VideoChain chain in _videoChains)
+        {
+            if (ReferenceEquals(chain.Source.CurrentComponent, source))
+            {
+                video = (VideoStreamInfo?)chain.Source.CurrentStream;
+                break;
+            }
+        }
+
+        AudioStreamInfo? audio = null;
+        foreach (AudioChain chain in _audioChains)
+        {
+            if (ReferenceEquals(chain.Source.CurrentComponent, source))
+            {
+                audio = (AudioStreamInfo?)chain.Source.CurrentStream;
+                break;
+            }
+        }
 
         if (video is null)
         {
@@ -598,12 +640,8 @@ public sealed partial class PlaybackPipeline : IDisposable
             return;
         }
 
-        if (Video.Source.Latest?.Stream is not null && Video.EndedEpoch != endingEpoch)
-        {
-            return;
-        }
-
-        if (Audio.Source.Latest?.Stream is not null && Audio.EndedEpoch != endingEpoch)
+        if (_videoChains.Any(chain => chain.Source.Latest?.Stream is not null && chain.EndedEpoch != endingEpoch)
+            || _audioChains.Any(chain => chain.Source.Latest?.Stream is not null && chain.EndedEpoch != endingEpoch))
         {
             return;
         }
@@ -616,16 +654,16 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     #region Events
 
-    private void VideoTarget_SurfaceSizeChanged()
+    private void VideoTarget_SurfaceSizeChanged(VideoChain chain)
     {
-        Video.RenderNode.Wake();
-        Subtitle.RenderNode.Wake();
+        chain.RenderNode.Wake();
+        NotifyLayoutChanged(chain);
     }
 
-    private void SubtitleTarget_SurfaceSizeChanged()
+    private void SubtitleTarget_SurfaceSizeChanged(SubtitleChain chain)
     {
-        Interlocked.Increment(ref Subtitle.SurfaceVersion);
-        Subtitle.RenderNode.Wake();
+        Interlocked.Increment(ref chain.SurfaceVersion);
+        chain.RenderNode.Wake();
     }
 
     #endregion
@@ -667,7 +705,10 @@ public sealed partial class PlaybackPipeline : IDisposable
     private void NotifyClockMoved()
     {
         // Subtitle might be changed
-        Subtitle.RenderNode.Wake();
+        foreach (SubtitleChain subtitle in _subtitleChains)
+        {
+            subtitle.RenderNode.Wake();
+        }
     }
 
     private void WakeAll()

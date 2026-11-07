@@ -46,11 +46,11 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
-    public VideoChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged)
+    public VideoChain(PipelineTimeline timeline, PipelineEvents events, Action<VideoChain> surfaceSizeChanged)
     {
         _timeline = timeline;
         _events = events;
-        _surfaceSizeChanged = surfaceSizeChanged;
+        _surfaceSizeChanged = () => surfaceSizeChanged(this);
     }
 
     public MediaStreamKind Kind => MediaStreamKind.Video;
