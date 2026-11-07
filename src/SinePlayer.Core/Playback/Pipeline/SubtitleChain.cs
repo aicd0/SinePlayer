@@ -43,7 +43,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
 
     public SubtitleStreamInfo? PlayingStream => (SubtitleStreamInfo?)Source.CurrentStream;
 
-    public bool IsActive => Decoder.HasComponent;
+    public bool IsRunning => _decodeCoroutine is not null || _renderThread is not null;
 
     public string? DecoderName => Decoder.CurrentComponent?.Name;
 
@@ -144,7 +144,6 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
         Source.Reset();
         Decoder.Reset();
         Renderer.Reset();
-        Target = null;
         Selected = default;
         ReadTail.Reset();
     }

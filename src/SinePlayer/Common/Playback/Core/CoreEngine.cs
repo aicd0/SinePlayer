@@ -143,7 +143,7 @@ internal sealed partial class CoreEngine : IDisposable
 
     public async Task<OperationResult> Reset()
     {
-        PlaybackPipeline pipeline = EnsurePipeline();
+        PlaybackPipeline pipeline = await EnsurePipeline();
 
         OperationResult reset = await pipeline.Reset();
         if (!reset.IsSuccessful)
@@ -182,7 +182,7 @@ internal sealed partial class CoreEngine : IDisposable
             return OperationResultExt.Failure<MediaSource>(TAG, $"Media file not found: '{filePath}'.");
         }
 
-        PlaybackPipeline pipeline = EnsurePipeline();
+        PlaybackPipeline pipeline = await EnsurePipeline();
 
         var locator = MediaLocator.Parse(filePath);
         MediaSource? existing = pipeline.Sources.FirstOrDefault(source => string.Equals(source.Locator.Value, locator.Value, StringComparison.Ordinal));
@@ -219,7 +219,19 @@ internal sealed partial class CoreEngine : IDisposable
             return OperationResultExt.Failure(TAG, "There is nothing open to change a track of.");
         }
 
-        OperationResult selected = await pipeline.SelectStream(kind, stream);
+        IPlaybackChain? chain = kind switch
+        {
+            MediaStreamKind.Video => _videoChain,
+            MediaStreamKind.Audio => _audioChain,
+            _ => _subtitleChain,
+        };
+
+        if (chain is null)
+        {
+            return OperationResultExt.Failure(TAG, $"There is no {kind.ToString().ToLowerInvariant()} to change a track of.");
+        }
+
+        OperationResult selected = await pipeline.SelectStream(chain, stream);
         if (!selected.IsSuccessful)
         {
             string wanted = stream is null ? "no track" : $"track #{stream.Index}";
@@ -383,7 +395,7 @@ internal sealed partial class CoreEngine : IDisposable
 
     private PlaybackPipeline? _pipeline;
 
-    private PlaybackPipeline EnsurePipeline()
+    private async Task<PlaybackPipeline> EnsurePipeline()
     {
         PlaybackPipeline? existing = _pipeline;
         if (existing is not null)
@@ -396,9 +408,9 @@ internal sealed partial class CoreEngine : IDisposable
             SourceFactory = new FFmpegSourceProviderFactory(),
         };
 
-        IVideoChain video = pipeline.AddVideoChain(EnsureVideoRenderTarget());
-        IAudioChain audio = pipeline.AddAudioChain();
-        ISubtitleChain subtitle = pipeline.AddSubtitleChain(EnsureSubtitleRenderTarget());
+        IVideoChain video = await pipeline.AddVideoChain(EnsureVideoRenderTarget());
+        IAudioChain audio = await pipeline.AddAudioChain();
+        ISubtitleChain subtitle = await pipeline.AddSubtitleChain(EnsureSubtitleRenderTarget());
         _videoChain = video;
         _audioChain = audio;
         _subtitleChain = subtitle;

@@ -21,7 +21,6 @@ using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Pipeline;
-using SinePlayer.Core.Playback.Registry;
 using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Timing;
 
@@ -42,6 +41,29 @@ public class PlaybackPipelineTests
     private const int SampleRate = 44100;
     private const int ChannelCount = 2;
     private const int SampleCount = 8820;
+
+    private int _liveThreadsBefore;
+
+    /// <summary>
+    /// Every test in this fixture is a pipeline and its threads, so every test is also a chance to leak one. What each
+    /// test starts is counted before it runs and expected back when it ends, whether or not that test is about removal:
+    /// a chain that keeps a thread of its own after it is gone fails here rather than in a profiler.
+    /// </summary>
+    [SetUp]
+    public void RememberLiveThreads()
+    {
+        _liveThreadsBefore = PipelineThread.LiveCount;
+    }
+
+    [TearDown]
+    public void ExpectTheThreadsBack()
+    {
+        int remaining = PipelineThread.LiveCount - _liveThreadsBefore;
+        Assert.That(
+            WaitForThreads(() => PipelineThread.LiveCount == _liveThreadsBefore),
+            Is.True,
+            $"{remaining} pipeline thread(s) were still running after the test ended");
+    }
 
     [Test]
     public void PlaysAVideoOnlyFileToTheEnd()
@@ -2538,37 +2560,6 @@ public class PlaybackPipelineTests
         }
     }
 
-    [Test]
-    public void RefusesVideoWithoutAPresentationSurface()
-    {
-        string path = CreateBitmapFile();
-        try
-        {
-            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
-
-            // The surface is a fact about the host, and it is what a picture is drawn through: the file opens
-            // without one, and choosing a video track is what cannot happen.
-            OperationResult opened = OpenFirstSource(pipeline, MediaLocator.Parse(path));
-            OperationResult selected = SelectDefaultStreams(pipeline);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(opened.IsSuccessful, Is.True, opened.Message);
-                Assert.That(selected.IsSuccessful, Is.False);
-
-                // A refused choice leaves nothing published rather than an error state: the caller that asked is
-                // the one holding the reason.
-                Assert.That(pipeline.VideoChains[0].SelectedStream?.Index, Is.EqualTo(pipeline.Sources[0].Info.VideoStreams[0].Index), "the choice is recorded");
-                Assert.That(pipeline.VideoChains[0].RendererName, Is.Null, "nothing is published for it");
-                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Paused));
-            }
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
     /// <summary>
     /// A playback that has failed stops reading. The reader has nothing to read *for* — nothing will consume
     /// what it produces, and the position it would fill is never played — so it parks in the same idle wait
@@ -3876,9 +3867,9 @@ public class PlaybackPipelineTests
     /// </summary>
     private static void AddChains(PlaybackPipeline pipeline, IVideoRenderTarget? videoTarget, IVideoRenderTarget? subtitleTarget)
     {
-        pipeline.AddVideoChain(videoTarget ?? new FakeRenderTarget());
-        pipeline.AddAudioChain();
-        pipeline.AddSubtitleChain(subtitleTarget ?? SubtitleSurfaceTarget);
+        Await(pipeline.AddVideoChain(videoTarget ?? new FakeRenderTarget()));
+        Await(pipeline.AddAudioChain());
+        Await(pipeline.AddSubtitleChain(subtitleTarget ?? SubtitleSurfaceTarget));
     }
 
     /// <summary>
@@ -3921,6 +3912,7 @@ public class PlaybackPipelineTests
                 }
             }
         }
+
         /// <summary>The requests, in order. Read it through <see cref="GetRequest"/> so a test never races one.</summary>
         internal DecoderOptions GetRequest(int index)
         {
@@ -3950,6 +3942,36 @@ public class PlaybackPipelineTests
     /// The real decoder, decoding exactly as it always would, saying something else about where it runs — which is
     /// the one thing a report can be tested against without depending on what the machine can do.
     /// </summary>
+    /// <summary>
+    /// A synthetic decoder that is asked the way its chain's preferences say, and remembers how it was asked — which
+    /// is what a test can pin about "hardware or not" without depending on the machine.
+    /// </summary>
+    private sealed class RecordingSyntheticVideoDecoderFactory : IVideoDecoderFactory
+    {
+        private readonly SyntheticVideoDecoderFactory _inner = new();
+        private readonly List<bool> _hardwareRequests = [];
+
+        internal IReadOnlyList<bool> HardwareRequests
+        {
+            get
+            {
+                lock (_hardwareRequests)
+                {
+                    return [.. _hardwareRequests];
+                }
+            }
+        }
+
+        public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
+        {
+            lock (_hardwareRequests)
+            {
+                _hardwareRequests.Add(options.HardwareDecoding);
+            }
+
+            return _inner.Create(source, stream, options);
+        }
+    }
     private sealed class FlaggedVideoDecoderFactory(bool hardware, string signature) : IVideoDecoderFactory
     {
         private readonly FFmpegVideoDecoderFactory _inner = new();
@@ -5141,7 +5163,7 @@ public class PlaybackPipelineTests
 
             // The sound is given a new device in the same reconcile as the picture's new track, so the audio chain has
             // something of its own to build while the video chain cannot build what was chosen.
-            Assert.That(Await(pipeline.SelectStream(MediaStreamKind.Video, second)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(pipeline.VideoChains[0], second)).IsSuccessful, Is.True);
             SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(new FakeAudioRenderer { Name = "second", PlaysWhatItIsGiven = true }));
             OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
@@ -6641,14 +6663,14 @@ public class PlaybackPipelineTests
 
         if (info.VideoStreams.Count > 0)
         {
-            OperationResult video = pipeline.SelectStream(MediaStreamKind.Video, info.VideoStreams[0]).GetAwaiter().GetResult();
+            OperationResult video = pipeline.SelectStream(ChainOf(pipeline, MediaStreamKind.Video), info.VideoStreams[0]).GetAwaiter().GetResult();
             any |= video.IsSuccessful;
             failure = video.IsSuccessful ? failure : video;
         }
 
         if (info.AudioStreams.Count > 0)
         {
-            OperationResult audio = pipeline.SelectStream(MediaStreamKind.Audio, info.AudioStreams[0]).GetAwaiter().GetResult();
+            OperationResult audio = pipeline.SelectStream(ChainOf(pipeline, MediaStreamKind.Audio), info.AudioStreams[0]).GetAwaiter().GetResult();
             any |= audio.IsSuccessful;
             failure = audio.IsSuccessful ? failure : audio;
         }
@@ -6708,7 +6730,7 @@ public class PlaybackPipelineTests
     /// </summary>
     private static OperationResult Select(PlaybackPipeline pipeline, MediaStreamKind kind, MediaStreamInfo? stream)
     {
-        OperationResult selected = Await(pipeline.SelectStream(kind, stream));
+        OperationResult selected = Await(pipeline.SelectStream(ChainOf(pipeline, kind), stream));
         if (!selected.IsSuccessful)
         {
             return selected;
@@ -6730,6 +6752,17 @@ public class PlaybackPipelineTests
         };
     }
 
+    /// <summary>The chain of a kind a test means when it speaks of the kind rather than of a chain.</summary>
+    private static IPlaybackChain ChainOf(PlaybackPipeline pipeline, MediaStreamKind kind)
+    {
+        return kind switch
+        {
+            MediaStreamKind.Video => pipeline.VideoChains[0],
+            MediaStreamKind.Audio => pipeline.AudioChains[0],
+            _ => pipeline.SubtitleChains[0],
+        };
+    }
+
     private static OperationResult Await(Task<OperationResult> command)
     {
         Assert.That(command.Wait(5000), Is.True, "the command was never carried out");
@@ -6743,6 +6776,13 @@ public class PlaybackPipelineTests
         return command.Result;
     }
 
+    /// <summary>Waits for a command that answers with the thing it made rather than a result, such as adding a chain.</summary>
+    private static T Await<T>(Task<T> command)
+    {
+        Assert.That(command.Wait(5000), Is.True, "the command was never carried out");
+        return command.Result;
+    }
+
     /// <summary>
     /// Waits for something about playback to become true. A call is posted, so what a test is usually about is
     /// what a call led to — a frame shown, the clock moving, a state reached before anything else changes it.
@@ -6750,6 +6790,22 @@ public class PlaybackPipelineTests
     private static void WaitFor(Func<bool> condition, string what)
     {
         WaitFor(condition, what, 2000);
+    }
+
+    /// <summary>Waits without failing, for a check that has a message of its own.</summary>
+    private static bool WaitForThreads(Func<bool> condition)
+    {
+        for (int attempt = 0; attempt < 200; attempt++)
+        {
+            if (condition())
+            {
+                return true;
+            }
+
+            Thread.Sleep(10);
+        }
+
+        return condition();
     }
 
     /// <summary>
@@ -7551,6 +7607,7 @@ public class PlaybackPipelineTests
 
             set => _queuedSampleCount = value;
         }
+
         /// <summary>
         /// How many channels this stand-in device plays; the stream is narrowed to it the way a real endpoint with
         /// fewer speakers narrows one, which is what makes the pipeline fold the mix down.
@@ -8235,7 +8292,8 @@ public class PlaybackPipelineTests
     }
 
     [Test]
-    public void DrawsAgainWhenOnlyTheFontChanges()    {
+    public void DrawsAgainWhenOnlyTheFontChanges()
+    {
         // The font travels with the drawing, so a change to it has to be drawn even though the cue, the position and the
         // surface are all the same. Without that a new size would only appear with the next cue.
         SyntheticMediaScript script = new()
@@ -8363,6 +8421,509 @@ public class PlaybackPipelineTests
 
             string cue = SyntheticSubtitleDecoderFactory.TextAt(TimeSpan.FromSeconds(0.2));
             WaitFor(() => subtitleRenderer.Texts.Contains(cue), "the cue of the added file to be drawn");
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A picture can be taken out while its words stay. They were laid out against it, so they are laid out against the
+    /// picture that is left — and they keep being drawn, which is what says the removal did not take them with it.
+    /// </summary>
+    [Test]
+    public void LaysTheWordsOutAgainstTheNextPictureWhenTheirsIsRemoved()
+    {
+        int baseline = PipelineThread.LiveCount;
+
+        string firstPosition = SyntheticPath("leaving-picture");
+        string secondPosition = SyntheticPath("staying-picture");
+        string wordsPosition = SyntheticPath("words-for-both");
+
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(firstPosition, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(10) });
+        sources.Add(secondPosition, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(10) });
+        sources.Add(wordsPosition, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(10),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(10))],
+        });
+
+        FakeVideoRenderer leavingRenderer = new();
+        FakeSubtitleRenderer words = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IVideoChain leaving = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            IVideoChain staying = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            ISubtitleChain subtitles = Await(pipeline.AddSubtitleChain(new SubtitleSurface()));
+
+            leaving.Components.Register(new SyntheticVideoDecoderFactory());
+            leaving.Components.Register(new FakeVideoRendererFactory(leavingRenderer));
+            staying.Components.Register(new SyntheticVideoDecoderFactory());
+            staying.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+            subtitles.Components.Register(new SyntheticSubtitleDecoderFactory());
+            subtitles.Components.Register(new FakeSubtitleRendererFactory(words));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(firstPosition))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(secondPosition))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(wordsPosition))).IsSuccessful, Is.True);
+
+            Assert.That(Await(pipeline.SelectStream(leaving, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(staying, pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(subtitles, pipeline.Sources[2].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => words.ShowCount > 0, "the words to be drawn");
+
+            // The reader, two for each picture and one for the words.
+            WaitFor(() => PipelineThread.LiveCount - baseline == 6, $"all six threads to be running (was {PipelineThread.LiveCount - baseline})");
+
+            Assert.That(Await(pipeline.RemoveChain(leaving)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            long drawn = words.ShowCount;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.VideoChains, Is.EqualTo(new[] { staying }), "only the picture that was asked to go has gone");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "and playback never left");
+            }
+
+            WaitFor(() => PipelineThread.LiveCount - baseline == 4, $"the picture that went to cost no thread (was {PipelineThread.LiveCount - baseline})");
+            WaitFor(() => words.ShowCount > drawn, "the words to keep being drawn against the picture that is left");
+            Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Threads are a resource: a chain that is gone has none left running, and disposing the pipeline hands back every
+    /// thread it took — the reader's, the decoders' and the renderers'. Counted against a baseline, because other tests
+    /// may be running pipelines of their own.
+    /// </summary>
+    [Test]
+    public void HandsBackEveryThreadItTook()
+    {
+        int baseline = PipelineThread.LiveCount;
+
+        string playing = SyntheticPath("threads");
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(playing, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(30) });
+
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IVideoChain video = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            Await(pipeline.AddAudioChain());
+            ISubtitleChain first = Await(pipeline.AddSubtitleChain(new SubtitleSurface()));
+            ISubtitleChain second = Await(pipeline.AddSubtitleChain(new SubtitleSurface()));
+
+            video.Components.Register(new SyntheticVideoDecoderFactory());
+            video.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+            pipeline.AudioChains[0].Components.Register(new SyntheticAudioDecoderFactory());
+            pipeline.AudioChains[0].Components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
+            foreach (ISubtitleChain subtitle in pipeline.SubtitleChains)
+            {
+                subtitle.Components.Register(new SyntheticSubtitleDecoderFactory());
+                subtitle.Components.Register(new FakeSubtitleRendererFactory(new FakeSubtitleRenderer()));
+            }
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            // The reader, two per picture, one per sound and one per set of words.
+            WaitFor(() => PipelineThread.LiveCount - baseline == 6, $"all six threads to be running (was {PipelineThread.LiveCount - baseline})");
+
+            Assert.That(Await(pipeline.RemoveChain(second)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            WaitFor(() => PipelineThread.LiveCount - baseline == 5, $"the removed chain to cost no thread (was {PipelineThread.LiveCount - baseline})");
+
+            Assert.That(Await(pipeline.RemoveChain(first)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            WaitFor(() => PipelineThread.LiveCount - baseline == 4, $"the second removed chain to cost no thread (was {PipelineThread.LiveCount - baseline})");
+        }
+        finally
+        {
+            pipeline.Dispose();
+            sources.Release();
+        }
+
+        WaitFor(() => PipelineThread.LiveCount == baseline, $"the pipeline to hand every thread back (was {PipelineThread.LiveCount - baseline})");
+    }
+
+    /// <summary>
+    /// A chain removed and never reconciled is still running, so stopping the pipeline has to stop it too rather than
+    /// leave it behind.
+    /// </summary>
+    [Test]
+    public void StopsAChainRemovedButNeverReconciled()
+    {
+        int baseline = PipelineThread.LiveCount;
+
+        string playing = SyntheticPath("removed-then-stopped");
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(playing, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(30) });
+
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IVideoChain video = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            ISubtitleChain subtitle = Await(pipeline.AddSubtitleChain(new SubtitleSurface()));
+
+            video.Components.Register(new SyntheticVideoDecoderFactory());
+            video.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+            subtitle.Components.Register(new SyntheticSubtitleDecoderFactory());
+            subtitle.Components.Register(new FakeSubtitleRendererFactory(new FakeSubtitleRenderer()));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            // The reader, two for the picture and one for the words.
+            WaitFor(() => PipelineThread.LiveCount - baseline == 4, $"the pipeline to be running (was {PipelineThread.LiveCount - baseline})");
+
+            Assert.That(Await(pipeline.RemoveChain(subtitle)).IsSuccessful, Is.True);
+
+            // No reconcile: the removal is recorded and the chain is still winding down when the pipeline is stopped.
+            pipeline.Dispose();
+        }
+        finally
+        {
+            sources.Release();
+        }
+
+        WaitFor(() => PipelineThread.LiveCount == baseline, $"the unreconciled chain to be stopped with the rest (was {PipelineThread.LiveCount - baseline})");
+    }
+
+    /// <summary>
+    /// A chain can be taken out while the others play. What keeps the clock goes with it, so another sound takes the
+    /// clock over, and the one that is left carries on handing sound to its device without a pause.
+    /// </summary>
+    [Test]
+    public void RemovesTheChainThatKeepsTheClockWhileTheOtherPlaysOn()
+    {
+        int baseline = PipelineThread.LiveCount;
+
+        string firstPosition = SyntheticPath("leaving-sound");
+        string secondPosition = SyntheticPath("staying-sound");
+
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(firstPosition, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(10) });
+        sources.Add(secondPosition, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(10) });
+
+        FakeAudioRenderer leavingDevice = new();
+        FakeAudioRenderer stayingDevice = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IAudioChain leaving = Await(pipeline.AddAudioChain());
+            IAudioChain staying = Await(pipeline.AddAudioChain());
+
+            leaving.Components.Register(new SyntheticAudioDecoderFactory());
+            leaving.Components.Register(new FixedAudioRendererFactory(leavingDevice));
+            staying.Components.Register(new SyntheticAudioDecoderFactory());
+            staying.Components.Register(new FixedAudioRendererFactory(stayingDevice));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(firstPosition))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(secondPosition))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(leaving, pipeline.Sources[0].Info.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(staying, pipeline.Sources[1].Info.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => leavingDevice.SubmittedBuffers > 1 && stayingDevice.SubmittedBuffers > 1, "both chains to be playing");
+            Assert.That(leaving.OwnsClock, Is.True, "the chain that arrived first keeps the clock");
+
+            // The reader and one for each sound.
+            WaitFor(() => PipelineThread.LiveCount - baseline == 3, $"both chains to be running (was {PipelineThread.LiveCount - baseline})");
+
+            long handedOver = stayingDevice.SubmittedBuffers;
+            Assert.That(Await(pipeline.RemoveChain(leaving)).IsSuccessful, Is.True);
+            Assert.That(pipeline.AudioChains, Is.EqualTo(new[] { staying }), "the removal is recorded at once");
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "removing a chain is not a stop");
+                Assert.That(staying.OwnsClock, Is.True, "the clock falls to the sound that is left");
+            }
+
+            WaitFor(() => PipelineThread.LiveCount - baseline == 2, $"the sound that went to cost no thread (was {PipelineThread.LiveCount - baseline})");
+            WaitFor(() => stayingDevice.SubmittedBuffers > handedOver, "the remaining chain to keep playing");
+            Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Two pictures are two chains: each decodes and presents into the surface it was made with, and rebuilding one
+    /// chain's selection leaves the other one drawing. This is the case a single pipeline-wide version could not
+    /// express, because there was only ever one chain to be out of date.
+    /// </summary>
+    [Test]
+    public void PlaysTwoPicturesOnTheirOwnSurfaces()
+    {
+        string firstPosition = SyntheticPath("first-picture");
+        string secondPosition = SyntheticPath("second-picture");
+        string afterTheSwitch = SyntheticPath("other-picture");
+
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(firstPosition, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(10) });
+        sources.Add(secondPosition, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(10) });
+        sources.Add(afterTheSwitch, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(10) });
+
+        FakeRenderTarget firstTarget = new();
+        FakeRenderTarget secondTarget = new();
+        FakeVideoRenderer firstRenderer = new();
+        FakeVideoRenderer secondRenderer = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IVideoChain first = Await(pipeline.AddVideoChain(firstTarget));
+            IVideoChain second = Await(pipeline.AddVideoChain(secondTarget));
+
+            first.Components.Register(new SyntheticVideoDecoderFactory());
+            first.Components.Register(new FakeVideoRendererFactory(firstRenderer));
+            second.Components.Register(new SyntheticVideoDecoderFactory());
+            second.Components.Register(new FakeVideoRendererFactory(secondRenderer));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(firstPosition))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(secondPosition))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(afterTheSwitch))).IsSuccessful, Is.True);
+
+            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => firstRenderer.RenderedFrames > 2 && secondRenderer.RenderedFrames > 2, "both chains to draw");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(firstRenderer.Target, Is.SameAs(firstTarget), "each chain presents into the surface it was made with");
+                Assert.That(secondRenderer.Target, Is.SameAs(secondTarget));
+            }
+
+            // One chain is pointed at another file while the other keeps playing: what is rebuilt is that chain.
+            long drawnByTheOther = secondRenderer.RenderedFrames;
+            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[2].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            WaitFor(() => secondRenderer.RenderedFrames > drawnByTheOther, "the untouched chain to keep drawing across the other's rebuild");
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "rebuilding one chain is not a pause");
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// How a picture is decoded is the chain's business: one chain can be told to stay in software while the other is
+    /// left to take whatever the machine offers. The preferences live on the chain's own resolver, so what one chain
+    /// asks for is never what the other gets.
+    /// </summary>
+    [Test]
+    public void GivesEachVideoChainItsOwnDecoderPreference()
+    {
+        string firstPosition = SyntheticPath("software-picture");
+        string secondPosition = SyntheticPath("default-picture");
+
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(firstPosition, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(3) });
+        sources.Add(secondPosition, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(3) });
+
+        RecordingSyntheticVideoDecoderFactory softwareOnly = new();
+        RecordingSyntheticVideoDecoderFactory byDefault = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IVideoChain first = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            IVideoChain second = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+
+            first.Components.Preferences = new VideoPreferences { PreferHardwareDecoding = false };
+            first.Components.Register(softwareOnly);
+            first.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+            second.Components.Register(byDefault);
+            second.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(firstPosition))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(secondPosition))).IsSuccessful, Is.True);
+
+            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(softwareOnly.HardwareRequests, Has.None.True, "a chain asked for software never asks for hardware at all");
+                Assert.That(byDefault.HardwareRequests, Has.Some.True, "the chain that was not asked anything tries the machine's decoder first");
+                Assert.That(first.IsHardwareAccelerated, Is.False, "and the chain that stayed in software says so");
+            }
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Two sounds are two chains: each hands its own samples to its own device, each filters what it plays on its own,
+    /// and only the one that arrived first moves the clock — a second sound plays alongside rather than pulling time
+    /// its own way. One chain's device jamming leaves the other handing sound over.
+    /// </summary>
+    [Test]
+    public void PlaysTwoAudioChainsOfWhichOnlyTheFirstKeepsTheClock()
+    {
+        string firstPosition = SyntheticPath("first-sound");
+        string secondPosition = SyntheticPath("second-sound");
+
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(firstPosition, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(3) });
+        sources.Add(secondPosition, new SyntheticMediaScript { Duration = TimeSpan.FromSeconds(3) });
+
+        FakeAudioRenderer firstDevice = new();
+        FakeAudioRenderer secondDevice = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IAudioChain first = Await(pipeline.AddAudioChain());
+            IAudioChain second = Await(pipeline.AddAudioChain());
+
+            first.Components.Register(new SyntheticAudioDecoderFactory());
+            first.Components.Register(new FixedAudioRendererFactory(firstDevice));
+            second.Components.Register(new SyntheticAudioDecoderFactory());
+            second.Components.Register(new FixedAudioRendererFactory(secondDevice));
+
+            // What the two chains play is processed separately: a filter added to one is not something the other runs.
+            first.Filters.Add(new GainAudioFilter());
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(firstPosition))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(secondPosition))).IsSuccessful, Is.True);
+
+            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[1].Info.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            // One device has no room from the start. Its own chain waits in front of it; the other chain knows nothing
+            // about it, which is the whole point of the two being chains rather than one shared stage.
+            secondDevice.QueuedSampleCount = SampleRate;
+            secondDevice.NoRoom = true;
+
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => firstDevice.SubmittedBuffers > 2, "the chain whose device is open to play");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(secondDevice.SubmittedBuffers, Is.Zero, "the jammed device has taken nothing");
+                Assert.That(first.OwnsClock, Is.True, "the sound that arrived first is what moves the clock");
+                Assert.That(second.OwnsClock, Is.False, "a second sound plays alongside it");
+                Assert.That(first.Filters.Count, Is.EqualTo(1), "the filter belongs to the chain it was added to");
+                Assert.That(second.Filters.Count, Is.Zero, "and never reaches the other");
+            }
+
+            // Letting that device take sound again frees its own chain, and the sound it was holding reaches it.
+            secondDevice.NoRoom = false;
+            secondDevice.QueuedSampleCount = 0;
+            WaitFor(() => secondDevice.SubmittedBuffers > 0, "the jammed chain to hand sound over once its device opens");
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Two sets of words are two chains: each draws into its own surface, shows its own cues, and keeps its own
+    /// presentation. Nothing about one chain's drawing is decided by another's.
+    /// </summary>
+    [Test]
+    public void DrawsEachSubtitleChainOnItsOwnSurface()
+    {
+        string playing = SyntheticPath("playing");
+        string words = SyntheticPath("words");
+
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(playing, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        });
+        sources.Add(words, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(1.0), TimeSpan.FromSeconds(3))],
+        });
+
+        FakeSubtitleRenderer firstRenderer = new();
+        FakeSubtitleRenderer secondRenderer = new();
+        SubtitleSurface firstSurface = new();
+        SubtitleSurface secondSurface = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            // No sound at all: a pipeline is what the host makes it, and the kinds it never asked for are simply absent.
+            IVideoChain video = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            ISubtitleChain first = Await(pipeline.AddSubtitleChain(firstSurface));
+            ISubtitleChain second = Await(pipeline.AddSubtitleChain(secondSurface));
+
+            video.Components.Register(new SyntheticVideoDecoderFactory());
+            video.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+            first.Components.Register(new SyntheticSubtitleDecoderFactory());
+            first.Components.Register(new FakeSubtitleRendererFactory(firstRenderer));
+            second.Components.Register(new SyntheticSubtitleDecoderFactory());
+            second.Components.Register(new FakeSubtitleRendererFactory(secondRenderer));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(words))).IsSuccessful, Is.True);
+
+            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[1].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            // One chain is asked to draw its words larger; the other has said nothing and keeps the decoder's own idea.
+            second.Presentation = SubtitlePresentation.Identity with { FontSize = 32.0 };
+
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            string firstCue = SyntheticSubtitleDecoderFactory.TextAt(TimeSpan.FromSeconds(0.2));
+            string secondCue = SyntheticSubtitleDecoderFactory.TextAt(TimeSpan.FromSeconds(1.0));
+            WaitFor(() => firstRenderer.Texts.Contains(firstCue), "the first chain's words to be drawn");
+            WaitFor(() => secondRenderer.Texts.Contains(secondCue), "the second chain's words to be drawn");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(firstRenderer.Target, Is.SameAs(firstSurface), "each chain draws into the surface it was made with");
+                Assert.That(secondRenderer.Target, Is.SameAs(secondSurface));
+                Assert.That(firstRenderer.Texts, Does.Not.Contain(secondCue), "and shows only its own words");
+                Assert.That(secondRenderer.Texts, Does.Not.Contain(firstCue));
+                Assert.That(secondRenderer.Presentations[^1].FontSize, Is.EqualTo(32.0), "the presentation is the chain's own");
+                Assert.That(firstRenderer.Presentations[^1].FontSize, Is.EqualTo(SubtitlePresentation.Identity.FontSize), "the other chain was never asked to change");
+            }
         }
         finally
         {

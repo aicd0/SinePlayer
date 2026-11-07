@@ -389,9 +389,9 @@ internal sealed partial class PlaybackLabPage : BasePage
             SourceFactory = new FFmpegSourceProviderFactory(),
         };
 
-        IVideoChain video = pipeline.AddVideoChain(_videoRenderTarget);
-        IAudioChain audio = pipeline.AddAudioChain();
-        ISubtitleChain subtitle = pipeline.AddSubtitleChain(_subtitleRenderTarget);
+        IVideoChain video = await pipeline.AddVideoChain(_videoRenderTarget);
+        IAudioChain audio = await pipeline.AddAudioChain();
+        ISubtitleChain subtitle = await pipeline.AddSubtitleChain(_subtitleRenderTarget);
 
         ApplyComponentSelection<IVideoDecoderFactory>(pipeline, VideoDecoderPicker.SelectedItem as ComponentChoice);
         ApplyComponentSelection<IVideoRendererFactory>(pipeline, VideoRendererPicker.SelectedItem as ComponentChoice);
@@ -497,7 +497,14 @@ internal sealed partial class PlaybackLabPage : BasePage
             return;
         }
 
-        OperationResult selected = await pipeline.SelectStream(kind, choice.Stream);
+        IPlaybackChain? chain = kind switch
+        {
+            MediaStreamKind.Video => pipeline.VideoChains[0],
+            MediaStreamKind.Audio => pipeline.AudioChains[0],
+            _ => pipeline.SubtitleChains[0],
+        };
+
+        OperationResult selected = await pipeline.SelectStream(chain, choice.Stream);
         if (!selected.IsSuccessful)
         {
             Logger.E(TAG, $"The track could not be changed. {selected.Message}");
