@@ -61,22 +61,22 @@ internal sealed partial class PlaybackLabPage : BasePage
         switch (typeof(TFactory).Name)
         {
             case nameof(IVideoDecoderFactory):
-                pipeline.VideoComponents.ClearDecoders();
+                pipeline.VideoChains[0].Components.ClearDecoders();
                 break;
             case nameof(IVideoRendererFactory):
-                pipeline.VideoComponents.ClearRenderers();
+                pipeline.VideoChains[0].Components.ClearRenderers();
                 break;
             case nameof(IAudioDecoderFactory):
-                pipeline.AudioComponents.ClearDecoders();
+                pipeline.AudioChains[0].Components.ClearDecoders();
                 break;
             case nameof(IAudioRendererFactory):
-                pipeline.AudioComponents.ClearRenderers();
+                pipeline.AudioChains[0].Components.ClearRenderers();
                 break;
             case nameof(ISubtitleDecoderFactory):
-                pipeline.SubtitleComponents.ClearDecoders();
+                pipeline.SubtitleChains[0].Components.ClearDecoders();
                 break;
             case nameof(ISubtitleRendererFactory):
-                pipeline.SubtitleComponents.ClearRenderers();
+                pipeline.SubtitleChains[0].Components.ClearRenderers();
                 break;
         }
 
@@ -85,22 +85,22 @@ internal sealed partial class PlaybackLabPage : BasePage
             switch (factory)
             {
                 case IVideoDecoderFactory decoder:
-                    pipeline.VideoComponents.Register(decoder);
+                    pipeline.VideoChains[0].Components.Register(decoder);
                     break;
                 case IVideoRendererFactory renderer:
-                    pipeline.VideoComponents.Register(renderer);
+                    pipeline.VideoChains[0].Components.Register(renderer);
                     break;
                 case IAudioDecoderFactory decoder:
-                    pipeline.AudioComponents.Register(decoder);
+                    pipeline.AudioChains[0].Components.Register(decoder);
                     break;
                 case IAudioRendererFactory renderer:
-                    pipeline.AudioComponents.Register(renderer);
+                    pipeline.AudioChains[0].Components.Register(renderer);
                     break;
                 case ISubtitleDecoderFactory decoder:
-                    pipeline.SubtitleComponents.Register(decoder);
+                    pipeline.SubtitleChains[0].Components.Register(decoder);
                     break;
                 case ISubtitleRendererFactory renderer:
-                    pipeline.SubtitleComponents.Register(renderer);
+                    pipeline.SubtitleChains[0].Components.Register(renderer);
                     break;
             }
         }
@@ -108,7 +108,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         if (choice.HardwareDecoding is bool hardwareDecoding)
         {
             // Choosing a software decoder is a different request, not just a different registration.
-            pipeline.VideoComponents.Preferences = pipeline.VideoComponents.Preferences with { PreferHardwareDecoding = hardwareDecoding };
+            pipeline.VideoChains[0].Components.Preferences = pipeline.VideoChains[0].Components.Preferences with { PreferHardwareDecoding = hardwareDecoding };
         }
     }
 
@@ -389,6 +389,10 @@ internal sealed partial class PlaybackLabPage : BasePage
             SourceFactory = new FFmpegSourceProviderFactory(),
         };
 
+        IVideoChain video = pipeline.AddVideoChain(_videoRenderTarget);
+        IAudioChain audio = pipeline.AddAudioChain();
+        ISubtitleChain subtitle = pipeline.AddSubtitleChain(_subtitleRenderTarget);
+
         ApplyComponentSelection<IVideoDecoderFactory>(pipeline, VideoDecoderPicker.SelectedItem as ComponentChoice);
         ApplyComponentSelection<IVideoRendererFactory>(pipeline, VideoRendererPicker.SelectedItem as ComponentChoice);
         ApplyComponentSelection<IAudioDecoderFactory>(pipeline, AudioDecoderPicker.SelectedItem as ComponentChoice);
@@ -398,19 +402,19 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         // What the transform controls say is what the file is opened with, so a picture that is turned stays
         // turned across files rather than snapping back on every open.
-        pipeline.VideoChains[0].Transform = CreateTransform();
+        video.Transform = CreateTransform();
 
         pipeline.StateChanged += Pipeline_StateChanged;
         pipeline.WarningRaised += Pipeline_WarningRaised;
 
         GainAudioFilter gain = new();
         gain.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
-        pipeline.AudioChains[0].Filters.Add(gain);
+        audio.Filters.Add(gain);
 
         DownmixAudioFilter downmix = new();
-        pipeline.AudioChains[0].Filters.Add(downmix);
+        audio.Filters.Add(downmix);
 
-        OperationResult reset = await pipeline.Reset(_videoRenderTarget, _subtitleRenderTarget);
+        OperationResult reset = await pipeline.Reset();
         string? failure = reset.IsSuccessful ? null : reset.Message;
         if (failure is null)
         {

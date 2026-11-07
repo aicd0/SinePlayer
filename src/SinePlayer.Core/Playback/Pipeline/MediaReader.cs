@@ -37,6 +37,13 @@ internal sealed class MediaReader(
         _subtitleSources.Write(current => new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(current) { [feed] = slot });
     }
 
+    public void RemoveSource(IChainFeed feed)
+    {
+        _videoSources.Write(current => Without(current, feed));
+        _audioSources.Write(current => Without(current, feed));
+        _subtitleSources.Write(current => Without(current, feed));
+    }
+
     public void Wake()
     {
         _node.Wake();
@@ -293,6 +300,19 @@ internal sealed class MediaReader(
         }
 
         return true;
+    }
+
+    private static IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>> Without(
+        IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>> current,
+        IChainFeed feed)
+    {
+        if (!current.ContainsKey(feed))
+        {
+            return current;
+        }
+
+        List<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> kept = [.. current.Where(entry => !ReferenceEquals(entry.Key, feed))];
+        return new Dictionary<IChainFeed, ComponentSlot<MediaSource>>(kept);
     }
 
     private IReadOnlyList<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> ReadSources()

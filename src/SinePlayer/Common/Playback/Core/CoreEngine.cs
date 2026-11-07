@@ -44,6 +44,9 @@ internal sealed partial class CoreEngine : IDisposable
     private DownmixAudioFilter? _downmixFilter;
 
     private readonly PlaybackInfoHandle _playbackInfo = new();
+    private IVideoChain? _videoChain;
+    private IAudioChain? _audioChain;
+    private ISubtitleChain? _subtitleChain;
     private bool _hasSource = false;
     private PlaybackComponents _components = PlaybackComponents.Default;
     private VideoTransform _videoTransform = VideoTransform.Identity;
@@ -110,6 +113,9 @@ internal sealed partial class CoreEngine : IDisposable
 
         PlaybackPipeline? pipeline = _pipeline;
         _pipeline = null;
+        _videoChain = null;
+        _audioChain = null;
+        _subtitleChain = null;
         if (pipeline is not null)
         {
             pipeline.StateChanged -= Pipeline_StateChanged;
@@ -139,7 +145,7 @@ internal sealed partial class CoreEngine : IDisposable
     {
         PlaybackPipeline pipeline = EnsurePipeline();
 
-        OperationResult reset = await pipeline.Reset(EnsureVideoRenderTarget(), EnsureSubtitleRenderTarget());
+        OperationResult reset = await pipeline.Reset();
         if (!reset.IsSuccessful)
         {
             return OperationResultExt.Failure(TAG, "The player could not be reset.", reset);
@@ -316,7 +322,10 @@ internal sealed partial class CoreEngine : IDisposable
         }
 
         _videoTransform = transform;
-        _pipeline?.VideoChains[0].Transform = transform;
+        if (_videoChain is { } video)
+        {
+            video.Transform = transform;
+        }
     }
 
     public void SetSubtitlePresentation(SubtitlePresentation presentation)
@@ -327,7 +336,10 @@ internal sealed partial class CoreEngine : IDisposable
         }
 
         _subtitlePresentation = presentation;
-        _pipeline?.SubtitleChains[0].Presentation = presentation;
+        if (_subtitleChain is { } subtitle)
+        {
+            subtitle.Presentation = presentation;
+        }
     }
 
     public void SetVolume(double volume)
@@ -384,25 +396,32 @@ internal sealed partial class CoreEngine : IDisposable
             SourceFactory = new FFmpegSourceProviderFactory(),
         };
 
+        IVideoChain video = pipeline.AddVideoChain(EnsureVideoRenderTarget());
+        IAudioChain audio = pipeline.AddAudioChain();
+        ISubtitleChain subtitle = pipeline.AddSubtitleChain(EnsureSubtitleRenderTarget());
+        _videoChain = video;
+        _audioChain = audio;
+        _subtitleChain = subtitle;
+
         _components.Apply(pipeline);
-        pipeline.VideoChains[0].Transform = _videoTransform;
-        pipeline.SubtitleChains[0].Presentation = _subtitlePresentation;
+        video.Transform = _videoTransform;
+        subtitle.Presentation = _subtitlePresentation;
         pipeline.StateChanged += Pipeline_StateChanged;
 
         GainAudioFilter gainFilter = new();
         gainFilter.SetLevel(_volume, _muted);
-        pipeline.AudioChains[0].Filters.Add(gainFilter);
+        audio.Filters.Add(gainFilter);
         _gainFilter = gainFilter;
 
         DownmixAudioFilter downmixFilter = new();
-        pipeline.AudioChains[0].Filters.Add(downmixFilter);
+        audio.Filters.Add(downmixFilter);
         _downmixFilter = downmixFilter;
 
         // Warnings are heard as they happen — during the open for something left out of it, and later for a
         // device that stops moving. They were only ever looked at once, at load, before.
         pipeline.WarningRaised += Pipeline_WarningRaised;
 
-        _playbackInfo.Attach(pipeline);
+        _playbackInfo.Attach(pipeline, video, audio, subtitle);
         _pipeline = pipeline;
         _pendingReconcile = true;
         return pipeline;
@@ -443,7 +462,7 @@ internal sealed partial class CoreEngine : IDisposable
         }
 
         PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is null || pipeline.AudioChains[0].SelectedStream is null)
+        if (pipeline is null || _audioChain?.SelectedStream is null)
         {
             return;
         }
