@@ -17,7 +17,7 @@ using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged) : IPictureFrameSource, IChainFeed, IPipelineWakeTarget
+internal sealed class VideoChain : IPlaybackChain, IPictureFrameSource, IChainFeed, IPipelineWakeTarget
 {
     private const int FrameQueueCapacity = 8;
     private const int VideoStarvationMilliseconds = 200;
@@ -27,9 +27,95 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
     public const int DecoderBufferedFrames = FrameQueueCapacity + 4;
 
+    private readonly PipelineTimeline _timeline;
+    private readonly PipelineEvents _events;
+    private readonly Action _surfaceSizeChanged;
+
+    private IVideoRenderTarget? _target;
+    private volatile bool _starved;
+    private long _endedEpoch = -1;
+    private long _presentedFrameCount;
+    private long _droppedFrameCount;
+    private long _decodedFrameCount;
+    private long _decodeTicks;
+    private long _renderTicks;
+    private long _pictureTicks = -1;
     private PipelineThread? _decodeThread;
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
+
+    public VideoChain(PipelineTimeline timeline, PipelineEvents events, Action surfaceSizeChanged)
+    {
+        _timeline = timeline;
+        _events = events;
+        _surfaceSizeChanged = surfaceSizeChanged;
+    }
+
+    public MediaStreamKind Kind => MediaStreamKind.Video;
+
+    public MediaStreamInfo? SelectedStream => Selected.Stream;
+
+    public MediaStreamInfo? PlayingStream => Source.CurrentStream;
+
+    public bool IsActive => Decoder.HasComponent;
+
+    public string? DecoderName => Decoder.CurrentComponent?.Name;
+
+    public string? RendererName => Renderer.CurrentComponent?.Name;
+
+    public bool IsHardwareAccelerated => Decoder.CurrentComponent?.IsHardwareAccelerated ?? false;
+
+    public ISynchronizer Synchronizer { get; set; } = new DefaultSynchronizer();
+
+    public IVideoRenderTarget? Target
+    {
+        get => _target;
+        set
+        {
+            _target?.SurfaceSizeChanged -= _surfaceSizeChanged;
+            _target = value;
+            _target?.SurfaceSizeChanged += _surfaceSizeChanged;
+        }
+    }
+
+    public long PresentedFrameCount => Interlocked.Read(ref _presentedFrameCount);
+
+    public long DroppedFrameCount => Interlocked.Read(ref _droppedFrameCount);
+
+    public long DecodedFrameCount => Interlocked.Read(ref _decodedFrameCount);
+
+    public double AverageDecodeMilliseconds
+    {
+        get
+        {
+            long frames = Interlocked.Read(ref _decodedFrameCount);
+            return frames <= 0 ? 0 : Interlocked.Read(ref _decodeTicks) * 1000.0 / Stopwatch.Frequency / frames;
+        }
+    }
+
+    public double AverageRenderMilliseconds
+    {
+        get
+        {
+            long frames = Interlocked.Read(ref _presentedFrameCount);
+            return frames <= 0 ? 0 : Interlocked.Read(ref _renderTicks) * 1000.0 / Stopwatch.Frequency / frames;
+        }
+    }
+
+    public TimeSpan PictureLag
+    {
+        get
+        {
+            long ticks = Interlocked.Read(ref _pictureTicks);
+            if (ticks < 0 || PresentedFrameCount == 0)
+            {
+                return TimeSpan.Zero;
+            }
+
+            TimeSpan lag = _timeline.Position - TimeSpan.FromTicks(ticks);
+            return lag > TimeSpan.Zero ? lag : TimeSpan.Zero;
+        }
+    }
 
     public ComponentSlot<MediaSource> Source { get; } = new();
 
@@ -47,41 +133,32 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
     public AtomicCell<VideoTransform> Transform { get; } = new(VideoTransform.Identity);
 
-    public ISynchronizer Synchronizer { get; set; } = new DefaultSynchronizer();
-
-    private IVideoRenderTarget? _target;
-    public IVideoRenderTarget? Target
-    {
-        get => _target;
-        set
-        {
-            _target?.SurfaceSizeChanged -= surfaceSizeChanged;
-            _target = value;
-            _target?.SurfaceSizeChanged += surfaceSizeChanged;
-        }
-    }
-
     public StreamBinding<VideoStreamInfo> Selected { get; set; }
 
-    public long EndedEpoch { get; set; } = -1;
-
-    private volatile bool _starved;
     public bool Starved
     {
         get => _starved;
         set => _starved = value;
     }
 
+    public long EndedEpoch
+    {
+        get => Interlocked.Read(ref _endedEpoch);
+        set => Interlocked.Exchange(ref _endedEpoch, value);
+    }
+
     public ChainTail ReadTail { get; } = new();
 
     public bool IsConsuming => Decoder.HasComponent;
 
-    public long PresentedFrameCount;
-    public long DroppedFrameCount;
-    public long DecodedFrameCount;
-    public long DecodeTicks;
-    public long RenderTicks;
-    public long PictureTicks = -1;
+    public TimeSpan LastPresentedTimestamp
+    {
+        get
+        {
+            long ticks = Interlocked.Read(ref _pictureTicks);
+            return ticks < 0 ? TimeSpan.Zero : TimeSpan.FromTicks(ticks);
+        }
+    }
 
     public void Start(Action wakeReader, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
@@ -125,12 +202,12 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         EndedEpoch = -1;
         ReadTail.Reset();
 
-        Interlocked.Exchange(ref PresentedFrameCount, 0);
-        Interlocked.Exchange(ref DroppedFrameCount, 0);
-        Interlocked.Exchange(ref DecodedFrameCount, 0);
-        Interlocked.Exchange(ref DecodeTicks, 0);
-        Interlocked.Exchange(ref RenderTicks, 0);
-        Interlocked.Exchange(ref PictureTicks, -1);
+        Interlocked.Exchange(ref _presentedFrameCount, 0);
+        Interlocked.Exchange(ref _droppedFrameCount, 0);
+        Interlocked.Exchange(ref _decodedFrameCount, 0);
+        Interlocked.Exchange(ref _decodeTicks, 0);
+        Interlocked.Exchange(ref _renderTicks, 0);
+        Interlocked.Exchange(ref _pictureTicks, -1);
     }
 
     public void Wake()
@@ -154,7 +231,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         WakeDecode();
     }
 
-    public void Decode(Func<bool> stopRequested, Action wakeReader)
+    private void Decode(Func<bool> stopRequested, Action wakeReader)
     {
         bool awaitingKeyFrame = false;
         long workingEpoch = -1;
@@ -175,7 +252,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
             IVideoDecoder? videoDecoder = Decoder.CurrentComponent;
 
-            long epoch = timeline.Epoch;
+            long epoch = _timeline.Epoch;
             if (workingEpoch != epoch)
             {
                 workingEpoch = epoch;
@@ -186,7 +263,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
                 }
                 catch (Exception exception)
                 {
-                    events.PostFailure(exception.Message, exception);
+                    _events.PostFailure(exception.Message, exception);
                     return;
                 }
 
@@ -238,7 +315,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
                         OperationResult drained = DrainDecoder(videoDecoder, videoFrameVersions, packetEpoch);
                         if (!drained.IsSuccessful)
                         {
-                            events.PostWarning(drained.Message);
+                            _events.PostWarning(drained.Message);
                         }
                     }
 
@@ -266,13 +343,13 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
                 OperationResult decoded = DecodePacket(videoDecoder, packet, out IReadOnlyList<RawVideoFrame>? frames);
                 if (!decoded.IsSuccessful)
                 {
-                    events.PostFailure(decoded);
+                    _events.PostFailure(decoded);
                     return;
                 }
 
                 if (frames is null)
                 {
-                    events.PostFailure("The video decoder returned no frames.");
+                    _events.PostFailure("The video decoder returned no frames.");
                     return;
                 }
 
@@ -281,7 +358,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         }
     }
 
-    public void Render(Func<bool> stopRequested, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
+    private void Render(Func<bool> stopRequested, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
         bool deviceAvailable = false;
         long workingEpoch = -1;
@@ -326,10 +403,10 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
                         if (!cleared.IsSuccessful)
                         {
-                            events.PostWarning(cleared.Message);
+                            _events.PostWarning(cleared.Message);
                         }
 
-                        Interlocked.Exchange(ref PictureTicks, -1);
+                        Interlocked.Exchange(ref _pictureTicks, -1);
                     }
 
                     oldVideoRenderer.Dispose();
@@ -341,17 +418,17 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
             IVideoRenderer? videoRenderer = Renderer.CurrentComponent;
 
-            EpochGate epochGate = timeline.Gate;
+            EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             if (workingEpoch != epoch)
             {
                 workingEpoch = epoch;
                 startTime = epochGate.SeekMode == SeekMode.Precise ? epochGate.SeekPosition : null;
                 firstFrameTime = null;
-                Interlocked.Exchange(ref PictureTicks, -1);
+                Interlocked.Exchange(ref _pictureTicks, -1);
             }
 
-            bool playing = events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
+            bool playing = _events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
             VideoTransform transform = Transform.Read();
 
             VideoOrientation containerTransform = ((VideoStreamInfo?)Renderer.CurrentStream)?.Orientation ?? VideoOrientation.Identity;
@@ -374,23 +451,23 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
                 if (!refreshed.IsSuccessful)
                 {
-                    events.PostWarning(refreshed.Message);
+                    _events.PostWarning(refreshed.Message);
                     deviceAvailable = false;
                 }
             }
 
             FrameEntry? entry = FrameQueue.TryPeek(out FrameEntry head) ? head : null;
-            TimeSpan position = timeline.Position;
+            TimeSpan position = _timeline.Position;
             bool offeringTheStill = state == MediaEngineState.Paused && !firstFrameTime.HasValue && endingEpoch != epoch;
 
             bool starved = Decoder.HasComponent && endingEpoch != epoch && entry is null;
             starved = starved && !isStreamSpent(epoch, position);
             starved = starved && (!firstFrameTime.HasValue || IsStarved(position));
 
-            lock (timeline.ClockLock)
+            lock (_timeline.ClockLock)
             {
                 Starved = starved;
-                timeline.StartOrPause(epoch, state);
+                _timeline.StartOrPause(epoch, state);
             }
 
             if (!playing && !offeringTheStill)
@@ -432,7 +509,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
                     endingEpoch = entry.Value.Epoch;
 
                     long epochCopy = entry.Value.Epoch;
-                    events.Submit(() =>
+                    _events.Submit(() =>
                     {
                         EndedEpoch = epochCopy;
                         reportEnded();
@@ -455,15 +532,15 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
             {
                 TimeSpan anchor = firstFrameTime ?? frame.Timestamp;
 
-                lock (timeline.ClockLock)
+                lock (_timeline.ClockLock)
                 {
-                    if (timeline.Anchor(epoch, anchor))
+                    if (_timeline.Anchor(epoch, anchor))
                     {
-                        position = timeline.Position;
+                        position = _timeline.Position;
                         syncAction = Synchronizer.Evaluate(frame.Timestamp, position);
                     }
 
-                    timeline.StartOrPause(epoch, state);
+                    _timeline.StartOrPause(epoch, state);
                 }
             }
 
@@ -489,7 +566,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
                     && closer.Frame is not null
                     && closer.Epoch == epoch)
                 {
-                    Interlocked.Increment(ref DroppedFrameCount);
+                    Interlocked.Increment(ref _droppedFrameCount);
                     continue;
                 }
 
@@ -497,14 +574,14 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
                 {
                     if (playing && firstFrameTime.HasValue && !videoRenderer.TryAcquireFrameSlot())
                     {
-                        Interlocked.Increment(ref DroppedFrameCount);
+                        Interlocked.Increment(ref _droppedFrameCount);
                         continue;
                     }
 
                     OperationResult shown = RenderFrame(videoRenderer, frame, transform);
                     if (!shown.IsSuccessful)
                     {
-                        events.PostWarning(shown.Message);
+                        _events.PostWarning(shown.Message);
                         deviceAvailable = false;
                     }
                 }
@@ -533,7 +610,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
             decoded = OperationResult.Failure(ex);
         }
 
-        Interlocked.Add(ref DecodeTicks, Stopwatch.GetTimestamp() - startTicks);
+        Interlocked.Add(ref _decodeTicks, Stopwatch.GetTimestamp() - startTicks);
 
         if (!decoded.IsSuccessful || produced is null)
         {
@@ -541,7 +618,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
         }
 
         frames = produced;
-        Interlocked.Add(ref DecodedFrameCount, produced.Count);
+        Interlocked.Add(ref _decodedFrameCount, produced.Count);
         return OperationResult.Success();
     }
 
@@ -578,7 +655,7 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
 
         foreach (RawVideoFrame frame in frames)
         {
-            if (fastExit || timeline.Epoch != epoch)
+            if (fastExit || _timeline.Epoch != epoch)
             {
                 fastExit = true;
                 frame.Dispose();
@@ -612,22 +689,22 @@ internal sealed class VideoChain(PipelineTimeline timeline, PipelineEvents event
             rendered = OperationResult.Failure(ex.Message);
         }
 
-        Interlocked.Add(ref RenderTicks, Stopwatch.GetTimestamp() - startTicks);
+        Interlocked.Add(ref _renderTicks, Stopwatch.GetTimestamp() - startTicks);
 
         if (!rendered.IsSuccessful)
         {
             return rendered;
         }
 
-        Interlocked.Increment(ref PresentedFrameCount);
-        Interlocked.Exchange(ref PictureTicks, frame.Timestamp.Ticks);
+        Interlocked.Increment(ref _presentedFrameCount);
+        Interlocked.Exchange(ref _pictureTicks, frame.Timestamp.Ticks);
 
         return OperationResult.Success();
     }
 
     private bool IsStarved(TimeSpan position)
     {
-        long presentedTicks = Interlocked.Read(ref PictureTicks);
+        long presentedTicks = Interlocked.Read(ref _pictureTicks);
         if (presentedTicks < 0)
         {
             return false;
