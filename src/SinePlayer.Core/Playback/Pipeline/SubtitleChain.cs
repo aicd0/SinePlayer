@@ -132,7 +132,7 @@ internal sealed class SubtitleChain : IPlaybackChain, IChainFeed, IPipelineWakeT
         ReadTail.Reset();
     }
 
-    public OperationResult<ChainChange> Reconcile(ComponentResolver resolver)
+    public OperationResult<ChainChange> Reconcile(SubtitleComponentResolver resolver)
     {
         OperationResultCreator<ChainChange> result = new();
 
@@ -155,7 +155,7 @@ internal sealed class SubtitleChain : IPlaybackChain, IChainFeed, IPipelineWakeT
                 bool rebuildSubtitleDecoder = sourceChanged;
                 PipelineComponent<ISubtitleDecoder>? latestDecoder = Decoder.Latest;
                 OperationResult<PipelineComponent<ISubtitleDecoder>?> decoderResolved = ComponentResolution.Resolve(
-                    resolver.ResolveSubtitleDecoders(subtitleSource.Source, subtitleStream),
+                    resolver.ResolveDecoders(subtitleSource.Source, subtitleStream),
                     rebuildSubtitleDecoder ? null : latestDecoder?.Signature,
                     subtitleStream,
                     "subtitle decoder");
@@ -181,7 +181,7 @@ internal sealed class SubtitleChain : IPlaybackChain, IChainFeed, IPipelineWakeT
                 bool rebuildSubtitleRenderer = decoder is not null || sourceChanged;
                 PipelineComponent<ISubtitleRenderer>? latestRenderer = Renderer.Latest;
                 OperationResult<PipelineComponent<ISubtitleRenderer>?> rendererResolved = ComponentResolution.Resolve(
-                    resolver.ResolveSubtitleRenderers(subtitleStream, format),
+                    resolver.ResolveRenderers(subtitleStream, format),
                     rebuildSubtitleRenderer ? null : latestRenderer?.Signature,
                     subtitleStream,
                     "subtitle renderer");
