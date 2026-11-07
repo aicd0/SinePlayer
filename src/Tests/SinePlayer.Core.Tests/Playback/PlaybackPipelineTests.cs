@@ -8028,7 +8028,7 @@ public class PlaybackPipelineTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(first.Disposed, Is.True, "the renderer that was replaced is released");
-            Assert.That(pipeline.SelectedSubtitleStream, Is.Not.Null, "the track itself is untouched by a renderer switch");
+            Assert.That(pipeline.SubtitleChains[0].SelectedStream, Is.Not.Null, "the track itself is untouched by a renderer switch");
         }
 
         // The switch clears the screen before it draws again, so the new renderer's first drawing may well be an empty
@@ -8116,7 +8116,7 @@ public class PlaybackPipelineTests
         Assert.That(Select(pipeline, MediaStreamKind.Subtitle, null).IsSuccessful, Is.True);
 
         WaitFor(() => subtitleRenderer.Texts.Length == 0, "nothing may be left on the surface of a track that was turned off");
-        Assert.That(pipeline.SelectedSubtitleStream, Is.Null);
+        Assert.That(pipeline.SubtitleChains[0].SelectedStream, Is.Null);
     }
 
     [Test]
@@ -8294,7 +8294,7 @@ public class PlaybackPipelineTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(selected.IsSuccessful, Is.False);
-            Assert.That(pipeline.SelectedSubtitleStream, Is.Not.Null, "the choice is recorded even though no pair could be built for it");
+            Assert.That(pipeline.SubtitleChains[0].SelectedStream, Is.Not.Null, "the choice is recorded even though no pair could be built for it");
             Assert.That(subtitleRenderer.ShowCount, Is.Zero, "and nothing was drawn");
         }
     }
@@ -8443,7 +8443,7 @@ public class PlaybackPipelineTests
             {
                 Assert.That(pipeline.Sources, Has.Count.EqualTo(2), "the file was given to the pipeline");
                 Assert.That(sources.Opened[1].LastSeekPosition, Is.Null, "and nothing was asked of it, because nothing of it is being played");
-                Assert.That(pipeline.SelectedSubtitleStream, Is.Null);
+                Assert.That(pipeline.SubtitleChains[0].SelectedStream, Is.Null);
             }
         }
         finally
@@ -8550,7 +8550,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(pipeline.SelectedSubtitleStream, Is.SameAs(added.Result), "the track that is selected is the one that was asked for");
+                Assert.That(pipeline.SubtitleChains[0].SelectedStream, Is.SameAs(added.Result), "the track that is selected is the one that was asked for");
                 Assert.That(subtitleRenderer.Texts, Does.Not.Contain(ownCue), "and the cues of the other file are gone");
             }
         }
