@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Reflection;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Pipeline;
@@ -124,5 +125,34 @@ public class PipelineSurfaceTests
             Assert.That(pipeline.AudioChains[0].Components, Is.SameAs(pipeline.AudioComponents));
             Assert.That(pipeline.SubtitleChains[0].Components, Is.SameAs(pipeline.SubtitleComponents));
         }
+    }
+
+    /// <summary>
+    /// The pipeline describes playback, not one chain of each kind: what is per kind belongs to the chain, and the only
+    /// per-kind names left on the pipeline are the ways to reach a chain — its list, and the resolver it owns.
+    /// </summary>
+    [Test]
+    public void NamesNoKindButToReachItsChains()
+    {
+        string[] perKind = [.. typeof(PlaybackPipeline)
+            .GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+            .Select(member => member.Name)
+            .Where(name => name.StartsWith("Video", StringComparison.Ordinal)
+                || name.StartsWith("Audio", StringComparison.Ordinal)
+                || name.StartsWith("Subtitle", StringComparison.Ordinal))
+            .Distinct()];
+
+        Assert.That(
+            perKind.Order(),
+            Is.EqualTo(new[]
+            {
+                nameof(PlaybackPipeline.VideoChains),
+                nameof(PlaybackPipeline.AudioChains),
+                nameof(PlaybackPipeline.SubtitleChains),
+                nameof(PlaybackPipeline.VideoComponents),
+                nameof(PlaybackPipeline.AudioComponents),
+                nameof(PlaybackPipeline.SubtitleComponents),
+            }.Order()),
+            "a per-kind member on the pipeline is a second place to describe a chain");
     }
 }
