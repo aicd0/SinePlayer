@@ -114,12 +114,13 @@ internal sealed partial class PlayerPage : BasePage
 
         _sessionId = sessionId;
         PlayerSession session = EnsureSession();
+        _view = session.CreateView();
         ViewModel.Initialize(PageActionHandler, OpenMedia, session.Playback);
         ObserveData();
         UpdateKeyboardAccelerators();
 
         VideoHost.Children.Clear();
-        VideoHost.Children.Add(session.CreateVideoSurface());
+        VideoHost.Children.Add(_view.Panel);
         SubtitleHost.Children.Clear();
         SubtitleHost.Children.Add(session.CreateSubtitleSurface());
 
@@ -403,6 +404,7 @@ internal sealed partial class PlayerPage : BasePage
                 PlayQueue = session.PlayQueue.ToBuilder(),
                 Playback = ViewModel.Playback.ToBuilder(),
                 Session = session,
+                View = _view,
                 PromptInfo = PromptTemporary,
             };
 
@@ -546,6 +548,7 @@ internal sealed partial class PlayerPage : BasePage
 
     private string _sessionId = string.Empty;
     private PlayerSession? _session;
+    private PlayerView? _view;
     private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
 
     private async Task<OperationResult> OpenMedia(MediaModel media, long startPositionMs)
@@ -553,6 +556,12 @@ internal sealed partial class PlayerPage : BasePage
         ViewModel.SavePosition();
 
         PlayerSession session = EnsureSession();
+        PlayerView? view = _view;
+        if (view is null)
+        {
+            return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': the page has no picture to draw into.");
+        }
+
         await session.Reset();
 
         var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
@@ -564,7 +573,7 @@ internal sealed partial class PlayerPage : BasePage
             return OperationResult.Failure(loaded);
         }
 
-        OperationResult selected = await SelectTracks(session, media);
+        OperationResult selected = await SelectTracks(session, view, media);
         if (!selected.IsSuccessful)
         {
             return selected;
@@ -584,7 +593,7 @@ internal sealed partial class PlayerPage : BasePage
         return selected;
     }
 
-    private async Task<OperationResult> SelectTracks(PlayerSession session, MediaModel media)
+    private async Task<OperationResult> SelectTracks(PlayerSession session, PlayerView view, MediaModel media)
     {
         static T? DefaultTrack<T>(IReadOnlyList<T>? streams) where T : MediaStreamInfo
         {
@@ -604,17 +613,16 @@ internal sealed partial class PlayerPage : BasePage
             return streams[0];
         }
 
-        MediaInfo? info = session.PlaybackInfo.Media;
-        if (info is null)
-        {
-            return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': its tracks could not be read.");
-        }
-
         // Add external sources
         foreach (MediaStreamKind kind in (MediaStreamKind[])[MediaStreamKind.Video, MediaStreamKind.Audio, MediaStreamKind.Subtitle])
         {
-            TrackSelection.Preference? preference = TrackSelection.Load(media, kind, session.PlaybackInfo.Sources);
-            if (preference is null || !preference.Enabled || string.IsNullOrEmpty(preference.Path) || preference.Stream is not null)
+            TrackSelection.Preference? preference = TrackSelection.Load(media, kind, session.Sources);
+            if (preference is null || !preference.Enabled || preference.Stream is not null)
+            {
+                continue;
+            }
+
+            if (session.Sources.Any(source => source.Locator.Value == preference.Path))
             {
                 continue;
             }
@@ -635,7 +643,15 @@ internal sealed partial class PlayerPage : BasePage
             }
         }
 
-        IReadOnlyList<MediaSource> sources = session.PlaybackInfo.Sources;
+        IReadOnlyList<MediaSource> sources = session.Sources;
+        if (sources.Count == 0)
+        {
+            return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': it opened no media.");
+        }
+
+        IReadOnlyList<VideoStreamInfo> videoStreams = [.. sources.SelectMany(source => source.Info.VideoStreams)];
+        IReadOnlyList<AudioStreamInfo> audioStreams = [.. sources.SelectMany(source => source.Info.AudioStreams)];
+        IReadOnlyList<SubtitleStreamInfo> subtitleStreams = [.. sources.SelectMany(source => source.Info.SubtitleStreams)];
         List<string> unplayable = [];
 
         // Select video track
@@ -643,16 +659,16 @@ internal sealed partial class PlayerPage : BasePage
         TrackSelection.Preference? videoChoice = TrackSelection.Load(media, MediaStreamKind.Video, sources);
         if (videoChoice is null)
         {
-            video = DefaultTrack(info.VideoStreams);
+            video = DefaultTrack(videoStreams);
         }
         else if (videoChoice.Enabled)
         {
-            video = videoChoice.Stream ?? DefaultTrack(info.VideoStreams);
+            video = videoChoice.Stream ?? DefaultTrack(videoStreams);
         }
 
         if (video is not null)
         {
-            OperationResult chosen = await session.SelectStream(MediaStreamKind.Video, video);
+            OperationResult chosen = await session.SelectVideoStream(view, video);
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the picture could not be played ({chosen.Message})");
@@ -664,11 +680,11 @@ internal sealed partial class PlayerPage : BasePage
         TrackSelection.Preference? audioChoice = TrackSelection.Load(media, MediaStreamKind.Audio, sources);
         if (audioChoice is null)
         {
-            audio = DefaultTrack(info.AudioStreams);
+            audio = DefaultTrack(audioStreams);
         }
         else if (audioChoice.Enabled)
         {
-            audio = audioChoice.Stream ?? DefaultTrack(info.AudioStreams);
+            audio = audioChoice.Stream ?? DefaultTrack(audioStreams);
         }
 
         if (audio is not null)
@@ -682,7 +698,6 @@ internal sealed partial class PlayerPage : BasePage
 
         // Select subtitle track
         MediaStreamInfo? subtitle = null;
-        IReadOnlyList<SubtitleStreamInfo> subtitleStreams = [.. sources.SelectMany(source => source.Info.SubtitleStreams)];
         TrackSelection.Preference? subtitleChoice = TrackSelection.Load(media, MediaStreamKind.Subtitle, sources);
         if (subtitleChoice is null)
         {
@@ -714,7 +729,7 @@ internal sealed partial class PlayerPage : BasePage
 
             if (video is not null)
             {
-                OperationResult? videoResult = session.ResultOf(result, MediaStreamKind.Video);
+                OperationResult? videoResult = session.ResultOf(result, view);
                 playing |= videoResult?.IsSuccessful == true;
                 if (videoResult is { IsSuccessful: false })
                 {
@@ -801,10 +816,17 @@ internal sealed partial class PlayerPage : BasePage
     private void ReleaseSession()
     {
         PlayerSession? session = _session;
+        PlayerView? view = _view;
         _session = null;
+        _view = null;
         if (session is null)
         {
             return;
+        }
+
+        if (view is not null)
+        {
+            session.RemoveView(view);
         }
 
         session.StateChanged -= Session_StateChanged;
@@ -1252,7 +1274,10 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        session.SetVideoTransform(settings.ToVideoTransform());
+        if (_view is { } view)
+        {
+            view.Transform = settings.ToVideoTransform();
+        }
 
         _subtitlePresentation = _subtitlePresentation with
         {
@@ -1553,7 +1578,7 @@ internal sealed partial class PlayerPage : BasePage
             Media = ViewModel.Media,
             PlayQueue = session?.PlayQueue ?? PlayQueueModel.CreateEmpty(),
             ImageDescriptions = [],
-            PlaybackInfo = session?.PlaybackInfo,
+            PlaybackInfo = _view?.PlaybackInfo,
         });
 
         if (media is not null)

@@ -116,48 +116,55 @@ internal sealed record PlaybackComponents(
 
     public void Apply(PlaybackPipeline pipeline)
     {
-        ArgumentNullException.ThrowIfNull(pipeline);
+        foreach (IVideoChain chain in pipeline.VideoChains)
+        {
+            ApplyVideo(chain);
+        }
 
-        ApplyVideoDecoder(pipeline, VideoDecoder);
-        ApplyVideoRenderer(pipeline, VideoRenderer);
         ApplyAudioDecoder(pipeline, AudioDecoder);
         ApplyAudioRenderer(pipeline, AudioRenderer);
         ApplySubtitleDecoder(pipeline, SubtitleDecoder);
         ApplySubtitleRenderer(pipeline, SubtitleRenderer);
     }
 
-    private void ApplyVideoDecoder(PlaybackPipeline pipeline, string key)
+    public void ApplyVideo(IVideoChain chain)
+    {
+        ApplyVideoDecoder(chain, VideoDecoder);
+        ApplyVideoRenderer(chain, VideoRenderer);
+    }
+
+    private void ApplyVideoDecoder(IVideoChain chain, string key)
     {
         switch (key)
         {
             case FFMPEG:
-                SetVideoDecoders(pipeline, [new FFmpegVideoDecoderFactory()]);
+                SetVideoDecoders(chain, [new FFmpegVideoDecoderFactory()]);
                 break;
             case NONE:
-                SetVideoDecoders(pipeline, [new NullVideoDecoderFactory()]);
+                SetVideoDecoders(chain, [new NullVideoDecoderFactory()]);
                 break;
             default:
-                SetVideoDecoders(pipeline, [new FFmpegVideoDecoderFactory()]);
+                SetVideoDecoders(chain, [new FFmpegVideoDecoderFactory()]);
                 break;
         }
 
-        pipeline.VideoChains[0].Components.Preferences = pipeline.VideoChains[0].Components.Preferences with { PreferHardwareDecoding = VideoPreferHardwareDecoding };
+        chain.Components.Preferences = chain.Components.Preferences with { PreferHardwareDecoding = VideoPreferHardwareDecoding };
     }
 
-    private void ApplyVideoRenderer(PlaybackPipeline pipeline, string key)
+    private void ApplyVideoRenderer(IVideoChain chain, string key)
     {
         VideoSurfacePreference surface = VideoPreferHdr ? VideoSurfacePreference.Auto : VideoSurfacePreference.Sdr;
 
         switch (key)
         {
             case DIRECT3D11:
-                SetVideoRenderers(pipeline, [new D3D11VideoRendererFactory(surface)]);
+                SetVideoRenderers(chain, [new D3D11VideoRendererFactory(surface)]);
                 break;
             case NONE:
-                SetVideoRenderers(pipeline, [new NullVideoRendererFactory()]);
+                SetVideoRenderers(chain, [new NullVideoRendererFactory()]);
                 break;
             default:
-                SetVideoRenderers(pipeline, [new D3D11VideoRendererFactory(surface)]);
+                SetVideoRenderers(chain, [new D3D11VideoRendererFactory(surface)]);
                 break;
         }
     }
@@ -263,21 +270,21 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetVideoDecoders(PlaybackPipeline pipeline, IEnumerable<IVideoDecoderFactory> factories)
+    private static void SetVideoDecoders(IVideoChain chain, IEnumerable<IVideoDecoderFactory> factories)
     {
-        pipeline.VideoChains[0].Components.ClearDecoders();
+        chain.Components.ClearDecoders();
         foreach (IVideoDecoderFactory factory in factories)
         {
-            pipeline.VideoChains[0].Components.Register(factory);
+            chain.Components.Register(factory);
         }
     }
 
-    private static void SetVideoRenderers(PlaybackPipeline pipeline, IEnumerable<IVideoRendererFactory> factories)
+    private static void SetVideoRenderers(IVideoChain chain, IEnumerable<IVideoRendererFactory> factories)
     {
-        pipeline.VideoChains[0].Components.ClearRenderers();
+        chain.Components.ClearRenderers();
         foreach (IVideoRendererFactory factory in factories)
         {
-            pipeline.VideoChains[0].Components.Register(factory);
+            chain.Components.Register(factory);
         }
     }
 

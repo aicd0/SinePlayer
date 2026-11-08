@@ -71,7 +71,7 @@ internal sealed class PlayerView : IDisposable
     /// Ties this view to what the pipeline built for it. The transform it was asked for is applied here, because this
     /// is the first moment there is a chain to apply it to.
     /// </summary>
-    public void Attach(PlaybackPipeline pipeline, IVideoChain chain, IAudioChain audio, ISubtitleChain subtitle)
+    public void Attach(PlaybackPipeline pipeline, IVideoChain chain, IAudioChain? audio, ISubtitleChain? subtitle)
     {
         _chain = chain;
         chain.Transform = _transform;

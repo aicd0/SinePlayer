@@ -42,9 +42,11 @@ internal sealed class PlayerMenuContext
 
     public PlayerSession? Session { get; init; }
 
+    public PlayerView? View { get; init; }
+
     public Action<string>? PromptInfo { get; init; }
 
-    public IReadOnlyList<MediaSource> Sources => Session?.PlaybackInfo.Sources ?? [];
+    public IReadOnlyList<MediaSource> Sources => Session?.Sources ?? [];
 
     public IReadOnlyList<MediaStreamInfo>? Tracks(MediaStreamKind kind)
     {
@@ -67,9 +69,9 @@ internal sealed class PlayerMenuContext
     {
         return kind switch
         {
-            MediaStreamKind.Video => Session?.PlaybackInfo.SelectedVideoStream,
-            MediaStreamKind.Audio => Session?.PlaybackInfo.SelectedAudioStream,
-            MediaStreamKind.Subtitle => Session?.PlaybackInfo.SelectedSubtitleStream,
+            MediaStreamKind.Video => View?.PlaybackInfo.SelectedVideoStream,
+            MediaStreamKind.Audio => View?.PlaybackInfo.SelectedAudioStream,
+            MediaStreamKind.Subtitle => View?.PlaybackInfo.SelectedSubtitleStream,
             _ => null,
         };
     }
@@ -119,14 +121,17 @@ internal sealed class PlayerMenuContext
     public void SelectTrack(MediaStreamKind kind, MediaStreamInfo? stream)
     {
         PlayerSession? session = Session;
-        if (session is null)
+        PlayerView? view = View;
+        if (session is null || view is null)
         {
             return;
         }
 
         CoroutineUtils.Run(async () =>
         {
-            OperationResult selected = await session.SelectStream(kind, stream);
+            OperationResult selected = kind == MediaStreamKind.Video
+                ? await session.SelectVideoStream(view, stream)
+                : await session.SelectStream(kind, stream);
             if (!selected.IsSuccessful)
             {
                 PromptInfo?.Invoke(selected.Message);
@@ -140,14 +145,16 @@ internal sealed class PlayerMenuContext
                 return;
             }
 
-            OperationResult? built = session.ResultOf(reconciled.Result, kind);
+            OperationResult? built = kind == MediaStreamKind.Video
+                ? session.ResultOf(reconciled.Result, view)
+                : session.ResultOf(reconciled.Result, kind);
             if (built is { IsSuccessful: false })
             {
                 PromptInfo?.Invoke(built.Message);
                 return;
             }
 
-            TrackSelection.Save(Media, kind, session.PlaybackInfo.Sources, SourceOf(stream), stream);
+            TrackSelection.Save(Media, kind, SourceOf(stream), stream);
         });
     }
 
