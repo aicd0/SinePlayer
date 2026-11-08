@@ -11,10 +11,21 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Data.Models.Media;
 
-namespace SinePlayer.Views.Pages.Player;
+namespace SinePlayer.Common.Playback.Core;
 
 internal static class TrackSelection
 {
+    public static MediaStreamInfo? Resolve(MediaModel media, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
+    {
+        Preference? preference = Load(media, kind, sources);
+        if (preference is null)
+        {
+            return Default(sources, kind);
+        }
+
+        return preference.Enabled ? preference.Stream ?? Default(sources, kind) : null;
+    }
+
     public static Preference? Load(MediaModel media, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
     {
         string? value = media.GetExt(KeyOf(kind));
@@ -69,6 +80,30 @@ internal static class TrackSelection
         {
             return null;
         }
+    }
+
+    private static MediaStreamInfo? Default(IReadOnlyList<MediaSource> sources, MediaStreamKind kind)
+    {
+        MediaStreamInfo? first = null;
+        foreach (MediaSource source in sources)
+        {
+            foreach (MediaStreamInfo stream in source.Info.Streams)
+            {
+                if (stream.Kind != kind)
+                {
+                    continue;
+                }
+
+                if (stream.IsDefault)
+                {
+                    return stream;
+                }
+
+                first ??= stream;
+            }
+        }
+
+        return first;
     }
 
     private static MediaStreamInfo? Find(IReadOnlyList<MediaSource> sources, string path, MediaStreamKind kind, int index)

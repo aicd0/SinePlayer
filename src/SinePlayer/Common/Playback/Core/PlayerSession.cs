@@ -9,9 +9,11 @@ using System.Threading.Tasks;
 
 using Microsoft.UI.Dispatching;
 
+using SinePlayer.Common.Misc;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
@@ -21,6 +23,7 @@ using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
 
@@ -33,6 +36,9 @@ internal sealed partial class PlayerSession : IDisposable
     private const string TAG = nameof(PlayerSession);
 
     private const int PositionIntervalMilliseconds = 250;
+    private const long AlmostEndedThresholdMilliseconds = 5000;
+    private const long ProgressSaveIntervalMilliseconds = 5000;
+    private const int VolumeSaveDelayMilliseconds = 500;
 
     private bool _disposed;
     private readonly AudioDeviceNotifier _audioDeviceNotifier = AudioDeviceNotifier.Shared;
@@ -54,6 +60,7 @@ internal sealed partial class PlayerSession : IDisposable
     {
         Id = id;
         _audioDeviceNotifier.Subscribe(AudioDevices_Changed);
+        Playback.PlaybackStateChanged += Playback_PlaybackStateChanged;
     }
 
     private sealed record AudioChainEntry(IAudioChain Chain, GainAudioFilter Gain, DownmixAudioFilter Downmix);
@@ -62,13 +69,17 @@ internal sealed partial class PlayerSession : IDisposable
 
     #region Public API
 
+    public event Action<MediaEngineState, string?>? StateChanged;
+
+    public event Action<MediaModel?, OperationResult>? MediaChanged;
+
     public string Id { get; }
 
     public PlayQueueModel PlayQueue => _playQueue;
 
     public PlaybackModel Playback { get; } = new();
 
-    public event Action<MediaEngineState, string?>? StateChanged;
+    public MediaModel? CurrentMedia => Playback.CurrentItem?.Media;
 
     public event Action? PositionChanged;
 
@@ -109,6 +120,8 @@ internal sealed partial class PlayerSession : IDisposable
 
     public double PlaybackRate => 1.0;
 
+    public long StartPositionMs { get; private set; }
+
     public void Load(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
     {
         if (_loaded)
@@ -130,9 +143,12 @@ internal sealed partial class PlayerSession : IDisposable
 
         _disposed = true;
 
+        Playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
         _audioDeviceNotifier.Unsubscribe(AudioDevices_Changed);
 
         StopPositionTimer();
+
+        SaveProgress();
 
         foreach (PlayerView view in _views)
         {
@@ -423,12 +439,14 @@ internal sealed partial class PlayerSession : IDisposable
     {
         _volume = Math.Clamp(volume, 0.0, 1.0);
         ApplyVolume();
+        SaveVolumeAndMute();
     }
 
     public void SetMuted(bool muted)
     {
         _muted = muted;
         ApplyVolume();
+        SaveVolumeAndMute();
     }
 
     public void SetPlaybackRate(double rate)
@@ -557,7 +575,341 @@ internal sealed partial class PlayerSession : IDisposable
             Logger.E(TAG, $"Media playback failed: {message}", null);
         }
 
-        CoroutineUtils.RunInMainThread(() => StateChanged?.Invoke(state, message));
+        CoroutineUtils.RunInMainThread(() =>
+        {
+            StateChanged?.Invoke(state, message);
+
+            if (state == MediaEngineState.Ended)
+            {
+                CompleteProgress();
+                HandleEnded();
+            }
+        });
+    }
+
+    #endregion
+
+    #region Opening
+
+    private PlaybackStateChangedEventArgs? _pendingOpen;
+    private bool _isOpening;
+    private MediaModel? _openedMedia;
+    private long _lastProgressSaveTicks;
+    private bool _volumeSaveScheduled;
+
+    private void Playback_PlaybackStateChanged(PlaybackStateChangedEventArgs args)
+    {
+        CoroutineUtils.Run(async () =>
+        {
+            if (_isOpening)
+            {
+                _pendingOpen = args;
+                return;
+            }
+
+            _isOpening = true;
+            try
+            {
+                PlaybackStateChangedEventArgs? opening = args;
+                while (opening is not null)
+                {
+                    await OpenCurrentAsync(opening);
+                    opening = _pendingOpen;
+                    _pendingOpen = null;
+                }
+            }
+            finally
+            {
+                _isOpening = false;
+            }
+        });
+    }
+
+    private async Task OpenCurrentAsync(PlaybackStateChangedEventArgs args)
+    {
+        MediaModel? media = CurrentMedia;
+        StartPositionMs = media is null ? 0 : ResolveStartPositionMs(media, args);
+
+        // The media that was playing is still the one the pipeline holds, so this is the last moment its position can
+        // be recorded against it.
+        SaveProgress();
+
+        if (media is null)
+        {
+            _openedMedia = null;
+            RaiseMediaChanged(null, OperationResult.Success());
+            return;
+        }
+
+        if (Sources.Any(source => source.Locator.Value == media.Location))
+        {
+            // Nothing to open: a page joined a playback that is already playing this media, or the queue only
+            // re-announced it.
+            RaiseMediaChanged(media, OperationResult.Success());
+            return;
+        }
+
+        RaiseMediaChanged(media, await OpenAsync(media));
+    }
+
+    private async Task<OperationResult> OpenAsync(MediaModel media)
+    {
+        OperationResult reset = await Reset();
+        if (!reset.IsSuccessful)
+        {
+            return reset;
+        }
+
+        // Nothing is open any more, so nothing may later write progress against the media that just closed.
+        _openedMedia = null;
+
+        OperationResult<MediaSource> loaded = await AddSource(media.Location);
+        if (!loaded.IsSuccessful)
+        {
+            return OperationResult.Failure(loaded);
+        }
+
+        RecordOpen(media);
+
+        await AddRememberedSourcesAsync(media);
+        await AddSameNameSubtitlesAsync(media.Location);
+
+        MediaStreamInfo? audio = TrackSelection.Resolve(media, MediaStreamKind.Audio, Sources);
+        if (audio is not null)
+        {
+            OperationResult chosen = await SelectAudioStream(audio);
+            if (!chosen.IsSuccessful)
+            {
+                Logger.W(TAG, $"The sound could not be chosen: {chosen.Message}");
+            }
+        }
+
+        return OperationResult.Success();
+    }
+
+    /// <summary>
+    /// The sources a media's remembered tracks live in, added before anything is chosen: an audio track or a subtitle
+    /// track the user picked last time may sit in a file that is not the media itself.
+    /// </summary>
+    private async Task AddRememberedSourcesAsync(MediaModel media)
+    {
+        foreach (MediaStreamKind kind in (MediaStreamKind[])[MediaStreamKind.Video, MediaStreamKind.Audio, MediaStreamKind.Subtitle])
+        {
+            TrackSelection.Preference? preference = TrackSelection.Load(media, kind, Sources);
+            if (preference is null || !preference.Enabled || preference.Stream is not null)
+            {
+                continue;
+            }
+
+            if (Sources.Any(source => source.Locator.Value == preference.Path))
+            {
+                continue;
+            }
+
+            OperationResult<MediaSource> added = await AddSource(preference.Path);
+            if (!added.IsSuccessful)
+            {
+                Logger.W(TAG, $"The chosen {kind} track could not be restored from '{preference.Path}'. {added.Message}");
+            }
+        }
+    }
+
+    private async Task AddSameNameSubtitlesAsync(string mediaPath)
+    {
+        foreach (string path in await FindSameNameSubtitlesAsync(mediaPath))
+        {
+            if (Sources.Any(source => source.Locator.Value == path))
+            {
+                continue;
+            }
+
+            OperationResult<MediaSource> added = await AddSource(path);
+            if (!added.IsSuccessful)
+            {
+                Logger.W(TAG, $"'{path}' could not be imported: {added.Message}");
+            }
+        }
+    }
+
+    private static async Task<IReadOnlyList<string>> FindSameNameSubtitlesAsync(string mediaPath)
+    {
+        if (string.IsNullOrEmpty(mediaPath))
+        {
+            return [];
+        }
+
+        string? folder = Path.GetDirectoryName(mediaPath);
+        string stem = Path.GetFileNameWithoutExtension(mediaPath);
+        if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(stem))
+        {
+            return [];
+        }
+
+        List<string> candidates = await TaskDispatcher.DefaultThreadPool.Submit(() =>
+        {
+            List<string> found = [];
+            try
+            {
+                foreach (string path in Directory.EnumerateFiles(folder, "*", SearchOption.TopDirectoryOnly))
+                {
+                    if (!AppInfoProvider.IsSupportedSubtitleExtension(Path.GetExtension(path)))
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(Path.GetFileNameWithoutExtension(path), stem, StringComparison.OrdinalIgnoreCase))
+                    {
+                        found.Add(path);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.W(TAG, $"The folder '{folder}' could not be listed for subtitles: {ex.Message}");
+            }
+
+            return found;
+        });
+
+        return [.. candidates.OrderBy(path => StringUtils.SmartFileNameKeySelector(Path.GetFileName(path)), StringUtils.SmartFileNameComparer)];
+    }
+
+    private void RaiseMediaChanged(MediaModel? media, OperationResult result)
+    {
+        MediaChanged?.Invoke(media, result);
+    }
+
+    private void HandleEnded()
+    {
+        if (Playback.RepeatMode == RepeatMode.One)
+        {
+            Play();
+            return;
+        }
+
+        if (AppSettingsModel.AutoPlayNext)
+        {
+            Playback.Next();
+        }
+    }
+
+    private static long ResolveStartPositionMs(MediaModel media, PlaybackStateChangedEventArgs args)
+    {
+        if (args.InitialPositionMs >= 0)
+        {
+            return args.InitialPositionMs;
+        }
+
+        switch (args.Reason)
+        {
+            case PlaybackStateChangeReason.Next:
+            case PlaybackStateChangeReason.Previous:
+            case PlaybackStateChangeReason.PreviousByOverScroll:
+                return 0;
+
+            default:
+                {
+                    if (!AppSettingsModel.RestoreLastPlaybackPosition)
+                    {
+                        return 0;
+                    }
+
+                    long positionMs = media.LastPositionMs;
+                    long remainingMs = media.DurationMs - positionMs;
+                    return remainingMs >= 0 && remainingMs < AlmostEndedThresholdMilliseconds ? 0 : positionMs;
+                }
+        }
+    }
+
+    #endregion
+
+    #region Media record
+
+    /// <summary>
+    /// What a media remembers about being played. It is written here rather than by a page because the playback is one
+    /// however many pages show it: a page added later has no business rewriting what the media already recorded, and
+    /// two pages must not each save the same position.
+    /// </summary>
+    private void RecordOpen(MediaModel media)
+    {
+        _openedMedia = media;
+
+        CoroutineUtils.Run(async () =>
+        {
+            await media.SetAsVisited();
+            if (AppSettingsModel.SaveBrowsingHistory)
+            {
+                await MediaHistoryItemModel.AddAsync(media.Id, media.Title1);
+            }
+        });
+    }
+
+    /// <summary>How far the media being played has been played, for the next open to resume from.</summary>
+    public void SaveProgress()
+    {
+        MediaModel? media = _openedMedia;
+        if (media is null || _pipeline is null)
+        {
+            return;
+        }
+
+        _lastProgressSaveTicks = Environment.TickCount64;
+
+        long durationMs = Duration.Ticks / TimeSpan.TicksPerMillisecond;
+        long positionMs = Position.Ticks / TimeSpan.TicksPerMillisecond;
+
+        if (durationMs > 0 && media.DurationMs <= 0)
+        {
+            CoroutineUtils.Run(async () => await media.SetDuration(durationMs));
+        }
+
+        int progress = durationMs > 0 ? (int)Math.Clamp(positionMs * 100 / durationMs, 0, 100) : -1;
+        CoroutineUtils.Run(async () => await media.SetProgress(progress, positionMs));
+    }
+
+    public void CompleteProgress()
+    {
+        MediaModel? media = _openedMedia;
+        if (media is not null)
+        {
+            CoroutineUtils.Run(async () => await media.SetProgress(100, 0));
+        }
+    }
+
+    public void SetFavorite(bool isFavorite)
+    {
+        MediaModel? media = _openedMedia;
+        if (media is null)
+        {
+            return;
+        }
+
+        if (isFavorite)
+        {
+            FavoriteModel.Instance.Add(media.Id, media.Title1, true);
+        }
+        else
+        {
+            FavoriteModel.Instance.RemoveWithId(media.Id, true);
+        }
+    }
+
+    private void SaveVolumeAndMute()
+    {
+        if (_volumeSaveScheduled)
+        {
+            return;
+        }
+
+        _volumeSaveScheduled = true;
+        CoroutineUtils.Run(async () =>
+        {
+            await Task.Delay(VolumeSaveDelayMilliseconds);
+            _volumeSaveScheduled = false;
+
+            AppSettingsModel.PlayerVolume = _volume;
+            AppSettingsModel.PlayerMuted = _muted;
+        });
     }
 
     #endregion
@@ -641,10 +993,17 @@ internal sealed partial class PlayerSession : IDisposable
 
     private void PositionTimer_Tick(DispatcherQueueTimer sender, object args)
     {
-        if (State == MediaEngineState.Playing)
+        if (State != MediaEngineState.Playing)
         {
-            RaisePositionChanged();
+            return;
         }
+
+        if (Environment.TickCount64 - _lastProgressSaveTicks >= ProgressSaveIntervalMilliseconds)
+        {
+            SaveProgress();
+        }
+
+        RaisePositionChanged();
     }
 
     #endregion
