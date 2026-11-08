@@ -81,6 +81,8 @@ internal sealed partial class PlayerSession : IDisposable
 
     public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
 
+    public string? Error => _pipeline?.Error;
+
     public IReadOnlyList<MediaSource> Sources => _pipeline?.Sources ?? [];
 
     public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;

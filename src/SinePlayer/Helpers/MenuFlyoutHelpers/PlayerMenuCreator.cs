@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml.Controls;
 
+using SinePlayer.Common.Actions;
+using SinePlayer.Common.Actions.Providers;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Playback.Abstractions;
@@ -49,6 +51,12 @@ internal static class PlayerMenuCreator
                 Items = CreateSubtitleMenuItems(context),
             },
             new SeparatorMenuFlyoutItemModel(),
+            new SimpleMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.NewWindow,
+                Icon = new FontIconSource() { Glyph = "\uE8A7" },
+                Click = () => OpenInNewWindow(context),
+            },
             new SubItemMenuFlyoutItemModel()
             {
                 Text = TrimText(context.Media.Title),
@@ -370,6 +378,20 @@ internal static class PlayerMenuCreator
         });
 
         return items;
+    }
+
+    private static void OpenInNewWindow(PlayerMenuContext context)
+    {
+        if (string.IsNullOrEmpty(context.Url))
+        {
+            return;
+        }
+
+        ActionModel actionModel = ActionModel.Builder.Create(OpenTabProvider.NAME)
+            .AddParameter(OpenTabProvider.PARAM_URL, context.Url)
+            .AddParameter(OpenTabProvider.PARAM_WINDOW_ID, OpenTabProvider.WINDOW_ID_NEW)
+            .Build();
+        context.ActionHandler.HandleNoResult(actionModel);
     }
 
     private static string TrimText(string text)
