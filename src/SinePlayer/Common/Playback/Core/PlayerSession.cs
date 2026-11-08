@@ -8,10 +8,7 @@ using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Dispatching;
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 
-using SinePlayer.Common.Playback.Surface;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
@@ -40,16 +37,10 @@ internal sealed partial class PlayerSession : IDisposable
     private bool _disposed;
     private readonly AudioDeviceNotifier _audioDeviceNotifier = AudioDeviceNotifier.Shared;
     private readonly List<PlayerView> _views = [];
-    private SwapChainPanel? _subtitlePanel;
-    private SwapChainPanelRenderTarget? _subtitleRenderTarget;
-    private GainAudioFilter? _gainFilter;
-    private DownmixAudioFilter? _downmixFilter;
+    private readonly List<AudioChainEntry> _audioChains = [];
 
-    private IAudioChain? _audioChain;
-    private ISubtitleChain? _subtitleChain;
     private bool _hasSource = false;
     private PlaybackComponents _components = PlaybackComponents.Default;
-    private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
     private double _volume = 1.0;
     private bool _muted;
 
@@ -64,6 +55,8 @@ internal sealed partial class PlayerSession : IDisposable
         Id = id;
         _audioDeviceNotifier.Subscribe(AudioDevices_Changed);
     }
+
+    private sealed record AudioChainEntry(IAudioChain Chain, GainAudioFilter Gain, DownmixAudioFilter Downmix);
 
     #endregion
 
@@ -85,6 +78,8 @@ internal sealed partial class PlayerSession : IDisposable
 
     public IReadOnlyList<MediaSource> Sources => _pipeline?.Sources ?? [];
 
+    public IReadOnlyList<IAudioChain> AudioChains => [.. _audioChains.Select(entry => entry.Chain)];
+
     public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;
 
     public TimeSpan Duration
@@ -93,8 +88,10 @@ internal sealed partial class PlayerSession : IDisposable
         {
             TimeSpan video = _views.Count == 0
                 ? TimeSpan.Zero
-                : _views.Max(view => view.Chain?.SelectedStream?.Duration ?? TimeSpan.Zero);
-            TimeSpan audio = _audioChain?.SelectedStream?.Duration ?? TimeSpan.Zero;
+                : _views.Max(view => view.VideoChain?.SelectedStream?.Duration ?? TimeSpan.Zero);
+            TimeSpan audio = _audioChains.Count == 0
+                ? TimeSpan.Zero
+                : _audioChains.Max(entry => entry.Chain.SelectedStream?.Duration ?? TimeSpan.Zero);
             TimeSpan longest = video > audio ? video : audio;
             if (longest > TimeSpan.Zero)
             {
@@ -144,8 +141,6 @@ internal sealed partial class PlayerSession : IDisposable
 
         PlaybackPipeline? pipeline = _pipeline;
         _pipeline = null;
-        _audioChain = null;
-        _subtitleChain = null;
         if (pipeline is not null)
         {
             pipeline.StateChanged -= Pipeline_StateChanged;
@@ -153,13 +148,13 @@ internal sealed partial class PlayerSession : IDisposable
             pipeline.Dispose();
         }
 
-        GainAudioFilter? gainFilter = _gainFilter;
-        _gainFilter = null;
-        gainFilter?.Dispose();
+        foreach (AudioChainEntry entry in _audioChains)
+        {
+            entry.Gain.Dispose();
+            entry.Downmix.Dispose();
+        }
 
-        DownmixAudioFilter? downmixFilter = _downmixFilter;
-        _downmixFilter = null;
-        downmixFilter?.Dispose();
+        _audioChains.Clear();
 
         foreach (PlayerView view in _views)
         {
@@ -167,11 +162,6 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         _views.Clear();
-
-        _subtitleRenderTarget?.DetachSurface();
-        _subtitleRenderTarget?.Dispose();
-        _subtitleRenderTarget = null;
-        _subtitlePanel = null;
     }
 
     public async Task<OperationResult> Reset()
@@ -246,7 +236,7 @@ internal sealed partial class PlayerSession : IDisposable
 
     public PlayerView CreateView()
     {
-        PlayerView view = new();
+        PlayerView view = new(this);
         _views.Add(view);
         return view;
     }
@@ -258,14 +248,18 @@ internal sealed partial class PlayerSession : IDisposable
             return;
         }
 
-        if (_pipeline is not { } pipeline || view.Chain is not { } chain)
+        if (_pipeline is not { } pipeline)
         {
             view.Dispose();
             return;
         }
 
-        pipeline.RemoveChain(chain);
-        _pendingReconcile = true;
+        foreach (IPlaybackChain chain in ChainsOf(view))
+        {
+            pipeline.RemoveChain(chain);
+            _pendingReconcile = true;
+        }
+
         CoroutineUtils.Run(async () =>
         {
             await Reconcile();
@@ -281,7 +275,7 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResultExt.Failure(TAG, "There is no playback to change a track of.");
         }
 
-        IVideoChain chain = await EnsureChain(pipeline, view);
+        IVideoChain chain = await EnsureVideoChain(pipeline, view);
         OperationResult selected = await pipeline.SelectStream(chain, stream);
         if (!selected.IsSuccessful)
         {
@@ -293,7 +287,7 @@ internal sealed partial class PlayerSession : IDisposable
         return OperationResult.Success();
     }
 
-    public async Task<OperationResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)
+    public async Task<OperationResult> SelectAudioStream(MediaStreamInfo? stream)
     {
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is null)
@@ -301,18 +295,37 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResultExt.Failure(TAG, "There is nothing open to change a track of.");
         }
 
-        IPlaybackChain? chain = ChainOf(kind);
-
+        IAudioChain? chain = _audioChains.Count == 0 ? null : _audioChains[0].Chain;
         if (chain is null)
         {
-            return OperationResultExt.Failure(TAG, $"There is no {kind.ToString().ToLowerInvariant()} to change a track of.");
+            return OperationResultExt.Failure(TAG, "There is no sound to change a track of.");
         }
 
         OperationResult selected = await pipeline.SelectStream(chain, stream);
         if (!selected.IsSuccessful)
         {
             string wanted = stream is null ? "no track" : $"track #{stream.Index}";
-            return OperationResultExt.Failure(TAG, $"The {kind.ToString().ToLowerInvariant()} could not be changed to {wanted}. {selected.Message}");
+            return OperationResultExt.Failure(TAG, $"The sound could not be changed to {wanted}. {selected.Message}");
+        }
+
+        _pendingReconcile = true;
+        return OperationResult.Success();
+    }
+
+    public async Task<OperationResult> SelectSubtitleStream(PlayerView view, MediaStreamInfo? stream)
+    {
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            return OperationResultExt.Failure(TAG, "There is no playback to change a track of.");
+        }
+
+        ISubtitleChain chain = await EnsureSubtitleChain(pipeline, view);
+        OperationResult selected = await pipeline.SelectStream(chain, stream);
+        if (!selected.IsSuccessful)
+        {
+            string wanted = stream is null ? "no track" : $"track #{stream.Index}";
+            return OperationResultExt.Failure(TAG, $"The subtitles could not be changed to {wanted}. {selected.Message}");
         }
 
         _pendingReconcile = true;
@@ -400,28 +413,22 @@ internal sealed partial class PlayerSession : IDisposable
 
     public void SetSubtitlePresentation(SubtitlePresentation presentation)
     {
-        if (_subtitlePresentation == presentation)
+        foreach (PlayerView view in _views)
         {
-            return;
-        }
-
-        _subtitlePresentation = presentation;
-        if (_subtitleChain is { } subtitle)
-        {
-            subtitle.Presentation = presentation;
+            view.SubtitlePresentation = presentation;
         }
     }
 
     public void SetVolume(double volume)
     {
         _volume = Math.Clamp(volume, 0.0, 1.0);
-        _gainFilter?.SetLevel(_volume, _muted);
+        ApplyVolume();
     }
 
     public void SetMuted(bool muted)
     {
         _muted = muted;
-        _gainFilter?.SetLevel(_volume, _muted);
+        ApplyVolume();
     }
 
     public void SetPlaybackRate(double rate)
@@ -429,52 +436,25 @@ internal sealed partial class PlayerSession : IDisposable
         throw new NotSupportedException("This engine cannot change the playback rate yet.");
     }
 
-    public UIElement CreateSubtitleSurface()
+    private void ApplyVolume()
     {
-        // The surface sits above the video surface, so its opacity has to stay below 1. At 1 the two swap
-        // chain panels are composed as opaque planes, and once the video panel's swap chain is rebound -
-        // which is what switching the video track off and on does - the plane underneath stops being
-        // composed at all: the picture is gone from the window while its swap chain keeps attaching and
-        // presenting correct frames. Anything below 1 puts this surface in an alpha blended layer instead,
-        // which composes correctly, and a tenth of a percent of transparency is imperceptible.
-        _subtitlePanel ??= new SwapChainPanel { IsHitTestVisible = false, Opacity = 0.999 };
-        return _subtitlePanel;
+        foreach (AudioChainEntry entry in _audioChains)
+        {
+            entry.Gain.SetLevel(_volume, _muted);
+        }
     }
 
-    public OperationResult? ResultOf(ReconcileResult result, PlayerView view)
+    private static IEnumerable<IPlaybackChain> ChainsOf(PlayerView view)
     {
-        return view.Chain is { } chain ? result.VideoResults[chain] : null;
-    }
-
-    public OperationResult? ResultOf(ReconcileResult result, MediaStreamKind kind)
-    {
-        IPlaybackChain? chain = ChainOf(kind);
-        if (chain is null)
+        if (view.VideoChain is { } video)
         {
-            return null;
+            yield return video;
         }
 
-        if (chain is IVideoChain video)
+        if (view.SubtitleChain is { } subtitle)
         {
-            return result.VideoResults[video];
+            yield return subtitle;
         }
-
-        if (chain is IAudioChain audio)
-        {
-            return result.AudioResults[audio];
-        }
-
-        return result.SubtitleResults[(ISubtitleChain)chain];
-    }
-
-    private IPlaybackChain? ChainOf(MediaStreamKind kind)
-    {
-        return kind switch
-        {
-            MediaStreamKind.Audio => _audioChain,
-            MediaStreamKind.Subtitle => _subtitleChain,
-            _ => null,
-        };
     }
 
     #endregion
@@ -496,29 +476,16 @@ internal sealed partial class PlayerSession : IDisposable
             SourceFactory = new FFmpegSourceProviderFactory(),
         };
 
-        IAudioChain audio = await pipeline.AddAudioChain();
-        ISubtitleChain subtitle = await pipeline.AddSubtitleChain(EnsureSubtitleRenderTarget());
-        _audioChain = audio;
-        _subtitleChain = subtitle;
+        await EnsureAudioChain(pipeline);
 
         foreach (PlayerView view in _views)
         {
-            await CreateChain(pipeline, view);
+            await EnsureVideoChain(pipeline, view);
+            await EnsureSubtitleChain(pipeline, view);
         }
 
         _components.Apply(pipeline);
-        subtitle.Presentation = _subtitlePresentation;
         pipeline.StateChanged += Pipeline_StateChanged;
-
-        GainAudioFilter gainFilter = new();
-        gainFilter.SetLevel(_volume, _muted);
-        audio.Filters.Add(gainFilter);
-        _gainFilter = gainFilter;
-
-        DownmixAudioFilter downmixFilter = new();
-        audio.Filters.Add(downmixFilter);
-        _downmixFilter = downmixFilter;
-
         pipeline.WarningRaised += Pipeline_WarningRaised;
 
         _pipeline = pipeline;
@@ -526,23 +493,52 @@ internal sealed partial class PlayerSession : IDisposable
         return pipeline;
     }
 
-    private async Task<IVideoChain> EnsureChain(PlaybackPipeline pipeline, PlayerView view)
+    private async Task<IVideoChain> EnsureVideoChain(PlaybackPipeline pipeline, PlayerView view)
     {
-        if (view.Chain is { } existing)
+        if (view.VideoChain is { } existing)
         {
             return existing;
         }
 
-        IVideoChain chain = await CreateChain(pipeline, view);
+        IVideoChain chain = await pipeline.AddVideoChain(view.EnsureVideoRenderTarget());
+        view.AttachVideo(chain);
         _components.ApplyVideo(chain);
         _pendingReconcile = true;
         return chain;
     }
 
-    private async Task<IVideoChain> CreateChain(PlaybackPipeline pipeline, PlayerView view)
+    private async Task<IAudioChain> EnsureAudioChain(PlaybackPipeline pipeline)
     {
-        IVideoChain chain = await pipeline.AddVideoChain(view.EnsureRenderTarget());
-        view.Attach(pipeline, chain, _audioChain, _subtitleChain);
+        AudioChainEntry? entry = _audioChains.Count == 0 ? null : _audioChains[0];
+        if (entry is not null)
+        {
+            return entry.Chain;
+        }
+
+        IAudioChain chain = await pipeline.AddAudioChain();
+
+        GainAudioFilter gainFilter = new();
+        gainFilter.SetLevel(_volume, _muted);
+        chain.Filters.Add(gainFilter);
+
+        DownmixAudioFilter downmixFilter = new();
+        chain.Filters.Add(downmixFilter);
+
+        _audioChains.Add(new AudioChainEntry(chain, gainFilter, downmixFilter));
+        return chain;
+    }
+
+    private async Task<ISubtitleChain> EnsureSubtitleChain(PlaybackPipeline pipeline, PlayerView view)
+    {
+        if (view.SubtitleChain is { } existing)
+        {
+            return existing;
+        }
+
+        ISubtitleChain chain = await pipeline.AddSubtitleChain(view.EnsureSubtitleRenderTarget());
+        view.AttachSubtitle(chain);
+        _components.ApplySubtitle(chain);
+        _pendingReconcile = true;
         return chain;
     }
 
@@ -581,7 +577,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is null || _audioChain?.SelectedStream is null)
+        if (pipeline is null || _audioChains.Count == 0 || _audioChains[0].Chain.SelectedStream is null)
         {
             return;
         }
@@ -599,7 +595,7 @@ internal sealed partial class PlayerSession : IDisposable
             _pendingReconcile = true;
             Logger.W(TAG, $"The audio output could not be re-resolved: {reconciled.Message}");
         }
-        else if (ResultOf(reconciled.Result, MediaStreamKind.Audio) is { IsSuccessful: false } audioFailure)
+        else if (reconciled.Result.Audio() is { IsSuccessful: false } audioFailure)
         {
             Logger.W(TAG, $"The audio output could not be re-resolved: {audioFailure.Message}");
         }
@@ -654,12 +650,6 @@ internal sealed partial class PlayerSession : IDisposable
     #endregion
 
     #region Misc
-
-    private SwapChainPanelRenderTarget EnsureSubtitleRenderTarget()
-    {
-        _subtitleRenderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)CreateSubtitleSurface());
-        return _subtitleRenderTarget;
-    }
 
     private void RaisePositionChanged()
     {

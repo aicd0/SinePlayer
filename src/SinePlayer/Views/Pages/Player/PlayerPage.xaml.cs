@@ -120,9 +120,9 @@ internal sealed partial class PlayerPage : BasePage
         UpdateKeyboardAccelerators();
 
         VideoHost.Children.Clear();
-        VideoHost.Children.Add(_view.Panel);
+        VideoHost.Children.Add(_view.VideoPanel);
         SubtitleHost.Children.Clear();
-        SubtitleHost.Children.Add(session.CreateSubtitleSurface());
+        SubtitleHost.Children.Add(_view.SubtitlePanel);
 
         if (_sessionCreator)
         {
@@ -530,8 +530,9 @@ internal sealed partial class PlayerPage : BasePage
     private async Task AddSubtitleFilesAsync(IReadOnlyList<string> paths)
     {
         PlayerSession? session = _session;
+        PlayerView? view = _view;
         MediaModel? media = ViewModel.Media;
-        if (session is null || media is null)
+        if (session is null || view is null || media is null)
         {
             PromptTemporary("There is no playback to add the subtitles to.");
             return;
@@ -543,7 +544,7 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        OperationResult added = await SubtitleSourceLoader.AddAndSelect(session, media, paths);
+        OperationResult added = await SubtitleSourceLoader.AddAndSelect(session, view, media, paths);
         if (!added.IsSuccessful)
         {
             PromptTemporary(added.Message);
@@ -702,7 +703,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (audio is not null)
         {
-            OperationResult chosen = await session.SelectStream(MediaStreamKind.Audio, audio);
+            OperationResult chosen = await session.SelectAudioStream(audio);
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the sound could not be played ({chosen.Message})");
@@ -723,7 +724,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (subtitle is not null)
         {
-            OperationResult chosen = await session.SelectStream(MediaStreamKind.Subtitle, subtitle);
+            OperationResult chosen = await session.SelectSubtitleStream(view, subtitle);
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the subtitles could not be played ({chosen.Message})");
@@ -742,7 +743,7 @@ internal sealed partial class PlayerPage : BasePage
 
             if (video is not null)
             {
-                OperationResult? videoResult = session.ResultOf(result, view);
+                OperationResult? videoResult = result.Video(view);
                 playing |= videoResult?.IsSuccessful == true;
                 if (videoResult is { IsSuccessful: false })
                 {
@@ -752,7 +753,7 @@ internal sealed partial class PlayerPage : BasePage
 
             if (audio is not null)
             {
-                OperationResult? audioResult = session.ResultOf(result, MediaStreamKind.Audio);
+                OperationResult? audioResult = result.Audio();
                 playing |= audioResult?.IsSuccessful == true;
                 if (audioResult is { IsSuccessful: false })
                 {
@@ -760,7 +761,7 @@ internal sealed partial class PlayerPage : BasePage
                 }
             }
 
-            if (subtitle is not null && session.ResultOf(result, MediaStreamKind.Subtitle) is { IsSuccessful: false } subtitleFailure)
+            if (subtitle is not null && result.Subtitle(view) is { IsSuccessful: false } subtitleFailure)
             {
                 PromptTemporary(subtitleFailure.Message);
             }
@@ -1283,15 +1284,13 @@ internal sealed partial class PlayerPage : BasePage
     private async void ApplyPlayerSettings(PlayerSettingsModel settings)
     {
         PlayerSession? session = _session;
-        if (session is null)
+        PlayerView? view = _view;
+        if (session is null || view is null)
         {
             return;
         }
 
-        if (_view is { } view)
-        {
-            view.Transform = settings.ToVideoTransform();
-        }
+        view.VideoTransform = settings.ToVideoTransform();
 
         _subtitlePresentation = _subtitlePresentation with
         {
@@ -1322,17 +1321,17 @@ internal sealed partial class PlayerPage : BasePage
 
         ReconcileResult result = reconciled.Result;
 
-        if (session.ResultOf(result, MediaStreamKind.Video) is { IsSuccessful: false } videoFailure)
+        if (result.Video(view) is { IsSuccessful: false } videoFailure)
         {
             PromptTemporary(videoFailure.Message);
         }
 
-        if (session.ResultOf(result, MediaStreamKind.Audio) is { IsSuccessful: false } audioFailure)
+        if (result.Audio() is { IsSuccessful: false } audioFailure)
         {
             PromptTemporary(audioFailure.Message);
         }
 
-        if (session.ResultOf(result, MediaStreamKind.Subtitle) is { IsSuccessful: false } subtitleFailure)
+        if (result.Subtitle(view) is { IsSuccessful: false } subtitleFailure)
         {
             PromptTemporary(subtitleFailure.Message);
         }
