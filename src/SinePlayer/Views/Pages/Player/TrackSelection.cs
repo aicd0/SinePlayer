@@ -38,14 +38,14 @@ internal static class TrackSelection
         };
     }
 
-    public static void Save(MediaModel media, MediaStreamKind kind, IReadOnlyList<MediaSource> sources, MediaSource? source, MediaStreamInfo? stream)
+    public static void Save(MediaModel media, MediaStreamKind kind, MediaSource? source, MediaStreamInfo? stream)
     {
         SelectedTrackModel model = stream is null
             ? new() { Enabled = false }
             : new()
             {
                 Enabled = true,
-                Path = PathOf(sources, source),
+                Path = source?.Locator.Value ?? string.Empty,
                 Index = stream.Index,
             };
 
@@ -75,7 +75,7 @@ internal static class TrackSelection
     {
         foreach (MediaSource source in sources)
         {
-            if (!string.IsNullOrEmpty(path) ? source.Locator.Value != path : source != sources[0])
+            if (source.Locator.Value != path)
             {
                 continue;
             }
@@ -90,11 +90,6 @@ internal static class TrackSelection
         }
 
         return null;
-    }
-
-    private static string PathOf(IReadOnlyList<MediaSource> sources, MediaSource? source)
-    {
-        return source is null || (sources.Count > 0 && source == sources[0]) ? string.Empty : source.Locator.Value;
     }
 
     private static string KeyOf(MediaStreamKind kind)

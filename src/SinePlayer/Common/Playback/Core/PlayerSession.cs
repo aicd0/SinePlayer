@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -38,7 +39,7 @@ internal sealed partial class PlayerSession : IDisposable
 
     private bool _disposed;
     private readonly AudioDeviceNotifier _audioDeviceNotifier = AudioDeviceNotifier.Shared;
-    private readonly PlayerView _view = new();
+    private readonly List<PlayerView> _views = [];
     private SwapChainPanel? _subtitlePanel;
     private SwapChainPanelRenderTarget? _subtitleRenderTarget;
     private GainAudioFilter? _gainFilter;
@@ -66,13 +67,48 @@ internal sealed partial class PlayerSession : IDisposable
 
     #endregion
 
-    #region Session
+    #region Public API
 
     public string Id { get; }
 
     public PlayQueueModel PlayQueue => _playQueue;
 
     public PlaybackModel Playback { get; } = new();
+
+    public event Action<MediaEngineState, string?>? StateChanged;
+
+    public event Action? PositionChanged;
+
+    public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
+
+    public IReadOnlyList<MediaSource> Sources => _pipeline?.Sources ?? [];
+
+    public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;
+
+    public TimeSpan Duration
+    {
+        get
+        {
+            TimeSpan video = _views.Count == 0
+                ? TimeSpan.Zero
+                : _views.Max(view => view.Chain?.SelectedStream?.Duration ?? TimeSpan.Zero);
+            TimeSpan audio = _audioChain?.SelectedStream?.Duration ?? TimeSpan.Zero;
+            TimeSpan longest = video > audio ? video : audio;
+            if (longest > TimeSpan.Zero)
+            {
+                return longest;
+            }
+
+            IReadOnlyList<MediaSource> sources = Sources;
+            return sources.Count == 0 ? TimeSpan.Zero : sources.Max(source => source.Info.Duration);
+        }
+    }
+
+    public double Volume => _volume;
+
+    public bool IsMuted => _muted;
+
+    public double PlaybackRate => 1.0;
 
     public void Load(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
     {
@@ -86,41 +122,6 @@ internal sealed partial class PlayerSession : IDisposable
         Playback.LoadState(playQueue, serializedPlayback, initialPositionMs);
     }
 
-    #endregion
-
-    #region Public API
-
-    public event Action<MediaEngineState, string?>? StateChanged;
-    public event Action? PositionChanged;
-
-    public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
-
-    public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;
-
-    public TimeSpan Duration
-    {
-        get
-        {
-            TimeSpan video = PlaybackInfo.SelectedVideoStream?.Duration ?? TimeSpan.Zero;
-            TimeSpan audio = PlaybackInfo.SelectedAudioStream?.Duration ?? TimeSpan.Zero;
-            TimeSpan longest = video > audio ? video : audio;
-            if (longest > TimeSpan.Zero)
-            {
-                return longest;
-            }
-
-            return PlaybackInfo.Media?.Duration ?? TimeSpan.Zero;
-        }
-    }
-
-    public double Volume => _volume;
-
-    public bool IsMuted => _muted;
-
-    public double PlaybackRate => 1.0;
-
-    public PlaybackInfoHandle PlaybackInfo => _view.PlaybackInfo;
-
     public void Dispose()
     {
         if (_disposed)
@@ -133,7 +134,11 @@ internal sealed partial class PlayerSession : IDisposable
         _audioDeviceNotifier.Unsubscribe(AudioDevices_Changed);
 
         StopPositionTimer();
-        _view.Detach();
+
+        foreach (PlayerView view in _views)
+        {
+            view.Detach();
+        }
 
         PlaybackPipeline? pipeline = _pipeline;
         _pipeline = null;
@@ -154,7 +159,13 @@ internal sealed partial class PlayerSession : IDisposable
         _downmixFilter = null;
         downmixFilter?.Dispose();
 
-        _view.Dispose();
+        foreach (PlayerView view in _views)
+        {
+            view.Dispose();
+        }
+
+        _views.Clear();
+
         _subtitleRenderTarget?.DetachSurface();
         _subtitleRenderTarget?.Dispose();
         _subtitleRenderTarget = null;
@@ -229,6 +240,55 @@ internal sealed partial class PlayerSession : IDisposable
 
         _pendingReconcile = true;
         return added;
+    }
+
+    public PlayerView CreateView()
+    {
+        PlayerView view = new();
+        _views.Add(view);
+        return view;
+    }
+
+    public void RemoveView(PlayerView view)
+    {
+        if (!_views.Remove(view))
+        {
+            return;
+        }
+
+        if (_pipeline is not { } pipeline || view.Chain is not { } chain)
+        {
+            view.Dispose();
+            return;
+        }
+
+        pipeline.RemoveChain(chain);
+        _pendingReconcile = true;
+        CoroutineUtils.Run(async () =>
+        {
+            await Reconcile();
+            view.Dispose();
+        });
+    }
+
+    public async Task<OperationResult> SelectVideoStream(PlayerView view, MediaStreamInfo? stream)
+    {
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            return OperationResultExt.Failure(TAG, "There is no playback to change a track of.");
+        }
+
+        IVideoChain chain = await EnsureChain(pipeline, view);
+        OperationResult selected = await pipeline.SelectStream(chain, stream);
+        if (!selected.IsSuccessful)
+        {
+            string wanted = stream is null ? "no track" : $"track #{stream.Index}";
+            return OperationResultExt.Failure(TAG, $"The picture could not be changed to {wanted}. {selected.Message}");
+        }
+
+        _pendingReconcile = true;
+        return OperationResult.Success();
     }
 
     public async Task<OperationResult> SelectStream(MediaStreamKind kind, MediaStreamInfo? stream)
@@ -336,11 +396,6 @@ internal sealed partial class PlayerSession : IDisposable
         });
     }
 
-    public void SetVideoTransform(VideoTransform transform)
-    {
-        _view.Transform = transform;
-    }
-
     public void SetSubtitlePresentation(SubtitlePresentation presentation)
     {
         if (_subtitlePresentation == presentation)
@@ -372,11 +427,6 @@ internal sealed partial class PlayerSession : IDisposable
         throw new NotSupportedException("This engine cannot change the playback rate yet.");
     }
 
-    public UIElement CreateVideoSurface()
-    {
-        return _view.Panel;
-    }
-
     public UIElement CreateSubtitleSurface()
     {
         // The surface sits above the video surface, so its opacity has to stay below 1. At 1 the two swap
@@ -387,6 +437,11 @@ internal sealed partial class PlayerSession : IDisposable
         // which composes correctly, and a tenth of a percent of transparency is imperceptible.
         _subtitlePanel ??= new SwapChainPanel { IsHitTestVisible = false, Opacity = 0.999 };
         return _subtitlePanel;
+    }
+
+    public OperationResult? ResultOf(ReconcileResult result, PlayerView view)
+    {
+        return view.Chain is { } chain ? result.VideoResults[chain] : null;
     }
 
     public OperationResult? ResultOf(ReconcileResult result, MediaStreamKind kind)
@@ -414,9 +469,9 @@ internal sealed partial class PlayerSession : IDisposable
     {
         return kind switch
         {
-            MediaStreamKind.Video => _view.Chain,
             MediaStreamKind.Audio => _audioChain,
-            _ => _subtitleChain,
+            MediaStreamKind.Subtitle => _subtitleChain,
+            _ => null,
         };
     }
 
@@ -439,14 +494,17 @@ internal sealed partial class PlayerSession : IDisposable
             SourceFactory = new FFmpegSourceProviderFactory(),
         };
 
-        IVideoChain video = await pipeline.AddVideoChain(_view.EnsureRenderTarget());
         IAudioChain audio = await pipeline.AddAudioChain();
         ISubtitleChain subtitle = await pipeline.AddSubtitleChain(EnsureSubtitleRenderTarget());
         _audioChain = audio;
         _subtitleChain = subtitle;
 
+        foreach (PlayerView view in _views)
+        {
+            await CreateChain(pipeline, view);
+        }
+
         _components.Apply(pipeline);
-        _view.Attach(pipeline, video, audio, subtitle);
         subtitle.Presentation = _subtitlePresentation;
         pipeline.StateChanged += Pipeline_StateChanged;
 
@@ -464,6 +522,26 @@ internal sealed partial class PlayerSession : IDisposable
         _pipeline = pipeline;
         _pendingReconcile = true;
         return pipeline;
+    }
+
+    private async Task<IVideoChain> EnsureChain(PlaybackPipeline pipeline, PlayerView view)
+    {
+        if (view.Chain is { } existing)
+        {
+            return existing;
+        }
+
+        IVideoChain chain = await CreateChain(pipeline, view);
+        _components.ApplyVideo(chain);
+        _pendingReconcile = true;
+        return chain;
+    }
+
+    private async Task<IVideoChain> CreateChain(PlaybackPipeline pipeline, PlayerView view)
+    {
+        IVideoChain chain = await pipeline.AddVideoChain(view.EnsureRenderTarget());
+        view.Attach(pipeline, chain, _audioChain, _subtitleChain);
+        return chain;
     }
 
     private void Pipeline_WarningRaised(IPlaybackChain? chain, string warning)
