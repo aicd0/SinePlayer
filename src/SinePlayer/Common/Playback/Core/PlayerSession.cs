@@ -23,14 +23,16 @@ using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Data.Models.Misc;
+using SinePlayer.Data.Models.Playback;
 
 namespace SinePlayer.Common.Playback.Core;
 
-internal sealed partial class CoreEngine : IDisposable
+internal sealed partial class PlayerSession : IDisposable
 {
     #region Constructor
 
-    private const string TAG = nameof(CoreEngine);
+    private const string TAG = nameof(PlayerSession);
 
     private const int PositionIntervalMilliseconds = 250;
 
@@ -53,9 +55,35 @@ internal sealed partial class CoreEngine : IDisposable
     private bool _pendingReconcile = false;
     private ReconcileResult? _lastReconcile;
 
-    public CoreEngine()
+    private PlayQueueModel _playQueue = PlayQueueModel.CreateEmpty();
+    private bool _loaded;
+
+    public PlayerSession(string id)
     {
+        Id = id;
         _audioDeviceNotifier.Subscribe(AudioDevices_Changed);
+    }
+
+    #endregion
+
+    #region Session
+
+    public string Id { get; }
+
+    public PlayQueueModel PlayQueue => _playQueue;
+
+    public PlaybackModel Playback { get; } = new();
+
+    public void Load(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
+    {
+        if (_loaded)
+        {
+            return;
+        }
+
+        _loaded = true;
+        _playQueue = playQueue;
+        Playback.LoadState(playQueue, serializedPlayback, initialPositionMs);
     }
 
     #endregion
@@ -293,11 +321,6 @@ internal sealed partial class CoreEngine : IDisposable
             position = duration;
         }
 
-        // Posted, like everything else the pipeline offers, and the task is kept for three reasons: it says when
-        // the position has moved, which for a seek while paused is the only chance the page gets to re-read it;
-        // it says whether the source took the seek at all — a seek a source refuses leaves playback exactly
-        // where it was, so there is nothing for the page to react to beyond the line in the log; and it says
-        // when the seek is over, which is when a resumed playback has to start.
         CoroutineUtils.Run(async () =>
         {
             OperationResult seeked = await pipeline.Seek(position, mode);
@@ -366,10 +389,6 @@ internal sealed partial class CoreEngine : IDisposable
         return _subtitlePanel;
     }
 
-    /// <summary>
-    /// What reconciling made of the chain of a kind, or null when this engine has no chain of that kind. A kind is how
-    /// this app speaks about tracks; the pipeline's answer is per chain, so the mapping lives here.
-    /// </summary>
     public OperationResult? ResultOf(ReconcileResult result, MediaStreamKind kind)
     {
         IPlaybackChain? chain = ChainOf(kind);
@@ -440,8 +459,6 @@ internal sealed partial class CoreEngine : IDisposable
         audio.Filters.Add(downmixFilter);
         _downmixFilter = downmixFilter;
 
-        // Warnings are heard as they happen — during the open for something left out of it, and later for a
-        // device that stops moving. They were only ever looked at once, at load, before.
         pipeline.WarningRaised += Pipeline_WarningRaised;
 
         _pipeline = pipeline;

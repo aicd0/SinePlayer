@@ -93,12 +93,15 @@ internal sealed partial class PlayerPage : BasePage
         InitializeTransportBar();
         InitializePinState();
 
-        ViewModel.Initialize(PageActionHandler, OpenMedia);
-        ObserveData();
-        UpdateKeyboardAccelerators();
-
         bool restored = bundle.GetString(RouterConstants.ARG_RESTORED) == "1";
-        string playQueueId = bundle.GetString(RouterConstants.ARG_PLAY_QUEUE_ID) ?? string.Empty;
+        string sessionId = bundle.GetString(RouterConstants.ARG_PLAY_QUEUE_ID) ?? string.Empty;
+        if (string.IsNullOrEmpty(sessionId))
+        {
+            sessionId = Guid.NewGuid().ToString();
+            Route route = Route.Create(GetMainPageAbility().Url).WithParam(RouterConstants.ARG_PLAY_QUEUE_ID, sessionId);
+            GetMainPageAbility().SetUrl(route.Url);
+        }
+
         string serializedPlayback = bundle.GetString(RouterConstants.ARG_PLAYBACK) ?? string.Empty;
         long initialPositionMs = -1;
         string? positionString = bundle.GetString(RouterConstants.ARG_POSITION);
@@ -109,15 +112,21 @@ internal sealed partial class PlayerPage : BasePage
 
         _restoredFromLastSession = restored;
 
+        _sessionId = sessionId;
+        PlayerSession session = EnsureSession();
+        ViewModel.Initialize(PageActionHandler, OpenMedia, session.Playback);
+        ObserveData();
+        UpdateKeyboardAccelerators();
+
         VideoHost.Children.Clear();
-        VideoHost.Children.Add(EnsureEngine().CreateVideoSurface());
+        VideoHost.Children.Add(session.CreateVideoSurface());
         SubtitleHost.Children.Clear();
-        SubtitleHost.Children.Add(EnsureEngine().CreateSubtitleSurface());
+        SubtitleHost.Children.Add(session.CreateSubtitleSurface());
 
         CoroutineUtils.Run(async () =>
         {
-            PlayQueueModel playQueue = await GetPlayQueue(playQueueId);
-            ViewModel.LoadPlayQueue(playQueue, serializedPlayback, initialPositionMs);
+            PlayQueueModel playQueue = await GetPlayQueue(sessionId);
+            session.Load(playQueue, serializedPlayback, initialPositionMs);
         });
     }
 
@@ -143,7 +152,7 @@ internal sealed partial class PlayerPage : BasePage
         base.OnStop();
         ViewModel.SavePosition();
         ViewModel.Destory();
-        DisposeEngine();
+        ReleaseSession();
         StopPromptTimer();
         _navigationBar = null;
         GetMainPageAbility().SetCustomCenteredNavigationBar(null);
@@ -326,9 +335,9 @@ internal sealed partial class PlayerPage : BasePage
             _navigationBar?.SetFavorite(isFavorite);
         });
 
-        ViewModel.VolumeLiveData.Observe(this, TransportBar.SetVolume);
+        ViewModel.VolumeLiveData.ObserveSticky(this, TransportBar.SetVolume);
 
-        ViewModel.MuteLiveData.Observe(this, TransportBar.SetMuted);
+        ViewModel.MuteLiveData.ObserveSticky(this, TransportBar.SetMuted);
     }
 
     private async Task<PlayQueueModel> GetPlayQueue(string playQueueId)
@@ -336,34 +345,24 @@ internal sealed partial class PlayerPage : BasePage
         string playQueuesRegistry = $"{RegistryNames.TAB_RESOURCES}/{GetMainPageAbility().TabId}/PlayQueues";
 
         PlayQueueModel? playQueue = null;
-        if (!string.IsNullOrEmpty(playQueueId))
+        if (AppDB.MainRegistry.TryGetKey(RegistryNames.PLAY_QUEUES, out IRegistryKey? key))
         {
-            if (AppDB.MainRegistry.TryGetKey(RegistryNames.PLAY_QUEUES, out IRegistryKey? key))
+            if (key.TryGet(playQueueId, out string? serializedPlayQueue))
             {
-                if (key.TryGet(playQueueId, out string? serializedPlayQueue))
-                {
-                    playQueue = await PlayQueueModel.CreateFromSerializedString(serializedPlayQueue);
-                }
-            }
-
-            if (playQueue is null && AppDB.MainRegistry.TryGetKey(playQueuesRegistry, out key))
-            {
-                if (key.TryGet(playQueueId, out string? serializedPlayQueue))
-                {
-                    playQueue = await PlayQueueModel.CreateFromSerializedString(serializedPlayQueue);
-                    if (playQueue is not null)
-                    {
-                        return playQueue;
-                    }
-                }
+                playQueue = await PlayQueueModel.CreateFromSerializedString(serializedPlayQueue);
             }
         }
-        else
+
+        if (playQueue is null && AppDB.MainRegistry.TryGetKey(playQueuesRegistry, out key))
         {
-            playQueueId = Guid.NewGuid().ToString();
-            Route route = Route.Create(GetMainPageAbility().Url)
-                .WithParam(RouterConstants.ARG_PLAY_QUEUE_ID, playQueueId);
-            GetMainPageAbility().SetUrl(route.Url);
+            if (key.TryGet(playQueueId, out string? serializedPlayQueue))
+            {
+                playQueue = await PlayQueueModel.CreateFromSerializedString(serializedPlayQueue);
+                if (playQueue is not null)
+                {
+                    return playQueue;
+                }
+            }
         }
 
         playQueue ??= PlayQueueModel.CreateEmpty();
@@ -388,7 +387,8 @@ internal sealed partial class PlayerPage : BasePage
         {
             PlayerSettingsPanel? settingsPanel = _navigationBar?.PlayerSettingsPanel;
             MediaModel? media = ViewModel.Media;
-            if (settingsPanel is null || media is null)
+            PlayerSession? session = _session;
+            if (settingsPanel is null || media is null || session is null)
             {
                 return;
             }
@@ -400,9 +400,9 @@ internal sealed partial class PlayerPage : BasePage
                 Media = media,
                 Settings = settingsPanel.Settings,
                 UpdateSettings = settingsPanel.Apply,
-                PlayQueue = ViewModel.PlayQueue.ToBuilder(),
+                PlayQueue = session.PlayQueue.ToBuilder(),
                 Playback = ViewModel.Playback.ToBuilder(),
-                Engine = _engine,
+                Session = session,
                 PromptInfo = PromptTemporary,
             };
 
@@ -517,9 +517,9 @@ internal sealed partial class PlayerPage : BasePage
 
     private async Task AddSubtitleFilesAsync(IReadOnlyList<string> paths)
     {
-        CoreEngine? engine = _engine;
+        PlayerSession? session = _session;
         MediaModel? media = ViewModel.Media;
-        if (engine is null || media is null)
+        if (session is null || media is null)
         {
             PromptTemporary("There is no playback to add the subtitles to.");
             return;
@@ -531,7 +531,7 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        OperationResult added = await SubtitleSourceLoader.AddAndSelect(engine, media, paths);
+        OperationResult added = await SubtitleSourceLoader.AddAndSelect(session, media, paths);
         if (!added.IsSuccessful)
         {
             PromptTemporary(added.Message);
@@ -540,50 +540,51 @@ internal sealed partial class PlayerPage : BasePage
 
     #endregion
 
-    #region Engine
+    #region Session
 
     private const string TAG = nameof(PlayerPage);
 
-    private CoreEngine? _engine;
+    private string _sessionId = string.Empty;
+    private PlayerSession? _session;
     private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
 
     private async Task<OperationResult> OpenMedia(MediaModel media, long startPositionMs)
     {
         ViewModel.SavePosition();
 
-        CoreEngine engine = EnsureEngine();
-        await engine.Reset();
+        PlayerSession session = EnsureSession();
+        await session.Reset();
 
         var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
         ApplyPlayerSettings(mediaSettings);
 
-        OperationResult<MediaSource> loaded = await engine.AddSource(media.Location);
+        OperationResult<MediaSource> loaded = await session.AddSource(media.Location);
         if (!loaded.IsSuccessful)
         {
             return OperationResult.Failure(loaded);
         }
 
-        OperationResult selected = await SelectTracks(engine, media);
+        OperationResult selected = await SelectTracks(session, media);
         if (!selected.IsSuccessful)
         {
             return selected;
         }
 
-        ViewModel.SetDuration(engine.Duration.Ticks / TimeSpan.TicksPerMillisecond);
+        ViewModel.SetDuration(session.Duration.Ticks / TimeSpan.TicksPerMillisecond);
 
         if (startPositionMs > 0)
         {
             SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
-            engine.Seek(TimeSpan.FromMilliseconds(startPositionMs), mode);
+            session.Seek(TimeSpan.FromMilliseconds(startPositionMs), mode);
         }
 
         ViewModel.PositionLiveData.Emit(startPositionMs > 0 ? startPositionMs : 0);
 
-        StartPlaybackOnOpen(engine);
+        StartPlaybackOnOpen(session);
         return selected;
     }
 
-    private async Task<OperationResult> SelectTracks(CoreEngine engine, MediaModel media)
+    private async Task<OperationResult> SelectTracks(PlayerSession session, MediaModel media)
     {
         static T? DefaultTrack<T>(IReadOnlyList<T>? streams) where T : MediaStreamInfo
         {
@@ -603,7 +604,7 @@ internal sealed partial class PlayerPage : BasePage
             return streams[0];
         }
 
-        MediaInfo? info = engine.PlaybackInfo.Media;
+        MediaInfo? info = session.PlaybackInfo.Media;
         if (info is null)
         {
             return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': its tracks could not be read.");
@@ -612,13 +613,13 @@ internal sealed partial class PlayerPage : BasePage
         // Add external sources
         foreach (MediaStreamKind kind in (MediaStreamKind[])[MediaStreamKind.Video, MediaStreamKind.Audio, MediaStreamKind.Subtitle])
         {
-            TrackSelection.Preference? preference = TrackSelection.Load(media, kind, engine.PlaybackInfo.Sources);
+            TrackSelection.Preference? preference = TrackSelection.Load(media, kind, session.PlaybackInfo.Sources);
             if (preference is null || !preference.Enabled || string.IsNullOrEmpty(preference.Path) || preference.Stream is not null)
             {
                 continue;
             }
 
-            OperationResult<MediaSource> added = await engine.AddSource(preference.Path);
+            OperationResult<MediaSource> added = await session.AddSource(preference.Path);
             if (!added.IsSuccessful)
             {
                 Logger.W(TAG, $"The chosen {kind} track could not be restored from '{preference.Path}'. {added.Message}");
@@ -627,14 +628,14 @@ internal sealed partial class PlayerPage : BasePage
 
         foreach (string path in await FindSameNameSubtitlesAsync(media.Location))
         {
-            OperationResult<MediaSource> added = await engine.AddSource(path);
+            OperationResult<MediaSource> added = await session.AddSource(path);
             if (!added.IsSuccessful)
             {
                 Logger.W(TAG, $"'{path}' could not be imported: {added.Message}");
             }
         }
 
-        IReadOnlyList<MediaSource> sources = engine.PlaybackInfo.Sources;
+        IReadOnlyList<MediaSource> sources = session.PlaybackInfo.Sources;
         List<string> unplayable = [];
 
         // Select video track
@@ -651,7 +652,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (video is not null)
         {
-            OperationResult chosen = await engine.SelectStream(MediaStreamKind.Video, video);
+            OperationResult chosen = await session.SelectStream(MediaStreamKind.Video, video);
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the picture could not be played ({chosen.Message})");
@@ -672,7 +673,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (audio is not null)
         {
-            OperationResult chosen = await engine.SelectStream(MediaStreamKind.Audio, audio);
+            OperationResult chosen = await session.SelectStream(MediaStreamKind.Audio, audio);
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the sound could not be played ({chosen.Message})");
@@ -694,7 +695,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (subtitle is not null)
         {
-            OperationResult chosen = await engine.SelectStream(MediaStreamKind.Subtitle, subtitle);
+            OperationResult chosen = await session.SelectStream(MediaStreamKind.Subtitle, subtitle);
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the subtitles could not be played ({chosen.Message})");
@@ -702,7 +703,7 @@ internal sealed partial class PlayerPage : BasePage
         }
 
         bool playing = false;
-        OperationResult<ReconcileResult> reconciled = await engine.Reconcile();
+        OperationResult<ReconcileResult> reconciled = await session.Reconcile();
         if (!reconciled.IsSuccessful)
         {
             PromptTemporary(reconciled.Message);
@@ -713,7 +714,7 @@ internal sealed partial class PlayerPage : BasePage
 
             if (video is not null)
             {
-                OperationResult? videoResult = engine.ResultOf(result, MediaStreamKind.Video);
+                OperationResult? videoResult = session.ResultOf(result, MediaStreamKind.Video);
                 playing |= videoResult?.IsSuccessful == true;
                 if (videoResult is { IsSuccessful: false })
                 {
@@ -723,7 +724,7 @@ internal sealed partial class PlayerPage : BasePage
 
             if (audio is not null)
             {
-                OperationResult? audioResult = engine.ResultOf(result, MediaStreamKind.Audio);
+                OperationResult? audioResult = session.ResultOf(result, MediaStreamKind.Audio);
                 playing |= audioResult?.IsSuccessful == true;
                 if (audioResult is { IsSuccessful: false })
                 {
@@ -731,7 +732,7 @@ internal sealed partial class PlayerPage : BasePage
                 }
             }
 
-            if (subtitle is not null && engine.ResultOf(result, MediaStreamKind.Subtitle) is { IsSuccessful: false } subtitleFailure)
+            if (subtitle is not null && session.ResultOf(result, MediaStreamKind.Subtitle) is { IsSuccessful: false } subtitleFailure)
             {
                 PromptTemporary(subtitleFailure.Message);
             }
@@ -753,7 +754,7 @@ internal sealed partial class PlayerPage : BasePage
         return OperationResult.Success();
     }
 
-    private void StartPlaybackOnOpen(CoreEngine engine)
+    private void StartPlaybackOnOpen(PlayerSession session)
     {
         bool restoredFromLastSession = _restoredFromLastSession;
         _restoredFromLastSession = false;
@@ -765,7 +766,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (IsResumed)
         {
-            engine.Play();
+            session.Play();
         }
         else
         {
@@ -773,40 +774,45 @@ internal sealed partial class PlayerPage : BasePage
         }
     }
 
-    private CoreEngine EnsureEngine()
+    private PlayerSession EnsureSession()
     {
-        if (_engine is not null)
+        if (_session is not null)
         {
-            return _engine;
+            return _session;
         }
 
-        CoreEngine engine = new();
-        engine.SetVolume(Math.Clamp(AppSettingsModel.PlayerVolume, 0.0, 1.0));
-        engine.SetMuted(AppSettingsModel.PlayerMuted);
-        engine.StateChanged += Engine_StateChanged;
-        engine.PositionChanged += Engine_PositionChanged;
-        _engine = engine;
+        PlayerSession session = PlayerSessionManager.Shared.Acquire(_sessionId, out bool created);
+        if (created)
+        {
+            session.SetVolume(Math.Clamp(AppSettingsModel.PlayerVolume, 0.0, 1.0));
+            session.SetMuted(AppSettingsModel.PlayerMuted);
+        }
+
+        session.StateChanged += Session_StateChanged;
+        session.PositionChanged += Session_PositionChanged;
+        _session = session;
         UpdateSubtitlePresentation();
-        ViewModel.VolumeLiveData.Emit((int)Math.Round(engine.Volume * 100.0));
-        ViewModel.MuteLiveData.Emit(engine.IsMuted);
-        return engine;
+
+        ViewModel.VolumeLiveData.Emit((int)Math.Round(session.Volume * 100.0));
+        ViewModel.MuteLiveData.Emit(session.IsMuted);
+        return session;
     }
 
-    private void DisposeEngine()
+    private void ReleaseSession()
     {
-        CoreEngine? engine = _engine;
-        _engine = null;
-        if (engine is null)
+        PlayerSession? session = _session;
+        _session = null;
+        if (session is null)
         {
             return;
         }
 
-        engine.StateChanged -= Engine_StateChanged;
-        engine.PositionChanged -= Engine_PositionChanged;
-        engine.Dispose();
+        session.StateChanged -= Session_StateChanged;
+        session.PositionChanged -= Session_PositionChanged;
+        PlayerSessionManager.Shared.Release(session.Id);
     }
 
-    private void Engine_StateChanged(MediaEngineState state, string? message)
+    private void Session_StateChanged(MediaEngineState state, string? message)
     {
         ViewModel.IsPlayingLiveData.Emit(state == MediaEngineState.Playing);
 
@@ -839,17 +845,17 @@ internal sealed partial class PlayerPage : BasePage
         UpdateKeepScreenOn();
     }
 
-    private void Engine_PositionChanged()
+    private void Session_PositionChanged()
     {
-        CoreEngine? engine = _engine;
-        if (engine is null)
+        PlayerSession? session = _session;
+        if (session is null)
         {
             return;
         }
 
         ViewModel.SetPosition(
-            engine.Position.Ticks / TimeSpan.TicksPerMillisecond,
-            engine.Duration.Ticks / TimeSpan.TicksPerMillisecond);
+            session.Position.Ticks / TimeSpan.TicksPerMillisecond,
+            session.Duration.Ticks / TimeSpan.TicksPerMillisecond);
     }
 
     private void HandleMediaEnded()
@@ -858,7 +864,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (ViewModel.Playback.RepeatMode == RepeatMode.One)
         {
-            _engine?.Play();
+            _session?.Play();
             return;
         }
 
@@ -1174,50 +1180,50 @@ internal sealed partial class PlayerPage : BasePage
 
     private void TogglePlayPause()
     {
-        CoreEngine? engine = _engine;
-        if (engine is null)
+        PlayerSession? session = _session;
+        if (session is null)
         {
             return;
         }
 
-        if (engine.State == MediaEngineState.Playing)
+        if (session.State == MediaEngineState.Playing)
         {
-            engine.Pause();
+            session.Pause();
         }
         else
         {
-            engine.Play();
+            session.Play();
         }
     }
 
     private void SeekBy(long deltaMs)
     {
-        CoreEngine? engine = _engine;
-        if (engine is null)
+        PlayerSession? session = _session;
+        if (session is null)
         {
             return;
         }
 
-        long positionMs = engine.Position.Ticks / TimeSpan.TicksPerMillisecond;
+        long positionMs = session.Position.Ticks / TimeSpan.TicksPerMillisecond;
         SeekTo(Math.Max(positionMs + deltaMs, 0));
     }
 
     private void SeekTo(long positionMs)
     {
         SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
-        _engine?.Seek(TimeSpan.FromMilliseconds(positionMs), mode);
+        _session?.Seek(TimeSpan.FromMilliseconds(positionMs), mode);
     }
 
     private void SetVolume(int volume)
     {
-        CoreEngine? engine = _engine;
-        if (engine is null)
+        PlayerSession? session = _session;
+        if (session is null)
         {
             return;
         }
 
         int clampedVolume = Math.Clamp(volume, 0, 100);
-        engine.SetVolume(clampedVolume / 100.0);
+        session.SetVolume(clampedVolume / 100.0);
         ViewModel.SetVolume(clampedVolume);
     }
 
@@ -1228,25 +1234,25 @@ internal sealed partial class PlayerPage : BasePage
 
     private void SetMuted(bool isMuted)
     {
-        CoreEngine? engine = _engine;
-        if (engine is null)
+        PlayerSession? session = _session;
+        if (session is null)
         {
             return;
         }
 
-        engine.SetMuted(isMuted);
+        session.SetMuted(isMuted);
         ViewModel.SetMute(isMuted);
     }
 
     private async void ApplyPlayerSettings(PlayerSettingsModel settings)
     {
-        CoreEngine? engine = _engine;
-        if (engine is null)
+        PlayerSession? session = _session;
+        if (session is null)
         {
             return;
         }
 
-        engine.SetVideoTransform(settings.ToVideoTransform());
+        session.SetVideoTransform(settings.ToVideoTransform());
 
         _subtitlePresentation = _subtitlePresentation with
         {
@@ -1258,17 +1264,17 @@ internal sealed partial class PlayerPage : BasePage
             FontWeight = settings.ToFontWeight(),
             OutlineWidth = settings.SubtitleOutlineWidth,
         };
-        engine.SetSubtitlePresentation(_subtitlePresentation);
+        session.SetSubtitlePresentation(_subtitlePresentation);
 
         PlaybackComponents components = settings.ToComponents();
-        engine.SetComponents(components);
+        session.SetComponents(components);
 
-        if (engine.State == MediaEngineState.None)
+        if (session.State == MediaEngineState.None)
         {
             return;
         }
 
-        OperationResult<ReconcileResult> reconciled = await engine.Reconcile();
+        OperationResult<ReconcileResult> reconciled = await session.Reconcile();
         if (!reconciled.IsSuccessful)
         {
             PromptTemporary(reconciled.Message);
@@ -1277,17 +1283,17 @@ internal sealed partial class PlayerPage : BasePage
 
         ReconcileResult result = reconciled.Result;
 
-        if (engine.ResultOf(result, MediaStreamKind.Video) is { IsSuccessful: false } videoFailure)
+        if (session.ResultOf(result, MediaStreamKind.Video) is { IsSuccessful: false } videoFailure)
         {
             PromptTemporary(videoFailure.Message);
         }
 
-        if (engine.ResultOf(result, MediaStreamKind.Audio) is { IsSuccessful: false } audioFailure)
+        if (session.ResultOf(result, MediaStreamKind.Audio) is { IsSuccessful: false } audioFailure)
         {
             PromptTemporary(audioFailure.Message);
         }
 
-        if (engine.ResultOf(result, MediaStreamKind.Subtitle) is { IsSuccessful: false } subtitleFailure)
+        if (session.ResultOf(result, MediaStreamKind.Subtitle) is { IsSuccessful: false } subtitleFailure)
         {
             PromptTemporary(subtitleFailure.Message);
         }
@@ -1439,7 +1445,7 @@ internal sealed partial class PlayerPage : BasePage
             ? new SubtitleInsets(0.0, _topOverlayHeight, _rightOverlayWidth, _bottomGridHeight)
             : SubtitleInsets.None;
         _subtitlePresentation = _subtitlePresentation with { Insets = insets };
-        _engine?.SetSubtitlePresentation(_subtitlePresentation);
+        _session?.SetSubtitlePresentation(_subtitlePresentation);
     }
 
     #endregion
@@ -1457,7 +1463,7 @@ internal sealed partial class PlayerPage : BasePage
         {
             if (AppSettingsModel.PauseOnLeaveTab && !ViewModel.IsAudio)
             {
-                _engine?.Pause();
+                _session?.Pause();
             }
 
             ViewModel.SavePosition();
@@ -1466,7 +1472,7 @@ internal sealed partial class PlayerPage : BasePage
         if (IsResumed && _playbackPendingOnActivate)
         {
             _playbackPendingOnActivate = false;
-            _engine?.Play();
+            _session?.Play();
         }
     }
 
@@ -1496,8 +1502,8 @@ internal sealed partial class PlayerPage : BasePage
         {
             AppSettingsModel.KeepScreenOnBehaviorEnum.Never => false,
             AppSettingsModel.KeepScreenOnBehaviorEnum.Always => true,
-            AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlaying => _engine?.State == MediaEngineState.Playing,
-            AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos => _engine?.State == MediaEngineState.Playing && media is not null && media.Type == MediaType.Video,
+            AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlaying => _session?.State == MediaEngineState.Playing,
+            AppSettingsModel.KeepScreenOnBehaviorEnum.WhilePlayingVideos => _session?.State == MediaEngineState.Playing && media is not null && media.Type == MediaType.Video,
             _ => false,
         };
     }
@@ -1540,13 +1546,14 @@ internal sealed partial class PlayerPage : BasePage
     private void SyncCurrentMedia()
     {
         MediaModel? media = ViewModel.Media;
+        PlayerSession? session = _session;
 
         GetWindowEventBus().With<MediaChangedEventArgs>(EventId.MediaChanged).Emit(new()
         {
             Media = ViewModel.Media,
-            PlayQueue = ViewModel.PlayQueue,
+            PlayQueue = session?.PlayQueue ?? PlayQueueModel.CreateEmpty(),
             ImageDescriptions = [],
-            PlaybackInfo = _engine?.PlaybackInfo,
+            PlaybackInfo = session?.PlaybackInfo,
         });
 
         if (media is not null)
