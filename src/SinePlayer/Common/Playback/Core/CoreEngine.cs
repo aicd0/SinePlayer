@@ -36,20 +36,16 @@ internal sealed partial class CoreEngine : IDisposable
 
     private bool _disposed;
     private readonly AudioDeviceNotifier _audioDeviceNotifier = AudioDeviceNotifier.Shared;
-    private SwapChainPanel? _videoPanel;
-    private SwapChainPanelRenderTarget? _videoRenderTarget;
+    private readonly PlayerView _view = new();
     private SwapChainPanel? _subtitlePanel;
     private SwapChainPanelRenderTarget? _subtitleRenderTarget;
     private GainAudioFilter? _gainFilter;
     private DownmixAudioFilter? _downmixFilter;
 
-    private readonly PlaybackInfoHandle _playbackInfo = new();
-    private IVideoChain? _videoChain;
     private IAudioChain? _audioChain;
     private ISubtitleChain? _subtitleChain;
     private bool _hasSource = false;
     private PlaybackComponents _components = PlaybackComponents.Default;
-    private VideoTransform _videoTransform = VideoTransform.Identity;
     private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
     private double _volume = 1.0;
     private bool _muted;
@@ -95,7 +91,7 @@ internal sealed partial class CoreEngine : IDisposable
 
     public double PlaybackRate => 1.0;
 
-    public PlaybackInfoHandle PlaybackInfo => _playbackInfo;
+    public PlaybackInfoHandle PlaybackInfo => _view.PlaybackInfo;
 
     public void Dispose()
     {
@@ -109,11 +105,10 @@ internal sealed partial class CoreEngine : IDisposable
         _audioDeviceNotifier.Unsubscribe(AudioDevices_Changed);
 
         StopPositionTimer();
-        _playbackInfo.Detach();
+        _view.Detach();
 
         PlaybackPipeline? pipeline = _pipeline;
         _pipeline = null;
-        _videoChain = null;
         _audioChain = null;
         _subtitleChain = null;
         if (pipeline is not null)
@@ -131,10 +126,7 @@ internal sealed partial class CoreEngine : IDisposable
         _downmixFilter = null;
         downmixFilter?.Dispose();
 
-        _videoRenderTarget?.DetachSurface();
-        _videoRenderTarget?.Dispose();
-        _videoRenderTarget = null;
-        _videoPanel = null;
+        _view.Dispose();
         _subtitleRenderTarget?.DetachSurface();
         _subtitleRenderTarget?.Dispose();
         _subtitleRenderTarget = null;
@@ -323,16 +315,7 @@ internal sealed partial class CoreEngine : IDisposable
 
     public void SetVideoTransform(VideoTransform transform)
     {
-        if (_videoTransform == transform)
-        {
-            return;
-        }
-
-        _videoTransform = transform;
-        if (_videoChain is { } video)
-        {
-            video.Transform = transform;
-        }
+        _view.Transform = transform;
     }
 
     public void SetSubtitlePresentation(SubtitlePresentation presentation)
@@ -368,8 +351,7 @@ internal sealed partial class CoreEngine : IDisposable
 
     public UIElement CreateVideoSurface()
     {
-        _videoPanel ??= new SwapChainPanel();
-        return _videoPanel;
+        return _view.Panel;
     }
 
     public UIElement CreateSubtitleSurface()
@@ -413,7 +395,7 @@ internal sealed partial class CoreEngine : IDisposable
     {
         return kind switch
         {
-            MediaStreamKind.Video => _videoChain,
+            MediaStreamKind.Video => _view.Chain,
             MediaStreamKind.Audio => _audioChain,
             _ => _subtitleChain,
         };
@@ -438,15 +420,14 @@ internal sealed partial class CoreEngine : IDisposable
             SourceFactory = new FFmpegSourceProviderFactory(),
         };
 
-        IVideoChain video = await pipeline.AddVideoChain(EnsureVideoRenderTarget());
+        IVideoChain video = await pipeline.AddVideoChain(_view.EnsureRenderTarget());
         IAudioChain audio = await pipeline.AddAudioChain();
         ISubtitleChain subtitle = await pipeline.AddSubtitleChain(EnsureSubtitleRenderTarget());
-        _videoChain = video;
         _audioChain = audio;
         _subtitleChain = subtitle;
 
         _components.Apply(pipeline);
-        video.Transform = _videoTransform;
+        _view.Attach(pipeline, video, audio, subtitle);
         subtitle.Presentation = _subtitlePresentation;
         pipeline.StateChanged += Pipeline_StateChanged;
 
@@ -463,7 +444,6 @@ internal sealed partial class CoreEngine : IDisposable
         // device that stops moving. They were only ever looked at once, at load, before.
         pipeline.WarningRaised += Pipeline_WarningRaised;
 
-        _playbackInfo.Attach(pipeline, video, audio, subtitle);
         _pipeline = pipeline;
         _pendingReconcile = true;
         return pipeline;
@@ -577,12 +557,6 @@ internal sealed partial class CoreEngine : IDisposable
     #endregion
 
     #region Misc
-
-    private SwapChainPanelRenderTarget EnsureVideoRenderTarget()
-    {
-        _videoRenderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)CreateVideoSurface());
-        return _videoRenderTarget;
-    }
 
     private SwapChainPanelRenderTarget EnsureSubtitleRenderTarget()
     {
