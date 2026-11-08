@@ -28,6 +28,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
 
+    private PlaybackModel? _playback;
     private MediaModel? _media;
     private bool? _isFavorite = null;
     private long _positionMs;
@@ -189,30 +190,25 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
     #region Public API
 
-    public PlayQueueModel PlayQueue { get; private set; } = PlayQueueModel.CreateEmpty();
-    public PlaybackModel Playback { get; } = new();
+    public PlaybackModel Playback => _playback ?? throw new InvalidOperationException("The player view model was used before it was given a playback.");
     public PlayerStatusEnum PlayerStatus => PlayerStatusLiveData.Value.Status;
     public MediaModel? Media => _media;
     public long DurationMs => _durationMs;
     public bool IsLoading => _isLoading;
 
-    public void Initialize(ActionHandler actionHandler, OpenMediaHandler openHandler)
+    public void Initialize(ActionHandler actionHandler, OpenMediaHandler openHandler, PlaybackModel playback)
     {
         _actionHandler = actionHandler;
         _openHandler = openHandler;
+        _playback = playback;
         Playback.PlaybackStateChanged += Playback_PlaybackStateChanged;
     }
 
     public void Destory()
     {
         Playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
+        _playback = null;
         _media = null;
-    }
-
-    public void LoadPlayQueue(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
-    {
-        PlayQueue = playQueue;
-        Playback.LoadState(playQueue, serializedPlayback, initialPositionMs);
     }
 
     public void Next()

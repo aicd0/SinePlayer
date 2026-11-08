@@ -4,11 +4,12 @@ Status: plan. Nothing here is implemented yet.
 
 ## 1. What is being changed
 
-Today a `PlayerPage` owns its `CoreEngine`: the page creates it, uses it, and disposes it in `OnStop`. Two player
-pages therefore mean two engines, two pipelines, two decoders and two clocks — two players, not one player shown
-twice. This plan introduces a `PlayerSession` between the page and the engine:
+Today a `PlayerPage` owns its engine (formerly `CoreEngine`, 573 lines of it): the page creates it, uses it, and
+disposes it in `OnStop`. Two player pages therefore mean two engines, two pipelines, two decoders and two clocks —
+two players, not one player shown twice. This plan turns that engine into the thing a page attaches to:
 
-- **One `PlayerSession` owns exactly one `CoreEngine`**, and any number of `PlayerPage`s can attach to it.
+- **One `PlayerSession` per playback**, and any number of `PlayerPage`s can attach to it. The session *is* the
+  engine — one class, holding the pipeline, the queue, the cursor and the surfaces (decision 8).
 - Each attached page gets a **view**: its own swap-chain panel and its own video chain, so it can show a
   **different video track of the same media**, at the same position, with the picture it chose.
 - Audio and subtitle stay session-wide in v1: one device, one clock, one set of words.
@@ -34,15 +35,15 @@ The pipeline work of v1/v2 already paid for most of it, and the plan leans on sp
 - **Removal, seek, end and read-ahead are per chain, not per first-of-kind** (J4, J7). Closing one window removes
   one chain and the others carry on; the pipeline ends when every chain has reached its end.
 
-What is *not* there is the app layer: `CoreEngine` still assumes one video chain, `PlayerPage` assumes it owns the
+What is *not* there is the app layer: the engine still assumes one video chain, `PlayerPage` assumes it owns the
 engine, and the route assumes the media is what a tab remembers.
 
 ## 3. What is true today (facts the steps rely on)
 
-1. **`CoreEngine` holds one video output.** `_videoPanel`, `_videoRenderTarget`, `_videoChain` are single fields;
+1. **The engine holds one video output.** `_videoPanel`, `_videoRenderTarget`, `_videoChain` are single fields;
    `CreateVideoSurface()` returns the one cached panel; `PlaybackComponents.Apply` registers video components on
    `pipeline.VideoChains[0]`; `PlaybackInfoHandle` reports one video chain.
-2. **`PlayerPage` owns the engine.** `EnsureEngine()` in `OnStart`/`OpenMedia`, `DisposeEngine()` in `OnStop`.
+2. **`PlayerPage` owns the engine.** `EnsureSession()` in `OnStart`/`OpenMedia`, `ReleaseSession()` in `OnStop`.
 3. **The route carries the media, not a session.** `OpenMediaHelper.GetMediaRoute` writes a play queue into
    `/Resources/Runtime/PlayQueues` and builds `app://player?play_queue_id=…&playback=…&position=…`;
    `PlayerPage.GetPlayQueue` reads it back, and the page rewrites its own URL with a fresh serialized `playback`
@@ -109,6 +110,14 @@ video tracks of one media) is reachable while sessions are still keyed by the pl
 changes are made against something that can be seen working, and a persistence bug can be told apart from a
 multi-view bug.
 
+**Decision 8 — the session is the engine: one class, not two.** B1 first introduced a `PlayerSession` that *held* a
+`CoreEngine`, and that was a wrapper with nothing in it: the sharing and the lifetime live in `PlayerSessionManager`,
+so all the type carried was an id, a queue, a playback model and a six-line "load once" guard, while every call site
+read `session.Engine.…`. Worse, two objects describing one playback is what produced a duplicate reference the moment
+a second holder appeared. They are merged: the type is `PlayerSession`, it owns the pipeline, the queue, the cursor
+and the surfaces, and the page holds exactly one of it. What stays separate is `PlayerSessionManager`, which is real
+behaviour (registry, page count, disposal).
+
 ## 5. Phases
 
 Invariant, as in the previous plans: one coherent change per step, a build that is clean (0 errors, 0 warnings) at
@@ -124,8 +133,8 @@ the end of every step, and the manual check named for the step performed before 
 
 | # | Step | Change | Review focus | Verify |
 |---|---|---|---|---|
-| B1 | `PlayerSession` and its manager | `PlayerSession` owns the `CoreEngine`, the `PlayQueueModel` and the `PlaybackModel`, plus the attached views. `PlayerSessionManager` maps a session id to a live session and counts attached pages. The page holds a session instead of an engine; `EnsureEngine`/`DisposeEngine` become `AcquireSession`/`ReleaseSession`. The route is unchanged, so for now the session id is the play queue id the route already carries | the page must not keep a second copy of what the session owns — no `_engine`, no `ViewModel.Playback` of its own. Transport, position, queue navigation and the sidebar's `PlaybackChanged` event now come from the session | build + play a file, next/previous, switch tracks, close the tab: exactly as before |
-| B2 | Views become plural | `CoreEngine.CreateView()` / `RemoveView(view)`; `EnsurePipeline` adds one video chain per view; `SelectStream(view, kind, stream)`, `ResultOf(view, kind, result)`, `Apply` to every video chain, `Duration` from the view. `PlayerSession.AttachView()` / `DetachView()`; the page attaches in `OnStart`, detaches in `OnStop`; video menu items and video read surfaces go through the page's own view, audio/subtitle through the session | the pipeline already supports N chains, so this is app-side plumbing: what a page reads about the *picture* is its own chain, what it changes about the *sound* is the session's. Detaching the last view disposes the session | build + one page: parity with B1. The plural path is exercised by C1, one step later |
+| B1 | The session and its manager — **done** | The engine *is* the session (decision 8): `CoreEngine` is renamed `PlayerSession` and absorbs the id, the `PlayQueueModel`, the `PlaybackModel` and a first-caller-wins `Load`, which is the hook the attaching page needs in C1. `PlayerSessionManager.Shared` maps an id to a live session and counts pages, disposing it when the last page releases (outside the lock). The page holds a session instead of an engine; `EnsureEngine`/`DisposeEngine` become `EnsureSession`/`ReleaseSession`; `session.Engine.…` is gone, and the locals, the event handlers and `PlayerMenuContext.Engine` are named for a session. The route is unchanged, so the session id is still the play queue id — but it is now resolved in `OnStart`, so a page always knows which session it is on before the queue is read. Views arrive in B2 | the page is the only holder: the view model is given the session's `PlaybackModel` and nothing else, and its "load the queue" method is gone because loading is the session's. Volume and mute are applied only by the page that created the session, and are emitted stickily so the order against `ObserveData` no longer matters | build + play a file, next/previous, switch tracks, close the tab: exactly as before |
+| B2 | Views become plural | `PlayerSession.CreateView()` / `RemoveView(view)`; `EnsurePipeline` adds one video chain per view; `SelectStream(view, kind, stream)`, `ResultOf(view, kind, result)`, `Apply` to every video chain, `Duration` from the view. `PlayerSession.AttachView()` / `DetachView()`; the page attaches in `OnStart`, detaches in `OnStop`; video menu items and video read surfaces go through the page's own view, audio/subtitle through the session | the pipeline already supports N chains, so this is app-side plumbing: what a page reads about the *picture* is its own chain, what it changes about the *sound* is the session's. Detaching the last view disposes the session | build + one page: parity with B1. The plural path is exercised by C1, one step later |
 
 ### Phase C — the second window (all in memory)
 
@@ -164,7 +173,7 @@ the end of every step, and the manual check named for the step performed before 
 
 ## 7. Definition of done for v1
 
-1. One `CoreEngine` serves every page attached to its session; a page owns no engine and no playback state of its
+1. One `PlayerSession` serves every page attached to it; a page owns no playback state of its
    own.
 2. "New window" opens a second page on the same session, selecting no video track, and the track it chooses is
    independent of the other page's.

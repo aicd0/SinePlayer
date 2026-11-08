@@ -21,12 +21,12 @@ internal static class SubtitleSourceLoader
 {
     private const string TAG = nameof(SubtitleSourceLoader);
 
-    public static async Task<OperationResult> AddAndSelect(CoreEngine engine, MediaModel media, IReadOnlyList<string> paths)
+    public static async Task<OperationResult> AddAndSelect(PlayerSession session, MediaModel media, IReadOnlyList<string> paths)
     {
         (MediaSource Source, SubtitleStreamInfo Stream)? chosen = null;
         foreach (string path in paths)
         {
-            MediaSource? source = await AddSource(engine, path);
+            MediaSource? source = await AddSource(session, path);
             if (source is null)
             {
                 continue;
@@ -47,31 +47,31 @@ internal static class SubtitleSourceLoader
             return OperationResultExt.Failure(TAG, "None of the chosen files holds a subtitle track.");
         }
 
-        OperationResult selected = await engine.SelectStream(MediaStreamKind.Subtitle, selection.Stream);
+        OperationResult selected = await session.SelectStream(MediaStreamKind.Subtitle, selection.Stream);
         if (!selected.IsSuccessful)
         {
             return selected;
         }
 
-        OperationResult<ReconcileResult> reconciled = await engine.Reconcile();
+        OperationResult<ReconcileResult> reconciled = await session.Reconcile();
         if (!reconciled.IsSuccessful)
         {
             return OperationResultExt.Failure(reconciled);
         }
 
-        OperationResult? built = engine.ResultOf(reconciled.Result, MediaStreamKind.Subtitle);
+        OperationResult? built = session.ResultOf(reconciled.Result, MediaStreamKind.Subtitle);
         if (built is { IsSuccessful: false })
         {
             return OperationResultExt.Failure(built);
         }
 
-        TrackSelection.Save(media, MediaStreamKind.Subtitle, engine.PlaybackInfo.Sources, selection.Source, selection.Stream);
+        TrackSelection.Save(media, MediaStreamKind.Subtitle, session.PlaybackInfo.Sources, selection.Source, selection.Stream);
         return OperationResult.Success();
     }
 
-    private static async Task<MediaSource?> AddSource(CoreEngine engine, string path)
+    private static async Task<MediaSource?> AddSource(PlayerSession session, string path)
     {
-        OperationResult<MediaSource> added = await engine.AddSource(path);
+        OperationResult<MediaSource> added = await session.AddSource(path);
         if (!added.IsSuccessful)
         {
             Logger.W(TAG, $"'{path}' could not be added: {added.Message}");

@@ -40,11 +40,11 @@ internal sealed class PlayerMenuContext
 
     public PlaybackModel.Builder? Playback { get; init; }
 
-    public CoreEngine? Engine { get; init; }
+    public PlayerSession? Session { get; init; }
 
     public Action<string>? PromptInfo { get; init; }
 
-    public IReadOnlyList<MediaSource> Sources => Engine?.PlaybackInfo.Sources ?? [];
+    public IReadOnlyList<MediaSource> Sources => Session?.PlaybackInfo.Sources ?? [];
 
     public IReadOnlyList<MediaStreamInfo>? Tracks(MediaStreamKind kind)
     {
@@ -67,17 +67,17 @@ internal sealed class PlayerMenuContext
     {
         return kind switch
         {
-            MediaStreamKind.Video => Engine?.PlaybackInfo.SelectedVideoStream,
-            MediaStreamKind.Audio => Engine?.PlaybackInfo.SelectedAudioStream,
-            MediaStreamKind.Subtitle => Engine?.PlaybackInfo.SelectedSubtitleStream,
+            MediaStreamKind.Video => Session?.PlaybackInfo.SelectedVideoStream,
+            MediaStreamKind.Audio => Session?.PlaybackInfo.SelectedAudioStream,
+            MediaStreamKind.Subtitle => Session?.PlaybackInfo.SelectedSubtitleStream,
             _ => null,
         };
     }
 
     public void AddSubtitleTracks()
     {
-        CoreEngine? engine = Engine;
-        if (engine is null)
+        PlayerSession? session = Session;
+        if (session is null)
         {
             return;
         }
@@ -90,7 +90,7 @@ internal sealed class PlayerMenuContext
                 return;
             }
 
-            OperationResult added = await SubtitleSourceLoader.AddAndSelect(engine, Media, [.. files.Select(file => file.Path)]);
+            OperationResult added = await SubtitleSourceLoader.AddAndSelect(session, Media, [.. files.Select(file => file.Path)]);
             if (!added.IsSuccessful)
             {
                 PromptInfo?.Invoke(added.Message);
@@ -118,36 +118,36 @@ internal sealed class PlayerMenuContext
 
     public void SelectTrack(MediaStreamKind kind, MediaStreamInfo? stream)
     {
-        CoreEngine? engine = Engine;
-        if (engine is null)
+        PlayerSession? session = Session;
+        if (session is null)
         {
             return;
         }
 
         CoroutineUtils.Run(async () =>
         {
-            OperationResult selected = await engine.SelectStream(kind, stream);
+            OperationResult selected = await session.SelectStream(kind, stream);
             if (!selected.IsSuccessful)
             {
                 PromptInfo?.Invoke(selected.Message);
                 return;
             }
 
-            OperationResult<ReconcileResult> reconciled = await engine.Reconcile();
+            OperationResult<ReconcileResult> reconciled = await session.Reconcile();
             if (!reconciled.IsSuccessful)
             {
                 PromptInfo?.Invoke(reconciled.Message);
                 return;
             }
 
-            OperationResult? built = engine.ResultOf(reconciled.Result, kind);
+            OperationResult? built = session.ResultOf(reconciled.Result, kind);
             if (built is { IsSuccessful: false })
             {
                 PromptInfo?.Invoke(built.Message);
                 return;
             }
 
-            TrackSelection.Save(Media, kind, engine.PlaybackInfo.Sources, SourceOf(stream), stream);
+            TrackSelection.Save(Media, kind, session.PlaybackInfo.Sources, SourceOf(stream), stream);
         });
     }
 
