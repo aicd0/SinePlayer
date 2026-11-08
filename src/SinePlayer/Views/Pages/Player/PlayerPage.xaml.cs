@@ -713,25 +713,27 @@ internal sealed partial class PlayerPage : BasePage
 
             if (video is not null)
             {
-                playing |= result.Video.IsSuccessful;
-                if (!result.Video.IsSuccessful)
+                OperationResult? videoResult = engine.ResultOf(result, MediaStreamKind.Video);
+                playing |= videoResult?.IsSuccessful == true;
+                if (videoResult is { IsSuccessful: false })
                 {
-                    PromptTemporary(result.Video.Message);
+                    PromptTemporary(videoResult.Message);
                 }
             }
 
             if (audio is not null)
             {
-                playing |= result.Audio.IsSuccessful;
-                if (!result.Audio.IsSuccessful)
+                OperationResult? audioResult = engine.ResultOf(result, MediaStreamKind.Audio);
+                playing |= audioResult?.IsSuccessful == true;
+                if (audioResult is { IsSuccessful: false })
                 {
-                    PromptTemporary(result.Audio.Message);
+                    PromptTemporary(audioResult.Message);
                 }
             }
 
-            if (subtitle is not null && !result.Subtitle.IsSuccessful)
+            if (subtitle is not null && engine.ResultOf(result, MediaStreamKind.Subtitle) is { IsSuccessful: false } subtitleFailure)
             {
-                PromptTemporary(result.Subtitle.Message);
+                PromptTemporary(subtitleFailure.Message);
             }
         }
 
@@ -1275,19 +1277,19 @@ internal sealed partial class PlayerPage : BasePage
 
         ReconcileResult result = reconciled.Result;
 
-        if (!result.Video.IsSuccessful)
+        if (engine.ResultOf(result, MediaStreamKind.Video) is { IsSuccessful: false } videoFailure)
         {
-            PromptTemporary(result.Video.Message);
+            PromptTemporary(videoFailure.Message);
         }
 
-        if (!result.Audio.IsSuccessful)
+        if (engine.ResultOf(result, MediaStreamKind.Audio) is { IsSuccessful: false } audioFailure)
         {
-            PromptTemporary(result.Audio.Message);
+            PromptTemporary(audioFailure.Message);
         }
 
-        if (!result.Subtitle.IsSuccessful)
+        if (engine.ResultOf(result, MediaStreamKind.Subtitle) is { IsSuccessful: false } subtitleFailure)
         {
-            PromptTemporary(result.Subtitle.Message);
+            PromptTemporary(subtitleFailure.Message);
         }
     }
 

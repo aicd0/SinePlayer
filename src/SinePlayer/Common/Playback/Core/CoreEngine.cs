@@ -219,12 +219,7 @@ internal sealed partial class CoreEngine : IDisposable
             return OperationResultExt.Failure(TAG, "There is nothing open to change a track of.");
         }
 
-        IPlaybackChain? chain = kind switch
-        {
-            MediaStreamKind.Video => _videoChain,
-            MediaStreamKind.Audio => _audioChain,
-            _ => _subtitleChain,
-        };
+        IPlaybackChain? chain = ChainOf(kind);
 
         if (chain is null)
         {
@@ -389,6 +384,41 @@ internal sealed partial class CoreEngine : IDisposable
         return _subtitlePanel;
     }
 
+    /// <summary>
+    /// What reconciling made of the chain of a kind, or null when this engine has no chain of that kind. A kind is how
+    /// this app speaks about tracks; the pipeline's answer is per chain, so the mapping lives here.
+    /// </summary>
+    public OperationResult? ResultOf(ReconcileResult result, MediaStreamKind kind)
+    {
+        IPlaybackChain? chain = ChainOf(kind);
+        if (chain is null)
+        {
+            return null;
+        }
+
+        if (chain is IVideoChain video)
+        {
+            return result.VideoResults[video];
+        }
+
+        if (chain is IAudioChain audio)
+        {
+            return result.AudioResults[audio];
+        }
+
+        return result.SubtitleResults[(ISubtitleChain)chain];
+    }
+
+    private IPlaybackChain? ChainOf(MediaStreamKind kind)
+    {
+        return kind switch
+        {
+            MediaStreamKind.Video => _videoChain,
+            MediaStreamKind.Audio => _audioChain,
+            _ => _subtitleChain,
+        };
+    }
+
     #endregion
 
     #region Pipeline
@@ -492,9 +522,9 @@ internal sealed partial class CoreEngine : IDisposable
             _pendingReconcile = true;
             Logger.W(TAG, $"The audio output could not be re-resolved: {reconciled.Message}");
         }
-        else if (!reconciled.Result.Audio.IsSuccessful)
+        else if (ResultOf(reconciled.Result, MediaStreamKind.Audio) is { IsSuccessful: false } audioFailure)
         {
-            Logger.W(TAG, $"The audio output could not be re-resolved: {reconciled.Result.Audio.Message}");
+            Logger.W(TAG, $"The audio output could not be re-resolved: {audioFailure.Message}");
         }
         else
         {

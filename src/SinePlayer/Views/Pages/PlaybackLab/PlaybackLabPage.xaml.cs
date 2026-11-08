@@ -497,12 +497,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             return;
         }
 
-        IPlaybackChain? chain = kind switch
-        {
-            MediaStreamKind.Video => pipeline.VideoChains[0],
-            MediaStreamKind.Audio => pipeline.AudioChains[0],
-            _ => pipeline.SubtitleChains[0],
-        };
+        IPlaybackChain chain = ChainOf(pipeline, kind);
 
         OperationResult selected = await pipeline.SelectStream(chain, choice.Stream);
         if (!selected.IsSuccessful)
@@ -518,7 +513,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
             else
             {
-                OperationResult built = reconciled.Result.For(kind);
+                OperationResult built = ResultOf(reconciled.Result, chain);
                 if (!built.IsSuccessful)
                 {
                     Logger.E(TAG, $"The track could not be played. {built.Message}");
@@ -622,11 +617,36 @@ internal sealed partial class PlaybackLabPage : BasePage
             return;
         }
 
-        OperationResult built = reconciled.Result.For(kind);
+        OperationResult built = ResultOf(reconciled.Result, ChainOf(pipeline, kind));
         if (!built.IsSuccessful)
         {
             Logger.E(TAG, $"{what} could not be changed. {built.Message}");
         }
+    }
+
+    private static IPlaybackChain ChainOf(PlaybackPipeline pipeline, MediaStreamKind kind)
+    {
+        return kind switch
+        {
+            MediaStreamKind.Video => pipeline.VideoChains[0],
+            MediaStreamKind.Audio => pipeline.AudioChains[0],
+            _ => pipeline.SubtitleChains[0],
+        };
+    }
+
+    private static OperationResult ResultOf(ReconcileResult result, IPlaybackChain chain)
+    {
+        if (chain is IVideoChain video)
+        {
+            return result.VideoResults[video];
+        }
+
+        if (chain is IAudioChain audio)
+        {
+            return result.AudioResults[audio];
+        }
+
+        return result.SubtitleResults[(ISubtitleChain)chain];
     }
 
     private static MediaSource? SourceOf(IReadOnlyList<MediaSource> sources, MediaStreamInfo? stream)

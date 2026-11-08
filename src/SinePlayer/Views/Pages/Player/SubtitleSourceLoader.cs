@@ -59,8 +59,8 @@ internal static class SubtitleSourceLoader
             return OperationResultExt.Failure(reconciled);
         }
 
-        OperationResult built = reconciled.Result.Subtitle;
-        if (!built.IsSuccessful)
+        OperationResult? built = engine.ResultOf(reconciled.Result, MediaStreamKind.Subtitle);
+        if (built is { IsSuccessful: false })
         {
             return OperationResultExt.Failure(built);
         }
