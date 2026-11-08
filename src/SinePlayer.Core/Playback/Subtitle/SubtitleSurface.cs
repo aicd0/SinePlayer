@@ -17,7 +17,7 @@ using Windows.Win32.Graphics.Dxgi;
 using Windows.Win32.Graphics.Dxgi.Common;
 using Windows.Win32.System.WinRT;
 
-namespace SinePlayer.Core.Playback.Backends.Win2D;
+namespace SinePlayer.Core.Playback.Subtitle;
 
 internal sealed partial class SubtitleSurface : IDisposable
 {
@@ -125,21 +125,7 @@ internal sealed partial class SubtitleSurface : IDisposable
     /// </summary>
     internal CanvasDevice EnsureCanvasDevice()
     {
-        if (_canvasDevice is null)
-        {
-            if (_d3dDevice is null)
-            {
-                OperationResult<D3D11Device> created = D3D11Device.Create();
-                if (!created.IsSuccessful)
-                {
-                    throw new InvalidOperationException(created.Message);
-                }
-
-                _d3dDevice = created.Result;
-            }
-
-            _canvasDevice = CanvasDevice.CreateFromDirect3D11Device(CreateWin2DDevice(_d3dDevice!));
-        }
+        _canvasDevice ??= CanvasDevice.CreateFromDirect3D11Device(CreateWin2DDevice(EnsureDevice()));
 
         return _canvasDevice;
     }
@@ -162,7 +148,7 @@ internal sealed partial class SubtitleSurface : IDisposable
 
         try
         {
-            if (_d3dDevice is null || _canvasDevice is null)
+            if (_canvasDevice is null)
             {
                 EnsureCanvasDevice();
             }
@@ -179,7 +165,7 @@ internal sealed partial class SubtitleSurface : IDisposable
 
             if (_swapChain is null)
             {
-                OperationResult<D3D11SwapChain> created = D3D11SwapChain.Create(_d3dDevice!, width, height, scale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_PREMULTIPLIED);
+                OperationResult<D3D11SwapChain> created = D3D11SwapChain.Create(EnsureDevice(), width, height, scale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_PREMULTIPLIED);
                 if (!created.IsSuccessful)
                 {
                     return OperationResult.Failure(created);
@@ -246,6 +232,27 @@ internal sealed partial class SubtitleSurface : IDisposable
         }
     }
 
+    /// <summary>
+    /// The device this surface draws through, taking a share of the shared one on first use. Every surface draws
+    /// through the same Direct3D device; what each one has of its own is the device Win2D wraps it in.
+    /// </summary>
+    private D3D11Device EnsureDevice()
+    {
+        if (_d3dDevice is not { } device)
+        {
+            OperationResult<D3D11Device> rented = SharedSubtitleDevice.Rent();
+            if (!rented.IsSuccessful)
+            {
+                throw new InvalidOperationException(rented.Message);
+            }
+
+            device = rented.Result;
+            _d3dDevice = device;
+        }
+
+        return device;
+    }
+
     private static bool ScaleChanged(D3D11SwapChain swapChain, int width, int height, double scale)
     {
         return swapChain.Width != width || swapChain.Height != height || swapChain.CompositionScale != scale;
@@ -273,7 +280,11 @@ internal sealed partial class SubtitleSurface : IDisposable
         ReleaseChain();
         _canvasDevice?.Dispose();
         _canvasDevice = null;
-        _d3dDevice?.Dispose();
-        _d3dDevice = null;
+
+        if (_d3dDevice is not null)
+        {
+            _d3dDevice = null;
+            SharedSubtitleDevice.Return();
+        }
     }
 }

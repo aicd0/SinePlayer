@@ -20,6 +20,9 @@ internal sealed partial class D3D11Device : IDisposable
     /// <summary><c>D3D11_SDK_VERSION</c>.</summary>
     private const uint SdkVersion = 7;
 
+    /// <summary><c>ID3D11Multithread::SetMultithreadProtected</c> in the vtable.</summary>
+    private const int SetMultithreadProtectedSlot = 5;
+
     /// <summary>
     /// <c>IID_ID3D11Multithread</c>. The interface is declared in <c>d3d11_4.h</c> and is not bound by the projection, so
     /// it is reached through its vtable: three <c>IUnknown</c> slots, then <c>Enter</c>, <c>Leave</c>, and the two
@@ -27,8 +30,13 @@ internal sealed partial class D3D11Device : IDisposable
     /// </summary>
     private static readonly Guid sMultithreadId = new("9B7E4E00-342C-4106-A19F-4F2704F689F0");
 
-    /// <summary><c>ID3D11Multithread::SetMultithreadProtected</c> in the vtable.</summary>
-    private const int SetMultithreadProtectedSlot = 5;
+    private static int _aliveDeviceCount;
+
+    /// <summary>
+    /// How many Direct3D 11 devices are alive anywhere in the process. A device is a driver instance, so "the second
+    /// chain with subtitles costs no second device" is a number a test can count rather than a hope.
+    /// </summary>
+    internal static int AliveDeviceCount => Volatile.Read(ref _aliveDeviceCount);
 
     private static readonly D3D_FEATURE_LEVEL[] sFeatureLevels =
     [
@@ -154,6 +162,7 @@ internal sealed partial class D3D11Device : IDisposable
         FeatureLevel = featureLevel;
         DriverType = driverType;
 
+        Interlocked.Increment(ref _aliveDeviceCount);
         EnableMultithreadProtection(_nativeDevice);
     }
 
@@ -177,6 +186,8 @@ internal sealed partial class D3D11Device : IDisposable
         }
 
         _disposed = true;
+
+        Interlocked.Decrement(ref _aliveDeviceCount);
 
         nint nativeDevice = _nativeDevice;
         _nativeDevice = 0;
