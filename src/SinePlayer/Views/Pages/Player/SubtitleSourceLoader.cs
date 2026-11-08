@@ -21,7 +21,7 @@ internal static class SubtitleSourceLoader
 {
     private const string TAG = nameof(SubtitleSourceLoader);
 
-    public static async Task<OperationResult> AddAndSelect(PlayerSession session, MediaModel media, IReadOnlyList<string> paths)
+    public static async Task<OperationResult> AddAndSelect(PlayerSession session, PlayerView view, MediaModel media, IReadOnlyList<string> paths)
     {
         (MediaSource Source, SubtitleStreamInfo Stream)? chosen = null;
         foreach (string path in paths)
@@ -47,7 +47,7 @@ internal static class SubtitleSourceLoader
             return OperationResultExt.Failure(TAG, "None of the chosen files holds a subtitle track.");
         }
 
-        OperationResult selected = await session.SelectStream(MediaStreamKind.Subtitle, selection.Stream);
+        OperationResult selected = await session.SelectSubtitleStream(view, selection.Stream);
         if (!selected.IsSuccessful)
         {
             return selected;
@@ -59,7 +59,7 @@ internal static class SubtitleSourceLoader
             return OperationResultExt.Failure(reconciled);
         }
 
-        OperationResult? built = session.ResultOf(reconciled.Result, MediaStreamKind.Subtitle);
+        OperationResult? built = reconciled.Result.Subtitle(view);
         if (built is { IsSuccessful: false })
         {
             return OperationResultExt.Failure(built);

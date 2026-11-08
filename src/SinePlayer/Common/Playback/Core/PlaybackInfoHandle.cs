@@ -9,26 +9,25 @@ using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Common.Playback.Core;
 
-internal sealed class PlaybackInfoHandle
+internal sealed class PlaybackInfoHandle(PlayerSession session)
 {
-    private volatile PlaybackPipeline? _pipeline;
+    private readonly PlayerSession _session = session;
     private volatile IVideoChain? _video;
-    private volatile IAudioChain? _audio;
     private volatile ISubtitleChain? _subtitle;
 
-    public MediaInfo? Media => _pipeline?.Sources is [MediaSource first, ..] ? first.Info : null;
+    public MediaInfo? Media => _session.Sources is [MediaSource first, ..] ? first.Info : null;
 
     public VideoStreamInfo? SelectedVideoStream => _video?.SelectedStream;
 
-    public AudioStreamInfo? SelectedAudioStream => _audio?.SelectedStream;
+    public AudioStreamInfo? SelectedAudioStream => Audio?.SelectedStream;
 
     public SubtitleStreamInfo? SelectedSubtitleStream => _subtitle?.SelectedStream;
 
-    public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
+    public MediaEngineState State => _session.State;
 
-    public string? Error => _pipeline?.Error;
+    public string? Error => _session.Error;
 
-    public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;
+    public TimeSpan Position => _session.Position;
 
     public long PresentedFrames => _video?.PresentedFrameCount ?? 0;
 
@@ -40,15 +39,15 @@ internal sealed class PlaybackInfoHandle
 
     public double AverageVideoRenderMilliseconds => _video?.AverageRenderMilliseconds ?? 0;
 
-    public long AudioUnderruns => _audio?.Underruns ?? 0;
+    public long AudioUnderruns => Audio?.Underruns ?? 0;
 
     public string? VideoDecoderName => _video?.DecoderName;
 
     public string? VideoRendererName => _video?.RendererName;
 
-    public string? AudioDecoderName => _audio?.DecoderName;
+    public string? AudioDecoderName => Audio?.DecoderName;
 
-    public string? AudioRendererName => _audio?.RendererName;
+    public string? AudioRendererName => Audio?.RendererName;
 
     public string? SubtitleDecoderName => _subtitle?.DecoderName;
 
@@ -56,21 +55,19 @@ internal sealed class PlaybackInfoHandle
 
     public bool IsVideoHardwareAccelerated => _video?.IsHardwareAccelerated ?? false;
 
-    public bool IsAudioHardwareAccelerated => _audio?.IsHardwareAccelerated ?? false;
+    public bool IsAudioHardwareAccelerated => Audio?.IsHardwareAccelerated ?? false;
 
-    internal void Attach(PlaybackPipeline pipeline, IVideoChain video, IAudioChain? audio, ISubtitleChain? subtitle)
+    private IAudioChain? Audio => _session.AudioChains is [IAudioChain first, ..] ? first : null;
+
+    internal void Attach(IVideoChain? video, ISubtitleChain? subtitle)
     {
         _video = video;
-        _audio = audio;
         _subtitle = subtitle;
-        _pipeline = pipeline;
     }
 
     internal void Detach()
     {
-        _pipeline = null;
         _video = null;
-        _audio = null;
         _subtitle = null;
     }
 }

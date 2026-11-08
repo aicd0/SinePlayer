@@ -12,75 +12,105 @@ using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Common.Playback.Core;
 
-/// <summary>
-/// One page's picture: the panel it is shown in, the render target over that panel, and the video chain that decodes
-/// into it — with what that chain is asked to do and what it reports.
-/// <para>
-/// It is the unit a page holds, so that several pages can read and change their own picture of one playback without
-/// reaching for each other's. The sound and the words are not here: they belong to the session that owns the engine,
-/// because one playback has one of each.
-/// </para>
-/// </summary>
-internal sealed class PlayerView : IDisposable
+internal sealed partial class PlayerView(PlayerSession session) : IDisposable
 {
-    private readonly PlaybackInfoHandle _playbackInfo = new();
+    private readonly PlaybackInfoHandle _playbackInfo = new(session);
 
-    private SwapChainPanel? _panel;
-    private SwapChainPanelRenderTarget? _renderTarget;
-    private IVideoChain? _chain;
-    private VideoTransform _transform = VideoTransform.Identity;
+    private SwapChainPanel? _videoPanel;
+    private SwapChainPanelRenderTarget? _videoRenderTarget;
+    private IVideoChain? _videoChain;
+    private VideoTransform _videoTransform = VideoTransform.Identity;
 
-    /// <summary>The panel the page puts in its window, created on first use.</summary>
-    public UIElement Panel => _panel ??= new SwapChainPanel();
+    private SwapChainPanel? _subtitlePanel;
+    private SwapChainPanelRenderTarget? _subtitleRenderTarget;
+    private ISubtitleChain? _subtitleChain;
+    private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
 
-    /// <summary>What this view reports about the picture it is playing, and the sound and words it shares.</summary>
-    public PlaybackInfoHandle PlaybackInfo => _playbackInfo;
-
-    public IVideoChain? Chain => _chain;
+    public UIElement VideoPanel => _videoPanel ??= new SwapChainPanel();
 
     /// <summary>
-    /// How the picture is fitted and turned. Kept here rather than on the chain so that a view created before the
-    /// pipeline exists still remembers what it was asked for, and applies it when the chain appears.
+    /// The panel the words are drawn into, created on first use. Its opacity has to stay below 1: at 1 the two swap
+    /// chain panels are composed as opaque planes, and once the picture's chain is rebound, which is what switching the
+    /// video track off and on does, the plane underneath stops being composed at all, so the picture is gone from the
+    /// window while its chain keeps attaching and presenting correct frames. Anything below 1 puts this surface in an
+    /// alpha blended layer instead, which composes correctly, and a tenth of a percent of transparency is imperceptible.
     /// </summary>
-    public VideoTransform Transform
+    public UIElement SubtitlePanel => _subtitlePanel ??= new SwapChainPanel { IsHitTestVisible = false, Opacity = 0.999 };
+
+    public PlaybackInfoHandle PlaybackInfo => _playbackInfo;
+
+    public IVideoChain? VideoChain => _videoChain;
+
+    public ISubtitleChain? SubtitleChain => _subtitleChain;
+
+    public VideoTransform VideoTransform
     {
-        get => _transform;
+        get => _videoTransform;
         set
         {
-            if (_transform == value)
+            if (_videoTransform == value)
             {
                 return;
             }
 
-            _transform = value;
-            if (_chain is { } chain)
+            _videoTransform = value;
+
+            if (_videoChain is { } chain)
             {
                 chain.Transform = value;
             }
         }
     }
 
-    /// <summary>The render target over this view's panel, created on first use, for the chain this view is given.</summary>
-    public SwapChainPanelRenderTarget EnsureRenderTarget()
+    public SubtitlePresentation SubtitlePresentation
     {
-        _renderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)Panel);
-        return _renderTarget;
+        get => _subtitlePresentation;
+        set
+        {
+            if (_subtitlePresentation == value)
+            {
+                return;
+            }
+
+            _subtitlePresentation = value;
+
+            if (_subtitleChain is { } chain)
+            {
+                chain.Presentation = value;
+            }
+        }
     }
 
-    /// <summary>
-    /// Ties this view to what the pipeline built for it. The transform it was asked for is applied here, because this
-    /// is the first moment there is a chain to apply it to.
-    /// </summary>
-    public void Attach(PlaybackPipeline pipeline, IVideoChain chain, IAudioChain? audio, ISubtitleChain? subtitle)
+    public SwapChainPanelRenderTarget EnsureVideoRenderTarget()
     {
-        _chain = chain;
-        chain.Transform = _transform;
-        _playbackInfo.Attach(pipeline, chain, audio, subtitle);
+        _videoRenderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)VideoPanel);
+        return _videoRenderTarget;
+    }
+
+    public SwapChainPanelRenderTarget EnsureSubtitleRenderTarget()
+    {
+        _subtitleRenderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)SubtitlePanel);
+        return _subtitleRenderTarget;
+    }
+
+    public void AttachVideo(IVideoChain video)
+    {
+        _videoChain = video;
+        video.Transform = _videoTransform;
+        _playbackInfo.Attach(_videoChain, _subtitleChain);
+    }
+
+    public void AttachSubtitle(ISubtitleChain subtitle)
+    {
+        _subtitleChain = subtitle;
+        subtitle.Presentation = _subtitlePresentation;
+        _playbackInfo.Attach(_videoChain, _subtitleChain);
     }
 
     public void Detach()
     {
-        _chain = null;
+        _videoChain = null;
+        _subtitleChain = null;
         _playbackInfo.Detach();
     }
 
@@ -88,9 +118,14 @@ internal sealed class PlayerView : IDisposable
     {
         Detach();
 
-        _renderTarget?.DetachSurface();
-        _renderTarget?.Dispose();
-        _renderTarget = null;
-        _panel = null;
+        _videoRenderTarget?.DetachSurface();
+        _videoRenderTarget?.Dispose();
+        _videoRenderTarget = null;
+        _videoPanel = null;
+
+        _subtitleRenderTarget?.DetachSurface();
+        _subtitleRenderTarget?.Dispose();
+        _subtitleRenderTarget = null;
+        _subtitlePanel = null;
     }
 }
