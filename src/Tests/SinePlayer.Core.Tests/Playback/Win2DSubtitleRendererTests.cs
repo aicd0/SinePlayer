@@ -11,6 +11,7 @@ using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
+using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.Win2D;
 
 using Windows.UI;
@@ -766,6 +767,39 @@ public class Win2DSubtitleRendererTests
         }
     }
 
+    /// <summary>
+    /// Two subtitle chains are two surfaces, and they draw through one Direct3D device: a device is a driver instance
+    /// with its own command queue, and a second one per chain buys nothing — a device is meant to be shared, and this
+    /// one is multithread protected. What each surface keeps to itself is the device Win2D wraps it in, so no two
+    /// render threads ever drive one drawing device.
+    /// </summary>
+    [Test]
+    public void SharesOneDeviceBetweenSurfaces()
+    {
+        int baseline = D3D11Device.AliveDeviceCount;
+
+        Win2DSubtitleRenderer first = new();
+        Win2DSubtitleRenderer second = new();
+        try
+        {
+            CanvasDevice firstDevice = EnsureCanvasDevice(first);
+            CanvasDevice secondDevice = EnsureCanvasDevice(second);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(D3D11Device.AliveDeviceCount - baseline, Is.EqualTo(1), "two surfaces, one Direct3D device");
+                Assert.That(firstDevice, Is.Not.SameAs(secondDevice), "each draws through its own, so the sharing stops at the device");
+            }
+        }
+        finally
+        {
+            first.Dispose();
+            second.Dispose();
+        }
+
+        Assert.That(D3D11Device.AliveDeviceCount, Is.EqualTo(baseline), "and the device goes with the last surface that held it");
+    }
+
     /// <summary>How many pixels carry anything at all, in the blue-green-red-alpha buffer the surface reads back as.</summary>
     private static int DrawnPixels(byte[] pixels)
     {
@@ -779,6 +813,19 @@ public class Win2DSubtitleRendererTests
         }
 
         return drawn;
+    }
+
+    private static CanvasDevice EnsureCanvasDevice(Win2DSubtitleRenderer renderer)
+    {
+        try
+        {
+            return renderer.EnsureCanvasDevice();
+        }
+        catch (InvalidOperationException exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            throw;
+        }
     }
 
     private static SubtitleStreamInfo Stream()
