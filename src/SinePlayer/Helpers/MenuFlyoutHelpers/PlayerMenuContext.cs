@@ -140,8 +140,8 @@ internal sealed class PlayerMenuContext
                 return;
             }
 
-            OperationResult built = reconciled.Result.For(kind);
-            if (!built.IsSuccessful)
+            OperationResult? built = engine.ResultOf(reconciled.Result, kind);
+            if (built is { IsSuccessful: false })
             {
                 PromptInfo?.Invoke(built.Message);
                 return;

@@ -3160,8 +3160,8 @@ public class PlaybackPipelineTests
                 Assert.That(result.AudioResults.Keys, Is.EqualTo(pipeline.AudioChains), "one entry per audio chain, keyed by the chain");
                 Assert.That(result.SubtitleResults.Keys, Is.EqualTo(pipeline.SubtitleChains), "one entry per subtitle chain, keyed by the chain");
                 Assert.That(result.VideoResults[pipeline.VideoChains[0]].IsSuccessful, Is.False, "the chain that could not be built says so");
-                Assert.That(result.Audio.IsSuccessful, Is.True, "another kind's chain is untouched by it");
-                Assert.That(result.Video.Message, Is.Not.Empty, "the failure carries the reason the decoder gave");
+                Assert.That(result.AudioResults[pipeline.AudioChains[0]].IsSuccessful, Is.True, "another kind's chain is untouched by it");
+                Assert.That(result.VideoResults[pipeline.VideoChains[0]].Message, Is.Not.Empty, "the failure carries the reason the decoder gave");
             }
         }
         finally
@@ -3458,7 +3458,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(swapped.Result.Video.IsSuccessful, Is.False, "a renderer that cannot be made is the caller's failure to see");
+                Assert.That(swapped.Result.VideoResults[pipeline.VideoChains[0]].IsSuccessful, Is.False, "a renderer that cannot be made is the caller's failure to see");
                 Assert.That(pipeline.VideoChains[0].RendererName, Is.EqualTo("first"), "the running renderer is untouched");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
             }
@@ -3543,7 +3543,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(swapped.Result.Audio.IsSuccessful, Is.False, "a device that cannot be opened is the caller's failure to see");
+                Assert.That(swapped.Result.AudioResults[pipeline.AudioChains[0]].IsSuccessful, Is.False, "a device that cannot be opened is the caller's failure to see");
                 Assert.That(pipeline.AudioChains[0].RendererName, Is.EqualTo("first"), "the playing device is untouched");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
             }
@@ -3725,7 +3725,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(reconciled.Result.Video.IsSuccessful, Is.False, "a replacement that cannot be built is the caller's to see");
+                Assert.That(reconciled.Result.VideoResults[pipeline.VideoChains[0]].IsSuccessful, Is.False, "a replacement that cannot be built is the caller's to see");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a failed replacement is not a playback failure");
             }
 
@@ -5169,8 +5169,8 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(reconciled.Result.Video.IsSuccessful, Is.False, "a stream no decoder can take is the caller's failure to see");
-                Assert.That(reconciled.Result.Audio.IsSuccessful, Is.True, "the sound has a device of its own to build");
+                Assert.That(reconciled.Result.VideoResults[pipeline.VideoChains[0]].IsSuccessful, Is.False, "a stream no decoder can take is the caller's failure to see");
+                Assert.That(reconciled.Result.AudioResults[pipeline.AudioChains[0]].IsSuccessful, Is.True, "the sound has a device of its own to build");
                 Assert.That(pipeline.VideoChains[0].SelectedStream?.Index, Is.EqualTo(second.Index), "the choice is recorded, refused or not");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the picture that is playing is untouched");
             }
@@ -6689,14 +6689,14 @@ public class PlaybackPipelineTests
         }
 
         ReconcileResult result = reconciled.Result;
-        if (info.VideoStreams.Count > 0 && !result.Video.IsSuccessful)
+        if (info.VideoStreams.Count > 0 && result.VideoResults[pipeline.VideoChains[0]] is { IsSuccessful: false } videoFailure)
         {
-            return result.Video;
+            return videoFailure;
         }
 
-        if (info.AudioStreams.Count > 0 && !result.Audio.IsSuccessful)
+        if (info.AudioStreams.Count > 0 && result.AudioResults[pipeline.AudioChains[0]] is { IsSuccessful: false } audioFailure)
         {
-            return result.Audio;
+            return audioFailure;
         }
 
         return OperationResult.Success();
@@ -6730,7 +6730,8 @@ public class PlaybackPipelineTests
     /// </summary>
     private static OperationResult Select(PlaybackPipeline pipeline, MediaStreamKind kind, MediaStreamInfo? stream)
     {
-        OperationResult selected = Await(pipeline.SelectStream(ChainOf(pipeline, kind), stream));
+        IPlaybackChain chain = ChainOf(pipeline, kind);
+        OperationResult selected = Await(pipeline.SelectStream(chain, stream));
         if (!selected.IsSuccessful)
         {
             return selected;
@@ -6742,14 +6743,24 @@ public class PlaybackPipelineTests
             return OperationResult.Failure(reconciled);
         }
 
-        // The reconcile happened; what the chain for the chosen kind made of it is the answer about that kind.
-        ReconcileResult result = reconciled.Result;
-        return kind switch
+        // The reconcile happened; what the chain that was chosen made of it is the answer about that choice.
+        return ResultOf(reconciled.Result, chain);
+    }
+
+    /// <summary>What reconciling made of one chain, which is what the results are keyed by.</summary>
+    private static OperationResult ResultOf(ReconcileResult result, IPlaybackChain chain)
+    {
+        if (chain is IVideoChain video)
         {
-            MediaStreamKind.Video => result.Video,
-            MediaStreamKind.Audio => result.Audio,
-            _ => result.Subtitle,
-        };
+            return result.VideoResults[video];
+        }
+
+        if (chain is IAudioChain audio)
+        {
+            return result.AudioResults[audio];
+        }
+
+        return result.SubtitleResults[(ISubtitleChain)chain];
     }
 
     /// <summary>The chain of a kind a test means when it speaks of the kind rather than of a chain.</summary>
