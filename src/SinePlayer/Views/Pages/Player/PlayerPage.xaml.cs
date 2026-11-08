@@ -28,12 +28,10 @@ using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Lifecycle;
-using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
-using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
@@ -115,7 +113,7 @@ internal sealed partial class PlayerPage : BasePage
         _sessionId = sessionId;
         PlayerSession session = EnsureSession();
         _view = session.CreateView();
-        ViewModel.Initialize(PageActionHandler, OpenMedia, session.Playback);
+        ViewModel.Initialize(PageActionHandler, session.Playback);
         ObserveData();
         UpdateKeyboardAccelerators();
 
@@ -134,7 +132,7 @@ internal sealed partial class PlayerPage : BasePage
         }
         else
         {
-            ViewModel.Adopt();
+            ViewModel.ShowMedia(session.CurrentMedia);
             ShowState(session.State, session.Error);
             Session_PositionChanged();
         }
@@ -160,7 +158,6 @@ internal sealed partial class PlayerPage : BasePage
     protected override void OnStop()
     {
         base.OnStop();
-        ViewModel.SavePosition();
         ViewModel.Destory();
         ReleaseSession();
         StopPromptTimer();
@@ -174,10 +171,14 @@ internal sealed partial class PlayerPage : BasePage
     {
         var bar = new PlayerNavigationBar();
         bar.Initialize(GetMainWindowAbility());
-        bar.FavoriteChanged += isFavorite => ViewModel.SetFavorite(isFavorite, true);
+        bar.FavoriteChanged += isFavorite =>
+        {
+            ViewModel.SetFavorite(isFavorite);
+            _session?.SetFavorite(isFavorite);
+        };
         bar.MediaInfoRequested += OpenMediaInfoPane;
         bar.PlaybackInfoRequested += ShowPlaybackInfo;
-        bar.PlayerSettingsChanged += ApplyPlayerSettings;
+        bar.PlayerSettingsChanged += settings => CoroutineUtils.Run(() => ApplyPlayerSettings(settings));
         GetMainPageAbility().SetCustomCenteredNavigationBar(bar);
         _navigationBar = bar;
     }
@@ -538,7 +539,7 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        if (ViewModel.IsLoading)
+        if (ViewModel.PlayerStatus == PlayerPageViewModel.PlayerStatusEnum.Loading)
         {
             Logger.W(TAG, "Subtitles were dropped while the player was loading, so they were not added.");
             return;
@@ -563,123 +564,82 @@ internal sealed partial class PlayerPage : BasePage
     private PlayerView? _view;
     private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
 
-    private async Task<OperationResult> OpenMedia(MediaModel media, long startPositionMs)
+    /// <summary>
+    /// The playback moved to a media, and the session has opened it. This page's part is what only it can do: the media
+    /// it shows, the picture and the words its own view draws, and whether the playback starts. What the media records
+    /// about being played, and what comes after it ends, are the session's. The work here is this page's own, so a
+    /// media that has already been replaced by the time an await returns is left alone.
+    /// </summary>
+    private void Session_MediaChanged(MediaModel? media, OperationResult opened)
     {
-        ViewModel.SavePosition();
-
-        PlayerSession session = EnsureSession();
-        PlayerView? view = _view;
-        if (view is null)
+        CoroutineUtils.Run(async () =>
         {
-            return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': the page has no picture to draw into.");
-        }
-
-        if (!session.Sources.Any(source => source.Locator.Value == media.Location))
-        {
-            await session.Reset();
-
-            var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
-            ApplyPlayerSettings(mediaSettings);
-
-            OperationResult<MediaSource> loaded = await session.AddSource(media.Location);
-            if (!loaded.IsSuccessful)
+            PlayerSession? session = _session;
+            PlayerView? view = _view;
+            if (session is null || view is null)
             {
-                return OperationResult.Failure(loaded);
+                return;
             }
 
-            OperationResult selected = await SelectTracks(session, view, media);
-            if (!selected.IsSuccessful)
+            ViewModel.PositionLiveData.Emit(0);
+            ViewModel.ShowMedia(media);
+
+            if (media is null)
             {
-                return selected;
+                return;
             }
 
-            if (startPositionMs > 0)
+            if (session.CurrentMedia != media)
+            {
+                return;
+            }
+
+            if (!opened.IsSuccessful)
+            {
+                ViewModel.PlayerStatusLiveData.Emit(new()
+                {
+                    Status = PlayerPageViewModel.PlayerStatusEnum.Error,
+                    Description = opened.Message,
+                });
+                return;
+            }
+
+            ViewModel.PlayerStatusLiveData.Emit(new() { Status = PlayerPageViewModel.PlayerStatusEnum.Loading });
+
+            await ApplyPlayerSettings(PlayerSettingsModel.LoadFromMedia(media));
+
+            OperationResult played = await SelectTracks(session, view, media);
+            if (played.IsSuccessful)
+            {
+                ViewModel.PlayerStatusLiveData.Emit(new() { Status = PlayerPageViewModel.PlayerStatusEnum.Working });
+            }
+            else
+            {
+                ViewModel.PlayerStatusLiveData.Emit(new()
+                {
+                    Status = PlayerPageViewModel.PlayerStatusEnum.Error,
+                    Description = played.Message,
+                });
+            }
+
+            if (session.StartPositionMs > 0)
             {
                 SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
-                session.Seek(TimeSpan.FromMilliseconds(startPositionMs), mode);
+                session.Seek(TimeSpan.FromMilliseconds(session.StartPositionMs), mode);
             }
 
             StartPlaybackOnOpen(session);
-        }
 
-        ViewModel.SetDuration(session.Duration.Ticks / TimeSpan.TicksPerMillisecond);
-        ViewModel.PositionLiveData.Emit(session.Position.Ticks / TimeSpan.TicksPerMillisecond);
-        return OperationResult.Success();
+            ViewModel.SetDuration(session.Duration.Ticks / TimeSpan.TicksPerMillisecond);
+            ViewModel.PositionLiveData.Emit(session.Position.Ticks / TimeSpan.TicksPerMillisecond);
+        });
     }
 
     private async Task<OperationResult> SelectTracks(PlayerSession session, PlayerView view, MediaModel media)
     {
-        static T? DefaultTrack<T>(IReadOnlyList<T>? streams) where T : MediaStreamInfo
-        {
-            if (streams is null || streams.Count == 0)
-            {
-                return null;
-            }
-
-            foreach (T stream in streams)
-            {
-                if (stream.IsDefault)
-                {
-                    return stream;
-                }
-            }
-
-            return streams[0];
-        }
-
-        // Add external sources
-        foreach (MediaStreamKind kind in (MediaStreamKind[])[MediaStreamKind.Video, MediaStreamKind.Audio, MediaStreamKind.Subtitle])
-        {
-            TrackSelection.Preference? preference = TrackSelection.Load(media, kind, session.Sources);
-            if (preference is null || !preference.Enabled || preference.Stream is not null)
-            {
-                continue;
-            }
-
-            if (session.Sources.Any(source => source.Locator.Value == preference.Path))
-            {
-                continue;
-            }
-
-            OperationResult<MediaSource> added = await session.AddSource(preference.Path);
-            if (!added.IsSuccessful)
-            {
-                Logger.W(TAG, $"The chosen {kind} track could not be restored from '{preference.Path}'. {added.Message}");
-            }
-        }
-
-        foreach (string path in await FindSameNameSubtitlesAsync(media.Location))
-        {
-            OperationResult<MediaSource> added = await session.AddSource(path);
-            if (!added.IsSuccessful)
-            {
-                Logger.W(TAG, $"'{path}' could not be imported: {added.Message}");
-            }
-        }
-
-        IReadOnlyList<MediaSource> sources = session.Sources;
-        if (sources.Count == 0)
-        {
-            return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': it opened no media.");
-        }
-
-        IReadOnlyList<VideoStreamInfo> videoStreams = [.. sources.SelectMany(source => source.Info.VideoStreams)];
-        IReadOnlyList<AudioStreamInfo> audioStreams = [.. sources.SelectMany(source => source.Info.AudioStreams)];
-        IReadOnlyList<SubtitleStreamInfo> subtitleStreams = [.. sources.SelectMany(source => source.Info.SubtitleStreams)];
         List<string> unplayable = [];
 
-        // Select video track
-        MediaStreamInfo? video = null;
-        TrackSelection.Preference? videoChoice = TrackSelection.Load(media, MediaStreamKind.Video, sources);
-        if (videoChoice is null)
-        {
-            video = DefaultTrack(videoStreams);
-        }
-        else if (videoChoice.Enabled)
-        {
-            video = videoChoice.Stream ?? DefaultTrack(videoStreams);
-        }
-
+        MediaStreamInfo? video = TrackSelection.Resolve(media, MediaStreamKind.Video, session.Sources);
         if (video is not null)
         {
             OperationResult chosen = await session.SelectVideoStream(view, video);
@@ -689,39 +649,7 @@ internal sealed partial class PlayerPage : BasePage
             }
         }
 
-        // Select audio track
-        MediaStreamInfo? audio = null;
-        TrackSelection.Preference? audioChoice = TrackSelection.Load(media, MediaStreamKind.Audio, sources);
-        if (audioChoice is null)
-        {
-            audio = DefaultTrack(audioStreams);
-        }
-        else if (audioChoice.Enabled)
-        {
-            audio = audioChoice.Stream ?? DefaultTrack(audioStreams);
-        }
-
-        if (audio is not null)
-        {
-            OperationResult chosen = await session.SelectAudioStream(audio);
-            if (!chosen.IsSuccessful)
-            {
-                unplayable.Add($"the sound could not be played ({chosen.Message})");
-            }
-        }
-
-        // Select subtitle track
-        MediaStreamInfo? subtitle = null;
-        TrackSelection.Preference? subtitleChoice = TrackSelection.Load(media, MediaStreamKind.Subtitle, sources);
-        if (subtitleChoice is null)
-        {
-            subtitle = DefaultTrack(subtitleStreams);
-        }
-        else if (subtitleChoice.Enabled)
-        {
-            subtitle = subtitleChoice.Stream ?? DefaultTrack(subtitleStreams);
-        }
-
+        MediaStreamInfo? subtitle = TrackSelection.Resolve(media, MediaStreamKind.Subtitle, session.Sources);
         if (subtitle is not null)
         {
             OperationResult chosen = await session.SelectSubtitleStream(view, subtitle);
@@ -751,15 +679,7 @@ internal sealed partial class PlayerPage : BasePage
                 }
             }
 
-            if (audio is not null)
-            {
-                OperationResult? audioResult = result.Audio();
-                playing |= audioResult?.IsSuccessful == true;
-                if (audioResult is { IsSuccessful: false })
-                {
-                    PromptTemporary(audioResult.Message);
-                }
-            }
+            playing |= result.Audio()?.IsSuccessful == true;
 
             if (subtitle is not null && result.Subtitle(view) is { IsSuccessful: false } subtitleFailure)
             {
@@ -819,6 +739,7 @@ internal sealed partial class PlayerPage : BasePage
 
         session.StateChanged += Session_StateChanged;
         session.PositionChanged += Session_PositionChanged;
+        session.MediaChanged += Session_MediaChanged;
         _session = session;
         UpdateSubtitlePresentation();
 
@@ -845,6 +766,7 @@ internal sealed partial class PlayerPage : BasePage
 
         session.StateChanged -= Session_StateChanged;
         session.PositionChanged -= Session_PositionChanged;
+        session.MediaChanged -= Session_MediaChanged;
         PlayerSessionManager.Shared.Release(session.Id);
     }
 
@@ -852,16 +774,9 @@ internal sealed partial class PlayerPage : BasePage
     {
         ShowState(state, message);
 
-        switch (state)
+        if (state == MediaEngineState.Playing)
         {
-            case MediaEngineState.Playing:
-                UnholdOverlay();
-                break;
-            case MediaEngineState.Ended:
-                HandleMediaEnded();
-                break;
-            default:
-                break;
+            UnholdOverlay();
         }
     }
 
@@ -893,22 +808,6 @@ internal sealed partial class PlayerPage : BasePage
         }
 
         UpdateKeepScreenOn();
-    }
-
-    private void HandleMediaEnded()
-    {
-        ViewModel.CompleteMedia();
-
-        if (ViewModel.Playback.RepeatMode == RepeatMode.One)
-        {
-            _session?.Play();
-            return;
-        }
-
-        if (AppSettingsModel.AutoPlayNext)
-        {
-            ViewModel.Next();
-        }
     }
 
     #endregion
@@ -1281,7 +1180,7 @@ internal sealed partial class PlayerPage : BasePage
         ViewModel.SetMute(isMuted);
     }
 
-    private async void ApplyPlayerSettings(PlayerSettingsModel settings)
+    private async Task ApplyPlayerSettings(PlayerSettingsModel settings)
     {
         PlayerSession? session = _session;
         PlayerView? view = _view;
@@ -1504,7 +1403,7 @@ internal sealed partial class PlayerPage : BasePage
                 _session?.Pause();
             }
 
-            ViewModel.SavePosition();
+            ViewModel.Next();
         }
 
         if (IsResumed && _playbackPendingOnActivate)
@@ -1640,49 +1539,6 @@ internal sealed partial class PlayerPage : BasePage
     #endregion
 
     #region Utilities
-
-    private static async Task<IReadOnlyList<string>> FindSameNameSubtitlesAsync(string mediaPath)
-    {
-        if (string.IsNullOrEmpty(mediaPath))
-        {
-            return [];
-        }
-
-        string? folder = Path.GetDirectoryName(mediaPath);
-        string stem = Path.GetFileNameWithoutExtension(mediaPath);
-        if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(stem))
-        {
-            return [];
-        }
-
-        List<string> candidates = await TaskDispatcher.DefaultThreadPool.Submit(() =>
-        {
-            List<string> found = [];
-            try
-            {
-                foreach (string path in Directory.EnumerateFiles(folder, "*", SearchOption.TopDirectoryOnly))
-                {
-                    if (!AppInfoProvider.IsSupportedSubtitleExtension(Path.GetExtension(path)))
-                    {
-                        continue;
-                    }
-
-                    if (string.Equals(Path.GetFileNameWithoutExtension(path), stem, StringComparison.OrdinalIgnoreCase))
-                    {
-                        found.Add(path);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.W(TAG, $"The folder '{folder}' could not be listed for subtitles: {ex.Message}");
-            }
-
-            return found;
-        });
-
-        return [.. candidates.OrderBy(path => StringUtils.SmartFileNameKeySelector(Path.GetFileName(path)), StringUtils.SmartFileNameComparer)];
-    }
 
     private IMainPageAbilityForTab GetMainPageAbility()
     {

@@ -3,28 +3,21 @@
 
 using System;
 using System.ComponentModel;
-using System.Threading.Tasks;
 
 using SinePlayer.Common.Actions;
 using SinePlayer.Common.Localization;
-using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Lifecycle;
-using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
 using SinePlayer.Data.Tables;
-
 namespace SinePlayer.Views.Pages.Player;
 
 internal partial class PlayerPageViewModel : INotifyPropertyChanged
 {
     #region Constructor
 
-    private const long ALMOST_ENDED_THRESHOLD_MS = 5000;
-    private const long POSITION_SAVE_INTERVAL = 5000;
     private const long POSITION_UI_INTERVAL = 200;
-    private const int VOLUME_SAVE_DELAY_MS = 500;
 
     private ActionHandler _actionHandler = ActionHandler.Dummy;
 
@@ -34,8 +27,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     private long _positionMs;
     private long _durationMs;
     private long _lastPositionUiTicks;
-    private long _lastPositionSaveTicks;
-    private bool _volumeSaveScheduled;
 
     public PlayerPageViewModel() { }
 
@@ -194,14 +185,31 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     public PlayerStatusEnum PlayerStatus => PlayerStatusLiveData.Value.Status;
     public MediaModel? Media => _media;
     public long DurationMs => _durationMs;
-    public bool IsLoading => _isLoading;
 
-    public void Initialize(ActionHandler actionHandler, OpenMediaHandler openHandler, PlaybackModel playback)
+    public void Initialize(ActionHandler actionHandler, PlaybackModel playback)
     {
         _actionHandler = actionHandler;
-        _openHandler = openHandler;
         _playback = playback;
         Playback.PlaybackStateChanged += Playback_PlaybackStateChanged;
+    }
+
+    public void ShowMedia(MediaModel? media)
+    {
+        _media = null;
+        _durationMs = 0;
+        BackgroundImageUri = null;
+        IsAudio = false;
+
+        if (media is null)
+        {
+            PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Idle });
+            return;
+        }
+
+        _media = media;
+        IsAudio = media.Type == MediaType.Audio;
+        UpdateMediaMetadata();
+        UpdateFavoriteStatusInternal(media);
     }
 
     public void Destory()
@@ -209,16 +217,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         Playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
         _playback = null;
         _media = null;
-    }
-
-    public void Adopt()
-    {
-        PlayQueueModel.PlayQueueItem? item = Playback.CurrentItem;
-        CoroutineUtils.Run(async () =>
-        {
-            await SetMedia(item?.Media);
-            PlaybackChangeLiveData.Emit(true);
-        });
     }
 
     public void Next()
@@ -235,12 +233,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     {
         _positionMs = 0;
         _durationMs = durationMs;
-
-        MediaModel? media = _media;
-        if (durationMs > 0 && media is not null && media.DurationMs <= 0)
-        {
-            CoroutineUtils.Run(async () => await media.SetDuration(durationMs));
-        }
     }
 
     public void SetPosition(long positionMs, long durationMs)
@@ -256,25 +248,16 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             _lastPositionUiTicks = now;
             PositionLiveData.Emit(positionMs);
         }
-
-        if (now - _lastPositionSaveTicks < POSITION_SAVE_INTERVAL)
-        {
-            return;
-        }
-
-        SavePosition();
     }
 
     public void SetVolume(int volume)
     {
         VolumeLiveData.Emit(Math.Clamp(volume, 0, 100));
-        SaveVolumeAndMute();
     }
 
     public void SetMute(bool isMuted)
     {
         MuteLiveData.Emit(isMuted);
-        SaveVolumeAndMute();
     }
 
     public void CycleRepeatMode()
@@ -292,7 +275,7 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         Playback.IsShuffle = !Playback.IsShuffle;
     }
 
-    public void SetFavorite(bool isFavorite, bool writeDatabase)
+    public void SetFavorite(bool isFavorite)
     {
         if (_isFavorite == isFavorite)
         {
@@ -301,19 +284,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
         _isFavorite = isFavorite;
         IsFavoriteLiveData.Emit(isFavorite);
-
-        MediaModel? media = _media;
-        if (writeDatabase && media != null)
-        {
-            if (isFavorite)
-            {
-                FavoriteModel.Instance.Add(media.Id, media.Title1, true);
-            }
-            else
-            {
-                FavoriteModel.Instance.RemoveWithId(media.Id, true);
-            }
-        }
     }
 
     public void SetFullscreen(bool isFullscreen)
@@ -366,224 +336,20 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         BackgroundImageUri = media.GetExt(MediaExt.BACKGROUND_IMAGE);
     }
 
-    /// <summary>
-    /// Keeps where playback was left on the media it was left in. Reads the engine's last reported position, so a
-    /// caller that is about to replace the media saves first, and one that has just paused saves as it is.
-    /// </summary>
-    public void SavePosition()
-    {
-        _lastPositionSaveTicks = Environment.TickCount64;
-
-        MediaModel? media = _media;
-        if (media is null)
-        {
-            return;
-        }
-
-        int progress = _durationMs > 0 ? (int)Math.Clamp(_positionMs * 100 / _durationMs, 0, 100) : -1;
-        CoroutineUtils.Run(async () => await media.SetProgress(progress, _positionMs));
-    }
-
     #endregion
 
-    #region Load
-
-    /// <summary>Opens a file, wherever the engine that does it lives. The page supplies this; the view model owns
-    /// the rest of loading — which file, where in it, and what the status says while it happens.</summary>
-    public delegate Task<OperationResult> OpenMediaHandler(MediaModel media, long startPositionMs);
-    private OpenMediaHandler? _openHandler;
-
-    private LoadMediaArgs? _pendingMedia;
-    private bool _isLoading;
+    #region Media presentation
 
     private void Playback_PlaybackStateChanged(PlaybackStateChangedEventArgs args)
     {
         IsPlaybackNextEnabled = Playback.CanGoNext;
         IsPlaybackPreviousEnabled = Playback.CanGoPrevious;
-
-        PlayQueueModel.PlayQueueItem? playQueueItem = Playback.CurrentItem;
-        if (playQueueItem is null)
-        {
-            PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
-            LoadMedia(new()
-            {
-                Media = null,
-                PlaybackArgs = args,
-            });
-        }
-        else if (playQueueItem.Media != _media || args.Reason == PlaybackStateChangeReason.Refresh)
-        {
-            PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
-            LoadMedia(new()
-            {
-                Media = playQueueItem.Media,
-                PlaybackArgs = args,
-            });
-        }
-
         PlaybackChangeLiveData.Emit(true);
-    }
-
-    private void LoadMedia(LoadMediaArgs args)
-    {
-        CoroutineUtils.Run(async () =>
-        {
-            if (_isLoading)
-            {
-                _pendingMedia = args;
-                return;
-            }
-
-            _isLoading = true;
-            try
-            {
-                LoadMediaArgs? loadingMedia = args;
-                while (loadingMedia != null)
-                {
-                    await LoadMediaInternal(loadingMedia);
-                    loadingMedia = _pendingMedia;
-                    _pendingMedia = null;
-                }
-            }
-            finally
-            {
-                _isLoading = false;
-            }
-        });
-    }
-
-    private async Task LoadMediaInternal(LoadMediaArgs args)
-    {
-        MediaModel? media = args.Media;
-        PositionLiveData.Emit(0);
-
-        await SetMedia(media);
-        if (media is null)
-        {
-            return;
-        }
-
-        long startPositionMs = ResolveStartPositionMs(media, args.PlaybackArgs);
-        PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Loading });
-
-        OpenMediaHandler? openHandler = _openHandler;
-        if (openHandler is null)
-        {
-            return;
-        }
-
-        // The file itself is opened by whoever owns the engine; what it is, where in it to start and what the
-        // status says around it is decided here.
-        OperationResult err = await openHandler(media, startPositionMs);
-        if (!err.IsSuccessful)
-        {
-            PlayerStatusLiveData.Emit(new()
-            {
-                Status = PlayerStatusEnum.Error,
-                Description = err.Message,
-            });
-            return;
-        }
-
-        PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Working });
-    }
-
-    /// <summary>
-    /// The media the page is opening: what the panel and the title show, the history write and the favorite
-    /// status. Opening the file itself is the page's, since it is the one that owns the engine.
-    /// </summary>
-    private async Task SetMedia(MediaModel? media)
-    {
-        _media = null;
-        _durationMs = 0;
-        BackgroundImageUri = null;
-        IsAudio = false;
-
-        if (media is null)
-        {
-            PlayerStatusLiveData.Emit(new() { Status = PlayerStatusEnum.Idle });
-            return;
-        }
-
-        _media = media;
-        IsAudio = media.Type == MediaType.Audio;
-        UpdateMediaMetadata();
-
-        // Save to history
-        await media.SetAsVisited();
-        if (AppSettingsModel.SaveBrowsingHistory)
-        {
-            await MediaHistoryItemModel.AddAsync(media.Id, media.Title1);
-        }
-
-        UpdateFavoriteStatusInternal(media);
-    }
-
-    private static long ResolveStartPositionMs(MediaModel media, PlaybackStateChangedEventArgs args)
-    {
-        long overridePositionMs = args.InitialPositionMs;
-        if (overridePositionMs >= 0)
-        {
-            return overridePositionMs;
-        }
-
-        switch (args.Reason)
-        {
-            case PlaybackStateChangeReason.Next:
-            case PlaybackStateChangeReason.Previous:
-            case PlaybackStateChangeReason.PreviousByOverScroll:
-                return 0;
-
-            default:
-                {
-                    if (!AppSettingsModel.RestoreLastPlaybackPosition)
-                    {
-                        return 0;
-                    }
-
-                    long positionMs = media.LastPositionMs;
-                    long remainingMs = media.DurationMs - positionMs;
-                    return remainingMs >= 0 && remainingMs < ALMOST_ENDED_THRESHOLD_MS ? 0 : positionMs;
-                }
-        }
     }
 
     private void UpdateFavoriteStatusInternal(MediaModel media)
     {
-        bool isFavorite = FavoriteModel.Instance.FromId(media.Id) != null;
-        SetFavorite(isFavorite, false);
-    }
-
-    #endregion
-
-    #region Media state
-
-    private void SaveVolumeAndMute()
-    {
-        if (_volumeSaveScheduled)
-        {
-            return;
-        }
-
-        _volumeSaveScheduled = true;
-        CoroutineUtils.Run(async () =>
-        {
-            await Task.Delay(VOLUME_SAVE_DELAY_MS);
-            _volumeSaveScheduled = false;
-
-            AppSettingsModel.PlayerVolume = VolumeLiveData.Value / 100.0;
-            AppSettingsModel.PlayerMuted = MuteLiveData.Value;
-        });
-    }
-
-    /// <summary>The item just ended, so the media keeps the mark that it was played to the end.</summary>
-    public void CompleteMedia()
-    {
-        MediaModel? media = _media;
-        if (media is not null)
-        {
-            CoroutineUtils.Run(async () => await media.SetProgress(100, 0));
-        }
+        SetFavorite(FavoriteModel.Instance.FromId(media.Id) != null);
     }
 
     #endregion
@@ -603,12 +369,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         public required PlayerStatusEnum Status { get; init; }
         public string Description { get; init; } = string.Empty;
         public int Progress { get; init; } = -1;
-    }
-
-    private class LoadMediaArgs
-    {
-        public required MediaModel? Media { get; init; }
-        public required PlaybackStateChangedEventArgs PlaybackArgs { get; init; }
     }
 
     #endregion
