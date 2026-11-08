@@ -40,6 +40,8 @@ internal sealed class PlayerMenuContext
 
     public PlaybackModel.Builder? Playback { get; init; }
 
+    public string? Url { get; init; }
+
     public PlayerSession? Session { get; init; }
 
     public PlayerView? View { get; init; }

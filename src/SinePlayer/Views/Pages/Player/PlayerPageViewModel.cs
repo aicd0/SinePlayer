@@ -211,6 +211,16 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         _media = null;
     }
 
+    public void Adopt()
+    {
+        PlayQueueModel.PlayQueueItem? item = Playback.CurrentItem;
+        CoroutineUtils.Run(async () =>
+        {
+            await SetMedia(item?.Media);
+            PlaybackChangeLiveData.Emit(true);
+        });
+    }
+
     public void Next()
     {
         Playback.Next();

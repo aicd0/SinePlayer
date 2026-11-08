@@ -124,11 +124,20 @@ internal sealed partial class PlayerPage : BasePage
         SubtitleHost.Children.Clear();
         SubtitleHost.Children.Add(session.CreateSubtitleSurface());
 
-        CoroutineUtils.Run(async () =>
+        if (_sessionCreator)
         {
-            PlayQueueModel playQueue = await GetPlayQueue(sessionId);
-            session.Load(playQueue, serializedPlayback, initialPositionMs);
-        });
+            CoroutineUtils.Run(async () =>
+            {
+                PlayQueueModel playQueue = await GetPlayQueue(sessionId);
+                session.Load(playQueue, serializedPlayback, initialPositionMs);
+            });
+        }
+        else
+        {
+            ViewModel.Adopt();
+            ShowState(session.State, session.Error);
+            Session_PositionChanged();
+        }
     }
 
     protected override void OnResume()
@@ -405,6 +414,7 @@ internal sealed partial class PlayerPage : BasePage
                 Playback = ViewModel.Playback.ToBuilder(),
                 Session = session,
                 View = _view,
+                Url = GetMainPageAbility().Url,
                 PromptInfo = PromptTemporary,
             };
 
@@ -547,6 +557,7 @@ internal sealed partial class PlayerPage : BasePage
     private const string TAG = nameof(PlayerPage);
 
     private string _sessionId = string.Empty;
+    private bool _sessionCreator;
     private PlayerSession? _session;
     private PlayerView? _view;
     private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
@@ -562,35 +573,37 @@ internal sealed partial class PlayerPage : BasePage
             return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': the page has no picture to draw into.");
         }
 
-        await session.Reset();
-
-        var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
-        ApplyPlayerSettings(mediaSettings);
-
-        OperationResult<MediaSource> loaded = await session.AddSource(media.Location);
-        if (!loaded.IsSuccessful)
+        if (!session.Sources.Any(source => source.Locator.Value == media.Location))
         {
-            return OperationResult.Failure(loaded);
-        }
+            await session.Reset();
 
-        OperationResult selected = await SelectTracks(session, view, media);
-        if (!selected.IsSuccessful)
-        {
-            return selected;
+            var mediaSettings = PlayerSettingsModel.LoadFromMedia(media);
+            ApplyPlayerSettings(mediaSettings);
+
+            OperationResult<MediaSource> loaded = await session.AddSource(media.Location);
+            if (!loaded.IsSuccessful)
+            {
+                return OperationResult.Failure(loaded);
+            }
+
+            OperationResult selected = await SelectTracks(session, view, media);
+            if (!selected.IsSuccessful)
+            {
+                return selected;
+            }
+
+            if (startPositionMs > 0)
+            {
+                SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
+                session.Seek(TimeSpan.FromMilliseconds(startPositionMs), mode);
+            }
+
+            StartPlaybackOnOpen(session);
         }
 
         ViewModel.SetDuration(session.Duration.Ticks / TimeSpan.TicksPerMillisecond);
-
-        if (startPositionMs > 0)
-        {
-            SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
-            session.Seek(TimeSpan.FromMilliseconds(startPositionMs), mode);
-        }
-
-        ViewModel.PositionLiveData.Emit(startPositionMs > 0 ? startPositionMs : 0);
-
-        StartPlaybackOnOpen(session);
-        return selected;
+        ViewModel.PositionLiveData.Emit(session.Position.Ticks / TimeSpan.TicksPerMillisecond);
+        return OperationResult.Success();
     }
 
     private async Task<OperationResult> SelectTracks(PlayerSession session, PlayerView view, MediaModel media)
@@ -796,8 +809,8 @@ internal sealed partial class PlayerPage : BasePage
             return _session;
         }
 
-        PlayerSession session = PlayerSessionManager.Shared.Acquire(_sessionId, out bool created);
-        if (created)
+        PlayerSession session = PlayerSessionManager.Shared.Acquire(_sessionId, out _sessionCreator);
+        if (_sessionCreator)
         {
             session.SetVolume(Math.Clamp(AppSettingsModel.PlayerVolume, 0.0, 1.0));
             session.SetMuted(AppSettingsModel.PlayerMuted);
@@ -836,35 +849,19 @@ internal sealed partial class PlayerPage : BasePage
 
     private void Session_StateChanged(MediaEngineState state, string? message)
     {
-        ViewModel.IsPlayingLiveData.Emit(state == MediaEngineState.Playing);
+        ShowState(state, message);
 
         switch (state)
         {
             case MediaEngineState.Playing:
-                ViewModel.IsPlaying = true;
                 UnholdOverlay();
                 break;
-            case MediaEngineState.None:
-            case MediaEngineState.Paused:
-                ViewModel.IsPlaying = false;
-                break;
             case MediaEngineState.Ended:
-                ViewModel.IsPlaying = false;
                 HandleMediaEnded();
-                break;
-            case MediaEngineState.Error:
-                ViewModel.IsPlaying = false;
-                ViewModel.PlayerStatusLiveData.Emit(new()
-                {
-                    Status = PlayerPageViewModel.PlayerStatusEnum.Error,
-                    Description = message ?? "Unknown error",
-                });
                 break;
             default:
                 break;
         }
-
-        UpdateKeepScreenOn();
     }
 
     private void Session_PositionChanged()
@@ -878,6 +875,23 @@ internal sealed partial class PlayerPage : BasePage
         ViewModel.SetPosition(
             session.Position.Ticks / TimeSpan.TicksPerMillisecond,
             session.Duration.Ticks / TimeSpan.TicksPerMillisecond);
+    }
+
+    private void ShowState(MediaEngineState state, string? message)
+    {
+        ViewModel.IsPlayingLiveData.Emit(state == MediaEngineState.Playing);
+        ViewModel.IsPlaying = state == MediaEngineState.Playing;
+
+        if (state == MediaEngineState.Error)
+        {
+            ViewModel.PlayerStatusLiveData.Emit(new()
+            {
+                Status = PlayerPageViewModel.PlayerStatusEnum.Error,
+                Description = message ?? "Unknown error",
+            });
+        }
+
+        UpdateKeepScreenOn();
     }
 
     private void HandleMediaEnded()
