@@ -65,7 +65,7 @@ internal static class SubtitleSourceLoader
             return OperationResultExt.Failure(built);
         }
 
-        TrackSelection.Save(media, MediaStreamKind.Subtitle, session.PlaybackInfo.Sources, selection.Source, selection.Stream);
+        TrackSelection.Save(media, MediaStreamKind.Subtitle, selection.Source, selection.Stream);
         return OperationResult.Success();
     }
 

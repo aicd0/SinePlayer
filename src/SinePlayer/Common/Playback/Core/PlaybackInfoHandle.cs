@@ -2,7 +2,6 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
-using System.Collections.Generic;
 
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
@@ -17,15 +16,13 @@ internal sealed class PlaybackInfoHandle
     private volatile IAudioChain? _audio;
     private volatile ISubtitleChain? _subtitle;
 
-    public MediaInfo? Media => Sources is [MediaSource first, ..] ? first.Info : null;
+    public MediaInfo? Media => _pipeline?.Sources is [MediaSource first, ..] ? first.Info : null;
 
     public VideoStreamInfo? SelectedVideoStream => _video?.SelectedStream;
 
     public AudioStreamInfo? SelectedAudioStream => _audio?.SelectedStream;
 
     public SubtitleStreamInfo? SelectedSubtitleStream => _subtitle?.SelectedStream;
-
-    public IReadOnlyList<MediaSource> Sources => _pipeline?.Sources ?? [];
 
     public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
 
@@ -61,7 +58,7 @@ internal sealed class PlaybackInfoHandle
 
     public bool IsAudioHardwareAccelerated => _audio?.IsHardwareAccelerated ?? false;
 
-    internal void Attach(PlaybackPipeline pipeline, IVideoChain video, IAudioChain audio, ISubtitleChain subtitle)
+    internal void Attach(PlaybackPipeline pipeline, IVideoChain video, IAudioChain? audio, ISubtitleChain? subtitle)
     {
         _video = video;
         _audio = audio;
