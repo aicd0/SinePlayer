@@ -57,6 +57,7 @@ internal static class PlayerMenuCreator
                 Icon = new FontIconSource() { Glyph = "\uE8A7" },
                 Click = () => OpenInNewWindow(context),
             },
+            new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
             {
                 Text = TrimText(context.Media.Title),

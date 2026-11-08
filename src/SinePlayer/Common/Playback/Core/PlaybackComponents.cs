@@ -121,16 +121,25 @@ internal sealed record PlaybackComponents(
             ApplyVideo(chain);
         }
 
+        foreach (ISubtitleChain chain in pipeline.SubtitleChains)
+        {
+            ApplySubtitle(chain);
+        }
+
         ApplyAudioDecoder(pipeline, AudioDecoder);
         ApplyAudioRenderer(pipeline, AudioRenderer);
-        ApplySubtitleDecoder(pipeline, SubtitleDecoder);
-        ApplySubtitleRenderer(pipeline, SubtitleRenderer);
     }
 
     public void ApplyVideo(IVideoChain chain)
     {
         ApplyVideoDecoder(chain, VideoDecoder);
         ApplyVideoRenderer(chain, VideoRenderer);
+    }
+
+    public void ApplySubtitle(ISubtitleChain chain)
+    {
+        ApplySubtitleDecoder(chain, SubtitleDecoder);
+        ApplySubtitleRenderer(chain, SubtitleRenderer);
     }
 
     private void ApplyVideoDecoder(IVideoChain chain, string key)
@@ -235,37 +244,37 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void ApplySubtitleDecoder(PlaybackPipeline pipeline, string key)
+    private static void ApplySubtitleDecoder(ISubtitleChain chain, string key)
     {
         switch (key)
         {
             case FFMPEG:
-                SetSubtitleDecoders(pipeline, [new FFmpegSubtitleDecoderFactory()]);
+                SetSubtitleDecoders(chain, [new FFmpegSubtitleDecoderFactory()]);
                 break;
             case NONE:
-                SetSubtitleDecoders(pipeline, [new NullSubtitleDecoderFactory()]);
+                SetSubtitleDecoders(chain, [new NullSubtitleDecoderFactory()]);
                 break;
             default:
-                SetSubtitleDecoders(pipeline, [new FFmpegSubtitleDecoderFactory()]);
+                SetSubtitleDecoders(chain, [new FFmpegSubtitleDecoderFactory()]);
                 break;
         }
     }
 
-    private static void ApplySubtitleRenderer(PlaybackPipeline pipeline, string key)
+    private static void ApplySubtitleRenderer(ISubtitleChain chain, string key)
     {
         switch (key)
         {
             case WIN2D:
-                SetSubtitleRenderers(pipeline, [new Win2DSubtitleRendererFactory()]);
+                SetSubtitleRenderers(chain, [new Win2DSubtitleRendererFactory()]);
                 break;
             case LIBASS:
-                SetSubtitleRenderers(pipeline, [new AssSubtitleRendererFactory()]);
+                SetSubtitleRenderers(chain, [new AssSubtitleRendererFactory()]);
                 break;
             case NONE:
-                SetSubtitleRenderers(pipeline, [new NullSubtitleRendererFactory()]);
+                SetSubtitleRenderers(chain, [new NullSubtitleRendererFactory()]);
                 break;
             default:
-                SetSubtitleRenderers(pipeline, [new AssSubtitleRendererFactory(), new Win2DSubtitleRendererFactory()]);
+                SetSubtitleRenderers(chain, [new AssSubtitleRendererFactory(), new Win2DSubtitleRendererFactory()]);
                 break;
         }
     }
@@ -306,21 +315,21 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetSubtitleDecoders(PlaybackPipeline pipeline, IEnumerable<ISubtitleDecoderFactory> factories)
+    private static void SetSubtitleDecoders(ISubtitleChain chain, IEnumerable<ISubtitleDecoderFactory> factories)
     {
-        pipeline.SubtitleChains[0].Components.ClearDecoders();
+        chain.Components.ClearDecoders();
         foreach (ISubtitleDecoderFactory factory in factories)
         {
-            pipeline.SubtitleChains[0].Components.Register(factory);
+            chain.Components.Register(factory);
         }
     }
 
-    private static void SetSubtitleRenderers(PlaybackPipeline pipeline, IEnumerable<ISubtitleRendererFactory> factories)
+    private static void SetSubtitleRenderers(ISubtitleChain chain, IEnumerable<ISubtitleRendererFactory> factories)
     {
-        pipeline.SubtitleChains[0].Components.ClearRenderers();
+        chain.Components.ClearRenderers();
         foreach (ISubtitleRendererFactory factory in factories)
         {
-            pipeline.SubtitleChains[0].Components.Register(factory);
+            chain.Components.Register(factory);
         }
     }
 }

@@ -81,7 +81,8 @@ internal sealed class PlayerMenuContext
     public void AddSubtitleTracks()
     {
         PlayerSession? session = Session;
-        if (session is null)
+        PlayerView? view = View;
+        if (session is null || view is null)
         {
             return;
         }
@@ -94,7 +95,7 @@ internal sealed class PlayerMenuContext
                 return;
             }
 
-            OperationResult added = await SubtitleSourceLoader.AddAndSelect(session, Media, [.. files.Select(file => file.Path)]);
+            OperationResult added = await SubtitleSourceLoader.AddAndSelect(session, view, Media, [.. files.Select(file => file.Path)]);
             if (!added.IsSuccessful)
             {
                 PromptInfo?.Invoke(added.Message);
@@ -131,9 +132,12 @@ internal sealed class PlayerMenuContext
 
         CoroutineUtils.Run(async () =>
         {
-            OperationResult selected = kind == MediaStreamKind.Video
-                ? await session.SelectVideoStream(view, stream)
-                : await session.SelectStream(kind, stream);
+            OperationResult selected = kind switch
+            {
+                MediaStreamKind.Video => await session.SelectVideoStream(view, stream),
+                MediaStreamKind.Audio => await session.SelectAudioStream(stream),
+                _ => await session.SelectSubtitleStream(view, stream),
+            };
             if (!selected.IsSuccessful)
             {
                 PromptInfo?.Invoke(selected.Message);
@@ -147,9 +151,12 @@ internal sealed class PlayerMenuContext
                 return;
             }
 
-            OperationResult? built = kind == MediaStreamKind.Video
-                ? session.ResultOf(reconciled.Result, view)
-                : session.ResultOf(reconciled.Result, kind);
+            OperationResult? built = kind switch
+            {
+                MediaStreamKind.Video => reconciled.Result.Video(view),
+                MediaStreamKind.Audio => reconciled.Result.Audio(),
+                _ => reconciled.Result.Subtitle(view),
+            };
             if (built is { IsSuccessful: false })
             {
                 PromptInfo?.Invoke(built.Message);
