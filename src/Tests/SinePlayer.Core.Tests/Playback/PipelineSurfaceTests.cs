@@ -208,4 +208,30 @@ public class PipelineSurfaceTests
             }.Order()),
             "a per-kind member on the pipeline is a second place to describe a chain");
     }
+
+    /// <summary>
+    /// What reconciling made of a chain is asked of that chain, so a result is three dictionaries and nothing else. A
+    /// singular view would be a second place that assumes one chain of a kind — the assumption v2 exists to remove —
+    /// and it cannot be removed later without breaking whoever came to depend on it.
+    /// </summary>
+    [Test]
+    public void AReconcileResultAnswersOnlyPerChain()
+    {
+        string[] members = [.. typeof(ReconcileResult)
+            .GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(member => member is not ConstructorInfo)
+            .Select(member => member.Name)
+            .Where(name => !name.StartsWith("get_", StringComparison.Ordinal) && !name.StartsWith("set_", StringComparison.Ordinal))
+            .Distinct()];
+
+        Assert.That(
+            members.Order(),
+            Is.EqualTo(new[]
+            {
+                nameof(ReconcileResult.VideoResults),
+                nameof(ReconcileResult.AudioResults),
+                nameof(ReconcileResult.SubtitleResults),
+            }.Order()),
+            "a result is what happened to each chain, and anything else is a way to ask about a kind");
+    }
 }
