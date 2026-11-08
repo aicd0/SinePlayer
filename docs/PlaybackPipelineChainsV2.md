@@ -429,7 +429,7 @@ Each step adds tests rather than moving code; this is the phase that finds the b
 
 | # | Step | Why |
 |---|---|---|
-| K1 | One `D3D11Device` shared by all subtitle surfaces | removes a driver instance per extra chain (section 2); no API change |
+| K1 | One `D3D11Device` shared by all subtitle surfaces — **done**: `SharesOneDeviceBetweenSurfaces` | `SharedSubtitleDevice` rents one device to every subtitle surface and releases it with the last share, so a second chain with subtitles costs no driver instance; `SubtitleSurface` borrows it instead of calling `D3D11Device.Create()`, and the device Win2D wraps it in stays per surface so no two render threads ever drive one drawing device. `D3D11Device.Live` counts devices the way `PipelineThread.Live` counts threads | no API change — the whole thing is internal, and the app and the factories are untouched. The device is created by the first surface that needs it and released by the last, so a host that never shows subtitles never pays for it, and a lost device is replaced with the next surface | the test measures `D3D11Device.Live`: two renderers → one device, and both disposed → back to the count before. With `D3D11Device.Create()` put back in the surface it measures 2, which is the cost the step removes |
 | K2 | Subtitle layer compositor, only if the host needs one panel per set of chains | option B in section 2; the target is already the surface key |
 
 ## 5. Definition of done for v2

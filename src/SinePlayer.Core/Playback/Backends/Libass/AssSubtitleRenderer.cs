@@ -10,7 +10,7 @@ using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
-using SinePlayer.Core.Playback.Backends.Win2D;
+using SinePlayer.Core.Playback.Subtitle;
 using SinePlayer.Core.Playback.Utils;
 
 using Windows.Foundation;

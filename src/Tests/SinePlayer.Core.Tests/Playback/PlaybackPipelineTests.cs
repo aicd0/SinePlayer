@@ -9049,7 +9049,7 @@ public class PlaybackPipelineTests
             WaitFor(() => firstRenderer.Texts.Contains(firstCue), "one chain on the stream to be fed");
             WaitFor(() => secondRenderer.Texts.Contains(firstCue), "the other chain on the same stream to be fed too");
             WaitFor(() => secondRenderer.Texts.Contains(secondCue), "the second cue to reach the chain that came second");
-            Assert.That(firstRenderer.Texts, Does.Contain(secondCue), "and to reach the chain that came first");
+            WaitFor(() => firstRenderer.Texts.Contains(secondCue), "and to reach the chain that came first");
         }
         finally
         {
