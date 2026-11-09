@@ -1,7 +1,6 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -62,27 +61,8 @@ internal static class TrackSelection
         return view?.SubtitleSelections is { } subtitles ? ResolveFrom(subtitles, kind, sources) : Default(sources, kind);
     }
 
-    public static void Save(MediaModel media, MediaStreamKind kind, MediaSource? source, MediaStreamInfo? stream)
+    public static void Save(MediaModel media, TrackSelectionModel model)
     {
-        TrackSelectionModel model = Load(media) ?? new TrackSelectionModel();
-
-        switch (kind)
-        {
-            case MediaStreamKind.Audio:
-                model.AudioSelections = stream is null ? [] : [EntryOf(source, stream)];
-                break;
-            case MediaStreamKind.Video:
-                EnsureFirstView(model).VideoSelection = stream is null
-                    ? new SelectedTrackModel { Enabled = false }
-                    : new SelectedTrackModel { Enabled = true, Path = source?.Locator.Value ?? string.Empty, Index = stream.Index };
-                break;
-            case MediaStreamKind.Subtitle:
-                EnsureFirstView(model).SubtitleSelections = stream is null ? [] : [EntryOf(source, stream)];
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Only the picture, the sound and the subtitles can be chosen.");
-        }
-
         Store(media, model);
     }
 
@@ -192,11 +172,6 @@ internal static class TrackSelection
         ViewTrackSelectionModel view = new();
         model.Views = [view];
         return view;
-    }
-
-    private static TrackSelectionEntryModel EntryOf(MediaSource? source, MediaStreamInfo stream)
-    {
-        return new TrackSelectionEntryModel { Path = source?.Locator.Value ?? string.Empty, Index = stream.Index };
     }
 
     private static void Store(MediaModel media, TrackSelectionModel model)

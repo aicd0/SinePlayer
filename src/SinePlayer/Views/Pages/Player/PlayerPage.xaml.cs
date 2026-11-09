@@ -112,23 +112,9 @@ internal sealed partial class PlayerPage : BasePage
         SubtitleHost.Children.Clear();
         SubtitleHost.Children.Add(_view.SubtitlePanel);
 
-        if (_sessionCreator)
-        {
-            CoroutineUtils.Run(async () =>
-            {
-                var record = PlayerSessionRecord.Load(sessionId);
-                PlayQueueModel playQueue = record?.PlayQueue is { } items
-                    ? await PlayQueueModel.CreateFromJsonModel(items)
-                    : PlayQueueModel.CreateEmpty();
-                session.Load(playQueue, record?.Playback, -1);
-            });
-        }
-        else
-        {
-            ViewModel.ShowMedia(session.CurrentMedia);
-            ShowState(session.State, session.Error);
-            Session_PositionChanged();
-        }
+        ViewModel.ShowMedia(session.CurrentMedia);
+        ShowState(session.State, session.Error);
+        Session_PositionChanged();
     }
 
     protected override void OnResume()
@@ -704,6 +690,8 @@ internal sealed partial class PlayerPage : BasePage
 
         ViewModel.VolumeLiveData.Emit((int)Math.Round(session.Volume * 100.0));
         ViewModel.MuteLiveData.Emit(session.IsMuted);
+
+        session.EnsureLoaded();
         return session;
     }
 

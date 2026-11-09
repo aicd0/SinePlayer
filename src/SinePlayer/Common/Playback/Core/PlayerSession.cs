@@ -55,12 +55,14 @@ internal sealed partial class PlayerSession : IDisposable
 
     private PlayQueueModel _playQueue = PlayQueueModel.CreateEmpty();
     private bool _loaded;
+    private Task? _loadTask;
 
     public PlayerSession(string id)
     {
         Id = id;
         _audioDeviceNotifier.Subscribe(AudioDevices_Changed);
         Playback.PlaybackStateChanged += Playback_PlaybackStateChanged;
+        Playback.PlayQueueChanged += Playback_PlayQueueChanged;
     }
 
     private sealed record AudioChainEntry(IAudioChain Chain, GainAudioFilter Gain, DownmixAudioFilter Downmix);
@@ -127,16 +129,21 @@ internal sealed partial class PlayerSession : IDisposable
 
     public long StartPositionMs { get; private set; }
 
-    public void Load(PlayQueueModel playQueue, PlaybackModel.PlaybackJsonModel? playback, long initialPositionMs)
+    public Task EnsureLoaded()
     {
-        if (_loaded)
-        {
-            return;
-        }
+        return _loadTask ??= LoadRecordAsync();
 
-        _loaded = true;
-        _playQueue = playQueue;
-        Playback.LoadState(playQueue, playback, initialPositionMs);
+        async Task LoadRecordAsync()
+        {
+            var record = PlayerSessionRecord.Load(Id);
+            PlayQueueModel playQueue = record?.PlayQueue is { } items
+                ? await PlayQueueModel.CreateFromJsonModel(items)
+                : PlayQueueModel.CreateEmpty();
+
+            _loaded = true;
+            _playQueue = playQueue;
+            Playback.LoadState(playQueue, record?.Playback, -1);
+        }
     }
 
     public void Dispose()
@@ -154,6 +161,7 @@ internal sealed partial class PlayerSession : IDisposable
         StopPositionTimer();
 
         SaveProgress();
+        SaveRecord();
 
         foreach (PlayerView view in _views)
         {
@@ -259,6 +267,7 @@ internal sealed partial class PlayerSession : IDisposable
     {
         PlayerView view = new(this);
         _views.Add(view);
+        SaveRecord();
         return view;
     }
 
@@ -268,6 +277,8 @@ internal sealed partial class PlayerSession : IDisposable
         {
             return;
         }
+
+        SaveRecord();
 
         if (_pipeline is not { } pipeline)
         {
@@ -305,6 +316,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         _pendingReconcile = true;
+        SaveRecord();
         return OperationResult.Success();
     }
 
@@ -331,6 +343,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         _pendingReconcile = true;
+        SaveRecord();
         return OperationResult.Success();
     }
 
@@ -355,6 +368,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         _pendingReconcile = true;
+        SaveRecord();
         return OperationResult.Success();
     }
 
@@ -381,6 +395,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         _pendingReconcile = true;
+        SaveRecord();
         return OperationResult.Success();
     }
 
@@ -405,6 +420,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         _pendingReconcile = true;
+        SaveRecord();
         return OperationResult.Success();
     }
 
@@ -641,6 +657,8 @@ internal sealed partial class PlayerSession : IDisposable
 
     private void Playback_PlaybackStateChanged(PlaybackStateChangedEventArgs args)
     {
+        SaveRecord();
+
         CoroutineUtils.Run(async () =>
         {
             if (_isOpening)
@@ -1036,6 +1054,115 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         RaisePositionChanged();
+    }
+
+    #endregion
+
+    #region Record
+
+    /// <summary>
+    /// Writes what the session is, to its own record and — once it has something to record — to the media it opened, which is
+    /// what the next open of that file starts from (decision 3).
+    /// </summary>
+    private void SaveRecord()
+    {
+        if (!_loaded)
+        {
+            return;
+        }
+
+        TrackSelectionModel selection = DescribeSelection();
+        PlayerSessionRecord.Save(Id, new PlayerSessionRecord()
+        {
+            PlayQueue = _playQueue.ToJsonModel(),
+            Playback = Playback.ToJsonModel(),
+            TrackSelection = selection,
+        });
+
+        // Only a session showing something may rewrite the media's default: saving "nothing chosen yet" over it would
+        // erase the tracks the next open is supposed to start from.
+        if (_openedMedia is { } media && HasOpinion(selection))
+        {
+            TrackSelection.Save(media, selection);
+        }
+    }
+
+    /// <summary>
+    /// What the session is showing, as a model. A view with no chain of a kind has no opinion about it, which is not the same
+    /// as one that turned it off — the difference is what lets a first-ever open start from the media's default.
+    /// </summary>
+    private TrackSelectionModel DescribeSelection()
+    {
+        TrackSelectionModel model = _openedMedia is { } media
+            ? TrackSelection.Load(media) ?? new TrackSelectionModel()
+            : new TrackSelectionModel();
+
+        // The menu preference is still the media's, so every view entry mirrors it until views own one of their own.
+        bool allowMultiSubtitleTracks = model.Views is { Count: > 0 } existing ? existing[0].AllowMultiSubtitleTracks : false;
+
+        List<ViewTrackSelectionModel> views = [];
+        foreach (PlayerView view in _views)
+        {
+            ViewTrackSelectionModel entry = new()
+            {
+                AllowMultiSubtitleTracks = allowMultiSubtitleTracks,
+            };
+
+            if (view.VideoChain is { } video)
+            {
+                entry.VideoSelection = video.SelectedStream is { } stream
+                    ? new SelectedTrackModel { Enabled = true, Path = PathOf(stream), Index = stream.Index }
+                    : new SelectedTrackModel { Enabled = false };
+            }
+
+            if (view.SubtitleChains.Count > 0)
+            {
+                entry.SubtitleSelections = [.. view.SubtitleChains
+                    .Select(chain => chain.SelectedStream)
+                    .OfType<SubtitleStreamInfo>()
+                    .Select(stream => new TrackSelectionEntryModel { Path = PathOf(stream), Index = stream.Index })];
+            }
+
+            views.Add(entry);
+        }
+
+        model.Views = views;
+        model.AudioSelections = _audioChains.Count == 0
+            ? null
+            : [.. _audioChains
+                .Select(entry => entry.Chain.SelectedStream)
+                .OfType<AudioStreamInfo>()
+                .Select(stream => new TrackSelectionEntryModel { Path = PathOf(stream), Index = stream.Index })];
+
+        return model;
+    }
+
+    private static bool HasOpinion(TrackSelectionModel selection)
+    {
+        if (selection.AudioSelections is not null || selection.Views is not { } views)
+        {
+            return true;
+        }
+
+        return views.Any(view => view.VideoSelection is not null || view.SubtitleSelections is not null);
+    }
+
+    private string PathOf(MediaStreamInfo stream)
+    {
+        foreach (MediaSource source in Sources)
+        {
+            if (source.Info.Streams.Any(candidate => candidate.Equals(stream)))
+            {
+                return source.Locator.Value;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private void Playback_PlayQueueChanged()
+    {
+        SaveRecord();
     }
 
     #endregion
