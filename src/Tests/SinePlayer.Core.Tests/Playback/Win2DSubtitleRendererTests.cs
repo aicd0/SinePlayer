@@ -19,10 +19,10 @@ using Windows.UI;
 namespace SinePlayer.Core.Tests.Playback;
 
 /// <summary>
-/// The subtitle renderer that actually draws: Win2D over Direct2D and DirectWrite, into a swap chain of its own. What is
-/// checkable without looking at a screen is that it can build its surface, take a cue, take an empty set, survive a
-/// resize and hand the host a native swap chain — the drawing decisions (which words, where) are held by
-/// <see cref="AssSubtitleText"/> and the pipeline's tests.
+/// The subtitle renderer that puts words on screen: Win2D over Direct2D and DirectWrite, into a swap chain of its own. What
+/// is checkable without looking at a screen is that it can build its surface, take a cue, take an empty set, survive a
+/// resize and hand the host a native swap chain, and how the drawing it hands over lands on the target — the drawing itself
+/// is <see cref="Win2DSubtitleLayer"/>'s, so it is driven there.
 /// </summary>
 [TestFixture]
 public class Win2DSubtitleRendererTests
@@ -182,10 +182,10 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void PutsPixelsOnTheSurfaceAndTakesThemAwayAgain()
     {
-        // The point of the whole renderer: words become pixels, and an empty set leaves none. A call that succeeds while
+        // The point of the whole backend: words become pixels, and an empty set leaves none. A call that succeeds while
         // drawing nothing looks exactly like a working one from the outside, which is why the pixels are read back here —
         // against an offscreen target, since a presented swap chain cannot be read after the fact.
-        using Win2DSubtitleRenderer renderer = new();
+        using Win2DSubtitleLayer drawing = new();
 
         CanvasRenderTarget? target = null;
         try
@@ -193,7 +193,7 @@ public class Win2DSubtitleRendererTests
             CanvasDevice device;
             try
             {
-                device = renderer.EnsureCanvasDevice();
+                device = EnsureCanvasDevice(drawing);
             }
             catch (Exception exception)
             {
@@ -217,7 +217,7 @@ public class Win2DSubtitleRendererTests
                 using (CanvasDrawingSession session = target.CreateDrawingSession())
                 {
                     session.Clear(default(Color));
-                    renderer.DrawCues(session, [cue], SubtitlePresentation.Identity, width, height);
+                    drawing.DrawCues(session, [cue], SubtitlePresentation.Identity, width, height);
                 }
 
                 Assert.That(DrawnPixels(target.GetPixelBytes()), Is.GreaterThan(0), "the cue has to reach the target as pixels");
@@ -225,7 +225,7 @@ public class Win2DSubtitleRendererTests
                 using (CanvasDrawingSession session = target.CreateDrawingSession())
                 {
                     session.Clear(default(Color));
-                    renderer.DrawCues(session, [], SubtitlePresentation.Identity, width, height);
+                    drawing.DrawCues(session, [], SubtitlePresentation.Identity, width, height);
                 }
 
                 Assert.That(DrawnPixels(target.GetPixelBytes()), Is.Zero, "and an empty set has to leave nothing behind");
@@ -248,12 +248,12 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void DrawsTheTextAtTheSizeItIsGiven()
     {
-        using Win2DSubtitleRenderer renderer = new();
+        using Win2DSubtitleLayer drawing = new();
 
         CanvasDevice device;
         try
         {
-            device = renderer.EnsureCanvasDevice();
+            device = EnsureCanvasDevice(drawing);
         }
         catch (Exception exception)
         {
@@ -261,8 +261,8 @@ public class Win2DSubtitleRendererTests
             return;
         }
 
-        int small = InkRows(device, renderer, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 12.0));
-        int large = InkRows(device, renderer, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 48.0));
+        int small = InkRows(device, drawing, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 12.0));
+        int large = InkRows(device, drawing, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 48.0));
 
         using (Assert.EnterMultipleScope())
         {
@@ -272,18 +272,18 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>
-    /// Zero means "work it out from the surface", which is what the renderer did before a size could be asked for: an
+    /// Zero means "work it out from the surface", which is what the drawing did before a size could be asked for: an
     /// explicit size of the value it works out for itself has to draw the same picture.
     /// </summary>
     [Test]
     public void KeepsTheSizeItWorksOutForItselfWhenToldNone()
     {
-        using Win2DSubtitleRenderer renderer = new();
+        using Win2DSubtitleLayer drawing = new();
 
         CanvasDevice device;
         try
         {
-            device = renderer.EnsureCanvasDevice();
+            device = EnsureCanvasDevice(drawing);
         }
         catch (Exception exception)
         {
@@ -294,8 +294,8 @@ public class Win2DSubtitleRendererTests
         const int height = 300;
         double automatic = Math.Clamp(height * 0.045, 12.0, 72.0);
 
-        int unspecified = InkRows(device, renderer, 480, height, SubtitlePresentation.Identity);
-        int sameSize = InkRows(device, renderer, 480, height, new SubtitlePresentation(0.0, 0.0, default, null, automatic));
+        int unspecified = InkRows(device, drawing, 480, height, SubtitlePresentation.Identity);
+        int sameSize = InkRows(device, drawing, 480, height, new SubtitlePresentation(0.0, 0.0, default, null, automatic));
 
         using (Assert.EnterMultipleScope())
         {
@@ -305,9 +305,9 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>How many rows of the surface carry ink, drawing one cue with the presentation given.</summary>
-    private static int InkRows(CanvasDevice device, Win2DSubtitleRenderer renderer, int width, int height, SubtitlePresentation presentation)
+    private static int InkRows(CanvasDevice device, Win2DSubtitleLayer drawing, int width, int height, SubtitlePresentation presentation)
     {
-        byte[] pixels = RenderInk(device, renderer, width, height, presentation);
+        byte[] pixels = RenderInk(device, drawing, width, height, presentation);
         int rows = 0;
         for (int y = 0; y < height; y++)
         {
@@ -327,9 +327,9 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>How many pixels carry ink, drawing one cue with the presentation given.</summary>
-    private static int InkPixels(CanvasDevice device, Win2DSubtitleRenderer renderer, int width, int height, SubtitlePresentation presentation)
+    private static int InkPixels(CanvasDevice device, Win2DSubtitleLayer drawing, int width, int height, SubtitlePresentation presentation)
     {
-        byte[] pixels = RenderInk(device, renderer, width, height, presentation);
+        byte[] pixels = RenderInk(device, drawing, width, height, presentation);
         int count = 0;
         for (int index = 3; index < pixels.Length; index += 4)
         {
@@ -342,7 +342,7 @@ public class Win2DSubtitleRendererTests
         return count;
     }
 
-    private static byte[] RenderInk(CanvasDevice device, Win2DSubtitleRenderer renderer, int width, int height, SubtitlePresentation presentation)
+    private static byte[] RenderInk(CanvasDevice device, Win2DSubtitleLayer drawing, int width, int height, SubtitlePresentation presentation)
     {
         using CanvasRenderTarget target = new(device, width, height, 96.0f);
         using SubtitleCue cue = Cue("0,Default,,0,0,0,,Visible words");
@@ -350,7 +350,7 @@ public class Win2DSubtitleRendererTests
         using (CanvasDrawingSession session = target.CreateDrawingSession())
         {
             session.Clear(default(Color));
-            renderer.DrawCues(session, [cue], presentation, width, height);
+            drawing.DrawCues(session, [cue], presentation, width, height);
         }
 
         return target.GetPixelBytes();
@@ -364,12 +364,12 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void DrawsABorderAroundTheWordsWhenAWidthIsGiven()
     {
-        using Win2DSubtitleRenderer renderer = new();
+        using Win2DSubtitleLayer drawing = new();
 
         CanvasDevice device;
         try
         {
-            device = renderer.EnsureCanvasDevice();
+            device = EnsureCanvasDevice(drawing);
         }
         catch (Exception exception)
         {
@@ -380,10 +380,10 @@ public class Win2DSubtitleRendererTests
         SubtitlePresentation plain = new(0.0, 0.0, default, null, 24.0);
         SubtitlePresentation bordered = plain with { OutlineWidth = 6.0 };
 
-        int plainPixels = InkPixels(device, renderer, 480, 240, plain);
-        int borderedPixels = InkPixels(device, renderer, 480, 240, bordered);
-        int plainRows = InkRows(device, renderer, 480, 240, plain);
-        int borderedRows = InkRows(device, renderer, 480, 240, bordered);
+        int plainPixels = InkPixels(device, drawing, 480, 240, plain);
+        int borderedPixels = InkPixels(device, drawing, 480, 240, bordered);
+        int plainRows = InkRows(device, drawing, 480, 240, plain);
+        int borderedRows = InkRows(device, drawing, 480, 240, bordered);
 
         using (Assert.EnterMultipleScope())
         {
@@ -394,18 +394,18 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>
-    /// This renderer has no picture-relative coordinates: it lays lines out itself against the surface, so the frame a
+    /// This drawing has no picture-relative coordinates: it lays lines out itself against the surface, so the frame a
     /// script would be placed in changes nothing about where the words go.
     /// </summary>
     [Test]
     public void LaysTheWordsOutAgainstTheSurfaceWhateverThePictureIs()
     {
-        using Win2DSubtitleRenderer renderer = new();
+        using Win2DSubtitleLayer drawing = new();
 
         CanvasDevice device;
         try
         {
-            device = renderer.EnsureCanvasDevice();
+            device = EnsureCanvasDevice(drawing);
         }
         catch (Exception exception)
         {
@@ -415,8 +415,8 @@ public class Win2DSubtitleRendererTests
 
         const int width = 480;
         const int height = 240;
-        byte[] whole = RenderInk(device, renderer, width, height, SubtitlePresentation.Identity);
-        byte[] topHalf = RenderInk(device, renderer, width, height, SubtitlePresentation.Identity with
+        byte[] whole = RenderInk(device, drawing, width, height, SubtitlePresentation.Identity);
+        byte[] topHalf = RenderInk(device, drawing, width, height, SubtitlePresentation.Identity with
         {
             Frame = new SubtitleFrame(0.0, 0.0, 1.0, 0.5),
         });
@@ -427,7 +427,7 @@ public class Win2DSubtitleRendererTests
         {
             Assert.That(right, Is.GreaterThanOrEqualTo(left), "the cue is drawn for this to say anything");
             Assert.That(bottom, Is.GreaterThan(height / 2), "the words sit at the surface's bottom, not the picture's");
-            Assert.That(topHalf, Is.EqualTo(whole), "and the picture's place changes nothing for this renderer");
+            Assert.That(topHalf, Is.EqualTo(whole), "and the picture's place changes nothing for this drawing");
         }
     }
 
@@ -464,7 +464,7 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void DrawsABitmapCueWhereItsFractionsSay()
     {
-        using Win2DSubtitleRenderer renderer = new();
+        using Win2DSubtitleLayer drawing = new();
 
         CanvasRenderTarget? target = null;
         try
@@ -472,7 +472,7 @@ public class Win2DSubtitleRendererTests
             CanvasDevice device;
             try
             {
-                device = renderer.EnsureCanvasDevice();
+                device = EnsureCanvasDevice(drawing);
             }
             catch (Exception exception)
             {
@@ -490,7 +490,7 @@ public class Win2DSubtitleRendererTests
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Color));
-                renderer.DrawCues(session, [cue], SubtitlePresentation.Identity, width, height);
+                drawing.DrawCues(session, [cue], SubtitlePresentation.Identity, width, height);
             }
 
             byte[] pixels = target.GetPixelBytes();
@@ -515,7 +515,7 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void StacksSimultaneousCuesInsteadOfDrawingThemOnOneAnother()
     {
-        using Win2DSubtitleRenderer renderer = new();
+        using Win2DSubtitleLayer drawing = new();
 
         CanvasRenderTarget? target = null;
         try
@@ -523,7 +523,7 @@ public class Win2DSubtitleRendererTests
             CanvasDevice device;
             try
             {
-                device = renderer.EnsureCanvasDevice();
+                device = EnsureCanvasDevice(drawing);
             }
             catch (Exception exception)
             {
@@ -541,7 +541,7 @@ public class Win2DSubtitleRendererTests
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Color));
-                renderer.DrawCues(session, [first, second], SubtitlePresentation.Identity, width, height);
+                drawing.DrawCues(session, [first, second], SubtitlePresentation.Identity, width, height);
             }
 
             byte[] pixels = target.GetPixelBytes();
@@ -778,8 +778,8 @@ public class Win2DSubtitleRendererTests
     {
         int baseline = D3D11Device.AliveDeviceCount;
 
-        Win2DSubtitleRenderer first = new();
-        Win2DSubtitleRenderer second = new();
+        Win2DSubtitleLayer first = new();
+        Win2DSubtitleLayer second = new();
         try
         {
             CanvasDevice firstDevice = EnsureCanvasDevice(first);
@@ -815,11 +815,11 @@ public class Win2DSubtitleRendererTests
         return drawn;
     }
 
-    private static CanvasDevice EnsureCanvasDevice(Win2DSubtitleRenderer renderer)
+    private static CanvasDevice EnsureCanvasDevice(Win2DSubtitleLayer drawing)
     {
         try
         {
-            return renderer.EnsureCanvasDevice();
+            return drawing.EnsureCanvasDevice();
         }
         catch (InvalidOperationException exception)
         {
