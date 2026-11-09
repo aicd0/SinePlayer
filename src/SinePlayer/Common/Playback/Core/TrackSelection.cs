@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 
 using SinePlayer.Core.Common.Utils;
@@ -15,71 +16,199 @@ namespace SinePlayer.Common.Playback.Core;
 
 internal static class TrackSelection
 {
-    public static MediaStreamInfo? Resolve(MediaModel media, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
+    public static TrackSelectionModel? Load(MediaModel media)
     {
-        Preference? preference = Load(media, kind, sources);
-        if (preference is null)
-        {
-            return Default(sources, kind);
-        }
-
-        return preference.Enabled ? preference.Stream ?? Default(sources, kind) : null;
-    }
-
-    public static Preference? Load(MediaModel media, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
-    {
-        string? value = media.GetExt(KeyOf(kind));
+        string? value = media.GetExt(MediaExt.TRACK_SELECTION);
         if (string.IsNullOrEmpty(value))
         {
             return null;
         }
 
-        SelectedTrackModel? model = Parse(value);
-        if (model is null)
-        {
-            return null;
-        }
-
-        return new Preference
-        {
-            Enabled = model.Enabled,
-            Path = model.Path,
-            Index = model.Index,
-            Stream = model.Enabled ? Find(sources, model.Path, kind, model.Index) : null,
-        };
-    }
-
-    public static void Save(MediaModel media, MediaStreamKind kind, MediaSource? source, MediaStreamInfo? stream)
-    {
-        SelectedTrackModel model = stream is null
-            ? new() { Enabled = false }
-            : new()
-            {
-                Enabled = true,
-                Path = source?.Locator.Value ?? string.Empty,
-                Index = stream.Index,
-            };
-
-        string value = JsonSerializer.Serialize(model);
-        if (media.GetExt(KeyOf(kind)) == value)
-        {
-            return;
-        }
-
-        media.SetExt(KeyOf(kind), value);
-        CoroutineUtils.Run(media.FlushExt);
-    }
-
-    private static SelectedTrackModel? Parse(string value)
-    {
         try
         {
-            return JsonSerializer.Deserialize<SelectedTrackModel>(value);
+            return JsonSerializer.Deserialize<TrackSelectionModel>(value);
         }
         catch (JsonException)
         {
             return null;
         }
+    }
+
+    public static MediaStreamInfo? Resolve(MediaModel media, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
+    {
+        TrackSelectionModel? model = Load(media);
+        if (model is null)
+        {
+            return Default(sources, kind);
+        }
+
+        if (kind is MediaStreamKind.Audio)
+        {
+            return model.AudioSelections is { } audios ? ResolveFrom(audios, kind, sources) : Default(sources, kind);
+        }
+
+        ViewTrackSelectionModel? view = FirstView(model);
+        if (kind is MediaStreamKind.Video)
+        {
+            SelectedTrackModel? selection = view?.VideoSelection;
+            if (selection is null)
+            {
+                return Default(sources, kind);
+            }
+
+            return selection.Enabled ? Find(sources, kind, selection.Path, selection.Index) ?? Default(sources, kind) : null;
+        }
+
+        return view?.SubtitleSelections is { } subtitles ? ResolveFrom(subtitles, kind, sources) : Default(sources, kind);
+    }
+
+    public static void Save(MediaModel media, MediaStreamKind kind, MediaSource? source, MediaStreamInfo? stream)
+    {
+        TrackSelectionModel model = Load(media) ?? new TrackSelectionModel();
+
+        switch (kind)
+        {
+            case MediaStreamKind.Audio:
+                model.AudioSelections = stream is null ? [] : [EntryOf(source, stream)];
+                break;
+            case MediaStreamKind.Video:
+                EnsureFirstView(model).VideoSelection = stream is null
+                    ? new SelectedTrackModel { Enabled = false }
+                    : new SelectedTrackModel { Enabled = true, Path = source?.Locator.Value ?? string.Empty, Index = stream.Index };
+                break;
+            case MediaStreamKind.Subtitle:
+                EnsureFirstView(model).SubtitleSelections = stream is null ? [] : [EntryOf(source, stream)];
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Only the picture, the sound and the subtitles can be chosen.");
+        }
+
+        Store(media, model);
+    }
+
+    public static bool AllowMultiAudioTracks(MediaModel media)
+    {
+        return Load(media)?.AllowMultiAudioTracks ?? false;
+    }
+
+    public static bool AllowMultiSubtitleTracks(MediaModel media)
+    {
+        TrackSelectionModel? model = Load(media);
+        return model is not null && FirstView(model) is { AllowMultiSubtitleTracks: true };
+    }
+
+    public static void SetAllowMultiAudioTracks(MediaModel media, bool allow)
+    {
+        TrackSelectionModel model = Load(media) ?? new TrackSelectionModel();
+        if (model.AllowMultiAudioTracks == allow)
+        {
+            return;
+        }
+
+        model.AllowMultiAudioTracks = allow;
+        Store(media, model);
+    }
+
+    public static void SetAllowMultiSubtitleTracks(MediaModel media, bool allow)
+    {
+        TrackSelectionModel model = Load(media) ?? new TrackSelectionModel();
+        ViewTrackSelectionModel view = EnsureFirstView(model);
+        if (view.AllowMultiSubtitleTracks == allow)
+        {
+            return;
+        }
+
+        view.AllowMultiSubtitleTracks = allow;
+        Store(media, model);
+    }
+
+    /// <summary>
+    /// The sources this media's remembered tracks name, so one that is not part of the media — an external subtitle file —
+    /// can be added before anything is resolved.
+    /// </summary>
+    public static IReadOnlyList<string> RememberedPaths(MediaModel media)
+    {
+        TrackSelectionModel? model = Load(media);
+        if (model is null)
+        {
+            return [];
+        }
+
+        List<string> paths = [];
+        if (model.Views is { } views)
+        {
+            foreach (ViewTrackSelectionModel view in views)
+            {
+                if (view.VideoSelection is { Enabled: true } video)
+                {
+                    paths.Add(video.Path);
+                }
+
+                if (view.SubtitleSelections is { } subtitles)
+                {
+                    paths.AddRange(subtitles.Select(entry => entry.Path));
+                }
+            }
+        }
+
+        if (model.AudioSelections is { } audios)
+        {
+            paths.AddRange(audios.Select(entry => entry.Path));
+        }
+
+        return [.. paths.Where(path => !string.IsNullOrEmpty(path)).Distinct()];
+    }
+
+    private static MediaStreamInfo? ResolveFrom(List<TrackSelectionEntryModel> entries, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
+    {
+        if (entries.Count == 0)
+        {
+            return null;
+        }
+
+        foreach (TrackSelectionEntryModel entry in entries)
+        {
+            if (Find(sources, kind, entry.Path, entry.Index) is { } stream)
+            {
+                return stream;
+            }
+        }
+
+        return Default(sources, kind);
+    }
+
+    private static ViewTrackSelectionModel? FirstView(TrackSelectionModel model)
+    {
+        return model.Views is { Count: > 0 } views ? views[0] : null;
+    }
+
+    private static ViewTrackSelectionModel EnsureFirstView(TrackSelectionModel model)
+    {
+        if (FirstView(model) is { } existing)
+        {
+            return existing;
+        }
+
+        ViewTrackSelectionModel view = new();
+        model.Views = [view];
+        return view;
+    }
+
+    private static TrackSelectionEntryModel EntryOf(MediaSource? source, MediaStreamInfo stream)
+    {
+        return new TrackSelectionEntryModel { Path = source?.Locator.Value ?? string.Empty, Index = stream.Index };
+    }
+
+    private static void Store(MediaModel media, TrackSelectionModel model)
+    {
+        string value = JsonSerializer.Serialize(model);
+        if (media.GetExt(MediaExt.TRACK_SELECTION) == value)
+        {
+            return;
+        }
+
+        media.SetExt(MediaExt.TRACK_SELECTION, value);
+        CoroutineUtils.Run(media.FlushExt);
     }
 
     private static MediaStreamInfo? Default(IReadOnlyList<MediaSource> sources, MediaStreamKind kind)
@@ -106,7 +235,7 @@ internal static class TrackSelection
         return first;
     }
 
-    private static MediaStreamInfo? Find(IReadOnlyList<MediaSource> sources, string path, MediaStreamKind kind, int index)
+    private static MediaStreamInfo? Find(IReadOnlyList<MediaSource> sources, MediaStreamKind kind, string path, int index)
     {
         foreach (MediaSource source in sources)
         {
@@ -125,27 +254,5 @@ internal static class TrackSelection
         }
 
         return null;
-    }
-
-    private static string KeyOf(MediaStreamKind kind)
-    {
-        return kind switch
-        {
-            MediaStreamKind.Video => MediaExt.SELECTED_VIDEO_TRACK,
-            MediaStreamKind.Audio => MediaExt.SELECTED_AUDIO_TRACK,
-            MediaStreamKind.Subtitle => MediaExt.SELECTED_SUBTITLE_TRACK,
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Only the picture, the sound and the subtitles can be chosen."),
-        };
-    }
-
-    internal sealed class Preference
-    {
-        public bool Enabled { get; init; }
-
-        public string Path { get; init; } = string.Empty;
-
-        public int Index { get; init; }
-
-        public MediaStreamInfo? Stream { get; init; }
     }
 }
