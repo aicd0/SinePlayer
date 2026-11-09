@@ -69,6 +69,11 @@ internal sealed partial class PlayerSession : IDisposable
 
     #region Public API
 
+    public static string NewId()
+    {
+        return Guid.NewGuid().ToString();
+    }
+
     public event Action<MediaEngineState, string?>? StateChanged;
 
     public event Action<MediaModel?, OperationResult>? MediaChanged;
@@ -122,7 +127,7 @@ internal sealed partial class PlayerSession : IDisposable
 
     public long StartPositionMs { get; private set; }
 
-    public void Load(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
+    public void Load(PlayQueueModel playQueue, PlaybackModel.PlaybackJsonModel? playback, long initialPositionMs)
     {
         if (_loaded)
         {
@@ -131,7 +136,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         _loaded = true;
         _playQueue = playQueue;
-        Playback.LoadState(playQueue, serializedPlayback, initialPositionMs);
+        Playback.LoadState(playQueue, playback, initialPositionMs);
     }
 
     public void Dispose()
