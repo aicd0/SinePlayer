@@ -262,7 +262,7 @@ events stays blank: the repeat and shuffle marks, the transport's neighbour enab
 them were missing in the second window, and the volume was never the second window's business at all. So two rules:
 a page calls `RefreshFromSession` once as it starts, which reads the media, the state, the position, the volume and the
 playback in one pass; and any state the session owns that a page shows gets an event (`PlayerSession.VolumeChanged` is the
-one that was missing). Nothing may depend on having been present when something happened.
+one that was missing). Nothing may depend on having been present when something happened. Two consequences, both found by using the app: the position a media opens at is applied by the **session**, inside the open, rather than by each page when it hears the media opened — a page that started after that announcement (or missed it) sat at zero; and a playback dispatch that leaves the current queue item where it was is not an open at all (`_openedItemId` says so), because announcing it made every page re-run its open sequence — which is how cycling the repeat mode used to start the media and jump it back to the start position.
 ## 5. Phases
 
 Invariant, as in the previous plans: one coherent change per step, a build that is clean (0 errors, 0 warnings) at

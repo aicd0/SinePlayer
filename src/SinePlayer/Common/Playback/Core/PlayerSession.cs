@@ -132,8 +132,6 @@ internal sealed partial class PlayerSession : IDisposable
 
     public double PlaybackRate => 1.0;
 
-    public long StartPositionMs { get; private set; }
-
     public Task EnsureLoaded()
     {
         return _loadTask ??= LoadRecordAsync();
@@ -677,6 +675,8 @@ internal sealed partial class PlayerSession : IDisposable
     private PlaybackStateChangedEventArgs? _pendingOpen;
     private bool _isOpening;
     private MediaModel? _openedMedia;
+    private string? _openedItemId;
+    private long _startPositionMs;
     private long _lastProgressSaveTicks;
     private bool _volumeSaveScheduled;
 
@@ -712,41 +712,38 @@ internal sealed partial class PlayerSession : IDisposable
 
     private async Task OpenCurrentAsync(PlaybackStateChangedEventArgs args)
     {
-        MediaModel? media = CurrentMedia;
-        StartPositionMs = media is null ? 0 : ResolveStartPositionMs(media, args);
-
-        // The media that was playing is still the one the pipeline holds, so this is the last moment its position can
-        // be recorded against it.
         SaveProgress();
+
+        MediaModel? media = CurrentMedia;
+        if (media is not null && _openedItemId == Playback.CurrentItem?.Id && Sources.Any(source => source.Locator.Value == media.Location))
+        {
+            return;
+        }
 
         if (media is null)
         {
             _openedMedia = null;
+            _startPositionMs = 0;
             RaiseMediaChanged(null, OperationResult.Success());
             return;
         }
 
-        if (Sources.Any(source => source.Locator.Value == media.Location))
-        {
-            // Nothing to open: a page joined a playback that is already playing this media, or the queue only
-            // re-announced it.
-            RaiseMediaChanged(media, OperationResult.Success());
-            return;
-        }
-
+        _startPositionMs = ResolveStartPositionMs(media, args);
         RaiseMediaChanged(media, await OpenAsync(media));
     }
 
     private async Task<OperationResult> OpenAsync(MediaModel media)
     {
-        OperationResult reset = await Reset();
+        PlaybackPipeline pipeline = EnsurePipeline();
+
+        OperationResult reset = await pipeline.Reset();
         if (!reset.IsSuccessful)
         {
             return reset;
         }
 
-        // Nothing is open any more, so nothing may later write progress against the media that just closed.
         _openedMedia = null;
+        _openedItemId = null;
 
         OperationResult<MediaSource> loaded = await AddSource(media.Location);
         if (!loaded.IsSuccessful)
@@ -759,6 +756,18 @@ internal sealed partial class PlayerSession : IDisposable
         await AddRememberedSourcesAsync(media);
         await AddSameNameSubtitlesAsync(media.Location);
         await ApplyTrackSelectionsAsync();
+
+        if (_startPositionMs > 0)
+        {
+            SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
+            OperationResult sought = await pipeline.Seek(TimeSpan.FromMilliseconds(_startPositionMs), mode);
+            if (!sought.IsSuccessful)
+            {
+                Logger.W(TAG, $"The position {_startPositionMs} ms could not be restored: {sought.Message}");
+            }
+
+            RaisePositionChanged();
+        }
 
         return OperationResult.Success();
     }
@@ -895,6 +904,7 @@ internal sealed partial class PlayerSession : IDisposable
     private void RecordOpen(MediaModel media)
     {
         _openedMedia = media;
+        _openedItemId = Playback.CurrentItem?.Id;
 
         CoroutineUtils.Run(async () =>
         {
