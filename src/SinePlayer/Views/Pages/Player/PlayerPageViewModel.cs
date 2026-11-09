@@ -193,7 +193,14 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         Playback.PlaybackStateChanged += Playback_PlaybackStateChanged;
     }
 
-    public void ShowMedia(MediaModel? media)
+    public void Destory()
+    {
+        Playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
+        _playback = null;
+        _media = null;
+    }
+
+    public void SetMedia(MediaModel? media)
     {
         _media = null;
         _durationMs = 0;
@@ -210,13 +217,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         IsAudio = media.Type == MediaType.Audio;
         UpdateMediaMetadata();
         UpdateFavoriteStatusInternal(media);
-    }
-
-    public void Destory()
-    {
-        Playback.PlaybackStateChanged -= Playback_PlaybackStateChanged;
-        _playback = null;
-        _media = null;
     }
 
     public void Next()
@@ -314,6 +314,18 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
             PinButtonGlyph = "\uE718";
             PinButtonText = StringResourceProvider.Instance.Pin;
         }
+    }
+
+    public void UpdatePlaybackState()
+    {
+        if (_playback is null)
+        {
+            return;
+        }
+
+        IsPlaybackNextEnabled = _playback.CanGoNext;
+        IsPlaybackPreviousEnabled = _playback.CanGoPrevious;
+        PlaybackChangeLiveData.Emit(true);
     }
 
     public void UpdateFavoriteStatus()

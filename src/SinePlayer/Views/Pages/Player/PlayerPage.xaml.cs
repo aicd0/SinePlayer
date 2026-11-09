@@ -124,9 +124,12 @@ internal sealed partial class PlayerPage : BasePage
 
             await session.EnsureLoaded();
 
-            ViewModel.ShowMedia(session.CurrentMedia);
+            ViewModel.SetMedia(session.CurrentMedia);
             ShowState(session.State, session.Error);
             Session_PositionChanged();
+            ViewModel.SetVolume((int)Math.Round(session.Volume * 100.0));
+            ViewModel.SetMute(session.IsMuted);
+            ViewModel.UpdatePlaybackState();
         });
     }
 
@@ -527,12 +530,6 @@ internal sealed partial class PlayerPage : BasePage
     private bool _viewDisposed;
     private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
 
-    /// <summary>
-    /// The playback moved to a media, and the session has opened it. This page's part is what only it can do: the media
-    /// it shows, the picture and the words its own view draws, and whether the playback starts. What the media records
-    /// about being played, and what comes after it ends, are the session's. The work here is this page's own, so a
-    /// media that has already been replaced by the time an await returns is left alone.
-    /// </summary>
     private void Session_MediaChanged(MediaModel? media, OperationResult opened)
     {
         Enqueue(async () =>
@@ -545,7 +542,7 @@ internal sealed partial class PlayerPage : BasePage
             }
 
             ViewModel.PositionLiveData.Emit(0);
-            ViewModel.ShowMedia(media);
+            ViewModel.SetMedia(media);
 
             if (media is null)
             {
@@ -657,6 +654,7 @@ internal sealed partial class PlayerPage : BasePage
         session.StateChanged += Session_StateChanged;
         session.PositionChanged += Session_PositionChanged;
         session.MediaChanged += Session_MediaChanged;
+        session.VolumeChanged += Session_VolumeChanged;
         TabPlayerSessionModel.Save(GetMainPageAbility().TabId, session.Id);
         _session = session;
         UpdateSubtitlePresentation();
@@ -678,6 +676,7 @@ internal sealed partial class PlayerPage : BasePage
         session.StateChanged -= Session_StateChanged;
         session.PositionChanged -= Session_PositionChanged;
         session.MediaChanged -= Session_MediaChanged;
+        session.VolumeChanged -= Session_VolumeChanged;
 
         Enqueue(async () =>
         {
@@ -714,6 +713,18 @@ internal sealed partial class PlayerPage : BasePage
         ViewModel.SetPosition(
             session.Position.Ticks / TimeSpan.TicksPerMillisecond,
             session.Duration.Ticks / TimeSpan.TicksPerMillisecond);
+    }
+
+    private void Session_VolumeChanged()
+    {
+        PlayerSession? session = _session;
+        if (session is null)
+        {
+            return;
+        }
+
+        ViewModel.SetVolume((int)Math.Round(session.Volume * 100.0));
+        ViewModel.SetMute(session.IsMuted);
     }
 
     private void ShowState(MediaEngineState state, string? message)
