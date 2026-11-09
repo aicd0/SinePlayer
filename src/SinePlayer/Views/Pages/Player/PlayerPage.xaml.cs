@@ -29,7 +29,6 @@ using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
-using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Pipeline;
 using SinePlayer.Data.Database;
@@ -99,22 +98,36 @@ internal sealed partial class PlayerPage : BasePage
         }
 
         _restoredFromLastSession = restored;
-
         _sessionId = sessionId;
-        PlayerSession session = EnsureSession();
-        _view = session.CreateView();
-        ViewModel.Initialize(PageActionHandler, session.Playback);
-        ObserveData();
-        UpdateKeyboardAccelerators();
 
-        VideoHost.Children.Clear();
-        VideoHost.Children.Add(_view.VideoPanel);
-        SubtitleHost.Children.Clear();
-        SubtitleHost.Children.Add(_view.SubtitlePanel);
+        Enqueue(async () =>
+        {
+            PlayerSession session = EnsureSession();
+            _session = session;
 
-        ViewModel.ShowMedia(session.CurrentMedia);
-        ShowState(session.State, session.Error);
-        Session_PositionChanged();
+            if (_sessionCreator)
+            {
+                session.SetVolume(Math.Clamp(AppSettingsModel.PlayerVolume, 0.0, 1.0));
+                session.SetMuted(AppSettingsModel.PlayerMuted);
+            }
+
+            PlayerView view = await session.CreateView();
+            _view = view;
+            ViewModel.Initialize(PageActionHandler, session.Playback);
+            ObserveData();
+            UpdateKeyboardAccelerators();
+
+            VideoHost.Children.Clear();
+            VideoHost.Children.Add(view.VideoPanel);
+            SubtitleHost.Children.Clear();
+            SubtitleHost.Children.Add(view.SubtitlePanel);
+
+            await session.EnsureLoaded();
+
+            ViewModel.ShowMedia(session.CurrentMedia);
+            ShowState(session.State, session.Error);
+            Session_PositionChanged();
+        });
     }
 
     protected override void OnResume()
@@ -153,11 +166,11 @@ internal sealed partial class PlayerPage : BasePage
         bar.FavoriteChanged += isFavorite =>
         {
             ViewModel.SetFavorite(isFavorite);
-            _session?.SetFavorite(isFavorite);
+            Enqueue(() => _session?.SetFavorite(isFavorite));
         };
         bar.MediaInfoRequested += OpenMediaInfoPane;
         bar.PlaybackInfoRequested += ShowPlaybackInfo;
-        bar.PlayerSettingsChanged += settings => CoroutineUtils.Run(() => ApplyPlayerSettings(settings));
+        bar.PlayerSettingsChanged += settings => Enqueue(() => ApplyPlayerSettings(settings));
         GetMainPageAbility().SetCustomCenteredNavigationBar(bar);
         _navigationBar = bar;
     }
@@ -475,26 +488,29 @@ internal sealed partial class PlayerPage : BasePage
 
     private async Task AddSubtitleFilesAsync(IReadOnlyList<string> paths)
     {
-        PlayerSession? session = _session;
-        PlayerView? view = _view;
-        MediaModel? media = ViewModel.Media;
-        if (session is null || view is null || media is null)
+        Enqueue(async () =>
         {
-            PromptTemporary("There is no playback to add the subtitles to.");
-            return;
-        }
+            PlayerSession? session = _session;
+            PlayerView? view = _view;
+            MediaModel? media = ViewModel.Media;
+            if (session is null || view is null || media is null)
+            {
+                PromptTemporary("There is no playback to add the subtitles to.");
+                return;
+            }
 
-        if (ViewModel.PlayerStatus == PlayerPageViewModel.PlayerStatusEnum.Loading)
-        {
-            Logger.W(TAG, "Subtitles were dropped while the player was loading, so they were not added.");
-            return;
-        }
+            if (ViewModel.PlayerStatus == PlayerPageViewModel.PlayerStatusEnum.Loading)
+            {
+                Logger.W(TAG, "Subtitles were dropped while the player was loading, so they were not added.");
+                return;
+            }
 
-        OperationResult added = await SubtitleSourceLoader.AddAndSelect(session, view, media, paths);
-        if (!added.IsSuccessful)
-        {
-            PromptTemporary(added.Message);
-        }
+            OperationResult added = await SubtitleSourceLoader.AddAndSelect(session, view, media, paths);
+            if (!added.IsSuccessful)
+            {
+                PromptTemporary(added.Message);
+            }
+        });
     }
 
     #endregion
@@ -503,10 +519,12 @@ internal sealed partial class PlayerPage : BasePage
 
     private const string TAG = nameof(PlayerPage);
 
+    private readonly SimpleTaskQueue _sessionQueue = new();
     private string _sessionId = string.Empty;
     private bool _sessionCreator;
     private PlayerSession? _session;
     private PlayerView? _view;
+    private bool _viewDisposed;
     private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
 
     /// <summary>
@@ -517,7 +535,7 @@ internal sealed partial class PlayerPage : BasePage
     /// </summary>
     private void Session_MediaChanged(MediaModel? media, OperationResult opened)
     {
-        CoroutineUtils.Run(async () =>
+        Enqueue(async () =>
         {
             PlayerSession? session = _session;
             PlayerView? view = _view;
@@ -582,70 +600,30 @@ internal sealed partial class PlayerPage : BasePage
 
     private async Task<OperationResult> SelectTracks(PlayerSession session, PlayerView view, MediaModel media)
     {
-        List<string> unplayable = [];
-
-        MediaStreamInfo? video = TrackSelection.Resolve(media, MediaStreamKind.Video, session.Sources);
-        if (video is not null)
-        {
-            OperationResult chosen = await session.SelectVideoStream(view, video);
-            if (!chosen.IsSuccessful)
-            {
-                unplayable.Add($"the picture could not be played ({chosen.Message})");
-            }
-        }
-
-        MediaStreamInfo? subtitle = TrackSelection.Resolve(media, MediaStreamKind.Subtitle, session.Sources);
-        if (subtitle is not null)
-        {
-            OperationResult chosen = await session.AddSubtitleStream(view, subtitle);
-            if (!chosen.IsSuccessful)
-            {
-                unplayable.Add($"the subtitles could not be played ({chosen.Message})");
-            }
-        }
-
-        bool playing = false;
         OperationResult<ReconcileResult> reconciled = await session.Reconcile();
         if (!reconciled.IsSuccessful)
         {
             PromptTemporary(reconciled.Message);
+            return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': {reconciled.Message}");
         }
-        else
+
+        ReconcileResult result = reconciled.Result;
+
+        OperationResult? videoResult = result.Video(view);
+        if (videoResult is { IsSuccessful: false })
         {
-            ReconcileResult result = reconciled.Result;
-
-            if (video is not null)
-            {
-                OperationResult? videoResult = result.Video(view);
-                playing |= videoResult?.IsSuccessful == true;
-                if (videoResult is { IsSuccessful: false })
-                {
-                    PromptTemporary(videoResult.Message);
-                }
-            }
-
-            playing |= result.Audio()?.IsSuccessful == true;
-
-            if (subtitle is not null && result.Subtitle(view) is { IsSuccessful: false } subtitleFailure)
-            {
-                PromptTemporary(subtitleFailure.Message);
-            }
+            PromptTemporary(videoResult.Message);
         }
 
-        if (!playing)
+        if (result.Subtitle(view) is { IsSuccessful: false } subtitleFailure)
         {
-            string why = unplayable.Count == 0
-                ? "neither the picture nor the sound could be played"
-                : string.Join(", ", unplayable);
-            return OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': {why}.");
+            PromptTemporary(subtitleFailure.Message);
         }
 
-        if (unplayable.Count > 0)
-        {
-            Logger.W(TAG, $"Playing '{media.Location}' without everything it holds: {string.Join(", ", unplayable)}.");
-        }
-
-        return OperationResult.Success();
+        bool playing = videoResult?.IsSuccessful == true || result.Audio()?.IsSuccessful == true;
+        return playing
+            ? OperationResult.Success()
+            : OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': neither the picture nor the sound could be played.");
     }
 
     private void StartPlaybackOnOpen(PlayerSession session)
@@ -676,12 +654,6 @@ internal sealed partial class PlayerPage : BasePage
         }
 
         PlayerSession session = PlayerSessionManager.Shared.Acquire(_sessionId, out _sessionCreator);
-        if (_sessionCreator)
-        {
-            session.SetVolume(Math.Clamp(AppSettingsModel.PlayerVolume, 0.0, 1.0));
-            session.SetMuted(AppSettingsModel.PlayerMuted);
-        }
-
         session.StateChanged += Session_StateChanged;
         session.PositionChanged += Session_PositionChanged;
         session.MediaChanged += Session_MediaChanged;
@@ -690,31 +662,34 @@ internal sealed partial class PlayerPage : BasePage
 
         ViewModel.VolumeLiveData.Emit((int)Math.Round(session.Volume * 100.0));
         ViewModel.MuteLiveData.Emit(session.IsMuted);
-
-        session.EnsureLoaded();
         return session;
     }
 
     private void ReleaseSession()
     {
         PlayerSession? session = _session;
-        PlayerView? view = _view;
         _session = null;
-        _view = null;
         if (session is null)
         {
             return;
         }
 
-        if (view is not null)
-        {
-            session.RemoveView(view);
-        }
-
         session.StateChanged -= Session_StateChanged;
         session.PositionChanged -= Session_PositionChanged;
         session.MediaChanged -= Session_MediaChanged;
-        PlayerSessionManager.Shared.Release(session.Id);
+
+        Enqueue(async () =>
+        {
+            _viewDisposed = true;
+            PlayerView? view = _view;
+            _view = null;
+            if (view is not null)
+            {
+                await session.RemoveView(view);
+            }
+
+            PlayerSessionManager.Shared.Release(session.Id);
+        });
     }
 
     private void Session_StateChanged(MediaEngineState state, string? message)
@@ -1063,51 +1038,49 @@ internal sealed partial class PlayerPage : BasePage
 
     private void TogglePlayPause()
     {
-        PlayerSession? session = _session;
-        if (session is null)
+        Enqueue(() =>
         {
-            return;
-        }
+            if (_session is not { } session)
+            {
+                return;
+            }
 
-        if (session.State == MediaEngineState.Playing)
-        {
-            session.Pause();
-        }
-        else
-        {
-            session.Play();
-        }
+            if (session.State == MediaEngineState.Playing)
+            {
+                session.Pause();
+            }
+            else
+            {
+                session.Play();
+            }
+        });
     }
 
     private void SeekBy(long deltaMs)
     {
-        PlayerSession? session = _session;
-        if (session is null)
+        Enqueue(() =>
         {
-            return;
-        }
+            if (_session is not { } session)
+            {
+                return;
+            }
 
-        long positionMs = session.Position.Ticks / TimeSpan.TicksPerMillisecond;
-        SeekTo(Math.Max(positionMs + deltaMs, 0));
+            long positionMs = session.Position.Ticks / TimeSpan.TicksPerMillisecond;
+            SeekTo(Math.Max(positionMs + deltaMs, 0));
+        });
     }
 
     private void SeekTo(long positionMs)
     {
         SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
-        _session?.Seek(TimeSpan.FromMilliseconds(positionMs), mode);
+        Enqueue(() => _session?.Seek(TimeSpan.FromMilliseconds(positionMs), mode));
     }
 
     private void SetVolume(int volume)
     {
-        PlayerSession? session = _session;
-        if (session is null)
-        {
-            return;
-        }
-
         int clampedVolume = Math.Clamp(volume, 0, 100);
-        session.SetVolume(clampedVolume / 100.0);
         ViewModel.SetVolume(clampedVolume);
+        Enqueue(() => _session?.SetVolume(clampedVolume / 100.0));
     }
 
     private void AdjustVolume(int delta)
@@ -1117,14 +1090,8 @@ internal sealed partial class PlayerPage : BasePage
 
     private void SetMuted(bool isMuted)
     {
-        PlayerSession? session = _session;
-        if (session is null)
-        {
-            return;
-        }
-
-        session.SetMuted(isMuted);
         ViewModel.SetMute(isMuted);
+        Enqueue(() => _session?.SetMuted(isMuted));
     }
 
     private async Task ApplyPlayerSettings(PlayerSettingsModel settings)
@@ -1329,7 +1296,7 @@ internal sealed partial class PlayerPage : BasePage
             ? new SubtitleInsets(0.0, _topOverlayHeight, _rightOverlayWidth, _bottomGridHeight)
             : SubtitleInsets.None;
         _subtitlePresentation = _subtitlePresentation with { Insets = insets };
-        _session?.SetSubtitlePresentation(_subtitlePresentation);
+        Enqueue(() => _session?.SetSubtitlePresentation(_subtitlePresentation));
     }
 
     #endregion
@@ -1347,7 +1314,7 @@ internal sealed partial class PlayerPage : BasePage
         {
             if (AppSettingsModel.PauseOnLeaveTab && !ViewModel.IsAudio)
             {
-                _session?.Pause();
+                Enqueue(() => _session?.Pause());
             }
 
             ViewModel.Next();
@@ -1356,7 +1323,7 @@ internal sealed partial class PlayerPage : BasePage
         if (IsResumed && _playbackPendingOnActivate)
         {
             _playbackPendingOnActivate = false;
-            _session?.Play();
+            Enqueue(() => _session?.Play());
         }
     }
 
@@ -1486,6 +1453,28 @@ internal sealed partial class PlayerPage : BasePage
     #endregion
 
     #region Utilities
+
+    private void Enqueue(Action action)
+    {
+        Enqueue(() =>
+        {
+            action();
+            return Task.CompletedTask;
+        });
+    }
+
+    private void Enqueue(Func<Task> func)
+    {
+        CoroutineUtils.Run(() => _sessionQueue.Enqueue(async () =>
+        {
+            if (_viewDisposed)
+            {
+                return;
+            }
+
+            await func();
+        }));
+    }
 
     private IMainPageAbilityForTab GetMainPageAbility()
     {
