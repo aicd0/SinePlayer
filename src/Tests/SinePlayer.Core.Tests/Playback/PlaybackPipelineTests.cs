@@ -1268,6 +1268,53 @@ public class PlaybackPipelineTests
         }
     }
 
+    /// <summary>
+    /// A seek whose landing is not a keyframe — which is what a demuxer gives when it lands on the first packet at or after
+    /// the request, and what a group of pictures makes possible — must not hand that packet to a decoder that has just been
+    /// flushed. A real decoder answers "Invalid data found when processing input" and the playback is over; the picture waits
+    /// for the next keyframe instead. The synthetic decoder refuses a packet it has no reference for, so this test sees the
+    /// ordering the codecs see.
+    /// </summary>
+    [Test]
+    public void StartsAtTheNextKeyFrameWhenTheSeekLandsInsideAGroup()
+    {
+        string path = SyntheticPath("gop");
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(path, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            KeyFrameInterval = 30,
+            LandsOnTheKeyframeBefore = false,
+        });
+
+        PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, new FakeSubtitleRenderer());
+        try
+        {
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(path))).IsSuccessful, Is.True);
+
+            MediaInfo info = pipeline.Sources[0].Info;
+            Assert.That(Select(pipeline, MediaStreamKind.Video, info.VideoStreams[0]).IsSuccessful, Is.True);
+            Assert.That(Select(pipeline, MediaStreamKind.Audio, info.AudioStreams[0]).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            Thread.Sleep(40);
+
+            // 1.5 s is halfway between the keyframes at 1 s and 2 s.
+            SeekAndWait(pipeline, TimeSpan.FromSeconds(1.5));
+
+            Assert.That(pipeline.Error, Is.Null, "a packet with no keyframe before it must never reach the decoder");
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a seek leaves the state as it found it");
+
+            WaitForPlaybackToFinish(pipeline);
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
     [Test]
     public void SeeksWhilePausedAndStaysPaused()
     {

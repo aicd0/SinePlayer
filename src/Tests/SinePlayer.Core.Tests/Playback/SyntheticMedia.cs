@@ -66,6 +66,13 @@ internal sealed class SyntheticMediaScript
 
     internal int FrameRate { get; init; } = 30;
 
+    /// <summary>
+    /// How many video packets a keyframe covers: one means every packet is one, which is what every script that does not
+    /// ask for a group of pictures gets. A real codec only decodes a packet from the keyframe its group starts at, which is
+    /// what a seek that lands mid-group has to cope with.
+    /// </summary>
+    internal int KeyFrameInterval { get; init; } = 1;
+
     internal int SampleRate { get; init; } = 44100;
 
     /// <summary>How many channels the sound's stream declares, which is what a device with fewer speaks to.</summary>
@@ -216,7 +223,8 @@ internal sealed class SyntheticMediaSource : IMediaSource
         int frameCount = (int)(script.Duration.TotalSeconds * script.FrameRate);
         for (int index = 0; index < frameCount; index++)
         {
-            _timeline.Add(new ScriptedPacket(true, false, TimeSpan.FromSeconds((double)index / script.FrameRate), TimeSpan.FromSeconds(1.0 / script.FrameRate)));
+            bool keyFrame = index % Math.Max(script.KeyFrameInterval, 1) == 0;
+            _timeline.Add(new ScriptedPacket(true, false, keyFrame, TimeSpan.FromSeconds((double)index / script.FrameRate), TimeSpan.FromSeconds(1.0 / script.FrameRate)));
         }
 
         int packetCount = (int)(script.Duration.TotalSeconds * script.SampleRate / script.SamplesPerAudioPacket);
@@ -224,12 +232,12 @@ internal sealed class SyntheticMediaSource : IMediaSource
         {
             var start = TimeSpan.FromSeconds((double)(index * script.SamplesPerAudioPacket) / script.SampleRate);
             var length = TimeSpan.FromSeconds((double)script.SamplesPerAudioPacket / script.SampleRate);
-            _timeline.Add(new ScriptedPacket(false, false, start, length));
+            _timeline.Add(new ScriptedPacket(false, false, true, start, length));
         }
 
         foreach (ScriptedSubtitle subtitle in script.Subtitles)
         {
-            _timeline.Add(new ScriptedPacket(false, true, subtitle.Start, subtitle.Length));
+            _timeline.Add(new ScriptedPacket(false, true, true, subtitle.Start, subtitle.Length));
         }
 
         // Interleaved the way a real file is, so the reader meets the two streams together.
@@ -275,11 +283,11 @@ internal sealed class SyntheticMediaSource : IMediaSource
     }
 
     /// <summary>
-    /// The last packet at or before the position of the stream the landing was asked to be measured by — every
-    /// synthetic packet is a keyframe, so the last one is the keyframe a demuxer would fall back to. A position past
-    /// the end of that stream lands on its last packet, however far behind that is: which stream it is decides
-    /// everything the landing can be wrong by. Without a stream the picture is used, because a container's keyframes
-    /// are the picture's.
+    /// The last keyframe at or before the position of the stream the landing was asked to be measured by, which is what
+    /// a demuxer falls back to. A position past the end of that stream lands on its last keyframe, however far behind that
+    /// is: which stream it is decides everything the landing can be wrong by. Without a stream the picture is used, because
+    /// a container's keyframes are the picture's. A stream whose packets are not keyframes — the sound — has no keyframe to
+    /// land on, so its last packet is the landing.
     /// </summary>
     private int LandOnTheKeyframeBefore(TimeSpan position, int streamIndex)
     {
@@ -313,7 +321,12 @@ internal sealed class SyntheticMediaSource : IMediaSource
 
             if (byVideo is null ? packet.Video : packet.Video == byVideo.Value)
             {
-                landing = index;
+                // A keyframe is what a landing aims for; anything else is taken only when the stream has none, so the
+                // sound still lands somewhere.
+                if (landing < 0 || packet.IsKeyFrame)
+                {
+                    landing = index;
+                }
             }
         }
 
@@ -367,7 +380,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
                 StreamIndex = scripted.Video ? 0 : scripted.Subtitle ? SubtitleStreamIndex : 1,
                 Timestamp = scripted.Timestamp,
                 Duration = scripted.Length,
-                IsKeyFrame = true,
+                IsKeyFrame = scripted.IsKeyFrame,
                 Buffer = new SyntheticMediaBuffer(),
             };
 
@@ -391,7 +404,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
         _closed.Dispose();
     }
 
-    private readonly record struct ScriptedPacket(bool Video, bool Subtitle, TimeSpan Timestamp, TimeSpan Length);
+    private readonly record struct ScriptedPacket(bool Video, bool Subtitle, bool IsKeyFrame, TimeSpan Timestamp, TimeSpan Length);
 }
 
 /// <summary>
@@ -445,6 +458,13 @@ internal sealed class SyntheticVideoDecoderFactory(int packetsBeforeFailure = 0)
     {
         private int _packets;
 
+        /// <summary>
+        /// Whether this decoder has the picture a packet after a keyframe needs. A real one builds it from the keyframe and
+        /// forgets it when flushed, which is why a packet without one cannot be decoded at all — the failure this harness
+        /// reproduces instead of accepting every packet and hiding the ordering it cannot see.
+        /// </summary>
+        private bool _hasReference;
+
         public string Name => "synthetic";
         public MediaStreamInfo Stream => stream;
 
@@ -461,6 +481,14 @@ internal sealed class SyntheticVideoDecoderFactory(int packetsBeforeFailure = 0)
                 frames = [];
                 return OperationResult.Failure("The synthetic decoder was asked to fail.");
             }
+
+            if (!_hasReference && !packet.IsKeyFrame)
+            {
+                frames = [];
+                return OperationResult.Failure("Invalid data found when processing input");
+            }
+
+            _hasReference = packet.IsKeyFrame || _hasReference;
 
             frames =
             [
@@ -486,6 +514,7 @@ internal sealed class SyntheticVideoDecoderFactory(int packetsBeforeFailure = 0)
 
         public OperationResult Flush()
         {
+            _hasReference = false;
             return OperationResult.Success();
         }
 
@@ -544,6 +573,7 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
 
         public OperationResult Flush()
         {
+
             return OperationResult.Success();
         }
 
@@ -602,6 +632,7 @@ internal sealed class SyntheticSubtitleDecoderFactory : ISubtitleDecoderFactory
 
         public OperationResult Flush()
         {
+
             return OperationResult.Success();
         }
 
