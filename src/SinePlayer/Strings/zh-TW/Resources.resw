@@ -165,6 +165,9 @@
   <data name="AllPages" xml:space="preserve">
     <value>所有頁面</value>
   </data>
+  <data name="AllowMultiTracks" xml:space="preserve">
+    <value>允許多軌道</value>
+  </data>
   <data name="AllowPerMediaConfiguration" xml:space="preserve">
     <value>允許單一媒體設定</value>
   </data>

@@ -12,7 +12,9 @@ public interface IMediaSource : IDisposable
 
     bool CanSeek { get; }
 
-    OperationResult Seek(TimeSpan position, int streamIndex);
+    bool TryChooseSeekStream(IReadOnlyList<int> streamIndexes, TimeSpan position, SeekMode mode, out int streamIndex);
+
+    OperationResult Seek(TimeSpan position, int streamIndex, SeekMode mode);
 
     OperationResult TryReadPacket(out MediaPacket? packet);
 }

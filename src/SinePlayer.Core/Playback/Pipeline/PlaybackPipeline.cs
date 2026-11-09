@@ -148,7 +148,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         return _events.SubmitAndLog(nameof(Pause), PauseCore);
     }
 
-    public Task<OperationResult> Seek(TimeSpan position, SeekMode mode = SeekMode.Fast)
+    public Task<OperationResult> Seek(TimeSpan position, SeekMode mode = SeekMode.PreviousKeyframe)
     {
         return _events.SubmitAndLog(nameof(Seek), () => SeekCore(position, mode));
     }
@@ -172,7 +172,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         StopCore();
 
         _timeline.SetPosition(TimeSpan.Zero);
-        _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
+        _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.PreviousKeyframe);
 
         _events.SetState(MediaEngineState.Paused);
         return OperationResult.Success();
@@ -357,7 +357,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             return OperationResult.Failure("The pipeline has already been disposed.");
         }
 
-        if (mode is not (SeekMode.Fast or SeekMode.Precise))
+        if (!Enum.IsDefined(mode))
         {
             return OperationResult.Failure($"The seek mode {mode} is unknown.");
         }
@@ -584,7 +584,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         _timeline.Stop();
         _timeline.EndingEpoch = -1;
-        _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.Fast);
+        _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.PreviousKeyframe);
 
         _events.SetState(MediaEngineState.None);
         return OperationResult.Success();
@@ -604,15 +604,43 @@ public sealed partial class PlaybackPipeline : IDisposable
         switch (chain)
         {
             case VideoChain video:
-                video.Start(_reader.Wake, (epoch, position) => video.ReadTail.IsSpent(epoch, position, FurthestTailTicks), TryNotifyPlaybackEnded);
+                video.Start(_reader.Wake, (epoch, position) => IsStreamSpent(video.Source, video.ReadTail, epoch, position), TryNotifyPlaybackEnded);
                 break;
             case AudioChain audio:
-                audio.Start(host, _reader.Wake, (epoch, position) => audio.ReadTail.IsSpent(epoch, position, FurthestTailTicks), TryNotifyPlaybackEnded);
+                audio.Start(host, _reader.Wake, (epoch, position) => IsStreamSpent(audio.Source, audio.ReadTail, epoch, position), TryNotifyPlaybackEnded);
                 break;
             case SubtitleChain subtitle:
                 subtitle.Start(host, _reader.Wake);
                 break;
         }
+    }
+
+    private bool IsStreamSpent(ComponentSlot<MediaSource> slot, ChainTail tail, long epoch, TimeSpan position)
+    {
+        return HasEnded(slot.Latest?.Stream?.Duration ?? TimeSpan.Zero, position)
+            || tail.IsSpent(epoch, position, FurthestTailTicksOf(slot.CurrentComponent));
+    }
+
+    private long FurthestTailTicksOf(MediaSource? source)
+    {
+        long furthest = -1;
+        foreach (VideoChain chain in _videoChains)
+        {
+            if (chain.Source.CurrentComponent == source)
+            {
+                furthest = Math.Max(furthest, chain.ReadTail.Ticks);
+            }
+        }
+
+        foreach (AudioChain chain in _audioChains)
+        {
+            if (chain.Source.CurrentComponent == source)
+            {
+                furthest = Math.Max(furthest, chain.ReadTail.Ticks);
+            }
+        }
+
+        return furthest;
     }
 
     private static void RequestStopChain(IPlaybackChain chain)
@@ -678,6 +706,14 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     #region Playback
 
+    private bool IsStarved
+    {
+        get
+        {
+            return _videoChains.Any(chain => chain.Starved) || _audioChains.Any(chain => chain.Starved);
+        }
+    }
+
     private void StopThreads()
     {
         IPlaybackChain[] removed = [.. _removedChains];
@@ -737,34 +773,14 @@ public sealed partial class PlaybackPipeline : IDisposable
         TryNotifyPlaybackEnded();
     }
 
-    private long FurthestTailTicks
+    private int ChooseSeekLanding(MediaSource source, TimeSpan position, SeekMode mode)
     {
-        get
-        {
-            return _videoChains.Select(chain => chain.ReadTail.Ticks)
-                .Concat(_audioChains.Select(chain => chain.ReadTail.Ticks))
-                .DefaultIfEmpty(0)
-                .Max();
-        }
-    }
-
-    private bool IsStarved
-    {
-        get
-        {
-            return _videoChains.Any(chain => chain.Starved) || _audioChains.Any(chain => chain.Starved);
-        }
-    }
-
-    private int ChooseSeekLanding(MediaSource source, TimeSpan position)
-    {
-        VideoStreamInfo? video = null;
+        List<VideoStreamInfo> videos = [];
         foreach (VideoChain chain in _videoChains)
         {
-            if (chain.Source.CurrentComponent == source)
+            if (chain.Source.CurrentComponent == source && chain.Source.CurrentStream is VideoStreamInfo video)
             {
-                video = (VideoStreamInfo?)chain.Source.CurrentStream;
-                break;
+                videos.Add(video);
             }
         }
 
@@ -778,25 +794,30 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
         }
 
-        if (video is null)
+        List<VideoStreamInfo> playing = [.. videos.Where(video => !HasEnded(video.Duration, position))];
+        if (playing.Count > 0)
         {
-            if (audio is null)
+            if (playing.Count == 1)
             {
-                return -1;
+                return playing[0].Index;
             }
 
-            return audio.Index;
+            int[] candidates = [.. playing.Select(video => video.Index)];
+            return source.Source.TryChooseSeekStream(candidates, position, mode, out int landing) ? landing : playing[0].Index;
         }
 
-        if (audio is not null &&
-            video.Duration > TimeSpan.Zero &&
-            audio.Duration > video.Duration &&
-            position > video.Duration)
+        if (videos.Count == 0)
+        {
+            return audio is null ? -1 : audio.Index;
+        }
+
+        if (audio is not null && !HasEnded(audio.Duration, position))
         {
             return audio.Index;
         }
 
-        return video.Index;
+        VideoStreamInfo last = videos.MaxBy(video => video.Duration)!;
+        return audio is not null && audio.Duration > last.Duration ? audio.Index : last.Index;
     }
 
     private void TryNotifyPlaybackEnded()
@@ -820,6 +841,11 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         _events.SetState(MediaEngineState.Ended);
         WakeAll();
+    }
+
+    private static bool HasEnded(TimeSpan duration, TimeSpan position)
+    {
+        return duration > TimeSpan.Zero && position > duration;
     }
 
     #endregion

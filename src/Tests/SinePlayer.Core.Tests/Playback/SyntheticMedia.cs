@@ -32,6 +32,9 @@ internal sealed class SyntheticMediaScript
     /// <summary>Video packets are withheld from here on, as a source that has stopped carrying the stream is.</summary>
     internal TimeSpan VideoStopsAt { get; init; } = TimeSpan.MaxValue;
 
+    /// <summary>The second picture stream's packets are withheld from here on, when the script has one.</summary>
+    internal TimeSpan SecondVideoStopsAt { get; init; } = TimeSpan.MaxValue;
+
     /// <summary>Audio packets are withheld from here on.</summary>
     internal TimeSpan AudioStopsAt { get; init; } = TimeSpan.MaxValue;
 
@@ -47,16 +50,22 @@ internal sealed class SyntheticMediaScript
     /// </summary>
     internal TimeSpan? VideoDuration { get; init; }
 
+    /// <summary>
+    /// How long the second picture stream declares itself to be, when the script has one and it is a different length from
+    /// the first: two picture streams of one file are not always the same size. Unset means the first one's.
+    /// </summary>
+    internal TimeSpan? SecondVideoDuration { get; init; }
+
     /// <summary>How long the sound's stream declares itself to be. Unset means the file's own length.</summary>
     internal TimeSpan? AudioDuration { get; init; }
 
     /// <summary>
-    /// Whether a seek lands on the keyframe at or before the request rather than on the first packet at or after it,
-    /// which is what a demuxer does — and it lands by the picture's keyframes, since they are the only ones a
-    /// container has. So a picture that ends before the request leaves the landing at its last keyframe, however far
-    /// behind that is.
+    /// Whether a seek lands on a keyframe rather than on the first packet at or after the request. With it, a backward
+    /// landing is the keyframe at or before the request and a forward one the keyframe at or after it, which is what a
+    /// demuxer does — and it lands by the picture's keyframes, since they are the only ones a container has. So a
+    /// picture that ends before the request leaves the landing at its last keyframe, however far behind that is.
     /// </summary>
-    internal bool LandsOnTheKeyframeBefore { get; init; }
+    internal bool LandsOnKeyframes { get; init; }
 
     /// <summary>
     /// Whether a seek is refused rather than carried out, which is what a live source does when it finds out only by
@@ -72,6 +81,14 @@ internal sealed class SyntheticMediaScript
     /// what a seek that lands mid-group has to cope with.
     /// </summary>
     internal int KeyFrameInterval { get; init; } = 1;
+
+    /// <summary>
+    /// The packet of the second picture stream its group starts at, when the script has one: unset means the file has a
+    /// single picture stream, which is every script that does not ask for two. Its keyframes are the shared grid shifted
+    /// by this many packets, so two chains reading the file have their own keyframes at different moments — which is what
+    /// makes the landing a seek has to agree on a choice rather than a fact.
+    /// </summary>
+    internal int SecondVideoKeyFrameOffset { get; init; } = -1;
 
     internal int SampleRate { get; init; } = 44100;
 
@@ -178,6 +195,9 @@ internal sealed class SyntheticMediaSource : IMediaSource
     /// <summary>The subtitle stream's index, when the script has one. The picture and the sound keep 0 and 1.</summary>
     internal const int SubtitleStreamIndex = 2;
 
+    /// <summary>The second picture stream's index, when the script has one.</summary>
+    internal const int SecondVideoStreamIndex = 3;
+
     private int _next;
     private int _reads;
     private readonly Stopwatch _since = Stopwatch.StartNew();
@@ -214,9 +234,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
         {
             ContainerId = "synthetic",
             Duration = script.Duration,
-            Streams = script.Subtitles.Count == 0
-                ? [video, audio]
-                : [video, audio, new SubtitleStreamInfo { Index = SubtitleStreamIndex, CodecId = "synthetic-subtitle", Duration = script.Duration }],
+            Streams = BuildStreams(script, video, audio),
             Attachments = script.Attachments,
         };
 
@@ -225,6 +243,20 @@ internal sealed class SyntheticMediaSource : IMediaSource
         {
             bool keyFrame = index % Math.Max(script.KeyFrameInterval, 1) == 0;
             _timeline.Add(new ScriptedPacket(true, false, keyFrame, TimeSpan.FromSeconds((double)index / script.FrameRate), TimeSpan.FromSeconds(1.0 / script.FrameRate)));
+        }
+
+        if (script.SecondVideoKeyFrameOffset >= 0)
+        {
+            int interval = Math.Max(script.KeyFrameInterval, 1);
+            for (int index = 0; index < frameCount; index++)
+            {
+                int sinceKeyFrame = index - script.SecondVideoKeyFrameOffset;
+                bool keyFrame = sinceKeyFrame >= 0 && sinceKeyFrame % interval == 0;
+                _timeline.Add(new ScriptedPacket(true, false, keyFrame, TimeSpan.FromSeconds((double)index / script.FrameRate), TimeSpan.FromSeconds(1.0 / script.FrameRate))
+                {
+                    Stream = SecondVideoStreamIndex,
+                });
+            }
         }
 
         int packetCount = (int)(script.Duration.TotalSeconds * script.SampleRate / script.SamplesPerAudioPacket);
@@ -240,8 +272,39 @@ internal sealed class SyntheticMediaSource : IMediaSource
             _timeline.Add(new ScriptedPacket(false, true, true, subtitle.Start, subtitle.Length));
         }
 
-        // Interleaved the way a real file is, so the reader meets the two streams together.
-        _timeline.Sort((left, right) => left.Timestamp.CompareTo(right.Timestamp));
+        // Interleaved the way a real file is, so the reader meets the two streams together. Packets of the same instant
+        // are ordered by stream, which is how a container writes them and what decides whether a seek that starts at one
+        // stream's block still delivers the other's.
+        _timeline.Sort((left, right) =>
+        {
+            int byTime = left.Timestamp.CompareTo(right.Timestamp);
+            return byTime != 0 ? byTime : StreamOf(left).CompareTo(StreamOf(right));
+        });
+    }
+
+    private static MediaStreamInfo[] BuildStreams(SyntheticMediaScript script, VideoStreamInfo video, AudioStreamInfo audio)
+    {
+        List<MediaStreamInfo> streams = [video, audio];
+        if (script.SecondVideoKeyFrameOffset >= 0)
+        {
+            streams.Add(new VideoStreamInfo
+            {
+                Index = SecondVideoStreamIndex,
+                CodecId = video.CodecId,
+                Width = video.Width,
+                Height = video.Height,
+                FrameRate = video.FrameRate,
+                PixelFormat = video.PixelFormat,
+                Duration = script.SecondVideoDuration ?? video.Duration,
+            });
+        }
+
+        if (script.Subtitles.Count > 0)
+        {
+            streams.Add(new SubtitleStreamInfo { Index = SubtitleStreamIndex, CodecId = "synthetic-subtitle", Duration = script.Duration });
+        }
+
+        return [.. streams];
     }
 
     public MediaInfo Info { get; }
@@ -254,10 +317,11 @@ internal sealed class SyntheticMediaSource : IMediaSource
     /// </summary>
     public bool CanSeek => true;
 
-    public OperationResult Seek(TimeSpan position, int streamIndex)
+    public OperationResult Seek(TimeSpan position, int streamIndex, SeekMode mode)
     {
         LastSeekPosition = position;
         LastSeekStreamIndex = streamIndex;
+        LastSeekMode = mode;
 
         if (_script.RefusesToSeek)
         {
@@ -266,7 +330,20 @@ internal sealed class SyntheticMediaSource : IMediaSource
 
         // The timeline is fixed and ordered, so a position is realised by starting at a packet rather than by
         // decoding and skipping.
-        int next = _script.LandsOnTheKeyframeBefore ? LandOnTheKeyframeBefore(position, streamIndex) : FirstPacketAtOrAfter(position);
+        int next;
+        if (!_script.LandsOnKeyframes)
+        {
+            next = FirstPacketAtOrAfter(position);
+        }
+        else if (mode == SeekMode.NextKeyframe)
+        {
+            next = LandOnTheKeyframeAfter(position, streamIndex);
+        }
+        else
+        {
+            next = LandOnTheKeyframeBefore(position, streamIndex);
+        }
+
         _next = next < 0 ? _timeline.Count : next;
         return OperationResult.Success();
     }
@@ -277,9 +354,24 @@ internal sealed class SyntheticMediaSource : IMediaSource
     /// <summary>The stream index the last seek was asked to land by, or -1 when the pipeline left it to this source.</summary>
     internal int LastSeekStreamIndex { get; private set; } = -1;
 
+    /// <summary>The direction the last seek asked for, which decides which way the landing was looked for.</summary>
+    internal SeekMode LastSeekMode { get; private set; } = SeekMode.Precise;
+
     private int FirstPacketAtOrAfter(TimeSpan position)
     {
         return _timeline.FindIndex(packet => packet.Timestamp >= position);
+    }
+
+    /// <summary>Which stream a scripted packet belongs to: the one it names, or the one its kind always has.</summary>
+    private static int StreamOf(ScriptedPacket packet)
+    {
+        return packet.Stream >= 0 ? packet.Stream : packet.Video ? 0 : packet.Subtitle ? SubtitleStreamIndex : 1;
+    }
+
+    /// <summary>Where a stream stops carrying media, which two picture streams need not agree on.</summary>
+    private TimeSpan StopsAtOf(int streamIndex)
+    {
+        return streamIndex == SecondVideoStreamIndex ? _script.SecondVideoStopsAt : _script.VideoStopsAt;
     }
 
     /// <summary>
@@ -291,12 +383,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
     /// </summary>
     private int LandOnTheKeyframeBefore(TimeSpan position, int streamIndex)
     {
-        bool? byVideo = streamIndex switch
-        {
-            0 => true,
-            1 => false,
-            _ => null,
-        };
+        int wanted = streamIndex >= 0 ? streamIndex : 0;
 
         int landing = -1;
         for (int index = 0; index < _timeline.Count; index++)
@@ -308,7 +395,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
             }
 
             // A packet this source withholds is not part of the file it declares: the landing cannot be on one.
-            if (packet.Video && packet.Timestamp >= _script.VideoStopsAt)
+            if (packet.Video && packet.Timestamp >= StopsAtOf(StreamOf(packet)))
             {
                 continue;
             }
@@ -319,7 +406,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
                 continue;
             }
 
-            if (byVideo is null ? packet.Video : packet.Video == byVideo.Value)
+            if (StreamOf(packet) == wanted)
             {
                 // A keyframe is what a landing aims for; anything else is taken only when the stream has none, so the
                 // sound still lands somewhere.
@@ -331,6 +418,137 @@ internal sealed class SyntheticMediaSource : IMediaSource
         }
 
         return landing >= 0 ? landing : FirstPacketAtOrAfter(position);
+    }
+
+    /// <summary>
+    /// The first keyframe at or after the position of the stream the landing was asked to be measured by, which is what a
+    /// demuxer gives when it is asked to look forward: a seek that overshoots the target by up to one group of pictures,
+    /// and one that can always start a decoder because its landing is a keyframe. A stream whose packets are not keyframes
+    /// — the sound — has no keyframe to land on, so its first packet at or after the position is the landing.
+    /// </summary>
+    private int LandOnTheKeyframeAfter(TimeSpan position, int streamIndex)
+    {
+        int wanted = streamIndex >= 0 ? streamIndex : 0;
+
+        int landing = -1;
+        for (int index = 0; index < _timeline.Count; index++)
+        {
+            ScriptedPacket packet = _timeline[index];
+            if (packet.Timestamp < position)
+            {
+                continue;
+            }
+
+            if (packet.Video && packet.Timestamp >= StopsAtOf(StreamOf(packet)))
+            {
+                continue;
+            }
+
+            if (packet.Subtitle)
+            {
+                continue;
+            }
+
+            if (StreamOf(packet) == wanted)
+            {
+                if (packet.IsKeyFrame)
+                {
+                    landing = index;
+                    break;
+                }
+
+                // Kept only in case the stream turns out to have no keyframe left at all, so that it still lands
+                // somewhere rather than nowhere.
+                if (landing < 0)
+                {
+                    landing = index;
+                }
+            }
+        }
+
+        return landing >= 0 ? landing : FirstPacketAtOrAfter(position);
+    }
+
+    /// <summary>
+    /// Which stream a seek should be measured by, read off the fixed timeline: the earliest landing among the candidates,
+    /// and among those that land together the one after which every candidate's next packet is still a keyframe — the
+    /// packets the container wrote before the landing block are the ones a seek never delivers.
+    /// </summary>
+    public bool TryChooseSeekStream(IReadOnlyList<int> streamIndexes, TimeSpan position, SeekMode mode, out int streamIndex)
+    {
+        streamIndex = -1;
+        List<int> candidates = [];
+        List<int> landings = [];
+        List<TimeSpan> instants = [];
+        TimeSpan earliest = TimeSpan.MaxValue;
+        foreach (int candidate in streamIndexes)
+        {
+            int landing = LandingIndex(candidate, position, mode);
+            if (landing < 0)
+            {
+                continue;
+            }
+
+            TimeSpan instant = _timeline[landing].Timestamp;
+            candidates.Add(candidate);
+            landings.Add(landing);
+            instants.Add(instant);
+            earliest = instant < earliest ? instant : earliest;
+        }
+
+        if (candidates.Count == 0)
+        {
+            return false;
+        }
+
+        // Equal instants are the ordinary case — streams encoded together keyframe together — and then only the order the
+        // container wrote them in decides which of them a read still finds a keyframe for.
+        for (int index = 0; index < candidates.Count; index++)
+        {
+            if (instants[index] == earliest && EveryStreamStartsAtAKeyFrame(landings[index], streamIndexes))
+            {
+                streamIndex = candidates[index];
+                return true;
+            }
+        }
+
+        streamIndex = candidates[instants.IndexOf(earliest)];
+        return true;
+    }
+
+    private int LandingIndex(int streamIndex, TimeSpan position, SeekMode mode)
+    {
+        return !_script.LandsOnKeyframes
+            ? FirstPacketAtOrAfter(position)
+            : mode == SeekMode.NextKeyframe ? LandOnTheKeyframeAfter(position, streamIndex) : LandOnTheKeyframeBefore(position, streamIndex);
+    }
+
+    /// <summary>
+    /// Whether a read that starts at <paramref name="landing"/> still meets a keyframe first for every candidate: a
+    /// stream whose keyframe was written before that point is behind the read and waits for its next group instead.
+    /// </summary>
+    private bool EveryStreamStartsAtAKeyFrame(int landing, IReadOnlyList<int> streamIndexes)
+    {
+        foreach (int stream in streamIndexes)
+        {
+            int next = -1;
+            for (int index = landing; index < _timeline.Count; index++)
+            {
+                if (StreamOf(_timeline[index]) == stream)
+                {
+                    next = index;
+                    break;
+                }
+            }
+
+            // A stream with nothing left cannot be started by any landing, so it is not a reason to reject one.
+            if (next >= 0 && !_timeline[next].IsKeyFrame)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public OperationResult TryReadPacket(out MediaPacket? packet)
@@ -368,7 +586,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
             }
 
             ScriptedPacket scripted = _timeline[_next++];
-            if (scripted.Video ? scripted.Timestamp >= _script.VideoStopsAt
+            if (scripted.Video ? scripted.Timestamp >= StopsAtOf(StreamOf(scripted))
                 : scripted.Subtitle ? false
                 : scripted.Timestamp >= _script.AudioStopsAt)
             {
@@ -377,7 +595,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
 
             packet = new MediaPacket
             {
-                StreamIndex = scripted.Video ? 0 : scripted.Subtitle ? SubtitleStreamIndex : 1,
+                StreamIndex = StreamOf(scripted),
                 Timestamp = scripted.Timestamp,
                 Duration = scripted.Length,
                 IsKeyFrame = scripted.IsKeyFrame,
@@ -404,7 +622,14 @@ internal sealed class SyntheticMediaSource : IMediaSource
         _closed.Dispose();
     }
 
-    private readonly record struct ScriptedPacket(bool Video, bool Subtitle, bool IsKeyFrame, TimeSpan Timestamp, TimeSpan Length);
+    private readonly record struct ScriptedPacket(bool Video, bool Subtitle, bool IsKeyFrame, TimeSpan Timestamp, TimeSpan Length)
+    {
+        /// <summary>
+        /// The stream the packet belongs to, when it is not the one its kind always has: a second picture stream is what
+        /// a container with two of them carries, and what two chains reading one file are each given.
+        /// </summary>
+        internal int Stream { get; init; } = -1;
+    }
 }
 
 /// <summary>

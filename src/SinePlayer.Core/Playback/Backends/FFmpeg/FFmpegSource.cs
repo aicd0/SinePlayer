@@ -24,6 +24,9 @@ public sealed partial class FFmpegSource : IMediaSource
     private const int MaximumAttachmentBytes = 16 * 1024 * 1024;
     private const long MaximumAttachmentTotalBytes = 64L * 1024 * 1024;
 
+    /// <summary>How far a probe reads to decide where a seek would land: a landing block is within a packet or two of it.</summary>
+    private const int ProbePacketLimit = 512;
+
     private static readonly string[] sBitmapSubtitleCodecs =
     [
         "dvd_subtitle",
@@ -54,7 +57,30 @@ public sealed partial class FFmpegSource : IMediaSource
 
     public bool CanSeek => true;
 
-    /// <summary>Time base of a stream, needed to interpret packet and frame timestamps.</summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        nint readPacket = _readPacket;
+        _readPacket = 0;
+        if (readPacket != 0)
+        {
+            FFmpegNative.av_packet_free(ref readPacket);
+        }
+
+        nint context = _context;
+        _context = 0;
+        if (context != 0)
+        {
+            FFmpegNative.avformat_close_input(ref context);
+        }
+    }
+
     internal AVRational GetTimeBase(int streamIndex)
     {
         if (streamIndex < 0 || streamIndex >= _timeBases.Length)
@@ -65,11 +91,6 @@ public sealed partial class FFmpegSource : IMediaSource
         return _timeBases[streamIndex];
     }
 
-    /// <summary>
-    /// Borrows the codec parameters of a stream. The pointer is owned by the open context and stays
-    /// valid until this source is disposed; callers must copy what they need (which is what
-    /// <c>avcodec_parameters_to_context</c> does).
-    /// </summary>
     internal unsafe bool TryGetCodecParameters(int streamIndex, out nint parameters)
     {
         parameters = 0;
@@ -90,9 +111,6 @@ public sealed partial class FFmpegSource : IMediaSource
         return true;
     }
 
-    /// <summary>
-    /// Opens a locator with libavformat and reads its stream table.
-    /// </summary>
     public static OperationResult<FFmpegSource> TryOpen(MediaLocator locator)
     {
         OperationResultCreator<FFmpegSource> result = new();
@@ -106,8 +124,7 @@ public sealed partial class FFmpegSource : IMediaSource
             return result.Failure(exception);
         }
 
-        nint context = 0;
-        int opened = FFmpegNative.avformat_open_input(out context, locator.Value, 0, 0);
+        int opened = FFmpegNative.avformat_open_input(out nint context, locator.Value, 0, 0);
         if (opened < 0)
         {
             return result.Failure($"Unable to open '{locator.Value}': {FFmpegInterop.GetErrorMessage(opened)}");
@@ -131,7 +148,52 @@ public sealed partial class FFmpegSource : IMediaSource
         return result.Success(new FFmpegSource(context, readPacket, info, timeBases));
     }
 
-    public OperationResult Seek(TimeSpan position, int streamIndex)
+    public bool TryChooseSeekStream(IReadOnlyList<int> streamIndexes, TimeSpan position, SeekMode mode, out int streamIndex)
+    {
+        streamIndex = -1;
+        if (_disposed || streamIndexes.Count == 0)
+        {
+            return false;
+        }
+
+        List<int> candidates = [];
+        List<TimeSpan> landings = [];
+        TimeSpan earliest = TimeSpan.MaxValue;
+        foreach (int candidate in streamIndexes)
+        {
+            if (!TryGetLanding(candidate, position, mode, out TimeSpan landing))
+            {
+                continue;
+            }
+
+            candidates.Add(candidate);
+            landings.Add(landing);
+            earliest = landing < earliest ? landing : earliest;
+        }
+
+        if (candidates.Count == 0)
+        {
+            return false;
+        }
+
+        // Equal landings are the ordinary case — streams encoded together keyframe together — and then the order the
+        // container wrote them in decides, which only a seek can find out.
+        for (int index = 0; index < candidates.Count; index++)
+        {
+            if (landings[index] == earliest && LeavesAKeyframeForEveryStream(candidates[index], streamIndexes, position, mode))
+            {
+                streamIndex = candidates[index];
+                return true;
+            }
+        }
+
+        // Nothing suits every stream: the earliest landing still leaves each chain's next keyframe closest to the target,
+        // and it is what a source that cannot answer for the others would be asked for anyway.
+        streamIndex = candidates[landings.IndexOf(earliest)];
+        return true;
+    }
+
+    public OperationResult Seek(TimeSpan position, int streamIndex, SeekMode mode)
     {
         if (_disposed)
         {
@@ -155,8 +217,9 @@ public sealed partial class FFmpegSource : IMediaSource
             timestamp = (long)(position.TotalSeconds * FFmpegConstants.TimeBase);
         }
 
-        int result = FFmpegNative.av_seek_frame(_context, byStream ? streamIndex : -1, timestamp, FFmpegConstants.SeekFlagBackward);
-        if (result == FFmpegConstants.ErrorRange)
+        int flags = mode == SeekMode.NextKeyframe ? 0 : FFmpegConstants.SeekFlagBackward;
+        int result = FFmpegNative.av_seek_frame(_context, byStream ? streamIndex : -1, timestamp, flags);
+        if (result == FFmpegConstants.ErrorRange && flags != 0)
         {
             // A backward seek promises an event at or before the target, and a subtitle queue refuses to break that
             // promise: it reads the whole file up front, so when nothing is at or before the target — a seek to the
@@ -212,28 +275,69 @@ public sealed partial class FFmpegSource : IMediaSource
         return OperationResult.Success();
     }
 
-    public void Dispose()
+    private bool TryGetLanding(int streamIndex, TimeSpan position, SeekMode mode, out TimeSpan landing)
     {
-        if (_disposed)
+        landing = position;
+        if (streamIndex < 0 || streamIndex >= _timeBases.Length)
         {
-            return;
+            return false;
         }
 
-        _disposed = true;
-
-        nint readPacket = _readPacket;
-        _readPacket = 0;
-        if (readPacket != 0)
+        if (!Seek(position, streamIndex, mode).IsSuccessful)
         {
-            FFmpegNative.av_packet_free(ref readPacket);
+            return false;
         }
 
-        nint context = _context;
-        _context = 0;
-        if (context != 0)
+        while (true)
         {
-            FFmpegNative.avformat_close_input(ref context);
+            OperationResult read = TryReadPacket(out MediaPacket? packet);
+            if (!read.IsSuccessful || packet is null)
+            {
+                return false;
+            }
+
+            using (packet)
+            {
+                if (packet.StreamIndex == streamIndex)
+                {
+                    landing = packet.Timestamp;
+                    return true;
+                }
+            }
         }
+    }
+
+    private bool LeavesAKeyframeForEveryStream(int landingStream, IReadOnlyList<int> streamIndexes, TimeSpan position, SeekMode mode)
+    {
+        if (!Seek(position, landingStream, mode).IsSuccessful)
+        {
+            return false;
+        }
+
+        HashSet<int> pending = [.. streamIndexes];
+        for (int read = 0; read < ProbePacketLimit && pending.Count > 0; read++)
+        {
+            OperationResult result = TryReadPacket(out MediaPacket? packet);
+            if (!result.IsSuccessful || packet is null)
+            {
+                return false;
+            }
+
+            using (packet)
+            {
+                if (!pending.Remove(packet.StreamIndex))
+                {
+                    continue;
+                }
+
+                if (!packet.IsKeyFrame)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return pending.Count == 0;
     }
 
     private unsafe MediaPacket CreatePacket(nint packetPointer)

@@ -165,6 +165,9 @@
   <data name="AllPages" xml:space="preserve">
     <value>Все страницы</value>
   </data>
+  <data name="AllowMultiTracks" xml:space="preserve">
+    <value>Разрешить несколько дорожек</value>
+  </data>
   <data name="AllowPerMediaConfiguration" xml:space="preserve">
     <value>Разрешить настройку для каждого файла</value>
   </data>

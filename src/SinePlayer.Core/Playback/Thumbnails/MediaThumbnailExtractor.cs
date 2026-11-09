@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
@@ -84,7 +85,7 @@ public static class MediaThumbnailExtractor
 
         if (source.CanSeek && samplePosition > TimeSpan.Zero)
         {
-            OperationResult sought = source.Seek(samplePosition, stream.Index);
+            OperationResult sought = source.Seek(samplePosition, stream.Index, SeekMode.Precise);
             if (!sought.IsSuccessful)
             {
                 return result.Failure($"Unable to seek to the frame to draw: {sought}");
@@ -142,7 +143,7 @@ public static class MediaThumbnailExtractor
                     if (!restarted && samplePosition > TimeSpan.Zero)
                     {
                         restarted = true;
-                        if (source.CanSeek && source.Seek(TimeSpan.Zero, stream.Index).IsSuccessful)
+                        if (source.CanSeek && source.Seek(TimeSpan.Zero, stream.Index, SeekMode.Precise).IsSuccessful)
                         {
                             continue;
                         }
