@@ -33,32 +33,41 @@ internal static class TrackSelection
         }
     }
 
-    public static MediaStreamInfo? Resolve(MediaModel media, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
+    public static IReadOnlyList<MediaStreamInfo> Resolve(
+        TrackSelectionModel? record,
+        TrackSelectionModel? media,
+        int viewIndex,
+        bool opening,
+        MediaStreamKind kind,
+        IReadOnlyList<MediaSource> sources)
     {
-        TrackSelectionModel? model = Load(media);
-        if (model is null)
-        {
-            return Default(sources, kind);
-        }
-
         if (kind is MediaStreamKind.Audio)
         {
-            return model.AudioSelections is { } audios ? ResolveFrom(audios, kind, sources) : Default(sources, kind);
+            return Choose(record?.AudioSelections ?? media?.AudioSelections, opening, kind, sources);
         }
 
-        ViewTrackSelectionModel? view = FirstView(model);
+        ViewTrackSelectionModel? recordView = ViewAt(record, viewIndex);
+        ViewTrackSelectionModel? mediaView = ViewAt(media, viewIndex);
+
         if (kind is MediaStreamKind.Video)
         {
-            SelectedTrackModel? selection = view?.VideoSelection;
+            SelectedTrackModel? selection = recordView?.VideoSelection ?? mediaView?.VideoSelection;
             if (selection is null)
             {
-                return Default(sources, kind);
+                return opening ? Defaults(sources, kind) : [];
             }
 
-            return selection.Enabled ? Find(sources, kind, selection.Path, selection.Index) ?? Default(sources, kind) : null;
+            if (!selection.Enabled)
+            {
+                return [];
+            }
+
+            return Find(sources, kind, selection.Path, selection.Index) is { } stream
+                ? [stream]
+                : opening ? Defaults(sources, kind) : [];
         }
 
-        return view?.SubtitleSelections is { } subtitles ? ResolveFrom(subtitles, kind, sources) : Default(sources, kind);
+        return Choose(recordView?.SubtitleSelections ?? mediaView?.SubtitleSelections, opening, kind, sources);
     }
 
     public static void Save(MediaModel media, TrackSelectionModel model)
@@ -106,9 +115,8 @@ internal static class TrackSelection
     /// The sources this media's remembered tracks name, so one that is not part of the media — an external subtitle file —
     /// can be added before anything is resolved.
     /// </summary>
-    public static IReadOnlyList<string> RememberedPaths(MediaModel media)
+    public static IReadOnlyList<string> PathsOf(TrackSelectionModel? model)
     {
-        TrackSelectionModel? model = Load(media);
         if (model is null)
         {
             return [];
@@ -139,22 +147,47 @@ internal static class TrackSelection
         return [.. paths.Where(path => !string.IsNullOrEmpty(path)).Distinct()];
     }
 
-    private static MediaStreamInfo? ResolveFrom(List<TrackSelectionEntryModel> entries, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
+    /// <summary>
+    /// A set of streams: an absent list is no preference, an empty one is "show none", and entries that no longer resolve
+    /// are dropped — with the default standing in only when this view opened the media and nothing survived.
+    /// </summary>
+    private static IReadOnlyList<MediaStreamInfo> Choose(List<TrackSelectionEntryModel>? entries, bool opening, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
     {
-        if (entries.Count == 0)
+        if (entries is null)
         {
-            return null;
+            return opening ? Defaults(sources, kind) : [];
         }
 
+        if (entries.Count == 0)
+        {
+            return [];
+        }
+
+        List<MediaStreamInfo> chosen = [];
         foreach (TrackSelectionEntryModel entry in entries)
         {
             if (Find(sources, kind, entry.Path, entry.Index) is { } stream)
             {
-                return stream;
+                chosen.Add(stream);
             }
         }
 
-        return Default(sources, kind);
+        if (chosen.Count == 0 && opening)
+        {
+            chosen.AddRange(Defaults(sources, kind));
+        }
+
+        return chosen;
+    }
+
+    private static IReadOnlyList<MediaStreamInfo> Defaults(IReadOnlyList<MediaSource> sources, MediaStreamKind kind)
+    {
+        return Default(sources, kind) is { } stream ? [stream] : [];
+    }
+
+    private static ViewTrackSelectionModel? ViewAt(TrackSelectionModel? model, int index)
+    {
+        return model?.Views is { } views && index >= 0 && index < views.Count ? views[index] : null;
     }
 
     private static ViewTrackSelectionModel? FirstView(TrackSelectionModel model)
