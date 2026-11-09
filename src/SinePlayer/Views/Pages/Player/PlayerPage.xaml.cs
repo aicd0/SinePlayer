@@ -301,7 +301,7 @@ internal sealed partial class PlayerPage : BasePage
             TransportBar.SetShuffle(ViewModel.Playback.IsShuffle);
             GetWindowEventBus().With<PlaybackModel>(EventId.PlaybackChanged).Emit(ViewModel.Playback);
 
-            MediaModel? media = ViewModel.Media;
+            MediaModel? media = _session?.CurrentMedia;
             if (media is null)
             {
                 GetMainPageAbility().SetTitle(string.Empty);
