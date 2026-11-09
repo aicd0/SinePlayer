@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 
 using SinePlayer.Common.Constants;
+using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Threading;
@@ -224,6 +225,19 @@ internal sealed class WindowManager
                 return !aliveTabIds.Contains(tabId);
             });
         foreach (string key in unusedKeys)
+        {
+            AppDB.MainRegistry.RemoveKey(key);
+        }
+
+        HashSet<string> aliveSessionIds = TabPlayerSessionModel.SessionIdsOf(aliveTabIds);
+        IEnumerable<string> unusedSessions = AppDB.MainRegistry.GetKeys(RegistryNames.PLAYER_SESSIONS, recursive: false)
+            .Where(x =>
+            {
+                int index = x.LastIndexOf('/');
+                string sessionId = x[(index + 1)..];
+                return !aliveSessionIds.Contains(sessionId);
+            });
+        foreach (string key in unusedSessions)
         {
             AppDB.MainRegistry.RemoveKey(key);
         }
