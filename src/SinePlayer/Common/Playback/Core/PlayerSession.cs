@@ -93,6 +93,8 @@ internal sealed partial class PlayerSession : IDisposable
 
     public event Action? PositionChanged;
 
+    public event Action? VolumeChanged;
+
     public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
 
     public string? Error => _pipeline?.Error;
@@ -523,16 +525,29 @@ internal sealed partial class PlayerSession : IDisposable
 
     public void SetVolume(double volume)
     {
-        _volume = Math.Clamp(volume, 0.0, 1.0);
+        double clamped = Math.Clamp(volume, 0.0, 1.0);
+        if (_volume == clamped)
+        {
+            return;
+        }
+
+        _volume = clamped;
         ApplyVolume();
         SaveVolumeAndMute();
+        VolumeChanged?.Invoke();
     }
 
     public void SetMuted(bool muted)
     {
+        if (_muted == muted)
+        {
+            return;
+        }
+
         _muted = muted;
         ApplyVolume();
         SaveVolumeAndMute();
+        VolumeChanged?.Invoke();
     }
 
     public void SetPlaybackRate(double rate)
