@@ -180,8 +180,6 @@ internal sealed class PlayerMenuContext
                 PromptInfo?.Invoke(built.Message);
                 return;
             }
-
-            TrackSelection.Save(Media, MediaStreamKind.Audio, SourceOf(stream), stream);
         });
     }
 
@@ -362,8 +360,6 @@ internal sealed class PlayerMenuContext
                 PromptInfo?.Invoke(built.Message);
                 return;
             }
-
-            TrackSelection.Save(Media, kind, SourceOf(stream), stream);
         });
     }
 
