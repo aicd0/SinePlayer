@@ -724,29 +724,19 @@ internal sealed partial class PlayerSession : IDisposable
         return OperationResult.Success();
     }
 
-    /// <summary>
-    /// The sources a media's remembered tracks live in, added before anything is chosen: an audio track or a subtitle
-    /// track the user picked last time may sit in a file that is not the media itself.
-    /// </summary>
     private async Task AddRememberedSourcesAsync(MediaModel media)
     {
-        foreach (MediaStreamKind kind in (MediaStreamKind[])[MediaStreamKind.Video, MediaStreamKind.Audio, MediaStreamKind.Subtitle])
+        foreach (string path in TrackSelection.RememberedPaths(media))
         {
-            TrackSelection.Preference? preference = TrackSelection.Load(media, kind, Sources);
-            if (preference is null || !preference.Enabled || preference.Stream is not null)
+            if (Sources.Any(source => source.Locator.Value == path))
             {
                 continue;
             }
 
-            if (Sources.Any(source => source.Locator.Value == preference.Path))
-            {
-                continue;
-            }
-
-            OperationResult<MediaSource> added = await AddSource(preference.Path);
+            OperationResult<MediaSource> added = await AddSource(path);
             if (!added.IsSuccessful)
             {
-                Logger.W(TAG, $"The chosen {kind} track could not be restored from '{preference.Path}'. {added.Message}");
+                Logger.W(TAG, $"A remembered track could not be restored from '{path}'. {added.Message}");
             }
         }
     }

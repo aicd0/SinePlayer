@@ -27,13 +27,6 @@ namespace SinePlayer.Helpers.MenuFlyoutHelpers;
 
 internal sealed class PlayerMenuContext
 {
-    // Temporary workaround for the lack of a proper settings system. This is a static field to avoid having to pass the setting around in the constructor, but it should be replaced with a proper settings system that can be injected into the class.
-    private static bool _allowMultiAudioTracks = false;
-
-    // The same workaround, kept apart on purpose: the two menus answer for different things, so folding them into one
-    // switch would make turning tracks on for the sound turn them on for the words.
-    private static bool _allowMultiSubtitleTracks = false;
-
     public required int WindowId { get; init; }
 
     public required ActionHandler ActionHandler { get; init; }
@@ -58,9 +51,9 @@ internal sealed class PlayerMenuContext
 
     public IReadOnlyList<MediaSource> Sources => Session?.Sources ?? [];
 
-    public bool AllowMultiAudioTracks => _allowMultiAudioTracks;
+    public bool AllowMultiAudioTracks => TrackSelection.AllowMultiAudioTracks(Media);
 
-    public bool AllowMultiSubtitleTracks => _allowMultiSubtitleTracks;
+    public bool AllowMultiSubtitleTracks => TrackSelection.AllowMultiSubtitleTracks(Media);
 
     public IReadOnlyList<MediaStreamInfo>? Tracks(MediaStreamKind kind)
     {
@@ -102,7 +95,7 @@ internal sealed class PlayerMenuContext
 
     public void SetAllowMultiAudioTracks(bool allow)
     {
-        _allowMultiAudioTracks = allow;
+        TrackSelection.SetAllowMultiAudioTracks(Media, allow);
 
         PlayerSession? session = Session;
         if (allow || session is not { } target)
@@ -129,7 +122,7 @@ internal sealed class PlayerMenuContext
 
     public void SetAllowMultiSubtitleTracks(bool allow)
     {
-        _allowMultiSubtitleTracks = allow;
+        TrackSelection.SetAllowMultiSubtitleTracks(Media, allow);
 
         PlayerSession? session = Session;
         PlayerView? view = View;
