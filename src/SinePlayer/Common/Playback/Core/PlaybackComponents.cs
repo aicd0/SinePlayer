@@ -121,19 +121,27 @@ internal sealed record PlaybackComponents(
             ApplyVideo(chain);
         }
 
+        foreach (IAudioChain chain in pipeline.AudioChains)
+        {
+            ApplyAudio(chain);
+        }
+
         foreach (ISubtitleChain chain in pipeline.SubtitleChains)
         {
             ApplySubtitle(chain);
         }
-
-        ApplyAudioDecoder(pipeline, AudioDecoder);
-        ApplyAudioRenderer(pipeline, AudioRenderer);
     }
 
     public void ApplyVideo(IVideoChain chain)
     {
         ApplyVideoDecoder(chain, VideoDecoder);
         ApplyVideoRenderer(chain, VideoRenderer);
+    }
+
+    public void ApplyAudio(IAudioChain chain)
+    {
+        ApplyAudioDecoder(chain, AudioDecoder);
+        ApplyAudioRenderer(chain, AudioRenderer);
     }
 
     public void ApplySubtitle(ISubtitleChain chain)
@@ -178,23 +186,23 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void ApplyAudioDecoder(PlaybackPipeline pipeline, string key)
+    private static void ApplyAudioDecoder(IAudioChain chain, string key)
     {
         switch (key)
         {
             case FFMPEG:
-                SetAudioDecoders(pipeline, [new FFmpegAudioDecoderFactory()]);
+                SetAudioDecoders(chain, [new FFmpegAudioDecoderFactory()]);
                 break;
             case NONE:
-                SetAudioDecoders(pipeline, [new NullAudioDecoderFactory()]);
+                SetAudioDecoders(chain, [new NullAudioDecoderFactory()]);
                 break;
             default:
-                SetAudioDecoders(pipeline, [new FFmpegAudioDecoderFactory()]);
+                SetAudioDecoders(chain, [new FFmpegAudioDecoderFactory()]);
                 break;
         }
     }
 
-    private static void ApplyAudioRenderer(PlaybackPipeline pipeline, string key)
+    private static void ApplyAudioRenderer(IAudioChain chain, string key)
     {
         if (key.StartsWith(WASAPI_PREFIX, StringComparison.Ordinal))
         {
@@ -206,7 +214,7 @@ internal sealed record PlaybackComponents(
                 {
                     if (endpoint.Id == endpointId)
                     {
-                        SetAudioRenderers(pipeline, [WasapiAudioRendererFactory.For(endpoint)]);
+                        SetAudioRenderers(chain, [WasapiAudioRendererFactory.For(endpoint)]);
                         return;
                     }
                 }
@@ -218,7 +226,7 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case NONE:
-                SetAudioRenderers(pipeline, [new NullAudioRendererFactory()]);
+                SetAudioRenderers(chain, [new NullAudioRendererFactory()]);
                 return;
             case AUTO:
             default:
@@ -238,7 +246,7 @@ internal sealed record PlaybackComponents(
                         factories.Add(new WasapiAudioRendererFactory());
                     }
 
-                    SetAudioRenderers(pipeline, factories);
+                    SetAudioRenderers(chain, factories);
                     return;
                 }
         }
@@ -297,21 +305,21 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetAudioDecoders(PlaybackPipeline pipeline, IEnumerable<IAudioDecoderFactory> factories)
+    private static void SetAudioDecoders(IAudioChain chain, IEnumerable<IAudioDecoderFactory> factories)
     {
-        pipeline.AudioChains[0].Components.ClearDecoders();
+        chain.Components.ClearDecoders();
         foreach (IAudioDecoderFactory factory in factories)
         {
-            pipeline.AudioChains[0].Components.Register(factory);
+            chain.Components.Register(factory);
         }
     }
 
-    private static void SetAudioRenderers(PlaybackPipeline pipeline, IEnumerable<IAudioRendererFactory> factories)
+    private static void SetAudioRenderers(IAudioChain chain, IEnumerable<IAudioRendererFactory> factories)
     {
-        pipeline.AudioChains[0].Components.ClearRenderers();
+        chain.Components.ClearRenderers();
         foreach (IAudioRendererFactory factory in factories)
         {
-            pipeline.AudioChains[0].Components.Register(factory);
+            chain.Components.Register(factory);
         }
     }
 
