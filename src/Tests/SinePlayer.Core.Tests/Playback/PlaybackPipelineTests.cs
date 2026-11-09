@@ -3869,7 +3869,10 @@ public class PlaybackPipelineTests
     {
         Await(pipeline.AddVideoChain(videoTarget ?? new FakeRenderTarget()));
         Await(pipeline.AddAudioChain());
-        Await(pipeline.AddSubtitleChain(subtitleTarget ?? SubtitleSurfaceTarget));
+
+        // A host names the picture its words belong to; the pipeline no longer picks one.
+        ISubtitleChain subtitles = Await(pipeline.AddSubtitleChain(subtitleTarget ?? SubtitleSurfaceTarget));
+        subtitles.LayoutVideoChain = pipeline.VideoChains[0];
     }
 
     /// <summary>
@@ -8303,12 +8306,13 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
-    /// A picture added after the words still becomes what they are laid out in: the layout source is resolved when the
-    /// pipeline is reconciled, so the order the chains were added in does not decide it — and nothing had to be
-    /// stopped and started again for the words to find the picture.
+    /// The picture the words belong to is the host's to name, so a picture added after them is not adopted: the words keep
+    /// being laid out against the whole surface until the host binds theirs. That is what makes a second view's words sit
+    /// on its own picture — before this, the pipeline pointed every set of words at the first picture it had, which in a
+    /// session with two views is another window's.
     /// </summary>
     [Test]
-    public void LaysTheWordsOutInAPictureAddedAfterThem()
+    public void LaysTheWordsOutInThePictureTheyWereBoundTo()
     {
         string playing = SyntheticPath("words-then-picture");
         SyntheticMultiSourceProviderFactory sources = new();
@@ -8322,8 +8326,8 @@ public class PlaybackPipelineTests
         PlaybackPipeline pipeline = new() { SourceFactory = sources };
         try
         {
-            // The words first, the picture second, and no reset in between: the only thing that can point the words at
-            // the picture is the reconcile that installs it.
+            // The words first, the picture second, and no reset in between: the picture is added while the words already
+            // exist, which is the ordering a page that picks subtitles before a video track produces.
             ISubtitleChain subtitles = Await(pipeline.AddSubtitleChain(new SubtitleSurface()));
             subtitles.Components.Register(new SyntheticSubtitleDecoderFactory());
             subtitles.Components.Register(new FakeSubtitleRendererFactory(words));
@@ -8342,12 +8346,70 @@ public class PlaybackPipelineTests
 
             WaitFor(() => words.Texts.Length == 1, "the cue to be up");
 
+            Assert.That(words.Presentations[^1].Frame.Height, Is.EqualTo(1.0).Within(0.001), "no picture was bound, so the words use the whole surface");
+
+            // Binding is the host's call, and it takes effect without stopping anything.
+            subtitles.LayoutVideoChain = video;
+            WaitFor(() => words.Presentations[^1].Frame.Height < 0.99, "the words to be laid out in the bound picture");
+
             SubtitleFrame frame = words.Presentations[^1].Frame;
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(frame.Top, Is.EqualTo(0.125).Within(0.001), "the words are laid out in the picture, not in the whole surface");
+                Assert.That(frame.Top, Is.EqualTo(0.125).Within(0.001), "the words are laid out in the picture they were bound to");
                 Assert.That(frame.Height, Is.EqualTo(0.75).Within(0.001));
             }
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A picture that leaves the pipeline takes nothing with it: the words it was measuring are let go and fall back to the
+    /// whole surface, rather than being passed to whichever picture is left — another window's, in a session with two.
+    /// </summary>
+    [Test]
+    public void LetsGoOfAPictureItWasLaidOutInWhenThatPictureIsRemoved()
+    {
+        string playing = SyntheticPath("words-picture-removed");
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(playing, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        });
+
+        FakeSubtitleRenderer words = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+
+            IVideoChain video = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            video.Components.Register(new SyntheticVideoDecoderFactory());
+            video.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
+
+            ISubtitleChain subtitles = Await(pipeline.AddSubtitleChain(new SubtitleSurface()));
+            subtitles.Components.Register(new SyntheticSubtitleDecoderFactory());
+            subtitles.Components.Register(new FakeSubtitleRendererFactory(words));
+            subtitles.LayoutVideoChain = video;
+
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(subtitles, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => words.Texts.Length == 1, "the cue to be up");
+            WaitFor(() => words.Presentations[^1].Frame.Height < 0.99, "the words to be laid out in the picture");
+
+            Assert.That(Await(pipeline.RemoveChain(video)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            WaitFor(() => words.Presentations[^1].Frame.Height > 0.99, "the words to fall back to the whole surface");
+            Assert.That(words.Presentations[^1].Frame.Top, Is.EqualTo(0.0).Within(0.001));
         }
         finally
         {
