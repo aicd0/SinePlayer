@@ -256,6 +256,13 @@ per-kind model. The three keys are not migrated: a media simply has no remembere
 "no preference" is not "off" — no preference is what makes a first-ever open choose the default stream instead of showing
 nothing. `Views` holds one entry per page the media was last shown on, in the order they joined, so reopening it with two
 windows restores both; a fresh open with one page reads `Views[0]`.
+**Decision 17 — a page seeds itself from the session; a delta alone is not enough.** The session raises what *changes*, so a
+page that joins a session already playing has witnessed none of those changes, and every piece of UI derived only from
+events stays blank: the repeat and shuffle marks, the transport's neighbour enablement, the settings panel content — all of
+them were missing in the second window, and the volume was never the second window's business at all. So two rules:
+a page calls `RefreshFromSession` once as it starts, which reads the media, the state, the position, the volume and the
+playback in one pass; and any state the session owns that a page shows gets an event (`PlayerSession.VolumeChanged` is the
+one that was missing). Nothing may depend on having been present when something happened.
 ## 5. Phases
 
 Invariant, as in the previous plans: one coherent change per step, a build that is clean (0 errors, 0 warnings) at
