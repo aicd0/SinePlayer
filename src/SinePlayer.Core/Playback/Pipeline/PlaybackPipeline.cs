@@ -511,16 +511,12 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void ReconcileLayoutSources()
     {
-        VideoChain? picture = _videoChains.Length > 0 ? _videoChains[0] : null;
         foreach (SubtitleChain subtitle in _subtitleChains)
         {
-            if (subtitle.LayoutSource == picture)
+            if (subtitle.LayoutVideoChain is not VideoChain picture || Array.IndexOf(_videoChains, picture) < 0)
             {
-                continue;
+                subtitle.LayoutVideoChain = null;
             }
-
-            subtitle.LayoutSource = picture;
-            subtitle.RenderNode.Wake();
         }
     }
 
@@ -871,7 +867,7 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         foreach (SubtitleChain subtitle in _subtitleChains)
         {
-            if (subtitle.LayoutSource == picture)
+            if (subtitle.LayoutVideoChain == picture)
             {
                 subtitle.RenderNode.Wake();
             }

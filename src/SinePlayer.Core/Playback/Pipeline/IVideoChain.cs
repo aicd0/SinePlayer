@@ -8,7 +8,7 @@ using SinePlayer.Core.Playback.Selection;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-public interface IVideoChain : IPlaybackChain<VideoStreamInfo>
+public interface IVideoChain : IPlaybackChain<VideoStreamInfo>, IPictureFrameSource
 {
     VideoComponentResolver Components { get; }
 
