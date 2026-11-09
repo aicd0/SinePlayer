@@ -30,6 +30,10 @@ internal sealed class PlayerMenuContext
     // Temporary workaround for the lack of a proper settings system. This is a static field to avoid having to pass the setting around in the constructor, but it should be replaced with a proper settings system that can be injected into the class.
     private static bool _allowMultiAudioTracks = false;
 
+    // The same workaround, kept apart on purpose: the two menus answer for different things, so folding them into one
+    // switch would make turning tracks on for the sound turn them on for the words.
+    private static bool _allowMultiSubtitleTracks = false;
+
     public required int WindowId { get; init; }
 
     public required ActionHandler ActionHandler { get; init; }
@@ -55,6 +59,8 @@ internal sealed class PlayerMenuContext
     public IReadOnlyList<MediaSource> Sources => Session?.Sources ?? [];
 
     public bool AllowMultiAudioTracks => _allowMultiAudioTracks;
+
+    public bool AllowMultiSubtitleTracks => _allowMultiSubtitleTracks;
 
     public IReadOnlyList<MediaStreamInfo>? Tracks(MediaStreamKind kind)
     {
@@ -89,6 +95,11 @@ internal sealed class PlayerMenuContext
         return Session?.AudioChains.Any(chain => chain.SelectedStream?.Equals(stream) == true) == true;
     }
 
+    public bool IsSubtitleTrackPlaying(MediaStreamInfo stream)
+    {
+        return View?.SubtitleChains.Any(chain => chain.SelectedStream?.Equals(stream) == true) == true;
+    }
+
     public void SetAllowMultiAudioTracks(bool allow)
     {
         _allowMultiAudioTracks = allow;
@@ -110,6 +121,35 @@ internal sealed class PlayerMenuContext
             foreach (MediaStreamInfo stream in extra)
             {
                 await target.RemoveAudioStream(stream);
+            }
+
+            await target.Reconcile();
+        });
+    }
+
+    public void SetAllowMultiSubtitleTracks(bool allow)
+    {
+        _allowMultiSubtitleTracks = allow;
+
+        PlayerSession? session = Session;
+        PlayerView? view = View;
+        if (allow || session is not { } target || view is not { } targetView)
+        {
+            return;
+        }
+
+        // Going back to one set keeps the first of them, so the chain that was there before the others joined is the one left drawing.
+        MediaStreamInfo[] extra = [.. targetView.SubtitleChains.Select(chain => chain.SelectedStream).OfType<MediaStreamInfo>().Skip(1)];
+        if (extra.Length == 0)
+        {
+            return;
+        }
+
+        CoroutineUtils.Run(async () =>
+        {
+            foreach (MediaStreamInfo stream in extra)
+            {
+                await target.RemoveSubtitleStream(targetView, stream);
             }
 
             await target.Reconcile();
@@ -152,6 +192,40 @@ internal sealed class PlayerMenuContext
         });
     }
 
+    public void ToggleSubtitleTrack(MediaStreamInfo stream)
+    {
+        PlayerSession? session = Session;
+        PlayerView? view = View;
+        if (session is null || view is null)
+        {
+            return;
+        }
+
+        bool playing = IsSubtitleTrackPlaying(stream);
+        CoroutineUtils.Run(async () =>
+        {
+            OperationResult changed = playing ? await session.RemoveSubtitleStream(view, stream) : await session.AddSubtitleStream(view, stream);
+            if (!changed.IsSuccessful)
+            {
+                PromptInfo?.Invoke(changed.Message);
+                return;
+            }
+
+            OperationResult<ReconcileResult> reconciled = await session.Reconcile();
+            if (!reconciled.IsSuccessful)
+            {
+                PromptInfo?.Invoke(reconciled.Message);
+                return;
+            }
+
+            OperationResult? built = reconciled.Result.Subtitle(view);
+            if (built is { IsSuccessful: false })
+            {
+                PromptInfo?.Invoke(built.Message);
+            }
+        });
+    }
+
     public void ClearAudioTracks()
     {
         PlayerSession? session = Session;
@@ -166,6 +240,36 @@ internal sealed class PlayerMenuContext
             foreach (MediaStreamInfo stream in playing)
             {
                 OperationResult removed = await session.RemoveAudioStream(stream);
+                if (!removed.IsSuccessful)
+                {
+                    PromptInfo?.Invoke(removed.Message);
+                    return;
+                }
+            }
+
+            OperationResult<ReconcileResult> reconciled = await session.Reconcile();
+            if (!reconciled.IsSuccessful)
+            {
+                PromptInfo?.Invoke(reconciled.Message);
+            }
+        });
+    }
+
+    public void ClearSubtitleTracks()
+    {
+        PlayerSession? session = Session;
+        PlayerView? view = View;
+        if (session is null || view is null)
+        {
+            return;
+        }
+
+        MediaStreamInfo[] playing = [.. view.SubtitleChains.Select(chain => chain.SelectedStream).OfType<MediaStreamInfo>()];
+        CoroutineUtils.Run(async () =>
+        {
+            foreach (MediaStreamInfo stream in playing)
+            {
+                OperationResult removed = await session.RemoveSubtitleStream(view, stream);
                 if (!removed.IsSuccessful)
                 {
                     PromptInfo?.Invoke(removed.Message);
