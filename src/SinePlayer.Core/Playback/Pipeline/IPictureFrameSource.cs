@@ -5,7 +5,7 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal interface IPictureFrameSource
+public interface IPictureFrameSource
 {
     SubtitleFrame Frame { get; }
 }

@@ -97,6 +97,12 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
     {
         _videoChain = video;
         video.Transform = _videoTransform;
+
+        if (_subtitleChain is { } subtitle)
+        {
+            subtitle.LayoutVideoChain = video;
+        }
+
         _playbackInfo.Attach(_videoChain, _subtitleChain);
     }
 
@@ -104,11 +110,17 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
     {
         _subtitleChain = subtitle;
         subtitle.Presentation = _subtitlePresentation;
+        subtitle.LayoutVideoChain = _videoChain;
         _playbackInfo.Attach(_videoChain, _subtitleChain);
     }
 
     public void Detach()
     {
+        if (_subtitleChain is { } subtitle)
+        {
+            subtitle.LayoutVideoChain = null;
+        }
+
         _videoChain = null;
         _subtitleChain = null;
         _playbackInfo.Detach();

@@ -26,6 +26,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
     private readonly AtomicCell<SubtitlePresentation> _presentation = new(SubtitlePresentation.Identity);
+    private volatile IVideoChain? _layoutVideoChain;
     private IVideoRenderTarget? _target;
     private volatile bool _starved;
     private long _endedEpoch = -1;
@@ -97,7 +98,20 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
         }
     }
 
-    public IPictureFrameSource? LayoutSource { get; set; }
+    public IVideoChain? LayoutVideoChain
+    {
+        get => _layoutVideoChain;
+        set
+        {
+            if (_layoutVideoChain == value)
+            {
+                return;
+            }
+
+            _layoutVideoChain = value;
+            RenderNode.Wake();
+        }
+    }
 
     public long SurfaceVersion;
 
@@ -447,7 +461,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
 
             SubtitlePresentation presentation = _presentation.Read() with
             {
-                Frame = LayoutSource?.Frame ?? SubtitleFrame.Full
+                Frame = LayoutVideoChain?.Frame ?? SubtitleFrame.Full
             };
 
             if (drawnInvalidated ||
