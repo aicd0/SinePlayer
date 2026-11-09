@@ -153,6 +153,63 @@ because what a page does about it is the page's own business and the session has
 part is what only it can do: what it shows, its own view's chains, whether playback starts. `Ended` moves with the
 open for the same reason — one playback ends once, so one place decides repeat and auto-next.
 
+**Decision 12 — a tab title is not assigned before the tab item has loaded.** Assigning an *empty* `TabViewItem.Header`
+while the item's template is still being realized breaks that realization: the item's own content presenter then takes
+the tab's `Frame` away from `TabContentPresenter` — the `TabView` content host that `TabContentPresenter_Loaded` moves
+out of the template into `ContentGrid` — and that presenter is left with no children, so its next measure returns
+`E_INVALIDARG` from native `Microsoft.ui.xaml.dll` (`FrameworkElement.MeasureOverride` → `base.MeasureOverride`). The
+app treats an unhandled UI-thread exception as fatal, so the tab painted nothing and the process ended; the tab
+bookkeeping the failure left behind is also what made closing the window throw. `MainPageAbilityForTab.SetTitle`
+therefore holds the title in `TabInfo.PendingTitle` until `TabItem_Loaded` applies it.
+
+The failing element was identified first: the tab's `Frame` was measured through both presenters in one pass, first
+through `TabContentPresenter` (`ContentGrid < ContentGridImmersive < Grid < MainPage`, available width 1905), then
+through the item's presenter inside the tab strip (`TabViewItem < LayoutRoot < TabContainer < ContentPresenter`,
+available width 164), confirmed with a native debugger and by re-measuring the tree by hand.
+
+Which component reaches that state was narrowed with a repeatable harness: one build, one configuration per run chosen
+by a marker file, three launches per configuration, always the same click on the first library item.
+
+| configuration | crashes |
+| --- | --- |
+| session load started from `OnStart` (baseline) | 3/3 |
+| the same, deferred to `LayoutUpdated` | 0/3 |
+| `session.Load` not called at all | 0/3 |
+| load called, the open body skipped entirely | 3/3 |
+| load called, the page's `MediaChanged` handler inert | 3/3 |
+| load called, the page's view-model observers not registered | 0/3 |
+| observers on, only the playback observer skipped | 0/3 |
+| playback observer: head only (`TransportBar`, `Emit`) | 0/3 |
+| playback observer: tail only (title, icon, settings, URL, sync) | 3/3 |
+| without `SetTitle` and `SetIcon` | 0/3 |
+| without `SetUrl` and `SyncCurrentMedia` | 3/3 |
+| without `SetPlayerSettings` | 3/3 |
+| without `SetIcon` only | 3/3 |
+| without `SetTitle` only | 0/3 |
+| the player tab reported as non-immersive | 3/3 |
+| header assigned from the playback dispatch, title `'1'` | 0/3 |
+| header assigned from the playback dispatch, title `''` | 3/3 |
+| header assigned directly in `OnStart`, title `'EARLY'` | 0/3 |
+| header assigned directly in `OnStart`, title `''` | 3/3 |
+| `SetTitle` holding the title until the item loads (the fix) | 0/3 |
+
+So the window is "the page has started and the tab item has not loaded yet", but inside it only an empty header is
+fatal: the same assignment with a non-empty value is harmless at the same moment, from the same dispatch. Immersive
+mode and nesting are not factors at all — a player tab treated as non-immersive still crashed 3/3, and a direct
+`OnStart` call with an empty value crashed 3/3. Once the item has loaded, even an empty header is safe.
+
+Why only the player tab: it is the only page that ever assigns an empty title. Its observer reports
+`SetTitle(string.Empty)` whenever the media is not known yet, which — after the session took over the open — was always
+the case at the playback dispatch because the media only reaches a page in `MediaChanged`, after that dispatch. Home
+pages report `'New tab'` and are unaffected.
+
+That same ordering is why the tab also lost its title when the crash was first papered over: reading `ViewModel.Media`
+gave null and the page reported `''`. The header is now taken from `session.CurrentMedia`, which is already set at that
+point; verified by reading the tab titles back through UI Automation (`'New tab', '1'`).
+
+The earlier workaround — a page creating its session waited for its first `LayoutUpdated` before loading its queue — is
+no longer needed and has been removed.
+
 ## 5. Phases
 
 Invariant, as in the previous plans: one coherent change per step, a build that is clean (0 errors, 0 warnings) at

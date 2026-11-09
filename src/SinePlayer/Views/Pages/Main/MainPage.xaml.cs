@@ -697,6 +697,13 @@ internal sealed partial class MainPage : BasePage
                 headerText.TextTrimming = TextTrimming.CharacterEllipsis;
             }
         }
+
+        TabInfo? tabInfo = _tabs.FirstOrDefault(tab => tab.Item == item);
+        if (tabInfo?.PendingTitle is { } pendingTitle)
+        {
+            tabInfo.PendingTitle = null;
+            item.Header = pendingTitle;
+        }
     }
 
     private void RootGrid_DragOver(object sender, DragEventArgs e)
@@ -1419,8 +1426,20 @@ internal sealed partial class MainPage : BasePage
         public void SetTitle(string title)
         {
             TabInfo? tab = GetTab();
-            if (tab == null)
+            if (tab is null)
             {
+                return;
+            }
+
+            if (!tab.Item.IsLoaded)
+            {
+                // An empty header assigned to an item whose template is still being realized breaks that
+                // realization: the item's own content presenter then takes the tab's frame away from
+                // TabContentPresenter, which is left with no children, and its next measure returns E_INVALIDARG
+                // ("Value does not fall within the expected range") — fatal for the app. A non-empty header at the
+                // same moment is harmless, but the title may well be cleared before the media is known, so hold it
+                // until the item has loaded.
+                tab.PendingTitle = title;
                 return;
             }
 
@@ -1631,6 +1650,7 @@ internal sealed partial class MainPage : BasePage
         public required MainPageAbilityForTab Ability { init; get; }
         public required PageNavigationBundle CurrentBundle { get; set; }
         public NavigatedEventHandler? NavigatedHandler { get; set; }
+        public string? PendingTitle { get; set; }
 
         //
         // ITabInfo Implmentation
