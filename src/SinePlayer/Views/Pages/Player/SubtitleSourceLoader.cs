@@ -9,7 +9,6 @@ using SinePlayer.Common.Playback.Core;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
-using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Pipeline;
@@ -80,7 +79,6 @@ internal static class SubtitleSourceLoader
             return OperationResultExt.Failure(built);
         }
 
-        TrackSelection.Save(media, MediaStreamKind.Subtitle, selection.Source, selection.Stream);
         return OperationResult.Success();
     }
 
