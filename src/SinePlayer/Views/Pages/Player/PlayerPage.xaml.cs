@@ -1072,13 +1072,21 @@ internal sealed partial class PlayerPage : BasePage
             }
 
             long positionMs = session.Position.Ticks / TimeSpan.TicksPerMillisecond;
-            SeekTo(Math.Max(positionMs + deltaMs, 0));
+            SeekMode mode = AppSettingsModel.PreciseSeeking
+                ? SeekMode.Precise
+                : deltaMs > 0 ? SeekMode.NextKeyframe : SeekMode.PreviousKeyframe;
+            SeekTo(Math.Max(positionMs + deltaMs, 0), mode);
         });
     }
 
     private void SeekTo(long positionMs)
     {
-        SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
+        SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.PreviousKeyframe;
+        SeekTo(positionMs, mode);
+    }
+
+    private void SeekTo(long positionMs, SeekMode mode)
+    {
         Enqueue(() => _session?.Seek(TimeSpan.FromMilliseconds(positionMs), mode));
     }
 

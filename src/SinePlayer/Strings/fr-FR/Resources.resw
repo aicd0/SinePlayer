@@ -165,6 +165,9 @@
   <data name="AllPages" xml:space="preserve">
     <value>Toutes les pages</value>
   </data>
+  <data name="AllowMultiTracks" xml:space="preserve">
+    <value>Autoriser plusieurs pistes</value>
+  </data>
   <data name="AllowPerMediaConfiguration" xml:space="preserve">
     <value>Autoriser la configuration par média</value>
   </data>

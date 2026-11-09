@@ -1284,7 +1284,7 @@ public class PlaybackPipelineTests
         {
             Duration = TimeSpan.FromSeconds(3),
             KeyFrameInterval = 30,
-            LandsOnTheKeyframeBefore = false,
+            LandsOnKeyframes = false,
         });
 
         PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, new FakeSubtitleRenderer());
@@ -1307,6 +1307,325 @@ public class PlaybackPipelineTests
 
             WaitForPlaybackToFinish(pipeline);
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended), pipeline.Error);
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A forward keyframe seek resumes at the next place a decoder can start rather than at the frame that was asked
+    /// for: the source lands on the first keyframe at or after the target, so nothing from before that keyframe is ever
+    /// shown, and the picture's own first frame is the keyframe itself rather than a frame of the group behind it. The
+    /// synthetic decoder refuses a packet whose keyframe it never saw, so a landing that was not a keyframe would end the
+    /// playback instead of merely being inaccurate.
+    /// </summary>
+    [Test]
+    public void NextKeyframeSeekResumesAtTheKeyframeAfterThePosition()
+    {
+        SyntheticSourceProviderFactory sources = new(new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            KeyFrameInterval = 30,
+            LandsOnKeyframes = true,
+        });
+
+        FakeVideoRenderer videoRenderer = new();
+        PlaybackPipeline pipeline = CreatePipeline(
+            videoRenderer,
+            new FakeAudioRenderer(),
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
+            Assert.That(Select(pipeline, MediaStreamKind.Video, pipeline.Sources[0].Info.VideoStreams[0]).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.3), "playback to be under way", 5000);
+
+            // 1.5 s is halfway between the keyframes at 1 s and 2 s, so a forward landing is the one at 2 s.
+            var target = TimeSpan.FromSeconds(1.5);
+            var keyframeAfter = TimeSpan.FromSeconds(2);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.NextKeyframe)).IsSuccessful, Is.True);
+            WaitFor(() => sources.Source?.LastSeekPosition == target, "the cursor to be asked to move", 5000);
+
+            Assert.That(sources.Source!.LastSeekMode, Is.EqualTo(SeekMode.NextKeyframe), "the landing is looked for forward");
+
+            int marker = videoRenderer.RenderedTimestamps.Count;
+            WaitFor(() => pipeline.VideoChains[0].LastPresentedTimestamp >= keyframeAfter,
+                $"a forward seek offered the still of {pipeline.VideoChains[0].LastPresentedTimestamp:g}, before the keyframe it lands on ({keyframeAfter:g})");
+            WaitForPresentedFrames(pipeline, pipeline.VideoChains[0].PresentedFrameCount + 2);
+
+            IReadOnlyList<TimeSpan> rendered = videoRenderer.RenderedTimestamps;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.Error, Is.Null, "a forward landing starts the decoder at a keyframe, so nothing is undecodable");
+                Assert.That(rendered.Count, Is.GreaterThan(marker), "the picture has to carry on after a forward seek");
+                Assert.That(rendered.Skip(marker).All(timestamp => timestamp >= keyframeAfter), Is.True,
+                    "a forward seek showed a frame from before the keyframe it landed on");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(keyframeAfter),
+                    "the clock follows the picture to the keyframe the seek landed on");
+            }
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Two chains reading one file have keyframes of their own, so a landing has to be one both of them can start from:
+    /// the file is asked where each stream would land and the earliest answer wins. Every chain's own keyframe is then at
+    /// or after the landing, so each decoder starts from its own. Landing by the first chain's keyframe instead puts the
+    /// second chain's keyframe behind the landing, and it has to wait for the group after it — up to a whole group of
+    /// pictures of picture that no seek asked to lose. Nothing plays: a paused seek moves the reader and both decoders,
+    /// and the stills they offer are where each of them started.
+    /// </summary>
+    [Test]
+    public void LandsByTheEarliestKeyframeOfTheChainsReadingOneFile()
+    {
+        SyntheticSourceProviderFactory sources = new(new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            KeyFrameInterval = 30,
+            SecondVideoKeyFrameOffset = 20,
+            LandsOnKeyframes = true,
+        });
+
+        FakeVideoRenderer firstRenderer = new();
+        FakeVideoRenderer secondRenderer = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IVideoChain first = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            IVideoChain second = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            first.Components.Register(new SyntheticVideoDecoderFactory());
+            first.Components.Register(new FakeVideoRendererFactory(firstRenderer));
+            second.Components.Register(new SyntheticVideoDecoderFactory());
+            second.Components.Register(new FakeVideoRendererFactory(secondRenderer));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(SyntheticPath()))).IsSuccessful, Is.True);
+
+            MediaInfo info = pipeline.Sources[0].Info;
+            Assert.That(Await(pipeline.SelectStream(first, info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(second, info.VideoStreams[1])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            // At 1.5 s the first stream's keyframe is the one at 1 s and the second stream's the one at 20/30 s.
+            var target = TimeSpan.FromSeconds(1.5);
+            var earliest = TimeSpan.FromSeconds(20.0 / 30);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.PreviousKeyframe)).IsSuccessful, Is.True);
+            WaitFor(() => sources.Source?.LastSeekPosition == target, "the file to be asked to move", 5000);
+
+            Assert.That(sources.Source!.LastSeekStreamIndex, Is.EqualTo(SyntheticMediaSource.SecondVideoStreamIndex),
+                "the landing is the earliest keyframe the two chains have, not the one the first chain has");
+
+            // Both pictures start at a keyframe no later than where the seek asked. The first chain finds its own one
+            // second in, the second chain the landing itself at 20/30 s: nothing has to wait for the next group.
+            WaitFor(
+                () => firstRenderer.RenderedTimestamps.Any(timestamp => timestamp >= earliest && timestamp <= target)
+                    && secondRenderer.RenderedTimestamps.Any(timestamp => timestamp >= earliest && timestamp <= target),
+                "both pictures to start at a keyframe at or before the position the seek asked for",
+                4000);
+
+            Assert.That(pipeline.Error, Is.Null, "a landing both streams can start from leaves nothing undecodable");
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Two picture streams of one file keyframe at the same instants, which is what one encode of one source produces, so
+    /// the landing cannot be chosen by position. A seek starts the read at the block of the stream it is measured by, and
+    /// the container writes one stream's keyframe before the other's: measuring it by the later block leaves the earlier
+    /// stream's keyframe behind, and that picture waits a whole group of pictures. The chains' order is not the answer —
+    /// the file is asked which of them suits both — so the chain added first here is the one that must not land it.
+    /// </summary>
+    [Test]
+    public void LandsByTheStreamWhoseKeyframeTheContainerWritesFirst()
+    {
+        SyntheticSourceProviderFactory sources = new(new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            KeyFrameInterval = 30,
+            SecondVideoKeyFrameOffset = 0,
+            LandsOnKeyframes = true,
+        });
+
+        FakeVideoRenderer firstRenderer = new();
+        FakeVideoRenderer secondRenderer = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IVideoChain first = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            IVideoChain second = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            first.Components.Register(new SyntheticVideoDecoderFactory());
+            first.Components.Register(new FakeVideoRendererFactory(firstRenderer));
+            second.Components.Register(new SyntheticVideoDecoderFactory());
+            second.Components.Register(new FakeVideoRendererFactory(secondRenderer));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(SyntheticPath()))).IsSuccessful, Is.True);
+
+            MediaInfo info = pipeline.Sources[0].Info;
+            Assert.That(Await(pipeline.SelectStream(first, info.VideoStreams[1])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(second, info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            var target = TimeSpan.FromSeconds(1.5);
+            var landing = TimeSpan.FromSeconds(1);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.PreviousKeyframe)).IsSuccessful, Is.True);
+            WaitFor(() => sources.Source?.LastSeekPosition == target, "the file to be asked to move", 5000);
+
+            Assert.That(sources.Source!.LastSeekStreamIndex, Is.EqualTo(info.VideoStreams[0].Index),
+                "the landing is measured by the stream whose keyframe the container wrote first, not by the first chain");
+
+            WaitFor(
+                () => firstRenderer.RenderedTimestamps.Any(timestamp => timestamp >= landing && timestamp <= target)
+                    && secondRenderer.RenderedTimestamps.Any(timestamp => timestamp >= landing && timestamp <= target),
+                "both pictures to start at the keyframe they share",
+                4000);
+
+            Assert.That(pipeline.Error, Is.Null, "a landing both streams can start from leaves nothing undecodable");
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Two picture streams of one file are not always the same length. A seek past the end of the shorter one must not land
+    /// where that stream ended: a landing by a stream that is over is its last keyframe, so the rest of the file — which
+    /// the longer stream still has — would be thrown away, and the position would jump back to where the short picture
+    /// stopped. Only the streams that still have media at the position may decide it.
+    /// </summary>
+    [Test]
+    public void DoesNotLandWhereAShorterPictureStreamEnded()
+    {
+        SyntheticSourceProviderFactory sources = new(new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            KeyFrameInterval = 30,
+            SecondVideoKeyFrameOffset = 0,
+            LandsOnKeyframes = true,
+            VideoStopsAt = TimeSpan.FromSeconds(1),
+            VideoDuration = TimeSpan.FromSeconds(1),
+            SecondVideoDuration = TimeSpan.FromSeconds(3),
+        });
+
+        FakeVideoRenderer shortRenderer = new();
+        FakeVideoRenderer longRenderer = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IVideoChain shortChain = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            IVideoChain longChain = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            shortChain.Components.Register(new SyntheticVideoDecoderFactory());
+            shortChain.Components.Register(new FakeVideoRendererFactory(shortRenderer));
+            longChain.Components.Register(new SyntheticVideoDecoderFactory());
+            longChain.Components.Register(new FakeVideoRendererFactory(longRenderer));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(SyntheticPath()))).IsSuccessful, Is.True);
+
+            MediaInfo info = pipeline.Sources[0].Info;
+            Assert.That(Await(pipeline.SelectStream(shortChain, info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(longChain, info.VideoStreams[1])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+
+            // The picture of the first stream is over at one second; 2.5 s is well past it and the other stream still has it.
+            var target = TimeSpan.FromSeconds(2.5);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.PreviousKeyframe)).IsSuccessful, Is.True);
+            WaitFor(() => sources.Source?.LastSeekPosition == target, "the file to be asked to move", 5000);
+
+            Assert.That(sources.Source!.LastSeekStreamIndex, Is.EqualTo(info.VideoStreams[1].Index),
+                "the landing is measured by the stream that still has the position, not by the one that ended before it");
+
+            WaitFor(() => longRenderer.RenderedTimestamps.Any(timestamp => timestamp >= target - TimeSpan.FromSeconds(0.5)),
+                "the picture that still has the position to start at the keyframe it lands on",
+                4000);
+
+            Assert.That(longRenderer.RenderedTimestamps.Any(timestamp => timestamp < TimeSpan.FromSeconds(1.5)), Is.False,
+                "the seek must not land where the shorter picture ended");
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A seek past the end of one picture stream leaves that chain with nothing to present for the rest of the file, which
+    /// is not the same as being starved: holding the clock for it stops the playback the other streams can still carry, and
+    /// the position freezes at the position that was asked for. The stream that ended is over, so its chain waits quietly
+    /// while the ones that still have media play on — the sound here, which is what keeps the clock when a chain has none.
+    /// </summary>
+    [Test]
+    public void KeepsPlayingAfterASeekPastTheEndOfOnePictureStream()
+    {
+        SyntheticSourceProviderFactory sources = new(new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(60),
+            KeyFrameInterval = 30,
+            SecondVideoKeyFrameOffset = 0,
+            LandsOnKeyframes = true,
+            VideoStopsAt = TimeSpan.FromSeconds(20),
+            VideoDuration = TimeSpan.FromSeconds(20),
+            SecondVideoDuration = TimeSpan.FromSeconds(60),
+        });
+
+        FakeVideoRenderer shortRenderer = new();
+        FakeVideoRenderer longRenderer = new();
+        PlaybackPipeline pipeline = new() { SourceFactory = sources };
+        try
+        {
+            IVideoChain shortChain = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            IVideoChain longChain = Await(pipeline.AddVideoChain(new FakeRenderTarget()));
+            IAudioChain audioChain = Await(pipeline.AddAudioChain());
+            shortChain.Components.Register(new SyntheticVideoDecoderFactory());
+            shortChain.Components.Register(new FakeVideoRendererFactory(shortRenderer));
+            longChain.Components.Register(new SyntheticVideoDecoderFactory());
+            longChain.Components.Register(new FakeVideoRendererFactory(longRenderer));
+            audioChain.Components.Register(new SyntheticAudioDecoderFactory());
+            audioChain.Components.Register(new FixedAudioRendererFactory(new FakeAudioRenderer()));
+
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(SyntheticPath()))).IsSuccessful, Is.True);
+
+            MediaInfo info = pipeline.Sources[0].Info;
+            Assert.That(Await(pipeline.SelectStream(shortChain, info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(longChain, info.VideoStreams[1])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.SelectStream(audioChain, info.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitForPresentedFrames(pipeline, 2);
+
+            // The picture of the first stream is over at twenty seconds; forty is well past it and everything else has it.
+            var target = TimeSpan.FromSeconds(40);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.PreviousKeyframe)).IsSuccessful, Is.True);
+
+            WaitFor(() => longChain.PresentedFrameCount > 2 && pipeline.Position > target + TimeSpan.FromSeconds(1),
+                $"the clock to keep running past a seek to {target:g}; it stands at {pipeline.Position:g} with {pipeline.StarvedFor ?? "nothing"} starved",
+                6000);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the playback carried on");
+                Assert.That(longChain.LastPresentedTimestamp, Is.GreaterThan(target), "the stream that still has the position kept showing it");
+                Assert.That(shortChain.LastPresentedTimestamp, Is.LessThan(TimeSpan.FromSeconds(21)), "the stream that ended stayed where it ended");
+            }
         }
         finally
         {
@@ -2489,7 +2808,7 @@ public class PlaybackPipelineTests
     {
         for (var target = TimeSpan.FromMilliseconds(400); target <= TimeSpan.FromSeconds(2); target += TimeSpan.FromMilliseconds(5))
         {
-            Assert.That(source.Seek(target, -1).IsSuccessful, Is.True);
+            Assert.That(source.Seek(target, -1, SeekMode.Precise).IsSuccessful, Is.True);
             Assert.That(source.TryReadPacket(out MediaPacket? packet).IsSuccessful, Is.True);
             Assert.That(packet, Is.Not.Null, "the fixture has to hold something at every position tried");
 
@@ -2515,7 +2834,7 @@ public class PlaybackPipelineTests
         var margin = TimeSpan.FromMilliseconds(300);
         for (var target = TimeSpan.FromMilliseconds(300); target <= TimeSpan.FromSeconds(2.6); target += TimeSpan.FromMilliseconds(20))
         {
-            Assert.That(source.Seek(target, -1).IsSuccessful, Is.True);
+            Assert.That(source.Seek(target, -1, SeekMode.Precise).IsSuccessful, Is.True);
             Assert.That(source.TryReadPacket(out MediaPacket? packet).IsSuccessful, Is.True);
             Assert.That(packet, Is.Not.Null, "the fixture has to hold something at every position tried");
 
@@ -5655,7 +5974,7 @@ public class PlaybackPipelineTests
             Duration = TimeSpan.FromSeconds(3),
             VideoStopsAt = TimeSpan.FromSeconds(1),
             VideoDuration = TimeSpan.FromSeconds(1),
-            LandsOnTheKeyframeBefore = true,
+            LandsOnKeyframes = true,
         };
 
         FakeVideoRenderer videoRenderer = new();
@@ -5676,7 +5995,7 @@ public class PlaybackPipelineTests
             WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.3), "playback to be under way", 5000);
 
             var target = TimeSpan.FromSeconds(3.5);
-            Assert.That(Await(pipeline.Seek(target, SeekMode.Fast)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.PreviousKeyframe)).IsSuccessful, Is.True);
             WaitFor(() => sources.Source?.LastSeekPosition == target, "the cursor to be asked to move", 5000);
 
             Assert.That(sources.Source!.LastSeekStreamIndex, Is.EqualTo(pipeline.Sources[0].Info.AudioStreams[0].Index),
@@ -5702,7 +6021,7 @@ public class PlaybackPipelineTests
         {
             Duration = TimeSpan.FromSeconds(3),
             VideoDuration = TimeSpan.Zero,
-            LandsOnTheKeyframeBefore = true,
+            LandsOnKeyframes = true,
         };
 
         FakeVideoRenderer videoRenderer = new();
@@ -5723,7 +6042,7 @@ public class PlaybackPipelineTests
             WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.3), "playback to be under way", 5000);
 
             var target = TimeSpan.FromSeconds(2);
-            Assert.That(Await(pipeline.Seek(target, SeekMode.Fast)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.PreviousKeyframe)).IsSuccessful, Is.True);
             WaitFor(() => sources.Source?.LastSeekPosition == target, "the cursor to be asked to move", 5000);
 
             Assert.That(sources.Source!.LastSeekStreamIndex, Is.EqualTo(pipeline.Sources[0].Info.VideoStreams[0].Index),
@@ -5747,7 +6066,7 @@ public class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            LandsOnTheKeyframeBefore = true,
+            LandsOnKeyframes = true,
         };
 
         FakeVideoRenderer videoRenderer = new();
@@ -5768,7 +6087,7 @@ public class PlaybackPipelineTests
             WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.3), "playback to be under way", 5000);
 
             var target = TimeSpan.FromSeconds(1.5);
-            Assert.That(Await(pipeline.Seek(target, SeekMode.Fast)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.PreviousKeyframe)).IsSuccessful, Is.True);
             WaitFor(() => sources.Source?.LastSeekPosition == target, "the cursor to be asked to move", 5000);
 
             Assert.That(sources.Source!.LastSeekStreamIndex, Is.EqualTo(pipeline.Sources[0].Info.VideoStreams[0].Index));
@@ -5796,7 +6115,7 @@ public class PlaybackPipelineTests
             Duration = TimeSpan.FromSeconds(3),
             VideoStopsAt = TimeSpan.FromSeconds(1),
             VideoDuration = TimeSpan.FromSeconds(1),
-            LandsOnTheKeyframeBefore = true,
+            LandsOnKeyframes = true,
         };
 
         FakeVideoRenderer videoRenderer = new();
@@ -5824,7 +6143,7 @@ public class PlaybackPipelineTests
             int pictures = videoRenderer.RenderedTimestamps.Count;
 
             var target = TimeSpan.FromSeconds(2);
-            Assert.That(Await(pipeline.Seek(target, SeekMode.Fast)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Seek(target, SeekMode.PreviousKeyframe)).IsSuccessful, Is.True);
 
             // Nothing to wait for when the answer is right, so the answer is given a moment to be wrong in.
             Thread.Sleep(300);
@@ -6256,9 +6575,16 @@ public class PlaybackPipelineTests
 
             public bool CanSeek => !refusesInAdvance;
 
-            public OperationResult Seek(TimeSpan position, int streamIndex)
+            public OperationResult Seek(TimeSpan position, int streamIndex, SeekMode mode)
             {
                 return OperationResult.Failure("This source refuses to move.");
+            }
+
+            public bool TryChooseSeekStream(IReadOnlyList<int> streamIndexes, TimeSpan position, SeekMode mode, out int streamIndex)
+            {
+                // Answering would move the file it refuses to be moved, so it cannot say which stream a seek should use.
+                streamIndex = -1;
+                return false;
             }
 
             public OperationResult TryReadPacket(out MediaPacket? packet)
@@ -6267,7 +6593,7 @@ public class PlaybackPipelineTests
                 if (read.IsSuccessful && packet is null)
                 {
                     // The stream loops rather than ends, which is what a live one does.
-                    inner.Seek(TimeSpan.Zero, -1);
+                    inner.Seek(TimeSpan.Zero, -1, SeekMode.Precise);
                     read = inner.TryReadPacket(out packet);
                 }
 
@@ -6937,7 +7263,7 @@ public class PlaybackPipelineTests
     /// Seeks and waits for the answer: what a test is about — where the clock ended up, whether playback went
     /// on — is only settled once the queue item has run, and a seek the source refuses says so in the result.
     /// </summary>
-    private static void SeekAndWait(PlaybackPipeline pipeline, TimeSpan position, SeekMode mode = SeekMode.Fast)
+    private static void SeekAndWait(PlaybackPipeline pipeline, TimeSpan position, SeekMode mode = SeekMode.PreviousKeyframe)
     {
         OperationResult seeked = Await(pipeline.Seek(position, mode));
         Assert.That(seeked.IsSuccessful, Is.True, seeked.Message);

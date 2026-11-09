@@ -759,7 +759,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         if (_startPositionMs > 0)
         {
-            SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
+            SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.PreviousKeyframe;
             OperationResult sought = await pipeline.Seek(TimeSpan.FromMilliseconds(_startPositionMs), mode);
             if (!sought.IsSuccessful)
             {
