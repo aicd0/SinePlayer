@@ -64,8 +64,8 @@ internal class ApplicationService : IApplicationService
     });
 #pragma warning restore CS0162 // Unreachable code detected
 
-    private static bool _launching = true;
-    private static bool _exiting = false;
+    private static volatile bool _launching = true;
+    private static volatile bool _exiting = false;
 
     public static void StopLaunching()
     {

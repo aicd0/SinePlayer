@@ -82,6 +82,19 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
         }
     }
 
+    public void Dispose()
+    {
+        DetachChains();
+
+        _videoRenderTarget?.Dispose();
+        _videoRenderTarget = null;
+        _videoPanel = null;
+
+        _subtitleRenderTarget?.Dispose();
+        _subtitleRenderTarget = null;
+        _subtitlePanel = null;
+    }
+
     public SwapChainPanelRenderTarget EnsureVideoRenderTarget()
     {
         _videoRenderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)VideoPanel);
@@ -92,6 +105,12 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
     {
         _subtitleRenderTarget ??= new SwapChainPanelRenderTarget((SwapChainPanel)SubtitlePanel);
         return _subtitleRenderTarget;
+    }
+
+    public void DetachSurfaces()
+    {
+        _videoRenderTarget?.DetachSurface();
+        _subtitleRenderTarget?.DetachSurface();
     }
 
     public void AttachVideo(IVideoChain video)
@@ -119,7 +138,7 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
         PublishPlaybackInfo();
     }
 
-    public void Detach()
+    public void DetachChains()
     {
         foreach (ISubtitleChain subtitle in _subtitleChains)
         {
@@ -129,21 +148,6 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
         _videoChain = null;
         _subtitleChains.Clear();
         _playbackInfo.Detach();
-    }
-
-    public void Dispose()
-    {
-        Detach();
-
-        _videoRenderTarget?.DetachSurface();
-        _videoRenderTarget?.Dispose();
-        _videoRenderTarget = null;
-        _videoPanel = null;
-
-        _subtitleRenderTarget?.DetachSurface();
-        _subtitleRenderTarget?.Dispose();
-        _subtitleRenderTarget = null;
-        _subtitlePanel = null;
     }
 
     private void PublishPlaybackInfo()
