@@ -26,6 +26,7 @@ public class PipelineSurfaceTests
         typeof(AudioFilterChain),
         typeof(AudioFilterChainSnapshot),
         typeof(IAudioChain),
+        typeof(IPictureFrameSource),
         typeof(IPlaybackChain),
         typeof(IPlaybackChain<>),
         typeof(ISubtitleChain),
