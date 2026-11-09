@@ -28,8 +28,6 @@ internal static class RouterConstants
     public const string ARG_FILTER_JSON = "filter_json";
     public const string ARG_ID = "id";
     public const string ARG_KEYWORD = "keyword";
-    public const string ARG_PLAYBACK = "playback";
-    public const string ARG_PLAY_QUEUE_ID = "play_queue_id";
-    public const string ARG_POSITION = "position";
     public const string ARG_RESTORED = "restored";
+    public const string ARG_SESSION_ID = "session_id";
 }

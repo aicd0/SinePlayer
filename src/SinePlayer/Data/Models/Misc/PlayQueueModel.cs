@@ -4,43 +4,23 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
-using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Data.Models.Media;
 
 namespace SinePlayer.Data.Models.Misc;
 
 internal class PlayQueueModel
 {
-    private const string TAG = nameof(PlayQueueModel);
-
     public static PlayQueueModel CreateEmpty()
     {
         return new([]);
     }
 
-    public static async Task<PlayQueueModel?> CreateFromSerializedString(string serializedPlayQueue)
+    public static async Task<PlayQueueModel> CreateFromJsonModel(IEnumerable<PlayQueueItemJsonModel?> items)
     {
-        List<PlayQueueItemJsonModel?>? jsonItems;
-        try
-        {
-            jsonItems = JsonSerializer.Deserialize<List<PlayQueueItemJsonModel?>>(serializedPlayQueue);
-        }
-        catch (JsonException ex)
-        {
-            Logger.E(TAG, ex);
-            return null;
-        }
-
-        if (jsonItems is null)
-        {
-            return null;
-        }
-
-        return await CreateFromBuilder(jsonItems.Where(x => x is not null).Select(x => x!));
+        return await CreateFromBuilder(items.Where(x => x is not null).Select(x => x!));
     }
 
     private static async Task<PlayQueueModel> CreateFromBuilder(IEnumerable<PlayQueueItemJsonModel> builder)
@@ -88,15 +68,13 @@ internal class PlayQueueModel
         return new Builder().AddItems(_items);
     }
 
-    public string ToSerializedString()
+    public List<PlayQueueItemJsonModel> ToJsonModel()
     {
-        IEnumerable<PlayQueueItemJsonModel> jsonItems = _items
-            .Select(x => new PlayQueueItemJsonModel()
-            {
-                Id = x.Id,
-                MediaId = x.Media.Id,
-            });
-        return JsonSerializer.Serialize(new List<PlayQueueItemJsonModel>(jsonItems));
+        return [.. _items.Select(x => new PlayQueueItemJsonModel()
+        {
+            Id = x.Id,
+            MediaId = x.Media.Id,
+        })];
     }
 
     public class PlayQueueItem
@@ -105,7 +83,7 @@ internal class PlayQueueModel
         public required MediaModel Media { get; init; }
     }
 
-    private class PlayQueueItemJsonModel
+    internal class PlayQueueItemJsonModel
     {
         [JsonPropertyName("Id")]
         public string? Id { get; set; }
@@ -192,9 +170,9 @@ internal class PlayQueueModel
             return null;
         }
 
-        public string ToSerializedString()
+        public List<PlayQueueItemJsonModel> ToJsonModel()
         {
-            return JsonSerializer.Serialize(_mediaItems);
+            return _mediaItems;
         }
 
         private static string EnsureId(PlayQueueItemJsonModel item)

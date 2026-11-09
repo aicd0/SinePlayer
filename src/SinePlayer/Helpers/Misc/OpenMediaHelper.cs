@@ -3,13 +3,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 
 using SinePlayer.Common.Actions;
 using SinePlayer.Common.Actions.Providers;
-using SinePlayer.Common.Constants;
+using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.DebugTools;
-using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
@@ -25,7 +23,6 @@ internal static class OpenMediaHelper
 
     public static Route GetMediaRoute(
         MediaModel media,
-        long positionMs = -1,
         PlayQueueModel.Builder? playQueue = null,
         PlaybackModel.Builder? playback = null)
     {
@@ -41,19 +38,15 @@ internal static class OpenMediaHelper
         playback ??= new PlaybackModel.Builder();
         playback.CurrentId = itemId;
 
-        string playQueueId = Guid.NewGuid().ToString();
-        AppDB.MainRegistry.CreateKey(RegistryNames.PLAY_QUEUES).Set(playQueueId, playQueue.ToSerializedString());
-
-        Route route = Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_PLAYER)
-            .WithParam(RouterConstants.ARG_PLAY_QUEUE_ID, playQueueId)
-            .WithParam(RouterConstants.ARG_PLAYBACK, playback.ToSerializedString());
-
-        if (positionMs >= 0)
+        string sessionId = PlayerSession.NewId();
+        PlayerSessionRecord.Save(sessionId, new PlayerSessionRecord()
         {
-            route = route.WithParam(RouterConstants.ARG_POSITION, positionMs.ToString(CultureInfo.InvariantCulture));
-        }
+            PlayQueue = playQueue.ToJsonModel(),
+            Playback = playback.ToJsonModel(),
+        });
 
-        return route;
+        return Route.Create(RouterConstants.SCHEME_APP + RouterConstants.HOST_PLAYER)
+            .WithParam(RouterConstants.ARG_SESSION_ID, sessionId);
     }
 
     public static void OpenMedia(ActionHandler actionHandler, Route route)

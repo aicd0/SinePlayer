@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -41,7 +40,6 @@ using SinePlayer.Data.Tables;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
 using SinePlayer.Helpers.Misc;
 using SinePlayer.Helpers.Navigation;
-using SinePlayer.SDK.Models;
 using SinePlayer.UserControls.PlayerSettings;
 using SinePlayer.Views.AppWindows.Main;
 using SinePlayer.Views.Pages.Main.Sidebar;
@@ -92,20 +90,12 @@ internal sealed partial class PlayerPage : BasePage
         InitializePinState();
 
         bool restored = bundle.GetString(RouterConstants.ARG_RESTORED) == "1";
-        string sessionId = bundle.GetString(RouterConstants.ARG_PLAY_QUEUE_ID) ?? string.Empty;
+        string sessionId = bundle.GetString(RouterConstants.ARG_SESSION_ID) ?? string.Empty;
         if (string.IsNullOrEmpty(sessionId))
         {
-            sessionId = Guid.NewGuid().ToString();
-            Route route = Route.Create(GetMainPageAbility().Url).WithParam(RouterConstants.ARG_PLAY_QUEUE_ID, sessionId);
+            sessionId = PlayerSession.NewId();
+            Route route = Route.Create(GetMainPageAbility().Url).WithParam(RouterConstants.ARG_SESSION_ID, sessionId);
             GetMainPageAbility().SetUrl(route.Url);
-        }
-
-        string serializedPlayback = bundle.GetString(RouterConstants.ARG_PLAYBACK) ?? string.Empty;
-        long initialPositionMs = -1;
-        string? positionString = bundle.GetString(RouterConstants.ARG_POSITION);
-        if (!string.IsNullOrEmpty(positionString))
-        {
-            long.TryParse(positionString, CultureInfo.InvariantCulture, out initialPositionMs);
         }
 
         _restoredFromLastSession = restored;
@@ -126,8 +116,11 @@ internal sealed partial class PlayerPage : BasePage
         {
             CoroutineUtils.Run(async () =>
             {
-                PlayQueueModel playQueue = await GetPlayQueue(sessionId);
-                session.Load(playQueue, serializedPlayback, initialPositionMs);
+                var record = PlayerSessionRecord.Load(sessionId);
+                PlayQueueModel playQueue = record?.PlayQueue is { } items
+                    ? await PlayQueueModel.CreateFromJsonModel(items)
+                    : PlayQueueModel.CreateEmpty();
+                session.Load(playQueue, record?.Playback, -1);
             });
         }
         else
@@ -314,10 +307,6 @@ internal sealed partial class PlayerPage : BasePage
                 _navigationBar?.SetPlayerSettings(media);
             }
 
-            Route route = Route.Create(GetMainPageAbility().Url)
-                .WithParam(RouterConstants.ARG_PLAYBACK, ViewModel.Playback.ToSerializedString());
-            GetMainPageAbility().SetUrl(route.Url);
-
             SyncCurrentMedia();
         }, new ObserveOptions()
         {
@@ -349,36 +338,6 @@ internal sealed partial class PlayerPage : BasePage
         ViewModel.VolumeLiveData.ObserveSticky(this, TransportBar.SetVolume);
 
         ViewModel.MuteLiveData.ObserveSticky(this, TransportBar.SetMuted);
-    }
-
-    private async Task<PlayQueueModel> GetPlayQueue(string playQueueId)
-    {
-        string playQueuesRegistry = $"{RegistryNames.TAB_RESOURCES}/{GetMainPageAbility().TabId}/PlayQueues";
-
-        PlayQueueModel? playQueue = null;
-        if (AppDB.MainRegistry.TryGetKey(RegistryNames.PLAY_QUEUES, out IRegistryKey? key))
-        {
-            if (key.TryGet(playQueueId, out string? serializedPlayQueue))
-            {
-                playQueue = await PlayQueueModel.CreateFromSerializedString(serializedPlayQueue);
-            }
-        }
-
-        if (playQueue is null && AppDB.MainRegistry.TryGetKey(playQueuesRegistry, out key))
-        {
-            if (key.TryGet(playQueueId, out string? serializedPlayQueue))
-            {
-                playQueue = await PlayQueueModel.CreateFromSerializedString(serializedPlayQueue);
-                if (playQueue is not null)
-                {
-                    return playQueue;
-                }
-            }
-        }
-
-        playQueue ??= PlayQueueModel.CreateEmpty();
-        AppDB.MainRegistry.CreateKey(playQueuesRegistry).Set(playQueueId, playQueue.ToSerializedString());
-        return playQueue;
     }
 
     #endregion

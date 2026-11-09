@@ -5,10 +5,8 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
-using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Misc;
 
@@ -16,8 +14,6 @@ namespace SinePlayer.Data.Models.Playback;
 
 internal class PlaybackModel
 {
-    private const string TAG = nameof(PlaybackModel);
-
     public delegate void PlaybackStateChangedEventHandler(PlaybackStateChangedEventArgs args);
     public event PlaybackStateChangedEventHandler? PlaybackStateChanged;
 
@@ -114,12 +110,12 @@ internal class PlaybackModel
         };
     }
 
-    public void LoadState(PlayQueueModel playQueue, string? serializedPlayback, long initialPositionMs)
+    public void LoadState(PlayQueueModel playQueue, PlaybackJsonModel? playback, long initialPositionMs)
     {
         _playQueue = playQueue;
         _initialPositionMs = initialPositionMs;
 
-        if (!string.IsNullOrEmpty(serializedPlayback) && FromSerializedString(serializedPlayback))
+        if (playback is not null && FromJsonModel(playback))
         {
             return;
         }
@@ -178,9 +174,9 @@ internal class PlaybackModel
         DispatchPlaybackStatusChange(fromOverScroll ? PlaybackStateChangeReason.PreviousByOverScroll : PlaybackStateChangeReason.Previous);
     }
 
-    public string ToSerializedString()
+    public PlaybackJsonModel ToJsonModel()
     {
-        PlaybackJsonModel model = new()
+        return new PlaybackJsonModel()
         {
             CurrentId = CurrentItem?.Id,
             RepeatMode = _repeatMode,
@@ -188,7 +184,6 @@ internal class PlaybackModel
             RandomSeed = _randomSeed,
             FirstId = _firstId,
         };
-        return JsonSerializer.Serialize(model);
     }
 
     private void UpdateInternalStates(string? currentId)
@@ -199,24 +194,8 @@ internal class PlaybackModel
         DispatchPlaybackStatusChange(PlaybackStateChangeReason.Other);
     }
 
-    private bool FromSerializedString(string serialized)
+    private bool FromJsonModel(PlaybackJsonModel model)
     {
-        PlaybackJsonModel? model;
-        try
-        {
-            model = JsonSerializer.Deserialize<PlaybackJsonModel>(serialized);
-        }
-        catch (JsonException ex)
-        {
-            Logger.E(TAG, ex);
-            return false;
-        }
-
-        if (model is null)
-        {
-            return false;
-        }
-
         _repeatMode = model.RepeatMode ?? AppSettingsModel.PlaybackDefaultRepeatMode;
         _isShuffle = model.IsShuffle ?? AppSettingsModel.PlaybackDefaultShuffle;
         _randomSeed = model.RandomSeed ?? Random.Shared.Next();
@@ -293,7 +272,7 @@ internal class PlaybackModel
         PlayQueueChanged?.Invoke();
     }
 
-    private class PlaybackJsonModel
+    internal class PlaybackJsonModel
     {
         [JsonPropertyName("CurrentId")]
         public string? CurrentId { get; set; }
@@ -319,9 +298,9 @@ internal class PlaybackModel
         public bool? IsShuffle { get; set; }
         public int? RandomSeed { get; set; }
 
-        public string ToSerializedString()
+        public PlaybackJsonModel ToJsonModel()
         {
-            PlaybackJsonModel model = new()
+            return new PlaybackJsonModel()
             {
                 CurrentId = CurrentId,
                 RepeatMode = RepeatMode,
@@ -329,7 +308,6 @@ internal class PlaybackModel
                 RandomSeed = RandomSeed,
                 FirstId = FirstId,
             };
-            return JsonSerializer.Serialize(model);
         }
     }
 }
