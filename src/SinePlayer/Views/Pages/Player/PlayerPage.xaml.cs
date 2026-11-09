@@ -657,6 +657,7 @@ internal sealed partial class PlayerPage : BasePage
         session.StateChanged += Session_StateChanged;
         session.PositionChanged += Session_PositionChanged;
         session.MediaChanged += Session_MediaChanged;
+        TabPlayerSessionModel.Save(GetMainPageAbility().TabId, session.Id);
         _session = session;
         UpdateSubtitlePresentation();
 
