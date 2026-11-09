@@ -303,7 +303,7 @@ internal sealed partial class PlayerSession : IDisposable
         return OperationResult.Success();
     }
 
-    public async Task<OperationResult> SelectAudioStream(MediaStreamInfo? stream)
+    public async Task<OperationResult> AddAudioStream(MediaStreamInfo stream)
     {
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is null)
@@ -311,17 +311,42 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResultExt.Failure(TAG, "There is nothing open to change a track of.");
         }
 
-        IAudioChain? chain = _audioChains.Count == 0 ? null : _audioChains[0].Chain;
-        if (chain is null)
+        if (_audioChains.Any(entry => entry.Chain.SelectedStream?.Equals(stream) == true))
         {
-            return OperationResultExt.Failure(TAG, "There is no sound to change a track of.");
+            return OperationResult.Success();
         }
+
+        IAudioChain? chain = _audioChains.FirstOrDefault(entry => entry.Chain.SelectedStream is null)?.Chain;
+        chain ??= await CreateAudioChain(pipeline);
 
         OperationResult selected = await pipeline.SelectStream(chain, stream);
         if (!selected.IsSuccessful)
         {
-            string wanted = stream is null ? "no track" : $"track #{stream.Index}";
-            return OperationResultExt.Failure(TAG, $"The sound could not be changed to {wanted}. {selected.Message}");
+            return OperationResultExt.Failure(TAG, $"The sound of track #{stream.Index} could not be added. {selected.Message}");
+        }
+
+        _pendingReconcile = true;
+        return OperationResult.Success();
+    }
+
+    public async Task<OperationResult> RemoveAudioStream(MediaStreamInfo stream)
+    {
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            return OperationResultExt.Failure(TAG, "There is nothing open to change a track of.");
+        }
+
+        AudioChainEntry? entry = _audioChains.FirstOrDefault(candidate => candidate.Chain.SelectedStream?.Equals(stream) == true);
+        if (entry is null)
+        {
+            return OperationResult.Success();
+        }
+
+        OperationResult cleared = await pipeline.SelectStream(entry.Chain, null);
+        if (!cleared.IsSuccessful)
+        {
+            return OperationResultExt.Failure(TAG, $"The sound of track #{stream.Index} could not be taken away. {cleared.Message}");
         }
 
         _pendingReconcile = true;
@@ -533,6 +558,11 @@ internal sealed partial class PlayerSession : IDisposable
             return entry.Chain;
         }
 
+        return await CreateAudioChain(pipeline);
+    }
+
+    private async Task<IAudioChain> CreateAudioChain(PlaybackPipeline pipeline)
+    {
         IAudioChain chain = await pipeline.AddAudioChain();
 
         GainAudioFilter gainFilter = new();
@@ -542,6 +572,7 @@ internal sealed partial class PlayerSession : IDisposable
         DownmixAudioFilter downmixFilter = new();
         chain.Filters.Add(downmixFilter);
 
+        _components.ApplyAudio(chain);
         _audioChains.Add(new AudioChainEntry(chain, gainFilter, downmixFilter));
         return chain;
     }
@@ -677,7 +708,7 @@ internal sealed partial class PlayerSession : IDisposable
         MediaStreamInfo? audio = TrackSelection.Resolve(media, MediaStreamKind.Audio, Sources);
         if (audio is not null)
         {
-            OperationResult chosen = await SelectAudioStream(audio);
+            OperationResult chosen = await AddAudioStream(audio);
             if (!chosen.IsSuccessful)
             {
                 Logger.W(TAG, $"The sound could not be chosen: {chosen.Message}");
