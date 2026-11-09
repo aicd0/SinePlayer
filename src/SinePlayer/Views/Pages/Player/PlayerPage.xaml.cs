@@ -1311,20 +1311,20 @@ internal sealed partial class PlayerPage : BasePage
     {
         UpdateKeepScreenOn();
 
-        if (!IsResumed)
+        if (IsResumed)
+        {
+            if (_playbackPendingOnActivate)
+            {
+                _playbackPendingOnActivate = false;
+                Enqueue(() => _session?.Play());
+            }
+        }
+        else
         {
             if (AppSettingsModel.PauseOnLeaveTab && !ViewModel.IsAudio)
             {
                 Enqueue(() => _session?.Pause());
             }
-
-            ViewModel.Next();
-        }
-
-        if (IsResumed && _playbackPendingOnActivate)
-        {
-            _playbackPendingOnActivate = false;
-            Enqueue(() => _session?.Play());
         }
     }
 

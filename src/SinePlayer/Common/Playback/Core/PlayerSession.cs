@@ -13,6 +13,8 @@ using SinePlayer.Common.Misc;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Common.ServiceManagement;
+using SinePlayer.Core.Common.ServiceManagement.Services;
 using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
@@ -167,7 +169,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         foreach (PlayerView view in _views)
         {
-            view.Detach();
+            view.DetachChains();
         }
 
         PlaybackPipeline? pipeline = _pipeline;
@@ -294,6 +296,8 @@ internal sealed partial class PlayerSession : IDisposable
             view.Dispose();
             return;
         }
+
+        view.DetachSurfaces();
 
         foreach (IPlaybackChain chain in ChainsOf(view))
         {
@@ -873,11 +877,6 @@ internal sealed partial class PlayerSession : IDisposable
 
     #region Media record
 
-    /// <summary>
-    /// What a media remembers about being played. It is written here rather than by a page because the playback is one
-    /// however many pages show it: a page added later has no business rewriting what the media already recorded, and
-    /// two pages must not each save the same position.
-    /// </summary>
     private void RecordOpen(MediaModel media)
     {
         _openedMedia = media;
@@ -892,7 +891,6 @@ internal sealed partial class PlayerSession : IDisposable
         });
     }
 
-    /// <summary>How far the media being played has been played, for the next open to resume from.</summary>
     public void SaveProgress()
     {
         MediaModel? media = _openedMedia;
@@ -1115,7 +1113,7 @@ internal sealed partial class PlayerSession : IDisposable
 
     private void SaveRecord()
     {
-        if (!_loaded)
+        if (!_loaded || _views.Count == 0 || ServiceManager.GetService<IApplicationService>().Exiting)
         {
             return;
         }
@@ -1136,10 +1134,6 @@ internal sealed partial class PlayerSession : IDisposable
         }
     }
 
-    /// <summary>
-    /// What the session is showing, as a model. A view with no chain of a kind has no opinion about it, which is not the same
-    /// as one that turned it off — the difference is what lets a first-ever open start from the media's default.
-    /// </summary>
     private TrackSelectionModel DescribeSelection()
     {
         TrackSelectionModel model = _openedMedia is { } media
@@ -1176,6 +1170,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         model.Views = views;
+
         model.AudioSelections = _audioChains.Count == 0
             ? null
             : [.. _audioChains
