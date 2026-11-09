@@ -582,12 +582,6 @@ internal sealed partial class PlayerPage : BasePage
                 });
             }
 
-            if (session.StartPositionMs > 0)
-            {
-                SeekMode mode = AppSettingsModel.PreciseSeeking ? SeekMode.Precise : SeekMode.Fast;
-                session.Seek(TimeSpan.FromMilliseconds(session.StartPositionMs), mode);
-            }
-
             StartPlaybackOnOpen(session);
 
             ViewModel.SetDuration(session.Duration.Ticks / TimeSpan.TicksPerMillisecond);
