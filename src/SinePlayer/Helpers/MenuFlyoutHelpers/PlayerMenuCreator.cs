@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml.Controls;
@@ -261,7 +262,7 @@ internal static class PlayerMenuCreator
             new SubItemMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.SelectAudioTrack,
-                Items = CreateTrackItems(context, MediaStreamKind.Audio),
+                Items = CreateAudioTrackItems(context),
             },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
@@ -376,6 +377,70 @@ internal static class PlayerMenuCreator
             Text = StringResourceProvider.Instance.Off,
             IsChecked = selected is null,
             Click = () => context.SelectTrack(kind, null),
+        });
+
+        return items;
+    }
+
+    private static List<BaseMenuFlyoutItemModel> CreateAudioTrackItems(PlayerMenuContext context)
+    {
+        bool allowMulti = context.AllowMultiAudioTracks;
+
+        List<BaseMenuFlyoutItemModel> items = [];
+
+        IReadOnlyList<MediaStreamInfo>? streams = context.Tracks(MediaStreamKind.Audio);
+        if (streams is null || streams.Count == 0)
+        {
+            items.Add(new SimpleMenuFlyoutItemModel() { Text = StringResourceProvider.Instance.None, IsEnabled = false });
+            return items;
+        }
+
+        MediaStreamInfo? selected = context.SelectedTrack(MediaStreamKind.Audio);
+        bool playing = allowMulti ? streams.Any(context.IsAudioTrackPlaying) : selected is not null;
+
+        foreach (MediaStreamInfo stream in streams)
+        {
+            MediaStreamInfo choice = stream;
+            items.Add(new ToggleMenuFlyoutItemModel()
+            {
+                Text = MediaStreamLabel.Describe(choice, context.SourceOf(choice)),
+                IsChecked = allowMulti ? context.IsAudioTrackPlaying(choice) : choice == selected,
+                Click = () =>
+                {
+                    if (allowMulti)
+                    {
+                        context.ToggleAudioTrack(choice);
+                    }
+                    else
+                    {
+                        context.SelectTrack(MediaStreamKind.Audio, choice);
+                    }
+                },
+            });
+        }
+
+        items.Add(new SeparatorMenuFlyoutItemModel());
+        items.Add(new ToggleMenuFlyoutItemModel()
+        {
+            Text = StringResourceProvider.Instance.AllowMultiTracks,
+            IsChecked = allowMulti,
+            Click = () => context.SetAllowMultiAudioTracks(!allowMulti),
+        });
+        items.Add(new ToggleMenuFlyoutItemModel()
+        {
+            Text = StringResourceProvider.Instance.Off,
+            IsChecked = !playing,
+            Click = () =>
+            {
+                if (allowMulti)
+                {
+                    context.ClearAudioTracks();
+                }
+                else
+                {
+                    context.SelectTrack(MediaStreamKind.Audio, null);
+                }
+            },
         });
 
         return items;

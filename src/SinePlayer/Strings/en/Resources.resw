@@ -165,6 +165,9 @@
   <data name="AllPages" xml:space="preserve">
     <value>All pages</value>
   </data>
+  <data name="AllowMultiTracks" xml:space="preserve">
+    <value>Allow multi-tracks</value>
+  </data>
   <data name="AllowPerMediaConfiguration" xml:space="preserve">
     <value>Allow per-media configuration</value>
   </data>

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 using SinePlayer.Common.Actions;
 using SinePlayer.Common.Misc;
@@ -26,6 +27,9 @@ namespace SinePlayer.Helpers.MenuFlyoutHelpers;
 
 internal sealed class PlayerMenuContext
 {
+    // Temporary workaround for the lack of a proper settings system. This is a static field to avoid having to pass the setting around in the constructor, but it should be replaced with a proper settings system that can be injected into the class.
+    private static bool _allowMultiAudioTracks = false;
+
     public required int WindowId { get; init; }
 
     public required ActionHandler ActionHandler { get; init; }
@@ -49,6 +53,8 @@ internal sealed class PlayerMenuContext
     public Action<string>? PromptInfo { get; init; }
 
     public IReadOnlyList<MediaSource> Sources => Session?.Sources ?? [];
+
+    public bool AllowMultiAudioTracks => _allowMultiAudioTracks;
 
     public IReadOnlyList<MediaStreamInfo>? Tracks(MediaStreamKind kind)
     {
@@ -76,6 +82,103 @@ internal sealed class PlayerMenuContext
             MediaStreamKind.Subtitle => View?.PlaybackInfo.SelectedSubtitleStream,
             _ => null,
         };
+    }
+
+    public bool IsAudioTrackPlaying(MediaStreamInfo stream)
+    {
+        return Session?.AudioChains.Any(chain => chain.SelectedStream?.Equals(stream) == true) == true;
+    }
+
+    public void SetAllowMultiAudioTracks(bool allow)
+    {
+        _allowMultiAudioTracks = allow;
+
+        PlayerSession? session = Session;
+        if (allow || session is not { } target)
+        {
+            return;
+        }
+
+        MediaStreamInfo[] extra = [.. target.AudioChains.Select(chain => chain.SelectedStream).OfType<MediaStreamInfo>().Skip(1)];
+        if (extra.Length == 0)
+        {
+            return;
+        }
+
+        CoroutineUtils.Run(async () =>
+        {
+            foreach (MediaStreamInfo stream in extra)
+            {
+                await target.RemoveAudioStream(stream);
+            }
+
+            await target.Reconcile();
+        });
+    }
+
+    public void ToggleAudioTrack(MediaStreamInfo stream)
+    {
+        PlayerSession? session = Session;
+        if (session is null)
+        {
+            return;
+        }
+
+        bool playing = IsAudioTrackPlaying(stream);
+        CoroutineUtils.Run(async () =>
+        {
+            OperationResult changed = playing ? await session.RemoveAudioStream(stream) : await session.AddAudioStream(stream);
+            if (!changed.IsSuccessful)
+            {
+                PromptInfo?.Invoke(changed.Message);
+                return;
+            }
+
+            OperationResult<ReconcileResult> reconciled = await session.Reconcile();
+            if (!reconciled.IsSuccessful)
+            {
+                PromptInfo?.Invoke(reconciled.Message);
+                return;
+            }
+
+            OperationResult? built = reconciled.Result.Audio();
+            if (built is { IsSuccessful: false })
+            {
+                PromptInfo?.Invoke(built.Message);
+                return;
+            }
+
+            TrackSelection.Save(Media, MediaStreamKind.Audio, SourceOf(stream), stream);
+        });
+    }
+
+    public void ClearAudioTracks()
+    {
+        PlayerSession? session = Session;
+        if (session is null)
+        {
+            return;
+        }
+
+        MediaStreamInfo[] playing = [.. session.AudioChains.Select(chain => chain.SelectedStream).OfType<MediaStreamInfo>()];
+        CoroutineUtils.Run(async () =>
+        {
+            foreach (MediaStreamInfo stream in playing)
+            {
+                OperationResult removed = await session.RemoveAudioStream(stream);
+                if (!removed.IsSuccessful)
+                {
+                    PromptInfo?.Invoke(removed.Message);
+                    return;
+                }
+            }
+
+            OperationResult<ReconcileResult> reconciled = await session.Reconcile();
+            if (!reconciled.IsSuccessful)
+            {
+                PromptInfo?.Invoke(reconciled.Message);
+            }
+        });
     }
 
     public void AddSubtitleTracks()
@@ -135,7 +238,7 @@ internal sealed class PlayerMenuContext
             OperationResult selected = kind switch
             {
                 MediaStreamKind.Video => await session.SelectVideoStream(view, stream),
-                MediaStreamKind.Audio => await session.SelectAudioStream(stream),
+                MediaStreamKind.Audio => await SelectSoleAudioStream(session, stream),
                 _ => await session.SelectSubtitleStream(view, stream),
             };
             if (!selected.IsSuccessful)
@@ -165,6 +268,26 @@ internal sealed class PlayerMenuContext
 
             TrackSelection.Save(Media, kind, SourceOf(stream), stream);
         });
+    }
+
+    private static async Task<OperationResult> SelectSoleAudioStream(PlayerSession session, MediaStreamInfo? stream)
+    {
+        MediaStreamInfo[] playing = [.. session.AudioChains.Select(chain => chain.SelectedStream).OfType<MediaStreamInfo>()];
+        foreach (MediaStreamInfo candidate in playing)
+        {
+            if (stream is not null && candidate.Equals(stream))
+            {
+                continue;
+            }
+
+            OperationResult removed = await session.RemoveAudioStream(candidate);
+            if (!removed.IsSuccessful)
+            {
+                return removed;
+            }
+        }
+
+        return stream is null ? OperationResult.Success() : await session.AddAudioStream(stream);
     }
 
     private static IReadOnlyList<MediaStreamInfo> StreamsOf(MediaSource source, MediaStreamKind kind)
