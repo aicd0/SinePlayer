@@ -68,7 +68,7 @@ engine, and the route assumes the media is what a tab remembers.
    so views, panels and dispatcher callbacks need no extra marshalling between windows.
 8. **Tracks are remembered per media**, not per page: `TrackSelection` stores
    `SelectedTrackModel {Enabled, Path, Index}` under `MediaExt.SELECTED_VIDEO_TRACK` (and audio/subtitle
-   equivalents) on the `MediaModel`.
+   equivalents) on the `MediaModel`; D1 merges the three into one entry shaped like the record's (decision 16).
 9. **There are no tests for the app project.** `src/Tests` covers `SinePlayer.Core` only. Every step below is
    verified by a clean build plus a named manual check.
 10. **The audio path assumes exactly one chain.** `PlayerSession` holds `_audioChains`, a list of
@@ -90,17 +90,17 @@ while one tab is one player — but two pages sharing a session would keep two s
 moment the queue is edited, and the route's `playback` blob duplicates what the session already knows. One session
 must have one record of what it is playing.
 
-**Decision 2 — the position is recorded per session, and per media for a fresh open.** `media.LastPositionMs`
-keeps its meaning (where this file was last left, gated by `RestoreLastPlaybackPosition`), because that is what
-opening the file fresh resumes from; the session record additionally holds the position of that session, which is
-what two sessions of one file need in order not to overwrite each other's place.
-
-**Decision 3 — a page's video choice is written to two places.** The tab record
-(`/Resources/Tabs/{tabId}/PlayerSession`) is what that page restores from; `MediaExt.SELECTED_VIDEO_TRACK` keeps
-its current meaning as *the default for the next open of that media*. Reason: without the second write, opening the
-same file later would no longer remember the last chosen picture, which is existing behaviour a user would notice.
-Confirmed.
-
+**Decision 2 — the position stays where it is: on the media.** `media.LastPositionMs` keeps its meaning (where this file
+was last left, gated by `RestoreLastPlaybackPosition`) and stays the only carrier; the session record holds no position of
+its own. Two sessions of one file therefore share one resume point, and whichever saves last decides it — accepted,
+because a per-session position would be a second answer to "where was I", and the save path that writes the media's
+already exists and works. Revisit only if two sessions of one file become a real use.
+**Decision 3 — a view's choice is written to two places, in one shape.** The session record is what a *session* restores
+from, view by view and kind by kind; the media's `TrackSelection` ext is what a *fresh* open of that media starts from
+(decision 16). Both hold the same model, and one writer — the session — writes both at the same moment, so they cannot
+drift apart for longer than a keystroke. Reason: with only the ext, two windows could never hold different choices; with
+only the record, opening the same file again from the library would forget the picture the user left it on, which is
+existing behaviour. Confirmed.
 **Decision 4 — the sound is session-wide; the picture and the words are per view.** Audio has no surface, one device
 plays it and one clock times it, so one chain serves every page. Subtitles turned out not to be the same: a subtitle
 chain draws into a swap chain, a swap chain attaches to one `SwapChainPanel`, and a panel belongs to one window — so a
@@ -108,14 +108,14 @@ session-wide subtitle chain crashed the moment a second page put its panel in a 
 per view, like the picture (B3), which also means choosing a subtitle track per window is already possible. That is more
 than v1 asked for, and it cost nothing extra: K1 had already made every subtitle surface share one Direct3D device.
 
-**Decision 5 — creating a route does not write persisted state.** `GetMediaRoute` is called while *building a
-context menu*, whether or not the user ever opens the item, so it may not create a session record. It writes a
-**draft** — queue, playback state, position — to `/Resources/Runtime/PlayerSessionDrafts/{sessionId}`, which is
-wiped at launch like the rest of the runtime area, and returns `app://player?session={id}`. The page is what
-materialises the record from the draft, and deletes the draft once it has. So the route has exactly one shape from
-the first commit: a session id, never a queue blob and never a second parameter set that only exists before the
-first open.
-
+**Decision 5 — creating a route writes the record, and the launch prune cleans up after it.** `GetMediaRoute` runs while
+*building a context menu*, whether or not the user ever opens the item, so it writes a record that may never be claimed:
+`/Resources/PlayerSessions/{sessionId}` holds the document with the queue, the playback and one empty view entry, and the
+route is `app://player?session={id}`. An entry nothing names is deleted by the launch prune (D5), which is the only
+cleanup that can know whether a tab will still ask for it. A runtime *draft* that the first page materialises was the
+earlier shape and is dropped: it doubles the state, needs a second registry area and a materialise step, and buys only
+that an unused menu item leaves nothing behind until the next launch. So the route has exactly one shape from the first
+commit: a session id, never a queue blob and never a second parameter set that only exists before the first open.
 **Decision 6 — a session lives while at least one page is attached.** Last detach saves the record and disposes
 the engine. The record itself stays until the next launch's cleanup, which is the only thing that can know whether
 a tab will still ask for it.
@@ -216,14 +216,46 @@ no longer needed and has been removed.
 
 **Decision 13 — several sound tracks are chosen from one menu, behind a preference.** The audio track menu (`Audio →
 Select audio track`) gains a toggle at its top, *Allow multi-tracks*, which is a preference
-(`PlayerMenuContext.AllowMultiAudioTracks`, default false). It is a UI preference, not a property of the media, so it
-outlives the tab; today it sits in a static field on `PlayerMenuContext`, which should move into the settings system
-when there is one. With it off the submenu behaves as before: one track checked, plus *Off*. With it on every track is anindependent checkbox that says whether that track's chain is playing, and clicking one adds or removes that chain —
-several tracks therefore play at once, each with its own chain, its own components and its own gain/downmix filters,
-all of them the session's. *Off* with several chains clears them all. Turning the preference off while several play
-collapses to the first, so a preference change never silences the playback by surprise. The toggle needs no rebuild of
-the open menu: a menu item closes the menu it belongs to, and the mode is read when the menu is built.
+(`PlayerMenuContext.AllowMultiAudioTracks`, default false). It is a UI preference rather than a property of a track, and it
+travels with the media: it sits in `TrackSelection.AllowMultiAudioTracks` (D1, decision 16), so it outlives the tab and the
+launch, and a media that was used with several sound tracks reopens that way. With it off the submenu behaves as before:
+one track checked, plus *Off*. With it on every track is an independent checkbox that says whether that track's chain is
+playing, and clicking one adds or removes that chain — several tracks therefore play at once, each with its own chain, its
+own components and its own gain/downmix filters, all of them the session's. *Off* with several chains clears them all.
+Turning the preference off while several play collapses to the first, so a preference change never silences the playback by
+surprise. The toggle needs no rebuild of the open menu: a menu item closes the menu it belongs to, and the mode is read
+when the menu is built.
+**Decision 14 — several subtitle chains of one panel are composed under the swap chain.** A `SubtitleCompositor` per
+render target owns that target's swap chain and one `CanvasDevice`, and every renderer draws into a layer of its own;
+composing draws the layers in order and presents once. Win2D goes one step further: renderers bound to the same target
+share a single `Win2DSubtitleLayer`, so their cues are stacked in one pass instead of landing on one another. The sharing
+happens at the layer rather than at resolution because a chain can be pointed at another target at any time. So a view
+keeps one subtitle panel whatever it shows, and the number of chains on it is free (G2, G3).
 
+**Decision 15 — one record per session, holding the queue, the playback and every view's choices.** The record is a single
+JSON document at `/Resources/PlayerSessions/{sessionId}`: `{ PlayQueue, Playback, TrackSelection }`. `TrackSelection` is
+the model decision 16 describes — the same one the media's ext stores. The record does not name its media: the playback's
+current item already is that media, so the session reads it from the queue it just loaded and finds the ext to fall back
+on from there. The record is written when a route names a new session, whenever any part of it changes, and again at last
+detach. It replaces the runtime `PLAY_QUEUES` key, the per-tab `PlayQueues` snapshot and the `playback` blob the URL
+carried, with no compatibility path: the runtime area is wiped at launch, so a shape left behind by an older build is
+simply never read. Reason: three carriers of one state disagreed — the route said one thing, the tab's snapshot another —
+and only the session knows all of it. The position is deliberately not among them (decision 2). An entry written for a
+menu item that is never opened is never claimed, and the launch prune deletes it (D5, decision 5). The order of
+`TrackSelection.Views` is the order the pages joined, which is what hands the entries out: the *n*-th page to join takes
+the *n*-th entry, and a page that finds none selects nothing — which is exactly what "New window" should do (§7.2).
+**Decision 16 — a media's remembered tracks are one ext entry, in the record's shape.** `MediaExt.SELECTED_VIDEO_TRACK`,
+`SELECTED_AUDIO_TRACK` and `SELECTED_SUBTITLE_TRACK` are replaced by one `MediaExt.TRACK_SELECTION` holding
+`{ AllowMultiAudioTracks, Views[] { AllowMultiSubtitleTracks, VideoSelection, SubtitleSelections[] }, AudioSelections[] }`,
+the shape the session record carries, so one model reads both and no converter exists between them. The two menu
+preferences travel in it, each at the level it governs: the sound's is the session's, so it sits beside `AudioSelections`;
+the words' is the page's, so each view entry carries its own. Both default to false, which is what the static fields on
+`PlayerMenuContext` used to hold, and neither is a property of a track, which is why they were never a good fit for a
+per-kind model. The three keys are not migrated: a media simply has no remembered tracks until it is played once, the same
+"no compatibility" rule as the queue keys. The three states the old `SelectedTrackModel` carried survive the merge, because
+"no preference" is not "off" — no preference is what makes a first-ever open choose the default stream instead of showing
+nothing. `Views` holds one entry per page the media was last shown on, in the order they joined, so reopening it with two
+windows restores both; a fresh open with one page reads `Views[0]`.
 ## 5. Phases
 
 Invariant, as in the previous plans: one coherent change per step, a build that is clean (0 errors, 0 warnings) at
@@ -264,7 +296,7 @@ a set (F3).
 |---|---|---|---|---|
 | F1 | The sound becomes a list — **started** | `PlayerSession`'s `_audioChain`, `_gainFilter` and `_downmixFilter` are already one entry per chain (`AudioChainEntry` = chain + its gain filter + its downmix filter): `SetVolume`/`SetMuted`, `Duration`, `SelectAudioStream`, the audio re-resolve guard and disposal walk the list, and `PlaybackInfoHandle` reads `session.AudioChains` (the first entry) because the sound belongs to the playback. Done: `CreateAudioChain` gives a chain the session's volume and mute and the components the settings name, `AddAudioStream(stream)` puts a stream on a chain — taking over a chain no track is chosen for, which is what the open leaves behind, so the open path is an add and nothing else — `RemoveAudioStream(stream)` clears that chain instead of destroying it, so the next stream takes the same chain over, which is the path a single-track playback switches tracks on, and `PlaybackComponents` applies audio decoders and renderers per chain (`ApplyAudio(chain)`) instead of to `AudioChains[0]`. Chains that carry a stream are kept ahead of cleared ones, because the first audio chain is the one the picture follows. There is no "only this one" operation in the session: the single-track menu expresses it with the two it has — remove the others, then add — because that policy is the menu's, not the playback's. What remains of this step: `PlaybackInfoHandle`/the report still reads the first chain, so the info page shows one audio row | nothing may still say `AudioChains[0]`: a chain added later must get the same components and the same filters as one added at open. `AudioOf()` (B3) already aggregates, so "any chain failed" keeps its meaning. No audio chain may be reachable from a view alone | build + one file: sound plays, volume and mute work, switching an audio track rebuilds only that chain, the info page shows the audio rows it shows today, and switching tracks twice leaves no chain behind |
 | F2 | Two audio streams at once — **started** | The menu gained the shape decision 13 describes: an *Allow multi-tracks* toggle at the top of `Audio → Select audio track`, and, with it on, a checkbox per track that adds or removes that track's chain (`AddAudioStream`/`RemoveAudioStream`), with *Off* clearing them all. Each chain is built the way the first one is, so nothing else in the session had to learn about a second sound | the open question is still the output, not the app layer: two chains build two `IAudioRenderer`s on one endpoint. Whether a shared-mode endpoint mixes them, and which of them times the picture (today "the first audio chain keeps the clock"), has to be established before this is called done. If the answer is two clocks that drift, the fix is one output device fed by N decode chains — a mixer in the audio backend, i.e. a pipeline plan of its own (see §6) | build + `Multi-tracks/multi-track.mkv` (two audio streams): turn the toggle on, check both tracks, both audible, transport and position unchanged, picture still in sync after five minutes, unchecking one leaves the other playing |
-| F3 | The menu and the record — **moved**: the menu part is done in F2, the record part is D2 | `TrackSelection` stores a set of audio indices per media instead of one `SelectedTrackModel` (fact 8), the menu offers every active track with a checkmark, and the info page lists each chain rather than one. The checkmark half is in F2; storing and reading a set is what D2 writes down, together with the subtitle set, so the schema is written once | the preference is read at open by `SelectTracks` and again by an attaching page (C1); both must handle a set, and a stored index that no longer exists must be dropped rather than failing the open | see D2 |
+| F3 | The menu and the record — **moved**: the menu part is done in F2, the record part is D2–D4 | `TrackSelection` stores a set of audio indices per media instead of one `SelectedTrackModel` (fact 8), the menu offers every active track with a checkmark, and the info page lists each chain rather than one. The checkmark half is in F2; storing and reading a set is what D2 writes down, together with the subtitle set, so the schema is written once | the preference is read at open by `SelectTracks` and again by an attaching page (C1); both must handle a set, and a stored index that no longer exists must be dropped rather than failing the open | see D2 |
 
 ### Phase G — several subtitle streams on a view
 
@@ -286,7 +318,7 @@ the pipeline, not the app, and it stands in the way in three places, so the phas
   *first* video chain of the pipeline, so a second window's cues are positioned from the first window's frame — wrong
   as soon as there are two views, and it has to become the video chain of the same view (G1).
 
-Persistence is not part of this phase: the subtitle choice becomes a set here (G5) and is written in D2, which reads
+Persistence is not part of this phase: the subtitle choice becomes a set here (G5) and is written in D3–D4, which reads
 the shape this phase leaves behind.
 
 | # | Step | Change | Review focus | Verify |
@@ -295,21 +327,57 @@ the shape this phase leaves behind.
 | G2 | The subtitle compositor — **done** | A `SubtitleCompositor` per **render target**: `SubtitleSurface` stopped owning a swap chain and became a *layer* — an offscreen `CanvasRenderTarget` of the target's size plus a place in that target's compositor. `DrawAndPresent` draws into the layer's bitmap and then asks the compositor to compose, which draws every layer of that target in creation order over the swap chain and presents once. The compositor is acquired per target with a reference count and released with its last layer. Two chains on different targets never meet. One device per target: Win2D refuses to draw an image with a device other than the one that created it, so the layers' bitmaps are made by the compositor's device, and drawing plus composing happen under the compositor's lock. A layer with no target (a renderer measuring text, or an offscreen check) still makes its own device. The swap chain is still handed to the panel when the renderer is configured, as before, rather than at the first frame | composing touches one swap chain from more than one render thread, so it happens under the compositor's lock; a layer's bitmap persists between presents, which is why composing includes a chain that did not redraw. Resizing replaces the target's swap chain, because a Win2D wrapper around a back buffer cannot be resized | `SubtitleCompositorTests`: one compositor per target, two targets kept apart, a compositor let go with its last layer, and two layers of one target composed with a single swap chain handed to the panel. The painted result is checked on screen, not here |
 | G3 | Win2D renderers on one target share a layer — **done** | Sharing happens **under** the Win2D renderer, not at resolution: a `Win2DSubtitleLayer` per render target, joined by every Win2D renderer bound to that target and released with the last of them. Each renderer keeps its latest cues and presentation and contributes them to one drawing pass, so the band stacking that separated two events of one chain now separates two chains — one set of bands for the whole layer. `Configure` leaves the previous layer and joins the new one, which is what makes a rebind follow the target instead of pinning the sharing to resolution time. The drawing itself lives in the layer and a renderer only hands its cues over, so the layer never reaches back into a renderer. The layer owns a `SubtitleSurface`, so a shared layer is exactly one compositor layer (G2); libass is untouched and keeps one layer per chain, which the compositor stacks | the cues a renderer holds stay alive until that chain shows again, which is what makes holding them across another chain's draw safe; the participant list is read as a snapshot so a chain can leave while another draws; state is a single volatile reference per renderer. A renderer with no target still makes its own device, which is what measuring and offscreen checks need | `Win2DSubtitleLayerTests`: two renderers on one target share the layer's device, two targets stay apart, and a rebind moves a renderer out of the layer it was sharing while the other stays. The pixel checks that used to drive the renderer now drive an offscreen layer. What the composed result looks like is still not checked here |
 | G4 | The words become a list per view (app) — **done** | `PlayerView` replaces its subtitle chain field with a list; `AttachSubtitle` adds to the list and gives the new chain the view's `SubtitlePresentation`, which is then pushed to every chain. `PlaybackInfoHandle` reports the chain that is playing (else the first), so the info page keeps answering what it answered. `PlayerSession` gains `AddSubtitleStream(view, stream)` and `RemoveSubtitleStream(view, stream)` — the same two primitives the sound has, one chain per stream, a chain no track is chosen for taken over rather than left idle, and no chain of any kind is built before a track is chosen for it — the picture's, the sound's and the words' alike. `SelectSubtitleStream` is gone: "make this the only set" is policy, so the menu composes it the way the sound's single-track path does, and the file loader keeps "the picked file is what is shown". `ReconcileResult.Subtitle(view)` aggregates the view's chains the way `Audio()` aggregates the session's, and the view binds each new chain to its own picture as it attaches it (G1), so no chain reaches a picture except through the view it belongs to | the view's words stay the view's: nothing may reach a chain without going through the view, and the session must never confuse one view's chains with another's. `PlaybackComponents` needs no change — B3 already made `ApplySubtitle` and the subtitle decoder/renderer setters take a chain | build + one file: subtitles play, switching a subtitle track rebuilds only that view's chain, "New window" still draws its own cues, and a second window's cues are laid out against its own picture (G1) |
-| G5 | The menu: a preference and several tracks — **done** | Mirroring the sound (decision 13): `Subtitle → Select subtitle track` gains *Allow multi-tracks* below its track list, where the sound's sits — a UI preference of its own, off by default — and with it on each track is an independent checkbox that adds or removes that view's chain, *Off* clearing them all; with it off the submenu is what it is today. The menu is one method again, not a single-select path and a multi-select path, the way `CreateAudioTrackItems` was merged, and each kind now owns its own item builder rather than sharing a generic one: the picture's list selects one track, the sound's and the words' switch mode in place. Turning the preference off collapses the view to the first set | per view, not per session: the mode is a preference, but what it addresses is one view's chains, and an attaching page (C1) begins with no subtitle chain at all. The subtitle preference must not be the audio one — the two menus are independent | build + two subtitle tracks on in one window and one in the other: each window shows its own sets, checking and unchecking changes only that window, and the choices survive a track switch within the same launch (they are not persisted yet — see D2) |
+| G5 | The menu: a preference and several tracks — **done** | Mirroring the sound (decision 13): `Subtitle → Select subtitle track` gains *Allow multi-tracks* below its track list, where the sound's sits — a UI preference of its own, off by default, kept in that view's `TrackSelection` entry rather than in a static field (D1) — and with it on each track is an independent checkbox that adds or removes that view's chain, *Off* clearing them all; with it off the submenu is what it is today. The menu is one method again, not a single-select path and a multi-select path, the way `CreateAudioTrackItems` was merged, and each kind now owns its own item builder rather than sharing a generic one: the picture's list selects one track, the sound's and the words' switch mode in place. Turning the preference off collapses the view to the first set | per view, not per session: the mode is a preference, but what it addresses is one view's chains, and an attaching page (C1) begins with no subtitle chain at all. The subtitle preference must not be the audio one — the two menus are independent | build + two subtitle tracks on in one window and one in the other: each window shows its own sets, checking and unchecking changes only that window, and the choices survive a track switch within the same launch (they are not persisted yet — see D2) |
 | G6 | The words at open apply a set per view | `SelectTracks` applies the media's remembered subtitle choice to each view as a set, so a page that attaches later starts from the same choice, and a stored index that no longer exists is dropped rather than failing the open. Reading the set at *attach* rather than once per session is the part C1 needs | the preference is media-level and the chains are view-level, so the set is applied once per view, at the open and at the attach, and applying it twice must not add a chain twice | build + choose two subtitle tracks, open "New window": both windows show both sets; reopen the media: the same choice is requested (it is only remembered in memory until D2) |
 
 ### Phase D — persistence
 
-These steps come after F and G, because the record persists what those steps settle: today `TrackSelection` holds one
-audio index and one subtitle index per media, and F3 and G3 turn both into sets. Writing a schema first and rewriting
-it a phase later is what this plan avoids, the same reason B3 was allowed to reshape `ResultOf` rather than keep the
-kind-shaped API.
+These steps come after F and G, because the record persists what those steps settle. **G6 goes first**: it is what decides
+which track a view asks for, and the record only stores the answer. Writing a schema before that is settled is what this
+plan avoids, the same reason B3 reshaped `ResultOf` rather than keeping a kind-shaped API.
+
+**The record.** One JSON object per session, at `/Resources/PlayerSessions/{sessionId}`:
+
+```json
+{
+  "PlayQueue": [ { "Id": "3f2c…", "MediaId": 41 }, { "Id": "9a10…", "MediaId": 57 } ],
+  "Playback": { "CurrentId": "3f2c…", "FirstId": "3f2c…", "RepeatMode": 0, "IsShuffle": false, "RandomSeed": 0 },
+  "TrackSelection": {
+    "AllowMultiAudioTracks": false,
+    "Views": [
+      { "AllowMultiSubtitleTracks": false, "VideoSelection": { "Enabled": true, "Path": "D:\\media\\a.mkv", "Index": 0 }, "SubtitleSelections": [ { "Path": "D:\\media\\a.en.srt", "Index": 0 } ] },
+      { "AllowMultiSubtitleTracks": true, "VideoSelection": { "Enabled": true, "Path": "D:\\media\\a.mkv", "Index": 1 }, "SubtitleSelections": [] }
+    ],
+    "AudioSelections": [ { "Path": "D:\\media\\a.mkv", "Index": 1 } ]
+  }
+}
+```
+
+`TrackSelection` is exactly what the media's ext holds (decision 16), so the two stores share one model: a view entry is
+`{ AllowMultiSubtitleTracks, VideoSelection, SubtitleSelections[] }` and every selection names a `{ Path, Index }` — the
+source it came from and the stream inside it. The two menu preferences live at the level each one governs:
+`AllowMultiAudioTracks` beside `AudioSelections`, because the sound belongs to the session, and
+`AllowMultiSubtitleTracks` inside the view entry, because the words belong to the page. Both default to false. The three states survive: a **missing** property means "no preference, use the default stream", an empty
+list or `{ "Enabled": false }` means **off**, and a populated one names what to show.
+
+**How a choice is resolved.** A page never reads a store directly; the session answers, in this order:
+
+1. the record's `TrackSelection.Views[i]` for the page's index *i* — what this session was showing;
+2. else the media's `TrackSelection.Views[i]` — what this media was last shown with (decision 16);
+3. else, **only for the view that opened the media**, the default stream of each kind, which is what a first-ever open does
+   today;
+4. else nothing — a page joining a session that was already playing shows no picture and no words of its own (§7.2).
+
+Audio has no index: the record's `AudioSelections`, else the ext's, else the default audio stream for the session that
+opened the media.
 
 | # | Step | Change | Review focus | Verify |
 |---|---|---|---|---|
-| D1 | The session record, and a route that names it | `PlayerSessionRecord` — queue, playback state, position — persisted at `/Resources/PlayerSessions/{sessionId}`; written when the first view attaches, when the queue or the playback state changes, and at last detach. `RouterConstants.ARG_SESSION`; `GetMediaRoute` writes a draft to `/Resources/Runtime/PlayerSessionDrafts/{sessionId}` and returns `app://player?session={id}` — one shape, always. `PlayerPage.GetPlayQueue` becomes "the record, else the draft (which it then deletes), else an empty queue". `ARG_PLAY_QUEUE_ID`, `ARG_PLAYBACK`, `ARG_POSITION`, the runtime `PLAY_QUEUES` key, the per-tab `PlayQueues` write and the per-change URL rewriting are all deleted | the record is the only persisted state of a session, and one record per session. Route creation stays free of persisted writes and the URL never changes after it is built — which is what lets the identity of a tab be its session rather than a blob that changes under it. A record or draft that fails to parse leaves the session empty rather than failing the app | build + open a file: the tab URL is `app://player?session=…`; edit the queue (add items), inspect `/Resources/PlayerSessions` for one record holding the queue as edited and the position, and no draft left behind; restart with window restore on: the tab comes back with the **edited** queue, the track and the position — where today it would come back with the queue as it was when the tab opened |
-| D2 | The tab record | `/Resources/Tabs/{tabId}/PlayerSession` holds `SessionId` and the page's video `SelectedTrackModel`, plus the audio and subtitle sets F3 and G3 introduce. Written when the choice changes and when the page stops; read in `OnStart` before the view selects anything. `WindowManager.CleanUpTabResources` also prunes `/Resources/PlayerSessions` entries no restored tab names | per-tab state must never overwrite another tab's; the media-level preference is still written (decision 3). A tab whose record names a session that no longer exists opens with an empty session rather than failing | build + two windows on one session with different tracks, restart: each window restores its own track and both restore the same position; a third launch after closing one window prunes nothing it still needs |
-
+| D1 | The media's remembered tracks become one entry — **done** | `TrackSelectionModel` — `{ Views[] { VideoSelection, SubtitleSelections[] }, AudioSelections[] }` — with the wire names the record will use. `SelectedTrackModel` stays the single choice (`{ Enabled, Path, Index }`) and becomes `VideoSelection`; a new `TrackSelectionEntry` (`{ Path, Index }`) is what the two lists hold, because a list is already an on/off. `MediaExt.TRACK_SELECTION` in place of `SELECTED_VIDEO_TRACK`, `SELECTED_AUDIO_TRACK` and `SELECTED_SUBTITLE_TRACK`, and `TrackSelection`'s per-kind `Load`/`Save`/`Resolve` replaced by "read the model, resolve a selection inside it". The two menu preferences move into that model, each at the level it governs — the sound's beside `AudioSelections`, the words' in each view entry — and `PlayerMenuContext` reads and writes them there instead of its static fields. Read sites follow: `OpenAsync` (audio), `SelectTracks` (picture and words), `AddRememberedSourcesAsync` (an external file the model names). `Save` survives the merge by writing what the page shows into that one entry — `Views[0].VideoSelection` for the picture, `Views[0].SubtitleSelections` for the words, `AudioSelections` for the sound — because until D3 the ext is the only store; D3 gives the write to the session, which is the only holder that knows which view index a page is | no migration of the three old keys — a media has no remembered tracks until it is played once, the same rule the queue keys got. The three states must survive the merge: "no preference" is not "off", because a first-ever open has to choose the default stream rather than show nothing. The model must carry no app-layer dependency, since the record will hold it too | build + play a file, pick a picture, a sound set and two subtitle tracks, turn *Allow multi-tracks* on in both menus, then reopen it from the library: the ext holds one `TrackSelection` entry with `Views[0]`, `AudioSelections` and both flags, the three old keys are gone, and the same choices and preferences come back — which is what proves "no preference", "off" and "a stream" still read as three different things |
+| D2 | The record, and a route that names it | `PlayerSessionRecord` (`{ PlayQueue, Playback, TrackSelection }`) with the wire model and the live model in one file, the way `PlaybackModel` already carries `PlaybackJsonModel` beside its state, parsing into a `PlayQueueModel`, the playback's state and the `TrackSelectionModel`. `RegistryNames.PLAYER_SESSIONS` (`/Resources/PlayerSessions`). `RouterConstants.ARG_SESSION`, while `ARG_RESTORED` stays because auto-play on launch is gated by it. `GetMediaRoute` writes the record with the queue and the playback, and **no** `TrackSelection`, then returns `app://player?session={id}`. Deleted with no compatibility path: `PLAY_QUEUES`, `{tabId}/PlayQueues`, `ARG_PLAY_QUEUE_ID`, `ARG_PLAYBACK`, `ARG_POSITION`, `PlayerPage.GetPlayQueue`, and the URL rewrite in the playback observer | the route names one session and nothing else; building it writes a record that no tab names yet, and the launch prune is what deletes an entry left by a menu that was never used, so the record must be prunable before any page has started (D5). A record with no `TrackSelection` is not "select nothing" — it is "no choice recorded yet", and the resolution order above is what gives it meaning. The page mints an id and rewrites its URL once when it is opened without one, and never again | build + open a file: the tab URL is `app://player?session=…`, the record holds the queue and the playback with no `TrackSelection`, and no `PlayQueues` key is created anywhere |
+| D3 | The session reads and writes its own record — and the media's default | `PlayerSession` starts `LoadRecordAsync` in its constructor: the record if there is one, else an empty session, which is what a tab whose record was pruned gets. `Load(playQueue, serializedPlayback, positionMs)` becomes `ApplyRecord(record)`, and `PlayerPage` stops supplying queue, playback or position. Saves happen on `Playback.PlayQueueChanged`, on `Playback.PlaybackStateChanged`, after every successful `SelectVideoStream`, `AddAudioStream`, `RemoveAudioStream`, `AddSubtitleStream` and `RemoveSubtitleStream`, on `CreateView`/`RemoveView`, and once more at last detach. Each save writes **both** stores: the session's record with its `MediaId`, and the same `TrackSelection` onto the media of the playback's current item — the media it opened — so the ext is the default the next open starts from (decision 3). The position is not saved with either: `SaveProgress` keeps writing `media.LastPositionMs` on its existing five-second cadence, and `ResolveStartPositionMs` keeps deciding where an open resumes (decision 2) | the session is the only writer of both stores, and it writes them at the same instant, so they cannot disagree. A joining page writes nothing it did not load. `TrackSelection` the static helper is now a pure model reader; the writes are the session's, because only the session knows which view is which and which media it opened. A save that fails is logged and does not interrupt playback | build + open a file, add queue items, change repeat and shuffle, pick tracks: the record and the media's ext hold the same `TrackSelection`, and the record holds the edited queue and playback; restart with window restore on: the tab returns from its record; open the same media fresh from the library: it returns with the same picture and words, now from the ext |
+| D4 | The choice is resolved: record, then ext, then the default | One place implements the resolution order above — a `TrackSelection` helper taking the record's model, the media's model, the view's index, the kind and the sources — and the open path, `SelectTracks` and `AddRememberedSourcesAsync` go through it. Sources named by either store are found before the choice is resolved, so an external subtitle file that only the ext remembers is still added. A `Path` or `Index` that no longer resolves is dropped, never fatal, and a model that fails to parse is treated as absent rather than as "off" | "no preference" must never be read as "off": the view that opened the media has to fall back to the default stream, or a first-ever open of a file with a picture would show nothing. A joining page must never see the opening view's fallback, which is what keeps "New window" empty (§7.2). Applying a resolved set twice must not add a chain twice | build + open a media never played before: defaults everywhere; pick a second subtitle track and an audio set, close, reopen from the library: the same picture, both subtitle tracks and the audio set come back; open a second window on the running session: it selects nothing; restart with both windows: each restores its own from the record; delete the external subtitle file and reopen: the open succeeds without it |
+| D5 | The tab names its session, and launch prunes the rest | `PlayerPage` writes `/Resources/Tabs/{tabId}/PlayerSession` = `{ SessionId }` when it acquires the session; the key travels with the tab because `MainPage` copies the tab's registry tree when a tab moves windows. `WindowManager.CleanUpTabResources` first reads the session id of every **alive** tab, then deletes the tab keys of tabs that no longer exist, then deletes every `/Resources/PlayerSessions/{id}` that no alive tab names. This is also what removes the records written for context menus that were never used | pruning only ever deletes a record nothing names, and it runs before any page has started, so it can never race a live session. A tab whose record names a session that has been pruned opens a fresh session on that id rather than failing | build + two windows, close one, restart: the closed window's record is gone, the other window's record is intact and it restores its queue and tracks; a second restart deletes nothing it still needs |
 ### Phase E — edges
 
 This step comes after D because it verifies what D writes: that a dragged tab carries its `/PlayerSession` record with
@@ -328,9 +396,13 @@ it, and that the last view out saves before disposing.
 - **A hidden tab keeps decoding.** Two tabs in one window both hold live chains; only the selected tab's panel is
   composed. Acceptable for v1 — pausing a view when its panel is not visible needs a visibility signal the page
   does not have today.
-- **Stale session records and drafts.** Records are pruned at launch from the tab URLs that will be restored (D2);
-  drafts left by a context menu that was never opened live in the runtime area and go with the rest of it. Growth is
-  bounded by tabs a user actually opened.
+- **Stale session records.** Every `GetMediaRoute` call writes a record, and that also runs while a context menu is
+  being built, so a user who opens a menu without choosing anything leaves one behind until the next launch, when the
+  prune deletes every record no tab names (D5). Growth is bounded by the menus opened in one run. If that turns out to be
+  noticeable, keying the entry by media and tab instead of minting an id per build would cap it at one per tab.
+- **One resume point per media.** The position is not in the session record (decision 2), so two sessions of one file
+  resume from wherever the media was last left, and two windows on one session share it by definition. Accepted: it is
+  what the app does today, and a per-session position is a second answer to the same question.
 - **`PlaybackLabPage` is untouched.** It drives the pipeline directly and is not part of this plan.
 - **Two audio chains mean two renderers.** Nothing in the app prevents it, and a shared-mode endpoint would mix
   them, but each chain is timed by its own renderer, so two streams can drift apart and only one of them can be the
@@ -348,7 +420,9 @@ it, and that the last view out saves before disposing.
 2. "New window" opens a second page on the same session, selecting no video track, and the track it chooses is
    independent of the other page's.
 3. Both pages show the same position and transport state; sound plays once.
-4. The session survives a restart: queue, playback state, position, and each page's video track come back.
+4. The session survives a restart: queue, playback state, each page's video and subtitle tracks, and the session's
+   audio tracks come back, and the media resumes from the position it was left at (decision 2: the position stays on the
+   media, not in the record).
 5. Closing a page leaves the others playing; closing the last one saves and disposes.
 6. Single-page behaviour is unchanged when no second page exists.
 
