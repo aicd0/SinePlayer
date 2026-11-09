@@ -165,6 +165,9 @@
   <data name="AllPages" xml:space="preserve">
     <value>모든 페이지</value>
   </data>
+  <data name="AllowMultiTracks" xml:space="preserve">
+    <value>여러 트랙 허용</value>
+  </data>
   <data name="AllowPerMediaConfiguration" xml:space="preserve">
     <value>미디어별 설정 허용</value>
   </data>

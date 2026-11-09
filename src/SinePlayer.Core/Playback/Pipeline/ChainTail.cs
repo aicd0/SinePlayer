@@ -45,13 +45,8 @@ internal sealed class ChainTail
 
     public bool IsSpent(long epoch, TimeSpan position, long furthestTicks)
     {
-        if (Volatile.Read(ref _epoch) != epoch)
-        {
-            return false;
-        }
-
-        long ticks = Interlocked.Read(ref _ticks);
-        if (ticks < 0 || ticks >= position.Ticks)
+        long ticks = Volatile.Read(ref _epoch) == epoch ? Interlocked.Read(ref _ticks) : -1;
+        if (ticks >= position.Ticks)
         {
             return false;
         }

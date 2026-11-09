@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Utils;
 
@@ -10,7 +11,7 @@ namespace SinePlayer.Core.Playback.Pipeline;
 internal sealed class MediaReader(
     PipelineTimeline timeline,
     PipelineEvents events,
-    Func<MediaSource, TimeSpan, int> chooseSeekLanding) : IPipelineWakeTarget
+    Func<MediaSource, TimeSpan, SeekMode, int> chooseSeekLanding) : IPipelineWakeTarget
 {
     private static readonly TimeSpan ReadAheadMin = TimeSpan.FromMilliseconds(8000);
     private static readonly TimeSpan ReadAheadMax = TimeSpan.FromMilliseconds(10000);
@@ -118,7 +119,7 @@ internal sealed class MediaReader(
                     entry.Key.ReadTail.Reset();
                 }
 
-                OperationResult sought = SeekSources(sources, epochGate.SeekPosition);
+                OperationResult sought = SeekSources(sources, epochGate.SeekPosition, epochGate.SeekMode);
                 if (sought.IsSuccessful)
                 {
                     endingEpoch = -1;
@@ -235,7 +236,7 @@ internal sealed class MediaReader(
         }
     }
 
-    private OperationResult SeekSources(IReadOnlyList<MediaSource> sources, TimeSpan position)
+    private OperationResult SeekSources(IReadOnlyList<MediaSource> sources, TimeSpan position, SeekMode mode)
     {
         foreach (MediaSource source in sources)
         {
@@ -252,7 +253,7 @@ internal sealed class MediaReader(
             OperationResult sought;
             try
             {
-                sought = entry.Source.Seek(position, chooseSeekLanding(entry, position));
+                sought = entry.Source.Seek(position, chooseSeekLanding(entry, position, mode), mode);
             }
             catch (Exception ex)
             {

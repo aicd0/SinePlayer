@@ -5,6 +5,7 @@ namespace SinePlayer.Core.Playback.Abstractions;
 
 public enum SeekMode
 {
-    Fast,
     Precise,
+    PreviousKeyframe,
+    NextKeyframe,
 }

@@ -140,7 +140,7 @@ public class FFmpegSourceTests
     {
         using FFmpegSource source = OpenWaveFile();
 
-        OperationResult result = source.Seek(TimeSpan.FromSeconds(DurationSeconds / 2), -1);
+        OperationResult result = source.Seek(TimeSpan.FromSeconds(DurationSeconds / 2), -1, SeekMode.Precise);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         result = source.TryReadPacket(out MediaPacket? packet);
@@ -168,7 +168,7 @@ public class FFmpegSourceTests
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         using IMediaSource subtitleSource = source!;
-        result = subtitleSource.Seek(TimeSpan.FromSeconds(seconds), -1);
+        result = subtitleSource.Seek(TimeSpan.FromSeconds(seconds), -1, SeekMode.Precise);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         result = subtitleSource.TryReadPacket(out MediaPacket? packet);
@@ -206,7 +206,7 @@ public class FFmpegSourceTests
         // The jump lands on the second event, so the decoder counts it as its first one: the copy that comes back carries
         // a different number from the copy already held unless the number is not part of the cue at all.
         Assert.That(decoder.Flush().IsSuccessful, Is.True);
-        Assert.That(subtitleSource.Seek(first[1].Start, stream.Index).IsSuccessful, Is.True);
+        Assert.That(subtitleSource.Seek(first[1].Start, stream.Index, SeekMode.Precise).IsSuccessful, Is.True);
 
         IReadOnlyList<(TimeSpan Start, string Text)> again = ReadEvents(subtitleSource, decoder);
 
