@@ -156,7 +156,7 @@ internal static class PlayerMenuCreator
             new SubItemMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.SelectVideoTrack,
-                Items = CreateTrackItems(context, MediaStreamKind.Video),
+                Items = CreateVideoTrackItems(context),
             },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
@@ -334,30 +334,15 @@ internal static class PlayerMenuCreator
         ];
     }
 
-    private static List<BaseMenuFlyoutItemModel> CreateSubtitleTrackItems(PlayerMenuContext context)
+    private static List<BaseMenuFlyoutItemModel> CreateVideoTrackItems(PlayerMenuContext context)
     {
-        List<BaseMenuFlyoutItemModel> items = [];
-
-        items.Add(new SimpleMenuFlyoutItemModel()
-        {
-            Text = StringResourceProvider.Instance.AddSubtitleTracks,
-            Click = context.AddSubtitleTracks,
-        });
-        items.Add(new SeparatorMenuFlyoutItemModel());
-        items.AddRange(CreateTrackItems(context, MediaStreamKind.Subtitle));
-
-        return items;
-    }
-
-    private static List<BaseMenuFlyoutItemModel> CreateTrackItems(PlayerMenuContext context, MediaStreamKind kind)
-    {
-        IReadOnlyList<MediaStreamInfo>? streams = context.Tracks(kind);
+        IReadOnlyList<MediaStreamInfo>? streams = context.Tracks(MediaStreamKind.Video);
         if (streams is null || streams.Count == 0)
         {
             return [new SimpleMenuFlyoutItemModel() { Text = StringResourceProvider.Instance.None, IsEnabled = false }];
         }
 
-        MediaStreamInfo? selected = context.SelectedTrack(kind);
+        MediaStreamInfo? selected = context.SelectedTrack(MediaStreamKind.Video);
 
         List<BaseMenuFlyoutItemModel> items = [];
         foreach (MediaStreamInfo stream in streams)
@@ -367,7 +352,7 @@ internal static class PlayerMenuCreator
             {
                 Text = MediaStreamLabel.Describe(choice, context.SourceOf(choice)),
                 IsChecked = choice == selected,
-                Click = () => context.SelectTrack(kind, choice),
+                Click = () => context.SelectTrack(MediaStreamKind.Video, choice),
             });
         }
 
@@ -376,7 +361,7 @@ internal static class PlayerMenuCreator
         {
             Text = StringResourceProvider.Instance.Off,
             IsChecked = selected is null,
-            Click = () => context.SelectTrack(kind, null),
+            Click = () => context.SelectTrack(MediaStreamKind.Video, null),
         });
 
         return items;
@@ -439,6 +424,78 @@ internal static class PlayerMenuCreator
                 else
                 {
                     context.SelectTrack(MediaStreamKind.Audio, null);
+                }
+            },
+        });
+
+        return items;
+    }
+
+    private static List<BaseMenuFlyoutItemModel> CreateSubtitleTrackItems(PlayerMenuContext context)
+    {
+        bool allowMulti = context.AllowMultiSubtitleTracks;
+
+        List<BaseMenuFlyoutItemModel> items =
+        [
+            new SimpleMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.AddSubtitleTracks,
+                Click = context.AddSubtitleTracks,
+            },
+            new SeparatorMenuFlyoutItemModel(),
+        ];
+
+        IReadOnlyList<MediaStreamInfo>? streams = context.Tracks(MediaStreamKind.Subtitle);
+        if (streams is null || streams.Count == 0)
+        {
+            items.Add(new SimpleMenuFlyoutItemModel() { Text = StringResourceProvider.Instance.None, IsEnabled = false });
+            return items;
+        }
+
+        MediaStreamInfo? selected = context.SelectedTrack(MediaStreamKind.Subtitle);
+        bool playing = allowMulti ? streams.Any(context.IsSubtitleTrackPlaying) : selected is not null;
+
+        foreach (MediaStreamInfo stream in streams)
+        {
+            MediaStreamInfo choice = stream;
+            items.Add(new ToggleMenuFlyoutItemModel()
+            {
+                Text = MediaStreamLabel.Describe(choice, context.SourceOf(choice)),
+                IsChecked = allowMulti ? context.IsSubtitleTrackPlaying(choice) : choice == selected,
+                Click = () =>
+                {
+                    if (allowMulti)
+                    {
+                        context.ToggleSubtitleTrack(choice);
+                    }
+                    else
+                    {
+                        context.SelectTrack(MediaStreamKind.Subtitle, choice);
+                    }
+                },
+            });
+        }
+
+        items.Add(new SeparatorMenuFlyoutItemModel());
+        items.Add(new ToggleMenuFlyoutItemModel()
+        {
+            Text = StringResourceProvider.Instance.AllowMultiTracks,
+            IsChecked = allowMulti,
+            Click = () => context.SetAllowMultiSubtitleTracks(!allowMulti),
+        });
+        items.Add(new ToggleMenuFlyoutItemModel()
+        {
+            Text = StringResourceProvider.Instance.Off,
+            IsChecked = !playing,
+            Click = () =>
+            {
+                if (allowMulti)
+                {
+                    context.ClearSubtitleTracks();
+                }
+                else
+                {
+                    context.SelectTrack(MediaStreamKind.Subtitle, null);
                 }
             },
         });
