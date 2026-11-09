@@ -9,25 +9,19 @@ using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 
+using Windows.Graphics.DirectX;
 using Windows.Graphics.DirectX.Direct3D11;
 using Windows.UI;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Dxgi;
-using Windows.Win32.Graphics.Dxgi.Common;
 using Windows.Win32.System.WinRT;
 
 namespace SinePlayer.Core.Playback.Subtitle;
 
 internal sealed partial class SubtitleSurface : IDisposable
 {
-    /// <summary>
-    /// The Win2D device over the engine's Direct3D device, so drawing reaches the same swap chain rather than a device
-    /// of Win2D's own choosing. A Direct3D device is also a DXGI device, which is what the exporter wants; the WinRT object
-    /// it produces is another projection of the same thing, so it is handed to WinRT's marshaller to become the type Win2D
-    /// takes.
-    /// </summary>
-    private static IDirect3DDevice CreateWin2DDevice(D3D11Device device)
+    internal static IDirect3DDevice CreateWin2DDevice(D3D11Device device)
     {
         var dxgiDevice = (IDXGIDevice)device.Device;
 
@@ -49,40 +43,21 @@ internal sealed partial class SubtitleSurface : IDisposable
         }
     }
 
-    /// <summary>The swap chain's back buffer as the surface WinRT wraps, then as the surface type Win2D takes.</summary>
-    private static IDirect3DSurface CreateSurface(D3D11SwapChain swapChain)
-    {
-        var dxgiSurface = (IDXGISurface)swapChain.BackBuffer;
-
-        HRESULT created = PInvoke.CreateDirect3D11SurfaceFromDXGISurface(dxgiSurface, out IInspectable graphicsSurface);
-        if (created.Value < 0)
-        {
-            throw Marshal.GetExceptionForHR(created.Value) ?? new InvalidOperationException($"Unable to wrap the surface for Win2D (0x{created.Value:X8}).");
-        }
-
-        nint pointer = Marshal.GetIUnknownForObject(graphicsSurface);
-        try
-        {
-            return WinRT.MarshalInspectable<IDirect3DSurface>.FromAbi(pointer);
-        }
-        finally
-        {
-            Marshal.Release(pointer);
-        }
-    }
-
     private bool _disposed;
     private D3D11Device? _d3dDevice;
-    private D3D11SwapChain? _swapChain;
-    private IDirect3DSurface? _surface;
     private CanvasDevice? _canvasDevice;
+    private CanvasRenderTarget? _bitmap;
     private IVideoRenderTarget? _target;
+    private SubtitleCompositor? _compositor;
 
-    internal int Width => _swapChain?.Width ?? 0;
+    internal int Width => _bitmap is null ? 0 : (int)Math.Round(_bitmap.Size.Width);
 
-    internal int Height => _swapChain?.Height ?? 0;
+    internal int Height => _bitmap is null ? 0 : (int)Math.Round(_bitmap.Size.Height);
 
-    internal double CompositionScale => _swapChain?.CompositionScale ?? 1.0;
+    internal double CompositionScale => _compositor?.CompositionScale ?? 1.0;
+
+    /// <summary>The layer's pixels, as the compositor draws them over the swap chain.</summary>
+    internal CanvasRenderTarget? Bitmap => _bitmap;
 
     public void Dispose()
     {
@@ -93,51 +68,58 @@ internal sealed partial class SubtitleSurface : IDisposable
 
         _disposed = true;
 
-        if (_target is not null)
-        {
-            _target.SurfaceSizeChanged -= OnSurfaceSizeChanged;
-        }
-
-        ResetSurface();
+        _compositor?.RemoveLayer(this);
+        _compositor?.Release();
+        _compositor = null;
         _target = null;
+
+        _bitmap?.Dispose();
+        _bitmap = null;
+
+        _canvasDevice?.Dispose();
+        _canvasDevice = null;
+
+        if (_d3dDevice is not null)
+        {
+            _d3dDevice = null;
+            SharedSubtitleDevice.Return();
+        }
 
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>
-    /// Takes the host's element, letting go of the previous one. It is the surface that follows a target, not the other
-    /// way round: a renderer is configured once per track and a size change is answered when it next draws.
-    /// </summary>
     internal void BindTarget(IVideoRenderTarget target)
     {
-        if (!ReferenceEquals(_target, target) && _target is not null)
+        if (ReferenceEquals(_target, target))
         {
-            _target.SurfaceSizeChanged -= OnSurfaceSizeChanged;
-            _target = null;
+            return;
         }
 
+        _compositor?.RemoveLayer(this);
+        _compositor?.Release();
+        _compositor = null;
+
         _target = target;
+        _compositor = SubtitleCompositor.Acquire(target);
+        _compositor.AddLayer(this);
     }
 
-    /// <summary>
-    /// The device text and pictures are drawn with, built on first use. A test that wants to check a drawing against an
-    /// offscreen target uses this rather than a swap chain, which cannot be read back after it has presented.
-    /// </summary>
     internal CanvasDevice EnsureCanvasDevice()
     {
+        if (_compositor is { } compositor)
+        {
+            return compositor.EnsureCanvasDevice();
+        }
+
         _canvasDevice ??= CanvasDevice.CreateFromDirect3D11Device(CreateWin2DDevice(EnsureDevice()));
 
         return _canvasDevice;
     }
 
-    /// <summary>
-    /// Prepares a surface of the size the host now asks for, replacing one of another size or scale. Cheap when nothing
-    /// changed, which is why every drawing calls it rather than trusting what it was told in <c>Configure</c>.
-    /// </summary>
     internal OperationResult EnsureSurface()
     {
         IVideoRenderTarget? target = _target;
-        if (target is null)
+        if (target is null || _compositor is null)
         {
             return OperationResult.Failure("The subtitle renderer has no surface to draw into.");
         }
@@ -148,94 +130,63 @@ internal sealed partial class SubtitleSurface : IDisposable
 
         try
         {
-            if (_canvasDevice is null)
+            if (_bitmap is not null && ((int)Math.Round(_bitmap.Size.Width) != width || (int)Math.Round(_bitmap.Size.Height) != height))
             {
-                EnsureCanvasDevice();
+                _bitmap.Dispose();
+                _bitmap = null;
             }
 
-            if (_swapChain is not null && (ScaleChanged(_swapChain, width, height, scale)))
-            {
-                // A chain drawn through Win2D is replaced rather than resized. The wrapper this renderer holds around the
-                // chain's back buffer is a WinRT object whose reference DXGI counts, and ResizeBuffers refuses while any
-                // reference to a buffer is outstanding — the wrapper lives until its finalizer runs, so a resize fails
-                // with DXGI_ERROR_INVALID_CALL and would keep failing. A new chain has new buffers and nothing holding
-                // them, which is why the size change is answered by throwing the old one away.
-                ReleaseChain();
-            }
+            _bitmap ??= new CanvasRenderTarget(EnsureCanvasDevice(), width, height, 96.0f, DirectXPixelFormat.B8G8R8A8UIntNormalized, CanvasAlphaMode.Premultiplied);
 
-            if (_swapChain is null)
-            {
-                OperationResult<D3D11SwapChain> created = D3D11SwapChain.Create(EnsureDevice(), width, height, scale, DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_PREMULTIPLIED);
-                if (!created.IsSuccessful)
-                {
-                    return OperationResult.Failure(created);
-                }
-
-                OperationResult attached = created.Result.AttachTo(target);
-                if (!attached.IsSuccessful)
-                {
-                    created.Result.Dispose();
-                    return attached;
-                }
-
-                _swapChain = created.Result;
-                _surface = CreateSurface(created.Result);
-                target.SurfaceSizeChanged += OnSurfaceSizeChanged;
-            }
-
-            return OperationResult.Success();
+            // The panel is handed its swap chain when the renderer is configured, as it always was, rather than at the
+            // first frame: the compositor owns that chain, but preparing it is this layer's to ask for.
+            return _compositor.PrepareSwapChain();
         }
         catch (Exception exception)
         {
-            ResetSurface();
+            _bitmap?.Dispose();
+            _bitmap = null;
             return OperationResult.Failure($"Unable to prepare the subtitle surface: {exception.Message}");
         }
     }
 
-    /// <summary>
-    /// Clears the surface, hands it to <paramref name="draw"/>, and presents it. The clearing is part of the step because
-    /// a subtitle surface is transparent where nothing is drawn: what is left of the last frame would otherwise stay.
-    /// </summary>
     internal OperationResult DrawAndPresent(Action<CanvasDrawingSession> draw)
     {
         ArgumentNullException.ThrowIfNull(draw);
 
-        D3D11SwapChain? swapChain = _swapChain;
-        IDirect3DSurface? surface = _surface;
-        CanvasDevice? device = _canvasDevice;
-        if (swapChain is null || surface is null || device is null)
+        SubtitleCompositor? compositor = _compositor;
+        if (compositor is null)
         {
-            return OperationResult.Failure("The subtitle surface has no back buffer to draw into.");
+            return OperationResult.Failure("The subtitle surface has no target to present into.");
         }
 
-        CanvasRenderTarget? target = null;
+        return compositor.Render(this, draw);
+    }
+
+    internal OperationResult DrawLayer(Action<CanvasDrawingSession> draw)
+    {
+        CanvasRenderTarget? bitmap = _bitmap;
+        if (bitmap is null)
+        {
+            return OperationResult.Failure("The subtitle layer has no bitmap to draw into.");
+        }
+
         try
         {
-            target = CanvasRenderTarget.CreateFromDirect3D11Surface(device, surface, 96.0f, CanvasAlphaMode.Premultiplied);
-
-            using (CanvasDrawingSession session = target.CreateDrawingSession())
+            using (CanvasDrawingSession session = bitmap.CreateDrawingSession())
             {
                 session.Clear(default(Color));
                 draw(session);
             }
 
-            swapChain.Present();
             return OperationResult.Success();
         }
         catch (Exception exception)
         {
             return OperationResult.Failure($"Unable to draw the subtitles: {exception.Message}");
         }
-        finally
-        {
-            target?.Dispose();
-        }
     }
 
-    /// <summary>
-    /// The device this surface draws through, taking a share of the shared one on first use. Every surface draws
-    /// through the same Direct3D device; what each one has of its own is the device Win2D wraps it in.
-    /// </summary>
     private D3D11Device EnsureDevice()
     {
         if (_d3dDevice is not { } device)
@@ -251,40 +202,5 @@ internal sealed partial class SubtitleSurface : IDisposable
         }
 
         return device;
-    }
-
-    private static bool ScaleChanged(D3D11SwapChain swapChain, int width, int height, double scale)
-    {
-        return swapChain.Width != width || swapChain.Height != height || swapChain.CompositionScale != scale;
-    }
-
-    /// <summary>
-    /// Lets go of the chain and of the wrapper around its back buffer. Something that drew this chain cannot be resized
-    /// afterwards, so a resize is answered by this: the chain goes, and the next surface is a new one.
-    /// </summary>
-    private void ReleaseChain()
-    {
-        _surface = null;
-        _swapChain?.Dispose();
-        _swapChain = null;
-    }
-
-    private void OnSurfaceSizeChanged()
-    {
-        // A swap chain cannot be resized from the thread that raised this, and it does not need to be: the pipeline
-        // draws again after telling the renderer, and EnsureSurface compares the size it is asked for with its own.
-    }
-
-    private void ResetSurface()
-    {
-        ReleaseChain();
-        _canvasDevice?.Dispose();
-        _canvasDevice = null;
-
-        if (_d3dDevice is not null)
-        {
-            _d3dDevice = null;
-            SharedSubtitleDevice.Return();
-        }
     }
 }
