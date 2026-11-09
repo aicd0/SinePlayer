@@ -56,6 +56,7 @@ internal sealed partial class PlayerSession : IDisposable
     private PlayQueueModel _playQueue = PlayQueueModel.CreateEmpty();
     private bool _loaded;
     private Task? _loadTask;
+    private TrackSelectionModel? _loadedSelection;
 
     public PlayerSession(string id)
     {
@@ -141,6 +142,7 @@ internal sealed partial class PlayerSession : IDisposable
                 : PlayQueueModel.CreateEmpty();
 
             _loaded = true;
+            _loadedSelection = record?.TrackSelection;
             _playQueue = playQueue;
             Playback.LoadState(playQueue, record?.Playback, -1);
         }
@@ -263,15 +265,22 @@ internal sealed partial class PlayerSession : IDisposable
         return added;
     }
 
-    public PlayerView CreateView()
+    public async Task<PlayerView> CreateView()
     {
         PlayerView view = new(this);
         _views.Add(view);
         SaveRecord();
+
+        if (_openedMedia is not null)
+        {
+            await ApplyViewTracksAsync(view);
+            await Reconcile();
+        }
+
         return view;
     }
 
-    public void RemoveView(PlayerView view)
+    public async Task RemoveView(PlayerView view)
     {
         if (!_views.Remove(view))
         {
@@ -288,15 +297,12 @@ internal sealed partial class PlayerSession : IDisposable
 
         foreach (IPlaybackChain chain in ChainsOf(view))
         {
-            pipeline.RemoveChain(chain);
+            await pipeline.RemoveChain(chain);
             _pendingReconcile = true;
         }
 
-        CoroutineUtils.Run(async () =>
-        {
-            await Reconcile();
-            view.Dispose();
-        });
+        await Reconcile();
+        view.Dispose();
     }
 
     public async Task<OperationResult> SelectVideoStream(PlayerView view, MediaStreamInfo? stream)
@@ -733,23 +739,15 @@ internal sealed partial class PlayerSession : IDisposable
 
         await AddRememberedSourcesAsync(media);
         await AddSameNameSubtitlesAsync(media.Location);
-
-        MediaStreamInfo? audio = TrackSelection.Resolve(media, MediaStreamKind.Audio, Sources);
-        if (audio is not null)
-        {
-            OperationResult chosen = await AddAudioStream(audio);
-            if (!chosen.IsSuccessful)
-            {
-                Logger.W(TAG, $"The sound could not be chosen: {chosen.Message}");
-            }
-        }
+        await ApplyTrackSelectionsAsync();
 
         return OperationResult.Success();
     }
 
     private async Task AddRememberedSourcesAsync(MediaModel media)
     {
-        foreach (string path in TrackSelection.RememberedPaths(media))
+        List<string> paths = [.. TrackSelection.PathsOf(_loadedSelection), .. TrackSelection.PathsOf(TrackSelection.Load(media))];
+        foreach (string path in paths.Distinct())
         {
             if (Sources.Any(source => source.Locator.Value == path))
             {
@@ -1060,10 +1058,61 @@ internal sealed partial class PlayerSession : IDisposable
 
     #region Record
 
-    /// <summary>
-    /// Writes what the session is, to its own record and — once it has something to record — to the media it opened, which is
-    /// what the next open of that file starts from (decision 3).
-    /// </summary>
+    private async Task ApplyTrackSelectionsAsync()
+    {
+        if (_openedMedia is not { } media)
+        {
+            return;
+        }
+
+        TrackSelectionModel? mediaSelection = TrackSelection.Load(media);
+        foreach (MediaStreamInfo stream in TrackSelection.Resolve(_loadedSelection, mediaSelection, 0, true, MediaStreamKind.Audio, Sources))
+        {
+            OperationResult added = await AddAudioStream(stream);
+            if (!added.IsSuccessful)
+            {
+                Logger.W(TAG, $"The sound of track #{stream.Index} could not be chosen: {added.Message}");
+            }
+        }
+
+        foreach (PlayerView view in (PlayerView[])[.. _views])
+        {
+            await ApplyViewTracksAsync(view);
+        }
+
+        _loadedSelection = null;
+    }
+
+    private async Task ApplyViewTracksAsync(PlayerView view)
+    {
+        int index = _views.IndexOf(view);
+        if (index < 0 || _openedMedia is not { } media)
+        {
+            return;
+        }
+
+        TrackSelectionModel? mediaSelection = TrackSelection.Load(media);
+        bool opening = index == 0;
+
+        foreach (MediaStreamInfo stream in TrackSelection.Resolve(_loadedSelection, mediaSelection, index, opening, MediaStreamKind.Video, Sources))
+        {
+            OperationResult chosen = await SelectVideoStream(view, stream);
+            if (!chosen.IsSuccessful)
+            {
+                Logger.W(TAG, $"The picture of track #{stream.Index} could not be chosen for view {index}: {chosen.Message}");
+            }
+        }
+
+        foreach (MediaStreamInfo stream in TrackSelection.Resolve(_loadedSelection, mediaSelection, index, opening, MediaStreamKind.Subtitle, Sources))
+        {
+            OperationResult chosen = await AddSubtitleStream(view, stream);
+            if (!chosen.IsSuccessful)
+            {
+                Logger.W(TAG, $"The subtitles of track #{stream.Index} could not be chosen for view {index}: {chosen.Message}");
+            }
+        }
+    }
+
     private void SaveRecord()
     {
         if (!_loaded)
