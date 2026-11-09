@@ -652,7 +652,7 @@ internal sealed partial class PlayerPage : BasePage
         MediaStreamInfo? subtitle = TrackSelection.Resolve(media, MediaStreamKind.Subtitle, session.Sources);
         if (subtitle is not null)
         {
-            OperationResult chosen = await session.SelectSubtitleStream(view, subtitle);
+            OperationResult chosen = await session.AddSubtitleStream(view, subtitle);
             if (!chosen.IsSuccessful)
             {
                 unplayable.Add($"the subtitles could not be played ({chosen.Message})");

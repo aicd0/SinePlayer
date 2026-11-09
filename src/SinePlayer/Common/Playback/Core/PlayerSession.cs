@@ -182,7 +182,7 @@ internal sealed partial class PlayerSession : IDisposable
 
     public async Task<OperationResult> Reset()
     {
-        PlaybackPipeline pipeline = await EnsurePipeline();
+        PlaybackPipeline pipeline = EnsurePipeline();
 
         OperationResult reset = await pipeline.Reset();
         if (!reset.IsSuccessful)
@@ -221,7 +221,7 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResultExt.Failure<MediaSource>(TAG, $"Media file not found: '{filePath}'.");
         }
 
-        PlaybackPipeline pipeline = await EnsurePipeline();
+        PlaybackPipeline pipeline = EnsurePipeline();
 
         var locator = MediaLocator.Parse(filePath);
         MediaSource? existing = pipeline.Sources.FirstOrDefault(source => string.Equals(source.Locator.Value, locator.Value, StringComparison.Ordinal));
@@ -353,7 +353,7 @@ internal sealed partial class PlayerSession : IDisposable
         return OperationResult.Success();
     }
 
-    public async Task<OperationResult> SelectSubtitleStream(PlayerView view, MediaStreamInfo? stream)
+    public async Task<OperationResult> AddSubtitleStream(PlayerView view, MediaStreamInfo stream)
     {
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is null)
@@ -361,12 +361,42 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResultExt.Failure(TAG, "There is no playback to change a track of.");
         }
 
-        ISubtitleChain chain = await EnsureSubtitleChain(pipeline, view);
+        if (view.SubtitleChains.Any(chain => chain.SelectedStream?.Equals(stream) == true))
+        {
+            return OperationResult.Success();
+        }
+
+        ISubtitleChain? chain = view.SubtitleChains.FirstOrDefault(candidate => candidate.SelectedStream is null);
+        chain ??= await CreateSubtitleChain(pipeline, view);
+
         OperationResult selected = await pipeline.SelectStream(chain, stream);
         if (!selected.IsSuccessful)
         {
-            string wanted = stream is null ? "no track" : $"track #{stream.Index}";
-            return OperationResultExt.Failure(TAG, $"The subtitles could not be changed to {wanted}. {selected.Message}");
+            return OperationResultExt.Failure(TAG, $"The subtitles of track #{stream.Index} could not be added. {selected.Message}");
+        }
+
+        _pendingReconcile = true;
+        return OperationResult.Success();
+    }
+
+    public async Task<OperationResult> RemoveSubtitleStream(PlayerView view, MediaStreamInfo stream)
+    {
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            return OperationResultExt.Failure(TAG, "There is no playback to change a track of.");
+        }
+
+        ISubtitleChain? chain = view.SubtitleChains.FirstOrDefault(candidate => candidate.SelectedStream?.Equals(stream) == true);
+        if (chain is null)
+        {
+            return OperationResult.Success();
+        }
+
+        OperationResult cleared = await pipeline.SelectStream(chain, null);
+        if (!cleared.IsSuccessful)
+        {
+            return OperationResultExt.Failure(TAG, $"The subtitles of track #{stream.Index} could not be taken away. {cleared.Message}");
         }
 
         _pendingReconcile = true;
@@ -494,7 +524,7 @@ internal sealed partial class PlayerSession : IDisposable
             yield return video;
         }
 
-        if (view.SubtitleChain is { } subtitle)
+        foreach (ISubtitleChain subtitle in view.SubtitleChains)
         {
             yield return subtitle;
         }
@@ -506,7 +536,7 @@ internal sealed partial class PlayerSession : IDisposable
 
     private PlaybackPipeline? _pipeline;
 
-    private async Task<PlaybackPipeline> EnsurePipeline()
+    private PlaybackPipeline EnsurePipeline()
     {
         PlaybackPipeline? existing = _pipeline;
         if (existing is not null)
@@ -518,14 +548,6 @@ internal sealed partial class PlayerSession : IDisposable
         {
             SourceFactory = new FFmpegSourceProviderFactory(),
         };
-
-        await EnsureAudioChain(pipeline);
-
-        foreach (PlayerView view in _views)
-        {
-            await EnsureVideoChain(pipeline, view);
-            await EnsureSubtitleChain(pipeline, view);
-        }
 
         _components.Apply(pipeline);
         pipeline.StateChanged += Pipeline_StateChanged;
@@ -550,17 +572,6 @@ internal sealed partial class PlayerSession : IDisposable
         return chain;
     }
 
-    private async Task<IAudioChain> EnsureAudioChain(PlaybackPipeline pipeline)
-    {
-        AudioChainEntry? entry = _audioChains.Count == 0 ? null : _audioChains[0];
-        if (entry is not null)
-        {
-            return entry.Chain;
-        }
-
-        return await CreateAudioChain(pipeline);
-    }
-
     private async Task<IAudioChain> CreateAudioChain(PlaybackPipeline pipeline)
     {
         IAudioChain chain = await pipeline.AddAudioChain();
@@ -577,13 +588,8 @@ internal sealed partial class PlayerSession : IDisposable
         return chain;
     }
 
-    private async Task<ISubtitleChain> EnsureSubtitleChain(PlaybackPipeline pipeline, PlayerView view)
+    private async Task<ISubtitleChain> CreateSubtitleChain(PlaybackPipeline pipeline, PlayerView view)
     {
-        if (view.SubtitleChain is { } existing)
-        {
-            return existing;
-        }
-
         ISubtitleChain chain = await pipeline.AddSubtitleChain(view.EnsureSubtitleRenderTarget());
         view.AttachSubtitle(chain);
         _components.ApplySubtitle(chain);

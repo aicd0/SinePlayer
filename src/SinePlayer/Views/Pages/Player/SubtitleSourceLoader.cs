@@ -47,7 +47,22 @@ internal static class SubtitleSourceLoader
             return OperationResultExt.Failure(TAG, "None of the chosen files holds a subtitle track.");
         }
 
-        OperationResult selected = await session.SelectSubtitleStream(view, selection.Stream);
+        ISubtitleChain[] showing = [.. view.SubtitleChains];
+        foreach (ISubtitleChain chain in showing)
+        {
+            if (chain.SelectedStream is not { } previous || previous.Equals(selection.Stream))
+            {
+                continue;
+            }
+
+            OperationResult removed = await session.RemoveSubtitleStream(view, previous);
+            if (!removed.IsSuccessful)
+            {
+                return removed;
+            }
+        }
+
+        OperationResult selected = await session.AddSubtitleStream(view, selection.Stream);
         if (!selected.IsSuccessful)
         {
             return selected;

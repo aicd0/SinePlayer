@@ -34,6 +34,20 @@ internal static class ReconcileResultExtensions
 
     public static OperationResult? Subtitle(this ReconcileResult result, PlayerView view)
     {
-        return view.SubtitleChain is { } chain ? result.SubtitleResults[chain] : null;
+        if (result.SubtitleResults.Count == 0)
+        {
+            return null;
+        }
+
+        List<OperationResult> failures = [.. view.SubtitleChains
+            .Select(chain => result.SubtitleResults.TryGetValue(chain, out OperationResult? single) ? single : null)
+            .OfType<OperationResult>()
+            .Where(it => !it.IsSuccessful)];
+        if (failures.Count == 0)
+        {
+            return OperationResult.Success();
+        }
+
+        return failures[0];
     }
 }

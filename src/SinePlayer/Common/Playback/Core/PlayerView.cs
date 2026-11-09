@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
+using System.Collections.Generic;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -23,7 +24,7 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
 
     private SwapChainPanel? _subtitlePanel;
     private SwapChainPanelRenderTarget? _subtitleRenderTarget;
-    private ISubtitleChain? _subtitleChain;
+    private readonly List<ISubtitleChain> _subtitleChains = [];
     private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
 
     public UIElement VideoPanel => _videoPanel ??= new SwapChainPanel();
@@ -41,7 +42,7 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
 
     public IVideoChain? VideoChain => _videoChain;
 
-    public ISubtitleChain? SubtitleChain => _subtitleChain;
+    public IReadOnlyList<ISubtitleChain> SubtitleChains => [.. _subtitleChains];
 
     public VideoTransform VideoTransform
     {
@@ -74,7 +75,7 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
 
             _subtitlePresentation = value;
 
-            if (_subtitleChain is { } chain)
+            foreach (ISubtitleChain chain in _subtitleChains)
             {
                 chain.Presentation = value;
             }
@@ -98,31 +99,35 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
         _videoChain = video;
         video.Transform = _videoTransform;
 
-        if (_subtitleChain is { } subtitle)
+        foreach (ISubtitleChain subtitle in _subtitleChains)
         {
             subtitle.LayoutVideoChain = video;
         }
 
-        _playbackInfo.Attach(_videoChain, _subtitleChain);
+        PublishPlaybackInfo();
     }
 
     public void AttachSubtitle(ISubtitleChain subtitle)
     {
-        _subtitleChain = subtitle;
+        if (!_subtitleChains.Contains(subtitle))
+        {
+            _subtitleChains.Add(subtitle);
+        }
+
         subtitle.Presentation = _subtitlePresentation;
         subtitle.LayoutVideoChain = _videoChain;
-        _playbackInfo.Attach(_videoChain, _subtitleChain);
+        PublishPlaybackInfo();
     }
 
     public void Detach()
     {
-        if (_subtitleChain is { } subtitle)
+        foreach (ISubtitleChain subtitle in _subtitleChains)
         {
             subtitle.LayoutVideoChain = null;
         }
 
         _videoChain = null;
-        _subtitleChain = null;
+        _subtitleChains.Clear();
         _playbackInfo.Detach();
     }
 
@@ -139,5 +144,10 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
         _subtitleRenderTarget?.Dispose();
         _subtitleRenderTarget = null;
         _subtitlePanel = null;
+    }
+
+    private void PublishPlaybackInfo()
+    {
+        _playbackInfo.Attach(_videoChain, [.. _subtitleChains]);
     }
 }

@@ -239,7 +239,7 @@ internal sealed class PlayerMenuContext
             {
                 MediaStreamKind.Video => await session.SelectVideoStream(view, stream),
                 MediaStreamKind.Audio => await SelectSoleAudioStream(session, stream),
-                _ => await session.SelectSubtitleStream(view, stream),
+                _ => await SelectSoleSubtitleStream(session, view, stream),
             };
             if (!selected.IsSuccessful)
             {
@@ -288,6 +288,26 @@ internal sealed class PlayerMenuContext
         }
 
         return stream is null ? OperationResult.Success() : await session.AddAudioStream(stream);
+    }
+
+    private static async Task<OperationResult> SelectSoleSubtitleStream(PlayerSession session, PlayerView view, MediaStreamInfo? stream)
+    {
+        MediaStreamInfo[] selected = [.. view.SubtitleChains.Select(chain => chain.SelectedStream).OfType<MediaStreamInfo>()];
+        foreach (MediaStreamInfo candidate in selected)
+        {
+            if (stream is not null && candidate.Equals(stream))
+            {
+                continue;
+            }
+
+            OperationResult removed = await session.RemoveSubtitleStream(view, candidate);
+            if (!removed.IsSuccessful)
+            {
+                return removed;
+            }
+        }
+
+        return stream is null ? OperationResult.Success() : await session.AddSubtitleStream(view, stream);
     }
 
     private static IReadOnlyList<MediaStreamInfo> StreamsOf(MediaSource source, MediaStreamKind kind)

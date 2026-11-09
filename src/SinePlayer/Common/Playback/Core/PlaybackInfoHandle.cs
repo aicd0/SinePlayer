@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
+using System.Linq;
 
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
@@ -13,7 +14,7 @@ internal sealed class PlaybackInfoHandle(PlayerSession session)
 {
     private readonly PlayerSession _session = session;
     private volatile IVideoChain? _video;
-    private volatile ISubtitleChain? _subtitle;
+    private volatile ISubtitleChain[] _subtitles = [];
 
     public MediaInfo? Media => _session.Sources is [MediaSource first, ..] ? first.Info : null;
 
@@ -21,7 +22,7 @@ internal sealed class PlaybackInfoHandle(PlayerSession session)
 
     public AudioStreamInfo? SelectedAudioStream => Audio?.SelectedStream;
 
-    public SubtitleStreamInfo? SelectedSubtitleStream => _subtitle?.SelectedStream;
+    public SubtitleStreamInfo? SelectedSubtitleStream => Subtitle?.SelectedStream;
 
     public MediaEngineState State => _session.State;
 
@@ -49,9 +50,9 @@ internal sealed class PlaybackInfoHandle(PlayerSession session)
 
     public string? AudioRendererName => Audio?.RendererName;
 
-    public string? SubtitleDecoderName => _subtitle?.DecoderName;
+    public string? SubtitleDecoderName => Subtitle?.DecoderName;
 
-    public string? SubtitleRendererName => _subtitle?.RendererName;
+    public string? SubtitleRendererName => Subtitle?.RendererName;
 
     public bool IsVideoHardwareAccelerated => _video?.IsHardwareAccelerated ?? false;
 
@@ -59,15 +60,17 @@ internal sealed class PlaybackInfoHandle(PlayerSession session)
 
     private IAudioChain? Audio => _session.AudioChains is [IAudioChain first, ..] ? first : null;
 
-    internal void Attach(IVideoChain? video, ISubtitleChain? subtitle)
+    private ISubtitleChain? Subtitle => _subtitles.FirstOrDefault(chain => chain.PlayingStream is not null) ?? (_subtitles.Length == 0 ? null : _subtitles[0]);
+
+    internal void Attach(IVideoChain? video, ISubtitleChain[] subtitles)
     {
         _video = video;
-        _subtitle = subtitle;
+        _subtitles = subtitles;
     }
 
     internal void Detach()
     {
         _video = null;
-        _subtitle = null;
+        _subtitles = [];
     }
 }
