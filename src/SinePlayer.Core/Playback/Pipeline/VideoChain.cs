@@ -392,24 +392,6 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
 
             IVideoDecoder? videoDecoder = Decoder.CurrentComponent;
 
-            long epoch = _timeline.Epoch;
-            if (workingEpoch != epoch)
-            {
-                workingEpoch = epoch;
-
-                try
-                {
-                    videoDecoder?.Flush();
-                }
-                catch (Exception exception)
-                {
-                    _events.PostFailure(exception.Message, exception);
-                    return;
-                }
-
-                continue;
-            }
-
             if (!HasRoomForFrame())
             {
                 DecodeNode.Wait(stamp);
@@ -442,9 +424,30 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
             long packetEpoch = entry.Epoch;
             using (packet)
             {
-                if (verdict == VersionVerdict.Drop || epoch != packetEpoch)
+                if (verdict == VersionVerdict.Drop)
                 {
                     continue;
+                }
+
+                if (packetEpoch != _timeline.Epoch)
+                {
+                    continue;
+                }
+
+                if (workingEpoch != packetEpoch)
+                {
+                    workingEpoch = packetEpoch;
+                    awaitingKeyFrame = true;
+
+                    try
+                    {
+                        videoDecoder?.Flush();
+                    }
+                    catch (Exception exception)
+                    {
+                        _events.PostFailure(exception.Message, exception);
+                        return;
+                    }
                 }
 
                 var videoFrameVersions = ChainVersion.Max(entry.Versions, videoDecoderVersions);
@@ -459,7 +462,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
                         }
                     }
 
-                    FrameQueue.Enqueue(new FrameEntry(null, videoFrameVersions, epoch));
+                    FrameQueue.Enqueue(new FrameEntry(null, videoFrameVersions, packetEpoch));
                     WakeRender();
                     DecodeNode.Wait(stamp);
                     continue;
@@ -493,7 +496,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
                     return;
                 }
 
-                QueueFrames(frames, videoFrameVersions, epoch);
+                QueueFrames(frames, videoFrameVersions, packetEpoch);
             }
         }
     }

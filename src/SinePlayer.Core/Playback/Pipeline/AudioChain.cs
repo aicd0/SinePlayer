@@ -281,23 +281,6 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 oldAudioDecoder?.Dispose();
             }
 
-            long epoch = _timeline.Epoch;
-            if (workingEpoch != epoch)
-            {
-                workingEpoch = epoch;
-
-                try
-                {
-                    Decoder.CurrentComponent?.Flush();
-                }
-                catch (Exception ex)
-                {
-                    _events.PostWarning($"The audio decoder could not be flushed: {ex.Message}", this);
-                }
-
-                continue;
-            }
-
             if (!PacketQueue.TryPeek(out PacketEntry entry))
             {
                 await DecodeNode.WaitAsync(stamp);
@@ -324,9 +307,28 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
             long packetEpoch = entry.Epoch;
             using (packet)
             {
-                if (verdict == VersionVerdict.Drop || epoch != packetEpoch)
+                if (verdict == VersionVerdict.Drop)
                 {
                     continue;
+                }
+
+                if (packetEpoch != _timeline.Epoch)
+                {
+                    continue;
+                }
+
+                if (workingEpoch != packetEpoch)
+                {
+                    workingEpoch = packetEpoch;
+
+                    try
+                    {
+                        Decoder.CurrentComponent?.Flush();
+                    }
+                    catch (Exception ex)
+                    {
+                        _events.PostWarning($"The audio decoder could not be flushed: {ex.Message}", this);
+                    }
                 }
 
                 var audioBufferVersions = ChainVersion.Max(entry.Versions, audioDecoderVersions);
@@ -339,7 +341,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                         _events.PostWarning(drained.Message, this);
                     }
 
-                    BufferQueue.Enqueue(new AudioEntry(null, audioBufferVersions, epoch));
+                    BufferQueue.Enqueue(new AudioEntry(null, audioBufferVersions, packetEpoch));
                     WakeRender();
                     continue;
                 }
@@ -349,7 +351,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                     continue;
                 }
 
-                OperationResult routed = DecodePacket(audioDecoder, packet, audioBufferVersions, epoch);
+                OperationResult routed = DecodePacket(audioDecoder, packet, audioBufferVersions, packetEpoch);
                 if (!routed.IsSuccessful)
                 {
                     _events.PostFailure(routed);
