@@ -461,7 +461,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
 
             SubtitlePresentation presentation = _presentation.Read() with
             {
-                Frame = LayoutVideoChain?.Frame ?? SubtitleFrame.Full
+                Frame = LayoutVideoChain?.SubtitleFrame ?? SubtitleFrame.Full
             };
 
             if (drawnInvalidated ||

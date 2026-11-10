@@ -362,7 +362,7 @@ public class VideoTransformTests
     /// <summary>Where one corner of the drawn square lands, in surface pixels.</summary>
     private static (double X, double Y) Point(VideoTransform transform, float u, float v, int frameWidth, int frameHeight, int surfaceWidth, int surfaceHeight)
     {
-        Matrix3x2 placement = transform.GetPlacement(frameWidth, frameHeight, surfaceWidth, surfaceHeight);
+        Matrix3x2 placement = transform.GetPictureToSurfaceMatrix(frameWidth, frameHeight, surfaceWidth, surfaceHeight);
         var placed = Vector2.Transform(new Vector2(u, v), placement);
         return (placed.X * surfaceWidth, placed.Y * surfaceHeight);
     }

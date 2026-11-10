@@ -26,8 +26,6 @@ public readonly record struct VideoOrientation
     private readonly int _quarterTurns;
     private readonly bool _mirrored;
 
-    /// <param name="quarterTurns">Quarter turns clockwise; any whole number, reduced to 0 to 3.</param>
-    /// <param name="mirrored">Whether the picture is mirrored left to right.</param>
     public VideoOrientation(int quarterTurns, bool mirrored)
     {
         _quarterTurns = Normalize(quarterTurns);
@@ -72,6 +70,8 @@ public enum VideoScalingMode
     Bilinear,
 }
 
+internal readonly record struct PlacedPicture(double Width, double Height, double CenterX, double CenterY);
+
 public readonly record struct VideoTransform(
     VideoOrientation Orientation,
     VideoResizeMode ResizeMode,
@@ -84,16 +84,48 @@ public readonly record struct VideoTransform(
 
     public bool IsIdentity => Orientation.IsIdentity && ResizeMode == VideoResizeMode.Fit && Zoom == 1.0 && PanX == 0.0 && PanY == 0.0;
 
-    public Matrix3x2 GetPlacement(int frameWidth, int frameHeight, int surfaceWidth, int surfaceHeight)
+    /// <summary>
+    /// The matrix that draws the picture's own square onto the surface: the picture's coordinates are 0 to 1 along each of
+    /// its axes, and the surface's are 0 to 1 across and down. It is what the picture is drawn with.
+    /// </summary>
+    public Matrix3x2 GetPictureToSurfaceMatrix(int frameWidth, int frameHeight, int surfaceWidth, int surfaceHeight)
     {
         if (frameWidth <= 0 || frameHeight <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0)
         {
             return Matrix3x2.Identity;
         }
 
-        bool swapsAxes = Orientation.SwapsAxes;
-        double pictureWidth = swapsAxes ? frameHeight : frameWidth;
-        double pictureHeight = swapsAxes ? frameWidth : frameHeight;
+        PlacedPicture picture = GetPlacedPicture(frameWidth, frameHeight, surfaceWidth, surfaceHeight);
+
+        var placement = Matrix3x2.CreateTranslation(-0.5f, -0.5f);
+        placement *= Matrix3x2.CreateScale((float)picture.Width, (float)picture.Height);
+        placement *= Matrix3x2.CreateRotation((float)(Orientation.QuarterTurns * Math.PI / 2.0));
+        if (Orientation.Mirrored)
+        {
+            placement *= Matrix3x2.CreateScale(-1.0f, 1.0f);
+        }
+
+        placement *= Matrix3x2.CreateTranslation((float)picture.CenterX, (float)picture.CenterY);
+
+        // Normalized by dividing rather than by multiplying with the reciprocal: a picture that fills the surface
+        // has to land on 1.0 and not on the nearest float below it, which would leave the last row or column
+        // undrawn and show as a black edge.
+        return new Matrix3x2(
+            placement.M11 / surfaceWidth,
+            placement.M12 / surfaceHeight,
+            placement.M21 / surfaceWidth,
+            placement.M22 / surfaceHeight,
+            placement.M31 / surfaceWidth,
+            placement.M32 / surfaceHeight);
+    }
+
+    /// <summary>
+    /// The picture as this transform places it on the surface, before the surface crops it. The matrix the picture is
+    /// drawn with is built from this, so the two cannot disagree about what the transform does.
+    /// </summary>
+    internal PlacedPicture GetPlacedPicture(int frameWidth, int frameHeight, int surfaceWidth, int surfaceHeight)
+    {
+        (double pictureWidth, double pictureHeight) = GetPictureSize(frameWidth, frameHeight);
 
         double zoom = Zoom > 0 && double.IsFinite(Zoom) ? Zoom : 1.0;
         double scaleX = surfaceWidth / pictureWidth;
@@ -111,31 +143,22 @@ public readonly record struct VideoTransform(
         height *= zoom;
 
         // The square is the picture before it is turned, so its own shape is the turned picture's the other way round.
+        bool swapsAxes = Orientation.SwapsAxes;
         double squareWidth = swapsAxes ? height : width;
         double squareHeight = swapsAxes ? width : height;
 
         double centerX = surfaceWidth / 2.0 + PanX * surfaceWidth / 2.0;
         double centerY = surfaceHeight / 2.0 + PanY * surfaceHeight / 2.0;
 
-        var placement = Matrix3x2.CreateTranslation(-0.5f, -0.5f);
-        placement *= Matrix3x2.CreateScale((float)squareWidth, (float)squareHeight);
-        placement *= Matrix3x2.CreateRotation((float)(Orientation.QuarterTurns * Math.PI / 2.0));
-        if (Orientation.Mirrored)
-        {
-            placement *= Matrix3x2.CreateScale(-1.0f, 1.0f);
-        }
+        return new PlacedPicture(squareWidth, squareHeight, centerX, centerY);
+    }
 
-        placement *= Matrix3x2.CreateTranslation((float)centerX, (float)centerY);
-
-        // Normalized by dividing rather than by multiplying with the reciprocal: a picture that fills the surface
-        // has to land on 1.0 and not on the nearest float below it, which would leave the last row or column
-        // undrawn and show as a black edge.
-        return new Matrix3x2(
-            placement.M11 / surfaceWidth,
-            placement.M12 / surfaceHeight,
-            placement.M21 / surfaceWidth,
-            placement.M22 / surfaceHeight,
-            placement.M31 / surfaceWidth,
-            placement.M32 / surfaceHeight);
+    /// <summary>
+    /// The picture's own size in pixels: the one the container holds, turned by the orientation. Its shape is what the
+    /// words are laid out in, since a script scaled onto another shape is drawn stretched.
+    /// </summary>
+    internal (double Width, double Height) GetPictureSize(int frameWidth, int frameHeight)
+    {
+        return Orientation.SwapsAxes ? (frameHeight, frameWidth) : (frameWidth, frameHeight);
     }
 }

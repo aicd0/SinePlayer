@@ -7,5 +7,5 @@ namespace SinePlayer.Core.Playback.Pipeline;
 
 public interface IPictureFrameSource
 {
-    SubtitleFrame Frame { get; }
+    SubtitleFrame SubtitleFrame { get; }
 }

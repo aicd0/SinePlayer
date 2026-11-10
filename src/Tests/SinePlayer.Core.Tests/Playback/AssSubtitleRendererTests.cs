@@ -279,6 +279,79 @@ public class AssSubtitleRendererTests
         }
     }
 
+    /// <summary>
+    /// A box wider than the surface reaches libass at its own size and is cropped by the surface, as the picture it belongs
+    /// to is: a picture filling the surface can be wider than it. Narrowing the box to the surface instead — which is what
+    /// a box clamped to the surface means — would give it another shape, and libass scales a script onto the shape it is
+    /// given, so the words would come out smaller as well as stretched.
+    /// </summary>
+    [Test]
+    public void UsesABoxWiderThanTheSurfaceAtItsOwnSize()
+    {
+        using AssSubtitleRenderer renderer = new();
+        FakeTarget target = new(640, 360);
+
+        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        if (!configured.IsSuccessful)
+        {
+            Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
+            return;
+        }
+
+        using SubtitleCue cue = new()
+        {
+            Start = TimeSpan.Zero,
+            End = TimeSpan.FromSeconds(5),
+            Text = "0,Default,,0,0,0,,Visible words",
+        };
+
+        OperationResult inside = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity with { Frame = new SubtitleFrame(0.0, 0.0, 1.0, 1.0) });
+        Assert.That(inside.IsSuccessful, Is.True, inside.Message);
+        (int insideTop, int insideBottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
+        (int insideLeft, int insideRight) = InkColumns(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
+
+        // 840 × 360 is as tall as the surface and wider than it, so the words are the size the box's height gives them and
+        // the sides are cut off.
+        OperationResult wider = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity with { Frame = new SubtitleFrame(-0.15625, 0.0, 1.3125, 1.0) });
+        Assert.That(wider.IsSuccessful, Is.True, wider.Message);
+        (int widerTop, int widerBottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
+        (int widerLeft, int widerRight) = InkColumns(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(insideBottom, Is.GreaterThan(insideTop), "the cue is drawn for this to say anything");
+            Assert.That(widerTop, Is.EqualTo(insideTop).Within(2), "the box is as tall as before, so the words are as tall");
+            Assert.That(widerBottom, Is.EqualTo(insideBottom).Within(2));
+
+            // Both boxes are centred on the surface, so the words land on the same spot. A box cut down to the surface's
+            // width would draw them from the corner the box starts at instead, off centre by the width that was cut.
+            Assert.That((widerLeft + widerRight) / 2.0, Is.EqualTo((insideLeft + insideRight) / 2.0).Within(2.0));
+        }
+    }
+
+    /// <summary>The first and the last column of the frame that carry ink.</summary>
+    private static (int Left, int Right) InkColumns(ReadOnlySpan<byte> frame, int width, int height)
+    {
+        int left = int.MaxValue;
+        int right = -1;
+        for (int y = 0; y < height; y++)
+        {
+            ReadOnlySpan<byte> row = frame.Slice(y * width * 4, width * 4);
+            for (int x = 0; x < width; x++)
+            {
+                if (row[(x * 4) + 3] == 0)
+                {
+                    continue;
+                }
+
+                left = Math.Min(left, x);
+                right = Math.Max(right, x);
+            }
+        }
+
+        return (left, right);
+    }
+
     /// <summary>The first and the last row of the frame that carry ink.</summary>
     private static (int Top, int Bottom) InkRows(ReadOnlySpan<byte> frame, int width, int height)
     {
