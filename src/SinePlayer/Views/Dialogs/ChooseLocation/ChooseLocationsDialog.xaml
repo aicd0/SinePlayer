@@ -65,7 +65,7 @@
         </ResourceDictionary>
     </base:BaseContentDialog.Resources>
 
-    <Grid>
+    <Grid MinWidth="400">
         <StackPanel Orientation="Vertical">
             <TextBlock x:Uid="WatchingFolders" />
             <Grid Height="10" />

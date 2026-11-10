@@ -1129,7 +1129,7 @@ internal sealed partial class PlayerPage : BasePage
             FontWeight = settings.ToFontWeight(),
             OutlineWidth = settings.SubtitleOutlineWidth,
         };
-        session.SetSubtitlePresentation(_subtitlePresentation);
+        view.SubtitlePresentation = _subtitlePresentation;
 
         PlaybackComponents components = settings.ToComponents();
         session.SetComponents(components);
@@ -1310,7 +1310,13 @@ internal sealed partial class PlayerPage : BasePage
             ? new SubtitleInsets(0.0, _topOverlayHeight, _rightOverlayWidth, _bottomGridHeight)
             : SubtitleInsets.None;
         _subtitlePresentation = _subtitlePresentation with { Insets = insets };
-        Enqueue(() => _session?.SetSubtitlePresentation(_subtitlePresentation));
+        Enqueue(() =>
+        {
+            if (_view is { } view)
+            {
+                view.SubtitlePresentation = _subtitlePresentation;
+            }
+        });
     }
 
     #endregion

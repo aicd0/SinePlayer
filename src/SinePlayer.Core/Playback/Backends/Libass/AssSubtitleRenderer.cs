@@ -347,7 +347,8 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
     /// </summary>
     private OperationResult DrawPixels(float offsetX, float offsetY, int width, int height)
     {
-        CanvasDevice device = _surface.EnsureCanvasDevice();
+        CanvasDevice device = _surface.CanvasDevice ??
+            throw new InvalidOperationException("The subtitle surface is not bound to a target, so it has no device.");
         using var bitmap = CanvasBitmap.CreateFromBytes(
             device,
             _pixels,
@@ -358,7 +359,7 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
             CanvasAlphaMode.Premultiplied);
 
         Rect bounds = new(offsetX, offsetY, width, height);
-        return _surface.DrawAndPresent(session => session.DrawImage(bitmap, bounds));
+        return _surface.DrawAndPresent((session, _, _) => session.DrawImage(bitmap, bounds));
     }
 
     #endregion

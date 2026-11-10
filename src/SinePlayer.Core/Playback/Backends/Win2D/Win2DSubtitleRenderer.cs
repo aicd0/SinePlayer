@@ -17,9 +17,9 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
     /// <summary>Written when the renderer is configured, read on the render thread: a swap of one reference, so volatile.</summary>
     private volatile Win2DSubtitleLayer? _layer;
 
-    private Win2DSubtitleLayer? _offscreen;
-
     public string Name => "Win2D";
+
+    internal CanvasDevice? CanvasDevice => _layer?.CanvasDevice;
 
     public void Dispose()
     {
@@ -33,11 +33,8 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         if (_layer is { } layer)
         {
             _layer = null;
-            Win2DSubtitleLayer.Leave(layer, this);
+            layer.Leave(this);
         }
-
-        _offscreen?.Dispose();
-        _offscreen = null;
     }
 
     public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
@@ -52,7 +49,7 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         if (_layer is { } previous)
         {
             _layer = null;
-            Win2DSubtitleLayer.Leave(previous, this);
+            previous.Leave(this);
         }
 
         var layer = Win2DSubtitleLayer.Join(target, this);
@@ -77,21 +74,5 @@ public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 
         layer.SetCues(this, cues, presentation);
         return layer.Draw();
-    }
-
-    /// <summary>
-    /// The device text is laid out with. A test that wants to check the drawing against an offscreen target uses this rather
-    /// than a swap chain, which cannot be read back after it has presented.
-    /// </summary>
-    internal CanvasDevice EnsureCanvasDevice()
-    {
-        if (_layer is { } layer)
-        {
-            return layer.EnsureCanvasDevice();
-        }
-
-        // Nothing is bound, so all this device is used for is drawing that goes nowhere, which needs no shared layer.
-        _offscreen ??= new Win2DSubtitleLayer();
-        return _offscreen.EnsureCanvasDevice();
     }
 }

@@ -9,7 +9,9 @@ using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 
+using Windows.Graphics.DirectX;
 using Windows.Graphics.DirectX.Direct3D11;
+using Windows.UI;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Dxgi;
@@ -59,9 +61,32 @@ internal sealed partial class SubtitleCompositor : IDisposable
         }
     }
 
+    internal static IDirect3DDevice CreateWin2DDevice(D3D11Device device)
+    {
+        var dxgiDevice = (IDXGIDevice)device.Device;
+
+        HRESULT created = PInvoke.CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice, out IInspectable graphicsDevice);
+        if (created.Value < 0)
+        {
+            throw Marshal.GetExceptionForHR(created.Value) ?? new InvalidOperationException($"Unable to wrap the device for Win2D (0x{created.Value:X8}).");
+        }
+
+        nint pointer = Marshal.GetIUnknownForObject(graphicsDevice);
+        try
+        {
+            return WinRT.MarshalInspectable<IDirect3DDevice>.FromAbi(pointer);
+        }
+        finally
+        {
+            // WinRT's marshaller took its own reference; this one was only for the hand-off.
+            Marshal.Release(pointer);
+        }
+    }
+
     private readonly IVideoRenderTarget _target;
     private readonly Lock _drawLock = new();
-    private readonly List<SubtitleSurface> _layers = [];
+    private readonly List<object> _layers = [];
+    private readonly Dictionary<object, CanvasRenderTarget> _bitmaps = [];
     private CanvasDevice? _canvasDevice;
 
     private int _shares;
@@ -92,12 +117,20 @@ internal sealed partial class SubtitleCompositor : IDisposable
 
             _disposed = true;
             _layers.Clear();
+
+            foreach (CanvasRenderTarget bitmap in _bitmaps.Values)
+            {
+                bitmap.Dispose();
+            }
+
+            _bitmaps.Clear();
+
             ReleaseSurface();
 
-            if (_device is not null)
+            if (_device is { } device)
             {
                 _device = null;
-                SharedSubtitleDevice.Return();
+                device.Dispose();
             }
         }
     }
@@ -118,26 +151,63 @@ internal sealed partial class SubtitleCompositor : IDisposable
         Dispose();
     }
 
-    internal void AddLayer(SubtitleSurface layer)
+    internal CanvasDevice EnsureCanvasDevice()
     {
         lock (_drawLock)
         {
-            if (!_layers.Contains(layer))
+            _canvasDevice ??= CanvasDevice.CreateFromDirect3D11Device(CreateWin2DDevice(EnsureDevice()));
+            return _canvasDevice;
+        }
+    }
+
+    internal void AddLayer(object key)
+    {
+        lock (_drawLock)
+        {
+            if (!_layers.Contains(key))
             {
-                _layers.Add(layer);
+                _layers.Add(key);
             }
         }
     }
 
-    internal void RemoveLayer(SubtitleSurface layer)
+    internal void RemoveLayer(object key)
     {
         lock (_drawLock)
         {
-            _layers.Remove(layer);
+            _layers.Remove(key);
+
+            // The bitmap is the compositor's, so leaving the composition is what retires it — under the lock that excludes a
+            // frame drawing into it.
+            if (_bitmaps.Remove(key, out CanvasRenderTarget? bitmap))
+            {
+                bitmap.Dispose();
+            }
         }
     }
 
-    internal OperationResult Render(SubtitleSurface layer, Action<CanvasDrawingSession> draw)
+    internal OperationResult Prepare(object key, out int width, out int height)
+    {
+        lock (_drawLock)
+        {
+            width = 0;
+            height = 0;
+            if (_disposed)
+            {
+                return OperationResult.Failure("The subtitle compositor has been disposed.");
+            }
+
+            OperationResult prepared = PrepareSwapChain();
+            if (!prepared.IsSuccessful)
+            {
+                return prepared;
+            }
+
+            return EnsureBitmap(key, out width, out height);
+        }
+    }
+
+    internal OperationResult Render(object key, Action<CanvasDrawingSession, int, int> draw)
     {
         lock (_drawLock)
         {
@@ -152,7 +222,15 @@ internal sealed partial class SubtitleCompositor : IDisposable
                 return prepared;
             }
 
-            OperationResult drawn = layer.DrawLayer(draw);
+            // The size is prepared here rather than by the caller, so the words are laid out for the buffer they are drawn
+            // into even when a resize arrives between the two, and the very size is handed to the drawing.
+            OperationResult sized = EnsureBitmap(key, out int width, out int height);
+            if (!sized.IsSuccessful)
+            {
+                return sized;
+            }
+
+            OperationResult drawn = DrawLayer(key, width, height, draw);
             if (!drawn.IsSuccessful)
             {
                 return drawn;
@@ -162,7 +240,69 @@ internal sealed partial class SubtitleCompositor : IDisposable
         }
     }
 
-    internal OperationResult PrepareSwapChain()
+    private OperationResult EnsureBitmap(object key, out int width, out int height)
+    {
+        double scale = _target.RasterizationScale > 0 && double.IsFinite(_target.RasterizationScale) ? _target.RasterizationScale : 1.0;
+        int wantedWidth = Math.Max(1, (int)Math.Round(_target.SurfaceWidth * scale));
+        int wantedHeight = Math.Max(1, (int)Math.Round(_target.SurfaceHeight * scale));
+
+        width = 0;
+        height = 0;
+        try
+        {
+            if (_bitmaps.TryGetValue(key, out CanvasRenderTarget? existing)
+                && ((int)Math.Round(existing.Size.Width) != wantedWidth || (int)Math.Round(existing.Size.Height) != wantedHeight))
+            {
+                _bitmaps.Remove(key);
+                existing.Dispose();
+                existing = null;
+            }
+
+            if (existing is null)
+            {
+                existing = new CanvasRenderTarget(EnsureCanvasDevice(), wantedWidth, wantedHeight, 96.0f, DirectXPixelFormat.B8G8R8A8UIntNormalized, CanvasAlphaMode.Premultiplied);
+                _bitmaps[key] = existing;
+            }
+
+            width = (int)Math.Round(existing.Size.Width);
+            height = (int)Math.Round(existing.Size.Height);
+            return OperationResult.Success();
+        }
+        catch (Exception exception)
+        {
+            if (_bitmaps.Remove(key, out CanvasRenderTarget? broken))
+            {
+                broken.Dispose();
+            }
+
+            return OperationResult.Failure($"Unable to prepare the subtitle surface: {exception.Message}");
+        }
+    }
+
+    private OperationResult DrawLayer(object key, int width, int height, Action<CanvasDrawingSession, int, int> draw)
+    {
+        if (!_bitmaps.TryGetValue(key, out CanvasRenderTarget? bitmap))
+        {
+            return OperationResult.Failure("The subtitle layer has no bitmap to draw into.");
+        }
+
+        try
+        {
+            using (CanvasDrawingSession session = bitmap.CreateDrawingSession())
+            {
+                session.Clear(default(Color));
+                draw(session, width, height);
+            }
+
+            return OperationResult.Success();
+        }
+        catch (Exception exception)
+        {
+            return OperationResult.Failure($"Unable to draw the subtitles: {exception.Message}");
+        }
+    }
+
+    private OperationResult PrepareSwapChain()
     {
         double scale = _target.RasterizationScale > 0 && double.IsFinite(_target.RasterizationScale) ? _target.RasterizationScale : 1.0;
         int width = Math.Max(1, (int)Math.Round(_target.SurfaceWidth * scale));
@@ -223,9 +363,9 @@ internal sealed partial class SubtitleCompositor : IDisposable
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Windows.UI.Color));
-                foreach (SubtitleSurface layer in _layers)
+                foreach (object key in _layers)
                 {
-                    if (layer.Bitmap is { } bitmap)
+                    if (_bitmaps.TryGetValue(key, out CanvasRenderTarget? bitmap))
                     {
                         session.DrawImage(bitmap);
                     }
@@ -244,26 +384,17 @@ internal sealed partial class SubtitleCompositor : IDisposable
         }
     }
 
-    internal CanvasDevice EnsureCanvasDevice()
-    {
-        lock (_drawLock)
-        {
-            _canvasDevice ??= CanvasDevice.CreateFromDirect3D11Device(SubtitleSurface.CreateWin2DDevice(EnsureDevice()));
-            return _canvasDevice;
-        }
-    }
-
     private D3D11Device EnsureDevice()
     {
         if (_device is not { } device)
         {
-            OperationResult<D3D11Device> rented = SharedSubtitleDevice.Rent();
-            if (!rented.IsSuccessful)
+            OperationResult<D3D11Device> created = D3D11Device.Create();
+            if (!created.IsSuccessful)
             {
-                throw new InvalidOperationException(rented.Message);
+                throw new InvalidOperationException(created.Message);
             }
 
-            device = rented.Result;
+            device = created.Result;
             _device = device;
         }
 

@@ -34,7 +34,7 @@ public class Win2DSubtitleLayerTests
             Assert.Ignore("This machine has no usable graphics device.");
         }
 
-        Assert.That(first.EnsureCanvasDevice(), Is.SameAs(second.EnsureCanvasDevice()), "one layer means one device for its renderers");
+        Assert.That(first.CanvasDevice, Is.SameAs(second.CanvasDevice), "one layer means one device for its renderers");
     }
 
     [Test]
@@ -51,7 +51,7 @@ public class Win2DSubtitleLayerTests
             Assert.Ignore("This machine has no usable graphics device.");
         }
 
-        Assert.That(onFirst.EnsureCanvasDevice(), Is.Not.SameAs(onSecond.EnsureCanvasDevice()), "a layer belongs to one panel");
+        Assert.That(onFirst.CanvasDevice, Is.Not.SameAs(onSecond.CanvasDevice), "a layer belongs to one panel");
     }
 
     [Test]
@@ -68,14 +68,14 @@ public class Win2DSubtitleLayerTests
             Assert.Ignore("This machine has no usable graphics device.");
         }
 
-        CanvasDevice shared = stays.EnsureCanvasDevice();
-        Assert.That(mover.EnsureCanvasDevice(), Is.SameAs(shared));
+        CanvasDevice shared = stays.CanvasDevice!;
+        Assert.That(mover.CanvasDevice, Is.SameAs(shared));
 
         bool moved = Configure(mover, second);
 
         Assert.That(moved, Is.True, "the renderer can be pointed at another target");
-        Assert.That(mover.EnsureCanvasDevice(), Is.Not.SameAs(shared), "the renderer left the layer it was sharing");
-        Assert.That(stays.EnsureCanvasDevice(), Is.SameAs(shared), "and the one that stayed kept its own");
+        Assert.That(mover.CanvasDevice, Is.Not.SameAs(shared), "the renderer left the layer it was sharing");
+        Assert.That(stays.CanvasDevice, Is.SameAs(shared), "and the one that stayed kept its own");
     }
 
     private static bool Configure(Win2DSubtitleRenderer renderer, IVideoRenderTarget target)

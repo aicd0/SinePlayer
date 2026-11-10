@@ -40,17 +40,17 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
 
     #region Pool
 
-    private static readonly object s_poolLock = new();
-    private static readonly Dictionary<IVideoRenderTarget, Win2DSubtitleLayer> s_pool = [];
+    private static readonly Lock _poolLock = new();
+    private static readonly Dictionary<IVideoRenderTarget, Win2DSubtitleLayer> _pool = [];
 
     internal static Win2DSubtitleLayer Join(IVideoRenderTarget target, object participant)
     {
-        lock (s_poolLock)
+        lock (_poolLock)
         {
-            if (!s_pool.TryGetValue(target, out Win2DSubtitleLayer? layer))
+            if (!_pool.TryGetValue(target, out Win2DSubtitleLayer? layer))
             {
                 layer = new Win2DSubtitleLayer(target);
-                s_pool.Add(target, layer);
+                _pool.Add(target, layer);
             }
 
             layer.Add(participant);
@@ -58,26 +58,51 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         }
     }
 
-    internal static void Leave(Win2DSubtitleLayer layer, object participant)
+    internal void Leave(object participant)
     {
-        if (!layer.Release(participant))
+        if (!Release(participant))
         {
             return;
         }
 
-        // The share just given up may be the last, but another renderer can take one in between, so the pool decides
-        // whether the layer is still anyone's rather than the count that was just decremented.
-        lock (s_poolLock)
+        lock (_poolLock)
         {
-            if (layer.InUse)
+            lock (_lock)
             {
-                return;
+                if (_participants.Count > 0)
+                {
+                    return;
+                }
             }
 
-            s_pool.Remove(layer._target!);
+            if (_target is { } target)
+            {
+                _pool.Remove(target);
+            }
         }
 
-        layer.Dispose();
+        Dispose();
+    }
+
+    private void Add(object participant)
+    {
+        lock (_lock)
+        {
+            if (!_participants.Contains(participant))
+            {
+                _participants.Add(participant);
+            }
+        }
+    }
+
+    private bool Release(object participant)
+    {
+        lock (_lock)
+        {
+            _participants.Remove(participant);
+            _frames.Remove(participant);
+            return _participants.Count == 0;
+        }
     }
 
     #endregion
@@ -86,11 +111,14 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
 
     private readonly Lock _lock = new();
 
-    private readonly IVideoRenderTarget? _target;
+    private readonly IVideoRenderTarget _target;
     private readonly SubtitleSurface _surface;
+    private readonly OutlineCache _outlines = new();
     private readonly List<object> _participants = [];
     private readonly Dictionary<object, CueFrame> _frames = [];
     private bool _disposed;
+
+    internal CanvasDevice CanvasDevice => _surface.CanvasDevice ?? throw new InvalidOperationException("The subtitle layer has no device to draw with.");
 
     private sealed record CueFrame(IReadOnlyList<SubtitleCue> Cues, SubtitlePresentation Presentation);
 
@@ -101,11 +129,9 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         _surface.BindTarget(target);
     }
 
-    /// <summary>A layer with no panel, for drawing that goes nowhere: measuring, or a check against an offscreen target.</summary>
-    internal Win2DSubtitleLayer()
-    {
-        _surface = new SubtitleSurface();
-    }
+    #endregion
+
+    #region Public API
 
     public void Dispose()
     {
@@ -119,53 +145,11 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             _disposed = true;
             _frames.Clear();
             _participants.Clear();
-            ClearOutlines();
+            _outlines.Dispose();
             _surface.Dispose();
         }
     }
 
-    #endregion
-
-    #region Participation
-
-    /// <summary>Whether anyone is still drawing through this layer.</summary>
-    internal bool InUse
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _participants.Count > 0;
-            }
-        }
-    }
-
-    internal void Add(object participant)
-    {
-        lock (_lock)
-        {
-            if (!_participants.Contains(participant))
-            {
-                _participants.Add(participant);
-            }
-        }
-    }
-
-    /// <summary>Takes a participant out, saying whether that was the last one.</summary>
-    internal bool Release(object participant)
-    {
-        lock (_lock)
-        {
-            _participants.Remove(participant);
-            _frames.Remove(participant);
-            return _participants.Count == 0;
-        }
-    }
-
-    /// <summary>
-    /// What a renderer shows. The cues are kept as they were given: a chain keeps the set it handed over alive until it
-    /// shows again, which is what makes drawing them for another chain's frame safe.
-    /// </summary>
     internal void SetCues(object participant, IReadOnlyList<SubtitleCue> cues, SubtitlePresentation presentation)
     {
         lock (_lock)
@@ -183,21 +167,11 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
 
     #region Surface
 
-    /// <summary>Prepares the layer's surface, which is also what hands the panel its swap chain.</summary>
     internal OperationResult EnsureSurface()
     {
         return _surface.EnsureSurface();
     }
 
-    internal CanvasDevice EnsureCanvasDevice()
-    {
-        return _surface.EnsureCanvasDevice();
-    }
-
-    /// <summary>
-    /// Draws every participant's cues in one pass, sharing the bands between them: the stacking that keeps two events of one
-    /// chain apart keeps two chains apart the same way.
-    /// </summary>
     internal OperationResult Draw()
     {
         OperationResult sized = _surface.EnsureSurface();
@@ -217,16 +191,15 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             frames = [.. _participants.Select(participant => _frames.TryGetValue(participant, out CueFrame? frame) ? frame : null).OfType<CueFrame>()];
         }
 
-        int width = _surface.Width;
-        int height = _surface.Height;
+        CanvasDevice device = CanvasDevice;
         double scale = _surface.CompositionScale;
 
-        return _surface.DrawAndPresent(session =>
+        return _surface.DrawAndPresent((session, width, height) =>
         {
             float[] taken = new float[3];
             foreach (CueFrame frame in frames)
             {
-                DrawCuesInto(session, frame.Cues, frame.Presentation, width, height, scale, taken);
+                DrawCuesInto(session, device, frame.Cues, frame.Presentation, width, height, scale, taken, _outlines);
             }
         });
     }
@@ -235,16 +208,13 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
 
     #region Drawing
 
-    /// <summary>
-    /// Draws one set of cues into a surface of the caller's, which is what an offscreen check uses. The bands are its own,
-    /// so this is one chain drawn alone.
-    /// </summary>
-    internal void DrawCues(CanvasDrawingSession session, IReadOnlyList<SubtitleCue> cues, SubtitlePresentation presentation, int width, int height, double scale = 1.0)
+    internal static void DrawCues(CanvasDrawingSession session, CanvasDevice device, IReadOnlyList<SubtitleCue> cues, SubtitlePresentation presentation, int width, int height, double scale = 1.0)
     {
-        DrawCuesInto(session, cues, presentation, width, height, scale, new float[3]);
+        using OutlineCache outlines = new();
+        DrawCuesInto(session, device, cues, presentation, width, height, scale, new float[3], outlines);
     }
 
-    private void DrawCuesInto(CanvasDrawingSession session, IReadOnlyList<SubtitleCue> cues, SubtitlePresentation presentation, int width, int height, double scale, float[] taken)
+    private static void DrawCuesInto(CanvasDrawingSession session, CanvasDevice device, IReadOnlyList<SubtitleCue> cues, SubtitlePresentation presentation, int width, int height, double scale, float[] taken, OutlineCache outlines)
     {
         if (cues.Count == 0 || width <= 0 || height <= 0)
         {
@@ -259,7 +229,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             : Math.Clamp(height * FontSizeFraction, MinimumFontSize, MaximumFontSize);
         float margin = height * MarginFraction;
         float gap = fontSize * StackGapFraction;
-        SubtitleArea area = AreaOf(presentation, scale, width, height);
+        SubtitleArea safe = SafeAreaOf(presentation, scale, width, height);
 
         // How much of each band is taken, by the alignment's row: bottom, middle, top. Several events can be up at once —
         // the same speaker's two lines, or a sign beside dialogue — and they share a band far more often than not. Each is
@@ -280,7 +250,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         {
             if (cue.Image is { } image)
             {
-                DrawImage(session, image, presentation, area, width, height, scale);
+                DrawImage(session, device, image, presentation, safe, width, height, scale);
                 continue;
             }
 
@@ -291,27 +261,29 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             }
 
             string body = string.Join("\n", text.Lines);
-            using CanvasTextLayout layout = new(EnsureCanvasDevice(), body, format, width, height);
+            using CanvasTextLayout layout = new(device, body, format, width, height);
 
             int row = RowOf(text.Alignment);
-            float stacked = taken[row];
-            taken[row] += (float)layout.LayoutBounds.Height + gap;
-
-            Vector2 origin = Anchor(layout, row, text.Alignment, area, margin);
+            Vector2 origin = Anchor(layout, row, text.Alignment, width, height, margin);
 
             // The bottom and middle bands grow upwards, the top band downwards: the first cue keeps the place its alignment
             // asked for, and the ones after it make room above or below rather than covering it.
-            origin.Y += row == 2 ? stacked : -stacked;
-
+            origin.Y += row == 2 ? taken[row] : -taken[row];
             origin += new Vector2((float)(presentation.OffsetX * scale), (float)(presentation.OffsetY * scale));
-            origin = KeepInsideArea(origin, layout, area);
+
+            // What the safe region costs is only what it takes to be inside it, and the band grows from where the cue ended
+            // up rather than from where it would have gone, so cues of one band stay apart when the chrome moves them.
+            Vector2 kept = KeepInsideArea(origin, layout, safe);
+            float moved = kept.Y - origin.Y;
+            taken[row] += (row == 2 ? moved : -moved) + (float)layout.LayoutBounds.Height + gap;
+            origin = kept;
 
             if (presentation.OutlineWidth > 0.0)
             {
                 // The stroke runs down the middle of the glyph's edge, so half of it would be covered by the words. Twice
                 // the width is drawn and the words fill over the inner half, which leaves the border growing outwards by
                 // exactly the width asked for.
-                CanvasGeometry? outline = EnsureOutlineGeometry(body, format, width, height);
+                CanvasGeometry? outline = outlines.Get(device, body, format, width, height);
                 if (outline is not null)
                 {
                     session.DrawGeometry(outline, origin, OutlineColor, (float)(2.0 * presentation.OutlineWidth * scale), OutlineStrokeStyle);
@@ -321,11 +293,12 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             session.DrawTextLayout(layout, origin, Color.FromArgb(255, 255, 255, 255));
         }
     }
+
     #endregion
 
     #region Bitmap
 
-    private void DrawImage(CanvasDrawingSession session, SubtitleImage image, SubtitlePresentation presentation, SubtitleArea area, int width, int height, double scale)
+    private static void DrawImage(CanvasDrawingSession session, CanvasDevice device, SubtitleImage image, SubtitlePresentation presentation, SubtitleArea safe, int width, int height, double scale)
     {
         ISubtitleImageBuffer buffer = image.Buffer;
         if (buffer.Width <= 0 || buffer.Height <= 0)
@@ -337,7 +310,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         Marshal.Copy(buffer.Pixels, pixels, 0, pixels.Length);
 
         using var bitmap = CanvasBitmap.CreateFromBytes(
-            EnsureCanvasDevice(),
+            device,
             pixels,
             buffer.Width,
             buffer.Height,
@@ -345,96 +318,90 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             96.0f,
             CanvasAlphaMode.Premultiplied);
 
-        // The image's own geometry is a fraction of the frame it was authored against, which is the whole surface here; the
-        // presentation's offset is in pixels, so it is added after that geometry is scaled.
         double x = (image.Left * width) + (presentation.OffsetX * scale);
         double y = (image.Top * height) + (presentation.OffsetY * scale);
         double scaledWidth = image.Width * width;
         double scaledHeight = image.Height * height;
 
-        // Kept in the free part of the surface for the same reason the text is: an adjustment that pushes a cue out of it
-        // is cut back rather than obeyed, and a surface that later changes must not strand it.
-        double maxX = Math.Max(area.Left, area.Left + area.Width - scaledWidth);
-        double maxY = Math.Max(area.Top, area.Top + area.Height - scaledHeight);
-        x = Math.Clamp(x, area.Left, maxX);
-        y = Math.Clamp(y, area.Top, maxY);
+        double maxX = Math.Max(safe.Left, safe.Left + safe.Width - scaledWidth);
+        double maxY = Math.Max(safe.Top, safe.Top + safe.Height - scaledHeight);
+        x = Math.Clamp(x, safe.Left, maxX);
+        y = Math.Clamp(y, safe.Top, maxY);
 
         session.DrawImage(bitmap, new Rect(x, y, scaledWidth, scaledHeight));
     }
 
-    #region Outline
+    #endregion
 
-    private const int OutlineCacheLimit = 64;
+    #region Outline
 
     private static readonly Color OutlineColor = Color.FromArgb(255, 0, 0, 0);
     private static readonly CanvasStrokeStyle OutlineStrokeStyle = new() { LineJoin = CanvasLineJoin.Round };
 
-    private readonly Dictionary<OutlineKey, CanvasGeometry> _outlines = [];
-    private CanvasDevice? _outlineDevice;
-
-    /// <summary>
-    /// The outline of one cue's words, as the path the glyphs draw, kept for as long as the words and the style that shape
-    /// it stay the same. The geometry follows the whole layout, so the granularity is one cue — a line or a word cannot be
-    /// taken out on its own without laying it out again, and laying text out per letter would lose the kerning and shaping
-    /// that make it look right.
-    /// </summary>
-    private CanvasGeometry? EnsureOutlineGeometry(string body, CanvasTextFormat format, int width, int height)
+    private sealed partial class OutlineCache : IDisposable
     {
-        CanvasDevice device = EnsureCanvasDevice();
-        if (_outlineDevice != device)
+        private const int Limit = 64;
+
+        private readonly Dictionary<OutlineKey, CanvasGeometry> _outlines = [];
+        private CanvasDevice? _device;
+
+        internal CanvasGeometry? Get(CanvasDevice device, string body, CanvasTextFormat format, int width, int height)
         {
-            // A geometry belongs to the device that made it, so one made by a device that is gone cannot be drawn with.
-            ClearOutlines();
-            _outlineDevice = device;
+            if (_device != device)
+            {
+                Clear();
+                _device = device;
+            }
+
+            OutlineKey key = new(body, format.FontFamily, format.FontSize, (int)format.FontStyle, format.FontWeight.Weight, width, height);
+            if (_outlines.TryGetValue(key, out CanvasGeometry? cached))
+            {
+                return cached;
+            }
+
+            if (_outlines.Count >= Limit)
+            {
+                Clear();
+            }
+
+            try
+            {
+                using CanvasTextLayout layout = new(device, body, format, width, height);
+                var outline = CanvasGeometry.CreateText(layout);
+                _outlines[key] = outline;
+                return outline;
+            }
+            catch (Exception ex)
+            {
+                Logger.E(TAG, "The outline of a cue could not be built", ex);
+                return null;
+            }
         }
 
-        OutlineKey key = new(body, format.FontFamily, format.FontSize, (int)format.FontStyle, format.FontWeight.Weight, width, height);
-        if (_outlines.TryGetValue(key, out CanvasGeometry? cached))
+        public void Dispose()
         {
-            return cached;
+            Clear();
         }
 
-        if (_outlines.Count >= OutlineCacheLimit)
+        private void Clear()
         {
-            ClearOutlines();
+            foreach (CanvasGeometry outline in _outlines.Values)
+            {
+                outline.Dispose();
+            }
+
+            _outlines.Clear();
         }
 
-        try
-        {
-            using CanvasTextLayout layout = new(device, body, format, width, height);
-            var outline = CanvasGeometry.CreateText(layout);
-            _outlines[key] = outline;
-            return outline;
-        }
-        catch (Exception ex)
-        {
-            Logger.E(TAG, "The outline of a cue could not be built", ex);
-            return null;
-        }
+        /// <summary>What shapes one cue's outline: the words, and the style they are drawn in at the size of the surface.</summary>
+        private readonly record struct OutlineKey(string Text, string Family, float Size, int Style, ushort Weight, int Width, int Height);
     }
-
-    private void ClearOutlines()
-    {
-        foreach (CanvasGeometry outline in _outlines.Values)
-        {
-            outline.Dispose();
-        }
-
-        _outlines.Clear();
-    }
-
-    /// <summary>What shapes one cue's outline: the words, and the style they are drawn in at the size of the surface.</summary>
-    private readonly record struct OutlineKey(string Text, string Family, float Size, int Style, ushort Weight, int Width, int Height);
 
     #endregion
+
     #region Area calculation
 
-    /// <summary>
-    /// The box the words may be laid out in: the surface, less whatever covers it. This renderer is not a script
-    /// interpreter — it lays lines out itself — so it has no picture-relative coordinates to honour, and the chrome is
-    /// measured from the surface's edges, which is where it is.
-    /// </summary>
-    private static SubtitleArea AreaOf(SubtitlePresentation presentation, double scale, int width, int height)
+    private static SubtitleArea SafeAreaOf(SubtitlePresentation presentation, double scale, int width, int height)
     {
         float left = (float)Math.Clamp(presentation.Insets.Left * scale, 0.0, width * MaximumInsetFraction);
         float top = (float)Math.Clamp(presentation.Insets.Top * scale, 0.0, height * MaximumInsetFraction);
@@ -444,55 +411,40 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         return new SubtitleArea(left, top, Math.Max(1.0f, width - left - right), Math.Max(1.0f, height - top - bottom));
     }
 
-    /// <summary>
-    /// Which band of the surface an alignment belongs to: 0 bottom, 1 middle, 2 top. The three alignments in a band share a
-    /// height, so they are what has to stack together.
-    /// </summary>
     private static int RowOf(int alignment)
     {
         return (Math.Clamp(alignment, 1, 9) - 1) / 3;
     }
 
-    /// <summary>The rectangle of the surface the cues are laid out in, in physical pixels.</summary>
     private readonly record struct SubtitleArea(float Left, float Top, float Width, float Height);
 
-    /// <summary>
-    /// Where a block of text goes before any adjustment: the ASS anchor, laid out against the free part of the surface
-    /// with a margin from the edge it is anchored to. The layout is measured first, because centring needs its width.
-    /// </summary>
-    private static Vector2 Anchor(CanvasTextLayout layout, int row, int alignment, SubtitleArea area, float margin)
+    private static Vector2 Anchor(CanvasTextLayout layout, int row, int alignment, int width, int height, float margin)
     {
         int column = (Math.Clamp(alignment, 1, 9) - 1) % 3;
 
         float x = column switch
         {
             0 => margin,
-            2 => area.Width - (float)layout.LayoutBounds.Width - margin,
-            _ => (area.Width - (float)layout.LayoutBounds.Width) / 2.0f,
+            2 => width - (float)layout.LayoutBounds.Width - margin,
+            _ => (width - (float)layout.LayoutBounds.Width) / 2.0f,
         };
 
         float y = row switch
         {
-            0 => area.Height - (float)layout.LayoutBounds.Height - margin,
+            0 => height - (float)layout.LayoutBounds.Height - margin,
             2 => margin,
-            _ => (area.Height - (float)layout.LayoutBounds.Height) / 2.0f,
+            _ => (height - (float)layout.LayoutBounds.Height) / 2.0f,
         };
 
-        return new Vector2(area.Left + x, area.Top + y);
+        return new Vector2(x, y);
     }
 
-    /// <summary>
-    /// Keeps the text where it can be read. An adjustment that would push it out of the free part of the surface is cut
-    /// back, because the point of adjusting subtitles is still to read them — and the player's own chrome, which moves as
-    /// it is used, must not strand them.
-    /// </summary>
-    private static Vector2 KeepInsideArea(Vector2 origin, CanvasTextLayout layout, SubtitleArea area)
+    private static Vector2 KeepInsideArea(Vector2 origin, CanvasTextLayout layout, SubtitleArea safe)
     {
-        double maxX = Math.Max(area.Left, area.Left + area.Width - layout.LayoutBounds.Width);
-        double maxY = Math.Max(area.Top, area.Top + area.Height - layout.LayoutBounds.Height);
-        return new Vector2((float)Math.Clamp(origin.X, (double)area.Left, maxX), (float)Math.Clamp(origin.Y, (double)area.Top, maxY));
+        double maxX = Math.Max(safe.Left, safe.Left + safe.Width - layout.LayoutBounds.Width);
+        double maxY = Math.Max(safe.Top, safe.Top + safe.Height - layout.LayoutBounds.Height);
+        return new Vector2((float)Math.Clamp(origin.X, (double)safe.Left, maxX), (float)Math.Clamp(origin.Y, (double)safe.Top, maxY));
     }
 
-    #endregion
     #endregion
 }
