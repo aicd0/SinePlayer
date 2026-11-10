@@ -13,6 +13,7 @@ using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.Win2D;
+using SinePlayer.Core.Playback.Subtitle;
 
 using Windows.UI;
 
@@ -27,6 +28,9 @@ namespace SinePlayer.Core.Tests.Playback;
 [TestFixture]
 public class Win2DSubtitleRendererTests
 {
+    private static CanvasDevice? _detachedDevice;
+
+    private static D3D11Device? _detachedDeviceOwner;
     /// <summary>
     /// Both kinds of cue are drawn by the same renderer, and the kind is part of the signature: a chain assembled for text
     /// must not be kept when the same track is replaced by one carrying pictures. A format neither knows is refused here
@@ -185,15 +189,13 @@ public class Win2DSubtitleRendererTests
         // The point of the whole backend: words become pixels, and an empty set leaves none. A call that succeeds while
         // drawing nothing looks exactly like a working one from the outside, which is why the pixels are read back here —
         // against an offscreen target, since a presented swap chain cannot be read after the fact.
-        using Win2DSubtitleLayer drawing = new();
-
         CanvasRenderTarget? target = null;
         try
         {
             CanvasDevice device;
             try
             {
-                device = EnsureCanvasDevice(drawing);
+                device = EnsureDetachedDevice();
             }
             catch (Exception exception)
             {
@@ -217,7 +219,7 @@ public class Win2DSubtitleRendererTests
                 using (CanvasDrawingSession session = target.CreateDrawingSession())
                 {
                     session.Clear(default(Color));
-                    drawing.DrawCues(session, [cue], SubtitlePresentation.Identity, width, height);
+                    Win2DSubtitleLayer.DrawCues(session, device, [cue], SubtitlePresentation.Identity, width, height);
                 }
 
                 Assert.That(DrawnPixels(target.GetPixelBytes()), Is.GreaterThan(0), "the cue has to reach the target as pixels");
@@ -225,7 +227,7 @@ public class Win2DSubtitleRendererTests
                 using (CanvasDrawingSession session = target.CreateDrawingSession())
                 {
                     session.Clear(default(Color));
-                    drawing.DrawCues(session, [], SubtitlePresentation.Identity, width, height);
+                    Win2DSubtitleLayer.DrawCues(session, device, [], SubtitlePresentation.Identity, width, height);
                 }
 
                 Assert.That(DrawnPixels(target.GetPixelBytes()), Is.Zero, "and an empty set has to leave nothing behind");
@@ -248,12 +250,10 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void DrawsTheTextAtTheSizeItIsGiven()
     {
-        using Win2DSubtitleLayer drawing = new();
-
         CanvasDevice device;
         try
         {
-            device = EnsureCanvasDevice(drawing);
+            device = EnsureDetachedDevice();
         }
         catch (Exception exception)
         {
@@ -261,8 +261,8 @@ public class Win2DSubtitleRendererTests
             return;
         }
 
-        int small = InkRows(device, drawing, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 12.0));
-        int large = InkRows(device, drawing, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 48.0));
+        int small = InkRows(device, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 12.0));
+        int large = InkRows(device, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 48.0));
 
         using (Assert.EnterMultipleScope())
         {
@@ -278,12 +278,10 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void KeepsTheSizeItWorksOutForItselfWhenToldNone()
     {
-        using Win2DSubtitleLayer drawing = new();
-
         CanvasDevice device;
         try
         {
-            device = EnsureCanvasDevice(drawing);
+            device = EnsureDetachedDevice();
         }
         catch (Exception exception)
         {
@@ -294,8 +292,8 @@ public class Win2DSubtitleRendererTests
         const int height = 300;
         double automatic = Math.Clamp(height * 0.045, 12.0, 72.0);
 
-        int unspecified = InkRows(device, drawing, 480, height, SubtitlePresentation.Identity);
-        int sameSize = InkRows(device, drawing, 480, height, new SubtitlePresentation(0.0, 0.0, default, null, automatic));
+        int unspecified = InkRows(device, 480, height, SubtitlePresentation.Identity);
+        int sameSize = InkRows(device, 480, height, new SubtitlePresentation(0.0, 0.0, default, null, automatic));
 
         using (Assert.EnterMultipleScope())
         {
@@ -305,9 +303,9 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>How many rows of the surface carry ink, drawing one cue with the presentation given.</summary>
-    private static int InkRows(CanvasDevice device, Win2DSubtitleLayer drawing, int width, int height, SubtitlePresentation presentation)
+    private static int InkRows(CanvasDevice device, int width, int height, SubtitlePresentation presentation)
     {
-        byte[] pixels = RenderInk(device, drawing, width, height, presentation);
+        byte[] pixels = RenderInk(device, width, height, presentation);
         int rows = 0;
         for (int y = 0; y < height; y++)
         {
@@ -327,9 +325,9 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>How many pixels carry ink, drawing one cue with the presentation given.</summary>
-    private static int InkPixels(CanvasDevice device, Win2DSubtitleLayer drawing, int width, int height, SubtitlePresentation presentation)
+    private static int InkPixels(CanvasDevice device, int width, int height, SubtitlePresentation presentation)
     {
-        byte[] pixels = RenderInk(device, drawing, width, height, presentation);
+        byte[] pixels = RenderInk(device, width, height, presentation);
         int count = 0;
         for (int index = 3; index < pixels.Length; index += 4)
         {
@@ -342,15 +340,20 @@ public class Win2DSubtitleRendererTests
         return count;
     }
 
-    private static byte[] RenderInk(CanvasDevice device, Win2DSubtitleLayer drawing, int width, int height, SubtitlePresentation presentation)
+    private static byte[] RenderInk(CanvasDevice device, int width, int height, SubtitlePresentation presentation)
+    {
+        return RenderInk(device, width, height, presentation, "0,Default,,0,0,0,,Visible words");
+    }
+
+    private static byte[] RenderInk(CanvasDevice device, int width, int height, SubtitlePresentation presentation, string text)
     {
         using CanvasRenderTarget target = new(device, width, height, 96.0f);
-        using SubtitleCue cue = Cue("0,Default,,0,0,0,,Visible words");
+        using SubtitleCue cue = Cue(text);
 
         using (CanvasDrawingSession session = target.CreateDrawingSession())
         {
             session.Clear(default(Color));
-            drawing.DrawCues(session, [cue], presentation, width, height);
+            Win2DSubtitleLayer.DrawCues(session, device, [cue], presentation, width, height);
         }
 
         return target.GetPixelBytes();
@@ -364,12 +367,10 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void DrawsABorderAroundTheWordsWhenAWidthIsGiven()
     {
-        using Win2DSubtitleLayer drawing = new();
-
         CanvasDevice device;
         try
         {
-            device = EnsureCanvasDevice(drawing);
+            device = EnsureDetachedDevice();
         }
         catch (Exception exception)
         {
@@ -380,10 +381,10 @@ public class Win2DSubtitleRendererTests
         SubtitlePresentation plain = new(0.0, 0.0, default, null, 24.0);
         SubtitlePresentation bordered = plain with { OutlineWidth = 6.0 };
 
-        int plainPixels = InkPixels(device, drawing, 480, 240, plain);
-        int borderedPixels = InkPixels(device, drawing, 480, 240, bordered);
-        int plainRows = InkRows(device, drawing, 480, 240, plain);
-        int borderedRows = InkRows(device, drawing, 480, 240, bordered);
+        int plainPixels = InkPixels(device, 480, 240, plain);
+        int borderedPixels = InkPixels(device, 480, 240, bordered);
+        int plainRows = InkRows(device, 480, 240, plain);
+        int borderedRows = InkRows(device, 480, 240, bordered);
 
         using (Assert.EnterMultipleScope())
         {
@@ -400,12 +401,10 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void LaysTheWordsOutAgainstTheSurfaceWhateverThePictureIs()
     {
-        using Win2DSubtitleLayer drawing = new();
-
         CanvasDevice device;
         try
         {
-            device = EnsureCanvasDevice(drawing);
+            device = EnsureDetachedDevice();
         }
         catch (Exception exception)
         {
@@ -415,8 +414,8 @@ public class Win2DSubtitleRendererTests
 
         const int width = 480;
         const int height = 240;
-        byte[] whole = RenderInk(device, drawing, width, height, SubtitlePresentation.Identity);
-        byte[] topHalf = RenderInk(device, drawing, width, height, SubtitlePresentation.Identity with
+        byte[] whole = RenderInk(device, width, height, SubtitlePresentation.Identity);
+        byte[] topHalf = RenderInk(device, width, height, SubtitlePresentation.Identity with
         {
             Frame = new SubtitleFrame(0.0, 0.0, 1.0, 0.5),
         });
@@ -464,15 +463,13 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void DrawsABitmapCueWhereItsFractionsSay()
     {
-        using Win2DSubtitleLayer drawing = new();
-
         CanvasRenderTarget? target = null;
         try
         {
             CanvasDevice device;
             try
             {
-                device = EnsureCanvasDevice(drawing);
+                device = EnsureDetachedDevice();
             }
             catch (Exception exception)
             {
@@ -490,7 +487,7 @@ public class Win2DSubtitleRendererTests
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Color));
-                drawing.DrawCues(session, [cue], SubtitlePresentation.Identity, width, height);
+                Win2DSubtitleLayer.DrawCues(session, device, [cue], SubtitlePresentation.Identity, width, height);
             }
 
             byte[] pixels = target.GetPixelBytes();
@@ -515,15 +512,13 @@ public class Win2DSubtitleRendererTests
     [Test]
     public void StacksSimultaneousCuesInsteadOfDrawingThemOnOneAnother()
     {
-        using Win2DSubtitleLayer drawing = new();
-
         CanvasRenderTarget? target = null;
         try
         {
             CanvasDevice device;
             try
             {
-                device = EnsureCanvasDevice(drawing);
+                device = EnsureDetachedDevice();
             }
             catch (Exception exception)
             {
@@ -541,7 +536,7 @@ public class Win2DSubtitleRendererTests
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Color));
-                drawing.DrawCues(session, [first, second], SubtitlePresentation.Identity, width, height);
+                Win2DSubtitleLayer.DrawCues(session, device, [first, second], SubtitlePresentation.Identity, width, height);
             }
 
             byte[] pixels = target.GetPixelBytes();
@@ -555,6 +550,62 @@ public class Win2DSubtitleRendererTests
             (int Top, int Bottom, int Left, int Right) highest = bands[0];
             Assert.That(highest.Bottom, Is.LessThan(lowest.Top), "the second cue sits above the first, with clear space between them");
             Assert.That(lowest.Right - lowest.Left, Is.LessThan(highest.Right - highest.Left), "the wide line is the one that went up");
+        }
+        finally
+        {
+            target?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Cues that the chrome moves go on stacking from where they ended up, not from where they would have gone: the gap the
+    /// second cue makes is measured against the first one's final place, so a bar that lifts both does not fold them onto one
+    /// another.
+    /// </summary>
+    [Test]
+    public void StacksCuesThatTheSafeRegionMovesTogether()
+    {
+        CanvasRenderTarget? target = null;
+        try
+        {
+            CanvasDevice device;
+            try
+            {
+                device = EnsureDetachedDevice();
+            }
+            catch (Exception exception)
+            {
+                Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+                return;
+            }
+
+            const int width = 480;
+            const int height = 200;
+            target = new CanvasRenderTarget(device, width, height, 96.0f);
+
+            using SubtitleCue first = Cue("0,Default,,0,0,0,,帝");
+            using SubtitleCue second = Cue("0,Default,,0,0,0,,帝国黑客帝国黑客");
+
+            // A bar along the bottom of the surface, so both cues have to leave the band they were laid out in.
+            SubtitlePresentation presentation = SubtitlePresentation.Identity with
+            {
+                Insets = new SubtitleInsets(0.0, 0.0, 0.0, 100.0),
+            };
+
+            using (CanvasDrawingSession session = target.CreateDrawingSession())
+            {
+                session.Clear(default(Color));
+                Win2DSubtitleLayer.DrawCues(session, device, [first, second], presentation, width, height);
+            }
+
+            List<(int Top, int Bottom, int Left, int Right)> bands = InkBands(target.GetPixelBytes(), width, height);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(bands, Has.Count.EqualTo(2), "two cues, two separate bands of ink");
+                Assert.That(bands[^1].Bottom, Is.LessThanOrEqualTo(height - 100), "the cue that kept the bottom is clear of the bar");
+                Assert.That(bands[0].Bottom, Is.LessThan(bands[^1].Top), "and the one above it still sits above it");
+            }
         }
         finally
         {
@@ -768,36 +819,22 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>
-    /// Two subtitle chains are two surfaces, and they draw through one Direct3D device: a device is a driver instance
-    /// with its own command queue, and a second one per chain buys nothing — a device is meant to be shared, and this
-    /// one is multithread protected. What each surface keeps to itself is the device Win2D wraps it in, so no two
-    /// render threads ever drive one drawing device.
+    /// Drawing offscreen costs nothing: two checks that draw with the fixture's device leave the number of live Direct3D
+    /// devices alone, because the drawing takes the device it is handed rather than making one.
     /// </summary>
     [Test]
-    public void SharesOneDeviceBetweenSurfaces()
+    public void DrawsWithTheDeviceItIsHandedAndNoOther()
     {
+        CanvasDevice device = EnsureDetachedDevice();
         int baseline = D3D11Device.AliveDeviceCount;
 
-        Win2DSubtitleLayer first = new();
-        Win2DSubtitleLayer second = new();
-        try
-        {
-            CanvasDevice firstDevice = EnsureCanvasDevice(first);
-            CanvasDevice secondDevice = EnsureCanvasDevice(second);
+        int rows = InkRows(device, 480, 240, SubtitlePresentation.Identity);
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(D3D11Device.AliveDeviceCount - baseline, Is.EqualTo(1), "two surfaces, one Direct3D device");
-                Assert.That(firstDevice, Is.Not.SameAs(secondDevice), "each draws through its own, so the sharing stops at the device");
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            first.Dispose();
-            second.Dispose();
+            Assert.That(rows, Is.GreaterThan(0), "the drawing happened");
+            Assert.That(D3D11Device.AliveDeviceCount, Is.EqualTo(baseline), "and it bought no device of its own");
         }
-
-        Assert.That(D3D11Device.AliveDeviceCount, Is.EqualTo(baseline), "and the device goes with the last surface that held it");
     }
 
     /// <summary>How many pixels carry anything at all, in the blue-green-red-alpha buffer the surface reads back as.</summary>
@@ -815,11 +852,46 @@ public class Win2DSubtitleRendererTests
         return drawn;
     }
 
+    /// <summary>
+    /// The device the offscreen checks draw with, which is the fixture's own: a composed swap chain cannot be read back, so
+    /// these tests draw into a render target of their own and pass it the device to draw through.
+    /// </summary>
+    private static CanvasDevice EnsureDetachedDevice()
+    {
+        if (_detachedDevice is not null)
+        {
+            return _detachedDevice;
+        }
+
+        try
+        {
+            OperationResult<D3D11Device> created = D3D11Device.Create();
+            Assert.That(created.IsSuccessful, Is.True, created.Message);
+            _detachedDeviceOwner = created.Result;
+            _detachedDevice = CanvasDevice.CreateFromDirect3D11Device(SubtitleCompositor.CreateWin2DDevice(created.Result));
+            return _detachedDevice;
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            throw;
+        }
+    }
+
+    [OneTimeTearDown]
+    public void ReleaseDetachedDevice()
+    {
+        _detachedDevice?.Dispose();
+        _detachedDevice = null;
+        _detachedDeviceOwner?.Dispose();
+        _detachedDeviceOwner = null;
+    }
+
     private static CanvasDevice EnsureCanvasDevice(Win2DSubtitleLayer drawing)
     {
         try
         {
-            return drawing.EnsureCanvasDevice();
+            return drawing.CanvasDevice;
         }
         catch (InvalidOperationException exception)
         {
@@ -831,6 +903,102 @@ public class Win2DSubtitleRendererTests
     private static SubtitleStreamInfo Stream()
     {
         return new SubtitleStreamInfo { Index = 2, CodecId = "subrip" };
+    }
+
+    /// <summary>
+    /// The safe region is not the box the words are laid out in, it is what they must stay inside: a cue the chrome does not
+    /// reach is left exactly where the picture puts it. Laying it out against the safe region instead would move every cue the
+    /// moment any chrome appeared — the middle band would follow the bar up by half its height, and a bottom band the bar
+    /// already clears would still be pushed by the whole of it.
+    /// </summary>
+    [Test]
+    public void LeavesTheWordsWhereTheyAreWhenTheSafeRegionAlreadyHoldsThem()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 300;
+
+        // Bottom-anchored words, with a strip shorter than the margin they already keep: nothing about them is covered.
+        byte[] bare = RenderInk(device, width, height, SubtitlePresentation.Identity);
+        byte[] shortStrip = RenderInk(device, width, height, SubtitlePresentation.Identity with
+        {
+            Insets = new SubtitleInsets(0.0, 0.0, 0.0, 2.0),
+        });
+
+        // Middle-anchored words and a bar along the bottom of the surface: the bar is nowhere near the middle.
+        byte[] middle = RenderInk(device, width, height, SubtitlePresentation.Identity, "0,Default,,0,0,0,,{\\an5}Visible words");
+        byte[] middleWithBar = RenderInk(device, width, height, SubtitlePresentation.Identity with
+        {
+            Insets = new SubtitleInsets(0.0, 0.0, 0.0, 100.0),
+        }, "0,Default,,0,0,0,,{\\an5}Visible words");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(DrawnPixels(bare), Is.GreaterThan(0), "the cue is drawn for this to say anything");
+            Assert.That(shortStrip, Is.EqualTo(bare), "a strip the words already clear must not move them at all");
+            Assert.That(DrawnPixels(middle), Is.GreaterThan(0), "the middle cue is drawn too");
+            Assert.That(middleWithBar, Is.EqualTo(middle), "and a bar below it must not move it either");
+        }
+    }
+
+    /// <summary>
+    /// What the safe region costs is the least that puts the words inside it, not a fixed offset of its own size: a bottom
+    /// band under a bar moves up by the bar, less the margin it already kept from the edge, so it ends flush with the bar
+    /// rather than a margin above it — and a bar twice as tall moves it by twice as much.
+    /// </summary>
+    [Test]
+    public void MovesTheWordsOnlyAsFarAsTheSafeRegionNeeds()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 300;
+        // The margin a cue keeps from the edge of the surface, which is already clear of the chrome.
+        double margin = height * 0.03;
+
+        byte[] bare = RenderInk(device, width, height, SubtitlePresentation.Identity);
+        byte[] shortBar = RenderInk(device, width, height, SubtitlePresentation.Identity with
+        {
+            Insets = new SubtitleInsets(0.0, 0.0, 0.0, 60.0),
+        });
+        byte[] tallBar = RenderInk(device, width, height, SubtitlePresentation.Identity with
+        {
+            Insets = new SubtitleInsets(0.0, 0.0, 0.0, 120.0),
+        });
+
+        (int _, int bareTop, int _, int bareBottom) = InkBounds(bare, width, height);
+        (int _, int shortTop, int _, int shortBottom) = InkBounds(shortBar, width, height);
+        (int _, int tallTop, int _, int tallBottom) = InkBounds(tallBar, width, height);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(shortBottom, Is.LessThanOrEqualTo(height - 60), "the words are clear of the bar");
+            Assert.That(tallBottom, Is.LessThanOrEqualTo(height - 120), "and of the taller one");
+            Assert.That(bareBottom - shortBottom, Is.EqualTo(60 - margin).Within(2.0),
+                "the words moved by the bar less the margin they already kept");
+            Assert.That(shortBottom - tallBottom, Is.EqualTo(60.0).Within(2.0),
+                "so a bar twice as tall costs exactly its extra height");
+            Assert.That(bareBottom - bareTop, Is.EqualTo(shortBottom - shortTop), "and they are the same size they were");
+        }
     }
 
     /// <summary>

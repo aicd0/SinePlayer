@@ -513,14 +513,6 @@ internal sealed partial class PlayerSession : IDisposable
         });
     }
 
-    public void SetSubtitlePresentation(SubtitlePresentation presentation)
-    {
-        foreach (PlayerView view in _views)
-        {
-            view.SubtitlePresentation = presentation;
-        }
-    }
-
     public void SetVolume(double volume)
     {
         double clamped = Math.Clamp(volume, 0.0, 1.0);
