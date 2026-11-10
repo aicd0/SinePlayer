@@ -248,7 +248,6 @@ public class StringResourceProvider
     public string PlaybackInformation => GetResourceString("PlaybackInformation");
     public string PlayerSettings => GetResourceString("PlayerSettings");
     public string PlayerStatusError => GetResourceString("PlayerStatusError");
-    public string PlayerStatusLoading => GetResourceString("PlayerStatusLoading");
     public string PluginSettingsDescription => GetResourceString("PluginSettingsDescription");
     public string Plugins => GetResourceString("Plugins");
     public string Position => GetResourceString("Position");

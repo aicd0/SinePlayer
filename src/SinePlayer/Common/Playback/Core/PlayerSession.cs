@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Dispatching;
@@ -19,7 +20,6 @@ using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
-using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -81,6 +81,8 @@ internal sealed partial class PlayerSession : IDisposable
 
     public event Action<MediaEngineState, string?>? StateChanged;
 
+    public event Action? LoadingChanged;
+
     public event Action<MediaModel?, OperationResult>? MediaChanged;
 
     public string Id { get; }
@@ -96,6 +98,8 @@ internal sealed partial class PlayerSession : IDisposable
     public event Action? VolumeChanged;
 
     public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
+
+    public bool IsLoading => Volatile.Read(ref _loadingCount) > 0;
 
     public string? Error => _pipeline?.Error;
 
@@ -275,6 +279,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         if (_openedMedia is not null)
         {
+            using IDisposable loading = BeginLoading();
             await ApplyViewTracksAsync(view);
             await Reconcile();
         }
@@ -447,7 +452,12 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResultExt.Success(_lastReconcile);
         }
 
-        OperationResult<ReconcileResult> reconciled = await pipeline.Reconcile();
+        OperationResult<ReconcileResult> reconciled;
+        using (BeginLoading())
+        {
+            reconciled = await pipeline.Reconcile();
+        }
+
         if (!reconciled.IsSuccessful)
         {
             return OperationResultExt.Failure<ReconcileResult>(TAG, $"What was chosen could not be built. {reconciled.Message}");
@@ -721,6 +731,8 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         _startPositionMs = ResolveStartPositionMs(media, args);
+
+        using IDisposable loading = BeginLoading();
         RaiseMediaChanged(media, await OpenAsync(media));
     }
 
@@ -1224,6 +1236,47 @@ internal sealed partial class PlayerSession : IDisposable
     private void Playback_PlayQueueChanged()
     {
         SaveRecord();
+    }
+
+    #endregion
+
+    #region Loading state
+
+    private int _loadingCount;
+
+    internal IDisposable BeginLoading()
+    {
+        if (Interlocked.Increment(ref _loadingCount) == 1)
+        {
+            RaiseLoadingChanged();
+        }
+
+        return new LoadingSession(this);
+    }
+
+    private void RaiseLoadingChanged()
+    {
+        CoroutineUtils.RunInMainThread(() => LoadingChanged?.Invoke());
+    }
+
+    private sealed partial class LoadingSession(PlayerSession session) : IDisposable
+    {
+        private bool _ended;
+
+        public void Dispose()
+        {
+            if (_ended)
+            {
+                return;
+            }
+
+            _ended = true;
+
+            if (Interlocked.Decrement(ref session._loadingCount) == 0)
+            {
+                session.RaiseLoadingChanged();
+            }
+        }
     }
 
     #endregion

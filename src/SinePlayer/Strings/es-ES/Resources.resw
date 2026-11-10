@@ -949,9 +949,6 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="PlayerStatusError" xml:space="preserve">
     <value>Se produjo un error durante la carga</value>
   </data>
-  <data name="PlayerStatusLoading" xml:space="preserve">
-    <value>El reproductor se está cargando</value>
-  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Administrar y configurar complementos</value>
   </data>

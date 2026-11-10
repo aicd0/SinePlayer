@@ -949,9 +949,6 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="PlayerStatusError" xml:space="preserve">
     <value>Une erreur s'est produite lors du chargement</value>
   </data>
-  <data name="PlayerStatusLoading" xml:space="preserve">
-    <value>Chargement du lecteur</value>
-  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Gérer et configurer les extensions</value>
   </data>

@@ -130,6 +130,7 @@ internal sealed partial class PlayerPage : BasePage
             ViewModel.SetVolume((int)Math.Round(session.Volume * 100.0));
             ViewModel.SetMute(session.IsMuted);
             ViewModel.UpdatePlaybackState();
+            RefreshPlayerStatus();
         });
     }
 
@@ -541,6 +542,7 @@ internal sealed partial class PlayerPage : BasePage
                 return;
             }
 
+            using IDisposable preparation = session.BeginLoading();
             ViewModel.PositionLiveData.Emit(0);
             ViewModel.SetMedia(media);
 
@@ -556,30 +558,17 @@ internal sealed partial class PlayerPage : BasePage
 
             if (!opened.IsSuccessful)
             {
-                ViewModel.PlayerStatusLiveData.Emit(new()
-                {
-                    Status = PlayerPageViewModel.PlayerStatusEnum.Error,
-                    Description = opened.Message,
-                });
+                EmitError(opened.Message);
                 return;
             }
-
-            ViewModel.PlayerStatusLiveData.Emit(new() { Status = PlayerPageViewModel.PlayerStatusEnum.Loading });
 
             await ApplyPlayerSettings(PlayerSettingsModel.LoadFromMedia(media));
 
             OperationResult played = await SelectTracks(session, view, media);
-            if (played.IsSuccessful)
+            if (!played.IsSuccessful)
             {
-                ViewModel.PlayerStatusLiveData.Emit(new() { Status = PlayerPageViewModel.PlayerStatusEnum.Working });
-            }
-            else
-            {
-                ViewModel.PlayerStatusLiveData.Emit(new()
-                {
-                    Status = PlayerPageViewModel.PlayerStatusEnum.Error,
-                    Description = played.Message,
-                });
+                EmitError(played.Message);
+                return;
             }
 
             StartPlaybackOnOpen(session);
@@ -646,6 +635,7 @@ internal sealed partial class PlayerPage : BasePage
 
         PlayerSession session = PlayerSessionManager.Shared.Acquire(_sessionId, out _sessionCreator);
         session.StateChanged += Session_StateChanged;
+        session.LoadingChanged += Session_LoadingChanged;
         session.PositionChanged += Session_PositionChanged;
         session.MediaChanged += Session_MediaChanged;
         session.VolumeChanged += Session_VolumeChanged;
@@ -668,6 +658,7 @@ internal sealed partial class PlayerPage : BasePage
         }
 
         session.StateChanged -= Session_StateChanged;
+        session.LoadingChanged -= Session_LoadingChanged;
         session.PositionChanged -= Session_PositionChanged;
         session.MediaChanged -= Session_MediaChanged;
         session.VolumeChanged -= Session_VolumeChanged;
@@ -694,6 +685,11 @@ internal sealed partial class PlayerPage : BasePage
         {
             UnholdOverlay();
         }
+    }
+
+    private void Session_LoadingChanged()
+    {
+        RefreshPlayerStatus();
     }
 
     private void Session_PositionChanged()
@@ -728,11 +724,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (state == MediaEngineState.Error)
         {
-            ViewModel.PlayerStatusLiveData.Emit(new()
-            {
-                Status = PlayerPageViewModel.PlayerStatusEnum.Error,
-                Description = message ?? "Unknown error",
-            });
+            EmitError(message ?? "Unknown error");
         }
 
         UpdateKeepScreenOn();
@@ -862,6 +854,45 @@ internal sealed partial class PlayerPage : BasePage
 
         _lastPointerPosition = null;
         ShowCursor();
+    }
+
+    #endregion
+
+    #region State management
+
+    private void RefreshPlayerStatus()
+    {
+        PlayerSession? session = _session;
+        if (session is null)
+        {
+            return;
+        }
+
+        if (session.IsLoading)
+        {
+            ViewModel.PlayerStatusLiveData.Emit(new() { Status = PlayerPageViewModel.PlayerStatusEnum.Loading });
+            return;
+        }
+
+        // A failure is not undone by the preparation that ran into it ending.
+        if (ViewModel.PlayerStatus == PlayerPageViewModel.PlayerStatusEnum.Error)
+        {
+            return;
+        }
+
+        ViewModel.PlayerStatusLiveData.Emit(new()
+        {
+            Status = session.CurrentMedia is null ? PlayerPageViewModel.PlayerStatusEnum.Idle : PlayerPageViewModel.PlayerStatusEnum.Working,
+        });
+    }
+
+    private void EmitError(string message)
+    {
+        ViewModel.PlayerStatusLiveData.Emit(new()
+        {
+            Status = PlayerPageViewModel.PlayerStatusEnum.Error,
+            Description = message,
+        });
     }
 
     #endregion
