@@ -949,9 +949,6 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="PlayerStatusError" xml:space="preserve">
     <value>読み込みエラー</value>
   </data>
-  <data name="PlayerStatusLoading" xml:space="preserve">
-    <value>プレーヤーを読み込み中</value>
-  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>プラグインの管理と設定</value>
   </data>

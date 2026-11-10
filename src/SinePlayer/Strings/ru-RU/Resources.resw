@@ -949,9 +949,6 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="PlayerStatusError" xml:space="preserve">
     <value>Произошла ошибка при загрузке</value>
   </data>
-  <data name="PlayerStatusLoading" xml:space="preserve">
-    <value>Загрузка проигрывателя</value>
-  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Управление и настройка плагинов</value>
   </data>

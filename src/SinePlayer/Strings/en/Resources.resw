@@ -949,9 +949,6 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="PlayerStatusError" xml:space="preserve">
     <value>An error occured while loading</value>
   </data>
-  <data name="PlayerStatusLoading" xml:space="preserve">
-    <value>The player is loading</value>
-  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Manage and configure plugins</value>
   </data>

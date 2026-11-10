@@ -949,9 +949,6 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="PlayerStatusError" xml:space="preserve">
     <value>로딩 중 오류가 발생했습니다.</value>
   </data>
-  <data name="PlayerStatusLoading" xml:space="preserve">
-    <value>플레이어를 불러오는 중</value>
-  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>플러그인 관리 및 구성</value>
   </data>

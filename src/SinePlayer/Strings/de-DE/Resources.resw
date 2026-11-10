@@ -949,9 +949,6 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="PlayerStatusError" xml:space="preserve">
     <value>Beim Laden ist ein Fehler aufgetreten</value>
   </data>
-  <data name="PlayerStatusLoading" xml:space="preserve">
-    <value>Der Player wird geladen</value>
-  </data>
   <data name="PluginSettingsDescription" xml:space="preserve">
     <value>Plugins verwalten und konfigurieren</value>
   </data>
