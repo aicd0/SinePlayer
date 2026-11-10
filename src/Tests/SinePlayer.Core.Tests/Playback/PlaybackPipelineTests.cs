@@ -7555,11 +7555,11 @@ public class PlaybackPipelineTests
 
     private sealed class FakeRenderTarget : IVideoRenderTarget
     {
-        public int SurfaceWidth => 320;
+        public int SurfaceWidth { get; init; } = 320;
 
-        public int SurfaceHeight => 240;
+        public int SurfaceHeight { get; init; } = 240;
 
-        public double RasterizationScale => 1.0;
+        public double RasterizationScale { get; init; } = 1.0;
 
         public event Action? SurfaceSizeChanged;
 
@@ -8642,8 +8642,8 @@ public class PlaybackPipelineTests
 
     /// <summary>
     /// A picture fitted into the surface does not fill it: the words belong to the picture, so the presentation says where
-    /// the picture is and the renderer draws there. A 320×180 picture in a 320×240 surface leaves a bar of 30 pixels above
-    /// and below it, which is a quarter of the height in total.
+    /// the picture is and the renderer draws there. A 320×180 picture in a 640×480 surface is drawn 640×360 with a bar of
+    /// 60 pixels above and below it, which is a quarter of the height in total.
     /// </summary>
     [Test]
     public void LaysTheSubtitlesOutInThePictureRatherThanTheSurface()
@@ -8670,12 +8670,139 @@ public class PlaybackPipelineTests
             Assert.That(frame.Top, Is.EqualTo(0.125).Within(0.001), "and the bars above and below it are not its frame");
             Assert.That(frame.Height, Is.EqualTo(0.75).Within(0.001));
         }
+    }
 
-        // Stretched, the picture is the surface, and so is the frame.
-        pipeline.VideoChains[0].Transform = VideoTransform.Identity with { ResizeMode = VideoResizeMode.Stretch };
-        WaitFor(() => subtitleRenderer.Presentations[^1].Frame.Height > 0.99, "the words to be laid out in the whole surface");
+    /// <summary>
+    /// The box a script is laid out in keeps the picture's own shape whatever the transform does to the picture, because
+    /// libass scales a script onto that box one axis at a time: a box of the surface's shape draws every glyph stretched.
+    /// The box's height is the picture's, and its width follows from the picture's shape, so a picture drawn as tall as the
+    /// surface — filled, or stretched to a surface of another shape — gives a box wider than the surface, whose sides are
+    /// cropped as the picture's are. Narrowing that box to the surface instead would make it shorter too, and would lift
+    /// the words off the bottom of the picture.
+    /// </summary>
+    [Test]
+    public void KeepsTheScriptInABoxOfThePicturesShape()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        };
 
-        Assert.That(subtitleRenderer.Presentations[^1].Frame.Top, Is.EqualTo(0.0).Within(0.001));
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+
+        IVideoChain video = pipeline.VideoChains[0];
+
+        foreach (VideoResizeMode mode in (VideoResizeMode[])[VideoResizeMode.Fit, VideoResizeMode.Fill, VideoResizeMode.Stretch, VideoResizeMode.OriginalSize])
+        {
+            video.Transform = VideoTransform.Identity with { ResizeMode = mode };
+            AssertPicturesShape(video.SubtitleFrame, $"{mode} keeps the picture's shape");
+        }
+
+        // Filled or stretched, the picture is drawn 426×240 in this 320×240 surface, and the box is that size too: the
+        // words are cropped with the picture rather than shrunk to fit the surface's width, which would float them up.
+        foreach (VideoResizeMode mode in (VideoResizeMode[])[VideoResizeMode.Fill, VideoResizeMode.Stretch])
+        {
+            video.Transform = VideoTransform.Identity with { ResizeMode = mode };
+            SubtitleFrame filled = video.SubtitleFrame;
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(filled.Width, Is.EqualTo(426.67 / 320.0).Within(0.001), $"{mode} keeps the box the picture's width");
+                Assert.That(filled.Height, Is.EqualTo(1.0).Within(0.001), $"{mode} keeps it the picture's height");
+                Assert.That(filled.Left, Is.EqualTo(-53.33 / 320.0).Within(0.001), "and it runs past both sides of the surface");
+            }
+        }
+
+        // Zoomed out, the picture is smaller than the surface, and the words may not be larger than the picture they
+        // belong to: half the size is the whole of it.
+        video.Transform = VideoTransform.Identity with { Zoom = 0.5 };
+        SubtitleFrame small = video.SubtitleFrame;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(small.Width, Is.EqualTo(0.5).Within(0.001), "the box is the picture's own size");
+            Assert.That(small.Height, Is.EqualTo(0.375).Within(0.001));
+            Assert.That(small.Left, Is.EqualTo(0.25).Within(0.001), "centred on the surface the picture sits on");
+            Assert.That(small.Top, Is.EqualTo(0.3125).Within(0.001));
+        }
+
+        // Panned, the box follows the picture's centre: a quarter of the way to the right moves it by 40 of the 160 pixels
+        // the picture is wide, which is an eighth of the surface.
+        video.Transform = VideoTransform.Identity with { Zoom = 0.5, PanX = 0.25 };
+        Assert.That(video.SubtitleFrame.Left, Is.EqualTo(0.375).Within(0.001), "the words move with the picture");
+
+        // Panned off the surface, the picture the viewer ends up with is only the part still on it — 45 of the 90 pixels —
+        // and the box is that tall, at the picture's shape: 80 pixels wide.
+        video.Transform = VideoTransform.Identity with { Zoom = 0.5, PanY = 1.0 };
+        SubtitleFrame cropped = video.SubtitleFrame;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(cropped.Height, Is.EqualTo(45.0 / 240.0).Within(0.001), "as tall as what the surface leaves of the picture");
+            Assert.That(cropped.Width, Is.EqualTo(80.0 / 320.0).Within(0.001), "and as wide as the picture's shape makes that");
+        }
+    }
+
+    /// <summary>
+    /// The picture is measured in the pixels the window draws it in, which are the stream's own: a window reports its size
+    /// in device independent pixels, and on a display that is not at 100% those are fewer than the pixels drawn. A picture
+    /// of the stream's own size — OriginalSize — is the mode where that difference shows, because it is the only one whose
+    /// size does not come from the window; before this, a 320×180 picture in a 320×240 window at 2× was measured as
+    /// filling the window, and the words were laid out across it instead of around the picture.
+    /// </summary>
+    [Test]
+    public void MeasuresThePictureInThePixelsTheWindowDrawsItIn()
+    {
+        SyntheticMediaScript script = new()
+        {
+            Duration = TimeSpan.FromSeconds(3),
+            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+        };
+
+        FakeSubtitleRenderer subtitleRenderer = new();
+        using PlaybackPipeline pipeline = CreatePipeline(
+            new FakeVideoRenderer(),
+            new FakeAudioRenderer { PlaysWhatItIsGiven = true },
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: new SyntheticSourceProviderFactory(script),
+            audioDecoders: new SyntheticAudioDecoderFactory(),
+            subtitleDecoders: new SyntheticSubtitleDecoderFactory(),
+            subtitleRenderers: new FakeSubtitleRendererFactory(subtitleRenderer),
+            videoTarget: new FakeRenderTarget { RasterizationScale = 2.0 },
+            subtitleTarget: new SubtitleSurface());
+
+        Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
+
+        // The window is 320×240 device independent pixels, so it draws 640×480. The picture at its own size is 320×180 of
+        // those, centred: an eighth of the surface above and below it, and a quarter of it either side.
+        IVideoChain video = pipeline.VideoChains[0];
+        video.Transform = VideoTransform.Identity with { ResizeMode = VideoResizeMode.OriginalSize };
+        SubtitleFrame frame = video.SubtitleFrame;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(frame.Left, Is.EqualTo(0.25).Within(0.001), "the picture starts a quarter of the way across");
+            Assert.That(frame.Top, Is.EqualTo(0.3125).Within(0.001), "and an eighth of the way down");
+            Assert.That(frame.Width, Is.EqualTo(0.5).Within(0.001), "it is half as wide as the window");
+            Assert.That(frame.Height, Is.EqualTo(0.375).Within(0.001), "and three eighths as tall");
+        }
+    }
+
+    /// <summary>Asserts that a box has the shape of the 320×180 picture, is centred on it, and is no taller than the surface.</summary>
+    private static void AssertPicturesShape(SubtitleFrame frame, string because)
+    {
+        // The picture's surface is 320×240, so a pixel is 320 × 0.001 wide and 240 × 0.001 high in the box's own units.
+        double width = frame.Width * 320.0;
+        double height = frame.Height * 240.0;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(width / height, Is.EqualTo(320.0 / 180.0).Within(0.01), because);
+            Assert.That(height, Is.LessThanOrEqualTo(240.0), "and no taller than the surface");
+            Assert.That(frame.Left + (frame.Width / 2.0), Is.EqualTo(0.5).Within(0.001), "centred on the picture's own centre");
+            Assert.That(frame.Top + (frame.Height / 2.0), Is.EqualTo(0.5).Within(0.001));
+        }
     }
 
     /// <summary>

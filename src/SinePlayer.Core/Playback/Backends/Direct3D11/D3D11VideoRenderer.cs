@@ -663,11 +663,6 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         }
     }
 
-    /// <summary>
-    /// Draws the planes of the last uploaded frame into the output surface and presents it. Kept apart
-    /// from <see cref="Render"/> because the planes outlive the frame: they are what makes it possible to
-    /// show the same picture again after the surface changed.
-    /// </summary>
     private OperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, (float X, float Y) texCoords, (float X, float Y) texCoordMax, (float X, float Y) chromaTexCoordMax, VideoTransform transform)
     {
         ID3D11DeviceContext context = _device.Context;
@@ -686,9 +681,9 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         D3D11Interop.SetShaders(context, _shaders.VertexShader, pixelShader);
 
         // Where the picture lies inside the texture it is drawn from: all of it for an uploaded frame, less
-        // for one a hardware decoder padded. Where it lies on the surface is the placement beside it. Beside the
+        // for one a hardware decoder padded. Where it lies on the surface is the matrix beside it. Beside the
         // span is the coordinate past which the picture has no samples of its own.
-        Matrix3x2 placement = transform.GetPlacement(_frameWidth, _frameHeight, _outputWidth, _outputHeight);
+        Matrix3x2 placement = transform.GetPictureToSurfaceMatrix(_frameWidth, _frameHeight, _outputWidth, _outputHeight);
         D3D11Interop.SetFrameTransform(context, _frameTransform, texCoords, texCoordMax, chromaTexCoordMax, placement);
         D3D11Interop.SetFrameConstantBuffer(context, 0, _frameTransform);
 

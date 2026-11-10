@@ -127,15 +127,11 @@ public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
             return tracked;
         }
 
-        // A script places its own events, and it places them against the picture: a picture fitted into the surface leaves
-        // bars, and a script given the surface would spread its lines across them. So libass is told the picture's own box
-        // and its bitmaps are put down at that box's corner, which is the one thing the margins cannot say — they mean
-        // "the window is bigger than the video", and libass answers that by scaling the script down.
         SubtitleFrame frame = presentation.Frame.IsEmpty ? SubtitleFrame.Full : presentation.Frame;
         int frameX = (int)Math.Round(frame.Left * width);
         int frameY = (int)Math.Round(frame.Top * height);
-        int frameWidth = Math.Clamp((int)Math.Round(frame.Width * width), 1, width);
-        int frameHeight = Math.Clamp((int)Math.Round(frame.Height * height), 1, height);
+        int frameWidth = Math.Max(1, (int)Math.Round(frame.Width * width));
+        int frameHeight = Math.Max(1, (int)Math.Round(frame.Height * height));
 
         LibassNative.ass_set_frame_size(_renderer, frameWidth, frameHeight);
 

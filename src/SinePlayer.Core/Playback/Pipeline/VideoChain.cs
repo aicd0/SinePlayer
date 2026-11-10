@@ -3,7 +3,6 @@
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Numerics;
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
@@ -35,6 +34,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
 
     private IVideoRenderTarget? _target;
     private volatile bool _starved;
+
     private long _endedEpoch = -1;
     private long _presentedFrameCount;
     private long _droppedFrameCount;
@@ -572,13 +572,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
             }
 
             bool playing = _events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
-            VideoTransform transform = _transform.Read();
-
-            VideoOrientation containerTransform = ((VideoStreamInfo?)Renderer.CurrentStream)?.Orientation ?? VideoOrientation.Identity;
-            if (!containerTransform.IsIdentity)
-            {
-                transform = transform with { Orientation = transform.Orientation.Combine(containerTransform) };
-            }
+            VideoTransform transform = GetStreamTransform((VideoStreamInfo?)Renderer.CurrentStream);
 
             if (deviceAvailable && videoRenderer is not null && state is MediaEngineState.Paused or MediaEngineState.Ended)
             {
@@ -900,7 +894,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
         return TimeSpan.FromSeconds(1 / frameRate);
     }
 
-    public SubtitleFrame Frame
+    public SubtitleFrame SubtitleFrame
     {
         get
         {
@@ -911,30 +905,50 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
                 return SubtitleFrame.Full;
             }
 
-            int surfaceWidth = target.SurfaceWidth;
-            int surfaceHeight = target.SurfaceHeight;
-            if (surfaceWidth <= 0 || surfaceHeight <= 0)
+            // The surface in the pixels the picture is drawn in, which is what the transform's own maths uses: the window's
+            // size is reported in device independent pixels, and the picture and the surface it is drawn on are physical
+            // ones. A picture of the stream's own size — OriginalSize — is the case where the two spaces differ; every other
+            // mode scales the picture with the surface, so the scale cancels out of the fraction it produces.
+            double scale = target.RasterizationScale > 0 && double.IsFinite(target.RasterizationScale) ? target.RasterizationScale : 1.0;
+            double surfaceWidth = Math.Max(1.0, Math.Round(target.SurfaceWidth * scale));
+            double surfaceHeight = Math.Max(1.0, Math.Round(target.SurfaceHeight * scale));
+
+            VideoTransform transform = GetStreamTransform(stream);
+            (double pictureWidth, double pictureHeight) = transform.GetPictureSize(stream.Width, stream.Height);
+
+            // The picture as the app's transform places it, uncropped by the surface.
+            PlacedPicture placed = transform.GetPlacedPicture(stream.Width, stream.Height, (int)surfaceWidth, (int)surfaceHeight);
+
+            // And what the surface leaves of it, which is the picture the viewer ends up with: cropped by the surface like
+            // the picture itself is, so a picture panned partly off the surface is only as tall as the part still on it.
+            double visibleTop = Math.Max(placed.CenterY - (placed.Height / 2.0), 0.0);
+            double visibleBottom = Math.Min(placed.CenterY + (placed.Height / 2.0), surfaceHeight);
+            double outputHeight = Math.Max(visibleBottom - visibleTop, 0.0);
+
+            // The box is as tall as the picture the viewer ends up with, and takes its width from the picture's own shape
+            // rather than from the width it was drawn at: libass scales a script onto the box one axis at a time, so a box
+            // of another shape than the picture's draws every glyph stretched. That shape may make the box wider than the
+            // surface — a picture stretched to a surface of another shape is as tall as the surface — and then its sides are
+            // cropped with the picture's.
+            double height = Math.Min(surfaceHeight, outputHeight);
+            if (!(height > 0.0) || !double.IsFinite(height))
             {
                 return SubtitleFrame.Full;
             }
 
-            // The placement maps the picture's own square onto the surface, so its four corners say where the picture ends:
-            // the bounding box of that is the frame, whatever turning, zooming or mirroring was asked for.
-            Matrix3x2 placement = _transform.Read().GetPlacement(stream.Width, stream.Height, surfaceWidth, surfaceHeight);
-            var zero = Vector2.Transform(Vector2.Zero, placement);
-            var unitX = Vector2.Transform(Vector2.UnitX, placement);
-            var unitY = Vector2.Transform(Vector2.UnitY, placement);
-            var one = Vector2.Transform(Vector2.One, placement);
-
-            float left = Math.Clamp(MathF.Min(MathF.Min(zero.X, unitX.X), MathF.Min(unitY.X, one.X)), 0.0f, 1.0f);
-            float top = Math.Clamp(MathF.Min(MathF.Min(zero.Y, unitX.Y), MathF.Min(unitY.Y, one.Y)), 0.0f, 1.0f);
-            float right = Math.Clamp(MathF.Max(MathF.Max(zero.X, unitX.X), MathF.Max(unitY.X, one.X)), 0.0f, 1.0f);
-            float bottom = Math.Clamp(MathF.Max(MathF.Max(zero.Y, unitX.Y), MathF.Max(unitY.Y, one.Y)), 0.0f, 1.0f);
-
-            // A picture larger than the surface is cropped by it, so what is left of it is the whole surface.
-            return right > left && bottom > top
-                ? new SubtitleFrame(left, top, right - left, bottom - top)
-                : SubtitleFrame.Full;
+            double width = height * pictureWidth / pictureHeight;
+            double left = placed.CenterX - (width / 2.0);
+            double top = placed.CenterY - (height / 2.0);
+            return new SubtitleFrame(left / surfaceWidth, top / surfaceHeight, width / surfaceWidth, height / surfaceHeight);
         }
+    }
+
+    private VideoTransform GetStreamTransform(VideoStreamInfo? stream)
+    {
+        VideoTransform transform = _transform.Read();
+        VideoOrientation container = stream?.Orientation ?? VideoOrientation.Identity;
+        return container.IsIdentity
+            ? transform
+            : transform with { Orientation = transform.Orientation.Combine(container) };
     }
 }
