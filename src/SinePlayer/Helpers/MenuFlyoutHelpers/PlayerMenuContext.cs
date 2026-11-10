@@ -72,25 +72,15 @@ internal sealed class PlayerMenuContext
         return streams;
     }
 
-    public MediaStreamInfo? SelectedTrack(MediaStreamKind kind)
+    public bool IsTrackPlaying(MediaStreamInfo stream)
     {
-        return kind switch
+        return stream.Kind switch
         {
-            MediaStreamKind.Video => View?.PlaybackInfo.SelectedVideoStream,
-            MediaStreamKind.Audio => View?.PlaybackInfo.SelectedAudioStream,
-            MediaStreamKind.Subtitle => View?.PlaybackInfo.SelectedSubtitleStream,
-            _ => null,
+            MediaStreamKind.Video => View?.VideoChain?.SelectedStream?.Equals(stream) == true,
+            MediaStreamKind.Audio => Session?.AudioChains.Any(chain => chain.SelectedStream?.Equals(stream) == true) == true,
+            MediaStreamKind.Subtitle => View?.SubtitleChains.Any(chain => chain.SelectedStream?.Equals(stream) == true) == true,
+            _ => false,
         };
-    }
-
-    public bool IsAudioTrackPlaying(MediaStreamInfo stream)
-    {
-        return Session?.AudioChains.Any(chain => chain.SelectedStream?.Equals(stream) == true) == true;
-    }
-
-    public bool IsSubtitleTrackPlaying(MediaStreamInfo stream)
-    {
-        return View?.SubtitleChains.Any(chain => chain.SelectedStream?.Equals(stream) == true) == true;
     }
 
     public void SetAllowMultiAudioTracks(bool allow)
@@ -157,7 +147,7 @@ internal sealed class PlayerMenuContext
             return;
         }
 
-        bool playing = IsAudioTrackPlaying(stream);
+        bool playing = IsTrackPlaying(stream);
         CoroutineUtils.Run(async () =>
         {
             OperationResult changed = playing ? await session.RemoveAudioStream(stream) : await session.AddAudioStream(stream);
@@ -192,7 +182,7 @@ internal sealed class PlayerMenuContext
             return;
         }
 
-        bool playing = IsSubtitleTrackPlaying(stream);
+        bool playing = IsTrackPlaying(stream);
         CoroutineUtils.Run(async () =>
         {
             OperationResult changed = playing ? await session.RemoveSubtitleStream(view, stream) : await session.AddSubtitleStream(view, stream);

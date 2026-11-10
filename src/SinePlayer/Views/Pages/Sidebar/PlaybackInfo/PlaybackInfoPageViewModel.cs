@@ -10,6 +10,7 @@ using System.Linq;
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Views.Pages.Sidebar.PlaybackInfo;
 
@@ -67,7 +68,7 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             Add("media.bitrate", StringResource.BitRate, FormatBitrate(media.Bitrate));
         }
 
-        if (info.SelectedVideoStream is { } video)
+        if (info.VideoChain?.SelectedStream is { } video)
         {
             Group("group.video", StringResource.Video);
             Add("video.codec", StringResource.Codec, FormatCodec(video));
@@ -93,47 +94,65 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             Add("video.renderer", StringResource.Renderer, info.VideoRendererName ?? StringResource.None);
         }
 
-        if (info.SelectedAudioStream is { } audio)
+        IAudioChain[] audioChains = [.. info.AudioChains.Where(chain => chain.SelectedStream is not null)];
+        for (int index = 0; index < audioChains.Length; index++)
         {
-            Group("group.audio", StringResource.Audio);
-            Add("audio.codec", StringResource.Codec, FormatCodec(audio));
-            Add("audio.samplerate", StringResource.SampleRate, audio.SampleRate.ToString(CultureInfo.InvariantCulture) + " Hz");
-            Add("audio.channels", StringResource.Channels, audio.ChannelCount.ToString(CultureInfo.InvariantCulture));
-            Add("audio.layout", StringResource.ChannelLayout, audio.ChannelLayout.ToString().ToLowerInvariant());
-            Add("audio.sampleformat", StringResource.SampleFormat, audio.SampleFormat.ToString().ToLowerInvariant());
-            if (audio.Bitrate > 0)
+            IAudioChain chain = audioChains[index];
+            if (chain.SelectedStream is not { } audio)
             {
-                Add("audio.bitrate", StringResource.BitRate, FormatBitrate(audio.Bitrate));
+                continue;
             }
 
-            Add("audio.decoder", StringResource.Decoder, info.AudioDecoderName ?? StringResource.None);
-            Add("audio.decoder.mode", StringResource.DecodeMode, info.IsAudioHardwareAccelerated ? StringResource.Hardware : StringResource.Software);
-            Add("audio.renderer", StringResource.Renderer, info.AudioRendererName ?? StringResource.None);
+            string suffix = index == 0 ? string.Empty : $" #{index + 1}";
+            string key = $"audio#{index + 1}";
+            Group($"group.{key}", StringResource.Audio + suffix);
+            Add($"{key}.codec", StringResource.Codec, FormatCodec(audio));
+            Add($"{key}.samplerate", StringResource.SampleRate, audio.SampleRate.ToString(CultureInfo.InvariantCulture) + " Hz");
+            Add($"{key}.channels", StringResource.Channels, audio.ChannelCount.ToString(CultureInfo.InvariantCulture));
+            Add($"{key}.layout", StringResource.ChannelLayout, audio.ChannelLayout.ToString().ToLowerInvariant());
+            Add($"{key}.sampleformat", StringResource.SampleFormat, audio.SampleFormat.ToString().ToLowerInvariant());
+            if (audio.Bitrate > 0)
+            {
+                Add($"{key}.bitrate", StringResource.BitRate, FormatBitrate(audio.Bitrate));
+            }
+
+            Add($"{key}.decoder", StringResource.Decoder, chain.DecoderName ?? StringResource.None);
+            Add($"{key}.decoder.mode", StringResource.DecodeMode, chain.IsHardwareAccelerated ? StringResource.Hardware : StringResource.Software);
+            Add($"{key}.renderer", StringResource.Renderer, chain.RendererName ?? StringResource.None);
         }
 
-        if (info.SelectedSubtitleStream is { } subtitle)
+        ISubtitleChain[] subtitleChains = [.. info.SubtitleChains.Where(chain => chain.SelectedStream is not null)];
+        for (int index = 0; index < subtitleChains.Length; index++)
         {
-            Group("group.subtitle", StringResource.Subtitle);
-            Add("subtitle.codec", StringResource.Codec, FormatCodec(subtitle));
-            Add("subtitle.type", StringResource.Type, subtitle.IsBitmap ? StringResource.SubtitleTypeBitmap : StringResource.SubtitleTypeText);
-            Add("subtitle.forced", StringResource.SubtitleForced, subtitle.IsForced ? StringResource.Yes : StringResource.No);
+            ISubtitleChain chain = subtitleChains[index];
+            if (chain.SelectedStream is not { } subtitle)
+            {
+                continue;
+            }
+
+            string suffix = index == 0 ? string.Empty : $" #{index + 1}";
+            string key = $"subtitle#{index + 1}";
+            Group($"group.{key}", StringResource.Subtitle + suffix);
+            Add($"{key}.codec", StringResource.Codec, FormatCodec(subtitle));
+            Add($"{key}.type", StringResource.Type, subtitle.IsBitmap ? StringResource.SubtitleTypeBitmap : StringResource.SubtitleTypeText);
+            Add($"{key}.forced", StringResource.SubtitleForced, subtitle.IsForced ? StringResource.Yes : StringResource.No);
             if (!string.IsNullOrEmpty(subtitle.Language))
             {
-                Add("subtitle.language", StringResource.Language, subtitle.Language);
+                Add($"{key}.language", StringResource.Language, subtitle.Language);
             }
 
             if (!string.IsNullOrEmpty(subtitle.Title))
             {
-                Add("subtitle.title", StringResource.Title, subtitle.Title);
+                Add($"{key}.title", StringResource.Title, subtitle.Title);
             }
 
             if (subtitle.Bitrate > 0)
             {
-                Add("subtitle.bitrate", StringResource.BitRate, FormatBitrate(subtitle.Bitrate));
+                Add($"{key}.bitrate", StringResource.BitRate, FormatBitrate(subtitle.Bitrate));
             }
 
-            Add("subtitle.decoder", StringResource.Decoder, info.SubtitleDecoderName ?? StringResource.None);
-            Add("subtitle.renderer", StringResource.Renderer, info.SubtitleRendererName ?? StringResource.None);
+            Add($"{key}.decoder", StringResource.Decoder, chain.DecoderName ?? StringResource.None);
+            Add($"{key}.renderer", StringResource.Renderer, chain.RendererName ?? StringResource.None);
         }
 
         Group("group.playback", StringResource.Playback);
@@ -145,7 +164,7 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
         Add("playback.lag", StringResource.PictureLag, FormatMilliseconds(info.PictureLag.TotalMilliseconds));
         Add("playback.decode.video", StringResource.VideoDecodeTime, FormatMilliseconds(info.AverageVideoDecodeMilliseconds));
         Add("playback.render.video", StringResource.VideoRenderTime, FormatMilliseconds(info.AverageVideoRenderMilliseconds));
-        Add("playback.underruns", StringResource.AudioUnderruns, info.AudioUnderruns.ToString(CultureInfo.InvariantCulture));
+        Add("playback.underruns", StringResource.AudioUnderruns, info.AudioChains.Sum(chain => chain.Underruns).ToString(CultureInfo.InvariantCulture));
 
         Rows = rows;
     }

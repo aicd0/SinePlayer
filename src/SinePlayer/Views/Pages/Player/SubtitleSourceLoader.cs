@@ -22,7 +22,7 @@ internal static class SubtitleSourceLoader
 
     public static async Task<OperationResult> AddAndSelect(PlayerSession session, PlayerView view, MediaModel media, IReadOnlyList<string> paths)
     {
-        (MediaSource Source, SubtitleStreamInfo Stream)? chosen = null;
+        List<SubtitleStreamInfo> chosen = [];
         foreach (string path in paths)
         {
             MediaSource? source = await AddSource(session, path);
@@ -38,33 +38,41 @@ internal static class SubtitleSourceLoader
                 continue;
             }
 
-            chosen = (source, stream);
+            chosen.Add(stream);
         }
 
-        if (chosen is not { } selection)
+        if (chosen.Count == 0)
         {
             return OperationResultExt.Failure(TAG, "None of the chosen files holds a subtitle track.");
         }
 
-        ISubtitleChain[] showing = [.. view.SubtitleChains];
-        foreach (ISubtitleChain chain in showing)
+        if (!TrackSelection.AllowMultiSubtitleTracks(media))
         {
-            if (chain.SelectedStream is not { } previous || previous.Equals(selection.Stream))
-            {
-                continue;
-            }
+            SubtitleStreamInfo single = chosen[^1];
+            chosen = [single];
 
-            OperationResult removed = await session.RemoveSubtitleStream(view, previous);
-            if (!removed.IsSuccessful)
+            foreach (ISubtitleChain chain in view.SubtitleChains)
             {
-                return removed;
+                if (chain.SelectedStream is not { } previous || previous.Equals(single))
+                {
+                    continue;
+                }
+
+                OperationResult removed = await session.RemoveSubtitleStream(view, previous);
+                if (!removed.IsSuccessful)
+                {
+                    return removed;
+                }
             }
         }
 
-        OperationResult selected = await session.AddSubtitleStream(view, selection.Stream);
-        if (!selected.IsSuccessful)
+        foreach (SubtitleStreamInfo stream in chosen)
         {
-            return selected;
+            OperationResult selected = await session.AddSubtitleStream(view, stream);
+            if (!selected.IsSuccessful)
+            {
+                return selected;
+            }
         }
 
         OperationResult<ReconcileResult> reconciled = await session.Reconcile();

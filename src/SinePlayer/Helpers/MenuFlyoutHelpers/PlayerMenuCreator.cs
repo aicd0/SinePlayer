@@ -342,8 +342,6 @@ internal static class PlayerMenuCreator
             return [new SimpleMenuFlyoutItemModel() { Text = StringResourceProvider.Instance.None, IsEnabled = false }];
         }
 
-        MediaStreamInfo? selected = context.SelectedTrack(MediaStreamKind.Video);
-
         List<BaseMenuFlyoutItemModel> items = [];
         foreach (MediaStreamInfo stream in streams)
         {
@@ -351,7 +349,7 @@ internal static class PlayerMenuCreator
             items.Add(new ToggleMenuFlyoutItemModel()
             {
                 Text = MediaStreamLabel.Describe(choice, context.SourceOf(choice)),
-                IsChecked = choice == selected,
+                IsChecked = context.IsTrackPlaying(choice),
                 Click = () => context.SelectTrack(MediaStreamKind.Video, choice),
             });
         }
@@ -360,7 +358,7 @@ internal static class PlayerMenuCreator
         items.Add(new ToggleMenuFlyoutItemModel()
         {
             Text = StringResourceProvider.Instance.Off,
-            IsChecked = selected is null,
+            IsChecked = !streams.Any(context.IsTrackPlaying),
             Click = () => context.SelectTrack(MediaStreamKind.Video, null),
         });
 
@@ -380,8 +378,7 @@ internal static class PlayerMenuCreator
             return items;
         }
 
-        MediaStreamInfo? selected = context.SelectedTrack(MediaStreamKind.Audio);
-        bool playing = allowMulti ? streams.Any(context.IsAudioTrackPlaying) : selected is not null;
+        bool playing = streams.Any(context.IsTrackPlaying);
 
         foreach (MediaStreamInfo stream in streams)
         {
@@ -389,7 +386,7 @@ internal static class PlayerMenuCreator
             items.Add(new ToggleMenuFlyoutItemModel()
             {
                 Text = MediaStreamLabel.Describe(choice, context.SourceOf(choice)),
-                IsChecked = allowMulti ? context.IsAudioTrackPlaying(choice) : choice == selected,
+                IsChecked = context.IsTrackPlaying(choice),
                 Click = () =>
                 {
                     if (allowMulti)
@@ -452,8 +449,7 @@ internal static class PlayerMenuCreator
             return items;
         }
 
-        MediaStreamInfo? selected = context.SelectedTrack(MediaStreamKind.Subtitle);
-        bool playing = allowMulti ? streams.Any(context.IsSubtitleTrackPlaying) : selected is not null;
+        bool playing = streams.Any(context.IsTrackPlaying);
 
         foreach (MediaStreamInfo stream in streams)
         {
@@ -461,7 +457,7 @@ internal static class PlayerMenuCreator
             items.Add(new ToggleMenuFlyoutItemModel()
             {
                 Text = MediaStreamLabel.Describe(choice, context.SourceOf(choice)),
-                IsChecked = allowMulti ? context.IsSubtitleTrackPlaying(choice) : choice == selected,
+                IsChecked = context.IsTrackPlaying(choice),
                 Click = () =>
                 {
                     if (allowMulti)
