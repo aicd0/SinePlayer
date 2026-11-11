@@ -116,7 +116,6 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
             _disposed = true;
 
-            _target?.SurfaceSizeChanged -= Surface_SizeChanged;
             _target = null;
 
             _surface?.Dispose();
@@ -142,12 +141,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                 return OperationResult.Failure("The renderer has already been disposed.");
             }
 
-            if (!ReferenceEquals(_target, target))
-            {
-                _target?.SurfaceSizeChanged -= Surface_SizeChanged;
-                _target = target;
-                target.SurfaceSizeChanged += Surface_SizeChanged;
-            }
+            _target = target;
 
             (int width, int height, double scale) = GetSurfaceSize(target);
 
@@ -169,19 +163,11 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                 _surface = created.Result;
                 _surfaceKind = created.Result.Kind;
                 _name = Describe(_surfaceKind);
-            }
-            else
-            {
-                OperationResult resize = _surface.Resize(width, height, scale);
-                if (!resize.IsSuccessful)
-                {
-                    return resize;
-                }
+                _appliedSize = (width, height, scale);
+                SetOutput(_surface.View, _surface.Width, _surface.Height);
             }
 
-            _needsResize = false;
-            SetOutput(_surface.View, _surface.Width, _surface.Height);
-            return OperationResult.Success();
+            return MatchSurfaceSize();
         }
     }
 
@@ -207,13 +193,10 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
         lock (_deviceLock)
         {
-            if (_surface is not null && _needsResize)
+            OperationResult sized = MatchSurfaceSize();
+            if (!sized.IsSuccessful)
             {
-                OperationResult resize = ApplyPendingResize();
-                if (!resize.IsSuccessful)
-                {
-                    return resize;
-                }
+                return sized;
             }
 
             if (_outputView is null || _outputWidth <= 0 || _outputHeight <= 0)
@@ -272,13 +255,10 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
         lock (_deviceLock)
         {
-            if (_surface is not null && _needsResize)
+            OperationResult sized = MatchSurfaceSize();
+            if (!sized.IsSuccessful)
             {
-                OperationResult resize = ApplyPendingResize();
-                if (!resize.IsSuccessful)
-                {
-                    return resize;
-                }
+                return sized;
             }
 
             if (_lastPixelShader is null || _lastViews.Length == 0 || _outputView is null)
@@ -299,13 +279,10 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
         lock (_deviceLock)
         {
-            if (_surface is not null && _needsResize)
+            OperationResult sized = MatchSurfaceSize();
+            if (!sized.IsSuccessful)
             {
-                OperationResult resize = ApplyPendingResize();
-                if (!resize.IsSuccessful)
-                {
-                    return resize;
-                }
+                return sized;
             }
 
             _lastPixelShader = null;
@@ -711,31 +688,32 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     private IVideoRenderTarget? _target;
     private IVideoSurface? _surface;
     private VideoSurfaceKind _surfaceKind = VideoSurfaceKind.Sdr;
-    private bool _needsResize;
+    private (int Width, int Height, double Scale) _appliedSize;
 
-    private OperationResult ApplyPendingResize()
+    private OperationResult MatchSurfaceSize()
     {
-        if (_surface is null || _target is null)
+        if (_surface is not { } surface || _target is not { } target)
         {
             return OperationResult.Success();
         }
 
-        (int width, int height, double scale) = GetSurfaceSize(_target);
-        OperationResult resize = _surface.Resize(width, height, scale);
+        (int width, int height, double scale) = GetSurfaceSize(target);
+        if (_appliedSize == (width, height, scale))
+        {
+            return OperationResult.Success();
+        }
+
+        OperationResult resize = surface.Resize(width, height, scale);
         if (!resize.IsSuccessful)
         {
             return resize;
         }
 
-        _needsResize = false;
-        SetOutput(_surface.View, _surface.Width, _surface.Height);
+        _appliedSize = (width, height, scale);
+        SetOutput(surface.View, surface.Width, surface.Height);
         return OperationResult.Success();
     }
 
-    /// <summary>
-    /// The size the swap chain has to be, in physical pixels, and the scale of the host's element that
-    /// has to be cancelled for those pixels to reach the display unchanged.
-    /// </summary>
     private static (int Width, int Height, double Scale) GetSurfaceSize(IVideoRenderTarget target)
     {
         double scale = target.RasterizationScale > 0 ? target.RasterizationScale : 1.0;
@@ -748,11 +726,6 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
             Math.Max(1, (int)Math.Round(target.SurfaceWidth * scale)),
             Math.Max(1, (int)Math.Round(target.SurfaceHeight * scale)),
             scale);
-    }
-
-    private void Surface_SizeChanged()
-    {
-        _needsResize = true;
     }
 
     #endregion

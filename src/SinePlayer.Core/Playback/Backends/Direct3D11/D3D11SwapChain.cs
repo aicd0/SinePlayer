@@ -275,6 +275,7 @@ internal sealed partial class D3D11SwapChain : IDisposable
         ID3D11Texture2D backBuffer = _backBuffer ?? throw new ObjectDisposedException(nameof(D3D11SwapChain));
         return D3D11Interop.ReadPixels(_device.Device, _device.Context, backBuffer, Width, Height, _format);
     }
+
     /// <summary>
     /// Declares what the buffer's codes mean, which is the half of a container DXGI cannot be told at creation.
     /// <para>

@@ -12,15 +12,6 @@
 - Ownership decides placement: state that has to agree with other state belongs to the object holding both (a view
   holds its picture and its words, so the view binds them), never to a caller that must remember the pairing.
 
-### On a test failure
-
-1. If the test expects an old behavior that the user explicitly asked to change, fix the test expectation.
-2. If it is confirmed an implementation bug, that is not part of the design the user asked for and was only
-   introduced by the agent's mistake, fix the bug.
-3. Otherwise, always ask for the user's expectation before making any changes.
-- A flaky test is investigated, not re-run. Never loop the suite hoping to catch it again: read the log of the run that
-  failed and work out why it flakes. A re-run is only for confirming a fix.
-
 ## Building
 
 `dotnet build` does not work here: the MrtCore PriGen targets load `Microsoft.Build.Packaging.Pri.Tasks.dll`
@@ -46,3 +37,12 @@ dotnet test src\Tests\SinePlayer.Core.Tests\SinePlayer.Core.Tests.csproj --no-bu
 ```
 
 Never test UI behavior. Leave it to the user.
+
+### On a test failure
+
+1. If the test expects an old behavior that the user explicitly asked to change, fix the test expectation.
+2. If it is confirmed an implementation bug, that is not part of the design the user asked for and was only
+   introduced by the agent's mistake, fix the bug.
+3. Otherwise, always ask for the user's expectation before making any changes.
+- A flaky test is investigated, not re-run. Never loop the suite hoping to catch it again: read the log of the run that
+  failed and work out why it flakes. A re-run is only for confirming a fix.
