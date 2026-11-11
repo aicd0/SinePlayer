@@ -12,6 +12,8 @@ internal interface IChainFeed
 
     ChainTail ReadTail { get; }
 
+    TimeSpan Offset { get; set; }
+
     void Accept(MediaStreamInfo stream, MediaPacket packet, ChainVersion versions, long epoch);
 
     void SignalEnd(ChainVersion versions, long epoch);

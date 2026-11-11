@@ -138,6 +138,16 @@ public sealed partial class PlaybackPipeline : IDisposable
         return _events.SubmitAndLog(nameof(SelectStream), () => SelectStreamCore(chain, stream));
     }
 
+    public Task<OperationResult> SetOffset(IPlaybackChain chain, TimeSpan offset)
+    {
+        return _events.SubmitAndLog(nameof(SetOffset), () => SetOffsetCore(chain, offset));
+    }
+
+    public TimeSpan GetOffset(IPlaybackChain chain)
+    {
+        return chain is IChainFeed feed ? feed.Offset : TimeSpan.Zero;
+    }
+
     public Task<OperationResult> Play()
     {
         return _events.SubmitAndLog(nameof(Play), PlayCore);
@@ -307,6 +317,38 @@ public sealed partial class PlaybackPipeline : IDisposable
             default:
                 return OperationResult.Failure("The chain is not one of this pipeline's.");
         }
+    }
+
+    private OperationResult SetOffsetCore(IPlaybackChain chain, TimeSpan offset)
+    {
+        if (_disposed)
+        {
+            return OperationResult.Failure("The pipeline has already been disposed.");
+        }
+
+        bool present =
+            (chain is VideoChain heldVideo && Array.IndexOf(_videoChains, heldVideo) >= 0) ||
+            (chain is AudioChain heldAudio && Array.IndexOf(_audioChains, heldAudio) >= 0) ||
+            (chain is SubtitleChain heldSubtitle && Array.IndexOf(_subtitleChains, heldSubtitle) >= 0);
+        if (!present || chain is not IChainFeed feed)
+        {
+            return OperationResult.Failure("The chain is not one of this pipeline's.");
+        }
+
+        if (!_events.CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
+        {
+            return OperationResult.Failure($"Cannot move a track when the state is {state}.");
+        }
+
+        TimeSpan current = feed.Offset;
+        if (current == offset)
+        {
+            return OperationResult.Success();
+        }
+
+        feed.Offset = offset;
+        _reader.RequestResync();
+        return OperationResult.Success();
     }
 
     private OperationResult PlayCore()

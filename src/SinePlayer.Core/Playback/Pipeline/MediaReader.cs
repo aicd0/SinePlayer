@@ -18,6 +18,7 @@ internal sealed class MediaReader(
     private static readonly TimeSpan ReadAheadWake = TimeSpan.FromMilliseconds(4000);
 
     private readonly PipelineNodeAsync _node = new();
+    private int _resyncRequested;
 
     private readonly AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> _videoSources = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
     private readonly AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> _audioSources = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
@@ -45,6 +46,12 @@ internal sealed class MediaReader(
         _subtitleSources.Write(current => Without(current, feed));
     }
 
+    public void RequestResync()
+    {
+        Interlocked.Exchange(ref _resyncRequested, 1);
+        _node.Wake();
+    }
+
     public void Wake()
     {
         _node.Wake();
@@ -53,7 +60,6 @@ internal sealed class MediaReader(
     public async Task Run(Func<bool> stopRequested, Action<long> reportSourceEnded)
     {
         bool pendingEpochChange = false;
-        bool buffering = false;
         long workingEpoch = -1;
         long endingEpoch = -1;
         Dictionary<MediaSource, SourceTail> tails = [];
@@ -105,6 +111,21 @@ internal sealed class MediaReader(
                 continue;
             }
 
+            if (Interlocked.Exchange(ref _resyncRequested, 0) == 1)
+            {
+                Dictionary<IChainFeed, TimeSpan> offsets = [];
+                foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
+                {
+                    if (entry.Value.CurrentStream is not null)
+                    {
+                        offsets[entry.Key] = entry.Key.Offset;
+                    }
+                }
+
+                timeline.PublishOffsets(offsets);
+                continue;
+            }
+
             // Bump epoch
             EpochGate epochGate = timeline.Gate;
             long epoch = epochGate.Epoch;
@@ -119,7 +140,7 @@ internal sealed class MediaReader(
                     entry.Key.ReadTail.Reset();
                 }
 
-                OperationResult sought = SeekSources(sources, epochGate.SeekPosition, epochGate.SeekMode);
+                OperationResult sought = SeekSources(sources, epochGate.SeekPosition + epochGate.ReadOffset, epochGate.SeekMode);
                 if (sought.IsSuccessful)
                 {
                     endingEpoch = -1;
@@ -139,33 +160,26 @@ internal sealed class MediaReader(
             }
 
             // Buffering
-            if (!buffering)
-            {
-                if (IsBuffered(bindings, ReadAheadWake))
-                {
-                    await _node.WaitAsync(stamp);
-                    continue;
-                }
-
-                buffering = true;
-            }
-            else if (IsBuffered(bindings, ReadAheadMin))
-            {
-                buffering = false;
-                continue;
-            }
-
             MediaSource? chosenSource = null;
             SourceTail? chosenTail = null;
+            bool anyUnended = false;
             foreach (MediaSource candidate in sources)
             {
                 if (!tails.TryGetValue(candidate, out SourceTail? tail))
                 {
-                    tail = new SourceTail { Tail = epochGate.SeekPosition };
+                    tail = new SourceTail { Tail = epochGate.SeekPosition + epochGate.ReadOffset };
                     tails[candidate] = tail;
                 }
 
                 if (tail.Ended)
+                {
+                    continue;
+                }
+
+                anyUnended = true;
+
+                tail.IsBuffered = IsBuffered(candidate, tail, bindings);
+                if (tail.IsBuffered)
                 {
                     continue;
                 }
@@ -179,6 +193,12 @@ internal sealed class MediaReader(
 
             if (chosenSource is null || chosenTail is null)
             {
+                if (anyUnended)
+                {
+                    await _node.WaitAsync(stamp);
+                    continue;
+                }
+
                 endingEpoch = epoch;
 
                 foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
@@ -272,32 +292,39 @@ internal sealed class MediaReader(
         return firstFailure;
     }
 
-    private bool IsBuffered(IReadOnlyList<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> bindings, TimeSpan minimumReadAhead)
+    private bool IsBuffered(
+        MediaSource source,
+        SourceTail tail,
+        IReadOnlyList<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> bindings)
     {
-        static bool IsConsuming(KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry)
-        {
-            return entry.Value.CurrentStream is not null && entry.Key.IsConsuming;
-        }
-
         TimeSpan position = timeline.Position;
+        TimeSpan furthest = TimeSpan.MinValue;
+        TimeSpan closest = TimeSpan.MaxValue;
+        TimeSpan mostDelayed = TimeSpan.MinValue;
+        TimeSpan leastDelayed = TimeSpan.MaxValue;
 
         foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
         {
-            if (IsConsuming(entry) && entry.Key.ReadTail.ReadAhead(position) >= ReadAheadMax)
+            if (entry.Value.CurrentStream is null || !entry.Key.IsConsuming || entry.Value.CurrentComponent != source)
             {
-                return true;
+                continue;
             }
+
+            TimeSpan offset = entry.Key.Offset;
+            TimeSpan readAhead = tail.Tail - (position - offset);
+            furthest = TimeSpan.FromTicks(Math.Max(furthest.Ticks, readAhead.Ticks));
+            closest = TimeSpan.FromTicks(Math.Min(closest.Ticks, readAhead.Ticks));
+            mostDelayed = TimeSpan.FromTicks(Math.Max(mostDelayed.Ticks, offset.Ticks));
+            leastDelayed = TimeSpan.FromTicks(Math.Min(leastDelayed.Ticks, offset.Ticks));
         }
 
-        foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
+        if (closest == TimeSpan.MaxValue)
         {
-            if (IsConsuming(entry) && entry.Key.ReadTail.ReadAhead(position) < minimumReadAhead)
-            {
-                return false;
-            }
+            return true;
         }
 
-        return true;
+        TimeSpan enough = tail.IsBuffered ? ReadAheadWake : ReadAheadMin;
+        return furthest >= ReadAheadMax + (mostDelayed - leastDelayed) || closest >= enough;
     }
 
     private static IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>> Without(
@@ -324,5 +351,7 @@ internal sealed class MediaReader(
         public TimeSpan Tail { get; set; }
 
         public bool Ended { get; set; }
+
+        public bool IsBuffered { get; set; }
     }
 }
