@@ -18,7 +18,7 @@ using Windows.Graphics.DirectX;
 
 namespace SinePlayer.Core.Playback.Backends.Libass;
 
-public sealed partial class AssSubtitleRenderer : ISubtitleRenderer
+internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 {
     #region Constructor
 

@@ -27,11 +27,11 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
 
     public const int DecoderBufferedFrames = FrameQueueCapacity + 4;
 
+    private readonly IChainHost _host;
     private readonly PipelineTimeline _timeline;
     private readonly PipelineEvents _events;
-    private readonly Action _surfaceSizeChanged;
-    private readonly AtomicCell<VideoTransform> _transform = new(VideoTransform.Identity);
 
+    private readonly AtomicCell<VideoTransform> _transform = new(VideoTransform.Identity);
     private IVideoRenderTarget? _target;
     private volatile bool _starved;
 
@@ -47,16 +47,16 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
-    public VideoChain(PipelineTimeline timeline, PipelineEvents events, Action<VideoChain> surfaceSizeChanged)
+    public VideoChain(IChainHost host, PipelineTimeline timeline, PipelineEvents events)
     {
+        _host = host;
         _timeline = timeline;
         _events = events;
-        _surfaceSizeChanged = () => surfaceSizeChanged(this);
     }
 
     public MediaStreamKind Kind => MediaStreamKind.Video;
 
-    public VideoStreamInfo? SelectedStream => Selected.Stream;
+    public VideoStreamInfo? SelectedStream => Selected?.Stream;
 
     public VideoStreamInfo? PlayingStream => (VideoStreamInfo?)Source.CurrentStream;
 
@@ -75,9 +75,9 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
         get => _target;
         set
         {
-            _target?.SurfaceSizeChanged -= _surfaceSizeChanged;
+            _target?.SurfaceSizeChanged -= OnSurfaceSizeChanged;
             _target = value;
-            _target?.SurfaceSizeChanged += _surfaceSizeChanged;
+            _target?.SurfaceSizeChanged += OnSurfaceSizeChanged;
         }
     }
 
@@ -148,13 +148,11 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
 
             _transform.Write(_ => value);
             RenderNode.Wake();
-            LayoutChanged?.Invoke(this);
+            _host.PictureLayoutChanged(this);
         }
     }
 
-    public Action<IPictureFrameSource>? LayoutChanged { get; set; }
-
-    public StreamBinding<VideoStreamInfo> Selected { get; set; }
+    public StreamBinding<VideoStreamInfo>? Selected { get; set; }
 
     public bool Starved
     {
@@ -175,7 +173,15 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
     public TimeSpan Offset
     {
         get => TimeSpan.FromTicks(Interlocked.Read(ref _offsetTicks));
-        set => Interlocked.Exchange(ref _offsetTicks, value.Ticks);
+        set
+        {
+            if (Interlocked.Exchange(ref _offsetTicks, value.Ticks) == value.Ticks)
+            {
+                return;
+            }
+
+            _host.OffsetChanged(this);
+        }
     }
 
     public TimeSpan LastPresentedTimestamp
@@ -185,6 +191,11 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
             long ticks = Interlocked.Read(ref _pictureTicks);
             return ticks < 0 ? TimeSpan.Zero : TimeSpan.FromTicks(ticks);
         }
+    }
+
+    public Task<OperationResult> SelectStream(MediaStreamInfo? stream)
+    {
+        return _host.Select(this, stream);
     }
 
     public void Start(Action wakeReader, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
@@ -223,7 +234,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
         Source.Reset();
         Decoder.Reset();
         Renderer.Reset();
-        Selected = default;
+        Selected = null;
         Starved = false;
         EndedEpoch = -1;
         ReadTail.Reset();
@@ -242,16 +253,18 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
 
         OperationResultCreator<ChainChange> result = new();
 
-        StreamBinding<VideoStreamInfo> selected = Selected;
-        bool sourceChanged = !selected.Matches(
-            Source.Latest?.Component, (VideoStreamInfo?)Source.Latest?.Stream);
+        StreamBinding<VideoStreamInfo>? chosen = Selected;
+        bool sourceChanged = chosen?.Source != Source.Latest?.Component || chosen?.Stream != Source.Latest?.Stream;
         ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
         PipelineComponent<IVideoRenderer>? renderer = null;
         PipelineComponent<IVideoDecoder>? decoder = null;
         try
         {
-            if (selected.Source is { } videoSource && selected.Stream is { } videoStream)
+            if (chosen is StreamBinding<VideoStreamInfo> selected)
             {
+                MediaSource videoSource = selected.Source;
+                VideoStreamInfo videoStream = selected.Stream;
+
                 IVideoRenderTarget? videoTarget = Target;
                 if (videoTarget is null)
                 {
@@ -332,7 +345,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
 
                 if (changed.HasFlag(ChainChange.Source))
                 {
-                    Source.Publish(selected.Source is { } source && selected.Stream is { } stream ? new(source, stream, "source") : null, versions);
+                    Source.Publish(chosen is { } bound ? new(bound.Source, bound.Stream, "source") : null, versions);
                 }
 
                 if (changed.HasFlag(ChainChange.Decoder))
@@ -376,6 +389,11 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
     {
         PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
         WakeDecode();
+    }
+
+    public void Select(StreamBinding<MediaStreamInfo>? binding)
+    {
+        Selected = binding is { } chosen ? new(chosen.Source, (VideoStreamInfo)chosen.Stream) : null;
     }
 
     private void Decode(Func<bool> stopRequested, Action wakeReader)
@@ -884,6 +902,12 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
         {
             RenderNode.Wake();
         }
+    }
+
+    private void OnSurfaceSizeChanged()
+    {
+        RenderNode.Wake();
+        _host.PictureLayoutChanged(this);
     }
 
     private TimeSpan SpanOf(MediaPacket packet, double frameRate)

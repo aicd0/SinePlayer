@@ -58,13 +58,13 @@ public sealed class AudioFilterChain
     /// <see cref="Snapshot"/> can tell, for the price of one read, whether there is a newer one to take. It says nothing
     /// about the format: a snapshot that moved on may hand on the same shape, and only the formats answer that.
     /// </summary>
-    public long Version => _snapshot.Version;
+    internal long Version => _snapshot.Version;
 
     /// <summary>
     /// The chain as it is now. The answer never changes afterwards, so a caller that has asked once can keep running
     /// blocks through it while the host edits the chain underneath.
     /// </summary>
-    public AudioFilterChainSnapshot Snapshot() => _snapshot;
+    internal AudioFilterChainSnapshot Snapshot() => _snapshot;
 
     public void Add(IAudioFilter filter)
     {

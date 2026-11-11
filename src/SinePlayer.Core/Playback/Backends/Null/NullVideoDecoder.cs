@@ -9,7 +9,7 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
 
-public sealed partial class NullVideoDecoder : IVideoDecoder
+internal sealed partial class NullVideoDecoder : IVideoDecoder
 {
     private readonly VideoStreamInfo _stream;
 

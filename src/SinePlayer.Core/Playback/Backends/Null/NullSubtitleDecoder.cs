@@ -8,12 +8,7 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
 
-/// <summary>
-/// A subtitle decoder that produces no cues. It exists so a chain can be built and switched without a real subtitle
-/// stream — a test of what happens when a subtitle track is chosen, or a host that wants to see the wiring — and it is
-/// deliberately honest about it: nothing appears on screen because nothing was decoded.
-/// </summary>
-public sealed partial class NullSubtitleDecoder : ISubtitleDecoder
+internal sealed partial class NullSubtitleDecoder : ISubtitleDecoder
 {
     private readonly SubtitleStreamInfo _stream;
 

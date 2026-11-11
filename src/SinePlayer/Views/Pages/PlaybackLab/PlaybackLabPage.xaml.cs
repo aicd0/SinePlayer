@@ -274,12 +274,7 @@ internal sealed partial class PlaybackLabPage : BasePage
                 : sender == SubtitleOffsetBox ? MediaStreamKind.Subtitle
                 : MediaStreamKind.Video;
 
-            OperationResult moved = await pipeline.SetOffset(ChainOf(pipeline, kind), TimeSpan.FromMilliseconds(args.NewValue));
-            if (!moved.IsSuccessful)
-            {
-                Logger.E(TAG, $"The track could not be moved. {moved.Message}");
-            }
-
+            ChainOf(pipeline, kind).Offset = TimeSpan.FromMilliseconds(args.NewValue);
             RefreshStatus();
         });
     }
@@ -530,7 +525,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         IPlaybackChain chain = ChainOf(pipeline, kind);
 
-        OperationResult selected = await pipeline.SelectStream(chain, choice.Stream);
+        OperationResult selected = await chain.SelectStream(choice.Stream);
         if (!selected.IsSuccessful)
         {
             Logger.E(TAG, $"The track could not be changed. {selected.Message}");
@@ -544,7 +539,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             }
             else
             {
-                OperationResult built = ResultOf(reconciled.Result, chain);
+                OperationResult built = reconciled.Result[chain];
                 if (!built.IsSuccessful)
                 {
                     Logger.E(TAG, $"The track could not be played. {built.Message}");
@@ -648,7 +643,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             return;
         }
 
-        OperationResult built = ResultOf(reconciled.Result, ChainOf(pipeline, kind));
+        OperationResult built = reconciled.Result[ChainOf(pipeline, kind)];
         if (!built.IsSuccessful)
         {
             Logger.E(TAG, $"{what} could not be changed. {built.Message}");
@@ -667,22 +662,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private static string OffsetOf(PlaybackPipeline pipeline, MediaStreamKind kind)
     {
-        return pipeline.GetOffset(ChainOf(pipeline, kind)).TotalMilliseconds.ToString("0");
-    }
-
-    private static OperationResult ResultOf(ReconcileResult result, IPlaybackChain chain)
-    {
-        if (chain is IVideoChain video)
-        {
-            return result.VideoResults[video];
-        }
-
-        if (chain is IAudioChain audio)
-        {
-            return result.AudioResults[audio];
-        }
-
-        return result.SubtitleResults[(ISubtitleChain)chain];
+        return ChainOf(pipeline, kind).Offset.TotalMilliseconds.ToString("0");
     }
 
     private static MediaSource? SourceOf(IReadOnlyList<MediaSource> sources, MediaStreamInfo? stream)

@@ -17,9 +17,9 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     private const int SubtitleChangeIntervalMilliseconds = 16;
     private const int FallbackFrameMilliseconds = 40;
 
+    private readonly IChainHost _host;
     private readonly PipelineTimeline _timeline;
     private readonly PipelineEvents _events;
-    private readonly Action _surfaceSizeChanged;
 
     private PipelineCoroutine? _decodeCoroutine;
     private PipelineThread? _renderThread;
@@ -32,16 +32,16 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     private long _endedEpoch = -1;
     private long _offsetTicks;
 
-    public SubtitleChain(PipelineTimeline timeline, PipelineEvents events, Action<SubtitleChain> surfaceSizeChanged)
+    public SubtitleChain(IChainHost host, PipelineTimeline timeline, PipelineEvents events)
     {
+        _host = host;
         _timeline = timeline;
         _events = events;
-        _surfaceSizeChanged = () => surfaceSizeChanged(this);
     }
 
     public MediaStreamKind Kind => MediaStreamKind.Subtitle;
 
-    public SubtitleStreamInfo? SelectedStream => Selected.Stream;
+    public SubtitleStreamInfo? SelectedStream => Selected?.Stream;
 
     public SubtitleStreamInfo? PlayingStream => (SubtitleStreamInfo?)Source.CurrentStream;
 
@@ -60,7 +60,15 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     public TimeSpan Offset
     {
         get => TimeSpan.FromTicks(Interlocked.Read(ref _offsetTicks));
-        set => Interlocked.Exchange(ref _offsetTicks, value.Ticks);
+        set
+        {
+            if (Interlocked.Exchange(ref _offsetTicks, value.Ticks) == value.Ticks)
+            {
+                return;
+            }
+
+            _host.OffsetChanged(this);
+        }
     }
 
     public SubtitleComponentResolver Components { get; } = new();
@@ -70,9 +78,9 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
         get => _target;
         set
         {
-            _target?.SurfaceSizeChanged -= _surfaceSizeChanged;
+            _target?.SurfaceSizeChanged -= OnSurfaceSizeChanged;
             _target = value;
-            _target?.SurfaceSizeChanged += _surfaceSizeChanged;
+            _target?.SurfaceSizeChanged += OnSurfaceSizeChanged;
         }
     }
 
@@ -122,7 +130,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
 
     public long SurfaceVersion;
 
-    public StreamBinding<SubtitleStreamInfo> Selected { get; set; }
+    public StreamBinding<SubtitleStreamInfo>? Selected { get; set; }
 
     public bool Starved
     {
@@ -134,6 +142,11 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     {
         get => Interlocked.Read(ref _endedEpoch);
         set => Interlocked.Exchange(ref _endedEpoch, value);
+    }
+
+    public Task<OperationResult> SelectStream(MediaStreamInfo? stream)
+    {
+        return _host.Select(this, stream);
     }
 
     public void Start(CoroutineHost host, Action wakeReader)
@@ -165,7 +178,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
         Source.Reset();
         Decoder.Reset();
         Renderer.Reset();
-        Selected = default;
+        Selected = null;
         ReadTail.Reset();
     }
 
@@ -175,15 +188,18 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
 
         OperationResultCreator<ChainChange> result = new();
 
-        StreamBinding<SubtitleStreamInfo> selected = Selected;
-        bool sourceChanged = !selected.Matches(Source.Latest?.Component, (SubtitleStreamInfo?)Source.Latest?.Stream);
+        StreamBinding<SubtitleStreamInfo>? chosen = Selected;
+        bool sourceChanged = chosen?.Source != Source.Latest?.Component || chosen?.Stream != Source.Latest?.Stream;
         ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
         PipelineComponent<ISubtitleDecoder>? decoder = null;
         PipelineComponent<ISubtitleRenderer>? renderer = null;
         try
         {
-            if (selected.Source is { } subtitleSource && selected.Stream is { } subtitleStream)
+            if (chosen is StreamBinding<SubtitleStreamInfo> selected)
             {
+                MediaSource subtitleSource = selected.Source;
+                SubtitleStreamInfo subtitleStream = selected.Stream;
+
                 IVideoRenderTarget? subtitleTarget = Target;
                 if (subtitleTarget is null)
                 {
@@ -270,7 +286,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
 
                 if (changed.HasFlag(ChainChange.Source))
                 {
-                    Source.Publish(selected.Source is { } source && selected.Stream is { } stream ? new(source, stream, "source") : null, versions);
+                    Source.Publish(chosen is { } bound ? new(bound.Source, bound.Stream, "source") : null, versions);
                 }
 
                 if (changed.HasFlag(ChainChange.Decoder))
@@ -313,6 +329,11 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     {
         PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
         WakeDecode();
+    }
+
+    public void Select(StreamBinding<MediaStreamInfo>? binding)
+    {
+        Selected = binding is { } chosen ? new(chosen.Source, (SubtitleStreamInfo)chosen.Stream) : null;
     }
 
     private async Task Decode(Func<bool> stopRequested, Action wakeReader)
@@ -569,6 +590,12 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
         {
             DecodeNode.Wake();
         }
+    }
+
+    private void OnSurfaceSizeChanged()
+    {
+        Interlocked.Increment(ref SurfaceVersion);
+        RenderNode.Wake();
     }
 
     private TimeSpan SpanOf(MediaPacket packet)

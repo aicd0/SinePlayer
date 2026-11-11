@@ -18,7 +18,7 @@ namespace SinePlayer.Core.Playback.Pipeline;
 /// and what happens when a filter cannot transform it.
 /// </para>
 /// </summary>
-public sealed class AudioFilterChainSnapshot
+internal sealed class AudioFilterChainSnapshot
 {
     private readonly IAudioFilter[] _filters;
 

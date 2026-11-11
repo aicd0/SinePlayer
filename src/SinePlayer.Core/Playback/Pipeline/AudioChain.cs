@@ -18,6 +18,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     private const int AudioDeviceLeewayMilliseconds = 3000;
     private const int FallbackFrameMilliseconds = 40;
 
+    private readonly IChainHost _host;
     private readonly PipelineTimeline _timeline;
     private readonly PipelineEvents _events;
 
@@ -28,15 +29,16 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     private long _endedEpoch = -1;
     private long _offsetTicks;
 
-    public AudioChain(PipelineTimeline timeline, PipelineEvents events)
+    public AudioChain(IChainHost host, PipelineTimeline timeline, PipelineEvents events)
     {
+        _host = host;
         _timeline = timeline;
         _events = events;
     }
 
     public MediaStreamKind Kind => MediaStreamKind.Audio;
 
-    public AudioStreamInfo? SelectedStream => Selected.Stream;
+    public AudioStreamInfo? SelectedStream => Selected?.Stream;
 
     public AudioStreamInfo? PlayingStream => (AudioStreamInfo?)Source.CurrentStream;
 
@@ -63,7 +65,15 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     public TimeSpan Offset
     {
         get => TimeSpan.FromTicks(Interlocked.Read(ref _offsetTicks));
-        set => Interlocked.Exchange(ref _offsetTicks, value.Ticks);
+        set
+        {
+            if (Interlocked.Exchange(ref _offsetTicks, value.Ticks) == value.Ticks)
+            {
+                return;
+            }
+
+            _host.OffsetChanged(this);
+        }
     }
 
     public ComponentSlot<MediaSource> Source { get; } = new();
@@ -80,7 +90,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
     public PipelineNode RenderNode { get; } = new();
 
-    public StreamBinding<AudioStreamInfo> Selected { get; set; }
+    public StreamBinding<AudioStreamInfo>? Selected { get; set; }
 
     public bool Starved
     {
@@ -92,6 +102,11 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     {
         get => Interlocked.Read(ref _endedEpoch);
         set => Interlocked.Exchange(ref _endedEpoch, value);
+    }
+
+    public Task<OperationResult> SelectStream(MediaStreamInfo? stream)
+    {
+        return _host.Select(this, stream);
     }
 
     public void Start(CoroutineHost host, Action wakeReader, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
@@ -125,7 +140,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
         Decoder.Reset();
         Renderer.CurrentComponent?.Flush();
         Renderer.Reset();
-        Selected = default;
+        Selected = null;
         Starved = false;
         EndedEpoch = -1;
         ReadTail.Reset();
@@ -137,16 +152,19 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
         OperationResultCreator<ChainChange> result = new();
 
-        StreamBinding<AudioStreamInfo> selected = Selected;
-        bool sourceChanged = !selected.Matches(Source.Latest?.Component, (AudioStreamInfo?)Source.Latest?.Stream);
+        StreamBinding<AudioStreamInfo>? chosen = Selected;
+        bool sourceChanged = chosen?.Source != Source.Latest?.Component || chosen?.Stream != Source.Latest?.Stream;
         ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
         PipelineComponent<IAudioRenderer>? renderer = null;
         PipelineComponent<IAudioDecoder>? decoder = null;
         AudioStreamInfo? negotiatedFormat = null;
         try
         {
-            if (selected.Source is { } audioSource && selected.Stream is { } audioStream)
+            if (chosen is StreamBinding<AudioStreamInfo> selected)
             {
+                MediaSource audioSource = selected.Source;
+                AudioStreamInfo audioStream = selected.Stream;
+
                 // Resolve audio renderer
                 bool rebuildAudioRenderer = sourceChanged;
                 PipelineComponent<IAudioRenderer>? latestRenderer = Renderer.Latest;
@@ -226,7 +244,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
                 if (changed.HasFlag(ChainChange.Source))
                 {
-                    Source.Publish(selected.Source is { } source && selected.Stream is { } stream ? new(source, stream, "source") : null, versions);
+                    Source.Publish(chosen is { } bound ? new(bound.Source, bound.Stream, "source") : null, versions);
                 }
 
                 if (changed.HasFlag(ChainChange.Decoder))
@@ -269,6 +287,11 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     {
         PacketQueue.Enqueue(new PacketEntry(null, versions, epoch, TimeSpan.Zero));
         WakeDecode();
+    }
+
+    public void Select(StreamBinding<MediaStreamInfo>? binding)
+    {
+        Selected = binding is { } chosen ? new(chosen.Source, (AudioStreamInfo)chosen.Stream) : null;
     }
 
     private async Task Decode(Func<bool> stopRequested, Action wakeReader)

@@ -9,16 +9,7 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
 
-/// <summary>
-/// A renderer that presents nothing. Frames are counted and dropped, so the video chain still runs at the pace
-/// the synchronizer sets — the pipeline's picture timing, starvation and end-of-stream logic all behave as they
-/// would with a real renderer — while nothing needs a window, a panel or a graphics device.
-/// <para>
-/// <see cref="RenderedFrameCount"/> is what a test or the Lab watches to see that a switch happened: after a
-/// replacement the new instance starts from zero and the old one stops counting.
-/// </para>
-/// </summary>
-public sealed partial class NullVideoRenderer : IVideoRenderer
+internal sealed partial class NullVideoRenderer : IVideoRenderer
 {
     private long _renderedFrameCount;
 

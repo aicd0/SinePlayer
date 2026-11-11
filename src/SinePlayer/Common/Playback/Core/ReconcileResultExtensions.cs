@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Pipeline;
 
 namespace SinePlayer.Common.Playback.Core;
@@ -13,41 +14,32 @@ internal static class ReconcileResultExtensions
 {
     public static OperationResult? Video(this ReconcileResult result, PlayerView view)
     {
-        return view.VideoChain is { } chain ? result.VideoResults[chain] : null;
+        return view.VideoChain is { } chain ? result[chain] : null;
     }
 
     public static OperationResult? Audio(this ReconcileResult result)
     {
-        if (result.AudioResults.Count == 0)
-        {
-            return null;
-        }
-
-        List<OperationResult> failures = [.. result.AudioResults.Values.Where(it => !it.IsSuccessful)];
-        if (failures.Count == 0)
-        {
-            return OperationResult.Success();
-        }
-
-        return failures[0];
+        return Combine(result, MediaStreamKind.Audio);
     }
 
     public static OperationResult? Subtitle(this ReconcileResult result, PlayerView view)
     {
-        if (result.SubtitleResults.Count == 0)
-        {
-            return null;
-        }
+        return view.SubtitleChains.Count == 0 ? null : Combine(result, view.SubtitleChains);
+    }
 
-        List<OperationResult> failures = [.. view.SubtitleChains
-            .Select(chain => result.SubtitleResults.TryGetValue(chain, out OperationResult? single) ? single : null)
-            .OfType<OperationResult>()
-            .Where(it => !it.IsSuccessful)];
-        if (failures.Count == 0)
-        {
-            return OperationResult.Success();
-        }
+    private static OperationResult? Combine(ReconcileResult result, MediaStreamKind kind)
+    {
+        List<OperationResult> failures =
+            [.. result.Results.Where(entry => entry.Key.Kind == kind).Select(entry => entry.Value).Where(it => !it.IsSuccessful)];
+        return failures.Count == 0 ? OperationResult.Success() : failures[0];
+    }
 
-        return failures[0];
+    private static OperationResult? Combine(ReconcileResult result, IReadOnlyList<ISubtitleChain> chains)
+    {
+        List<OperationResult> failures =
+            [.. chains.Select(chain => result.Results.TryGetValue(chain, out OperationResult? single) ? single : null)
+                .OfType<OperationResult>()
+                .Where(it => !it.IsSuccessful)];
+        return failures.Count == 0 ? OperationResult.Success() : failures[0];
     }
 }

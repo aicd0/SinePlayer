@@ -13,7 +13,7 @@ using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
-public sealed partial class FFmpegSource : IMediaSource
+internal sealed partial class FFmpegSource : IMediaSource
 {
     private const string TAG = nameof(FFmpegSource);
 
