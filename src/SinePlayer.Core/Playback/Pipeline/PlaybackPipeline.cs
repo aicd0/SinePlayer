@@ -172,7 +172,7 @@ public sealed partial class PlaybackPipeline : IDisposable
         StopCore();
 
         _timeline.SetPosition(TimeSpan.Zero);
-        _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.PreviousKeyframe);
+        _timeline.PublishMove(TimeSpan.Zero, SeekMode.PreviousKeyframe);
 
         _events.SetState(MediaEngineState.Paused);
         return OperationResult.Success();
@@ -386,7 +386,7 @@ public sealed partial class PlaybackPipeline : IDisposable
             _events.SetState(MediaEngineState.Paused);
         }
 
-        _timeline.AdvanceEpoch(position, mode);
+        _timeline.PublishMove(position, mode);
         _timeline.SeekTo(position);
 
         WakeAll();
@@ -444,7 +444,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         if (changed)
         {
-            _timeline.AdvanceEpoch(_timeline.Position, SeekMode.Precise);
+            _timeline.PublishMove(_timeline.Position, SeekMode.Precise);
             WakeAll();
         }
 
@@ -584,7 +584,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         _timeline.Stop();
         _timeline.EndingEpoch = -1;
-        _timeline.AdvanceEpoch(TimeSpan.Zero, SeekMode.PreviousKeyframe);
+        _timeline.PublishMove(TimeSpan.Zero, SeekMode.PreviousKeyframe);
 
         _events.SetState(MediaEngineState.None);
         return OperationResult.Success();

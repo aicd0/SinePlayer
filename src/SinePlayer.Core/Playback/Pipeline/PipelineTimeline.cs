@@ -44,13 +44,15 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
         set => Interlocked.Exchange(ref _endingEpoch, value);
     }
 
-    public void AdvanceEpoch(TimeSpan position, SeekMode mode)
+    public void PublishMove(TimeSpan position, SeekMode mode)
     {
         _epochGate.Write(x => new EpochGate()
         {
             Epoch = x.Epoch + 1,
             SeekPosition = position,
             SeekMode = mode,
+            ReadOffset = x.ReadOffset,
+            Offsets = x.Offsets,
         });
     }
 
