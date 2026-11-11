@@ -168,9 +168,6 @@ internal sealed partial class PlayerSession : IDisposable
 
         StopPositionTimer();
 
-        SaveProgress();
-        SaveRecord();
-
         foreach (PlayerView view in _views)
         {
             view.DetachChains();
@@ -684,16 +681,14 @@ internal sealed partial class PlayerSession : IDisposable
 
     private void Playback_PlaybackStateChanged(PlaybackStateChangedEventArgs args)
     {
-        SaveRecord();
+        if (_isOpening)
+        {
+            _pendingOpen = args;
+            return;
+        }
 
         CoroutineUtils.Run(async () =>
         {
-            if (_isOpening)
-            {
-                _pendingOpen = args;
-                return;
-            }
-
             _isOpening = true;
             try
             {
@@ -709,6 +704,8 @@ internal sealed partial class PlayerSession : IDisposable
             {
                 _isOpening = false;
             }
+
+            SaveRecord();
         });
     }
 
@@ -1142,7 +1139,8 @@ internal sealed partial class PlayerSession : IDisposable
 
     private void SaveRecord()
     {
-        if (!_loaded || _views.Count == 0 || ServiceManager.GetService<IApplicationService>().Exiting)
+        if (!_loaded || _isOpening || _views.Count == 0 ||
+            ServiceManager.GetService<IApplicationService>().Exiting)
         {
             return;
         }
