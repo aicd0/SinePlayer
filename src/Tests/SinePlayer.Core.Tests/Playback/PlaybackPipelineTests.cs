@@ -20,7 +20,8 @@ using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Null;
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Engine;
+using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Core.Playback.Selection;
 using SinePlayer.Core.Playback.Timing;
 

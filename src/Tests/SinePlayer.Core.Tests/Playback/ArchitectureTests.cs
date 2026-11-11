@@ -4,7 +4,7 @@
 using System.Reflection;
 
 using SinePlayer.Core.Playback.Backends.FFmpeg;
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Core.Tests.Playback;
 

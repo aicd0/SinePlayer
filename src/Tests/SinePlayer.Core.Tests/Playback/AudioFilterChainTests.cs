@@ -6,7 +6,8 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Filter;
 using SinePlayer.Core.Playback.Abstractions.Info;
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Engine;
+using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Core.Tests.Playback;
 

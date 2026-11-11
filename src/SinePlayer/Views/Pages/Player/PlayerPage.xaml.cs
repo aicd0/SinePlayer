@@ -30,7 +30,7 @@ using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Render;
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;

@@ -108,7 +108,8 @@ public class FFmpegSourceTests
     }
 
     [Test]
-    public void ReadsPacketsUntilEndOfStream()    {
+    public void ReadsPacketsUntilEndOfStream()
+    {
         using FFmpegSource source = OpenWaveFile();
 
         int packetCount = 0;

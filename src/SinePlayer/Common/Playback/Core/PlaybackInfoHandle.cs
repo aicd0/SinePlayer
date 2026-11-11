@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Source;
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Common.Playback.Core;
 
