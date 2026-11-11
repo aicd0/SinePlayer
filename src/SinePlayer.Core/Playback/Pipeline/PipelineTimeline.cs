@@ -56,6 +56,24 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
         });
     }
 
+    public void PublishOffsets(IReadOnlyDictionary<IChainFeed, TimeSpan> offsets)
+    {
+        TimeSpan position = Position;
+        TimeSpan readOffset = EpochGate.ReadOffsetOf(offsets);
+        _epochGate.Write(x =>
+        {
+            bool reseek = readOffset != x.ReadOffset || EpochGate.AnyOffsetIncreased(x.Offsets, offsets);
+            return new EpochGate()
+            {
+                Epoch = reseek ? x.Epoch + 1 : x.Epoch,
+                SeekPosition = reseek ? position : x.SeekPosition,
+                SeekMode = reseek ? SeekMode.Precise : x.SeekMode,
+                ReadOffset = readOffset,
+                Offsets = offsets,
+            };
+        });
+    }
+
     public void SetPosition(TimeSpan position)
     {
         lock (_clockLock)
@@ -64,8 +82,6 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
         }
     }
 
-    // A seek moves the clock at once only while nothing has anchored it at this epoch, because an anchored clock
-    // is already where the chain that owns it says the sound or the picture is.
     public void SeekTo(TimeSpan position)
     {
         lock (_clockLock)

@@ -319,6 +319,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
 
     public OperationResult Seek(TimeSpan position, int streamIndex, SeekMode mode)
     {
+        SeekCount++;
         LastSeekPosition = position;
         LastSeekStreamIndex = streamIndex;
         LastSeekMode = mode;
@@ -347,6 +348,9 @@ internal sealed class SyntheticMediaSource : IMediaSource
         _next = next < 0 ? _timeline.Count : next;
         return OperationResult.Success();
     }
+
+    /// <summary>How many times the pipeline has asked this source to move, whatever the answer was.</summary>
+    internal int SeekCount { get; private set; }
 
     /// <summary>Where the pipeline last asked the cursor to go, and what it asked the landing to be measured by.</summary>
     internal TimeSpan? LastSeekPosition { get; private set; }

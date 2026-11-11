@@ -17,7 +17,7 @@ using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed, IPipelineWakeTarget
+internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
 {
     private const int FrameQueueCapacity = 8;
     private const int VideoStarvationMilliseconds = 200;
@@ -42,6 +42,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
     private long _decodeTicks;
     private long _renderTicks;
     private long _pictureTicks = -1;
+    private long _offsetTicks;
     private PipelineThread? _decodeThread;
     private PipelineThread? _renderThread;
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
@@ -170,6 +171,12 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
     public ChainTail ReadTail { get; } = new();
 
     public bool IsConsuming => Decoder.HasComponent;
+
+    public TimeSpan Offset
+    {
+        get => TimeSpan.FromTicks(Interlocked.Read(ref _offsetTicks));
+        set => Interlocked.Exchange(ref _offsetTicks, value.Ticks);
+    }
 
     public TimeSpan LastPresentedTimestamp
     {
@@ -506,6 +513,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
         bool deviceAvailable = false;
         long workingEpoch = -1;
         long endingEpoch = -1;
+        TimeSpan workingOffset = TimeSpan.Zero;
         TimeSpan? startTime = null;
         TimeSpan? firstFrameTime = null;
 
@@ -564,9 +572,11 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
             EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             TimeSpan offset = epochGate.OffsetOf(this);
-            if (workingEpoch != epoch)
+            bool restarted = workingEpoch != epoch || workingOffset != offset;
+            if (restarted)
             {
                 workingEpoch = epoch;
+                workingOffset = offset;
                 startTime = epochGate.SeekMode == SeekMode.Precise ? epochGate.SeekPosition : null;
                 firstFrameTime = null;
                 Interlocked.Exchange(ref _pictureTicks, -1);

@@ -12,6 +12,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -164,7 +165,41 @@
                 Content="Reset transform" />
         </StackPanel>
 
-        <Grid Grid.Row="3" Background="Black">
+        <StackPanel
+            Grid.Row="3"
+            Margin="12,0,12,12"
+            Orientation="Horizontal"
+            Spacing="8">
+            <NumberBox
+                x:Name="VideoOffsetBox"
+                Width="150"
+                Header="Video offset (ms)"
+                LargeChange="1000"
+                SmallChange="100"
+                SpinButtonPlacementMode="Compact"
+                Value="0"
+                ValueChanged="OffsetBox_ValueChanged" />
+            <NumberBox
+                x:Name="AudioOffsetBox"
+                Width="150"
+                Header="Audio offset (ms)"
+                LargeChange="1000"
+                SmallChange="100"
+                SpinButtonPlacementMode="Compact"
+                Value="0"
+                ValueChanged="OffsetBox_ValueChanged" />
+            <NumberBox
+                x:Name="SubtitleOffsetBox"
+                Width="150"
+                Header="Subtitle offset (ms)"
+                LargeChange="1000"
+                SmallChange="100"
+                SpinButtonPlacementMode="Compact"
+                Value="0"
+                ValueChanged="OffsetBox_ValueChanged" />
+        </StackPanel>
+
+        <Grid Grid.Row="4" Background="Black">
             <SwapChainPanel x:Name="VideoPanel" IsHitTestVisible="False" />
             <SwapChainPanel
                 x:Name="SubtitlePanel"
@@ -174,7 +209,7 @@
 
         <TextBlock
             x:Name="StatusText"
-            Grid.Row="4"
+            Grid.Row="5"
             Margin="12"
             IsTextSelectionEnabled="True"
             Text="Pick a file to play it through the engine: FFmpeg decodes, Direct3D 11 presents and WASAPI plays the sound."

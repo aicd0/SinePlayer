@@ -26,6 +26,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
     private volatile bool _starved;
     private long _endedEpoch = -1;
+    private long _offsetTicks;
 
     public AudioChain(PipelineTimeline timeline, PipelineEvents events)
     {
@@ -58,6 +59,12 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     public ChainTail ReadTail { get; } = new();
 
     public bool IsConsuming => Decoder.HasComponent;
+
+    public TimeSpan Offset
+    {
+        get => TimeSpan.FromTicks(Interlocked.Read(ref _offsetTicks));
+        set => Interlocked.Exchange(ref _offsetTicks, value.Ticks);
+    }
 
     public ComponentSlot<MediaSource> Source { get; } = new();
 
@@ -449,7 +456,8 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
         long workingEpoch = -1;
         long endingEpoch = -1;
         long playedOutEpoch = -1;
-        TimeSpan? clockOffset = null;
+        TimeSpan workingOffset = TimeSpan.Zero;
+        TimeSpan? deviceOffset = null;
         TimeSpan? startTime = null;
         TimeSpan? tailBufferPosition = null;
         AudioStreamInfo? deviceFormat = null;
@@ -495,7 +503,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
                 deviceAvailable = false;
                 reportedRunningAhead = false;
-                clockOffset = null;
+                deviceOffset = null;
                 deviceFormat = null;
                 filters = null;
                 continue;
@@ -528,33 +536,34 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                         }
                     }
 
-                    clockOffset = null;
+                    deviceOffset = null;
                 }
             }
 
             EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
             TimeSpan offset = epochGate.OffsetOf(this);
-            bool epochChanged = workingEpoch != epoch;
-            if (epochChanged)
+            bool restarted = workingEpoch != epoch || workingOffset != offset;
+            if (restarted)
             {
                 workingEpoch = epoch;
+                workingOffset = offset;
                 startTime = epochGate.SeekMode == SeekMode.Precise ? epochGate.SeekPosition : null;
                 tailBufferPosition = null;
                 reportedRunningAhead = false;
                 audioRenderer?.Flush();
             }
 
-            if (epochChanged || !deviceAvailable)
+            if (restarted || !deviceAvailable)
             {
-                clockOffset = null;
+                deviceOffset = null;
                 ReleaseInFlightAudio();
             }
 
             bool playing = _events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
             lock (_timeline.ClockLock)
             {
-                if (epochChanged)
+                if (restarted)
                 {
                     Starved = true;
                 }
@@ -619,9 +628,9 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
             {
                 IPlaybackClock deviceClock = audioRenderer.Clock;
 
-                if (hasDeviceAudio && clockOffset is TimeSpan deviceOffset)
+                if (hasDeviceAudio && deviceOffset.HasValue)
                 {
-                    _timeline.SyncClock(this, deviceClock, deviceOffset);
+                    _timeline.SyncClock(this, deviceClock, deviceOffset.Value);
                 }
 
                 if (inFlightSubmit is not null)
@@ -740,9 +749,9 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 Starved = false;
 
                 bool clockChanged = _timeline.Anchor(epoch, timestamp);
-                if (deviceAvailable && audioRenderer is not null && (clockChanged || clockOffset is null))
+                if (deviceAvailable && audioRenderer is not null && (clockChanged || deviceOffset is null))
                 {
-                    clockOffset = audioRenderer.Clock.Position - timestamp;
+                    deviceOffset = audioRenderer.Clock.Position - timestamp;
                 }
 
                 _timeline.StartOrPause(epoch, state);

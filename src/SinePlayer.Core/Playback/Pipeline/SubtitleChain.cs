@@ -30,6 +30,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     private IVideoRenderTarget? _target;
     private volatile bool _starved;
     private long _endedEpoch = -1;
+    private long _offsetTicks;
 
     public SubtitleChain(PipelineTimeline timeline, PipelineEvents events, Action<SubtitleChain> surfaceSizeChanged)
     {
@@ -55,6 +56,12 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     public ChainTail ReadTail { get; } = new();
 
     public bool IsConsuming => Decoder.HasComponent;
+
+    public TimeSpan Offset
+    {
+        get => TimeSpan.FromTicks(Interlocked.Read(ref _offsetTicks));
+        set => Interlocked.Exchange(ref _offsetTicks, value.Ticks);
+    }
 
     public SubtitleComponentResolver Components { get; } = new();
 

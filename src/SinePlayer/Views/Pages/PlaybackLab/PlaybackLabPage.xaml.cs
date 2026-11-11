@@ -260,6 +260,30 @@ internal sealed partial class PlaybackLabPage : BasePage
         CoroutineUtils.Run(() => SeekBy(30));
     }
 
+    private void OffsetBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        CoroutineUtils.Run(async () =>
+        {
+            PlaybackPipeline? pipeline = _pipeline;
+            if (pipeline is null || double.IsNaN(args.NewValue))
+            {
+                return;
+            }
+
+            MediaStreamKind kind = sender == AudioOffsetBox ? MediaStreamKind.Audio
+                : sender == SubtitleOffsetBox ? MediaStreamKind.Subtitle
+                : MediaStreamKind.Video;
+
+            OperationResult moved = await pipeline.SetOffset(ChainOf(pipeline, kind), TimeSpan.FromMilliseconds(args.NewValue));
+            if (!moved.IsSuccessful)
+            {
+                Logger.E(TAG, $"The track could not be moved. {moved.Message}");
+            }
+
+            RefreshStatus();
+        });
+    }
+
     private void VideoDecoderPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         CoroutineUtils.Run(async () =>
@@ -392,6 +416,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         IVideoChain video = await pipeline.AddVideoChain(_videoRenderTarget);
         IAudioChain audio = await pipeline.AddAudioChain();
         ISubtitleChain subtitle = await pipeline.AddSubtitleChain(_subtitleRenderTarget);
+        subtitle.LayoutVideoChain = video;
 
         ApplyComponentSelection<IVideoDecoderFactory>(pipeline, VideoDecoderPicker.SelectedItem as ComponentChoice);
         ApplyComponentSelection<IVideoRendererFactory>(pipeline, VideoRendererPicker.SelectedItem as ComponentChoice);
@@ -466,6 +491,12 @@ internal sealed partial class PlaybackLabPage : BasePage
         // The panel gives the surface back before the swap chain it is showing goes away.
         _videoRenderTarget?.DetachSurface();
         _subtitleRenderTarget?.DetachSurface();
+
+        // The shifts belonged to the chains that just went away, so the boxes go back to nothing.
+        VideoOffsetBox.Value = 0;
+        AudioOffsetBox.Value = 0;
+        SubtitleOffsetBox.Value = 0;
+
         PopulateTrackPickers();
     }
 
@@ -632,6 +663,11 @@ internal sealed partial class PlaybackLabPage : BasePage
             MediaStreamKind.Audio => pipeline.AudioChains[0],
             _ => pipeline.SubtitleChains[0],
         };
+    }
+
+    private static string OffsetOf(PlaybackPipeline pipeline, MediaStreamKind kind)
+    {
+        return pipeline.GetOffset(ChainOf(pipeline, kind)).TotalMilliseconds.ToString("0");
     }
 
     private static OperationResult ResultOf(ReconcileResult result, IPlaybackChain chain)
@@ -905,13 +941,14 @@ internal sealed partial class PlaybackLabPage : BasePage
             : $"filters {string.Join(", ", pipeline.AudioChains[0].Filters.Filters.Select(filter => filter.Name))}";
         string pace = $" decode {video.AverageDecodeMilliseconds:0.0} ms {decoding}, render {video.AverageRenderMilliseconds:0.0} ms by {renderer}{sound}, {chain}.";
         string transform = DescribeTransform(pipeline.VideoChains[0].Transform);
+        string offsets = $" offsets {OffsetOf(pipeline, MediaStreamKind.Video)}/{OffsetOf(pipeline, MediaStreamKind.Audio)}/{OffsetOf(pipeline, MediaStreamKind.Subtitle)} ms";
         string tracks = DescribeTracks(pipeline);
 
         string media = Describe(pipeline);
         string described = media.Length == 0 ? string.Empty : $" {media}.";
 
         string status = $"{pipeline.State}:{described} {pipeline.Position:mm\\:ss\\.fff} / {ReachableDuration(pipeline):mm\\:ss\\.fff}."
-            + $" {presented} frame(s).{health}{pace}{transform}{tracks}{surface}";
+            + $" {presented} frame(s).{health}{pace}{transform}{offsets}{tracks}{surface}";
         if (status != StatusText.Text)
         {
             StatusText.Text = status;
