@@ -3,7 +3,7 @@
 
 using System.Reflection;
 
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Core.Tests.Playback;
 
@@ -118,16 +118,16 @@ public class PublicSurfaceTests
         "SinePlayer.Core.Playback.Backends.Wasapi.WasapiAudioRendererFactory",
         "SinePlayer.Core.Playback.Backends.Win2D.SubtitleFonts",
         "SinePlayer.Core.Playback.Backends.Win2D.Win2DSubtitleRendererFactory",
-        "SinePlayer.Core.Playback.Pipeline.AudioFilterChain",
-        "SinePlayer.Core.Playback.Pipeline.IAudioChain",
-        "SinePlayer.Core.Playback.Pipeline.IPictureFrameSource",
-        "SinePlayer.Core.Playback.Pipeline.IPlaybackChain",
-        "SinePlayer.Core.Playback.Pipeline.IPlaybackChain`1",
-        "SinePlayer.Core.Playback.Pipeline.ISubtitleChain",
-        "SinePlayer.Core.Playback.Pipeline.IVideoChain",
-        "SinePlayer.Core.Playback.Pipeline.MediaEngineState",
-        "SinePlayer.Core.Playback.Pipeline.PlaybackPipeline",
-        "SinePlayer.Core.Playback.Pipeline.ReconcileResult",
+        "SinePlayer.Core.Playback.Hosting.AudioFilterChain",
+        "SinePlayer.Core.Playback.Hosting.IAudioChain",
+        "SinePlayer.Core.Playback.Hosting.IPictureFrameSource",
+        "SinePlayer.Core.Playback.Hosting.IPlaybackChain",
+        "SinePlayer.Core.Playback.Hosting.IPlaybackChain`1",
+        "SinePlayer.Core.Playback.Hosting.ISubtitleChain",
+        "SinePlayer.Core.Playback.Hosting.IVideoChain",
+        "SinePlayer.Core.Playback.Hosting.MediaEngineState",
+        "SinePlayer.Core.Playback.Hosting.PlaybackPipeline",
+        "SinePlayer.Core.Playback.Hosting.ReconcileResult",
         "SinePlayer.Core.Playback.Selection.AudioComponentResolver",
         "SinePlayer.Core.Playback.Selection.SubtitleComponentResolver",
         "SinePlayer.Core.Playback.Selection.VideoComponentResolver",

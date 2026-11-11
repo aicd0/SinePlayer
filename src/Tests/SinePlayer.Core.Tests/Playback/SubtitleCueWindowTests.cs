@@ -3,7 +3,7 @@
 
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Engine;
 
 namespace SinePlayer.Core.Tests.Playback;
 

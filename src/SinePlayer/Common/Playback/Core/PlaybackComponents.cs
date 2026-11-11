@@ -14,7 +14,7 @@ using SinePlayer.Core.Playback.Backends.Libass;
 using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Backends.Wasapi;
 using SinePlayer.Core.Playback.Backends.Win2D;
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Common.Playback.Core;
 

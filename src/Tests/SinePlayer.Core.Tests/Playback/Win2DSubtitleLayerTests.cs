@@ -3,8 +3,6 @@
 
 using Microsoft.Graphics.Canvas;
 
-using NUnit.Framework;
-
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;

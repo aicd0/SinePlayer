@@ -9,7 +9,7 @@ using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Common.Playback.Surface;
 using SinePlayer.Core.Playback.Abstractions.Render;
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Common.Playback.Core;
 

@@ -10,7 +10,7 @@ using System.Linq;
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Playback.Abstractions.Info;
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Views.Pages.Sidebar.PlaybackInfo;
 

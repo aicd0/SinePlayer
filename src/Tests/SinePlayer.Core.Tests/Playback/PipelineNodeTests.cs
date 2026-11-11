@@ -3,7 +3,7 @@
 
 using System.Diagnostics;
 
-using SinePlayer.Core.Playback.Pipeline;
+using SinePlayer.Core.Playback.Engine;
 
 namespace SinePlayer.Core.Tests.Playback;
 
