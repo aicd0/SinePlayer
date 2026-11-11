@@ -341,7 +341,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                     _events.PostWarning($"The subtitle decoder could not be flushed: {ex.Message}", this);
                 }
 
-                CueWindow.SeekTo(epoch, epochGate.SeekPosition);
+                CueWindow.SeekTo(epoch, epochGate.SeekPosition + epochGate.ReadOffset);
                 continue;
             }
 
@@ -448,14 +448,16 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                 continue;
             }
 
-            long epoch = _timeline.Epoch;
+            EpochGate epochGate = _timeline.Gate;
+            long epoch = epochGate.Epoch;
+            TimeSpan offset = epochGate.OffsetOf(this);
             if (workingEpoch != epoch)
             {
                 workingEpoch = epoch;
                 drawnInvalidated = true;
             }
 
-            TimeSpan position = _timeline.Position;
+            TimeSpan position = _timeline.Position - offset;
             SubtitleCueSnapshot cues = CueWindow.GetVisibleCues(epoch, position);
             long surfaceVersion = Interlocked.Read(ref SurfaceVersion);
 

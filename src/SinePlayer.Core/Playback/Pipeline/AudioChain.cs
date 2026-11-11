@@ -534,8 +534,8 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
             EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
+            TimeSpan offset = epochGate.OffsetOf(this);
             bool epochChanged = workingEpoch != epoch;
-
             if (epochChanged)
             {
                 workingEpoch = epoch;
@@ -619,9 +619,9 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
             {
                 IPlaybackClock deviceClock = audioRenderer.Clock;
 
-                if (hasDeviceAudio && clockOffset is TimeSpan offset)
+                if (hasDeviceAudio && clockOffset is TimeSpan deviceOffset)
                 {
-                    _timeline.SyncClock(this, deviceClock, offset);
+                    _timeline.SyncClock(this, deviceClock, deviceOffset);
                 }
 
                 if (inFlightSubmit is not null)
@@ -716,7 +716,8 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 continue;
             }
 
-            if (startTime.HasValue && buffer.Timestamp < startTime)
+            TimeSpan timestamp = buffer.Timestamp + offset;
+            if (startTime.HasValue && timestamp < startTime)
             {
                 buffer.Dispose();
                 continue;
@@ -731,17 +732,17 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
             }
 
             buffer = filtersApplied.Result;
-
-            tailBufferPosition = buffer.Timestamp + buffer.Duration;
+            timestamp = buffer.Timestamp + offset;
+            tailBufferPosition = timestamp + buffer.Duration;
 
             lock (_timeline.ClockLock)
             {
                 Starved = false;
 
-                bool clockChanged = _timeline.Anchor(epoch, buffer.Timestamp);
+                bool clockChanged = _timeline.Anchor(epoch, timestamp);
                 if (deviceAvailable && audioRenderer is not null && (clockChanged || clockOffset is null))
                 {
-                    clockOffset = audioRenderer.Clock.Position - buffer.Timestamp;
+                    clockOffset = audioRenderer.Clock.Position - timestamp;
                 }
 
                 _timeline.StartOrPause(epoch, state);
