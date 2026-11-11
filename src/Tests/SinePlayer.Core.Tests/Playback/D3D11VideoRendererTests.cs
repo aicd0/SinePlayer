@@ -404,10 +404,28 @@ public class D3D11VideoRendererTests
         // The frame just presented belongs to the display now, so the next one has to wait for it. That wait is the
         // whole point of the waitable object, and the thing that stops happening — silently — when the chain presents
         // with a sync interval of zero.
-        long waitStart = System.Diagnostics.Stopwatch.GetTimestamp();
-        Assert.That(ownedSwapChain.TryAcquireFrameSlot(), Is.True, "the display takes the frame within the bound");
-        double waitedMilliseconds = (System.Diagnostics.Stopwatch.GetTimestamp() - waitStart) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-        Assert.That(waitedMilliseconds, Is.GreaterThan(1.0), "presenting consumed the slot, so the next frame waits for the display");
+        //
+        // One wait on its own is not the thing to measure: it ends when the display takes the frame, which is anywhere
+        // from nothing to a whole refresh away, so where in the refresh it happens to be asked decides how long it takes.
+        // Waiting, presenting and waiting again settles into a rhythm — each present comes right after a refresh, so the
+        // wait that follows it is a whole refresh — and that is what makes a bound worth asserting. The first wait only
+        // settles the rhythm, so it is not judged.
+        const int cycles = 4;
+        for (int cycle = 0; cycle < cycles; cycle++)
+        {
+            long waitStart = System.Diagnostics.Stopwatch.GetTimestamp();
+            Assert.That(ownedSwapChain.TryAcquireFrameSlot(), Is.True, "the display takes the frame within the bound");
+            double waitedMilliseconds = (System.Diagnostics.Stopwatch.GetTimestamp() - waitStart) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+
+            if (cycle > 0)
+            {
+                Assert.That(waitedMilliseconds, Is.GreaterThan(1.0),
+                    $"presenting consumed the slot, so the wait of cycle {cycle} is a refresh, not a return");
+            }
+
+            OperationResult cycled = ownedSwapChain.Present();
+            Assert.That(cycled.IsSuccessful, Is.True, cycled.Message);
+        }
     }
 
     [Test]
@@ -576,6 +594,31 @@ public class D3D11VideoRendererTests
         }
     }
 
+    /// <summary>
+    /// A panel that has not been measured yet reports a size the surface has to be made at, and it is attaching the swap chain
+    /// that makes the panel lay out and report the real one. That report arrives while the surface is being attached, so a
+    /// pending resize cleared right afterwards would swallow it and leave the picture at the guess it was made at.
+    /// </summary>
+    [Test]
+    public void FollowsASizeReportedWhileTheSwapChainIsBeingAttached()
+    {
+        FakeRenderTarget target = new() { SurfaceWidth = 1, SurfaceHeight = 1, RasterizationScale = 1.0 };
+        target.OnAttached = () =>
+        {
+            target.SurfaceWidth = 64;
+            target.SurfaceHeight = 32;
+            target.RaiseSizeChanged();
+        };
+
+        Assert.That(_renderer.Configure(CreateStreamInfo(64, 32), target).IsSuccessful, Is.True);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(_renderer.OutputPixelWidth, Is.EqualTo(64), "the size the panel reported while attaching is the one to use");
+            Assert.That(_renderer.OutputPixelHeight, Is.EqualTo(32));
+        }
+    }
+
     [Test]
     public void ReportsMissingOutputSurface()
     {
@@ -625,11 +668,15 @@ public class D3D11VideoRendererTests
 
         public nint AttachedSwapChain { get; private set; }
 
+        /// <summary>Stands in for the panel laying out as the swap chain arrives, which is what makes it report a size.</summary>
+        public Action? OnAttached { get; set; }
+
         public event Action? SurfaceSizeChanged;
 
         public void AttachPresentationSurface(nint swapChain)
         {
             AttachedSwapChain = swapChain;
+            OnAttached?.Invoke();
         }
 
         public void RaiseSizeChanged()
