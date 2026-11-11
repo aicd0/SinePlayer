@@ -563,6 +563,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
 
             EpochGate epochGate = _timeline.Gate;
             long epoch = epochGate.Epoch;
+            TimeSpan offset = epochGate.OffsetOf(this);
             if (workingEpoch != epoch)
             {
                 workingEpoch = epoch;
@@ -657,24 +658,25 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
                 continue;
             }
 
-            if (startTime.HasValue && frame.Timestamp < startTime)
+            TimeSpan timestamp = frame.Timestamp + offset;
+            if (startTime.HasValue && timestamp < startTime)
             {
                 DequeueAndDispose();
                 continue;
             }
 
-            FrameSyncAction syncAction = Synchronizer.Evaluate(frame.Timestamp, position);
+            FrameSyncAction syncAction = Synchronizer.Evaluate(timestamp, position);
 
             if (playing)
             {
-                TimeSpan anchor = firstFrameTime ?? frame.Timestamp;
+                TimeSpan anchor = (firstFrameTime ?? frame.Timestamp) + offset;
 
                 lock (_timeline.ClockLock)
                 {
                     if (_timeline.Anchor(epoch, anchor))
                     {
                         position = _timeline.Position;
-                        syncAction = Synchronizer.Evaluate(frame.Timestamp, position);
+                        syncAction = Synchronizer.Evaluate(timestamp, position);
                     }
 
                     _timeline.StartOrPause(epoch, state);
@@ -683,7 +685,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
 
             if (playing && syncAction == FrameSyncAction.Wait)
             {
-                int remaining = (int)Math.Clamp((frame.Timestamp - position).TotalMilliseconds, 1, VideoIdleTimeoutMilliseconds);
+                int remaining = (int)Math.Clamp((timestamp - position).TotalMilliseconds, 1, VideoIdleTimeoutMilliseconds);
                 RenderNode.Wait(stamp, remaining);
                 continue;
             }
@@ -715,7 +717,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
                         continue;
                     }
 
-                    OperationResult shown = RenderFrame(videoRenderer, frame, transform);
+                    OperationResult shown = RenderFrame(videoRenderer, frame, timestamp, transform);
                     if (!shown.IsSuccessful)
                     {
                         _events.PostWarning(shown.Message, this);
@@ -813,7 +815,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
         return FrameQueue.Count < FrameQueueCapacity;
     }
 
-    private OperationResult RenderFrame(IVideoRenderer renderer, RawVideoFrame frame, VideoTransform transform)
+    private OperationResult RenderFrame(IVideoRenderer renderer, RawVideoFrame frame, TimeSpan timestamp, VideoTransform transform)
     {
         long startTicks = Stopwatch.GetTimestamp();
         OperationResult rendered;
@@ -834,7 +836,7 @@ internal sealed class VideoChain : IVideoChain, IPictureFrameSource, IChainFeed,
         }
 
         Interlocked.Increment(ref _presentedFrameCount);
-        Interlocked.Exchange(ref _pictureTicks, frame.Timestamp.Ticks);
+        Interlocked.Exchange(ref _pictureTicks, timestamp.Ticks);
 
         return OperationResult.Success();
     }

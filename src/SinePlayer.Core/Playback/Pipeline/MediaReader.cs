@@ -221,14 +221,17 @@ internal sealed class MediaReader(
 
             foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
             {
-                if (entry.Value.CurrentComponent != chosenSource || entry.Value.CurrentStream?.Index != packet.StreamIndex)
+                IChainFeed chain = entry.Key;
+                ComponentSlot<MediaSource> slot = entry.Value;
+
+                if (slot.CurrentComponent != chosenSource || slot.CurrentStream?.Index != packet.StreamIndex)
                 {
                     continue;
                 }
 
                 packet.Ref();
-                entry.Key.Accept(entry.Value.CurrentStream, packet, entry.Value.CurrentVersions, epoch);
-                entry.Key.ReadTail.Report(epoch, packet.Timestamp);
+                chain.Accept(slot.CurrentStream, packet, slot.CurrentVersions, epoch);
+                chain.ReadTail.Report(epoch, packet.Timestamp + epochGate.OffsetOf(chain));
             }
 
             packet.Dispose();

@@ -84,7 +84,7 @@ No decisions. On an epoch change it seeks every source to `SeekPosition + ReadOf
 landing stream for that position), resets its tails, and continues. On an offsets-only publish nothing
 changes for it.
 
-`ReadTail` is reported in clock domain (`packet.Timestamp - offset`), so `ReadAhead`, `IsStreamSpent`
+`ReadTail` is reported in clock domain (`packet.Timestamp + offset`), so `ReadAhead`, `IsStreamSpent`
 and `IsBuffered` keep comparing a delivered time with the clock. `SourceTail` stays in media domain —
 it only compares packets with each other.
 
@@ -106,10 +106,15 @@ Video (`VideoChain.Render`):
 Audio (`AudioChain.Render`): the same four sites — start-time filter, `tailBufferPosition`, `Anchor`,
 `clockOffset`.
 
-Subtitles (`SubtitleChain.Render`): cues have no buffer timestamp, so the sites are the cue query
-(`GetVisibleCues`, `TimeUntilNextChange`, `drawnPosition` comparisons, all with `position - offset` —
-the chain's cursor at clock `P` is `P - offset`) and the cue window floor in the chain's epoch handling
-(`CueWindow.SeekTo(epoch, SeekPosition - offset)`). That is a line in the chain, not in a decoder.
+Subtitles (`SubtitleChain.Render`): cues have no buffer timestamp, so the equivalent site is the cue
+query — `GetVisibleCues`, `TimeUntilNextChange`, the `drawnPosition` comparisons, all with
+`Position − offset`, the chain's cursor at clock `P` being `P − offset`.
+
+The decode side knows nothing about the offset. The cue window holds the track's own times and its
+floor is where the file is read from, `SeekPosition + ReadOffset` — the earliest any chain can need,
+and never above this chain's own cursor. Re-flooring it with the chain's offset would discard cues
+that are still needed the moment the words are moved, which is precisely the case where nothing is
+read again; a cue already in the window therefore stays usable when the offset changes.
 
 Cached values that live in clock domain must be recomputed when the offset changes; the simplest way
 is to keep the raw media time and convert at the comparison.
