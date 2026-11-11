@@ -198,10 +198,7 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
     private OperationResult ResetCore()
     {
         StopCore();
-
-        _timeline.SetPosition(TimeSpan.Zero);
-        _timeline.PublishMove(TimeSpan.Zero, SeekMode.PreviousKeyframe);
-
+        _timeline.SeekTo(TimeSpan.Zero, SeekMode.PreviousKeyframe);
         _events.SetState(MediaEngineState.Paused);
         return OperationResult.Success();
     }
@@ -411,9 +408,7 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
             _events.SetState(MediaEngineState.Paused);
         }
 
-        _timeline.PublishMove(position, mode);
-        _timeline.SeekTo(position);
-
+        _timeline.SeekTo(position, mode);
         WakeAll();
         return OperationResult.Success();
     }
@@ -467,7 +462,7 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
 
         if (changed)
         {
-            _timeline.PublishMove(_timeline.Position, SeekMode.Precise);
+            _timeline.Refresh();
             WakeAll();
         }
 
@@ -607,7 +602,7 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
 
         _timeline.Stop();
         _timeline.EndingEpoch = -1;
-        _timeline.PublishMove(TimeSpan.Zero, SeekMode.PreviousKeyframe);
+        _timeline.SeekTo(TimeSpan.Zero, SeekMode.PreviousKeyframe);
 
         _events.SetState(MediaEngineState.None);
         return OperationResult.Success();
