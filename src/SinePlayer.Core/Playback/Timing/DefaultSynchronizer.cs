@@ -14,7 +14,7 @@ namespace SinePlayer.Core.Playback.Timing;
 /// correctness boundary.
 /// </para>
 /// </summary>
-public sealed class DefaultSynchronizer : ISynchronizer
+internal sealed class DefaultSynchronizer : ISynchronizer
 {
     private static readonly TimeSpan DefaultEarlyTolerance = TimeSpan.FromMilliseconds(2);
     private static readonly TimeSpan DefaultLateTolerance = TimeSpan.FromMilliseconds(40);

@@ -9,7 +9,7 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
 
-public sealed partial class NullAudioDecoder : IAudioDecoder
+internal sealed partial class NullAudioDecoder : IAudioDecoder
 {
     private readonly AudioStreamInfo _stream;
 

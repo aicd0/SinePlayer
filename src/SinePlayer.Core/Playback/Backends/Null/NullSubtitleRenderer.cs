@@ -8,7 +8,7 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
 
-public sealed partial class NullSubtitleRenderer : ISubtitleRenderer
+internal sealed partial class NullSubtitleRenderer : ISubtitleRenderer
 {
     private readonly Lock _lock = new();
 

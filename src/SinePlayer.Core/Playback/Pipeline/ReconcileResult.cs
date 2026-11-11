@@ -7,9 +7,7 @@ namespace SinePlayer.Core.Playback.Pipeline;
 
 public sealed class ReconcileResult
 {
-    public required IReadOnlyDictionary<IVideoChain, OperationResult> VideoResults { get; init; }
+    public required IReadOnlyDictionary<IPlaybackChain, OperationResult> Results { get; init; }
 
-    public required IReadOnlyDictionary<IAudioChain, OperationResult> AudioResults { get; init; }
-
-    public required IReadOnlyDictionary<ISubtitleChain, OperationResult> SubtitleResults { get; init; }
+    public OperationResult this[IPlaybackChain chain] => Results[chain];
 }

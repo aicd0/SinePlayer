@@ -1,16 +1,19 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Diagnostics.CodeAnalysis;
+
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
+using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Pipeline;
 
-public sealed partial class PlaybackPipeline : IDisposable
+public sealed partial class PlaybackPipeline : IDisposable, IChainHost
 {
     #region Variables
 
@@ -18,7 +21,9 @@ public sealed partial class PlaybackPipeline : IDisposable
     private readonly PipelineTimeline _timeline;
     private readonly MediaReader _reader;
 
-    private readonly List<IPlaybackChain> _removedChains = [];
+    private readonly List<IChainFeed> _removedChains = [];
+    private readonly AtomicCell<IReadOnlyDictionary<IPlaybackChain, IChainFeed>> _feeds =
+        new(new Dictionary<IPlaybackChain, IChainFeed>());
     private volatile VideoChain[] _videoChains = [];
     private volatile AudioChain[] _audioChains = [];
     private volatile SubtitleChain[] _subtitleChains = [];
@@ -133,21 +138,6 @@ public sealed partial class PlaybackPipeline : IDisposable
         return _events.SubmitAndLog(nameof(RemoveChain), () => RemoveChainCore(chain));
     }
 
-    public Task<OperationResult> SelectStream(IPlaybackChain chain, MediaStreamInfo? stream)
-    {
-        return _events.SubmitAndLog(nameof(SelectStream), () => SelectStreamCore(chain, stream));
-    }
-
-    public Task<OperationResult> SetOffset(IPlaybackChain chain, TimeSpan offset)
-    {
-        return _events.SubmitAndLog(nameof(SetOffset), () => SetOffsetCore(chain, offset));
-    }
-
-    public TimeSpan GetOffset(IPlaybackChain chain)
-    {
-        return chain is IChainFeed feed ? feed.Offset : TimeSpan.Zero;
-    }
-
     public Task<OperationResult> Play()
     {
         return _events.SubmitAndLog(nameof(Play), PlayCore);
@@ -171,6 +161,33 @@ public sealed partial class PlaybackPipeline : IDisposable
     public Task<OperationResult> Stop()
     {
         return _events.SubmitAndLog(nameof(Stop), ResetCore);
+    }
+
+    Task<OperationResult> IChainHost.Select(IPlaybackChain chain, MediaStreamInfo? stream)
+    {
+        return _events.SubmitAndLog(nameof(SelectStreamCore), () => SelectStreamCore(chain, stream));
+    }
+
+    void IChainHost.OffsetChanged(IChainFeed chain)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _reader.RequestResync();
+        _reader.Wake();
+    }
+
+    void IChainHost.PictureLayoutChanged(IPictureFrameSource picture)
+    {
+        foreach (SubtitleChain subtitle in _subtitleChains)
+        {
+            if (subtitle.LayoutVideoChain == picture)
+            {
+                subtitle.RenderNode.Wake();
+            }
+        }
     }
 
     #endregion
@@ -221,59 +238,58 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private VideoChain AddVideoChainCore(IVideoRenderTarget target)
     {
-        VideoChain chain = new(_timeline, _events, VideoTarget_SurfaceSizeChanged)
+        VideoChain chain = new(this, _timeline, _events)
         {
             Target = target,
-            LayoutChanged = NotifyLayoutChanged,
         };
 
         _videoChains = [.. _videoChains, chain];
+        RegisterFeed(chain);
         return chain;
     }
 
     private AudioChain AddAudioChainCore()
     {
-        AudioChain chain = new(_timeline, _events);
+        AudioChain chain = new(this, _timeline, _events);
         _audioChains = [.. _audioChains, chain];
+        RegisterFeed(chain);
         return chain;
     }
 
     private SubtitleChain AddSubtitleChainCore(IVideoRenderTarget target)
     {
-        SubtitleChain chain = new(_timeline, _events, SubtitleTarget_SurfaceSizeChanged)
+        SubtitleChain chain = new(this, _timeline, _events)
         {
             Target = target,
         };
 
         _subtitleChains = [.. _subtitleChains, chain];
+        RegisterFeed(chain);
         return chain;
     }
 
     private OperationResult RemoveChainCore(IPlaybackChain chain)
     {
-        bool present =
-            (chain is VideoChain heldVideo && Array.IndexOf(_videoChains, heldVideo) >= 0) ||
-            (chain is AudioChain heldAudio && Array.IndexOf(_audioChains, heldAudio) >= 0) ||
-            (chain is SubtitleChain heldSubtitle && Array.IndexOf(_subtitleChains, heldSubtitle) >= 0);
-        if (!present)
+        if (!TryGetFeed(chain, out IChainFeed? feed))
         {
             return OperationResult.Failure("The chain is not one of this pipeline's.");
         }
 
-        switch (chain)
+        switch (feed.Kind)
         {
-            case VideoChain video:
-                _videoChains = [.. _videoChains.Where(existing => existing != video)];
+            case MediaStreamKind.Video:
+                _videoChains = [.. _videoChains.Where(existing => existing != feed)];
                 break;
-            case AudioChain audio:
-                _audioChains = [.. _audioChains.Where(existing => existing != audio)];
+            case MediaStreamKind.Audio:
+                _audioChains = [.. _audioChains.Where(existing => existing != feed)];
                 break;
-            case SubtitleChain subtitle:
-                _subtitleChains = [.. _subtitleChains.Where(existing => existing != subtitle)];
+            case MediaStreamKind.Subtitle:
+                _subtitleChains = [.. _subtitleChains.Where(existing => existing != feed)];
                 break;
         }
 
-        _removedChains.Add(chain);
+        UnregisterFeed(feed);
+        _removedChains.Add(feed);
         return OperationResult.Success();
     }
 
@@ -302,52 +318,18 @@ public sealed partial class PlaybackPipeline : IDisposable
             }
         }
 
-        MediaSource? source = FindSource(stream);
-        switch (chain)
+        MediaSource? source = stream is null ? null : FindSource(stream);
+        if (stream is not null && source is null)
         {
-            case VideoChain video:
-                video.Selected = new(source, (VideoStreamInfo?)stream);
-                return OperationResult.Success();
-            case AudioChain audio:
-                audio.Selected = new(source, (AudioStreamInfo?)stream);
-                return OperationResult.Success();
-            case SubtitleChain subtitle:
-                subtitle.Selected = new(source, (SubtitleStreamInfo?)stream);
-                return OperationResult.Success();
-            default:
-                return OperationResult.Failure("The chain is not one of this pipeline's.");
-        }
-    }
-
-    private OperationResult SetOffsetCore(IPlaybackChain chain, TimeSpan offset)
-    {
-        if (_disposed)
-        {
-            return OperationResult.Failure("The pipeline has already been disposed.");
+            return OperationResult.Failure($"Stream {stream.Index} is not part of anything the pipeline was given.");
         }
 
-        bool present =
-            (chain is VideoChain heldVideo && Array.IndexOf(_videoChains, heldVideo) >= 0) ||
-            (chain is AudioChain heldAudio && Array.IndexOf(_audioChains, heldAudio) >= 0) ||
-            (chain is SubtitleChain heldSubtitle && Array.IndexOf(_subtitleChains, heldSubtitle) >= 0);
-        if (!present || chain is not IChainFeed feed)
+        if (!TryGetFeed(chain, out IChainFeed? feed))
         {
             return OperationResult.Failure("The chain is not one of this pipeline's.");
         }
 
-        if (!_events.CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
-        {
-            return OperationResult.Failure($"Cannot move a track when the state is {state}.");
-        }
-
-        TimeSpan current = feed.Offset;
-        if (current == offset)
-        {
-            return OperationResult.Success();
-        }
-
-        feed.Offset = offset;
-        _reader.RequestResync();
+        feed.Select(source is null || stream is null ? null : new StreamBinding<MediaStreamInfo>(source, stream));
         return OperationResult.Success();
     }
 
@@ -411,9 +393,9 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         MediaSource?[] sources =
         [
-            .. _videoChains.Select(chain => chain.Selected.Source),
-            .. _audioChains.Select(chain => chain.Selected.Source),
-            .. _subtitleChains.Select(chain => chain.Selected.Source),
+            .. _videoChains.Select(chain => chain.Selected?.Source),
+            .. _audioChains.Select(chain => chain.Selected?.Source),
+            .. _subtitleChains.Select(chain => chain.Selected?.Source),
         ];
         foreach (MediaSource source in sources.OfType<MediaSource>())
         {
@@ -437,10 +419,10 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private OperationResult<ReconcileResult> ReconcileCore()
     {
-        static bool Reconcile<TChain>(
-            TChain chain,
+        static bool Reconcile(
+            IPlaybackChain chain,
             OperationResult<ChainChange> reconciled,
-            Dictionary<TChain, OperationResult> results) where TChain : class, IPlaybackChain
+            Dictionary<IPlaybackChain, OperationResult> results)
         {
             results[chain] = reconciled.IsSuccessful ? OperationResult.Success() : OperationResult.Failure(reconciled);
             return reconciled.IsSuccessful && reconciled.Result != ChainChange.None;
@@ -464,24 +446,22 @@ public sealed partial class PlaybackPipeline : IDisposable
         ReconcileLayoutSources();
         ReconcileClockOwner();
 
-        Dictionary<IVideoChain, OperationResult> videoResults = [];
-        Dictionary<IAudioChain, OperationResult> audioResults = [];
-        Dictionary<ISubtitleChain, OperationResult> subtitleResults = [];
+        Dictionary<IPlaybackChain, OperationResult> results = [];
 
         bool changed = false;
         foreach (VideoChain chain in _videoChains)
         {
-            changed |= Reconcile(chain, chain.Reconcile(), videoResults);
+            changed |= Reconcile(chain, chain.Reconcile(), results);
         }
 
         foreach (AudioChain chain in _audioChains)
         {
-            changed |= Reconcile(chain, chain.Reconcile(), audioResults);
+            changed |= Reconcile(chain, chain.Reconcile(), results);
         }
 
         foreach (SubtitleChain chain in _subtitleChains)
         {
-            changed |= Reconcile(chain, chain.Reconcile(), subtitleResults);
+            changed |= Reconcile(chain, chain.Reconcile(), results);
         }
 
         if (changed)
@@ -497,9 +477,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
         return result.Success(new ReconcileResult
         {
-            VideoResults = videoResults,
-            AudioResults = audioResults,
-            SubtitleResults = subtitleResults,
+            Results = results,
         });
     }
 
@@ -510,18 +488,18 @@ public sealed partial class PlaybackPipeline : IDisposable
             return;
         }
 
-        IPlaybackChain[] removed = [.. _removedChains];
+        IChainFeed[] removed = [.. _removedChains];
         _removedChains.Clear();
 
-        foreach (IPlaybackChain chain in removed)
+        foreach (IChainFeed chain in removed)
         {
             RequestStopChain(chain);
-            _reader.RemoveSource((IChainFeed)chain);
+            _reader.RemoveSource(chain);
         }
 
         _reader.Wake();
 
-        foreach (IPlaybackChain chain in removed)
+        foreach (IChainFeed chain in removed)
         {
             JoinChain(chain);
             ResetChain(chain);
@@ -555,7 +533,9 @@ public sealed partial class PlaybackPipeline : IDisposable
     {
         foreach (SubtitleChain subtitle in _subtitleChains)
         {
-            if (subtitle.LayoutVideoChain is not VideoChain picture || Array.IndexOf(_videoChains, picture) < 0)
+            if (subtitle.LayoutVideoChain is not { } layout ||
+                !TryGetFeed(layout, out IChainFeed? feed) ||
+                feed.Kind != MediaStreamKind.Video)
             {
                 subtitle.LayoutVideoChain = null;
             }
@@ -564,7 +544,7 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void ReconcileClockOwner()
     {
-        if (_timeline.DeviceOwner is AudioChain owner && Array.IndexOf(_audioChains, owner) >= 0)
+        if (_timeline.DeviceOwner is { } owner && Array.IndexOf(_audioChains, owner) >= 0)
         {
             return;
         }
@@ -758,9 +738,9 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     private void StopThreads()
     {
-        IPlaybackChain[] removed = [.. _removedChains];
+        IChainFeed[] removed = [.. _removedChains];
         _removedChains.Clear();
-        foreach (IPlaybackChain chain in removed)
+        foreach (IChainFeed chain in removed)
         {
             RequestStopChain(chain);
         }
@@ -892,23 +872,39 @@ public sealed partial class PlaybackPipeline : IDisposable
 
     #endregion
 
-    #region Events
+    #region Misc
 
-    private void VideoTarget_SurfaceSizeChanged(VideoChain chain)
+    private void RegisterFeed(IChainFeed feed)
     {
-        chain.RenderNode.Wake();
-        NotifyLayoutChanged(chain);
+        _feeds.Write(current => new Dictionary<IPlaybackChain, IChainFeed>(current) { [feed] = feed });
     }
 
-    private void SubtitleTarget_SurfaceSizeChanged(SubtitleChain chain)
+    private void UnregisterFeed(IChainFeed feed)
     {
-        Interlocked.Increment(ref chain.SurfaceVersion);
-        chain.RenderNode.Wake();
+        _feeds.Write(current =>
+        {
+            if (!current.ContainsKey(feed))
+            {
+                return current;
+            }
+
+            Dictionary<IPlaybackChain, IChainFeed> next = new(current);
+            next.Remove(feed);
+            return next;
+        });
     }
 
-    #endregion
+    private bool TryGetFeed(IPlaybackChain chain, [NotNullWhen(true)] out IChainFeed? feed)
+    {
+        if (_feeds.Read().TryGetValue(chain, out IChainFeed? found))
+        {
+            feed = found;
+            return true;
+        }
 
-    #region Communication
+        feed = null;
+        return false;
+    }
 
     private MediaSource? FindSource(MediaStreamInfo? stream)
     {
@@ -929,17 +925,6 @@ public sealed partial class PlaybackPipeline : IDisposable
         }
 
         return null;
-    }
-
-    private void NotifyLayoutChanged(IPictureFrameSource picture)
-    {
-        foreach (SubtitleChain subtitle in _subtitleChains)
-        {
-            if (subtitle.LayoutVideoChain == picture)
-            {
-                subtitle.RenderNode.Wake();
-            }
-        }
     }
 
     private void NotifyClockMoved()

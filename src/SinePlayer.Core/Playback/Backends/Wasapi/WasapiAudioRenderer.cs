@@ -19,7 +19,7 @@ using Windows.Win32.System.Com;
 
 namespace SinePlayer.Core.Playback.Backends.Wasapi;
 
-public sealed partial class WasapiAudioRenderer : IAudioRenderer
+internal sealed partial class WasapiAudioRenderer : IAudioRenderer
 {
     private const string TAG = nameof(WasapiAudioRenderer);
 

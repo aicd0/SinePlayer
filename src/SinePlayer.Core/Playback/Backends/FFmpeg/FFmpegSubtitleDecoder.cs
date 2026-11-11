@@ -12,7 +12,7 @@ using SinePlayer.Core.Playback.Subtitle;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
-public sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
+internal sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
 {
     private readonly SubtitleStreamInfo _stream;
     private readonly string _decoderName;

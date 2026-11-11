@@ -323,7 +323,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         IVideoChain chain = await EnsureVideoChain(pipeline, view);
-        OperationResult selected = await pipeline.SelectStream(chain, stream);
+        OperationResult selected = await chain.SelectStream(stream);
         if (!selected.IsSuccessful)
         {
             string wanted = stream is null ? "no track" : $"track #{stream.Index}";
@@ -351,7 +351,7 @@ internal sealed partial class PlayerSession : IDisposable
         IAudioChain? chain = _audioChains.FirstOrDefault(entry => entry.Chain.SelectedStream is null)?.Chain;
         chain ??= await CreateAudioChain(pipeline);
 
-        OperationResult selected = await pipeline.SelectStream(chain, stream);
+        OperationResult selected = await chain.SelectStream(stream);
         if (!selected.IsSuccessful)
         {
             return OperationResultExt.Failure(TAG, $"The sound of track #{stream.Index} could not be added. {selected.Message}");
@@ -376,7 +376,7 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResult.Success();
         }
 
-        OperationResult cleared = await pipeline.SelectStream(entry.Chain, null);
+        OperationResult cleared = await entry.Chain.SelectStream(null);
         if (!cleared.IsSuccessful)
         {
             return OperationResultExt.Failure(TAG, $"The sound of track #{stream.Index} could not be taken away. {cleared.Message}");
@@ -403,7 +403,7 @@ internal sealed partial class PlayerSession : IDisposable
         ISubtitleChain? chain = view.SubtitleChains.FirstOrDefault(candidate => candidate.SelectedStream is null);
         chain ??= await CreateSubtitleChain(pipeline, view);
 
-        OperationResult selected = await pipeline.SelectStream(chain, stream);
+        OperationResult selected = await chain.SelectStream(stream);
         if (!selected.IsSuccessful)
         {
             return OperationResultExt.Failure(TAG, $"The subtitles of track #{stream.Index} could not be added. {selected.Message}");
@@ -428,7 +428,7 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResult.Success();
         }
 
-        OperationResult cleared = await pipeline.SelectStream(chain, null);
+        OperationResult cleared = await chain.SelectStream(null);
         if (!cleared.IsSuccessful)
         {
             return OperationResultExt.Failure(TAG, $"The subtitles of track #{stream.Index} could not be taken away. {cleared.Message}");

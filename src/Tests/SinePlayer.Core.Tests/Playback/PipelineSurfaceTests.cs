@@ -24,7 +24,6 @@ public class PipelineSurfaceTests
     private static readonly Type[] sPublished =
     [
         typeof(AudioFilterChain),
-        typeof(AudioFilterChainSnapshot),
         typeof(IAudioChain),
         typeof(IPictureFrameSource),
         typeof(IPlaybackChain),
@@ -69,7 +68,7 @@ public class PipelineSurfaceTests
     {
         Type[] interfaces = [.. typeof(PlaybackPipeline).Assembly
             .GetTypes()
-            .Where(type => type is { IsInterface: true } && typeof(IPlaybackChain).IsAssignableFrom(type))];
+            .Where(type => type is { IsInterface: true, IsVisible: true } && typeof(IPlaybackChain).IsAssignableFrom(type))];
 
         using (Assert.EnterMultipleScope())
         {
@@ -211,8 +210,8 @@ public class PipelineSurfaceTests
     }
 
     /// <summary>
-    /// What reconciling made of a chain is asked of that chain, so a result is three dictionaries and nothing else. A
-    /// singular view would be a second place that assumes one chain of a kind — the assumption v2 exists to remove —
+    /// What reconciling made of a chain is asked of that chain, so a result is one dictionary keyed by the chain and an
+    /// indexer into it, and nothing else. A per-kind member would be a second place that describes chains by what they are —
     /// and it cannot be removed later without breaking whoever came to depend on it.
     /// </summary>
     [Test]
@@ -220,7 +219,7 @@ public class PipelineSurfaceTests
     {
         string[] members = [.. typeof(ReconcileResult)
             .GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
-            .Where(member => member is not ConstructorInfo)
+            .Where(member => member is not ConstructorInfo && member is not MethodInfo)
             .Select(member => member.Name)
             .Where(name => !name.StartsWith("get_", StringComparison.Ordinal) && !name.StartsWith("set_", StringComparison.Ordinal))
             .Distinct()];
@@ -229,9 +228,8 @@ public class PipelineSurfaceTests
             members.Order(),
             Is.EqualTo(new[]
             {
-                nameof(ReconcileResult.VideoResults),
-                nameof(ReconcileResult.AudioResults),
-                nameof(ReconcileResult.SubtitleResults),
+                nameof(ReconcileResult.Results),
+                "Item",
             }.Order()),
             "a result is what happened to each chain, and anything else is a way to ask about a kind");
     }

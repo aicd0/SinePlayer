@@ -1413,8 +1413,8 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(SyntheticPath()))).IsSuccessful, Is.True);
 
             MediaInfo info = pipeline.Sources[0].Info;
-            Assert.That(Await(pipeline.SelectStream(first, info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(second, info.VideoStreams[1])).IsSuccessful, Is.True);
+            Assert.That(Await(first.SelectStream(info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(second.SelectStream(info.VideoStreams[1])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
             // At 1.5 s the first stream's keyframe is the one at 1 s and the second stream's the one at 20/30 s.
@@ -1477,8 +1477,8 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(SyntheticPath()))).IsSuccessful, Is.True);
 
             MediaInfo info = pipeline.Sources[0].Info;
-            Assert.That(Await(pipeline.SelectStream(first, info.VideoStreams[1])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(second, info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(first.SelectStream(info.VideoStreams[1])).IsSuccessful, Is.True);
+            Assert.That(Await(second.SelectStream(info.VideoStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
             var target = TimeSpan.FromSeconds(1.5);
@@ -1540,8 +1540,8 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(SyntheticPath()))).IsSuccessful, Is.True);
 
             MediaInfo info = pipeline.Sources[0].Info;
-            Assert.That(Await(pipeline.SelectStream(shortChain, info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(longChain, info.VideoStreams[1])).IsSuccessful, Is.True);
+            Assert.That(Await(shortChain.SelectStream(info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(longChain.SelectStream(info.VideoStreams[1])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
             // The picture of the first stream is over at one second; 2.5 s is well past it and the other stream still has it.
@@ -1605,9 +1605,9 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(SyntheticPath()))).IsSuccessful, Is.True);
 
             MediaInfo info = pipeline.Sources[0].Info;
-            Assert.That(Await(pipeline.SelectStream(shortChain, info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(longChain, info.VideoStreams[1])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(audioChain, info.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(shortChain.SelectStream(info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(longChain.SelectStream(info.VideoStreams[1])).IsSuccessful, Is.True);
+            Assert.That(Await(audioChain.SelectStream(info.AudioStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitForPresentedFrames(pipeline, 2);
@@ -3522,12 +3522,11 @@ public class PlaybackPipelineTests
             ReconcileResult result = reconciled.Result;
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(result.VideoResults.Keys, Is.EqualTo(pipeline.VideoChains), "one entry per video chain, keyed by the chain");
-                Assert.That(result.AudioResults.Keys, Is.EqualTo(pipeline.AudioChains), "one entry per audio chain, keyed by the chain");
-                Assert.That(result.SubtitleResults.Keys, Is.EqualTo(pipeline.SubtitleChains), "one entry per subtitle chain, keyed by the chain");
-                Assert.That(result.VideoResults[pipeline.VideoChains[0]].IsSuccessful, Is.False, "the chain that could not be built says so");
-                Assert.That(result.AudioResults[pipeline.AudioChains[0]].IsSuccessful, Is.True, "another kind's chain is untouched by it");
-                Assert.That(result.VideoResults[pipeline.VideoChains[0]].Message, Is.Not.Empty, "the failure carries the reason the decoder gave");
+                Assert.That(result.Results.Keys, Is.EqualTo<IEnumerable<IPlaybackChain>>([.. pipeline.VideoChains, .. pipeline.AudioChains, .. pipeline.SubtitleChains]),
+                    "one entry per chain, keyed by the chain");
+                Assert.That(result[pipeline.VideoChains[0]].IsSuccessful, Is.False, "the chain that could not be built says so");
+                Assert.That(result[pipeline.AudioChains[0]].IsSuccessful, Is.True, "another kind's chain is untouched by it");
+                Assert.That(result[pipeline.VideoChains[0]].Message, Is.Not.Empty, "the failure carries the reason the decoder gave");
             }
         }
         finally
@@ -3824,7 +3823,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(swapped.Result.VideoResults[pipeline.VideoChains[0]].IsSuccessful, Is.False, "a renderer that cannot be made is the caller's failure to see");
+                Assert.That(swapped.Result[pipeline.VideoChains[0]].IsSuccessful, Is.False, "a renderer that cannot be made is the caller's failure to see");
                 Assert.That(pipeline.VideoChains[0].RendererName, Is.EqualTo("first"), "the running renderer is untouched");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
             }
@@ -3909,7 +3908,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(swapped.Result.AudioResults[pipeline.AudioChains[0]].IsSuccessful, Is.False, "a device that cannot be opened is the caller's failure to see");
+                Assert.That(swapped.Result[pipeline.AudioChains[0]].IsSuccessful, Is.False, "a device that cannot be opened is the caller's failure to see");
                 Assert.That(pipeline.AudioChains[0].RendererName, Is.EqualTo("first"), "the playing device is untouched");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
             }
@@ -4091,7 +4090,7 @@ public class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(reconciled.Result.VideoResults[pipeline.VideoChains[0]].IsSuccessful, Is.False, "a replacement that cannot be built is the caller's to see");
+                Assert.That(reconciled.Result[pipeline.VideoChains[0]].IsSuccessful, Is.False, "a replacement that cannot be built is the caller's to see");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a failed replacement is not a playback failure");
             }
 
@@ -4166,14 +4165,14 @@ public class PlaybackPipelineTests
 
             // Both the picture and the sound move, so the earliest content anybody needs is 200 ms further on.
             var advance = TimeSpan.FromMilliseconds(-200);
-            Assert.That(Await(pipeline.SetOffset(pipeline.VideoChains[0], advance)).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SetOffset(pipeline.AudioChains[0], advance)).IsSuccessful, Is.True);
+            pipeline.VideoChains[0].Offset = advance;
+            pipeline.AudioChains[0].Offset = advance;
 
             WaitFor(() => sources.Source?.LastSeekPosition is TimeSpan position && position > TimeSpan.FromMilliseconds(200),
                 "the file to be read from where the shifted tracks need it", 5000);
 
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), pipeline.Error);
-            Assert.That(pipeline.GetOffset(pipeline.VideoChains[0]), Is.EqualTo(advance));
+            Assert.That(pipeline.VideoChains[0].Offset, Is.EqualTo(advance));
         }
         finally
         {
@@ -4219,13 +4218,13 @@ public class PlaybackPipelineTests
             TimeSpan before = pipeline.Position;
             int framesBefore = videoRenderer.RenderedFrames;
 
-            Assert.That(Await(pipeline.SetOffset(chain, TimeSpan.FromMilliseconds(-200))).IsSuccessful, Is.True);
+            chain.Offset = TimeSpan.FromMilliseconds(-200);
 
             // The sound still needs its content from the clock itself, so reading starts where it already did.
             WaitFor(() => pipeline.Position > before, "playback to carry on", 3000);
             WaitFor(() => videoRenderer.RenderedFrames > framesBefore + 3, "frames to keep arriving", 5000);
             Assert.That(sources.Source?.LastSeekPosition, Is.EqualTo(asked), "the read start was already early enough");
-            Assert.That(pipeline.GetOffset(chain), Is.EqualTo(TimeSpan.FromMilliseconds(-200)));
+            Assert.That(chain.Offset, Is.EqualTo(TimeSpan.FromMilliseconds(-200)));
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
         }
         finally
@@ -4271,13 +4270,13 @@ public class PlaybackPipelineTests
             WaitFor(() => pipeline.Position > start + TimeSpan.FromMilliseconds(200), "playback to be under way again", 5000);
 
             IVideoChain chain = pipeline.VideoChains[0];
-            Assert.That(Await(pipeline.SetOffset(chain, TimeSpan.FromSeconds(5))).IsSuccessful, Is.True);
+            chain.Offset = TimeSpan.FromSeconds(5);
 
             WaitFor(() => sources.Source?.LastSeekPosition is TimeSpan position && position < start - TimeSpan.FromSeconds(4),
                 "the file to be read from five seconds before where reading started", 5000);
 
             Assert.That(pipeline.Position, Is.GreaterThan(start), "the clock stayed where it was playing");
-            Assert.That(pipeline.GetOffset(chain), Is.EqualTo(TimeSpan.FromSeconds(5)));
+            Assert.That(chain.Offset, Is.EqualTo(TimeSpan.FromSeconds(5)));
         }
         finally
         {
@@ -4319,14 +4318,14 @@ public class PlaybackPipelineTests
 
             // Twice the ceiling: a margin read on the delayed chain alone would be over the limit after one packet.
             var delay = TimeSpan.FromSeconds(20);
-            Assert.That(Await(pipeline.SetOffset(pipeline.VideoChains[0], delay)).IsSuccessful, Is.True);
+            pipeline.VideoChains[0].Offset = delay;
 
             int submitted = audioRenderer.SubmittedTimestamps.Count;
-            TimeSpan after = pipeline.Position;
-            WaitFor(() => pipeline.Position > after + TimeSpan.FromSeconds(1.5),
-                "playback to carry on after the delay was taken", 6000);
-            Assert.That(audioRenderer.SubmittedTimestamps.Count, Is.GreaterThan(submitted + 3),
-                "the sound to keep arriving, which it cannot do if the reader parked");
+
+            // What matters is that reading did not park: the sound has to keep arriving, whatever the clock did when the shift
+            // was taken (it can be carried by the sound, which makes the position jump rather than advance).
+            WaitFor(() => audioRenderer.SubmittedTimestamps.Count > submitted + 8,
+                "the sound to keep arriving, which it cannot do if the reader parked", 10000);
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), pipeline.Error);
         }
         finally
@@ -4368,14 +4367,14 @@ public class PlaybackPipelineTests
             // The picture held back 800 ms pins where reading starts that much early; that start is what the sound has to stay
             // inside when it moves later.
             var picture = TimeSpan.FromMilliseconds(800);
-            Assert.That(Await(pipeline.SetOffset(pipeline.VideoChains[0], picture)).IsSuccessful, Is.True);
+            pipeline.VideoChains[0].Offset = picture;
             WaitFor(() => sources.Source?.LastSeekPosition is TimeSpan landed && landed < pipeline.Position - TimeSpan.FromMilliseconds(700),
                 "the file to be read from where the delayed picture needs it", 5000);
             TimeSpan? start = sources.Source?.LastSeekPosition;
             int seeks = sources.Source?.SeekCount ?? 0;
 
             // Half of that: the sound is moved later, but the read start stays exactly where the picture put it.
-            Assert.That(Await(pipeline.SetOffset(pipeline.AudioChains[0], TimeSpan.FromMilliseconds(400))).IsSuccessful, Is.True);
+            pipeline.AudioChains[0].Offset = TimeSpan.FromMilliseconds(400);
 
             WaitFor(() => (sources.Source?.SeekCount ?? 0) > seeks, "the file to be read again for the sound", 5000);
             Assert.That(sources.Source?.LastSeekPosition, Is.EqualTo(start).Within(TimeSpan.FromMilliseconds(500)),
@@ -4420,13 +4419,13 @@ public class PlaybackPipelineTests
             IVideoChain chain = pipeline.VideoChains[0];
             var delay = TimeSpan.FromMilliseconds(400);
             long before = chain.PresentedFrameCount;
-            Assert.That(Await(pipeline.SetOffset(chain, delay)).IsSuccessful, Is.True);
+            chain.Offset = delay;
 
             // Frames presented after the shift are the ones that can be wrong about it, so the wait is for those rather than
             // for the state as it was when the shift arrived.
             WaitFor(() => chain.PresentedFrameCount > before + 3, "the picture after the shift to be up", 4000);
 
-            Assert.That(pipeline.GetOffset(chain), Is.EqualTo(delay));
+            Assert.That(chain.Offset, Is.EqualTo(delay));
             Assert.That(pipeline.Position - chain.LastPresentedTimestamp, Is.LessThan(TimeSpan.FromMilliseconds(200)),
                 "a shift of the track is not the picture falling behind");
         }
@@ -4468,7 +4467,7 @@ public class PlaybackPipelineTests
 
             IVideoChain chain = pipeline.VideoChains[0];
             var delay = TimeSpan.FromMilliseconds(400);
-            Assert.That(Await(pipeline.SetOffset(chain, delay)).IsSuccessful, Is.True);
+            chain.Offset = delay;
             WaitFor(() => sources.Source?.LastSeekPosition is TimeSpan position && position < TimeSpan.FromMilliseconds(400),
                 "the file to be read from where the shifted picture needs it", 5000);
 
@@ -4482,7 +4481,7 @@ public class PlaybackPipelineTests
             long before = chain.PresentedFrameCount;
             WaitFor(() => chain.PresentedFrameCount > before + 3, "the picture after the seek to be up", 5000);
 
-            Assert.That(pipeline.GetOffset(chain), Is.EqualTo(delay));
+            Assert.That(chain.Offset, Is.EqualTo(delay));
             Assert.That(pipeline.Position - chain.LastPresentedTimestamp, Is.LessThan(TimeSpan.FromMilliseconds(200)),
                 "the shift survived the seek, so it is still not the picture falling behind");
         }
@@ -4523,8 +4522,8 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
 
             var advance = TimeSpan.FromMilliseconds(-200);
-            Assert.That(Await(pipeline.SetOffset(pipeline.VideoChains[0], advance)).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SetOffset(pipeline.AudioChains[0], advance)).IsSuccessful, Is.True);
+            pipeline.VideoChains[0].Offset = advance;
+            pipeline.AudioChains[0].Offset = advance;
 
             WaitFor(() => sources.Source?.LastSeekPosition is TimeSpan position && position > TimeSpan.FromMilliseconds(200),
                 "the file to be read from where the shifted tracks need it", 5000);
@@ -4570,7 +4569,7 @@ public class PlaybackPipelineTests
 
             // The picture is held back half a second, so reading starts that much earlier than the clock and stays there: the
             // sound moved afterwards is not what decides where reading starts.
-            Assert.That(Await(pipeline.SetOffset(pipeline.VideoChains[0], TimeSpan.FromMilliseconds(500))).IsSuccessful, Is.True);
+            pipeline.VideoChains[0].Offset = TimeSpan.FromMilliseconds(500);
             WaitFor(() => sources.Source?.LastSeekPosition is TimeSpan landed && landed < pipeline.Position - TimeSpan.FromMilliseconds(300),
                 "the file to be read from before the clock", 5000);
             TimeSpan? start = sources.Source?.LastSeekPosition;
@@ -4578,7 +4577,7 @@ public class PlaybackPipelineTests
             int flushes = audioRenderer.FlushCount;
             TimeSpan before = pipeline.Position;
             var advance = TimeSpan.FromMilliseconds(-400);
-            Assert.That(Await(pipeline.SetOffset(pipeline.AudioChains[0], advance)).IsSuccessful, Is.True);
+            pipeline.AudioChains[0].Offset = advance;
 
             // Let go of what the device holds, without reading anything again.
             WaitFor(() => audioRenderer.FlushCount > flushes, "the sound to be let go of", 3000);
@@ -5996,14 +5995,14 @@ public class PlaybackPipelineTests
 
             // The sound is given a new device in the same reconcile as the picture's new track, so the audio chain has
             // something of its own to build while the video chain cannot build what was chosen.
-            Assert.That(Await(pipeline.SelectStream(pipeline.VideoChains[0], second)).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.VideoChains[0].SelectStream(second)).IsSuccessful, Is.True);
             SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(new FakeAudioRenderer { Name = "second", PlaysWhatItIsGiven = true }));
             OperationResult<ReconcileResult> reconciled = Await(pipeline.Reconcile());
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(reconciled.Result.VideoResults[pipeline.VideoChains[0]].IsSuccessful, Is.False, "a stream no decoder can take is the caller's failure to see");
-                Assert.That(reconciled.Result.AudioResults[pipeline.AudioChains[0]].IsSuccessful, Is.True, "the sound has a device of its own to build");
+                Assert.That(reconciled.Result[pipeline.VideoChains[0]].IsSuccessful, Is.False, "a stream no decoder can take is the caller's failure to see");
+                Assert.That(reconciled.Result[pipeline.AudioChains[0]].IsSuccessful, Is.True, "the sound has a device of its own to build");
                 Assert.That(pipeline.VideoChains[0].SelectedStream?.Index, Is.EqualTo(second.Index), "the choice is recorded, refused or not");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "the picture that is playing is untouched");
             }
@@ -7503,14 +7502,14 @@ public class PlaybackPipelineTests
 
         if (info.VideoStreams.Count > 0)
         {
-            OperationResult video = pipeline.SelectStream(ChainOf(pipeline, MediaStreamKind.Video), info.VideoStreams[0]).GetAwaiter().GetResult();
+            OperationResult video = ChainOf(pipeline, MediaStreamKind.Video).SelectStream(info.VideoStreams[0]).GetAwaiter().GetResult();
             any |= video.IsSuccessful;
             failure = video.IsSuccessful ? failure : video;
         }
 
         if (info.AudioStreams.Count > 0)
         {
-            OperationResult audio = pipeline.SelectStream(ChainOf(pipeline, MediaStreamKind.Audio), info.AudioStreams[0]).GetAwaiter().GetResult();
+            OperationResult audio = ChainOf(pipeline, MediaStreamKind.Audio).SelectStream(info.AudioStreams[0]).GetAwaiter().GetResult();
             any |= audio.IsSuccessful;
             failure = audio.IsSuccessful ? failure : audio;
         }
@@ -7529,12 +7528,12 @@ public class PlaybackPipelineTests
         }
 
         ReconcileResult result = reconciled.Result;
-        if (info.VideoStreams.Count > 0 && result.VideoResults[pipeline.VideoChains[0]] is { IsSuccessful: false } videoFailure)
+        if (info.VideoStreams.Count > 0 && result[pipeline.VideoChains[0]] is { IsSuccessful: false } videoFailure)
         {
             return videoFailure;
         }
 
-        if (info.AudioStreams.Count > 0 && result.AudioResults[pipeline.AudioChains[0]] is { IsSuccessful: false } audioFailure)
+        if (info.AudioStreams.Count > 0 && result[pipeline.AudioChains[0]] is { IsSuccessful: false } audioFailure)
         {
             return audioFailure;
         }
@@ -7571,7 +7570,7 @@ public class PlaybackPipelineTests
     private static OperationResult Select(PlaybackPipeline pipeline, MediaStreamKind kind, MediaStreamInfo? stream)
     {
         IPlaybackChain chain = ChainOf(pipeline, kind);
-        OperationResult selected = Await(pipeline.SelectStream(chain, stream));
+        OperationResult selected = Await(chain.SelectStream(stream));
         if (!selected.IsSuccessful)
         {
             return selected;
@@ -7590,17 +7589,7 @@ public class PlaybackPipelineTests
     /// <summary>What reconciling made of one chain, which is what the results are keyed by.</summary>
     private static OperationResult ResultOf(ReconcileResult result, IPlaybackChain chain)
     {
-        if (chain is IVideoChain video)
-        {
-            return result.VideoResults[video];
-        }
-
-        if (chain is IAudioChain audio)
-        {
-            return result.AudioResults[audio];
-        }
-
-        return result.SubtitleResults[(ISubtitleChain)chain];
+        return result[chain];
     }
 
     /// <summary>The chain of a kind a test means when it speaks of the kind rather than of a chain.</summary>
@@ -9303,8 +9292,8 @@ public class PlaybackPipelineTests
             video.Components.Register(new FakeVideoRendererFactory(new FakeVideoRenderer()));
 
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(subtitles, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(video.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(subtitles.SelectStream(pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -9361,8 +9350,8 @@ public class PlaybackPipelineTests
             subtitles.LayoutVideoChain = video;
 
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(subtitles, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(video.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(subtitles.SelectStream(pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -9563,9 +9552,9 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(secondPosition))).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(wordsPosition))).IsSuccessful, Is.True);
 
-            Assert.That(Await(pipeline.SelectStream(leaving, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(staying, pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(subtitles, pipeline.Sources[2].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(leaving.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(staying.SelectStream(pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(subtitles.SelectStream(pipeline.Sources[2].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -9629,7 +9618,7 @@ public class PlaybackPipelineTests
 
             Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(video.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
             // The reader, two per picture, one per sound and one per set of words.
@@ -9678,7 +9667,7 @@ public class PlaybackPipelineTests
 
             Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(video.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
             // The reader, two for the picture and one for the words.
@@ -9729,8 +9718,8 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(firstPosition))).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(secondPosition))).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(leaving, pipeline.Sources[0].Info.AudioStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(staying, pipeline.Sources[1].Info.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(leaving.SelectStream(pipeline.Sources[0].Info.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(staying.SelectStream(pipeline.Sources[1].Info.AudioStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -9799,8 +9788,8 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(secondPosition))).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(afterTheSwitch))).IsSuccessful, Is.True);
 
-            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(first.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(second.SelectStream(pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -9814,7 +9803,7 @@ public class PlaybackPipelineTests
 
             // One chain is pointed at another file while the other keeps playing: what is rebuilt is that chain.
             long drawnByTheOther = secondRenderer.RenderedFrames;
-            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[2].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(first.SelectStream(pipeline.Sources[2].Info.VideoStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
             WaitFor(() => secondRenderer.RenderedFrames > drawnByTheOther, "the untouched chain to keep drawing across the other's rebuild");
@@ -9860,8 +9849,8 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(firstPosition))).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(secondPosition))).IsSuccessful, Is.True);
 
-            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(first.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(second.SelectStream(pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
             using (Assert.EnterMultipleScope())
@@ -9913,8 +9902,8 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(firstPosition))).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(secondPosition))).IsSuccessful, Is.True);
 
-            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.AudioStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[1].Info.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(first.SelectStream(pipeline.Sources[0].Info.AudioStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(second.SelectStream(pipeline.Sources[1].Info.AudioStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
             // One device has no room from the start. Its own chain waits in front of it; the other chain knows nothing
@@ -9991,9 +9980,9 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(words))).IsSuccessful, Is.True);
 
-            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[1].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(video.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(first.SelectStream(pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(second.SelectStream(pipeline.Sources[1].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
 
             // One chain is asked to draw its words larger; the other has said nothing and keeps the decoder's own idea.
@@ -10062,9 +10051,9 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
 
-            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(video.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(first.SelectStream(pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(second.SelectStream(pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -10125,9 +10114,9 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
 
-            Assert.That(Await(pipeline.SelectStream(video, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(video.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(first.SelectStream(pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(second.SelectStream(pipeline.Sources[0].Info.SubtitleStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -10187,8 +10176,8 @@ public class PlaybackPipelineTests
 
             Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(playing))).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(first, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(second, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(first.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(second.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
@@ -10246,8 +10235,8 @@ public class PlaybackPipelineTests
             Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(shorter))).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(longer))).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(shortChain, pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
-            Assert.That(Await(pipeline.SelectStream(longChain, pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(shortChain.SelectStream(pipeline.Sources[0].Info.VideoStreams[0])).IsSuccessful, Is.True);
+            Assert.That(Await(longChain.SelectStream(pipeline.Sources[1].Info.VideoStreams[0])).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 

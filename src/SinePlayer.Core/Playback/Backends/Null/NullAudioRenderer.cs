@@ -10,7 +10,7 @@ using SinePlayer.Core.Playback.Timing;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
 
-public sealed partial class NullAudioRenderer : IAudioRenderer
+internal sealed partial class NullAudioRenderer : IAudioRenderer
 {
     private readonly IPlaybackClock _clock = new StopwatchClock();
 

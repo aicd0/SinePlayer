@@ -5,7 +5,7 @@ using SinePlayer.Core.Playback.Abstractions.Registry;
 
 namespace SinePlayer.Core.Playback.Registry;
 
-public sealed class ComponentRegistry : IComponentRegistry
+internal sealed class ComponentRegistry : IComponentRegistry
 {
     private readonly Lock _lock = new();
     private readonly Dictionary<Type, List<IComponentFactory>> _components = [];

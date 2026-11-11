@@ -10,7 +10,7 @@ using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
 
-public sealed partial class FFmpegVideoDecoder : IVideoDecoder
+internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
 {
     private const int SearchChildren = 1;
 

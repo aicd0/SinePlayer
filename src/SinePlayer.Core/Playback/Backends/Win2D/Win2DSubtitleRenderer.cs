@@ -10,7 +10,7 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Backends.Win2D;
 
-public sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
+internal sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
 {
     private bool _disposed;
 
