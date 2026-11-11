@@ -18,6 +18,8 @@
 2. If it is confirmed an implementation bug, that is not part of the design the user asked for and was only
    introduced by the agent's mistake, fix the bug.
 3. Otherwise, always ask for the user's expectation before making any changes.
+- A flaky test is investigated, not re-run. Never loop the suite hoping to catch it again: read the log of the run that
+  failed and work out why it flakes. A re-run is only for confirming a fix.
 
 ## Building
 

@@ -22,6 +22,7 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
 
     private long _endingEpoch = -1;
     private long _anchoredEpoch = -1;
+    private TimeSpan? _pendingPosition;
 
     public Lock ClockLock => _clockLock;
 
@@ -45,52 +46,57 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
         set => Interlocked.Exchange(ref _endingEpoch, value);
     }
 
-    public void PublishMove(TimeSpan position, SeekMode mode)
-    {
-        _epochGate.Write(x => new EpochGate()
-        {
-            Epoch = x.Epoch + 1,
-            SeekPosition = position,
-            SeekMode = mode,
-            ReadOffset = x.ReadOffset,
-            Offsets = x.Offsets,
-        });
-    }
-
-    public void PublishOffsets(IReadOnlyDictionary<IChainFeed, TimeSpan> offsets)
-    {
-        TimeSpan position = Position;
-        TimeSpan readOffset = EpochGate.ReadOffsetOf(offsets);
-        _epochGate.Write(x =>
-        {
-            bool reseek = readOffset != x.ReadOffset || EpochGate.AnyOffsetIncreased(x.Offsets, offsets);
-            return new EpochGate()
-            {
-                Epoch = reseek ? x.Epoch + 1 : x.Epoch,
-                SeekPosition = reseek ? position : x.SeekPosition,
-                SeekMode = reseek ? SeekMode.Precise : x.SeekMode,
-                ReadOffset = readOffset,
-                Offsets = offsets,
-            };
-        });
-    }
-
-    public void SetPosition(TimeSpan position)
+    public void SeekTo(TimeSpan position, SeekMode mode)
     {
         lock (_clockLock)
         {
+            _pendingPosition = position;
+            _epochGate.Write(x => new EpochGate()
+            {
+                Epoch = x.Epoch + 1,
+                SeekPosition = position,
+                SeekMode = mode,
+                ReadOffset = x.ReadOffset,
+                Offsets = x.Offsets,
+            });
             _clock.SetPosition(position);
         }
     }
 
-    public void SeekTo(TimeSpan position)
+    public void Refresh()
     {
         lock (_clockLock)
         {
-            if (_anchoredEpoch != Epoch)
+            TimeSpan position = _pendingPosition ?? _clock.Position;
+            _epochGate.Write(x => new EpochGate()
             {
-                _clock.SetPosition(position);
-            }
+                Epoch = x.Epoch + 1,
+                SeekPosition = position,
+                SeekMode = SeekMode.Precise,
+                ReadOffset = x.ReadOffset,
+                Offsets = x.Offsets,
+            });
+        }
+    }
+
+    public void PublishOffsets(IReadOnlyDictionary<IChainFeed, TimeSpan> offsets)
+    {
+        TimeSpan readOffset = EpochGate.ReadOffsetOf(offsets);
+        lock (_clockLock)
+        {
+            TimeSpan position = _pendingPosition ?? _clock.Position;
+            _epochGate.Write(x =>
+            {
+                bool reseek = readOffset != x.ReadOffset || EpochGate.AnyOffsetIncreased(x.Offsets, offsets);
+                return new EpochGate()
+                {
+                    Epoch = reseek ? x.Epoch + 1 : x.Epoch,
+                    SeekPosition = reseek ? position : x.SeekPosition,
+                    SeekMode = reseek ? SeekMode.Precise : x.SeekMode,
+                    ReadOffset = readOffset,
+                    Offsets = offsets,
+                };
+            });
         }
     }
 
@@ -139,6 +145,7 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
             }
 
             _anchoredEpoch = iterationEpoch;
+            _pendingPosition = null;
             _clock.SetPosition(mediaTimestamp);
             clockMoved();
             return true;

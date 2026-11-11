@@ -4569,8 +4569,11 @@ public class PlaybackPipelineTests
             WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(0.5), "playback to be under way", 5000);
 
             // The picture is held back half a second, so reading starts that much earlier than the clock and stays there: the
-            // sound moved afterwards is not what decides where reading starts.
+            // sound moved afterwards is not what decides where reading starts. The wait is on the file being read again rather
+            // than on where reading starts, because the seek that began playback already starts behind the clock.
+            int seeks = sources.Source?.SeekCount ?? 0;
             pipeline.VideoChains[0].Offset = TimeSpan.FromMilliseconds(500);
+            WaitFor(() => (sources.Source?.SeekCount ?? 0) > seeks, "the file to be read again for the picture", 5000);
             WaitFor(() => sources.Source?.LastSeekPosition is TimeSpan landed && landed < pipeline.Position - TimeSpan.FromMilliseconds(300),
                 "the file to be read from before the clock", 5000);
             TimeSpan? start = sources.Source?.LastSeekPosition;
@@ -4591,6 +4594,54 @@ public class PlaybackPipelineTests
             Assert.That(sources.Source?.LastSeekPosition, Is.EqualTo(start), "nothing had to be read again");
             Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(before), "the clock itself was not taken back");
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing));
+        }
+        finally
+        {
+            sources.Release();
+        }
+    }
+
+    /// <summary>
+    /// Opening another file in the same pipeline is a reset followed by a fresh source and a fresh selection. The chains are the
+    /// same objects throughout, so what has to survive is that they are pointed at the new file rather than at what they last
+    /// played: the picture must come from the new source, not from the one that was just disposed.
+    /// </summary>
+    [Test]
+    public void PlaysTheSecondFileAfterTheFirst()
+    {
+        SyntheticSourceProviderFactory sources = new(new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(6),
+            KeyFrameInterval = 30,
+            LandsOnKeyframes = true,
+        });
+
+        FakeVideoRenderer videoRenderer = new();
+        using PlaybackPipeline pipeline = CreatePipeline(
+            videoRenderer,
+            new FakeAudioRenderer(),
+            videoDecoders: new SyntheticVideoDecoderFactory(),
+            sourceFactory: sources,
+            audioDecoders: new SyntheticAudioDecoderFactory());
+
+        try
+        {
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => videoRenderer.RenderedFrames > 3, "the first file to be playing", 5000);
+
+            // The host switches to the next item: the same pipeline, reset and opened again.
+            int framesBefore = videoRenderer.RenderedFrames;
+            Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitFor(() => videoRenderer.RenderedFrames > framesBefore + 3, "the second file to bring pictures", 5000);
+
+            MediaSource playing = pipeline.Sources[0];
+            Assert.That(pipeline.VideoChains[0].SelectedStream, Is.SameAs(playing.Info.VideoStreams[0]),
+                "the picture is the new file's, not the one that was disposed");
+            Assert.That(pipeline.VideoChains[0].PlayingStream, Is.SameAs(playing.Info.VideoStreams[0]),
+                "and it is what the chain is actually reading");
         }
         finally
         {
