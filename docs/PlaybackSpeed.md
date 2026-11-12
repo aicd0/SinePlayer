@@ -68,12 +68,13 @@ keeps the same `SetSpeed` contract so that can be a separate step later.
 
 ### The playhead understands a media extent
 
-`AudioPlayhead.OnHandOver(mediaStart, mediaEnd, frames, sampleRate, devicePosition)`, with `Span` carrying
-`MediaEnd`, and the resolution interpolating by frame proportion:
+`AudioPlayhead.OnHandOver(frames, sampleRate, startTime, endTime, deviceTime)`, with `Span` carrying both ends of the media
+it covers, and the resolution interpolating by frame proportion:
 
-    media = MediaStart + (played - Start) / (End - Start) * (MediaEnd - MediaStart)
+    media = StartTime + (deviceFrame - StartFrame) / (EndFrame - StartFrame) * (EndTime - StartTime)
 
-At 1.0x this is arithmetically identical to today, so every existing playhead test must pass unchanged.
+At 1.0x this is arithmetically identical to what came before, so every existing playhead test passes with only its call
+sites changed.
 
 One consequence: a block's media extent is a length, which the playhead has so far refused to use. There is
 no way around it - at a rate other than 1.0 the frames no longer encode media time. The extent comes from the
@@ -100,16 +101,21 @@ Audio already in the device plays at the old rate until it drains - at most one 
 
 ## Steps
 
-1. **The clock takes a rate, from above it (internal).** `Rate`/`SetRate` come off `IPlaybackClock`; a new `RetimedClock`
+1. **Done: the clock takes a rate, from above it (internal).** `Rate`/`SetRate` come off `IPlaybackClock`; a new `RetimedClock`
    wraps a clock and scales it; `PipelineTimeline` holds one over its stopwatch and exposes `Rate`/`SetRate`. Verified by
-   the retimed clock's own tests (hand-cranked, no sleeps) and the timeline's: the rate is reported, an unusable rate is
-   taken as none, a change does not move the position, a placed position is measured from exactly there, and the position
-   advances at the rate.
-2. **The playhead understands a media extent.** The signature above, `Span.MediaEnd`, the interpolation, and
-   `AudioChain` passing the media extent (also to `tailBufferPosition`). Verified by the existing playhead
-   tests passing unchanged, plus one where the frames and the media extent disagree.
-3. **`SpeedAudioFilter`.** As above, with its own tests: frame ratios across the range, 1.0 as a pass-through,
-   the format untouched, and no sample drift across many blocks.
+   the retimed clock's own tests (hand-cranked, no sleeps) and the timeline's.
+2. **Done: the playhead understands a media extent.** `OnHandOver(frames, sampleRate, startTime, endTime, deviceTime)`,
+   `Span` carrying both ends of the media, the interpolation, and `AudioChain` reading the media duration before the
+   filters run - also for `tailBufferPosition`. Every existing playhead test passes with only its call sites changed, plus
+   one where the frames and the media extent disagree.
+3. **Done: `SpeedAudioFilter`.** `Playback/Backends/Speed/SpeedAudioFilter.cs`, in the shape of the gain filter: one
+   lock-free speed read once per block, `OutputFormat => null`, and a speed of one returns the block it was given. Faster
+   averages the frames it skips (point-sampling would alias at 8x), slower interpolates between the frames it lands on, and
+   the fractional remainder carries into the next block so the sound stays continuous. Output keeps the timestamp, format
+   and layout, so nothing downstream has to be reconfigured. Verified by 20 tests: frame counts across 0.1x-8x, a constant
+   signal surviving all six sample formats, the two interpolation paths checked sample by sample, 40 blocks at a steady
+   level staying steady (no drift), channels kept apart both interleaved and planar, unusable speeds taken as none, and a
+   format it cannot read refused with the block handed back. Not wired into the pipeline yet - that is step 4.
 4. **Wire it up.** `PlaybackPipeline.Rate/SetRate` (clamped to 0.1-8) sets the timeline rate, calls `SetSpeed`
    on every audio chain's filter, and raises the playhead's adopt-next flag; `PlayerSession.SetPlaybackRate`
    stops throwing; the two wall-clock conversions divide by the rate (one helper on the timeline, so no third

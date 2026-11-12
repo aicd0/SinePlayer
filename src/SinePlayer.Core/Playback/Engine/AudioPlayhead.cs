@@ -10,7 +10,6 @@ internal sealed class AudioPlayhead
     private const double OffsetWeight = 1.0 / 16.0;
 
     private readonly List<Span> _spans = [];
-
     private long _frames;
     private bool _deviceOriginKnown;
     private TimeSpan _deviceOrigin;
@@ -26,35 +25,35 @@ internal sealed class AudioPlayhead
         _offsetKnown = false;
     }
 
-    internal void OnHandOver(TimeSpan mediaStart, int frames, int sampleRate, TimeSpan? devicePosition)
+    internal void OnHandOver(int frames, int sampleRate, TimeSpan startTime, TimeSpan endTime, TimeSpan? deviceTime)
     {
-        Append(mediaStart, frames, sampleRate);
+        Append(frames, sampleRate, startTime, endTime);
 
-        if (devicePosition is not TimeSpan device || sampleRate <= 0)
+        if (deviceTime is not TimeSpan deviceTimeNotNull || sampleRate <= 0)
         {
             return;
         }
 
         if (!_deviceOriginKnown)
         {
-            _deviceOrigin = device;
+            _deviceOrigin = deviceTimeNotNull;
             _sampleRate = sampleRate;
             _deviceOriginKnown = true;
         }
 
-        if (!TryResolve(FramesOf(device - _deviceOrigin, _sampleRate), out TimeSpan position))
+        if (!TryResolve(FramesOf(deviceTimeNotNull - _deviceOrigin, _sampleRate), out TimeSpan mediaTime))
         {
             return;
         }
 
-        TimeSpan sample = device - position;
-        if (!_offsetKnown || (sample - _offset).Duration() > OffsetNoise)
+        TimeSpan offset = deviceTimeNotNull - mediaTime;
+        if (!_offsetKnown || (offset - _offset).Duration() > OffsetNoise)
         {
-            _offset = sample;
+            _offset = offset;
         }
         else
         {
-            _offset += (sample - _offset) * OffsetWeight;
+            _offset += (offset - _offset) * OffsetWeight;
         }
 
         _offsetKnown = true;
@@ -66,16 +65,16 @@ internal sealed class AudioPlayhead
         return _offsetKnown;
     }
 
-    private bool TryResolve(long played, out TimeSpan mediaTime)
+    private bool TryResolve(long deviceFrame, out TimeSpan mediaTime)
     {
         mediaTime = default;
 
-        if (played < 0 || played >= _frames)
+        if (deviceFrame < 0 || deviceFrame >= _frames)
         {
             return false;
         }
 
-        while (_spans.Count > 0 && _spans[0].End <= played)
+        while (_spans.Count > 0 && _spans[0].EndFrame <= deviceFrame)
         {
             _spans.RemoveAt(0);
         }
@@ -86,8 +85,33 @@ internal sealed class AudioPlayhead
         }
 
         Span span = _spans[0];
-        mediaTime = span.MediaStart + TimeOf(played - span.Start, span.SampleRate);
+        long spanFrames = span.EndFrame - span.StartFrame;
+        long behindFrames = deviceFrame - span.StartFrame;
+        if (behindFrames < 0)
+        {
+            behindFrames = 0;
+        }
+
+        long spanTicks = (span.EndTime - span.StartTime).Ticks;
+        mediaTime = span.StartTime + TimeSpan.FromTicks(behindFrames * spanTicks / spanFrames);
         return true;
+    }
+
+    private void Append(int frames, int sampleRate, TimeSpan startTime, TimeSpan endTime)
+    {
+        if (frames <= 0 || sampleRate <= 0)
+        {
+            return;
+        }
+
+        _spans.Add(new()
+        {
+            StartFrame = _frames,
+            EndFrame = _frames + frames,
+            StartTime = startTime,
+            EndTime = endTime > startTime ? endTime : startTime + TimeOf(frames, sampleRate),
+        });
+        _frames += frames;
     }
 
     private static long FramesOf(TimeSpan elapsed, int sampleRate)
@@ -100,16 +124,5 @@ internal sealed class AudioPlayhead
         return TimeSpan.FromTicks(frames * TimeSpan.TicksPerSecond / sampleRate);
     }
 
-    private void Append(TimeSpan mediaStart, int frames, int sampleRate)
-    {
-        if (frames <= 0 || sampleRate <= 0)
-        {
-            return;
-        }
-
-        _spans.Add(new Span(_frames, _frames + frames, mediaStart, sampleRate));
-        _frames += frames;
-    }
-
-    private readonly record struct Span(long Start, long End, TimeSpan MediaStart, int SampleRate);
+    private readonly record struct Span(long StartFrame, long EndFrame, TimeSpan StartTime, TimeSpan EndTime);
 }
