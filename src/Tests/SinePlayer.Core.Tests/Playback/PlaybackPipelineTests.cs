@@ -8773,10 +8773,6 @@ public class PlaybackPipelineTests
             _zero = _device.Position;
         }
 
-        public void SetRate(double rate)
-        {
-        }
-
         /// <summary>The device being reset: its travel starts over. What it holds is gone with it.</summary>
         public void ResetPoint()
         {
@@ -8852,10 +8848,6 @@ public class PlaybackPipelineTests
                 _base = position;
                 _playedSeconds = 0;
             }
-        }
-
-        public void SetRate(double rate)
-        {
         }
 
         /// <summary>How much of what it was given is still unplayed, which is what the device reports as queued.</summary>

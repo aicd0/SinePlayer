@@ -18,7 +18,7 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
     private readonly AtomicCell<EpochGate> _epochGate = new(new());
     private readonly AtomicCell<AudioChain?> _deviceOwner = new(null);
     private readonly Lock _clockLock = new();
-    private readonly IPlaybackClock _clock = new StopwatchClock();
+    private readonly RetimedClock _clock = new(new StopwatchClock());
 
     private long _endingEpoch = -1;
     private long _anchoredEpoch = -1;
@@ -39,6 +39,8 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
     public TimeSpan Position => _clock.Position;
 
     public bool IsRunning => _clock.IsRunning;
+
+    public double Rate => _clock.Rate;
 
     public long EndingEpoch
     {
@@ -97,6 +99,14 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
                     Offsets = offsets,
                 };
             });
+        }
+    }
+
+    public void SetRate(double rate)
+    {
+        lock (_clockLock)
+        {
+            _clock.SetRate(rate);
         }
     }
 
