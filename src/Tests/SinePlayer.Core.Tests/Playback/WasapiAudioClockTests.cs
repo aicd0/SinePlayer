@@ -101,8 +101,6 @@ public class WasapiAudioClockTests
             Assert.That(clock.Position, Is.EqualTo(placed), "time has stopped where it was last put, which is what a lost device means");
             Assert.That(clock.Position, Is.EqualTo(placed), "and it does not move on its own");
         }
-
-        Assert.DoesNotThrow(() => clock.SetRate(1.5), "retiming a clock whose device is gone is not an event");
     }
 
     /// <summary>The device as the clock sees it, with a failure the test can arm and inspect.</summary>

@@ -124,6 +124,7 @@ public class ComponentRegistryTests
         registry.Register(stable);
 
         using CancellationTokenSource stop = new();
+        using ManualResetEventSlim reading = new();
         Exception? failure = null;
         List<Thread> writers = [];
         for (int writer = 0; writer < 3; writer++)
@@ -133,6 +134,10 @@ public class ComponentRegistryTests
             {
                 try
                 {
+                    // Nothing here may start before a read is under way. Otherwise the writers can finish inside the one slice the
+                    // reader has not been given yet, and this test then asserts about an interleaving that never happened.
+                    reading.Wait();
+
                     for (int step = 0; step < iterations; step++)
                     {
                         NullVideoDecoderFactory added = new($"w{index}-{step}");
@@ -156,6 +161,9 @@ public class ComponentRegistryTests
         int reads = 0;
         while (!stop.IsCancellationRequested)
         {
+            // Released before anything is asserted, so a read that fails cannot leave the writers waiting on it.
+            reading.Set();
+
             IReadOnlyList<IVideoDecoderFactory> components = Decoders(registry);
             HashSet<IVideoDecoderFactory> seen = [];
             foreach (IVideoDecoderFactory component in components)

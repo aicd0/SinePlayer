@@ -16,7 +16,6 @@ internal sealed class WasapiAudioClock : IPlaybackClock
     private TimeSpan _base;
     private TimeSpan _lastPosition;
     private ulong _basePosition;
-    private double _rate = 1.0;
     private volatile bool _deviceLost;
     private Exception? _cause;
 
@@ -70,9 +69,7 @@ internal sealed class WasapiAudioClock : IPlaybackClock
                 }
 
                 ulong travelled = position > _basePosition ? position - _basePosition : 0;
-
-                // At a rate above one, more media passes per device second, and the other way round.
-                double seconds = travelled / (double)_frequency * _rate;
+                double seconds = travelled / (double)_frequency;
                 _lastPosition = _base + TimeSpan.FromSeconds(seconds);
                 return _lastPosition;
             }
@@ -80,8 +77,6 @@ internal sealed class WasapiAudioClock : IPlaybackClock
     }
 
     public bool IsRunning { get; private set; }
-
-    public double Rate => _rate;
 
     public void Start()
     {
@@ -156,32 +151,6 @@ internal sealed class WasapiAudioClock : IPlaybackClock
                 MarkLost(exception);
                 _basePosition = 0;
             }
-        }
-    }
-
-    /// <summary>
-    /// Applies a new rate. The sink does not change the device's own rate yet, so only the reading of
-    /// the device's time changes; the position is re-anchored so it does not jump.
-    /// </summary>
-    public void SetRate(double rate)
-    {
-        lock (_lock)
-        {
-            if (!_deviceLost)
-            {
-                try
-                {
-                    _basePosition = _device.Position;
-                }
-                catch (Exception exception)
-                {
-                    MarkLost(exception);
-                    _basePosition = 0;
-                }
-            }
-
-            _base = _lastPosition;
-            _rate = rate > 0 ? rate : 1.0;
         }
     }
 

@@ -77,7 +77,6 @@ public class WasapiAudioRendererTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(renderer.Clock.IsRunning, Is.True);
-            Assert.That(renderer.Clock.Rate, Is.EqualTo(1.0));
         }
 
         Thread.Sleep(100);
