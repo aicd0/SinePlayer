@@ -2,7 +2,6 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Playback.Abstractions;
-using SinePlayer.Core.Playback.Abstractions.Timing;
 using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Core.Playback.Timing;
 using SinePlayer.Core.Playback.Utils;
@@ -11,8 +10,6 @@ namespace SinePlayer.Core.Playback.Engine;
 
 internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
 {
-    private const string TAG = nameof(PlaybackPipeline);
-
     private const int ClockSyncToleranceMilliseconds = 10;
 
     private readonly AtomicCell<EpochGate> _epochGate = new(new());
@@ -162,28 +159,15 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
         }
     }
 
-    public void SyncClock(AudioChain chain, IPlaybackClock deviceClock, TimeSpan offset)
+    public void SyncClock(AudioChain chain, TimeSpan position)
     {
         if (chain != DeviceOwner)
         {
             return;
         }
 
-        TimeSpan deviceTime;
-        TimeSpan localTime;
-        try
-        {
-            deviceTime = deviceClock.Position;
-            localTime = _clock.Position;
-        }
-        catch (Exception ex)
-        {
-            PlaybackLogger.E(TAG, ex);
-            return;
-        }
-
-        TimeSpan expected = deviceTime - offset;
-        if (Math.Abs((expected - localTime).TotalMilliseconds) <= ClockSyncToleranceMilliseconds)
+        TimeSpan localTime = _clock.Position;
+        if ((position - localTime).Duration() <= TimeSpan.FromMilliseconds(ClockSyncToleranceMilliseconds * Rate))
         {
             return;
         }
@@ -195,7 +179,7 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
                 return;
             }
 
-            _clock.SetPosition(expected);
+            _clock.SetPosition(position);
             clockMoved();
         }
     }

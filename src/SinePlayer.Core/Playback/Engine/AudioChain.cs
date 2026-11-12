@@ -677,9 +677,11 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
             bool hasDeviceAudio = deviceAvailable && audioRenderer is not null && audioRenderer.QueuedSampleCount > 0;
             if (deviceAvailable && audioRenderer is not null)
             {
-                if (hasDeviceAudio && playhead.TryGetOffset(out TimeSpan deviceToMedia))
+                if (hasDeviceAudio
+                    && DevicePositionOf(audioRenderer) is TimeSpan deviceTime
+                    && playhead.TryResolve(deviceTime, out TimeSpan mediaTime))
                 {
-                    _timeline.SyncClock(this, audioRenderer.Clock, deviceToMedia);
+                    _timeline.SyncClock(this, mediaTime);
                 }
 
                 if (inFlightSubmit is not null)

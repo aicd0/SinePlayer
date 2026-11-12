@@ -2206,6 +2206,49 @@ public class PlaybackPipelineTests
         }
     }
 
+    /// <summary>
+    /// The clock follows what the device is playing, and what the device is playing never goes backwards — at any rate. A
+    /// rate other than one makes the count and the file drift apart instead of moving together, and a sync that forgets that
+    /// drags the clock forward between hand-overs and back at each of them: the position then sawtooths by the depth of a
+    /// block, which is what a cue sitting on one of those teeth flickers on.
+    /// </summary>
+    [Test]
+    [TestCase(0.5)]
+    [TestCase(2.0)]
+    public void KeepsTheClockGoingForwardWhileTheRateIsNotOne(double rate)
+    {
+        string path = CreateWaveFile(SampleRate * 6);
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { QueuedSampleCount = SampleRate };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            pipeline.Rate = rate;
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(400), "playback to be under way and settled", 5000);
+
+            TimeSpan previous = pipeline.Position;
+            double worst = 0;
+            var watch = Stopwatch.StartNew();
+            while (watch.ElapsedMilliseconds < 1200)
+            {
+                TimeSpan now = pipeline.Position;
+                worst = Math.Min(worst, (now - previous).TotalMilliseconds);
+                previous = now;
+                Thread.SpinWait(2000);
+            }
+
+            Assert.That(worst, Is.GreaterThan(-20.0),
+                "the sound is the master, so the clock follows it rather than being stepped by how the sync is measured");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Test]
     public void EndsWhenTheDeviceHasPlayedOutTheSound()
     {
