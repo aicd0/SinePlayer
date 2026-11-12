@@ -178,6 +178,68 @@ public class AudioFilterChainTests
         Assert.That(order, Is.EqualTo(new[] { "first", "second", "third" }));
     }
 
+    /// <summary>
+    /// The forced filters are the owner's stages rather than the host's, so they run after everything the host added and the
+    /// host is told about none of them: they are not counted, not listed, and a later addition still goes in ahead of them.
+    /// </summary>
+    [Test]
+    public void RunsTheForcedFiltersAfterTheOnesTheHostAdded()
+    {
+        List<string> order = [];
+        AudioFilterChain chain = new();
+        RecordingFilter forcedFirst = new("forced-first", order);
+        RecordingFilter forcedSecond = new("forced-second", order);
+        chain.SetForcedFilters(forcedFirst, forcedSecond);
+
+        RecordingFilter hostFirst = new("host-first", order);
+        RecordingFilter hostSecond = new("host-second", order);
+        chain.Add(hostFirst);
+        chain.Add(hostSecond);
+        Prepare(chain);
+
+        using (Apply(chain))
+        {
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(order, Is.EqualTo(new[] { "host-first", "host-second", "forced-first", "forced-second" }));
+            Assert.That(chain.Count, Is.EqualTo(2), "the host counts only what it added");
+            Assert.That(chain.Filters, Is.EqualTo(new IAudioFilter[] { hostFirst, hostSecond }));
+        }
+    }
+
+    /// <summary>
+    /// Clearing is the host taking back its own filters, which says nothing about the forced ones: they stay, and they are not the
+    /// host's to remove either, because they were never theirs to add.
+    /// </summary>
+    [Test]
+    public void KeepsTheForcedFiltersWhenTheHostClearsTheChain()
+    {
+        List<string> order = [];
+        AudioFilterChain chain = new();
+        RecordingFilter forced = new("forced", order);
+        RecordingFilter host = new("host", order);
+        chain.SetForcedFilters(forced);
+        chain.Add(host);
+        Prepare(chain);
+
+        Assert.That(chain.Remove(forced), Is.False, "a forced filter is not the host's to take out");
+
+        chain.Clear();
+
+        using (Apply(chain))
+        {
+        }
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(chain.Count, Is.Zero);
+            Assert.That(chain.Filters, Is.Empty);
+            Assert.That(order, Is.EqualTo(new[] { "forced" }), "what the host added is gone and what the owner forced still runs");
+            Assert.That(forced.Disposed || host.Disposed, Is.False);
+        }
+    }
+
     [Test]
     public void HandsBackTheBlockItWasGivenWhenNothingTransformedIt()
     {

@@ -8,6 +8,7 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
+using SinePlayer.Core.Playback.Backends.Speed;
 using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Core.Playback.Selection;
 
@@ -29,12 +30,14 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     private volatile bool _starved;
     private long _endedEpoch = -1;
     private long _offsetTicks;
+    private readonly SpeedAudioFilter _speedFilter = new();
 
     public AudioChain(IChainHost host, PipelineTimeline timeline, PipelineEvents events)
     {
         _host = host;
         _timeline = timeline;
         _events = events;
+        Filters.SetForcedFilters(_speedFilter);
     }
 
     public MediaStreamKind Kind => MediaStreamKind.Audio;
@@ -293,6 +296,11 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     public void Select(StreamBinding<MediaStreamInfo>? binding)
     {
         Selected = binding is { } chosen ? new(chosen.Source, (AudioStreamInfo)chosen.Stream) : null;
+    }
+
+    public void SetSpeed(double speed)
+    {
+        _speedFilter.SetSpeed(speed);
     }
 
     private async Task Decode(Func<bool> stopRequested, Action wakeReader)
@@ -648,7 +656,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
             TimeSpan position = _timeline.Position;
             if (deviceAvailable && tailBufferPosition is TimeSpan consumed
-                && consumed - position > TimeSpan.FromMilliseconds(AudioDeviceLeewayMilliseconds))
+                && consumed - position > TimeSpan.FromMilliseconds(AudioDeviceLeewayMilliseconds * _timeline.Rate))
             {
                 if (!reportedRunningAhead)
                 {

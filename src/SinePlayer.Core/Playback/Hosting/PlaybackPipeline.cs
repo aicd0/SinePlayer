@@ -79,6 +79,20 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
 
     public TimeSpan Position => _timeline.Position;
 
+    public double Rate
+    {
+        get => _timeline.Rate;
+        set
+        {
+            double clamped = Math.Max(value, 0.0);
+            _timeline.SetRate(clamped);
+            foreach (AudioChain chain in _audioChains)
+            {
+                chain.SetSpeed(clamped);
+            }
+        }
+    }
+
     public string? StarvedFor
     {
         get
@@ -249,6 +263,7 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
     private AudioChain AddAudioChainCore()
     {
         AudioChain chain = new(this, _timeline, _events);
+        chain.SetSpeed(_timeline.Rate);
         _audioChains = [.. _audioChains, chain];
         RegisterFeed(chain);
         return chain;

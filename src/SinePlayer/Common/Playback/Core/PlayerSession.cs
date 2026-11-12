@@ -51,6 +51,7 @@ internal sealed partial class PlayerSession : IDisposable
     private PlaybackComponents _components = PlaybackComponents.Default;
     private double _volume = 1.0;
     private bool _muted;
+    private double _rate = 1.0;
 
     private bool _pendingReconcile = false;
     private ReconcileResult? _lastReconcile;
@@ -74,6 +75,9 @@ internal sealed partial class PlayerSession : IDisposable
 
     #region Public API
 
+    public const double MinimumPlaybackRate = 0.1;
+    public const double MaximumPlaybackRate = 8.0;
+
     public static string NewId()
     {
         return Guid.NewGuid().ToString();
@@ -96,6 +100,8 @@ internal sealed partial class PlayerSession : IDisposable
     public event Action? PositionChanged;
 
     public event Action? VolumeChanged;
+
+    public event Action? PlaybackRateChanged;
 
     public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
 
@@ -134,7 +140,7 @@ internal sealed partial class PlayerSession : IDisposable
 
     public bool IsMuted => _muted;
 
-    public double PlaybackRate => 1.0;
+    public double PlaybackRate => _rate;
 
     public Task EnsureLoaded()
     {
@@ -549,7 +555,15 @@ internal sealed partial class PlayerSession : IDisposable
 
     public void SetPlaybackRate(double rate)
     {
-        throw new NotSupportedException("This engine cannot change the playback rate yet.");
+        double clamped = double.IsFinite(rate) ? Math.Clamp(rate, MinimumPlaybackRate, MaximumPlaybackRate) : 1.0;
+        if (_rate == clamped)
+        {
+            return;
+        }
+
+        _rate = clamped;
+        _pipeline?.Rate = clamped;
+        PlaybackRateChanged?.Invoke();
     }
 
     private void ApplyVolume()
@@ -595,6 +609,7 @@ internal sealed partial class PlayerSession : IDisposable
         _components.Apply(pipeline);
         pipeline.StateChanged += Pipeline_StateChanged;
         pipeline.WarningRaised += Pipeline_WarningRaised;
+        pipeline.Rate = _rate;
 
         _pipeline = pipeline;
         _pendingReconcile = true;

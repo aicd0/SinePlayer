@@ -2151,6 +2151,61 @@ public class PlaybackPipelineTests
     /// The other half of the same model: an ending that is waiting for the sound is waiting for the sound, not
     /// for a timeout — so the file ends when the device has played the last of it, at the moment it does.
     /// </summary>
+    /// <summary>
+    /// Playback speed is a property of the pipeline: the clock runs at the rate, and the sound is resampled so that a device
+    /// rendering at its own rate keeps up with it. What is already in the device plays at the old speed until it drains, so a
+    /// change neither flushes nor takes the clock back.
+    /// </summary>
+    [Test]
+    public void RunsTheClockAtTheRateAndResamplesTheSound()
+    {
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 60);
+        try
+        {
+            FakeAudioRenderer audioRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(200), "playback to be under way", 5000);
+
+            using (Assert.EnterMultipleScope())
+            {
+                pipeline.Rate = -2.0;
+                Assert.That(pipeline.Rate, Is.EqualTo(1.0), "a rate below nothing is not a rate, and changes nothing");
+
+                pipeline.Rate = 0.0;
+                Assert.That(pipeline.Rate, Is.EqualTo(1.0), "nor is a rate of nothing");
+
+                pipeline.Rate = double.NaN;
+                Assert.That(pipeline.Rate, Is.EqualTo(1.0), "nor is one that means nothing");
+
+                pipeline.Rate = 4.0;
+                Assert.That(pipeline.Rate, Is.EqualTo(4.0), "what a host may ask for is the host's business, not the engine's");
+            }
+
+            int flushes = audioRenderer.FlushCount;
+            pipeline.Rate = 2.0;
+            TimeSpan before = pipeline.Position;
+
+            var waited = Stopwatch.StartNew();
+            WaitFor(() => pipeline.Position - before > TimeSpan.FromMilliseconds(400), "the clock to advance at the rate", 5000);
+            waited.Stop();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(waited.ElapsedMilliseconds, Is.LessThan(400),
+                    "400 ms of media has to take well under a second of wall time, or the clock is not running at twice the speed");
+                Assert.That(audioRenderer.FlushCount, Is.EqualTo(flushes), "a rate change does not flush the device");
+                Assert.That(pipeline.Position, Is.GreaterThanOrEqualTo(before), "and does not take the clock back");
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Test]
     public void EndsWhenTheDeviceHasPlayedOutTheSound()
     {

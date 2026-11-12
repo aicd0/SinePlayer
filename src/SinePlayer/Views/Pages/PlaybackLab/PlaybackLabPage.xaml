@@ -45,6 +45,22 @@
                 x:Name="SeekForwardButton"
                 Click="SeekForwardButton_Click"
                 Content="+30s" />
+            <StackPanel
+                VerticalAlignment="Bottom"
+                Orientation="Horizontal"
+                Spacing="6">
+                <TextBlock VerticalAlignment="Center" Text="Speed" />
+                <NumberBox
+                    x:Name="SpeedBox"
+                    Width="110"
+                    LargeChange="0.5"
+                    Maximum="8"
+                    Minimum="0.1"
+                    SmallChange="0.1"
+                    SpinButtonPlacementMode="Compact"
+                    Value="1"
+                    ValueChanged="SpeedBox_ValueChanged" />
+            </StackPanel>
             <Slider
                 x:Name="VolumeSlider"
                 Width="200"
