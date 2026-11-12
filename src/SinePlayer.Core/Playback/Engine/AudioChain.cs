@@ -477,15 +477,16 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     {
         bool deviceAvailable = false;
         bool reportedRunningAhead = false;
+        bool reportedClockFailure = false;
         long workingEpoch = -1;
         long endingEpoch = -1;
         long playedOutEpoch = -1;
         TimeSpan workingOffset = TimeSpan.Zero;
-        TimeSpan? deviceOffset = null;
         TimeSpan? startTime = null;
         TimeSpan? tailBufferPosition = null;
         AudioStreamInfo? deviceFormat = null;
         AudioFilterChainSnapshot? filters = null;
+        AudioPlayhead playhead = new();
 
         IAudioSubmit? inFlightSubmit = null;
         RawAudioBuffer? inFlightBuffer = null;
@@ -496,6 +497,24 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
             inFlightSubmit = null;
             inFlightBuffer?.Dispose();
             inFlightBuffer = null;
+        }
+
+        TimeSpan? DevicePositionOf(IAudioRenderer renderer)
+        {
+            try
+            {
+                return renderer.Clock.IsRunning ? renderer.Clock.Position : null;
+            }
+            catch (Exception ex)
+            {
+                if (!reportedClockFailure)
+                {
+                    reportedClockFailure = true;
+                    _events.PostWarning(ex.Message, this);
+                }
+
+                return null;
+            }
         }
 
         bool AbandonFailedDevice(IAudioRenderer? renderer)
@@ -527,9 +546,10 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
                 deviceAvailable = false;
                 reportedRunningAhead = false;
-                deviceOffset = null;
+                reportedClockFailure = false;
                 deviceFormat = null;
                 filters = null;
+                playhead.Reset();
                 continue;
             }
 
@@ -549,6 +569,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                     {
                         deviceFormat = outputFormat;
                         deviceAvailable = true;
+                        playhead.Reset();
                     }
                     else
                     {
@@ -559,8 +580,6 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                             continue;
                         }
                     }
-
-                    deviceOffset = null;
                 }
             }
 
@@ -576,11 +595,11 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 tailBufferPosition = null;
                 reportedRunningAhead = false;
                 audioRenderer?.Flush();
+                playhead.Reset();
             }
 
             if (restarted || !deviceAvailable)
             {
-                deviceOffset = null;
                 ReleaseInFlightAudio();
             }
 
@@ -650,11 +669,9 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
             bool hasDeviceAudio = deviceAvailable && audioRenderer is not null && audioRenderer.QueuedSampleCount > 0;
             if (deviceAvailable && audioRenderer is not null)
             {
-                IPlaybackClock deviceClock = audioRenderer.Clock;
-
-                if (hasDeviceAudio && deviceOffset.HasValue)
+                if (hasDeviceAudio && playhead.TryGetOffset(out TimeSpan deviceToMedia))
                 {
-                    _timeline.SyncClock(this, deviceClock, deviceOffset.Value);
+                    _timeline.SyncClock(this, audioRenderer.Clock, deviceToMedia);
                 }
 
                 if (inFlightSubmit is not null)
@@ -771,18 +788,13 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
             lock (_timeline.ClockLock)
             {
                 Starved = false;
-
-                bool clockChanged = _timeline.Anchor(epoch, timestamp);
-                if (deviceAvailable && audioRenderer is not null && (clockChanged || deviceOffset is null))
-                {
-                    deviceOffset = audioRenderer.Clock.Position - timestamp;
-                }
-
+                _timeline.Anchor(epoch, timestamp);
                 _timeline.StartOrPause(epoch, state);
             }
 
             if (deviceAvailable && audioRenderer is not null)
             {
+                playhead.OnHandOver(timestamp, buffer.SampleCount, buffer.SampleRate, DevicePositionOf(audioRenderer));
                 inFlightSubmit = audioRenderer.Submit(buffer);
                 inFlightBuffer = buffer;
             }
