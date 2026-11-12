@@ -2166,6 +2166,7 @@ public class PlaybackPipelineTests
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            pipeline.AudioChains[0].SpeedAlgorithm = AudioSpeedAlgorithm.None;
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(200), "playback to be under way", 5000);
 
@@ -2246,6 +2247,61 @@ public class PlaybackPipelineTests
         finally
         {
             File.Delete(path);
+        }
+    }
+
+    [Test]
+    public void LetsEachAudioChainChooseHowItIsSpeeded()
+    {
+        // The choice belongs to the chain, not to the pipeline: a second chain may be played at the same rate with its pitch
+        // carried along while this one keeps it.
+        using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), new FakeAudioRenderer());
+        IAudioChain first = pipeline.AudioChains[0];
+        IAudioChain second = Await(pipeline.AddAudioChain());
+
+        first.SpeedAlgorithm = AudioSpeedAlgorithm.None;
+        second.SpeedAlgorithm = AudioSpeedAlgorithm.WSOLA;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.SpeedAlgorithm, Is.EqualTo(AudioSpeedAlgorithm.None), "one chain's choice is its own");
+            Assert.That(second.SpeedAlgorithm, Is.EqualTo(AudioSpeedAlgorithm.WSOLA));
+        }
+    }
+
+    [Test]
+    public void PlaysAtTheRateThroughItsStretchAlgorithm()
+    {
+        // The choice has to reach the sound the chain plays, not just a field: played at the same rate through each algorithm, the
+        // same file reaches the device in the same number of frames, less whatever a window of stretch is still holding.
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 60);
+        try
+        {
+            int resampled = SoundAt(path, AudioSpeedAlgorithm.None);
+            int stretched = SoundAt(path, AudioSpeedAlgorithm.WSOLA);
+
+            Assert.That(resampled, Is.GreaterThan(0));
+            Assert.That(stretched, Is.EqualTo(resampled).Within(2000),
+                "the same media in the same frames, times two");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+
+        static int SoundAt(string path, AudioSpeedAlgorithm algorithm)
+        {
+            FakeAudioRenderer audioRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+
+            pipeline.AudioChains[0].SpeedAlgorithm = algorithm;
+            pipeline.Rate = 2.0;
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            WaitForPlaybackToFinish(pipeline);
+            Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Ended));
+            return audioRenderer.SubmittedSamples;
         }
     }
 

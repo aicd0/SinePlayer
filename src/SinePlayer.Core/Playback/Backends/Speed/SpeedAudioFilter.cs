@@ -8,26 +8,48 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Filter;
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Core.Playback.Backends.Speed;
 
-internal sealed partial class SpeedAudioFilter : IAudioFilter
+internal sealed class SpeedAudioFilter : IAudioFilter
 {
     private const int Int24Minimum = -8388608;
     private const int Int24Maximum = 8388607;
 
+    private readonly ResamplingSpeedAlgorithm _resampling = new();
+    private readonly WsolaSpeedAlgorithm _wsola = new();
+
     private long _speed = BitConverter.DoubleToInt64Bits(1.0);
+    private long _algorithm = (long)AudioSpeedAlgorithm.None;
     private bool _disposed;
 
     // Only the audio thread touches these, which is what lets them be reused rather than allocated for every block.
     private double _applied = 1.0;
-    private double _carry;
-    private double[] _source = [];
-    private double[] _target = [];
+    private AudioSpeedAlgorithm _appliedAlgorithm = AudioSpeedAlgorithm.None;
+    private double[][] _planes = [];
+    private double[][] _output = [];
 
     public string Name => "Speed";
 
     public AudioStreamInfo? OutputFormat => null;
+
+    /// <summary>The algorithm the next block will be fitted to the rate with.</summary>
+    internal AudioSpeedAlgorithm Algorithm => (AudioSpeedAlgorithm)Interlocked.Read(ref _algorithm);
+
+    /// <summary>
+    /// Chooses how the sound is fitted to the rate. A value this filter does not know is ignored rather than taken as a reason to
+    /// stop playing.
+    /// </summary>
+    internal void SetAlgorithm(AudioSpeedAlgorithm algorithm)
+    {
+        if (Volatile.Read(ref _disposed) || !Enum.IsDefined(algorithm))
+        {
+            return;
+        }
+
+        Interlocked.Exchange(ref _algorithm, (long)algorithm);
+    }
 
     /// <summary>
     /// Sets how fast the sound plays. Anything this filter cannot honour is taken as no change at all rather than as a reason to
@@ -49,8 +71,9 @@ internal sealed partial class SpeedAudioFilter : IAudioFilter
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(target);
 
-        // A new stream is a new sound: what was left over from the last one would only be a discontinuity in it.
-        _carry = 0;
+        // A new stream is a new sound: what was left over from the last one would only be a discontinuity in it. Both algorithms
+        // are reset, because which one is asked for may change while nothing is playing.
+        ResetAlgorithms(input.SampleRate);
 
         return Volatile.Read(ref _disposed)
             ? OperationResult.Failure("The filter has already been disposed.")
@@ -68,10 +91,13 @@ internal sealed partial class SpeedAudioFilter : IAudioFilter
         }
 
         double speed = BitConverter.Int64BitsToDouble(Interlocked.Read(ref _speed));
-        if (speed != _applied)
+        AudioSpeedAlgorithm algorithm = Algorithm;
+        if (speed != _applied || algorithm != _appliedAlgorithm)
         {
+            // Neither what was left over from the last block nor what a different algorithm held makes sense at a new rate.
             _applied = speed;
-            _carry = 0;
+            _appliedAlgorithm = algorithm;
+            ResetAlgorithms(input.SampleRate);
         }
 
         if (speed == 1.0)
@@ -115,30 +141,34 @@ internal sealed partial class SpeedAudioFilter : IAudioFilter
             }
         }
 
-        int targetFrames = Math.Max(1, (int)Math.Round(sourceFrames / speed, MidpointRounding.AwayFromZero));
-        int targetValues = targetFrames * valuesPerFrame;
-
-        EnsureScratch(ref _source, sourceValues);
-        EnsureScratch(ref _target, targetValues);
-
-        ResampledBuffer resampled = new(planeCount, targetValues * bytesPerSample);
-
-        double from = _carry;
+        EnsurePlanes(ref _planes, planeCount, sourceValues);
         for (int plane = 0; plane < planeCount; plane++)
         {
             nint sourcePointer = planar.GetPlanePointer(plane);
             if (sourcePointer == 0)
             {
-                resampled.Dispose();
                 return OperationResult.Failure($"Plane {plane} of the audio buffer has no memory.");
             }
 
-            ReadPlane(sourcePointer, input.SampleFormat, _source, sourceValues);
-            Resample(_source, sourceFrames, _target, targetFrames, valuesPerFrame, speed, from);
-            WritePlane(resampled.GetPlanePointer(plane), input.SampleFormat, _target, targetValues);
+            ReadPlane(sourcePointer, input.SampleFormat, _planes[plane], sourceValues);
         }
 
-        _carry = Math.Clamp(from + (targetFrames * speed) - sourceFrames, 0, speed);
+        // How much the block carries is a question about its media rather than about how it is fitted to the rate: the same span
+        // goes in and comes out, whatever happens in between.
+        int targetFrames = Math.Max(1, (int)Math.Round(sourceFrames / speed, MidpointRounding.AwayFromZero));
+        EnsurePlanes(ref _output, planeCount, targetFrames * valuesPerFrame);
+
+        // Two ways of fitting a block to the rate: the sound may simply follow it, which takes no algorithm of its own, or it may
+        // be re-cut so that it keeps its pitch.
+        ISpeedAlgorithm selected = algorithm == AudioSpeedAlgorithm.WSOLA ? _wsola : _resampling;
+        int produced = selected.Apply(_planes, valuesPerFrame, sourceFrames, speed, _output, targetFrames);
+        int producedValues = produced * valuesPerFrame;
+
+        ResampledBuffer resampled = new(planeCount, producedValues * bytesPerSample);
+        for (int plane = 0; plane < planeCount && produced > 0; plane++)
+        {
+            WritePlane(resampled.GetPlanePointer(plane), input.SampleFormat, _output[plane], producedValues);
+        }
 
         output = new RawAudioBuffer
         {
@@ -147,7 +177,7 @@ internal sealed partial class SpeedAudioFilter : IAudioFilter
             ChannelCount = input.ChannelCount,
             ChannelLayout = input.ChannelLayout,
             SampleFormat = input.SampleFormat,
-            SampleCount = targetFrames,
+            SampleCount = produced,
             Buffer = resampled,
         };
 
@@ -159,94 +189,30 @@ internal sealed partial class SpeedAudioFilter : IAudioFilter
         Volatile.Write(ref _disposed, true);
     }
 
-    /// <summary>
-    /// Writes the target frames from the source, each frame being <paramref name="valuesPerFrame"/> contiguous values, taking
-    /// <paramref name="speed"/> source frames per target frame from <paramref name="from"/>.
-    /// </summary>
-    private static void Resample(double[] source, int sourceFrames, double[] target, int targetFrames, int valuesPerFrame, double speed, double from)
+    /// <summary>Lets go of everything both algorithms hold, so the next block is fitted as if it were the first.</summary>
+    private void ResetAlgorithms(int sampleRate)
     {
-        for (int frame = 0; frame < targetFrames; frame++)
-        {
-            double at = from + (frame * speed);
-            if (at < 0)
-            {
-                at = 0;
-            }
-
-            if (speed >= 1.0)
-            {
-                // Faster: what falls between two target frames is averaged in, because picking one of every eight samples at eight
-                // times would alias.
-                int first = (int)Math.Floor(at);
-                int last = (int)Math.Ceiling(at + speed);
-                if (first >= sourceFrames)
-                {
-                    first = sourceFrames - 1;
-                }
-
-                if (last > sourceFrames)
-                {
-                    last = sourceFrames;
-                }
-
-                if (last <= first)
-                {
-                    last = first + 1;
-                }
-
-                double divisor = last - first;
-                for (int value = 0; value < valuesPerFrame; value++)
-                {
-                    double sum = 0;
-                    for (int index = first; index < last; index++)
-                    {
-                        sum += source[(index * valuesPerFrame) + value];
-                    }
-
-                    target[(frame * valuesPerFrame) + value] = sum / divisor;
-                }
-            }
-            else
-            {
-                // Slower: the position falls between two source frames, and the sound is what lies between them.
-                int first = (int)Math.Floor(at);
-                int second = first + 1;
-                if (first >= sourceFrames)
-                {
-                    first = sourceFrames - 1;
-                }
-
-                if (second >= sourceFrames)
-                {
-                    second = sourceFrames - 1;
-                }
-
-                if (first < 0)
-                {
-                    first = 0;
-                }
-
-                if (second < first)
-                {
-                    second = first;
-                }
-
-                double blend = at - Math.Floor(at);
-                for (int value = 0; value < valuesPerFrame; value++)
-                {
-                    double low = source[(first * valuesPerFrame) + value];
-                    double high = source[(second * valuesPerFrame) + value];
-                    target[(frame * valuesPerFrame) + value] = low + ((high - low) * blend);
-                }
-            }
-        }
+        _resampling.Reset(sampleRate);
+        _wsola.Reset(sampleRate);
     }
 
-    private static void EnsureScratch(ref double[] scratch, int length)
+    /// <summary>
+    /// Room for one block's planes, each its own array so an algorithm can work on any plane without the others. The arrays are
+    /// kept and only grown, because the audio thread sees these blocks for as long as the stream lasts.
+    /// </summary>
+    private static void EnsurePlanes(ref double[][] planes, int planeCount, int valuesPerPlane)
     {
-        if (scratch.Length < length)
+        if (planes.Length != planeCount)
         {
-            scratch = new double[length];
+            planes = new double[planeCount][];
+        }
+
+        for (int plane = 0; plane < planeCount; plane++)
+        {
+            if (planes[plane] is null || planes[plane].Length < valuesPerPlane)
+            {
+                planes[plane] = new double[valuesPerPlane];
+            }
         }
     }
 

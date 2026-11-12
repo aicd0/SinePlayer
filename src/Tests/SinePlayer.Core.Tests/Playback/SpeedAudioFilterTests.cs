@@ -7,6 +7,7 @@ using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Backends.Speed;
+using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Core.Tests.Playback;
 
@@ -45,6 +46,7 @@ public class SpeedAudioFilterTests
     {
         using SpeedAudioFilter filter = new();
         filter.SetSpeed(speed);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float32, [.. Enumerable.Repeat(0.5, Frames)])]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, Frames, channelCount: 1);
@@ -75,6 +77,7 @@ public class SpeedAudioFilterTests
         // the read and write of each format testable without depending on the interpolation itself.
         using SpeedAudioFilter filter = new();
         filter.SetSpeed(2.0);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         using TestPlanarBuffer planar = new([Write(format, [.. Enumerable.Repeat(value, Frames)])]);
         using RawAudioBuffer buffer = CreateBuffer(format, planar, Frames, channelCount: 1);
@@ -95,6 +98,7 @@ public class SpeedAudioFilterTests
         // averaged in: the output is the mean of the pair.
         using SpeedAudioFilter filter = new();
         filter.SetSpeed(2.0);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         double[] ramp = [0.0, 0.5, 0.25, 0.75];
         using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, ramp)]);
@@ -114,6 +118,7 @@ public class SpeedAudioFilterTests
         // Two frames become four, and what lies between them is what is heard: half way is half of the way between them.
         using SpeedAudioFilter filter = new();
         filter.SetSpeed(0.5);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         double[] ramp = [0.0, 0.5, 0.25, 0.75];
         using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, ramp)]);
@@ -137,6 +142,7 @@ public class SpeedAudioFilterTests
         // starts at, so nothing drifts and nothing restarts.
         using SpeedAudioFilter filter = new();
         filter.SetSpeed(speed);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         double value = 0.25;
         for (int block = 0; block < 40; block++)
@@ -160,6 +166,7 @@ public class SpeedAudioFilterTests
         // What a device consumes: one plane with the channels interleaved. Resampling by frames must not mix them.
         using SpeedAudioFilter filter = new();
         filter.SetSpeed(2.0);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         double[] interleaved = [1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
         using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, interleaved)]);
@@ -183,6 +190,7 @@ public class SpeedAudioFilterTests
     {
         using SpeedAudioFilter filter = new();
         filter.SetSpeed(2.0);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         using TestPlanarBuffer planar = new(
         [
@@ -216,6 +224,7 @@ public class SpeedAudioFilterTests
         foreach (double speed in new[] { 0.0, -2.0, double.NaN, double.PositiveInfinity })
         {
             filter.SetSpeed(speed);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
             OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
             Assert.That(result.IsSuccessful, Is.True, result.Message);
@@ -228,6 +237,7 @@ public class SpeedAudioFilterTests
     {
         using SpeedAudioFilter filter = new();
         filter.SetSpeed(2.0);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, [0.25, 0.25])]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Unknown, planar, sampleCount: 2, channelCount: 1);
@@ -239,6 +249,187 @@ public class SpeedAudioFilterTests
             Assert.That(result.IsSuccessful, Is.False, "a format with no sample size cannot be resampled");
             Assert.That(output, Is.SameAs(buffer), "and the block is handed back as it came in");
         }
+    }
+
+    /// <summary>
+    /// Stretching is the algorithm that keeps the pitch, and a tone is how that can be seen: the same 440 Hz comes out at 440 Hz
+    /// however fast it is played, where resampling takes it to 880 Hz at twice the speed.
+    /// </summary>
+    [TestCase(AudioSpeedAlgorithm.None, 880.0)]
+    [TestCase(AudioSpeedAlgorithm.WSOLA, 440.0)]
+    public void LeavesThePitchWhereItIsWhenItStretches(AudioSpeedAlgorithm algorithm, double expected)
+    {
+        const double frequency = 440.0;
+        using SpeedAudioFilter filter = new();
+        filter.SetSpeed(2.0);
+        filter.SetAlgorithm(algorithm);
+
+        List<double> produced = Stretch(Blocks(frequency, 40), filter);
+
+        double measured = FrequencyOf(produced, skip: 8192);
+        Assert.That(measured, Is.EqualTo(expected).Within(expected * 0.05),
+            "what a tone becomes says which of the two the filter did");
+    }
+
+    /// <summary>
+    /// Over a run of blocks the frames have to work out to the media over the rate: each window consumed the rate times its own
+    /// length, so the count is right on average even though no block on its own is exact.
+    /// </summary>
+    [TestCase(2.0)]
+    [TestCase(0.5)]
+    [TestCase(0.25)]
+    [TestCase(0.1)]
+    [TestCase(4.0)]
+    public void CarriesTheMediaInTheLongRunWhenItStretches(double speed)
+    {
+        const int blocks = 40;
+        using SpeedAudioFilter filter = new();
+        filter.SetSpeed(speed);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.WSOLA);
+
+        List<double> produced = Stretch(Blocks(220.0, blocks), filter);
+        double expected = (blocks * Frames) / speed;
+
+        // A window of frames, plus the stretch of audio the search never gets to use.
+        double slack = 2 * ((44100 * 20) / 1000 / 2) + ((44100 * 5) / 1000 / speed);
+        Assert.That(produced.Count, Is.EqualTo(expected).Within(slack),
+            "the frames carried are the media over the rate, in the long run");
+    }
+
+    [Test]
+    public void KeepsALevelSteadyWhenItStretches()
+    {
+        // Windows that add up to one leave a constant where it was: a level that drifts or pumps would show here.
+        using SpeedAudioFilter filter = new();
+        filter.SetSpeed(0.5);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.WSOLA);
+
+        List<double> produced = Stretch(Blocks(0.0, 20, level: 0.5), filter);
+        double[] settled = [.. produced.Skip(produced.Count / 2)];
+
+        Assert.That(settled, Is.Not.Empty);
+        Assert.That(settled, Is.All.EqualTo(0.5).Within(0.02));
+    }
+
+    /// <summary>
+    /// Below half speed the analysis advances by less than the search reaches back, so the first windows of a stream look for
+    /// their predecessors before the history begins. Nothing that is not held may be read - and the sound still has to come out
+    /// as what it was.
+    /// </summary>
+    [TestCase(0.4)]
+    [TestCase(0.25)]
+    [TestCase(0.1)]
+    public void StretchesBelowHalfSpeedWithoutReadingBeforeTheStream(double speed)
+    {
+        using SpeedAudioFilter filter = new();
+        filter.SetSpeed(speed);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.WSOLA);
+
+        List<double> produced = Stretch(Blocks(440.0, 10), filter);
+
+        Assert.That(FrequencyOf(produced, skip: 8192), Is.EqualTo(440.0).Within(22.0),
+            "the tone is still the tone, however slowly it is stretched");
+    }
+
+    [Test]
+    public void KeepsEveryPlaneWhenItStretches()
+    {
+        using SpeedAudioFilter filter = new();
+        filter.SetSpeed(2.0);
+        filter.SetAlgorithm(AudioSpeedAlgorithm.WSOLA);
+
+        List<double> left = [];
+        List<double> right = [];
+        for (int block = 0; block < 8; block++)
+        {
+            using TestPlanarBuffer planar = new(
+            [
+                Write(AudioSampleFormat.Float64, [.. Enumerable.Repeat(0.5, Frames)]),
+                Write(AudioSampleFormat.Float64, [.. Enumerable.Repeat(-0.5, Frames)]),
+            ]);
+            using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, Frames, channelCount: 2);
+
+            OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
+            Assert.That(result.IsSuccessful, Is.True, result.Message);
+
+            using TestPlanarBuffer read = Read(AudioSampleFormat.Float64, output);
+            left.AddRange(Read(AudioSampleFormat.Float64, read.Plane(0), output.SampleCount));
+            right.AddRange(Read(AudioSampleFormat.Float64, read.Plane(1), output.SampleCount));
+        }
+
+        Assert.That(left.Skip(left.Count / 2), Is.All.EqualTo(0.5).Within(0.02), "each plane keeps its own sound");
+        Assert.That(right.Skip(right.Count / 2), Is.All.EqualTo(-0.5).Within(0.02));
+    }
+
+    /// <summary>Forty blocks of a tone, block by block, so its phase carries across the boundaries the way a real stream's does.</summary>
+    private static List<double[]> Blocks(double frequency, int blocks, double level = 0.5)
+    {
+        const int sampleRate = 44100;
+        List<double[]> all = [];
+        for (int block = 0; block < blocks; block++)
+        {
+            double[] samples = new double[Frames];
+            for (int frame = 0; frame < Frames; frame++)
+            {
+                long at = ((long)block * Frames) + frame;
+                samples[frame] = frequency > 0 ? level * Math.Sin(2 * Math.PI * frequency * at / sampleRate) : level;
+            }
+
+            all.Add(samples);
+        }
+
+        return all;
+    }
+
+    /// <summary>Runs blocks through the filter and collects everything it produced, one plane's worth.</summary>
+    private static List<double> Stretch(IReadOnlyList<double[]> blocks, SpeedAudioFilter filter)
+    {
+        List<double> produced = [];
+        foreach (double[] block in blocks)
+        {
+            using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, block)]);
+            using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, block.Length, channelCount: 1);
+
+            OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
+            Assert.That(result.IsSuccessful, Is.True, result.Message);
+
+            using TestPlanarBuffer read = Read(AudioSampleFormat.Float64, output);
+            produced.AddRange(Read(AudioSampleFormat.Float64, read.Plane(0), output.SampleCount));
+        }
+
+        return produced;
+    }
+
+    /// <summary>
+    /// How often the samples cross zero, as a frequency: a tone played faster has more crossings per second, and one stretched
+    /// rather than resampled has the same.
+    /// </summary>
+    private static double FrequencyOf(IReadOnlyList<double> samples, int skip)
+    {
+        Assert.That(samples.Count, Is.GreaterThan(skip + 1000), "there has to be something to measure");
+
+        int crossings = 0;
+        int first = -1;
+        int last = -1;
+        for (int index = skip; index + 1 < samples.Count; index++)
+        {
+            double now = samples[index];
+            double next = samples[index + 1];
+            if ((now < 0 && next >= 0) || (now >= 0 && next < 0))
+            {
+                if (first < 0)
+                {
+                    first = index;
+                }
+
+                last = index;
+                crossings++;
+            }
+        }
+
+        double seconds = (last - first) / 44100.0;
+        Assert.That(seconds, Is.GreaterThan(0));
+        return crossings / 2.0 / seconds;
     }
 
     /// <summary>Copies what the filter produced into a buffer of the test's own, so it can be read after the filter's is gone.</summary>

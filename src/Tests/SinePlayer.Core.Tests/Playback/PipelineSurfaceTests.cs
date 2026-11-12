@@ -25,6 +25,7 @@ public class PipelineSurfaceTests
     private static readonly Type[] sPublished =
     [
         typeof(AudioFilterChain),
+        typeof(AudioSpeedAlgorithm),
         typeof(IAudioChain),
         typeof(IPictureFrameSource),
         typeof(IPlaybackChain),
