@@ -2,10 +2,10 @@
 
 ## What the feature is
 
-The user sets how fast the pipeline plays: 0.1x to 8x, clamped, defaulting to 1.0x. The rate is not
-persisted - every session starts at 1.0x. `PlayerSession.PlaybackRate` and `SetPlaybackRate` already exist
-as the surface for it; `SetPlaybackRate` currently throws `NotSupportedException`, and `PlaybackRate`
-returns 1.0.
+The user sets how fast playback runs: 0.1x to 8x, defaulting to 1.0x. That range is the session's policy and is
+clamped there; the engine itself only refuses what is less than nothing, since how fast a host wants to play is not
+something the pipeline should be deciding. The rate is not persisted - every session starts at 1.0x.
+`PlayerSession.PlaybackRate` and `SetPlaybackRate` are the surface for it.
 
 ## What speed costs, per chain
 
@@ -89,12 +89,15 @@ implements has no rate. Once the audio is resampled and the playhead's spans car
 time to media time is complete, and the retiming above applies to the timeline's own clock only. So the device's reading is
 never scaled, and the rate cannot be counted twice.
 
-### A rate change is adopted, not averaged
+### A rate change needs nothing from the playhead
 
-The playhead averages a new measurement inside 50 ms of the last one (weight 1/16). Right after a rate change,
-`offset = devicePosition - position` moves quickly - about 15 ms per hand-over at 4x - and averaging would
-take tens of hand-overs to follow. The rate change therefore sets a flag that makes the next measurement be
-adopted outright.
+The playhead measures `offset = deviceTime - media(deviceFrame)`, and both sides are in device frames: the spans map device
+frames to the media extent the block carries. Nothing in that mapping knows the rate, so the offset it measures is the same
+at 1x and at 8x, and a rate change does not disturb the averaging (a measurement inside 50 ms of the last one is smoothed,
+weight 1/16). An earlier version bypassed the smoothing after a rate change, on the theory that the offset moved ~15 ms per
+hand-over at 4x; it did not - the whole suite passes without it - and bypassing it would have been the wrong instinct
+anyway: a real device reports its position in chunks, so a single measurement is exactly what the smoothing is for, and
+adopting one outright would bank that chunk as a clock jump.
 
 Audio already in the device plays at the old rate until it drains - at most one queue depth, on the order of
 200 ms. No flush: a gap would be worse, and the picture follows the clock meanwhile.
@@ -116,18 +119,28 @@ Audio already in the device plays at the old rate until it drains - at most one 
    signal surviving all six sample formats, the two interpolation paths checked sample by sample, 40 blocks at a steady
    level staying steady (no drift), channels kept apart both interleaved and planar, unusable speeds taken as none, and a
    format it cannot read refused with the block handed back. Not wired into the pipeline yet - that is step 4.
-4. **Wire it up.** `PlaybackPipeline.Rate/SetRate` (clamped to 0.1-8) sets the timeline rate, calls `SetSpeed`
-   on every audio chain's filter, and raises the playhead's adopt-next flag; `PlayerSession.SetPlaybackRate`
-   stops throwing; the two wall-clock conversions divide by the rate (one helper on the timeline, so no third
-   site appears later); the audio leeway guard scales with the rate. Verified with the audio stand-in: the
-   clock advances at the rate, the frames submitted per media second scale, a mid-stream change neither
-   flushes nor jumps the position, and 1.0 restores exactly.
-5. **Optional, later: pitch-preserving stretch.** `atempo` (or another time-stretcher) behind the same
+4. **Done: wired up.** `PlaybackPipeline` gains a settable `Rate`, which refuses only what is below nothing, retimes the clock
+   and sets the speed on every audio chain; a chain added later joins at the current rate. The 0.1-8 range a user may ask for
+   is `PlayerSession`'s (`MinimumPlaybackRate`/`MaximumPlaybackRate`), because the limit belongs to the application rather than
+   to the engine. The chain takes `SpeedAudioFilter` as a forced filter, which is a stage the chain runs after the host's
+   filters and keeps out of `Count`/`Filters`, so the host still sees exactly the filters it added. The chain has no idea
+   what a forced filter does; the engine says which ones are forced. Verified by the chain's own tests: two forced filters
+   run after the host's, the host neither counts nor lists them, a forced one cannot be removed, and `Clear` keeps it.
+   `PipelineTimeline.MillisecondsToPlay` turns a stretch of media into a wall-clock wait, which the video and subtitle
+   loops now use; the audio leeway guard scales with the rate. The offset the playhead measures stays the same at any rate,
+   so a rate change needs no special handling there. `PlayerSession.PlaybackRate`/`SetPlaybackRate` no longer throw,
+   `PlaybackRateChanged` is raised, and a newly created pipeline is given the session's rate. Verified: 186 pipeline tests,
+   including a new end-to-end one - 400 ms of media in under 400 ms of wall time at 2x, no flush on the change, no jump in the
+   position, and a negative rate, zero and NaN each taken as no rate at all - plus every earlier suite unchanged.
+5. **Done: a control in the lab.** The playback lab's transport row has a `Speed` box, 0.1x-8x in 0.1 steps, which sets
+   `pipeline.Rate` and reads back in the status line (`rate 2x`). Like the volume, it outlives the file: a newly opened
+   pipeline is given whatever the box says, and it is not reset when a file is closed.
+6. **Optional, later: pitch-preserving stretch.** `atempo` (or another time-stretcher) behind the same
    `SetSpeed` contract, chosen by preference.
 
 ## Accepted costs
 
-* Pitch tracks speed until step 5. At 8x, decimation is box-filtered rather than properly low-passed.
+* Pitch tracks speed until step 6. At 8x, decimation is box-filtered rather than properly low-passed.
 * A rate change takes up to one queue depth to be fully heard, and is not persisted across sessions.
 * At 8x the decoder really does read eight times as much media per wall second, and most video frames are
   dropped by design.

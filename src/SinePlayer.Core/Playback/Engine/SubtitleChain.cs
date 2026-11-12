@@ -523,7 +523,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                 {
                     timeout = next.Value <= TimeSpan.Zero
                         ? SubtitleChangeIntervalMilliseconds
-                        : (int)Math.Clamp(Math.Ceiling(next.Value.TotalMilliseconds), 1, int.MaxValue);
+                        : _timeline.ToIdleTime(next.Value);
                 }
             }
 

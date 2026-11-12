@@ -191,6 +191,24 @@ internal sealed partial class PlaybackLabPage : BasePage
         ApplyLevel();
     }
 
+    private void SpeedBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null || double.IsNaN(args.NewValue))
+        {
+            return;
+        }
+
+        double exact = Math.Round(args.NewValue, 3);
+        if (exact != args.NewValue)
+        {
+            SpeedBox.Value = exact;
+        }
+
+        pipeline.Rate = exact;
+        RefreshStatus();
+    }
+
     private void TransformChoice_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         ApplyTransform();
@@ -423,6 +441,12 @@ internal sealed partial class PlaybackLabPage : BasePage
         // What the transform controls say is what the file is opened with, so a picture that is turned stays
         // turned across files rather than snapping back on every open.
         video.Transform = CreateTransform();
+
+        // The rate is the pipeline's, so it outlives the file it was set for, the way the volume does.
+        if (!double.IsNaN(SpeedBox.Value))
+        {
+            pipeline.Rate = SpeedBox.Value;
+        }
 
         pipeline.StateChanged += Pipeline_StateChanged;
         pipeline.WarningRaised += Pipeline_WarningRaised;
@@ -922,13 +946,14 @@ internal sealed partial class PlaybackLabPage : BasePage
         string pace = $" decode {video.AverageDecodeMilliseconds:0.0} ms {decoding}, render {video.AverageRenderMilliseconds:0.0} ms by {renderer}{sound}, {chain}.";
         string transform = DescribeTransform(pipeline.VideoChains[0].Transform);
         string offsets = $" offsets {OffsetOf(pipeline, MediaStreamKind.Video)}/{OffsetOf(pipeline, MediaStreamKind.Audio)}/{OffsetOf(pipeline, MediaStreamKind.Subtitle)} ms";
+        string rate = $" rate {pipeline.Rate:0.##}x";
         string tracks = DescribeTracks(pipeline);
 
         string media = Describe(pipeline);
         string described = media.Length == 0 ? string.Empty : $" {media}.";
 
         string status = $"{pipeline.State}:{described} {pipeline.Position:mm\\:ss\\.fff} / {ReachableDuration(pipeline):mm\\:ss\\.fff}."
-            + $" {presented} frame(s).{health}{pace}{transform}{offsets}{tracks}{surface}";
+            + $" {presented} frame(s).{health}{pace}{transform}{offsets}{rate}{tracks}{surface}";
         if (status != StatusText.Text)
         {
             StatusText.Text = status;

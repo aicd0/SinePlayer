@@ -199,4 +199,11 @@ internal sealed class PipelineTimeline(Action clockMoved, Func<bool> starved)
             clockMoved();
         }
     }
+
+    public int ToIdleTime(TimeSpan remainingTime)
+    {
+        double rate = Rate;
+        double milliseconds = remainingTime.TotalMilliseconds / (rate > 0 ? rate : 1.0);
+        return (int)Math.Clamp(Math.Ceiling(milliseconds), 1, int.MaxValue);
+    }
 }

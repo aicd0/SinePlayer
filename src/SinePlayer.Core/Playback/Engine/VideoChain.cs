@@ -714,7 +714,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
 
             if (playing && syncAction == FrameSyncAction.Wait)
             {
-                int remaining = (int)Math.Clamp((timestamp - position).TotalMilliseconds, 1, VideoIdleTimeoutMilliseconds);
+                int remaining = Math.Min(_timeline.ToIdleTime(timestamp - position), VideoIdleTimeoutMilliseconds);
                 RenderNode.Wait(stamp, remaining);
                 continue;
             }
