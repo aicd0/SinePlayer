@@ -773,6 +773,9 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 continue;
             }
 
+            // The media the block covers, read before the filters: retiming changes the frames, not the media.
+            TimeSpan bufferDuration = buffer.Duration;
+
             OperationResult<RawAudioBuffer> filtersApplied = filters.TryApply(buffer);
             if (!filtersApplied.IsSuccessful)
             {
@@ -783,7 +786,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
             buffer = filtersApplied.Result;
             timestamp = buffer.Timestamp + offset;
-            tailBufferPosition = timestamp + buffer.Duration;
+            tailBufferPosition = timestamp + bufferDuration;
 
             lock (_timeline.ClockLock)
             {
@@ -794,7 +797,8 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
             if (deviceAvailable && audioRenderer is not null)
             {
-                playhead.OnHandOver(timestamp, buffer.SampleCount, buffer.SampleRate, DevicePositionOf(audioRenderer));
+                playhead.OnHandOver(buffer.SampleCount, buffer.SampleRate,
+                    timestamp, timestamp + bufferDuration, DevicePositionOf(audioRenderer));
                 inFlightSubmit = audioRenderer.Submit(buffer);
                 inFlightBuffer = buffer;
             }
