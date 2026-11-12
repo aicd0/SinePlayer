@@ -5,24 +5,17 @@ namespace SinePlayer.Core.Playback.Engine;
 
 internal sealed class AudioPlayhead
 {
-    private static readonly TimeSpan OffsetNoise = TimeSpan.FromMilliseconds(50);
-
-    private const double OffsetWeight = 1.0 / 16.0;
-
     private readonly List<Span> _spans = [];
     private long _frames;
     private bool _deviceOriginKnown;
     private TimeSpan _deviceOrigin;
     private int _sampleRate;
-    private bool _offsetKnown;
-    private TimeSpan _offset;
 
     internal void Reset()
     {
         _spans.Clear();
         _frames = 0;
         _deviceOriginKnown = false;
-        _offsetKnown = false;
     }
 
     internal void OnHandOver(int frames, int sampleRate, TimeSpan startTime, TimeSpan endTime, TimeSpan? deviceTime)
@@ -40,35 +33,18 @@ internal sealed class AudioPlayhead
             _sampleRate = sampleRate;
             _deviceOriginKnown = true;
         }
-
-        if (!TryResolve(FramesOf(deviceTimeNotNull - _deviceOrigin, _sampleRate), out TimeSpan mediaTime))
-        {
-            return;
-        }
-
-        TimeSpan offset = deviceTimeNotNull - mediaTime;
-        if (!_offsetKnown || (offset - _offset).Duration() > OffsetNoise)
-        {
-            _offset = offset;
-        }
-        else
-        {
-            _offset += (offset - _offset) * OffsetWeight;
-        }
-
-        _offsetKnown = true;
     }
 
-    internal bool TryGetOffset(out TimeSpan offset)
-    {
-        offset = _offset;
-        return _offsetKnown;
-    }
-
-    private bool TryResolve(long deviceFrame, out TimeSpan mediaTime)
+    internal bool TryResolve(TimeSpan deviceTime, out TimeSpan mediaTime)
     {
         mediaTime = default;
 
+        if (!_deviceOriginKnown)
+        {
+            return false;
+        }
+
+        long deviceFrame = FramesOf(deviceTime - _deviceOrigin, _sampleRate);
         if (deviceFrame < 0 || deviceFrame >= _frames)
         {
             return false;
@@ -86,13 +62,9 @@ internal sealed class AudioPlayhead
 
         Span span = _spans[0];
         long spanFrames = span.EndFrame - span.StartFrame;
-        long behindFrames = deviceFrame - span.StartFrame;
-        if (behindFrames < 0)
-        {
-            behindFrames = 0;
-        }
-
         long spanTicks = (span.EndTime - span.StartTime).Ticks;
+        long behindFrames = Math.Max(0, deviceFrame - span.StartFrame);
+
         mediaTime = span.StartTime + TimeSpan.FromTicks(behindFrames * spanTicks / spanFrames);
         return true;
     }
