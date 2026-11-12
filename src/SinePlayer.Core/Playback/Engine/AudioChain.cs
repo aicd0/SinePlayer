@@ -58,6 +58,12 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
     public AudioFilterChain Filters { get; } = new();
 
+    public AudioSpeedAlgorithm SpeedAlgorithm
+    {
+        get => _speedFilter.Algorithm;
+        set => _speedFilter.SetAlgorithm(value);
+    }
+
     public long Underruns => Renderer.CurrentComponent?.UnderrunCount ?? 0;
 
     public bool OwnsClock => _timeline.DeviceOwner == this;

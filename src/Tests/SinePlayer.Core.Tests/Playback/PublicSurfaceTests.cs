@@ -119,6 +119,7 @@ public class PublicSurfaceTests
         "SinePlayer.Core.Playback.Backends.Win2D.SubtitleFonts",
         "SinePlayer.Core.Playback.Backends.Win2D.Win2DSubtitleRendererFactory",
         "SinePlayer.Core.Playback.Hosting.AudioFilterChain",
+        "SinePlayer.Core.Playback.Hosting.AudioSpeedAlgorithm",
         "SinePlayer.Core.Playback.Hosting.IAudioChain",
         "SinePlayer.Core.Playback.Hosting.IPictureFrameSource",
         "SinePlayer.Core.Playback.Hosting.IPlaybackChain",

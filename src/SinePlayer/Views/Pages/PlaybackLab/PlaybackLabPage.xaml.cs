@@ -209,6 +209,24 @@ internal sealed partial class PlaybackLabPage : BasePage
         RefreshStatus();
     }
 
+    private void SpeedAlgorithmPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        PlaybackPipeline? pipeline = _pipeline;
+        if (_updatingPickers || pipeline is null || SpeedAlgorithmPicker.SelectedItem is not AudioSpeedAlgorithm algorithm)
+        {
+            return;
+        }
+
+        // Every chain is fitted to the rate its own way, so the picker speaks to all of them: another chain may be listening for
+        // something else at the same rate.
+        foreach (IAudioChain chain in pipeline.AudioChains)
+        {
+            chain.SpeedAlgorithm = algorithm;
+        }
+
+        RefreshStatus();
+    }
+
     private void TransformChoice_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         ApplyTransform();
@@ -442,11 +460,12 @@ internal sealed partial class PlaybackLabPage : BasePage
         // turned across files rather than snapping back on every open.
         video.Transform = CreateTransform();
 
-        // The rate is the pipeline's, so it outlives the file it was set for, the way the volume does.
         if (!double.IsNaN(SpeedBox.Value))
         {
             pipeline.Rate = SpeedBox.Value;
         }
+
+        audio.SpeedAlgorithm = ChosenSpeedAlgorithm();
 
         pipeline.StateChanged += Pipeline_StateChanged;
         pipeline.WarningRaised += Pipeline_WarningRaised;
@@ -609,6 +628,11 @@ internal sealed partial class PlaybackLabPage : BasePage
     private void ApplyLevel()
     {
         _gain?.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
+    }
+
+    private AudioSpeedAlgorithm ChosenSpeedAlgorithm()
+    {
+        return SpeedAlgorithmPicker.SelectedItem is AudioSpeedAlgorithm algorithm ? algorithm : AudioSpeedAlgorithm.None;
     }
 
     private VideoTransform CreateTransform()
@@ -833,6 +857,9 @@ internal sealed partial class PlaybackLabPage : BasePage
             RotationPicker.SelectedIndex = 0;
             FittingPicker.ItemsSource = Enum.GetValues<VideoResizeMode>();
             FittingPicker.SelectedIndex = 0;
+
+            SpeedAlgorithmPicker.ItemsSource = Enum.GetValues<AudioSpeedAlgorithm>();
+            SpeedAlgorithmPicker.SelectedIndex = 0;
 
             VideoDecoderPicker.SelectedIndex = 0;
             VideoRendererPicker.SelectedIndex = 0;

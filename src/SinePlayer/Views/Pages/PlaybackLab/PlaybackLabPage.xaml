@@ -58,8 +58,9 @@
                     Minimum="0.1"
                     SmallChange="0.1"
                     SpinButtonPlacementMode="Compact"
-                    Value="1"
-                    ValueChanged="SpeedBox_ValueChanged" />
+                    ValueChanged="SpeedBox_ValueChanged"
+                    Value="1" />
+                <ComboBox x:Name="SpeedAlgorithmPicker" SelectionChanged="SpeedAlgorithmPicker_SelectionChanged" />
             </StackPanel>
             <Slider
                 x:Name="VolumeSlider"
@@ -193,8 +194,8 @@
                 LargeChange="1000"
                 SmallChange="100"
                 SpinButtonPlacementMode="Compact"
-                Value="0"
-                ValueChanged="OffsetBox_ValueChanged" />
+                ValueChanged="OffsetBox_ValueChanged"
+                Value="0" />
             <NumberBox
                 x:Name="AudioOffsetBox"
                 Width="150"
@@ -202,8 +203,8 @@
                 LargeChange="1000"
                 SmallChange="100"
                 SpinButtonPlacementMode="Compact"
-                Value="0"
-                ValueChanged="OffsetBox_ValueChanged" />
+                ValueChanged="OffsetBox_ValueChanged"
+                Value="0" />
             <NumberBox
                 x:Name="SubtitleOffsetBox"
                 Width="150"
@@ -211,8 +212,8 @@
                 LargeChange="1000"
                 SmallChange="100"
                 SpinButtonPlacementMode="Compact"
-                Value="0"
-                ValueChanged="OffsetBox_ValueChanged" />
+                ValueChanged="OffsetBox_ValueChanged"
+                Value="0" />
         </StackPanel>
 
         <Grid Grid.Row="4" Background="Black">
