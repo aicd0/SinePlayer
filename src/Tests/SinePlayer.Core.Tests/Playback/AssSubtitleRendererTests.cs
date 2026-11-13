@@ -132,7 +132,7 @@ public class AssSubtitleRendererTests
             int drawn = InkHeight(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
 
             // What the player hands over while its overlay is up: the strips the chrome covers.
-            SubtitlePresentation covered = new(0.0, 0.0, new SubtitleInsets(0.0, 40.0, 0.0, 90.0));
+            SubtitlePresentation covered = new() { Insets = new SubtitleInsets(0.0, 40.0, 0.0, 90.0) };
             OperationResult withChrome = renderer.Show([cue], TimeSpan.FromSeconds(1), covered);
             Assert.That(withChrome.IsSuccessful, Is.True, withChrome.Message);
 

@@ -190,6 +190,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleOrderLabel = string.Empty;
+    public string SubtitleOrderLabel
+    {
+        get => _subtitleOrderLabel;
+        set
+        {
+            _subtitleOrderLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleOrderLabel)));
+        }
+    }
+
     private string _subtitleFontFamilyLabel = string.Empty;
     public string SubtitleFontFamilyLabel
     {

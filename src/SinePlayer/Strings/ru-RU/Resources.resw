@@ -889,6 +889,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="OpenUserDataFolder" xml:space="preserve">
     <value>Открыть папку с данными пользователя</value>
   </data>
+  <data name="Order" xml:space="preserve">
+    <value>Порядок</value>
+  </data>
   <data name="OriginalSize" xml:space="preserve">
     <value>Исходный размер</value>
   </data>

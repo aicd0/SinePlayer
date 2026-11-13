@@ -173,7 +173,7 @@ public class Win2DSubtitleRendererTests
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show([cue], TimeSpan.Zero, new SubtitlePresentation(-50.0, 50.0));
+            drawn = renderer.Show([cue], TimeSpan.Zero, new SubtitlePresentation { OffsetX = -50.0, OffsetY = 50.0 });
         }
         finally
         {
@@ -261,8 +261,8 @@ public class Win2DSubtitleRendererTests
             return;
         }
 
-        int small = InkRows(device, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 12.0));
-        int large = InkRows(device, 480, 240, new SubtitlePresentation(0.0, 0.0, default, null, 48.0));
+        int small = InkRows(device, 480, 240, new SubtitlePresentation { FontSize = 12.0 });
+        int large = InkRows(device, 480, 240, new SubtitlePresentation { FontSize = 48.0 });
 
         using (Assert.EnterMultipleScope())
         {
@@ -293,7 +293,7 @@ public class Win2DSubtitleRendererTests
         double automatic = Math.Clamp(height * 0.045, 12.0, 72.0);
 
         int unspecified = InkRows(device, 480, height, SubtitlePresentation.Identity);
-        int sameSize = InkRows(device, 480, height, new SubtitlePresentation(0.0, 0.0, default, null, automatic));
+        int sameSize = InkRows(device, 480, height, new SubtitlePresentation { FontSize = automatic });
 
         using (Assert.EnterMultipleScope())
         {
@@ -378,7 +378,7 @@ public class Win2DSubtitleRendererTests
             return;
         }
 
-        SubtitlePresentation plain = new(0.0, 0.0, default, null, 24.0);
+        SubtitlePresentation plain = new() { FontSize = 24.0 };
         SubtitlePresentation bordered = plain with { OutlineWidth = 6.0 };
 
         int plainPixels = InkPixels(device, 480, 240, plain);

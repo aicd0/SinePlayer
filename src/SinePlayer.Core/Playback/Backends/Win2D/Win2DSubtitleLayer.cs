@@ -188,11 +188,19 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
                 return OperationResult.Failure("The Win2D subtitle layer has been disposed.");
             }
 
-            frames = [.. _participants.Select(participant => _frames.TryGetValue(participant, out CueFrame? frame) ? frame : null).OfType<CueFrame>()];
+            frames = [.. _participants
+                .Select(participant => _frames.TryGetValue(participant, out CueFrame? frame) ? frame : null)
+                .OfType<CueFrame>()
+                .OrderByDescending(frame => frame.Presentation.Order)];
         }
 
         CanvasDevice device = CanvasDevice;
         double scale = _surface.CompositionScale;
+
+        if (frames.Length > 0)
+        {
+            _surface.SetOrder(frames[^1].Presentation.Order);
+        }
 
         return _surface.DrawAndPresent((session, width, height) =>
         {

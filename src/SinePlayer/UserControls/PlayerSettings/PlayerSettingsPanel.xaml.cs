@@ -709,6 +709,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = settings.Subtitle.Order != presetSettings.Subtitle.Order;
+                tabModified = tabModified || modified;
+                UpdateSubtitleOrder(settings);
+                ViewModel.SubtitleOrderLabel = GetLabel(StringResource.Order, modified);
+            }
+
+            {
                 bool modified = settings.Subtitle.Family != presetSettings.Subtitle.Family;
                 tabModified = tabModified || modified;
                 UpdateSubtitleFontFamily(settings);
@@ -974,6 +981,41 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
         });
         SubtitleRendererDropDownButton.Content = choice.Label;
+    }
+
+    private void SubtitleOrderNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (double.IsNaN(sender.Value))
+        {
+            sender.Value = 0;
+            if (_mediaSettings.Subtitle.Order != 0)
+            {
+                Apply(settings => settings.Subtitle.Order = 0);
+            }
+
+            return;
+        }
+
+        int value = (int)Math.Round(sender.Value);
+        if (_mediaSettings.Subtitle.Order != value)
+        {
+            Apply(settings => settings.Subtitle.Order = value);
+        }
+    }
+
+    private void UpdateSubtitleOrder(PlayerSettingsModel settings)
+    {
+        double value = settings.Subtitle.Order;
+        double shown = SubtitleOrderNumberBox.Value;
+        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.5)
+        {
+            SubtitleOrderNumberBox.Value = value;
+        }
     }
 
     private void SubtitlePanXNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)

@@ -889,6 +889,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="OpenUserDataFolder" xml:space="preserve">
     <value>Benutzerdatenordner öffnen</value>
   </data>
+  <data name="Order" xml:space="preserve">
+    <value>Reihenfolge</value>
+  </data>
   <data name="OriginalSize" xml:space="preserve">
     <value>Originalgröße</value>
   </data>
