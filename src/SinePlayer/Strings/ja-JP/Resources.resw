@@ -168,8 +168,8 @@
   <data name="AllowMultiTracks" xml:space="preserve">
     <value>複数トラックを許可</value>
   </data>
-  <data name="AllowPerMediaConfiguration" xml:space="preserve">
-    <value>メディアごとの設定を許可</value>
+  <data name="AllowVariation" xml:space="preserve">
+    <value>バリエーションを許可</value>
   </data>
   <data name="Always" xml:space="preserve">
     <value>常に</value>
@@ -617,6 +617,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="GeneralSettingsDescription" xml:space="preserve">
     <value>アプリのデフォルト動作を変更</value>
+  </data>
+  <data name="Global" xml:space="preserve">
+    <value>グローバル</value>
   </data>
   <data name="GoBack" xml:space="preserve">
     <value>戻る</value>
@@ -1248,6 +1251,9 @@ $plugins</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>メディアの合計数</value>
+  </data>
+  <data name="Track" xml:space="preserve">
+    <value>トラック</value>
   </data>
   <data name="Transform" xml:space="preserve">
     <value>変換</value>

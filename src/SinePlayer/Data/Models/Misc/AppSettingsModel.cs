@@ -348,35 +348,33 @@ internal static class AppSettingsModel
         }
     }
 
-    public static string DefaultPlayerSettingPresetKey
+    public static string DefaultVideoSettingPresetKey
     {
         get
         {
-            return _db.Read(model => model.DefaultPlayerSettingPresetKey ?? string.Empty);
+            return _db.Read(model => model.DefaultVideoSettingPresetKey ?? string.Empty);
         }
         set
         {
-            _db.Write(model => model.DefaultPlayerSettingPresetKey = value);
+            _db.Write(model => model.DefaultVideoSettingPresetKey = value);
             _db.Save();
         }
     }
 
-    public static Dictionary<string, PlayerSettingsModel> PlayerSettingPresets
+    public static Dictionary<string, VideoSettingsModel> VideoSettingPresets
     {
         get
         {
             return _db.Read(model =>
             {
-                Dictionary<string, PlayerSettingsModel> presets = [];
-                if (model.PlayerSettingPresets is not null)
+                Dictionary<string, VideoSettingsModel> presets = [];
+                if (model.VideoSettingPresets is not null)
                 {
-                    foreach (KeyValuePair<string, PlayerSettingsModel.JsonModel?> kvp in model.PlayerSettingPresets)
+                    foreach (KeyValuePair<string, PresetJsonModel<VideoSettingsModel.JsonModel>?> kvp in model.VideoSettingPresets)
                     {
-                        string key = kvp.Key;
-                        PlayerSettingsModel.JsonModel? settingJsonModel = kvp.Value;
-                        if (settingJsonModel is not null)
+                        if (kvp.Value is not null)
                         {
-                            presets[key] = PlayerSettingsModel.FromJsonModel(key, settingJsonModel);
+                            presets[kvp.Key] = VideoSettingsModel.FromPresetJsonModel(kvp.Key, kvp.Value);
                         }
                     }
                 }
@@ -388,12 +386,106 @@ internal static class AppSettingsModel
         {
             _db.Write(model =>
             {
-                model.PlayerSettingPresets = [];
-                foreach (KeyValuePair<string, PlayerSettingsModel> kvp in value)
+                model.VideoSettingPresets = [];
+                foreach (KeyValuePair<string, VideoSettingsModel> kvp in value)
                 {
-                    string key = kvp.Key;
-                    PlayerSettingsModel setting = kvp.Value;
-                    model.PlayerSettingPresets[key] = setting.ToJsonModel();
+                    model.VideoSettingPresets[kvp.Key] = kvp.Value.ToPresetJsonModel();
+                }
+            });
+            _db.Save();
+        }
+    }
+
+    public static string DefaultAudioSettingPresetKey
+    {
+        get
+        {
+            return _db.Read(model => model.DefaultAudioSettingPresetKey ?? string.Empty);
+        }
+        set
+        {
+            _db.Write(model => model.DefaultAudioSettingPresetKey = value);
+            _db.Save();
+        }
+    }
+
+    public static Dictionary<string, AudioSettingsModel> AudioSettingPresets
+    {
+        get
+        {
+            return _db.Read(model =>
+            {
+                Dictionary<string, AudioSettingsModel> presets = [];
+                if (model.AudioSettingPresets is not null)
+                {
+                    foreach (KeyValuePair<string, PresetJsonModel<AudioSettingsModel.JsonModel>?> kvp in model.AudioSettingPresets)
+                    {
+                        if (kvp.Value is not null)
+                        {
+                            presets[kvp.Key] = AudioSettingsModel.FromPresetJsonModel(kvp.Key, kvp.Value);
+                        }
+                    }
+                }
+
+                return presets;
+            });
+        }
+        set
+        {
+            _db.Write(model =>
+            {
+                model.AudioSettingPresets = [];
+                foreach (KeyValuePair<string, AudioSettingsModel> kvp in value)
+                {
+                    model.AudioSettingPresets[kvp.Key] = kvp.Value.ToPresetJsonModel();
+                }
+            });
+            _db.Save();
+        }
+    }
+
+    public static string DefaultSubtitleSettingPresetKey
+    {
+        get
+        {
+            return _db.Read(model => model.DefaultSubtitleSettingPresetKey ?? string.Empty);
+        }
+        set
+        {
+            _db.Write(model => model.DefaultSubtitleSettingPresetKey = value);
+            _db.Save();
+        }
+    }
+
+    public static Dictionary<string, SubtitleSettingsModel> SubtitleSettingPresets
+    {
+        get
+        {
+            return _db.Read(model =>
+            {
+                Dictionary<string, SubtitleSettingsModel> presets = [];
+                if (model.SubtitleSettingPresets is not null)
+                {
+                    foreach (KeyValuePair<string, PresetJsonModel<SubtitleSettingsModel.JsonModel>?> kvp in model.SubtitleSettingPresets)
+                    {
+                        if (kvp.Value is not null)
+                        {
+                            presets[kvp.Key] = SubtitleSettingsModel.FromPresetJsonModel(kvp.Key, kvp.Value);
+                        }
+                    }
+                }
+
+                return presets;
+            });
+        }
+        set
+        {
+            _db.Write(model =>
+            {
+                model.SubtitleSettingPresets = [];
+                foreach (KeyValuePair<string, SubtitleSettingsModel> kvp in value)
+                {
+                    model.SubtitleSettingPresets[kvp.Key] = kvp.Value.ToPresetJsonModel();
                 }
             });
             _db.Save();
@@ -869,11 +961,23 @@ internal static class AppSettingsModel
         [JsonPropertyName("PlaybackDefaultShuffle")]
         public bool? PlaybackDefaultShuffle { get; set; }
 
-        [JsonPropertyName("DefaultPlayerSettingPresetKey")]
-        public string? DefaultPlayerSettingPresetKey { get; set; }
+        [JsonPropertyName("DefaultVideoSettingPresetKey")]
+        public string? DefaultVideoSettingPresetKey { get; set; }
 
-        [JsonPropertyName("PlayerSettingPresets")]
-        public Dictionary<string, PlayerSettingsModel.JsonModel?>? PlayerSettingPresets { get; set; }
+        [JsonPropertyName("VideoSettingPresets")]
+        public Dictionary<string, PresetJsonModel<VideoSettingsModel.JsonModel>?>? VideoSettingPresets { get; set; }
+
+        [JsonPropertyName("DefaultAudioSettingPresetKey")]
+        public string? DefaultAudioSettingPresetKey { get; set; }
+
+        [JsonPropertyName("AudioSettingPresets")]
+        public Dictionary<string, PresetJsonModel<AudioSettingsModel.JsonModel>?>? AudioSettingPresets { get; set; }
+
+        [JsonPropertyName("DefaultSubtitleSettingPresetKey")]
+        public string? DefaultSubtitleSettingPresetKey { get; set; }
+
+        [JsonPropertyName("SubtitleSettingPresets")]
+        public Dictionary<string, PresetJsonModel<SubtitleSettingsModel.JsonModel>?>? SubtitleSettingPresets { get; set; }
 
         [JsonPropertyName("PlayerMuted")]
         public bool? PlayerMuted { get; set; }

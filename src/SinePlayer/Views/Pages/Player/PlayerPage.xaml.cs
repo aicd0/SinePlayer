@@ -174,7 +174,7 @@ internal sealed partial class PlayerPage : BasePage
         };
         bar.MediaInfoRequested += OpenMediaInfoPane;
         bar.PlaybackInfoRequested += ShowPlaybackInfo;
-        bar.PlayerSettingsChanged += settings => Enqueue(() => ApplyPlayerSettings(settings));
+        bar.PlayerSettingsChanged += () => Enqueue(ApplyPlayerSettings);
         GetMainPageAbility().SetCustomCenteredNavigationBar(bar);
         _navigationBar = bar;
     }
@@ -307,7 +307,7 @@ internal sealed partial class PlayerPage : BasePage
             {
                 GetMainPageAbility().SetTitle(media.Title);
                 GetMainPageAbility().SetIcon(new FontIconSource { Glyph = MediaGlyphHelper.GetMediaGlyph(media) });
-                _navigationBar?.SetPlayerSettings(media);
+                _navigationBar?.SetPlayerSettings(media, _session);
             }
 
             SyncCurrentMedia();
@@ -529,7 +529,7 @@ internal sealed partial class PlayerPage : BasePage
     private PlayerSession? _session;
     private PlayerView? _view;
     private bool _viewDisposed;
-    private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
+    private SubtitleInsets _subtitleInsets = SubtitleInsets.None;
 
     private void Session_MediaChanged(MediaModel? media, OperationResult opened)
     {
@@ -562,7 +562,7 @@ internal sealed partial class PlayerPage : BasePage
                 return;
             }
 
-            await ApplyPlayerSettings(PlayerSettingsModel.LoadFromMedia(media));
+            await ApplyPlayerSettings();
 
             OperationResult played = await SelectTracks(session, view, media);
             if (!played.IsSuccessful)
@@ -1139,7 +1139,7 @@ internal sealed partial class PlayerPage : BasePage
         Enqueue(() => _session?.SetMuted(isMuted));
     }
 
-    private async Task ApplyPlayerSettings(PlayerSettingsModel settings)
+    private async Task ApplyPlayerSettings()
     {
         PlayerSession? session = _session;
         PlayerView? view = _view;
@@ -1148,22 +1148,8 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        view.VideoTransform = settings.Video.ToTransform();
-
-        _subtitlePresentation = _subtitlePresentation with
-        {
-            OffsetX = settings.Subtitle.PanX,
-            OffsetY = settings.Subtitle.PanY,
-            FontFamily = settings.Subtitle.Family,
-            FontSize = settings.Subtitle.Size,
-            FontStyle = settings.Subtitle.ToFontStyle(),
-            FontWeight = settings.Subtitle.ToFontWeight(),
-            OutlineWidth = settings.Subtitle.OutlineWidth,
-        };
-        view.SubtitlePresentation = _subtitlePresentation;
-
-        PlaybackComponents components = settings.ToComponents();
-        session.SetComponents(components);
+        session.SetSubtitleInsets(_subtitleInsets);
+        session.ReloadSettings();
 
         if (session.State == MediaEngineState.None)
         {
@@ -1340,14 +1326,8 @@ internal sealed partial class PlayerPage : BasePage
         SubtitleInsets insets = _isOverlayVisible
             ? new SubtitleInsets(0.0, _topOverlayHeight, _rightOverlayWidth, _bottomGridHeight)
             : SubtitleInsets.None;
-        _subtitlePresentation = _subtitlePresentation with { Insets = insets };
-        Enqueue(() =>
-        {
-            if (_view is { } view)
-            {
-                view.SubtitlePresentation = _subtitlePresentation;
-            }
-        });
+        _subtitleInsets = insets;
+        Enqueue(() => _session?.SetSubtitleInsets(insets));
     }
 
     #endregion

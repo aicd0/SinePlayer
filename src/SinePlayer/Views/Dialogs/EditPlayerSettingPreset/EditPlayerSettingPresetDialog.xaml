@@ -38,9 +38,9 @@
             Content="{x:Bind StringResource.SetAsDefault}"
             IsChecked="{x:Bind ViewModel.SetAsDefault, Mode=OneWay}" />
         <CheckBox
-            Click="AllowPerMediaConfigurationCheckBox_Click"
-            Content="{x:Bind StringResource.AllowPerMediaConfiguration}"
-            IsChecked="{x:Bind ViewModel.AllowPerMediaConfiguration, Mode=OneWay}" />
+            Click="AllowVariationCheckBox_Click"
+            Content="{x:Bind StringResource.AllowVariation}"
+            IsChecked="{x:Bind ViewModel.AllowVariation, Mode=OneWay}" />
         <Grid Margin="0,16,0,0" HorizontalAlignment="Stretch">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />

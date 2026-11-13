@@ -10,9 +10,6 @@ internal sealed class SelectedTrackModel
     [JsonPropertyName("Enabled")]
     public bool Enabled { get; init; }
 
-    [JsonPropertyName("Path")]
-    public string Path { get; init; } = string.Empty;
-
-    [JsonPropertyName("Index")]
-    public int Index { get; init; }
+    [JsonPropertyName("Track")]
+    public TrackIdentityModel? Track { get; init; }
 }

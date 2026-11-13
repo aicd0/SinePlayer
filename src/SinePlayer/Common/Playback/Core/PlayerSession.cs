@@ -20,6 +20,7 @@ using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -48,10 +49,10 @@ internal sealed partial class PlayerSession : IDisposable
     private readonly List<AudioChainEntry> _audioChains = [];
 
     private bool _hasSource = false;
-    private PlaybackComponents _components = PlaybackComponents.Default;
     private double _volume = 1.0;
     private bool _muted;
     private double _rate = 1.0;
+    private SubtitleInsets _subtitleInsets = SubtitleInsets.None;
 
     private bool _pendingReconcile = false;
     private ReconcileResult? _lastReconcile;
@@ -89,6 +90,14 @@ internal sealed partial class PlayerSession : IDisposable
 
     public event Action<MediaModel?, OperationResult>? MediaChanged;
 
+    public event Action? TrackSelectionChanged;
+
+    public event Action? PositionChanged;
+
+    public event Action? VolumeChanged;
+
+    public event Action? PlaybackRateChanged;
+
     public string Id { get; }
 
     public PlayQueueModel PlayQueue => _playQueue;
@@ -96,12 +105,6 @@ internal sealed partial class PlayerSession : IDisposable
     public PlaybackModel Playback { get; } = new();
 
     public MediaModel? CurrentMedia => Playback.CurrentItem?.Media;
-
-    public event Action? PositionChanged;
-
-    public event Action? VolumeChanged;
-
-    public event Action? PlaybackRateChanged;
 
     public MediaEngineState State => _pipeline?.State ?? MediaEngineState.None;
 
@@ -219,23 +222,81 @@ internal sealed partial class PlayerSession : IDisposable
         return OperationResult.Success();
     }
 
-    public void SetComponents(PlaybackComponents components)
+    public void ReloadSettings()
     {
-        ArgumentNullException.ThrowIfNull(components);
-
-        if (_components == components)
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
         {
             return;
         }
 
-        _components = components;
-        _pendingReconcile = true;
-
-        PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is not null)
+        foreach (IVideoChain chain in pipeline.VideoChains)
         {
-            components.Apply(pipeline);
+            ApplySettings(chain);
         }
+
+        foreach (IAudioChain chain in pipeline.AudioChains)
+        {
+            ApplySettings(chain);
+        }
+
+        foreach (ISubtitleChain chain in pipeline.SubtitleChains)
+        {
+            ApplySettings(chain);
+        }
+
+        _pendingReconcile = true;
+    }
+
+    public IReadOnlyList<(MediaSource Source, MediaStreamInfo Stream)> SelectedTracks(MediaStreamKind kind)
+    {
+        HashSet<TrackIdentityModel> seen = [];
+        List<(MediaSource Source, MediaStreamInfo Stream)> tracks = [];
+
+        void Add(MediaStreamInfo? stream)
+        {
+            if (stream is null || SourceOf(stream) is not { } source)
+            {
+                return;
+            }
+
+            if (!seen.Add(TrackIdentityModel.From(stream, source.Locator.Value)))
+            {
+                return;
+            }
+
+            tracks.Add((source, stream));
+        }
+
+        switch (kind)
+        {
+            case MediaStreamKind.Video:
+                foreach (PlayerView view in _views)
+                {
+                    Add(view.VideoChain?.SelectedStream);
+                }
+
+                break;
+            case MediaStreamKind.Audio:
+                foreach (AudioChainEntry entry in _audioChains)
+                {
+                    Add(entry.Chain.SelectedStream);
+                }
+
+                break;
+            case MediaStreamKind.Subtitle:
+                foreach (PlayerView view in _views)
+                {
+                    foreach (ISubtitleChain chain in view.SubtitleChains)
+                    {
+                        Add(chain.SelectedStream);
+                    }
+                }
+
+                break;
+        }
+
+        return tracks;
     }
 
     public async Task<OperationResult<MediaSource>> AddSource(string filePath)
@@ -314,6 +375,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         await Reconcile();
+        TrackSelectionChanged?.Invoke();
         view.Dispose();
     }
 
@@ -333,8 +395,10 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResultExt.Failure(TAG, $"The picture could not be changed to {wanted}. {selected.Message}");
         }
 
+        ApplySettings(chain);
         _pendingReconcile = true;
         SaveRecord();
+        TrackSelectionChanged?.Invoke();
         return OperationResult.Success();
     }
 
@@ -360,8 +424,10 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResultExt.Failure(TAG, $"The sound of track #{stream.Index} could not be added. {selected.Message}");
         }
 
+        ApplySettings(chain);
         _pendingReconcile = true;
         SaveRecord();
+        TrackSelectionChanged?.Invoke();
         return OperationResult.Success();
     }
 
@@ -387,6 +453,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         _pendingReconcile = true;
         SaveRecord();
+        TrackSelectionChanged?.Invoke();
         return OperationResult.Success();
     }
 
@@ -412,8 +479,10 @@ internal sealed partial class PlayerSession : IDisposable
             return OperationResultExt.Failure(TAG, $"The subtitles of track #{stream.Index} could not be added. {selected.Message}");
         }
 
+        ApplySettings(chain);
         _pendingReconcile = true;
         SaveRecord();
+        TrackSelectionChanged?.Invoke();
         return OperationResult.Success();
     }
 
@@ -439,6 +508,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         _pendingReconcile = true;
         SaveRecord();
+        TrackSelectionChanged?.Invoke();
         return OperationResult.Success();
     }
 
@@ -566,6 +636,27 @@ internal sealed partial class PlayerSession : IDisposable
         PlaybackRateChanged?.Invoke();
     }
 
+    public void SetSubtitleInsets(SubtitleInsets insets)
+    {
+        if (_subtitleInsets == insets)
+        {
+            return;
+        }
+
+        _subtitleInsets = insets;
+
+        PlaybackPipeline? pipeline = _pipeline;
+        if (pipeline is null)
+        {
+            return;
+        }
+
+        foreach (ISubtitleChain chain in pipeline.SubtitleChains)
+        {
+            chain.Presentation = chain.Presentation with { Insets = insets };
+        }
+    }
+
     private void ApplyVolume()
     {
         foreach (AudioChainEntry entry in _audioChains)
@@ -606,7 +697,6 @@ internal sealed partial class PlayerSession : IDisposable
             SourceFactory = new FFmpegSourceProviderFactory(),
         };
 
-        _components.Apply(pipeline);
         pipeline.StateChanged += Pipeline_StateChanged;
         pipeline.WarningRaised += Pipeline_WarningRaised;
         pipeline.Rate = _rate;
@@ -625,7 +715,6 @@ internal sealed partial class PlayerSession : IDisposable
 
         IVideoChain chain = await pipeline.AddVideoChain(view.EnsureVideoRenderTarget());
         view.AttachVideo(chain);
-        _components.ApplyVideo(chain);
         _pendingReconcile = true;
         return chain;
     }
@@ -641,7 +730,6 @@ internal sealed partial class PlayerSession : IDisposable
         DownmixAudioFilter downmixFilter = new();
         chain.Filters.Add(downmixFilter);
 
-        _components.ApplyAudio(chain);
         _audioChains.Add(new AudioChainEntry(chain, gainFilter, downmixFilter));
         return chain;
     }
@@ -650,7 +738,6 @@ internal sealed partial class PlayerSession : IDisposable
     {
         ISubtitleChain chain = await pipeline.AddSubtitleChain(view.EnsureSubtitleRenderTarget());
         view.AttachSubtitle(chain);
-        _components.ApplySubtitle(chain);
         _pendingReconcile = true;
         return chain;
     }
@@ -680,6 +767,71 @@ internal sealed partial class PlayerSession : IDisposable
                 HandleEnded();
             }
         });
+    }
+
+    #endregion
+
+    #region Settings
+
+    private PlayerSettingsModel SettingsOf(MediaStreamKind kind, MediaStreamInfo stream)
+    {
+        PlayerSettingsModel settings = new();
+        if (_openedMedia is not { } media)
+        {
+            return settings;
+        }
+
+        var track = TrackIdentityModel.From(stream, PathOf(stream));
+        string? record = PlayerSettingsStore.GetRecord(media, kind, track);
+
+        switch (kind)
+        {
+            case MediaStreamKind.Video:
+                settings.Video = VideoSettingsModel.FromRecordJson(record);
+                break;
+            case MediaStreamKind.Audio:
+                settings.Audio = AudioSettingsModel.FromRecordJson(record);
+                break;
+            case MediaStreamKind.Subtitle:
+                settings.Subtitle = SubtitleSettingsModel.FromRecordJson(record);
+                break;
+        }
+
+        return settings;
+    }
+
+    private void ApplySettings(IVideoChain chain)
+    {
+        if (chain.SelectedStream is not { } stream)
+        {
+            return;
+        }
+
+        PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Video, stream);
+        settings.ToComponents().ApplyVideo(chain);
+        chain.Transform = settings.Video.ToTransform();
+    }
+
+    private void ApplySettings(IAudioChain chain)
+    {
+        if (chain.SelectedStream is not { } stream)
+        {
+            return;
+        }
+
+        SettingsOf(MediaStreamKind.Audio, stream).ToComponents().ApplyAudio(chain);
+    }
+
+    private void ApplySettings(ISubtitleChain chain)
+    {
+        if (chain.SelectedStream is not { } stream)
+        {
+            return;
+        }
+
+        PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Subtitle, stream);
+        settings.ToComponents().ApplySubtitle(chain);
+        chain.Presentation = settings.Subtitle.ToPresentation() with { Insets = _subtitleInsets };
     }
 
     #endregion
@@ -1026,7 +1178,10 @@ internal sealed partial class PlayerSession : IDisposable
             return;
         }
 
-        _components.Apply(pipeline);
+        foreach (IAudioChain chain in pipeline.AudioChains)
+        {
+            ApplySettings(chain);
+        }
 
         OperationResult<ReconcileResult> reconciled = await pipeline.Reconcile();
         if (!reconciled.IsSuccessful)
@@ -1193,10 +1348,10 @@ internal sealed partial class PlayerSession : IDisposable
                 AllowMultiSubtitleTracks = allowMultiSubtitleTracks,
             };
 
-            if (view.VideoChain is { } video)
+            if (view.VideoChain is not null)
             {
-                entry.VideoSelection = video.SelectedStream is { } stream
-                    ? new SelectedTrackModel { Enabled = true, Path = PathOf(stream), Index = stream.Index }
+                entry.VideoSelection = view.VideoChain.SelectedStream is { } video
+                    ? new SelectedTrackModel { Enabled = true, Track = TrackIdentityModel.From(video, PathOf(video)) }
                     : new SelectedTrackModel { Enabled = false };
             }
 
@@ -1205,7 +1360,7 @@ internal sealed partial class PlayerSession : IDisposable
                 entry.SubtitleSelections = [.. view.SubtitleChains
                     .Select(chain => chain.SelectedStream)
                     .OfType<SubtitleStreamInfo>()
-                    .Select(stream => new TrackSelectionEntryModel { Path = PathOf(stream), Index = stream.Index })];
+                    .Select(stream => TrackIdentityModel.From(stream, PathOf(stream)))];
             }
 
             views.Add(entry);
@@ -1218,7 +1373,7 @@ internal sealed partial class PlayerSession : IDisposable
             : [.. _audioChains
                 .Select(entry => entry.Chain.SelectedStream)
                 .OfType<AudioStreamInfo>()
-                .Select(stream => new TrackSelectionEntryModel { Path = PathOf(stream), Index = stream.Index })];
+                .Select(stream => TrackIdentityModel.From(stream, PathOf(stream)))];
 
         return model;
     }
@@ -1235,15 +1390,20 @@ internal sealed partial class PlayerSession : IDisposable
 
     private string PathOf(MediaStreamInfo stream)
     {
+        return SourceOf(stream)?.Locator.Value ?? string.Empty;
+    }
+
+    private MediaSource? SourceOf(MediaStreamInfo stream)
+    {
         foreach (MediaSource source in Sources)
         {
             if (source.Info.Streams.Any(candidate => candidate.Equals(stream)))
             {
-                return source.Locator.Value;
+                return source;
             }
         }
 
-        return string.Empty;
+        return null;
     }
 
     private void Playback_PlayQueueChanged()

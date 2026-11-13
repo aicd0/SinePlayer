@@ -8,7 +8,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Common.Playback.Surface;
-using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Common.Playback.Core;
@@ -20,12 +19,10 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
     private SwapChainPanel? _videoPanel;
     private SwapChainPanelRenderTarget? _videoRenderTarget;
     private IVideoChain? _videoChain;
-    private VideoTransform _videoTransform = VideoTransform.Identity;
 
     private SwapChainPanel? _subtitlePanel;
     private SwapChainPanelRenderTarget? _subtitleRenderTarget;
     private readonly List<ISubtitleChain> _subtitleChains = [];
-    private SubtitlePresentation _subtitlePresentation = SubtitlePresentation.Identity;
 
     public UIElement VideoPanel => _videoPanel ??= new SwapChainPanel();
 
@@ -43,44 +40,6 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
     public IVideoChain? VideoChain => _videoChain;
 
     public IReadOnlyList<ISubtitleChain> SubtitleChains => [.. _subtitleChains];
-
-    public VideoTransform VideoTransform
-    {
-        get => _videoTransform;
-        set
-        {
-            if (_videoTransform == value)
-            {
-                return;
-            }
-
-            _videoTransform = value;
-
-            if (_videoChain is { } chain)
-            {
-                chain.Transform = value;
-            }
-        }
-    }
-
-    public SubtitlePresentation SubtitlePresentation
-    {
-        get => _subtitlePresentation;
-        set
-        {
-            if (_subtitlePresentation == value)
-            {
-                return;
-            }
-
-            _subtitlePresentation = value;
-
-            foreach (ISubtitleChain chain in _subtitleChains)
-            {
-                chain.Presentation = value;
-            }
-        }
-    }
 
     public void Dispose()
     {
@@ -116,7 +75,6 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
     public void AttachVideo(IVideoChain video)
     {
         _videoChain = video;
-        video.Transform = _videoTransform;
 
         foreach (ISubtitleChain subtitle in _subtitleChains)
         {
@@ -133,7 +91,6 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
             _subtitleChains.Add(subtitle);
         }
 
-        subtitle.Presentation = _subtitlePresentation;
         subtitle.LayoutVideoChain = _videoChain;
         PublishPlaybackInfo();
     }

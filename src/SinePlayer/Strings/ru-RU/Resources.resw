@@ -168,8 +168,8 @@
   <data name="AllowMultiTracks" xml:space="preserve">
     <value>Разрешить несколько дорожек</value>
   </data>
-  <data name="AllowPerMediaConfiguration" xml:space="preserve">
-    <value>Разрешить настройку для каждого файла</value>
+  <data name="AllowVariation" xml:space="preserve">
+    <value>Разрешить изменение</value>
   </data>
   <data name="Always" xml:space="preserve">
     <value>Всегда</value>
@@ -617,6 +617,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   </data>
   <data name="GeneralSettingsDescription" xml:space="preserve">
     <value>Изменить поведение приложения по умолчанию</value>
+  </data>
+  <data name="Global" xml:space="preserve">
+    <value>Общие</value>
   </data>
   <data name="GoBack" xml:space="preserve">
     <value>Перейти назад</value>
@@ -1248,6 +1251,9 @@ $plugins</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>Всего медиафайлов</value>
+  </data>
+  <data name="Track" xml:space="preserve">
+    <value>Дорожка</value>
   </data>
   <data name="Transform" xml:space="preserve">
     <value>Преобразование</value>

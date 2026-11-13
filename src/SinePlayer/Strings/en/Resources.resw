@@ -168,8 +168,8 @@
   <data name="AllowMultiTracks" xml:space="preserve">
     <value>Allow multi-tracks</value>
   </data>
-  <data name="AllowPerMediaConfiguration" xml:space="preserve">
-    <value>Allow per-media configuration</value>
+  <data name="AllowVariation" xml:space="preserve">
+    <value>Allow variation</value>
   </data>
   <data name="Always" xml:space="preserve">
     <value>Always</value>
@@ -617,6 +617,9 @@ The expression will be evaluated in the following order:
   </data>
   <data name="GeneralSettingsDescription" xml:space="preserve">
     <value>Change app default behavior</value>
+  </data>
+  <data name="Global" xml:space="preserve">
+    <value>Global</value>
   </data>
   <data name="GoBack" xml:space="preserve">
     <value>Go back</value>
@@ -1248,6 +1251,9 @@ Category2: Tag4, Tag5</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>Total media</value>
+  </data>
+  <data name="Track" xml:space="preserve">
+    <value>Track</value>
   </data>
   <data name="Transform" xml:space="preserve">
     <value>Transform</value>
