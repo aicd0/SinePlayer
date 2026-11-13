@@ -103,12 +103,9 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         Loaded += PlayerSettingsPanel_LoadedOrUnloaded;
         Unloaded += PlayerSettingsPanel_LoadedOrUnloaded;
 
-        string selectedTab = AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).GetValueOrDefault(RegistryNames.StateKey.SELECTED_PLAYER_SETTINGS_TAB, string.Empty);
-        SettingsTabSelectorBar.SelectedItem = selectedTab switch
-        {
-            "Second" => SelectorBarItem2,
-            _ => SelectorBarItem1,
-        };
+        string selectedTab = AppDB.MainRegistry.CreateKey(RegistryNames.STATE).GetValueOrDefault(RegistryNames.StateKey.SELECTED_PLAYER_SETTINGS_TAB, string.Empty);
+        SettingsTab? tab = _tabs.Find(candidate => string.Equals(candidate.Key, selectedTab, StringComparison.Ordinal));
+        SettingsTabSelectorBar.SelectedItem = (tab ?? _videoTab).Item;
 
         RestoreSectionStates();
     }
@@ -131,7 +128,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (_media != media)
         {
             _media = media;
-            _trackScopes.Clear();
+            LoadTrackScopes();
             RefreshScopeComboBox();
             LoadSettings();
             UpdateUI();
@@ -269,7 +266,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             tab.Content.Visibility = tab == selectedTab ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).Set(RegistryNames.StateKey.SELECTED_PLAYER_SETTINGS_TAB, selectedTab.Key);
+        AppDB.MainRegistry.CreateKey(RegistryNames.STATE).Set(RegistryNames.StateKey.SELECTED_PLAYER_SETTINGS_TAB, selectedTab.Key);
 
         if (_media is not null)
         {
@@ -486,6 +483,23 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         return _trackScopes.TryGetValue(kind, out TrackIdentityModel? track) ? track : null;
     }
 
+    private void LoadTrackScopes()
+    {
+        _trackScopes.Clear();
+        if (_media is not { } media)
+        {
+            return;
+        }
+
+        foreach (SettingsTab tab in _tabs)
+        {
+            if (KindOf(tab) is { } kind && PlayerSettingsStore.GetTrackScope(media, kind) is { } track)
+            {
+                _trackScopes[kind] = track;
+            }
+        }
+    }
+
     private void SetTrack(MediaStreamKind kind, TrackIdentityModel? track)
     {
         if (track is null)
@@ -495,6 +509,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         else
         {
             _trackScopes[kind] = track;
+        }
+
+        if (_media is { } media)
+        {
+            PlayerSettingsStore.SetTrackScope(media, kind, track);
         }
     }
 
@@ -514,16 +533,16 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
             TrackScopeComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.Global, Tag = null });
 
-            foreach ((MediaSource source, MediaStreamInfo stream) in _session?.SelectedTracks(kind) ?? [])
+            IReadOnlyList<(MediaSource Source, MediaStreamInfo Stream)> tracks = _session?.SelectedTracks(kind) ?? [];
+            foreach ((MediaSource source, MediaStreamInfo stream) in tracks)
             {
                 var track = TrackIdentityModel.From(stream, source.Locator.Value);
                 TrackScopeComboBox.Items.Add(new ComboBoxItem { Content = MediaStreamLabel.Describe(stream, source), Tag = track });
                 exists = exists || track.Equals(selected);
             }
 
-            if (!exists)
+            if (!exists && tracks.Count > 0)
             {
-                // The track is gone, so this kind goes back to configuring every track.
                 SetTrack(kind, null);
                 selected = null;
             }
