@@ -573,6 +573,9 @@ La evaluación se realizará en el siguiente orden:
   <data name="Font" xml:space="preserve">
     <value>Fuente</value>
   </data>
+  <data name="FontColor" xml:space="preserve">
+    <value>Color de fuente</value>
+  </data>
   <data name="FontFamily" xml:space="preserve">
     <value>Familia de fuentes</value>
   </data>

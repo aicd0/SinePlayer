@@ -11,6 +11,7 @@ using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Engine;
 using SinePlayer.Core.Playback.Hosting;
 
+using Windows.UI;
 using Windows.UI.Text;
 
 namespace SinePlayer.Core.Tests.Playback;
@@ -211,6 +212,7 @@ public partial class PlaybackPipelineTests
             FontSize = 32.0,
             FontStyle = FontStyle.Italic,
             FontWeight = new FontWeight { Weight = 700 },
+            FontColor = Color.FromArgb(255, 12, 34, 56),
             OutlineWidth = 3.0,
         };
         pipeline.SubtitleChains[0].Presentation = presentation;

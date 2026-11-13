@@ -573,6 +573,9 @@ L'évaluation s'effectuera dans l'ordre suivant :
   <data name="Font" xml:space="preserve">
     <value>Police</value>
   </data>
+  <data name="FontColor" xml:space="preserve">
+    <value>Couleur de police</value>
+  </data>
   <data name="FontFamily" xml:space="preserve">
     <value>Famille de polices</value>
   </data>

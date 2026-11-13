@@ -245,6 +245,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleFontColorLabel = string.Empty;
+    public string SubtitleFontColorLabel
+    {
+        get => _subtitleFontColorLabel;
+        set
+        {
+            _subtitleFontColorLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleFontColorLabel)));
+        }
+    }
+
     private string _subtitleOutlineLabel = string.Empty;
     public string SubtitleOutlineLabel
     {
