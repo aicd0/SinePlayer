@@ -119,9 +119,9 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
         return _host.Select(this, stream);
     }
 
-    public void Start(CoroutineHost host, Action wakeReader, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
+    public void Start(CoroutineHost host, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
-        _decodeCoroutine = host.Register(stop => Decode(stop, wakeReader));
+        _decodeCoroutine = host.Register(Decode);
         _renderThread = new PipelineThread("Pipeline - Audio render", stop => Render(stop, isStreamSpent, reportEnded));
         _renderThread.Start();
     }
@@ -309,7 +309,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
         _speedFilter.SetSpeed(speed);
     }
 
-    private async Task Decode(Func<bool> stopRequested, Action wakeReader)
+    private async Task Decode(Func<bool> stopRequested)
     {
         long workingEpoch = -1;
 
@@ -345,8 +345,6 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 await DecodeNode.WaitAsync(stamp);
                 continue;
             }
-
-            wakeReader();
 
             MediaPacket? packet = entry.Packet;
             long packetEpoch = entry.Epoch;

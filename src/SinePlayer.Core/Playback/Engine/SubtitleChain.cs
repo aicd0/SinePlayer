@@ -150,9 +150,9 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
         return _host.Select(this, stream);
     }
 
-    public void Start(CoroutineHost host, Action wakeReader)
+    public void Start(CoroutineHost host)
     {
-        _decodeCoroutine = host.Register(stop => Decode(stop, wakeReader));
+        _decodeCoroutine = host.Register(Decode);
         _renderThread = new PipelineThread("Pipeline - Subtitle render", Render);
         _renderThread.Start();
     }
@@ -337,7 +337,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
         Selected = binding is { } chosen ? new(chosen.Source, (SubtitleStreamInfo)chosen.Stream) : null;
     }
 
-    private async Task Decode(Func<bool> stopRequested, Action wakeReader)
+    private async Task Decode(Func<bool> stopRequested)
     {
         long workingEpoch = -1;
 
@@ -392,8 +392,6 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                 await DecodeNode.WaitAsync(stamp);
                 continue;
             }
-
-            wakeReader();
 
             MediaPacket? packet = entry.Packet;
             long packetEpoch = entry.Epoch;

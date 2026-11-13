@@ -637,13 +637,13 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
         switch (chain)
         {
             case VideoChain video:
-                video.Start(_reader.Wake, (epoch, position) => IsStreamSpent(video.Source, video.ReadTail, epoch, position), TryNotifyPlaybackEnded);
+                video.Start((epoch, position) => IsStreamSpent(video.Source, video.ReadTail, epoch, position), TryNotifyPlaybackEnded);
                 break;
             case AudioChain audio:
-                audio.Start(host, _reader.Wake, (epoch, position) => IsStreamSpent(audio.Source, audio.ReadTail, epoch, position), TryNotifyPlaybackEnded);
+                audio.Start(host, (epoch, position) => IsStreamSpent(audio.Source, audio.ReadTail, epoch, position), TryNotifyPlaybackEnded);
                 break;
             case SubtitleChain subtitle:
-                subtitle.Start(host, _reader.Wake);
+                subtitle.Start(host);
                 break;
         }
     }

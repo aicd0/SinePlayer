@@ -6331,6 +6331,47 @@ public class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// The picture being off leaves one chain reading for, and a chain that has decoded everything it was handed has
+    /// nothing to report: the reader's only account of "the read ahead is being played down" is the position moving on,
+    /// so it has to look again by itself — waiting for a chain to say so froze playback on the last of what was read.
+    /// <para>
+    /// It takes as long as the read ahead is deep, because the freeze is on the far side of everything that was
+    /// buffered when the picture went off: the test asks when the sound has got two seconds past that point.
+    /// </para>
+    /// </summary>
+    [Test]
+    public void KeepsReadingWhenTheOnlyChainLeftHasDecodedEverything()
+    {
+        string path = RawAudioVideoFixtureFile.Create(frameCount: 900);
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(300), "playback to be under way");
+
+            var audio = (AudioChain)ChainOf(pipeline, MediaStreamKind.Audio);
+            WaitFor(() => audio.PacketQueue.IsEmpty, "the sound to have decoded everything it was given");
+            var readAhead = TimeSpan.FromTicks(audio.ReadTail.Ticks);
+
+            Assert.That(Select(pipeline, MediaStreamKind.Video, null).IsSuccessful, Is.True);
+
+            // Nothing but the sound is left to report a read, and it has nothing left to report: from here on, only the
+            // reader looking again keeps the sound coming.
+            WaitFor(
+                () => pipeline.Position > readAhead + TimeSpan.FromSeconds(2),
+                "the sound to play on past everything that had been read when the picture went off",
+                30000);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
     /// A kind can be turned off, and only that kind moves: the picture's chain is let go of, its device closed, and the
     /// sound carries on playing — the selection is one thing per kind, so leaving one out leaves the other untouched.
     /// </summary>
