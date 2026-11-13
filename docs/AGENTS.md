@@ -19,8 +19,7 @@
 
 ## Building
 
-`dotnet build` does not work here: the MrtCore PriGen targets load `Microsoft.Build.Packaging.Pri.Tasks.dll`
-from the Visual Studio MSBuild layout, so the .NET SDK fails with MSB4062. Use that MSBuild:
+`dotnet build` does not work here. Use that MSBuild:
 
 ```
 & 'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe' src\SinePlayer.sln /p:Platform=x64 /v:q /nologo

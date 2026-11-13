@@ -1148,17 +1148,17 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        view.VideoTransform = settings.ToVideoTransform();
+        view.VideoTransform = settings.Video.ToTransform();
 
         _subtitlePresentation = _subtitlePresentation with
         {
-            OffsetX = settings.SubtitlePanX,
-            OffsetY = settings.SubtitlePanY,
-            FontFamily = settings.SubtitleFontFamily,
-            FontSize = settings.SubtitleFontSize,
-            FontStyle = settings.ToFontStyle(),
-            FontWeight = settings.ToFontWeight(),
-            OutlineWidth = settings.SubtitleOutlineWidth,
+            OffsetX = settings.Subtitle.PanX,
+            OffsetY = settings.Subtitle.PanY,
+            FontFamily = settings.Subtitle.Family,
+            FontSize = settings.Subtitle.Size,
+            FontStyle = settings.Subtitle.ToFontStyle(),
+            FontWeight = settings.Subtitle.ToFontWeight(),
+            OutlineWidth = settings.Subtitle.OutlineWidth,
         };
         view.SubtitlePresentation = _subtitlePresentation;
 

@@ -12,10 +12,7 @@ using SinePlayer.Common.Localization;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Utils;
-using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Data.Models.Media;
-
-using Windows.UI.Text;
 
 namespace SinePlayer.Data.Models.Misc;
 
@@ -49,26 +46,9 @@ internal class PlayerSettingsModel
             PresetKey = key,
             PresetName = model.PresetName ?? fallbackModel.PresetName,
             AllowPerMediaConfiguration = model.AllowPerMediaConfiguration ?? fallbackModel.AllowPerMediaConfiguration,
-            VideoDecoder = model.VideoDecoder ?? fallbackModel.VideoDecoder,
-            VideoRenderer = model.VideoRenderer ?? fallbackModel.VideoRenderer,
-            AudioDecoder = model.AudioDecoder ?? fallbackModel.AudioDecoder,
-            AudioRenderer = model.AudioRenderer ?? fallbackModel.AudioRenderer,
-            SubtitleDecoder = model.Subtitle?.Decoder ?? fallbackModel.SubtitleDecoder,
-            SubtitleRenderer = model.Subtitle?.Renderer ?? fallbackModel.SubtitleRenderer,
-            SubtitlePanX = model.Subtitle?.PanX ?? fallbackModel.SubtitlePanX,
-            SubtitlePanY = model.Subtitle?.PanY ?? fallbackModel.SubtitlePanY,
-            SubtitleFontFamily = model.Subtitle?.FontFamily ?? fallbackModel.SubtitleFontFamily,
-            SubtitleFontSize = model.Subtitle?.FontSize ?? fallbackModel.SubtitleFontSize,
-            SubtitleFontStyle = model.Subtitle?.FontStyle ?? fallbackModel.SubtitleFontStyle,
-            SubtitleFontWeight = model.Subtitle?.FontWeight ?? fallbackModel.SubtitleFontWeight,
-            SubtitleOutlineWidth = model.Subtitle?.OutlineWidth ?? fallbackModel.SubtitleOutlineWidth,
-            VideoPreferHardwareDecoding = model.VideoPreferHardwareDecoding ?? fallbackModel.VideoPreferHardwareDecoding,
-            VideoPreferHdr = model.VideoPreferHdr ?? fallbackModel.VideoPreferHdr,
-            VideoResizeMode = ParseResizeMode(model.VideoResizeMode, fallbackModel.VideoResizeMode),
-            VideoScalingMode = ParseScalingMode(model.VideoScalingMode, fallbackModel.VideoScalingMode),
-            VideoRotationDegrees = ParseRotationDegrees(model.VideoRotationDegrees, fallbackModel.VideoRotationDegrees),
-            VideoFlipHorizontal = model.VideoFlipHorizontal ?? fallbackModel.VideoFlipHorizontal,
-            VideoFlipVertical = model.VideoFlipVertical ?? fallbackModel.VideoFlipVertical,
+            Video = VideoSettingsModel.FromJsonModel(model.Video, fallbackModel.Video),
+            Audio = AudioSettingsModel.FromJsonModel(model.Audio, fallbackModel.Audio),
+            Subtitle = SubtitleSettingsModel.FromJsonModel(model.Subtitle, fallbackModel.Subtitle),
         };
     }
 
@@ -167,60 +147,22 @@ internal class PlayerSettingsModel
         return presetModel;
     }
 
-    private static VideoResizeMode ParseResizeMode(string? value, VideoResizeMode fallback)
-    {
-        if (!string.IsNullOrEmpty(value) && Enum.TryParse(value, ignoreCase: true, out VideoResizeMode mode) && Enum.IsDefined(mode))
-        {
-            return mode;
-        }
-
-        return fallback;
-    }
-
-    private static int ParseRotationDegrees(int? value, int fallback)
-    {
-        return value is 0 or 90 or 180 or 270 ? value.Value : fallback;
-    }
-
-    private static VideoScalingMode ParseScalingMode(string? value, VideoScalingMode fallback)
-    {
-        if (!string.IsNullOrEmpty(value) && Enum.TryParse(value, ignoreCase: true, out VideoScalingMode mode) && Enum.IsDefined(mode))
-        {
-            return mode;
-        }
-
-        return fallback;
-    }
-
     public string PresetKey { get; set; } = string.Empty;
     public string PresetName { get; set; } = "?";
     public bool AllowPerMediaConfiguration { get; set; } = false;
-    public string VideoDecoder { get; set; } = PlaybackComponents.AUTO;
-    public string VideoRenderer { get; set; } = PlaybackComponents.AUTO;
-    public string AudioDecoder { get; set; } = PlaybackComponents.AUTO;
-    public string AudioRenderer { get; set; } = PlaybackComponents.AUTO;
-    public string SubtitleDecoder { get; set; } = PlaybackComponents.AUTO;
-    public string SubtitleRenderer { get; set; } = PlaybackComponents.AUTO;
-    public int SubtitlePanX { get; set; }
-    public int SubtitlePanY { get; set; }
-    public string SubtitleFontFamily { get; set; } = string.Empty;
-    public double SubtitleFontSize { get; set; }
-    public string SubtitleFontStyle { get; set; } = nameof(FontStyle.Normal);
-    public int SubtitleFontWeight { get; set; }
-    public double SubtitleOutlineWidth { get; set; } = 2.0;
-    public bool VideoPreferHardwareDecoding { get; set; } = true;
-    public bool VideoPreferHdr { get; set; } = true;
-    public VideoResizeMode VideoResizeMode { get; set; } = VideoResizeMode.Fit;
-    public VideoScalingMode VideoScalingMode { get; set; } = VideoScalingMode.Bilinear;
-    public int VideoRotationDegrees { get; set; } = 0;
-    public bool VideoFlipHorizontal { get; set; }
-    public bool VideoFlipVertical { get; set; }
+    public VideoSettingsModel Video { get; set; } = new();
+    public AudioSettingsModel Audio { get; set; } = new();
+    public SubtitleSettingsModel Subtitle { get; set; } = new();
 
     private PlayerSettingsModel() { }
 
     public PlayerSettingsModel Clone()
     {
-        return (PlayerSettingsModel)MemberwiseClone();
+        var clone = (PlayerSettingsModel)MemberwiseClone();
+        clone.Video = Video.Clone();
+        clone.Audio = Audio.Clone();
+        clone.Subtitle = Subtitle.Clone();
+        return clone;
     }
 
     public JsonModel ToJsonModel()
@@ -229,58 +171,15 @@ internal class PlayerSettingsModel
         {
             PresetName = PresetName,
             AllowPerMediaConfiguration = AllowPerMediaConfiguration,
-            VideoDecoder = VideoDecoder,
-            VideoRenderer = VideoRenderer,
-            AudioDecoder = AudioDecoder,
-            AudioRenderer = AudioRenderer,
-            Subtitle = new()
-            {
-                Decoder = SubtitleDecoder,
-                Renderer = SubtitleRenderer,
-                PanX = SubtitlePanX,
-                PanY = SubtitlePanY,
-                FontFamily = SubtitleFontFamily,
-                FontSize = SubtitleFontSize,
-                FontStyle = SubtitleFontStyle,
-                FontWeight = SubtitleFontWeight,
-                OutlineWidth = SubtitleOutlineWidth,
-            },
-            VideoPreferHardwareDecoding = VideoPreferHardwareDecoding,
-            VideoPreferHdr = VideoPreferHdr,
-            VideoResizeMode = VideoResizeMode.ToString(),
-            VideoScalingMode = VideoScalingMode.ToString(),
-            VideoRotationDegrees = VideoRotationDegrees,
-            VideoFlipHorizontal = VideoFlipHorizontal,
-            VideoFlipVertical = VideoFlipVertical,
+            Video = Video.ToJsonModel(),
+            Audio = Audio.ToJsonModel(),
+            Subtitle = Subtitle.ToJsonModel(),
         };
     }
 
     public PlaybackComponents ToComponents()
     {
-        return new(VideoDecoder, VideoRenderer, AudioDecoder, AudioRenderer, SubtitleDecoder, SubtitleRenderer, VideoPreferHardwareDecoding, VideoPreferHdr);
-    }
-
-    public VideoTransform ToVideoTransform()
-    {
-        int quarterTurns = (int)Math.Round(VideoRotationDegrees / 90.0);
-
-        return new VideoTransform(
-            VideoOrientation.FromDegrees(quarterTurns * 90, VideoFlipHorizontal, VideoFlipVertical),
-            VideoResizeMode,
-            1.0,
-            0.0,
-            0.0,
-            VideoScalingMode);
-    }
-
-    public FontStyle ToFontStyle()
-    {
-        return Enum.TryParse(SubtitleFontStyle, ignoreCase: true, out FontStyle style) && Enum.IsDefined(style) ? style : FontStyle.Normal;
-    }
-
-    public FontWeight ToFontWeight()
-    {
-        return SubtitleFontWeight > 0 ? new FontWeight { Weight = (ushort)SubtitleFontWeight } : default;
+        return new(Video.Decoder, Video.Renderer, Audio.Decoder, Audio.Renderer, Subtitle.Decoder, Subtitle.Renderer, Video.PreferHardwareDecoding, Video.PreferHdr);
     }
 
     public void SaveToMedia(MediaModel media)
@@ -406,70 +305,13 @@ internal class PlayerSettingsModel
         [JsonPropertyName("AllowPerMediaConfiguration")]
         public bool? AllowPerMediaConfiguration { get; set; }
 
-        [JsonPropertyName("VideoDecoder")]
-        public string? VideoDecoder { get; set; }
+        [JsonPropertyName("Video")]
+        public VideoSettingsModel.JsonModel? Video { get; set; }
 
-        [JsonPropertyName("VideoRenderer")]
-        public string? VideoRenderer { get; set; }
-
-        [JsonPropertyName("AudioDecoder")]
-        public string? AudioDecoder { get; set; }
-
-        [JsonPropertyName("AudioRenderer")]
-        public string? AudioRenderer { get; set; }
+        [JsonPropertyName("Audio")]
+        public AudioSettingsModel.JsonModel? Audio { get; set; }
 
         [JsonPropertyName("Subtitle")]
-        public JsonSubtitleModel? Subtitle { get; set; }
-
-        [JsonPropertyName("VideoPreferHardwareDecoding")]
-        public bool? VideoPreferHardwareDecoding { get; set; }
-
-        [JsonPropertyName("VideoPreferHdr")]
-        public bool? VideoPreferHdr { get; set; }
-
-        [JsonPropertyName("VideoResizeMode")]
-        public string? VideoResizeMode { get; set; }
-
-        [JsonPropertyName("VideoScalingMode")]
-        public string? VideoScalingMode { get; set; }
-
-        [JsonPropertyName("VideoRotationDegrees")]
-        public int? VideoRotationDegrees { get; set; }
-
-        [JsonPropertyName("VideoFlipHorizontal")]
-        public bool? VideoFlipHorizontal { get; set; }
-
-        [JsonPropertyName("VideoFlipVertical")]
-        public bool? VideoFlipVertical { get; set; }
-    }
-
-    public class JsonSubtitleModel
-    {
-        [JsonPropertyName("Decoder")]
-        public string? Decoder { get; set; }
-
-        [JsonPropertyName("Renderer")]
-        public string? Renderer { get; set; }
-
-        [JsonPropertyName("PanX")]
-        public int? PanX { get; set; }
-
-        [JsonPropertyName("PanY")]
-        public int? PanY { get; set; }
-
-        [JsonPropertyName("FontFamily")]
-        public string? FontFamily { get; set; }
-
-        [JsonPropertyName("FontSize")]
-        public double? FontSize { get; set; }
-
-        [JsonPropertyName("FontStyle")]
-        public string? FontStyle { get; set; }
-
-        [JsonPropertyName("FontWeight")]
-        public int? FontWeight { get; set; }
-
-        [JsonPropertyName("OutlineWidth")]
-        public double? OutlineWidth { get; set; }
+        public SubtitleSettingsModel.JsonModel? Subtitle { get; set; }
     }
 }
