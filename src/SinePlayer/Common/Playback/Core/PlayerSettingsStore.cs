@@ -17,6 +17,11 @@ internal static class PlayerSettingsStore
 {
     private const string TAG = nameof(PlayerSettingsStore);
 
+    public static string? GetRecord(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track)
+    {
+        return track is null ? GetGlobalRecord(media, kind) : GetTrackRecord(media, kind, track) ?? GetGlobalRecord(media, kind);
+    }
+
     public static string? GetGlobalRecord(MediaModel media, MediaStreamKind kind)
     {
         PlayerSettingsScopeJsonModel? scope = Load(media).Global;
@@ -110,9 +115,39 @@ internal static class PlayerSettingsStore
         Store(media, model);
     }
 
-    public static string? GetRecord(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track)
+    public static TrackIdentityModel? GetTrackScope(MediaModel media, MediaStreamKind kind)
     {
-        return track is null ? GetGlobalRecord(media, kind) : GetTrackRecord(media, kind, track) ?? GetGlobalRecord(media, kind);
+        TrackScopeJsonModel? scope = Load(media).Scope;
+        return kind switch
+        {
+            MediaStreamKind.Video => scope?.Video,
+            MediaStreamKind.Audio => scope?.Audio,
+            MediaStreamKind.Subtitle => scope?.Subtitle,
+            _ => null,
+        };
+    }
+
+    public static void SetTrackScope(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track)
+    {
+        PlayerSettingsJsonModel model = Load(media);
+        model.Scope ??= new();
+
+        switch (kind)
+        {
+            case MediaStreamKind.Video:
+                model.Scope.Video = track;
+                break;
+            case MediaStreamKind.Audio:
+                model.Scope.Audio = track;
+                break;
+            case MediaStreamKind.Subtitle:
+                model.Scope.Subtitle = track;
+                break;
+            default:
+                return;
+        }
+
+        Store(media, model);
     }
 
     private static PlayerSettingsJsonModel Load(MediaModel media)
@@ -196,6 +231,21 @@ internal sealed class PlayerSettingsJsonModel
 
     [JsonPropertyName("Tracks")]
     public TrackSettingsJsonModel? Tracks { get; set; }
+
+    [JsonPropertyName("Scope")]
+    public TrackScopeJsonModel? Scope { get; set; }
+}
+
+internal sealed class TrackScopeJsonModel
+{
+    [JsonPropertyName("Video")]
+    public TrackIdentityModel? Video { get; set; }
+
+    [JsonPropertyName("Audio")]
+    public TrackIdentityModel? Audio { get; set; }
+
+    [JsonPropertyName("Subtitle")]
+    public TrackIdentityModel? Subtitle { get; set; }
 }
 
 internal sealed class PlayerSettingsScopeJsonModel
