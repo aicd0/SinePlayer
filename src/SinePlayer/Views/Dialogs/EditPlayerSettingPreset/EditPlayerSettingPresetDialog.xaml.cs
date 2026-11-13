@@ -4,7 +4,7 @@
 using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Common.BaseUI;
-using SinePlayer.Data.Models.Media;
+using SinePlayer.Data.Models.Misc;
 
 namespace SinePlayer.Views.Dialogs.EditPlayerSettingPreset;
 
@@ -12,11 +12,11 @@ internal sealed partial class EditPlayerSettingPresetDialog : BaseContentDialog
 {
     public EditPlayerSettingPresetDialogViewModel ViewModel = new();
 
-    public EditPlayerSettingPresetDialog(MediaModel media)
+    public EditPlayerSettingPresetDialog(PresetSettingsModel settings)
     {
         InitializeComponent();
 
-        ViewModel.Initialize(media);
+        ViewModel.Initialize(settings);
     }
 
     //
@@ -58,9 +58,9 @@ internal sealed partial class EditPlayerSettingPresetDialog : BaseContentDialog
         ViewModel.UpdateSetAsDefault(checkBox.IsChecked ?? false);
     }
 
-    private void AllowPerMediaConfigurationCheckBox_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void AllowVariationCheckBox_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         var checkBox = (CheckBox)sender;
-        ViewModel.UpdateAllowPerMediaConfiguration(checkBox.IsChecked ?? false);
+        ViewModel.UpdateAllowVariation(checkBox.IsChecked ?? false);
     }
 }

@@ -15,7 +15,7 @@ internal sealed class TrackSelectionModel
     public List<ViewTrackSelectionModel>? Views { get; set; }
 
     [JsonPropertyName("AudioSelections")]
-    public List<TrackSelectionEntryModel>? AudioSelections { get; set; }
+    public List<TrackIdentityModel>? AudioSelections { get; set; }
 }
 
 internal sealed class ViewTrackSelectionModel
@@ -27,14 +27,5 @@ internal sealed class ViewTrackSelectionModel
     public SelectedTrackModel? VideoSelection { get; set; }
 
     [JsonPropertyName("SubtitleSelections")]
-    public List<TrackSelectionEntryModel>? SubtitleSelections { get; set; }
-}
-
-internal sealed class TrackSelectionEntryModel
-{
-    [JsonPropertyName("Path")]
-    public string Path { get; init; } = string.Empty;
-
-    [JsonPropertyName("Index")]
-    public int Index { get; init; }
+    public List<TrackIdentityModel>? SubtitleSelections { get; set; }
 }

@@ -62,7 +62,7 @@ internal static class TrackSelection
                 return [];
             }
 
-            return Find(sources, kind, selection.Path, selection.Index) is { } stream
+            return selection.Track is { } track && Find(sources, kind, track) is { } stream
                 ? [stream]
                 : opening ? Defaults(sources, kind) : [];
         }
@@ -127,7 +127,7 @@ internal static class TrackSelection
         {
             foreach (ViewTrackSelectionModel view in views)
             {
-                if (view.VideoSelection is { Enabled: true } video)
+                if (view.VideoSelection is { Enabled: true, Track: { } video })
                 {
                     paths.Add(video.Path);
                 }
@@ -151,7 +151,7 @@ internal static class TrackSelection
     /// A set of streams: an absent list is no preference, an empty one is "show none", and entries that no longer resolve
     /// are dropped — with the default standing in only when this view opened the media and nothing survived.
     /// </summary>
-    private static IReadOnlyList<MediaStreamInfo> Choose(List<TrackSelectionEntryModel>? entries, bool opening, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
+    private static IReadOnlyList<MediaStreamInfo> Choose(List<TrackIdentityModel>? entries, bool opening, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
     {
         if (entries is null)
         {
@@ -164,9 +164,9 @@ internal static class TrackSelection
         }
 
         List<MediaStreamInfo> chosen = [];
-        foreach (TrackSelectionEntryModel entry in entries)
+        foreach (TrackIdentityModel entry in entries)
         {
-            if (Find(sources, kind, entry.Path, entry.Index) is { } stream)
+            if (Find(sources, kind, entry) is { } stream)
             {
                 chosen.Add(stream);
             }
@@ -243,18 +243,18 @@ internal static class TrackSelection
         return first;
     }
 
-    private static MediaStreamInfo? Find(IReadOnlyList<MediaSource> sources, MediaStreamKind kind, string path, int index)
+    private static MediaStreamInfo? Find(IReadOnlyList<MediaSource> sources, MediaStreamKind kind, TrackIdentityModel track)
     {
         foreach (MediaSource source in sources)
         {
-            if (source.Locator.Value != path)
+            if (source.Locator.Value != track.Path)
             {
                 continue;
             }
 
             foreach (MediaStreamInfo stream in source.Info.Streams)
             {
-                if (stream.Kind == kind && stream.Index == index)
+                if (stream.Kind == kind && stream.Index == track.Index)
                 {
                     return stream;
                 }

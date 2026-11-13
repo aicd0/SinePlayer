@@ -38,8 +38,6 @@ internal sealed record PlaybackComponents(
     public const string LIBASS = "libass";
     private const string WASAPI_PREFIX = "wasapi:";
 
-    public static PlaybackComponents Default { get; } = new(AUTO, AUTO, AUTO, AUTO, AUTO, AUTO, true, true);
-
     public static IReadOnlyList<PlaybackComponentOption> GetVideoDecoderOptions()
     {
         return
@@ -112,24 +110,6 @@ internal sealed record PlaybackComponents(
             new(LIBASS, "libass"),
             new(NONE, StringResourceProvider.Instance.None),
         ];
-    }
-
-    public void Apply(PlaybackPipeline pipeline)
-    {
-        foreach (IVideoChain chain in pipeline.VideoChains)
-        {
-            ApplyVideo(chain);
-        }
-
-        foreach (IAudioChain chain in pipeline.AudioChains)
-        {
-            ApplyAudio(chain);
-        }
-
-        foreach (ISubtitleChain chain in pipeline.SubtitleChains)
-        {
-            ApplySubtitle(chain);
-        }
     }
 
     public void ApplyVideo(IVideoChain chain)

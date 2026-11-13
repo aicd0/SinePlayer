@@ -27,7 +27,7 @@ public class StringResourceProvider
     public string AllMatchedResults => GetResourceString("AllMatchedResults");
     public string AllPages => GetResourceString("AllPages");
     public string AllowMultiTracks => GetResourceString("AllowMultiTracks");
-    public string AllowPerMediaConfiguration => GetResourceString("AllowPerMediaConfiguration");
+    public string AllowVariation => GetResourceString("AllowVariation");
     public string Always => GetResourceString("Always");
     public string AntiAliasingFilter => GetResourceString("AntiAliasingFilter");
     public string AppDescription => GetResourceString("AppDescription");
@@ -154,6 +154,7 @@ public class StringResourceProvider
     public string FunctionSum => GetResourceString("FunctionSum");
     public string General => GetResourceString("General");
     public string GeneralSettingsDescription => GetResourceString("GeneralSettingsDescription");
+    public string Global => GetResourceString("Global");
     public string GoBack => GetResourceString("GoBack");
     public string GoForward => GetResourceString("GoForward");
     public string Group => GetResourceString("Group");
@@ -338,6 +339,7 @@ public class StringResourceProvider
     public string Title2 => GetResourceString("Title2");
     public string ToggleFullscreen => GetResourceString("ToggleFullscreen");
     public string TotalMedia => GetResourceString("TotalMedia");
+    public string Track => GetResourceString("Track");
     public string Transform => GetResourceString("Transform");
     public string TwoPageMode => GetResourceString("TwoPageMode");
     public string Type => GetResourceString("Type");

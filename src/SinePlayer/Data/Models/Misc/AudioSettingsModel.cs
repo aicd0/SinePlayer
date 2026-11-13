@@ -1,42 +1,40 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 using SinePlayer.Common.Playback.Core;
 
 namespace SinePlayer.Data.Models.Misc;
 
-internal sealed class AudioSettingsModel
+internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsModel, AudioSettingsModel.JsonModel>
 {
-    public static AudioSettingsModel FromDefault()
-    {
-        return new();
-    }
-
-    public static AudioSettingsModel FromJsonModel(JsonModel? model, AudioSettingsModel fallback)
-    {
-        if (model is null)
-        {
-            return fallback.Clone();
-        }
-
-        return new()
-        {
-            Decoder = model.Decoder ?? fallback.Decoder,
-            Renderer = model.Renderer ?? fallback.Renderer,
-        };
-    }
-
     public string Decoder { get; set; } = PlaybackComponents.AUTO;
     public string Renderer { get; set; } = PlaybackComponents.AUTO;
 
-    public AudioSettingsModel Clone()
+    protected override Dictionary<string, AudioSettingsModel> LoadPresets()
     {
-        return (AudioSettingsModel)MemberwiseClone();
+        return AppSettingsModel.AudioSettingPresets;
     }
 
-    public JsonModel ToJsonModel()
+    protected override void SavePresets(Dictionary<string, AudioSettingsModel> presets)
+    {
+        AppSettingsModel.AudioSettingPresets = presets;
+    }
+
+    protected override string LoadDefaultPresetKey()
+    {
+        return AppSettingsModel.DefaultAudioSettingPresetKey;
+    }
+
+    protected override void ApplyJsonModel(JsonModel model)
+    {
+        Decoder = model.Decoder ?? Decoder;
+        Renderer = model.Renderer ?? Renderer;
+    }
+
+    protected override JsonModel ToJsonModel()
     {
         return new()
         {

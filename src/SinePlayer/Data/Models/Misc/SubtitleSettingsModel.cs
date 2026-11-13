@@ -2,42 +2,18 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 using SinePlayer.Common.Playback.Core;
+using SinePlayer.Core.Playback.Abstractions.Render;
 
 using Windows.UI.Text;
 
 namespace SinePlayer.Data.Models.Misc;
 
-internal sealed class SubtitleSettingsModel
+internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettingsModel, SubtitleSettingsModel.JsonModel>
 {
-    public static SubtitleSettingsModel FromDefault()
-    {
-        return new();
-    }
-
-    public static SubtitleSettingsModel FromJsonModel(JsonModel? model, SubtitleSettingsModel fallback)
-    {
-        if (model is null)
-        {
-            return fallback.Clone();
-        }
-
-        return new()
-        {
-            Decoder = model.Decoder ?? fallback.Decoder,
-            Renderer = model.Renderer ?? fallback.Renderer,
-            PanX = model.PanX ?? fallback.PanX,
-            PanY = model.PanY ?? fallback.PanY,
-            Family = model.FontFamily ?? fallback.Family,
-            Size = model.FontSize ?? fallback.Size,
-            Style = model.FontStyle ?? fallback.Style,
-            Weight = model.FontWeight ?? fallback.Weight,
-            OutlineWidth = model.OutlineWidth ?? fallback.OutlineWidth,
-        };
-    }
-
     public string Decoder { get; set; } = PlaybackComponents.AUTO;
     public string Renderer { get; set; } = PlaybackComponents.AUTO;
     public int PanX { get; set; }
@@ -48,12 +24,57 @@ internal sealed class SubtitleSettingsModel
     public int Weight { get; set; }
     public double OutlineWidth { get; set; } = 2.0;
 
-    public SubtitleSettingsModel Clone()
+    public SubtitlePresentation ToPresentation()
     {
-        return (SubtitleSettingsModel)MemberwiseClone();
+        return new(
+            PanX,
+            PanY,
+            FontFamily: Family,
+            FontSize: Size,
+            FontStyle: ToFontStyle(),
+            FontWeight: ToFontWeight(),
+            OutlineWidth: OutlineWidth);
     }
 
-    public JsonModel ToJsonModel()
+    public FontStyle ToFontStyle()
+    {
+        return Enum.TryParse(Style, ignoreCase: true, out FontStyle style) && Enum.IsDefined(style) ? style : FontStyle.Normal;
+    }
+
+    public FontWeight ToFontWeight()
+    {
+        return Weight > 0 ? new FontWeight { Weight = (ushort)Weight } : default;
+    }
+
+    protected override Dictionary<string, SubtitleSettingsModel> LoadPresets()
+    {
+        return AppSettingsModel.SubtitleSettingPresets;
+    }
+
+    protected override void SavePresets(Dictionary<string, SubtitleSettingsModel> presets)
+    {
+        AppSettingsModel.SubtitleSettingPresets = presets;
+    }
+
+    protected override string LoadDefaultPresetKey()
+    {
+        return AppSettingsModel.DefaultSubtitleSettingPresetKey;
+    }
+
+    protected override void ApplyJsonModel(JsonModel model)
+    {
+        Decoder = model.Decoder ?? Decoder;
+        Renderer = model.Renderer ?? Renderer;
+        PanX = model.PanX ?? PanX;
+        PanY = model.PanY ?? PanY;
+        Family = model.FontFamily ?? Family;
+        Size = model.FontSize ?? Size;
+        Style = model.FontStyle ?? Style;
+        Weight = model.FontWeight ?? Weight;
+        OutlineWidth = model.OutlineWidth ?? OutlineWidth;
+    }
+
+    protected override JsonModel ToJsonModel()
     {
         return new()
         {
@@ -67,16 +88,6 @@ internal sealed class SubtitleSettingsModel
             FontWeight = Weight,
             OutlineWidth = OutlineWidth,
         };
-    }
-
-    public FontStyle ToFontStyle()
-    {
-        return Enum.TryParse(Style, ignoreCase: true, out FontStyle style) && Enum.IsDefined(style) ? style : FontStyle.Normal;
-    }
-
-    public FontWeight ToFontWeight()
-    {
-        return Weight > 0 ? new FontWeight { Weight = (ushort)Weight } : default;
     }
 
     public class JsonModel

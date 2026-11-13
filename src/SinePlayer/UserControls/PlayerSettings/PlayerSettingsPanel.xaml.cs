@@ -16,12 +16,16 @@ using SinePlayer.Common.Localization;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Playback.Abstractions;
+using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
+using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Win2D;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
+using SinePlayer.Helpers.Misc;
 using SinePlayer.Views.Dialogs.EditPlayerSettingPreset;
 
 using Windows.UI.Text;
@@ -41,7 +45,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private static readonly double[] SubtitleFontSizePresets = [16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 48.0, 56.0, 64.0, 72.0];
 
-    public delegate void DataChangedEventHandler(PlayerSettingsModel data);
+    public delegate void DataChangedEventHandler();
     public event DataChangedEventHandler? DataChanged;
 
     public PlayerSettingsPanelViewModel ViewModel { get; } = new();
@@ -49,14 +53,55 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private IMainWindowAbility? _windowAbility;
     private MediaModel? _media;
-    private PlayerSettingsModel _mediaSettings = PlayerSettingsModel.FromDefault();
+    private PlayerSession? _session;
+    private readonly PlayerSettingsModel _mediaSettings = new();
     private PlayerSettingsModel? _presetSettings;
-    private bool _updatingUI = false;
-    private string? _subtitleFontWeightFamily;
 
     public PlayerSettingsPanel()
     {
         InitializeComponent();
+
+        SettingsCategory video = new()
+        {
+            Get = settings => settings.Video,
+            Set = (settings, value) =>
+            {
+                if (value is VideoSettingsModel videoSettings)
+                {
+                    settings.Video = videoSettings;
+                }
+            },
+        };
+        SettingsCategory audio = new()
+        {
+            Get = settings => settings.Audio,
+            Set = (settings, value) =>
+            {
+                if (value is AudioSettingsModel audioSettings)
+                {
+                    settings.Audio = audioSettings;
+                }
+            },
+        };
+        SettingsCategory subtitle = new()
+        {
+            Get = settings => settings.Subtitle,
+            Set = (settings, value) =>
+            {
+                if (value is SubtitleSettingsModel subtitleSettings)
+                {
+                    settings.Subtitle = subtitleSettings;
+                }
+            },
+        };
+
+        _tabs.Add(_videoTab = new() { Key = "Video", Item = SelectorBarItem1, Content = VideoSettingsGrid, Category = video });
+        _tabs.Add(_audioTab = new() { Key = "Audio", Item = SelectorBarItem2, Content = AudioSettingsGrid, Category = audio });
+        _tabs.Add(_subtitleTab = new() { Key = "Subtitle", Item = SelectorBarItem3, Content = SubtitleSettingsGrid, Category = subtitle });
+        _activeTab = _videoTab;
+
+        Loaded += PlayerSettingsPanel_LoadedOrUnloaded;
+        Unloaded += PlayerSettingsPanel_LoadedOrUnloaded;
 
         string selectedTab = AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).GetValueOrDefault(RegistryNames.StateKey.SELECTED_PLAYER_SETTINGS_TAB, string.Empty);
         SettingsTabSelectorBar.SelectedItem = selectedTab switch
@@ -79,17 +124,19 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         _windowAbility = windowAbility;
     }
 
-    public void SetMedia(MediaModel media)
+    public void SetMedia(MediaModel media, PlayerSession? session)
     {
-        if (_media == media)
-        {
-            return;
-        }
+        AttachSession(session);
 
-        _media = media;
-        LoadSettings();
-        UpdateUI();
-        DispatchDataChangeEvent();
+        if (_media != media)
+        {
+            _media = media;
+            _trackScopes.Clear();
+            RefreshScopeComboBox();
+            LoadSettings();
+            UpdateUI();
+            DispatchDataChangeEvent();
+        }
     }
 
     public void Apply(Action<PlayerSettingsModel> change)
@@ -108,27 +155,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         string[] segments = path.Split(SectionPathSeparator);
-        StackPanel? tabPanel = segments[0] switch
-        {
-            "Video" => VideoSettingsGrid,
-            "Audio" => AudioSettingsGrid,
-            "Subtitle" => SubtitleSettingsGrid,
-            _ => null,
-        };
-
-        SelectorBarItem? tabItem = segments[0] switch
-        {
-            "Video" => SelectorBarItem1,
-            "Audio" => SelectorBarItem2,
-            "Subtitle" => SelectorBarItem3,
-            _ => null,
-        };
-
-        if (tabPanel is null || tabItem is null)
+        SettingsTab? tab = _tabs.Find(candidate => string.Equals(candidate.Key, segments[0], StringComparison.Ordinal));
+        if (tab is null)
         {
             return false;
         }
 
+        StackPanel tabPanel = tab.Content;
         List<PlayerSettingsSection> chain = [];
         IEnumerable<object> container = tabPanel.Children;
         for (int i = 1; i < segments.Length; i++)
@@ -152,7 +185,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             container = found.SectionChildren;
         }
 
-        SettingsTabSelectorBar.SelectedItem = tabItem;
+        SettingsTabSelectorBar.SelectedItem = tab.Item;
 
         if (chain.Count == 0)
         {
@@ -183,6 +216,19 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         ObserveData();
     }
 
+    private void PlayerSettingsPanel_LoadedOrUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (IsLoaded)
+        {
+            AttachSession(_session);
+            RefreshTracks();
+        }
+        else
+        {
+            DetachSessionEvents();
+        }
+    }
+
     private void ObserveData()
     {
         ObserveOptions options = new()
@@ -200,53 +246,70 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     #endregion
 
-    #region Events
+    #region Tab UI
+
+    private readonly List<SettingsTab> _tabs = [];
+    private readonly SettingsTab _videoTab;
+    private readonly SettingsTab _audioTab;
+    private readonly SettingsTab _subtitleTab;
+    private SettingsTab _activeTab;
 
     private void SelectorBar_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
     {
-        string selectedTabKey = string.Empty;
-        SelectorBarItem selectedItem = sender.SelectedItem;
-
-        VideoSettingsGrid.Visibility = Visibility.Collapsed;
-        AudioSettingsGrid.Visibility = Visibility.Collapsed;
-        SubtitleSettingsGrid.Visibility = Visibility.Collapsed;
-
-        if (selectedItem == SelectorBarItem1)
-        {
-            selectedTabKey = "Video";
-            VideoSettingsGrid.Visibility = Visibility.Visible;
-        }
-        else if (selectedItem == SelectorBarItem2)
-        {
-            selectedTabKey = "Audio";
-            AudioSettingsGrid.Visibility = Visibility.Visible;
-        }
-        else if (selectedItem == SelectorBarItem3)
-        {
-            selectedTabKey = "Subtitle";
-            SubtitleSettingsGrid.Visibility = Visibility.Visible;
-        }
-
-        AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).Set(RegistryNames.StateKey.SELECTED_PLAYER_SETTINGS_TAB, selectedTabKey);
-    }
-
-    private async void EditPresetButton_Click(object sender, RoutedEventArgs e)
-    {
-        IMainWindowAbility? windowAbility = _windowAbility;
-        if (_media is null || windowAbility is null)
+        SettingsTab? selectedTab = _tabs.Find(candidate => candidate.Item == sender.SelectedItem);
+        if (selectedTab is null)
         {
             return;
         }
 
+        _activeTab = selectedTab;
+
+        foreach (SettingsTab tab in _tabs)
+        {
+            tab.Content.Visibility = tab == selectedTab ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        AppDB.MainRegistry.CreateKey(RegistryNames.SETTINGS).Set(RegistryNames.StateKey.SELECTED_PLAYER_SETTINGS_TAB, selectedTab.Key);
+
+        if (_media is not null)
+        {
+            RefreshScopeComboBox();
+            UpdateUI();
+        }
+    }
+
+    #endregion
+
+    #region Preset UI
+
+    private async void EditPresetButton_Click(object sender, RoutedEventArgs e)
+    {
+        IMainWindowAbility? windowAbility = _windowAbility;
+        if (_media is not { } media || windowAbility is null)
+        {
+            return;
+        }
+
+        PresetSettingsModel settings = ActiveSettings();
+        string presetKey = settings.PresetKey;
+
         ActionInProgress = true;
         try
         {
-            var dialog = new EditPlayerSettingPresetDialog(_media);
+            var dialog = new EditPlayerSettingPresetDialog(settings);
             await dialog.ShowAsync(windowAbility.WindowId);
         }
         finally
         {
             ActionInProgress = false;
+        }
+
+        if (settings.PresetKey != presetKey)
+        {
+            if (KindOf(_activeTab) is { } kind)
+            {
+                SaveCategory(media, kind, TrackOf(kind), settings);
+            }
         }
 
         LoadSettings();
@@ -256,219 +319,77 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void ResetButton_Click(object sender, RoutedEventArgs e)
     {
-        var newSettings = PlayerSettingsModel.FromDefault();
-        newSettings.PresetKey = _mediaSettings.PresetKey;
-        newSettings.PresetName = _mediaSettings.PresetName;
-        _mediaSettings = newSettings;
+        SettingsCategory category = _activeTab.Category;
+        PresetSettingsModel current = category.Get(_mediaSettings);
+        category.Set(_mediaSettings, KeepPreset(current, current.CreateDefault()));
+
+        if (_media is { } media && KindOf(_activeTab) is { } kind && TrackOf(kind) is null)
+        {
+            // Reset under Global means the media goes back to one set of values for every track.
+            PlayerSettingsStore.ClearTrackRecords(media, kind);
+        }
+
         NotifySettingsChanged();
     }
 
-    private void VideoPreferHardwareDecodingToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    private MenuFlyout CreatePresetContextMenu()
     {
-        if (_updatingUI)
+        List<Tuple<string, string>> presets = [];
+        foreach ((string key, string name) in ActiveSettings().ListPresets())
         {
-            return;
+            presets.Add(new Tuple<string, string>(name, key));
         }
 
-        bool value = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.Video.PreferHardwareDecoding != value)
+        if (presets.Count == 0)
         {
-            Apply(settings => settings.Video.PreferHardwareDecoding = value);
-        }
-    }
-
-    private void VideoPreferHdrToggleSwitch_Toggled(object sender, RoutedEventArgs e)
-    {
-        if (_updatingUI)
-        {
-            return;
+            presets.Add(new Tuple<string, string>(StringResource.Default, PresetSettingsModel.PRESET_KEY_DEFAULT));
         }
 
-        bool value = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.Video.PreferHdr != value)
-        {
-            Apply(settings => settings.Video.PreferHdr = value);
-        }
-    }
+        presets.Sort((a, b) => StringComparer.CurrentCultureIgnoreCase.Compare(a.Item1, b.Item1));
+        presets.Add(new Tuple<string, string>(StringResource.Custom, PresetSettingsModel.PRESET_KEY_CUSTOM));
 
-    private void VideoFlipHorizontalToggleSwitch_Toggled(object sender, RoutedEventArgs e)
-    {
-        if (_updatingUI)
+        List<BaseMenuFlyoutItemModel> items = [];
+        foreach (Tuple<string, string> preset in presets)
         {
-            return;
-        }
-
-        bool value = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.Video.FlipHorizontal != value)
-        {
-            Apply(settings => settings.Video.FlipHorizontal = value);
-        }
-    }
-
-    private void VideoFlipVerticalToggleSwitch_Toggled(object sender, RoutedEventArgs e)
-    {
-        if (_updatingUI)
-        {
-            return;
-        }
-
-        bool value = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.Video.FlipVertical != value)
-        {
-            Apply(settings => settings.Video.FlipVertical = value);
-        }
-    }
-
-    private void SubtitlePanXNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
-    {
-        if (_updatingUI)
-        {
-            return;
-        }
-
-        if (double.IsNaN(sender.Value))
-        {
-            sender.Value = 0;
-            if (_mediaSettings.Subtitle.PanX != 0)
+            string presetKey = preset.Item2;
+            items.Add(new ToggleMenuFlyoutItemModel()
             {
-                Apply(settings => settings.Subtitle.PanX = 0);
-            }
-
-            return;
+                Text = preset.Item1,
+                IsChecked = ActiveSettings().PresetKey == presetKey,
+                Click = () => ApplyPreset(presetKey),
+            });
         }
 
-        int value = (int)Math.Round(sender.Value);
-        if (_mediaSettings.Subtitle.PanX != value)
+        var flyout = new MenuFlyout();
+        foreach (BaseMenuFlyoutItemModel item in items)
         {
-            Apply(settings => settings.Subtitle.PanX = value);
+            flyout.Items.Add(item.CreateMenuFlyoutItem());
         }
+
+        return flyout;
     }
 
-    private void SubtitlePanYNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void ApplyPreset(string presetKey)
     {
-        if (_updatingUI)
+        SettingsCategory category = _activeTab.Category;
+        PresetSettingsModel current = category.Get(_mediaSettings);
+
+        PresetSettingsModel settings;
+        if (presetKey == PresetSettingsModel.PRESET_KEY_CUSTOM)
         {
-            return;
+            current.PresetKey = presetKey;
+            current.PresetName = StringResourceProvider.Instance.Custom;
+            settings = current;
+        }
+        else
+        {
+            settings = current.FindPreset(presetKey) ?? WithPresetKey(current.CreateDefault(), presetKey);
         }
 
-        if (double.IsNaN(sender.Value))
-        {
-            sender.Value = 0;
-            if (_mediaSettings.Subtitle.PanY != 0)
-            {
-                Apply(settings => settings.Subtitle.PanY = 0);
-            }
-
-            return;
-        }
-
-        int value = (int)Math.Round(sender.Value);
-        if (_mediaSettings.Subtitle.PanY != value)
-        {
-            Apply(settings => settings.Subtitle.PanY = value);
-        }
-    }
-
-    private void SubtitleFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_updatingUI)
-        {
-            return;
-        }
-
-        if (sender is not ComboBox comboBox || comboBox.SelectedItem is not ComboBoxItem item || item.Tag is not string family)
-        {
-            return;
-        }
-
-        if (_mediaSettings.Subtitle.Family != family)
-        {
-            Apply(settings => settings.Subtitle.Family = family);
-        }
-    }
-
-    private void SubtitleFontSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_updatingUI)
-        {
-            return;
-        }
-
-        if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem item && item.Tag is double size)
-        {
-            ApplySubtitleFontSize(size);
-        }
-    }
-
-    private void SubtitleFontSizeComboBox_TextSubmitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
-    {
-        if (_updatingUI)
-        {
-            return;
-        }
-
-        ApplySubtitleFontSize(ParseSubtitleFontSize(sender.Text));
-    }
-
-    private void SubtitleFontWeightComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_updatingUI)
-        {
-            return;
-        }
-
-        if (sender is not ComboBox comboBox || comboBox.SelectedItem is not ComboBoxItem item || item.Tag is not int weight)
-        {
-            return;
-        }
-
-        if (_mediaSettings.Subtitle.Weight != weight)
-        {
-            Apply(settings => settings.Subtitle.Weight = weight);
-        }
-    }
-
-    private void SubtitleFontStyleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_updatingUI)
-        {
-            return;
-        }
-
-        if (sender is not ComboBox comboBox || comboBox.SelectedItem is not ComboBoxItem item || item.Tag is not FontStyle style)
-        {
-            return;
-        }
-
-        string value = style.ToString();
-        if (_mediaSettings.Subtitle.Style != value)
-        {
-            Apply(settings => settings.Subtitle.Style = value);
-        }
-    }
-
-    private void SubtitleOutlineSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-    {
-        if (_updatingUI)
-        {
-            return;
-        }
-
-        double value = e.NewValue;
-        if (_mediaSettings.Subtitle.OutlineWidth != value)
-        {
-            Apply(settings => settings.Subtitle.OutlineWidth = value);
-        }
-    }
-
-    private void ApplySubtitleFontSize(double size)
-    {
-        double value = size <= 0.0 ? 0.0 : Math.Clamp(size, MinimumSubtitleFontSize, MaximumSubtitleFontSize);
-        if (_mediaSettings.Subtitle.Size != value)
-        {
-            Apply(settings => settings.Subtitle.Size = value);
-            return;
-        }
+        category.Set(_mediaSettings, settings);
+        SaveSettings();
+        DispatchDataChangeEvent();
+        UpdateUI();
     }
 
     #endregion
@@ -535,34 +456,121 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     #endregion
 
+    #region Track selection UI
+
+    private readonly Dictionary<MediaStreamKind, TrackIdentityModel> _trackScopes = [];
+
+    private MediaStreamKind? KindOf(SettingsTab tab)
+    {
+        if (tab == _videoTab)
+        {
+            return MediaStreamKind.Video;
+        }
+
+        if (tab == _audioTab)
+        {
+            return MediaStreamKind.Audio;
+        }
+
+        if (tab == _subtitleTab)
+        {
+            return MediaStreamKind.Subtitle;
+        }
+
+        // Other tabs are not configured per media stream.
+        return null;
+    }
+
+    private TrackIdentityModel? TrackOf(MediaStreamKind kind)
+    {
+        return _trackScopes.TryGetValue(kind, out TrackIdentityModel? track) ? track : null;
+    }
+
+    private void SetTrack(MediaStreamKind kind, TrackIdentityModel? track)
+    {
+        if (track is null)
+        {
+            _trackScopes.Remove(kind);
+        }
+        else
+        {
+            _trackScopes[kind] = track;
+        }
+    }
+
+    private void RefreshScopeComboBox()
+    {
+        _updatingUI = true;
+        try
+        {
+            TrackScopeComboBox.Items.Clear();
+            if (KindOf(_activeTab) is not { } kind)
+            {
+                return;
+            }
+
+            TrackIdentityModel? selected = TrackOf(kind);
+            bool exists = selected is null;
+
+            TrackScopeComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.Global, Tag = null });
+
+            foreach ((MediaSource source, MediaStreamInfo stream) in _session?.SelectedTracks(kind) ?? [])
+            {
+                var track = TrackIdentityModel.From(stream, source.Locator.Value);
+                TrackScopeComboBox.Items.Add(new ComboBoxItem { Content = MediaStreamLabel.Describe(stream, source), Tag = track });
+                exists = exists || track.Equals(selected);
+            }
+
+            if (!exists)
+            {
+                // The track is gone, so this kind goes back to configuring every track.
+                SetTrack(kind, null);
+                selected = null;
+            }
+
+            TrackScopeComboBox.SelectedIndex = IndexOfScope(selected);
+        }
+        finally
+        {
+            _updatingUI = false;
+        }
+    }
+
+    private int IndexOfScope(TrackIdentityModel? track)
+    {
+        for (int i = 0; i < TrackScopeComboBox.Items.Count; i++)
+        {
+            if (TrackScopeComboBox.Items[i] is ComboBoxItem item && Equals(item.Tag, track))
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    private void ScopeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (sender is not ComboBox comboBox || KindOf(_activeTab) is not { } kind)
+        {
+            return;
+        }
+
+        SetTrack(kind, (comboBox.SelectedItem as ComboBoxItem)?.Tag as TrackIdentityModel);
+        LoadSettings();
+        UpdateUI();
+    }
+
+    #endregion
+
     #region Settings UI
 
-    private void LoadSettings()
-    {
-        if (_media is null)
-        {
-            return;
-        }
-
-        _mediaSettings = PlayerSettingsModel.LoadFromMedia(_media);
-        _presetSettings = PlayerSettingsModel.LoadFromPreset(_mediaSettings.PresetKey);
-    }
-
-    private void NotifySettingsChanged()
-    {
-        ViewModel.SettingsChangedLiveData.Emit(true);
-    }
-
-    private void SaveSettings()
-    {
-        if (_updatingUI || _media is null)
-        {
-            return;
-        }
-
-        _mediaSettings.SaveToMedia(_media);
-        _presetSettings = PlayerSettingsModel.LoadFromPreset(_mediaSettings.PresetKey);
-    }
+    private bool _updatingUI = false;
 
     private void UpdateUI()
     {
@@ -591,8 +599,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         PlayerSettingsModel settings = _mediaSettings;
         PlayerSettingsModel presetSettings = _presetSettings ?? settings;
-
-        bool settingsModified = false;
 
         {
             bool tabModified = false;
@@ -660,7 +666,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 ViewModel.VideoFlipVerticalLabel = GetLabel(StringResource.FlipVertically, modified);
             }
 
-            settingsModified = settingsModified || tabModified;
+            _videoTab.Category.IsModified = tabModified;
             ViewModel.VideoTabTitle = GetLabel(StringResource.Video, tabModified);
         }
 
@@ -681,7 +687,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 ViewModel.AudioRendererLabel = GetLabel(StringResource.Renderer, modified);
             }
 
-            settingsModified = settingsModified || tabModified;
+            _audioTab.Category.IsModified = tabModified;
             ViewModel.AudioTabTitle = GetLabel(StringResource.Audio, tabModified);
         }
 
@@ -751,15 +757,18 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 ViewModel.SubtitlePanYLabel = GetLabel(StringResource.PanY, modified);
             }
 
-            settingsModified = settingsModified || tabModified;
+            _subtitleTab.Category.IsModified = tabModified;
             ViewModel.SubtitleTabTitle = GetLabel(StringResource.Subtitle, tabModified);
         }
 
-        PresetDropDownButton.Flyout = CreatePresetContextMenu(_mediaSettings);
+        SettingsCategory activeCategory = _activeTab.Category;
+        PresetSettingsModel activeSettings = activeCategory.Get(_mediaSettings);
+
+        PresetDropDownButton.Flyout = CreatePresetContextMenu();
         PresetDropDownButton.Content = GetLabel(
-            _mediaSettings.PresetKey == PlayerSettingsModel.PRESET_KEY_CUSTOM ?
-                StringResourceProvider.Instance.Custom : _mediaSettings.PresetName,
-            settingsModified);
+            activeSettings.PresetKey == PresetSettingsModel.PRESET_KEY_CUSTOM ?
+                StringResourceProvider.Instance.Custom : activeSettings.PresetName,
+            activeCategory.IsModified);
     }
 
     private void UpdateVideoDecoder(PlayerSettingsModel settings)
@@ -790,9 +799,37 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         VideoRendererDropDownButton.Content = choice.Label;
     }
 
+    private void VideoPreferHardwareDecodingToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool value = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.Video.PreferHardwareDecoding != value)
+        {
+            Apply(settings => settings.Video.PreferHardwareDecoding = value);
+        }
+    }
+
     private void UpdateVideoPreferHardwareDecoding(PlayerSettingsModel settings)
     {
         VideoPreferHardwareDecodingToggleSwitch.IsOn = settings.Video.PreferHardwareDecoding;
+    }
+
+    private void VideoPreferHdrToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool value = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.Video.PreferHdr != value)
+        {
+            Apply(settings => settings.Video.PreferHdr = value);
+        }
     }
 
     private void UpdateVideoPreferHdr(PlayerSettingsModel settings)
@@ -845,9 +882,37 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         VideoRotationDropDownButton.Content = choice.Label;
     }
 
+    private void VideoFlipHorizontalToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool value = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.Video.FlipHorizontal != value)
+        {
+            Apply(settings => settings.Video.FlipHorizontal = value);
+        }
+    }
+
     private void UpdateVideoFlipHorizontal(PlayerSettingsModel settings)
     {
         VideoFlipHorizontalToggleSwitch.IsOn = settings.Video.FlipHorizontal;
+    }
+
+    private void VideoFlipVerticalToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool value = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.Video.FlipVertical != value)
+        {
+            Apply(settings => settings.Video.FlipVertical = value);
+        }
     }
 
     private void UpdateVideoFlipVertical(PlayerSettingsModel settings)
@@ -911,6 +976,31 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         SubtitleRendererDropDownButton.Content = choice.Label;
     }
 
+    private void SubtitlePanXNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (double.IsNaN(sender.Value))
+        {
+            sender.Value = 0;
+            if (_mediaSettings.Subtitle.PanX != 0)
+            {
+                Apply(settings => settings.Subtitle.PanX = 0);
+            }
+
+            return;
+        }
+
+        int value = (int)Math.Round(sender.Value);
+        if (_mediaSettings.Subtitle.PanX != value)
+        {
+            Apply(settings => settings.Subtitle.PanX = value);
+        }
+    }
+
     private void UpdateSubtitlePanX(PlayerSettingsModel settings)
     {
         double value = settings.Subtitle.PanX;
@@ -921,6 +1011,31 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
+    private void SubtitlePanYNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (double.IsNaN(sender.Value))
+        {
+            sender.Value = 0;
+            if (_mediaSettings.Subtitle.PanY != 0)
+            {
+                Apply(settings => settings.Subtitle.PanY = 0);
+            }
+
+            return;
+        }
+
+        int value = (int)Math.Round(sender.Value);
+        if (_mediaSettings.Subtitle.PanY != value)
+        {
+            Apply(settings => settings.Subtitle.PanY = value);
+        }
+    }
+
     private void UpdateSubtitlePanY(PlayerSettingsModel settings)
     {
         double value = settings.Subtitle.PanY;
@@ -928,6 +1043,24 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.5)
         {
             SubtitlePanYNumberBox.Value = value;
+        }
+    }
+
+    private void SubtitleFontFamilyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (sender is not ComboBox comboBox || comboBox.SelectedItem is not ComboBoxItem item || item.Tag is not string family)
+        {
+            return;
+        }
+
+        if (_mediaSettings.Subtitle.Family != family)
+        {
+            Apply(settings => settings.Subtitle.Family = family);
         }
     }
 
@@ -964,6 +1097,39 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (SubtitleFontFamilyComboBox.SelectedIndex != index)
         {
             SubtitleFontFamilyComboBox.SelectedIndex = index;
+        }
+    }
+
+    private void SubtitleFontSizeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem item && item.Tag is double size)
+        {
+            ApplySubtitleFontSize(size);
+        }
+    }
+
+    private void SubtitleFontSizeComboBox_TextSubmitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        ApplySubtitleFontSize(ParseSubtitleFontSize(sender.Text));
+    }
+
+    private void ApplySubtitleFontSize(double size)
+    {
+        double value = size <= 0.0 ? 0.0 : Math.Clamp(size, MinimumSubtitleFontSize, MaximumSubtitleFontSize);
+        if (_mediaSettings.Subtitle.Size != value)
+        {
+            Apply(settings => settings.Subtitle.Size = value);
+            return;
         }
     }
 
@@ -1013,32 +1179,25 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void UpdateSubtitleFontStyle(PlayerSettingsModel settings)
+    private void SubtitleFontWeightComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (SubtitleFontStyleComboBox.Items.Count == 0)
+        if (_updatingUI)
         {
-            foreach (FontStyle style in Enum.GetValues<FontStyle>())
-            {
-                SubtitleFontStyleComboBox.Items.Add(new ComboBoxItem { Content = FormatSubtitleFontStyle(style), Tag = style });
-            }
+            return;
         }
 
-        var value = settings.Subtitle.ToFontStyle();
-        int index = 0;
-        for (int i = 0; i < SubtitleFontStyleComboBox.Items.Count; i++)
+        if (sender is not ComboBox comboBox || comboBox.SelectedItem is not ComboBoxItem item || item.Tag is not int weight)
         {
-            if (SubtitleFontStyleComboBox.Items[i] is ComboBoxItem item && item.Tag is FontStyle candidate && candidate == value)
-            {
-                index = i;
-                break;
-            }
+            return;
         }
 
-        if (SubtitleFontStyleComboBox.SelectedIndex != index)
+        if (_mediaSettings.Subtitle.Weight != weight)
         {
-            SubtitleFontStyleComboBox.SelectedIndex = index;
+            Apply(settings => settings.Subtitle.Weight = weight);
         }
     }
+
+    private string? _subtitleFontWeightFamily;
 
     private void UpdateSubtitleFontWeight(PlayerSettingsModel settings)
     {
@@ -1087,6 +1246,66 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
+    private void SubtitleFontStyleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (sender is not ComboBox comboBox || comboBox.SelectedItem is not ComboBoxItem item || item.Tag is not FontStyle style)
+        {
+            return;
+        }
+
+        string value = style.ToString();
+        if (_mediaSettings.Subtitle.Style != value)
+        {
+            Apply(settings => settings.Subtitle.Style = value);
+        }
+    }
+
+    private void UpdateSubtitleFontStyle(PlayerSettingsModel settings)
+    {
+        if (SubtitleFontStyleComboBox.Items.Count == 0)
+        {
+            foreach (FontStyle style in Enum.GetValues<FontStyle>())
+            {
+                SubtitleFontStyleComboBox.Items.Add(new ComboBoxItem { Content = FormatSubtitleFontStyle(style), Tag = style });
+            }
+        }
+
+        var value = settings.Subtitle.ToFontStyle();
+        int index = 0;
+        for (int i = 0; i < SubtitleFontStyleComboBox.Items.Count; i++)
+        {
+            if (SubtitleFontStyleComboBox.Items[i] is ComboBoxItem item && item.Tag is FontStyle candidate && candidate == value)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (SubtitleFontStyleComboBox.SelectedIndex != index)
+        {
+            SubtitleFontStyleComboBox.SelectedIndex = index;
+        }
+    }
+
+    private void SubtitleOutlineSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = e.NewValue;
+        if (_mediaSettings.Subtitle.OutlineWidth != value)
+        {
+            Apply(settings => settings.Subtitle.OutlineWidth = value);
+        }
+    }
+
     private void UpdateSubtitleOutline(PlayerSettingsModel settings)
     {
         double value = settings.Subtitle.OutlineWidth;
@@ -1096,7 +1315,185 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private MenuFlyout CreateChoiceMenu(IReadOnlyList<PlaybackComponentOption> options, string? selectedKey, Action<string> select)
+    #endregion
+
+    #region Settings
+
+    private void LoadSettings()
+    {
+        if (_media is not { } media)
+        {
+            return;
+        }
+
+        foreach (SettingsTab tab in _tabs)
+        {
+            SettingsCategory category = tab.Category;
+            PresetSettingsModel current = category.Get(_mediaSettings);
+            string? record = KindOf(tab) is { } kind ? PlayerSettingsStore.GetRecord(media, kind, TrackOf(kind)) : null;
+            category.Set(_mediaSettings, current.ResolveRecord(record));
+        }
+
+        _presetSettings = LoadPresetSettings(_mediaSettings);
+    }
+
+    private PlayerSettingsModel LoadPresetSettings(PlayerSettingsModel settings)
+    {
+        PlayerSettingsModel presets = new();
+        foreach (SettingsTab tab in _tabs)
+        {
+            SettingsCategory category = tab.Category;
+            PresetSettingsModel current = category.Get(settings);
+            category.Set(presets, current.FindPreset(current.PresetKey) ?? current);
+        }
+
+        return presets;
+    }
+
+    private void SaveSettings()
+    {
+        if (_updatingUI || _media is not { } media)
+        {
+            return;
+        }
+
+        foreach (SettingsTab tab in _tabs)
+        {
+            if (KindOf(tab) is not { } kind)
+            {
+                continue;
+            }
+
+            SaveCategory(media, kind, TrackOf(kind), tab.Category.Get(_mediaSettings));
+        }
+
+        _presetSettings = LoadPresetSettings(_mediaSettings);
+    }
+
+    private static void SaveCategory(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track, PresetSettingsModel settings)
+    {
+        string record = settings.ToRecordJson();
+        if (track is not null)
+        {
+            PlayerSettingsStore.SetTrackRecord(media, kind, track, record);
+            return;
+        }
+
+        if (PlayerSettingsStore.GetGlobalRecord(media, kind) == record)
+        {
+            return;
+        }
+
+        PlayerSettingsStore.SetGlobalRecord(media, kind, record);
+        PlayerSettingsStore.ClearTrackRecords(media, kind);
+    }
+
+    private void NotifySettingsChanged()
+    {
+        ViewModel.SettingsChangedLiveData.Emit(true);
+    }
+
+    #endregion
+
+    #region Session
+
+    private void AttachSession(PlayerSession? session)
+    {
+        if (_session != session)
+        {
+            DetachSessionEvents();
+            _session = session;
+        }
+
+        if (session is null)
+        {
+            return;
+        }
+
+        session.TrackSelectionChanged -= Session_TrackSelectionChanged;
+        session.TrackSelectionChanged += Session_TrackSelectionChanged;
+    }
+
+    private void DetachSessionEvents()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _session.TrackSelectionChanged -= Session_TrackSelectionChanged;
+    }
+
+    private void Session_TrackSelectionChanged()
+    {
+        CoroutineUtils.RunInMainThread(RefreshTracks);
+    }
+
+    private void RefreshTracks()
+    {
+        if (_media is null || !IsLoaded)
+        {
+            return;
+        }
+
+        RefreshScopeComboBox();
+        LoadSettings();
+        UpdateUI();
+    }
+
+    #endregion
+
+    #region Misc
+
+    private PresetSettingsModel ActiveSettings()
+    {
+        return _activeTab.Category.Get(_mediaSettings);
+    }
+
+    private static PresetSettingsModel WithPresetKey(PresetSettingsModel settings, string presetKey)
+    {
+        settings.PresetKey = presetKey;
+        return settings;
+    }
+
+    private static PresetSettingsModel KeepPreset(PresetSettingsModel current, PresetSettingsModel defaults)
+    {
+        defaults.PresetKey = current.PresetKey;
+        defaults.PresetName = current.PresetName;
+        defaults.AllowVariation = current.AllowVariation;
+        return defaults;
+    }
+
+    private void DispatchDataChangeEvent()
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        DataChanged?.Invoke();
+    }
+
+    private sealed class SettingsCategory
+    {
+        public required Func<PlayerSettingsModel, PresetSettingsModel> Get { get; init; }
+        public required Action<PlayerSettingsModel, PresetSettingsModel> Set { get; init; }
+        public bool IsModified { get; set; }
+    }
+
+    private sealed class SettingsTab
+    {
+        public required string Key { get; init; }
+        public required SelectorBarItem Item { get; init; }
+        public required StackPanel Content { get; init; }
+        public required SettingsCategory Category { get; init; }
+    }
+
+    #endregion
+
+    #region Utilities
+
+    private static MenuFlyout CreateChoiceMenu(IReadOnlyList<PlaybackComponentOption> options, string? selectedKey, Action<string> select)
     {
         var flyout = new MenuFlyout();
         foreach (BaseMenuFlyoutItemModel item in PlayerMenuCreator.CreateChoiceItems(options, selectedKey, select))
@@ -1106,87 +1503,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         return flyout;
     }
-
-    private MenuFlyout CreatePresetContextMenu(PlayerSettingsModel mediaSettings)
-    {
-        List<Tuple<string, string>> presets = [];
-        foreach (KeyValuePair<string, PlayerSettingsModel> kvp in AppSettingsModel.PlayerSettingPresets)
-        {
-            presets.Add(new Tuple<string, string>(kvp.Value.PresetName, kvp.Key));
-        }
-
-        if (presets.Count == 0)
-        {
-            presets.Add(new Tuple<string, string>(StringResource.Default, PlayerSettingsModel.PRESET_KEY_DEFAULT));
-        }
-
-        presets.Sort((a, b) => StringComparer.CurrentCultureIgnoreCase.Compare(a.Item1, b.Item1));
-        presets.Add(new Tuple<string, string>(StringResource.Custom, PlayerSettingsModel.PRESET_KEY_CUSTOM));
-
-        List<BaseMenuFlyoutItemModel> items = [];
-        foreach (Tuple<string, string> preset in presets)
-        {
-            string presetKey = preset.Item2;
-            items.Add(new ToggleMenuFlyoutItemModel()
-            {
-                Text = preset.Item1,
-                IsChecked = mediaSettings.PresetKey == presetKey,
-                Click = () =>
-                {
-                    var newSettings = PlayerSettingsModel.LoadFromPreset(presetKey);
-                    if (newSettings is not null)
-                    {
-                        _presetSettings = newSettings;
-                        _mediaSettings = newSettings.Clone();
-                        SaveSettings();
-                        DispatchDataChangeEvent();
-                    }
-                    else if (presetKey == PlayerSettingsModel.PRESET_KEY_CUSTOM)
-                    {
-                        _presetSettings = null;
-                        _mediaSettings.PresetKey = presetKey;
-                        SaveSettings();
-                    }
-                    else
-                    {
-                        newSettings = PlayerSettingsModel.FromDefault();
-                        _presetSettings = newSettings;
-                        _mediaSettings = newSettings.Clone();
-                        SaveSettings();
-                        DispatchDataChangeEvent();
-                    }
-
-                    UpdateUI();
-                },
-            });
-        }
-
-        var flyout = new MenuFlyout();
-        foreach (BaseMenuFlyoutItemModel item in items)
-        {
-            flyout.Items.Add(item.CreateMenuFlyoutItem());
-        }
-
-        return flyout;
-    }
-
-    #endregion
-
-    #region Misc
-
-    private void DispatchDataChangeEvent()
-    {
-        if (_updatingUI)
-        {
-            return;
-        }
-
-        DataChanged?.Invoke(_mediaSettings);
-    }
-
-    #endregion
-
-    #region Utilities
 
     private string FormatSubtitleFontSize(double size)
     {

@@ -8,8 +8,8 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Localization;
+using SinePlayer.Common.Playback.Core;
 using SinePlayer.Data.Models.Media;
-using SinePlayer.Data.Models.Misc;
 using SinePlayer.UserControls.PlayerSettings;
 
 namespace SinePlayer.Views.Pages.Player;
@@ -25,7 +25,7 @@ internal sealed partial class PlayerNavigationBar : BaseUserControl
     public delegate void PlaybackInfoRequestedEventHandler();
     public event PlaybackInfoRequestedEventHandler? PlaybackInfoRequested;
 
-    public delegate void PlayerSettingsChangedEventHandler(PlayerSettingsModel settings);
+    public delegate void PlayerSettingsChangedEventHandler();
     public event PlayerSettingsChangedEventHandler? PlayerSettingsChanged;
 
     private IMainWindowAbility? _windowAbility;
@@ -56,9 +56,9 @@ internal sealed partial class PlayerNavigationBar : BaseUserControl
         FavoriteChanged?.Invoke(isFavorite);
     }
 
-    public void SetPlayerSettings(MediaModel media)
+    public void SetPlayerSettings(MediaModel media, PlayerSession? session)
     {
-        MainPlayerSettingPanel.SetMedia(media);
+        MainPlayerSettingPanel.SetMedia(media, session);
     }
 
     private void OnAddToFavoritesClick(object sender, RoutedEventArgs e)
@@ -111,8 +111,8 @@ internal sealed partial class PlayerNavigationBar : BaseUserControl
         }
     }
 
-    private void MainPlayerSettingPanel_DataChanged(PlayerSettingsModel model)
+    private void MainPlayerSettingPanel_DataChanged()
     {
-        PlayerSettingsChanged?.Invoke(model);
+        PlayerSettingsChanged?.Invoke();
     }
 }

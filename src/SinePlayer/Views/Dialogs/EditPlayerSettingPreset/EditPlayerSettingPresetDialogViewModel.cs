@@ -4,9 +4,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 
 using SinePlayer.Common.Localization;
-using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 
 namespace SinePlayer.Views.Dialogs.EditPlayerSettingPreset;
@@ -48,14 +48,14 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
         }
     }
 
-    private bool _allowPerMediaConfiguration = true;
-    public bool AllowPerMediaConfiguration
+    private bool _allowVariation = true;
+    public bool AllowVariation
     {
-        get => _allowPerMediaConfiguration;
+        get => _allowVariation;
         set
         {
-            _allowPerMediaConfiguration = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AllowPerMediaConfiguration)));
+            _allowVariation = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AllowVariation)));
         }
     }
 
@@ -92,61 +92,44 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
         }
     }
 
-    private MediaModel? _media = null;
-    private PlayerSettingsModel _presetModel = PlayerSettingsModel.FromDefault();
+    private PresetSettingsModel _presetModel = VideoSettingsModel.FromDefault();
 
-    public void Initialize(MediaModel media)
+    public void Initialize(PresetSettingsModel settings)
     {
-        _media = media;
-        _presetModel = PlayerSettingsModel.LoadFromMedia(media);
+        _presetModel = settings;
 
         Title = StringResourceProvider.Instance.EditPreset;
         Name = _presetModel.PresetName;
-        SetAsDefault = _presetModel.PresetKey == AppSettingsModel.DefaultPlayerSettingPresetKey;
-        AllowPerMediaConfiguration = _presetModel.AllowPerMediaConfiguration;
+        SetAsDefault = _presetModel.PresetKey == LoadDefaultPresetKey(_presetModel);
+        AllowVariation = _presetModel.AllowVariation;
         UpdateUI();
     }
 
     public void Delete()
     {
-        if (_presetModel.PresetKey == PlayerSettingsModel.PRESET_KEY_CUSTOM)
+        if (_presetModel.PresetKey == PresetSettingsModel.PRESET_KEY_CUSTOM)
         {
             return;
         }
 
-        Dictionary<string, PlayerSettingsModel> presets = AppSettingsModel.PlayerSettingPresets;
-        presets.Remove(_presetModel.PresetKey);
-        AppSettingsModel.PlayerSettingPresets = presets;
-
-        if (_media is not null)
-        {
-            _media.SetExt(MediaExt.PLAYER_SETTING_PRESET_KEY, null);
-            _media.SetExt(MediaExt.CUSTOM_PLAYER_SETTINGS, null);
-        }
+        RemovePreset(_presetModel);
     }
 
     public void Save()
     {
         string name = _name.Trim();
-        if (string.IsNullOrEmpty(name) || _presetModel.PresetKey == PlayerSettingsModel.PRESET_KEY_CUSTOM)
+        if (string.IsNullOrEmpty(name) || _presetModel.PresetKey == PresetSettingsModel.PRESET_KEY_CUSTOM)
         {
             return;
         }
 
         _presetModel.PresetName = name;
-        _presetModel.AllowPerMediaConfiguration = _allowPerMediaConfiguration;
-        Dictionary<string, PlayerSettingsModel> presets = AppSettingsModel.PlayerSettingPresets;
-        presets[_presetModel.PresetKey] = _presetModel;
-        AppSettingsModel.PlayerSettingPresets = presets;
+        _presetModel.AllowVariation = _allowVariation;
+        SavePreset(_presetModel);
 
         if (_setAsDefault)
         {
-            AppSettingsModel.DefaultPlayerSettingPresetKey = _presetModel.PresetKey;
-        }
-
-        if (_media is not null)
-        {
-            _presetModel.SaveToMedia(_media);
+            SaveDefaultPresetKey(_presetModel);
         }
     }
 
@@ -160,19 +143,12 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
 
         _presetModel.PresetKey = Guid.NewGuid().ToString();
         _presetModel.PresetName = name;
-        _presetModel.AllowPerMediaConfiguration = _allowPerMediaConfiguration;
-        Dictionary<string, PlayerSettingsModel> presets = AppSettingsModel.PlayerSettingPresets;
-        presets[_presetModel.PresetKey] = _presetModel;
-        AppSettingsModel.PlayerSettingPresets = presets;
+        _presetModel.AllowVariation = _allowVariation;
+        SavePreset(_presetModel);
 
         if (_setAsDefault)
         {
-            AppSettingsModel.DefaultPlayerSettingPresetKey = _presetModel.PresetKey;
-        }
-
-        if (_media is not null)
-        {
-            _presetModel.SaveToMedia(_media);
+            SaveDefaultPresetKey(_presetModel);
         }
     }
 
@@ -187,28 +163,115 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
         _setAsDefault = isDefault;
     }
 
-    public void UpdateAllowPerMediaConfiguration(bool allow)
+    public void UpdateAllowVariation(bool allow)
     {
-        _allowPerMediaConfiguration = allow;
+        _allowVariation = allow;
     }
 
     private void UpdateUI()
     {
         string name = _name.Trim();
-        bool isCustomPreset = _presetModel.PresetKey == PlayerSettingsModel.PRESET_KEY_CUSTOM;
+        bool isCustomPreset = _presetModel.PresetKey == PresetSettingsModel.PRESET_KEY_CUSTOM;
         bool isNameValid = !string.IsNullOrEmpty(name);
-        bool isNameExisting = false;
-        foreach (PlayerSettingsModel preset in AppSettingsModel.PlayerSettingPresets.Values)
-        {
-            if (preset.PresetName == name)
-            {
-                isNameExisting = true;
-                break;
-            }
-        }
 
         SaveEnabled = !isCustomPreset && isNameValid;
-        SaveAsNewEnabled = isNameValid && !isNameExisting;
+        SaveAsNewEnabled = isNameValid && !IsNameExisting(name);
         DeleteEnabled = !isCustomPreset;
     }
+
+    #region Preset store
+
+    /// <summary>
+    /// The store a preset belongs to is decided by the kind of settings it is, not by where it was selected.
+    /// </summary>
+    private static void SavePreset(PresetSettingsModel preset)
+    {
+        switch (preset)
+        {
+            case VideoSettingsModel video:
+                Dictionary<string, VideoSettingsModel> videos = AppSettingsModel.VideoSettingPresets;
+                videos[video.PresetKey] = video;
+                AppSettingsModel.VideoSettingPresets = videos;
+                break;
+            case AudioSettingsModel audio:
+                Dictionary<string, AudioSettingsModel> audios = AppSettingsModel.AudioSettingPresets;
+                audios[audio.PresetKey] = audio;
+                AppSettingsModel.AudioSettingPresets = audios;
+                break;
+            case SubtitleSettingsModel subtitle:
+                Dictionary<string, SubtitleSettingsModel> subtitles = AppSettingsModel.SubtitleSettingPresets;
+                subtitles[subtitle.PresetKey] = subtitle;
+                AppSettingsModel.SubtitleSettingPresets = subtitles;
+                break;
+        }
+    }
+
+    private static void RemovePreset(PresetSettingsModel preset)
+    {
+        switch (preset)
+        {
+            case VideoSettingsModel video:
+                Dictionary<string, VideoSettingsModel> videos = AppSettingsModel.VideoSettingPresets;
+                if (videos.Remove(video.PresetKey))
+                {
+                    AppSettingsModel.VideoSettingPresets = videos;
+                }
+
+                break;
+            case AudioSettingsModel audio:
+                Dictionary<string, AudioSettingsModel> audios = AppSettingsModel.AudioSettingPresets;
+                if (audios.Remove(audio.PresetKey))
+                {
+                    AppSettingsModel.AudioSettingPresets = audios;
+                }
+
+                break;
+            case SubtitleSettingsModel subtitle:
+                Dictionary<string, SubtitleSettingsModel> subtitles = AppSettingsModel.SubtitleSettingPresets;
+                if (subtitles.Remove(subtitle.PresetKey))
+                {
+                    AppSettingsModel.SubtitleSettingPresets = subtitles;
+                }
+
+                break;
+        }
+    }
+
+    private static string LoadDefaultPresetKey(PresetSettingsModel preset)
+    {
+        return preset switch
+        {
+            AudioSettingsModel => AppSettingsModel.DefaultAudioSettingPresetKey,
+            SubtitleSettingsModel => AppSettingsModel.DefaultSubtitleSettingPresetKey,
+            _ => AppSettingsModel.DefaultVideoSettingPresetKey,
+        };
+    }
+
+    private static void SaveDefaultPresetKey(PresetSettingsModel preset)
+    {
+        switch (preset)
+        {
+            case AudioSettingsModel:
+                AppSettingsModel.DefaultAudioSettingPresetKey = preset.PresetKey;
+                break;
+            case SubtitleSettingsModel:
+                AppSettingsModel.DefaultSubtitleSettingPresetKey = preset.PresetKey;
+                break;
+            default:
+                AppSettingsModel.DefaultVideoSettingPresetKey = preset.PresetKey;
+                break;
+        }
+    }
+
+    private bool IsNameExisting(string name)
+    {
+        return _presetModel switch
+        {
+            AudioSettingsModel => AppSettingsModel.AudioSettingPresets.Values.Any(preset => preset.PresetName == name),
+            SubtitleSettingsModel => AppSettingsModel.SubtitleSettingPresets.Values.Any(preset => preset.PresetName == name),
+            _ => AppSettingsModel.VideoSettingPresets.Values.Any(preset => preset.PresetName == name),
+        };
+    }
+
+    #endregion
 }

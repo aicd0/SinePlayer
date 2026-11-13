@@ -168,8 +168,8 @@
   <data name="AllowMultiTracks" xml:space="preserve">
     <value>Autoriser plusieurs pistes</value>
   </data>
-  <data name="AllowPerMediaConfiguration" xml:space="preserve">
-    <value>Autoriser la configuration par média</value>
+  <data name="AllowVariation" xml:space="preserve">
+    <value>Autoriser une variation</value>
   </data>
   <data name="Always" xml:space="preserve">
     <value>Toujours</value>
@@ -617,6 +617,9 @@ L'évaluation s'effectuera dans l'ordre suivant :
   </data>
   <data name="GeneralSettingsDescription" xml:space="preserve">
     <value>Modifier le comportement par défaut de l’application</value>
+  </data>
+  <data name="Global" xml:space="preserve">
+    <value>Global</value>
   </data>
   <data name="GoBack" xml:space="preserve">
     <value>Retour</value>
@@ -1248,6 +1251,9 @@ Catégorie 2 : Étiquette 4, Étiquette 5</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>Nombre total de médias</value>
+  </data>
+  <data name="Track" xml:space="preserve">
+    <value>Piste</value>
   </data>
   <data name="Transform" xml:space="preserve">
     <value>Transformation</value>

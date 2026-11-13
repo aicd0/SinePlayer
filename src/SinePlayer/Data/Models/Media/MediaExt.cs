@@ -9,9 +9,8 @@ internal static class MediaExt
 {
     public const string BACKGROUND_IMAGE = "BackgroundImage";
     public const string COVER_IMAGE = "CoverImage";
-    public const string CUSTOM_PLAYER_SETTINGS = "CustomPlayerSettings";
     public const string LINKS = "Links";
-    public const string PLAYER_SETTING_PRESET_KEY = "PlayerSettingPresetKey";
+    public const string PLAYER_SETTINGS = "PlayerSettings";
     public const string RESOURCE_UUID = "ResourceUuid";
     public const string TRACK_SELECTION = "TrackSelection";
 

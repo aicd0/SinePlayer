@@ -168,8 +168,8 @@
   <data name="AllowMultiTracks" xml:space="preserve">
     <value>Mehrere Spuren zulassen</value>
   </data>
-  <data name="AllowPerMediaConfiguration" xml:space="preserve">
-    <value>Konfiguration pro Medium zulassen</value>
+  <data name="AllowVariation" xml:space="preserve">
+    <value>Abweichung zulassen</value>
   </data>
   <data name="Always" xml:space="preserve">
     <value>Immer</value>
@@ -617,6 +617,9 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   </data>
   <data name="GeneralSettingsDescription" xml:space="preserve">
     <value>Standardverhalten der App ändern</value>
+  </data>
+  <data name="Global" xml:space="preserve">
+    <value>Global</value>
   </data>
   <data name="GoBack" xml:space="preserve">
     <value>Geh zurück</value>
@@ -1248,6 +1251,9 @@ Kategorie 2: Tag 4, Tag 5</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>Medien insgesamt</value>
+  </data>
+  <data name="Track" xml:space="preserve">
+    <value>Spur</value>
   </data>
   <data name="Transform" xml:space="preserve">
     <value>Transformation</value>

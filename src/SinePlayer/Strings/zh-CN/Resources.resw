@@ -168,8 +168,8 @@
   <data name="AllowMultiTracks" xml:space="preserve">
     <value>允许多轨道</value>
   </data>
-  <data name="AllowPerMediaConfiguration" xml:space="preserve">
-    <value>允许单媒体配置</value>
+  <data name="AllowVariation" xml:space="preserve">
+    <value>允许变体</value>
   </data>
   <data name="Always" xml:space="preserve">
     <value>始终</value>
@@ -178,13 +178,13 @@
     <value>抗混叠滤波器</value>
   </data>
   <data name="AppDescription" xml:space="preserve">
-    <value>Sine 播放器</value>
+    <value>Sine Player</value>
   </data>
   <data name="AppDisplayName" xml:space="preserve">
-    <value>Sine 播放器</value>
+    <value>Sine Player</value>
   </data>
   <data name="AppStoreName" xml:space="preserve">
-    <value>Sine 播放器</value>
+    <value>Sine Player</value>
   </data>
   <data name="AppearanceExpander.Detail" xml:space="preserve">
     <value>选择要显示的应用主题</value>
@@ -378,7 +378,7 @@ $files</value>
     <value>描述</value>
   </data>
   <data name="DevAppDisplayName" xml:space="preserve">
-    <value>Sine 播放器 [Dev]</value>
+    <value>Sine Player [Dev]</value>
   </data>
   <data name="DeveloperMode" xml:space="preserve">
     <value>开发者模式</value>
@@ -617,6 +617,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   </data>
   <data name="GeneralSettingsDescription" xml:space="preserve">
     <value>修改应用默认行为</value>
+  </data>
+  <data name="Global" xml:space="preserve">
+    <value>全局</value>
   </data>
   <data name="GoBack" xml:space="preserve">
     <value>返回</value>
@@ -1248,6 +1251,9 @@ $plugins</value>
   </data>
   <data name="TotalMedia" xml:space="preserve">
     <value>媒体总数</value>
+  </data>
+  <data name="Track" xml:space="preserve">
+    <value>轨道</value>
   </data>
   <data name="Transform" xml:space="preserve">
     <value>变换</value>

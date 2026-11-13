@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 using SinePlayer.Common.Playback.Core;
@@ -9,31 +10,72 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Data.Models.Misc;
 
-internal sealed class VideoSettingsModel
+internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsModel, VideoSettingsModel.JsonModel>
 {
-    public static VideoSettingsModel FromDefault()
+    public string Decoder { get; set; } = PlaybackComponents.AUTO;
+    public string Renderer { get; set; } = PlaybackComponents.AUTO;
+    public bool PreferHardwareDecoding { get; set; } = true;
+    public bool PreferHdr { get; set; } = true;
+    public VideoResizeMode ResizeMode { get; set; } = VideoResizeMode.Fit;
+    public VideoScalingMode ScalingMode { get; set; } = VideoScalingMode.Bilinear;
+    public int RotationDegrees { get; set; } = 0;
+    public bool FlipHorizontal { get; set; }
+    public bool FlipVertical { get; set; }
+
+    public VideoTransform ToTransform()
     {
-        return new();
+        int quarterTurns = (int)Math.Round(RotationDegrees / 90.0);
+
+        return new VideoTransform(
+            VideoOrientation.FromDegrees(quarterTurns * 90, FlipHorizontal, FlipVertical),
+            ResizeMode,
+            1.0,
+            0.0,
+            0.0,
+            ScalingMode);
     }
 
-    public static VideoSettingsModel FromJsonModel(JsonModel? model, VideoSettingsModel fallback)
+    protected override Dictionary<string, VideoSettingsModel> LoadPresets()
     {
-        if (model is null)
-        {
-            return fallback.Clone();
-        }
+        return AppSettingsModel.VideoSettingPresets;
+    }
 
+    protected override void SavePresets(Dictionary<string, VideoSettingsModel> presets)
+    {
+        AppSettingsModel.VideoSettingPresets = presets;
+    }
+
+    protected override string LoadDefaultPresetKey()
+    {
+        return AppSettingsModel.DefaultVideoSettingPresetKey;
+    }
+
+    protected override void ApplyJsonModel(JsonModel model)
+    {
+        Decoder = model.Decoder ?? Decoder;
+        Renderer = model.Renderer ?? Renderer;
+        PreferHardwareDecoding = model.PreferHardwareDecoding ?? PreferHardwareDecoding;
+        PreferHdr = model.PreferHdr ?? PreferHdr;
+        ResizeMode = ParseResizeMode(model.ResizeMode, ResizeMode);
+        ScalingMode = ParseScalingMode(model.ScalingMode, ScalingMode);
+        RotationDegrees = ParseRotationDegrees(model.RotationDegrees, RotationDegrees);
+        FlipHorizontal = model.FlipHorizontal ?? FlipHorizontal;
+        FlipVertical = model.FlipVertical ?? FlipVertical;
+    }
+
+    protected override JsonModel ToJsonModel()
+    {
         return new()
         {
-            Decoder = model.Decoder ?? fallback.Decoder,
-            Renderer = model.Renderer ?? fallback.Renderer,
-            PreferHardwareDecoding = model.PreferHardwareDecoding ?? fallback.PreferHardwareDecoding,
-            PreferHdr = model.PreferHdr ?? fallback.PreferHdr,
-            ResizeMode = ParseResizeMode(model.ResizeMode, fallback.ResizeMode),
-            ScalingMode = ParseScalingMode(model.ScalingMode, fallback.ScalingMode),
-            RotationDegrees = ParseRotationDegrees(model.RotationDegrees, fallback.RotationDegrees),
-            FlipHorizontal = model.FlipHorizontal ?? fallback.FlipHorizontal,
-            FlipVertical = model.FlipVertical ?? fallback.FlipVertical,
+            Decoder = Decoder,
+            Renderer = Renderer,
+            PreferHardwareDecoding = PreferHardwareDecoding,
+            PreferHdr = PreferHdr,
+            ResizeMode = ResizeMode.ToString(),
+            ScalingMode = ScalingMode.ToString(),
+            RotationDegrees = RotationDegrees,
+            FlipHorizontal = FlipHorizontal,
+            FlipVertical = FlipVertical,
         };
     }
 
@@ -60,50 +102,6 @@ internal sealed class VideoSettingsModel
     private static int ParseRotationDegrees(int? value, int fallback)
     {
         return value is 0 or 90 or 180 or 270 ? value.Value : fallback;
-    }
-
-    public string Decoder { get; set; } = PlaybackComponents.AUTO;
-    public string Renderer { get; set; } = PlaybackComponents.AUTO;
-    public bool PreferHardwareDecoding { get; set; } = true;
-    public bool PreferHdr { get; set; } = true;
-    public VideoResizeMode ResizeMode { get; set; } = VideoResizeMode.Fit;
-    public VideoScalingMode ScalingMode { get; set; } = VideoScalingMode.Bilinear;
-    public int RotationDegrees { get; set; } = 0;
-    public bool FlipHorizontal { get; set; }
-    public bool FlipVertical { get; set; }
-
-    public VideoSettingsModel Clone()
-    {
-        return (VideoSettingsModel)MemberwiseClone();
-    }
-
-    public JsonModel ToJsonModel()
-    {
-        return new()
-        {
-            Decoder = Decoder,
-            Renderer = Renderer,
-            PreferHardwareDecoding = PreferHardwareDecoding,
-            PreferHdr = PreferHdr,
-            ResizeMode = ResizeMode.ToString(),
-            ScalingMode = ScalingMode.ToString(),
-            RotationDegrees = RotationDegrees,
-            FlipHorizontal = FlipHorizontal,
-            FlipVertical = FlipVertical,
-        };
-    }
-
-    public VideoTransform ToTransform()
-    {
-        int quarterTurns = (int)Math.Round(RotationDegrees / 90.0);
-
-        return new VideoTransform(
-            VideoOrientation.FromDegrees(quarterTurns * 90, FlipHorizontal, FlipVertical),
-            ResizeMode,
-            1.0,
-            0.0,
-            0.0,
-            ScalingMode);
     }
 
     public class JsonModel
