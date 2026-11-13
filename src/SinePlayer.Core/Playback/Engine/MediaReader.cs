@@ -14,6 +14,8 @@ internal sealed class MediaReader(
     PipelineEvents events,
     Func<MediaSource, TimeSpan, SeekMode, int> chooseSeekLanding) : IPipelineWakeTarget
 {
+    private const int BufferedWaitMilliseconds = 200;
+
     private static readonly TimeSpan ReadAheadMin = TimeSpan.FromMilliseconds(8000);
     private static readonly TimeSpan ReadAheadMax = TimeSpan.FromMilliseconds(10000);
     private static readonly TimeSpan ReadAheadWake = TimeSpan.FromMilliseconds(4000);
@@ -196,7 +198,7 @@ internal sealed class MediaReader(
             {
                 if (anyUnended)
                 {
-                    await _node.WaitAsync(stamp);
+                    await _node.WaitAsync(stamp, BufferedWaitMilliseconds);
                     continue;
                 }
 

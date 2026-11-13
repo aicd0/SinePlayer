@@ -199,9 +199,9 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
         return _host.Select(this, stream);
     }
 
-    public void Start(Action wakeReader, Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
+    public void Start(Func<long, TimeSpan, bool> isStreamSpent, Action reportEnded)
     {
-        _decodeThread = new PipelineThread("Pipeline - Video decode", stop => Decode(stop, wakeReader));
+        _decodeThread = new PipelineThread("Pipeline - Video decode", Decode);
         _renderThread = new PipelineThread("Pipeline - Video render", stop => Render(stop, isStreamSpent, reportEnded));
         _decodeThread.Start();
         _renderThread.Start();
@@ -397,7 +397,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
         Selected = binding is { } chosen ? new(chosen.Source, (VideoStreamInfo)chosen.Stream) : null;
     }
 
-    private void Decode(Func<bool> stopRequested, Action wakeReader)
+    private void Decode(Func<bool> stopRequested)
     {
         bool awaitingKeyFrame = false;
         long workingEpoch = -1;
@@ -443,8 +443,6 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
                 DecodeNode.Wait(stamp);
                 continue;
             }
-
-            wakeReader();
 
             MediaPacket? packet = entry.Packet;
             long packetEpoch = entry.Epoch;
