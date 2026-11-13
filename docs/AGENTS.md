@@ -1,5 +1,10 @@
 # Agent Rules
 
+## Answering
+
+- Clear the thing out before summarizing it. Say what matters and stop: no account of how you got there, no unrelated
+  detail, no restating the question, no restating this rule. One sentence when one sentence does.
+
 ## Coding
 
 - Always ask before introducing anything new: a new pattern, a new design, new behavior, a new coding style, a new dependency or API.
