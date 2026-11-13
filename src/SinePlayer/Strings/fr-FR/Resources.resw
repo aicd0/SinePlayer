@@ -901,8 +901,11 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="OriginalSize" xml:space="preserve">
     <value>Taille d'origine</value>
   </data>
-  <data name="Outline" xml:space="preserve">
-    <value>Contour</value>
+  <data name="OutlineColor" xml:space="preserve">
+    <value>Couleur du contour</value>
+  </data>
+  <data name="OutlineWidth" xml:space="preserve">
+    <value>Épaisseur du contour</value>
   </data>
   <data name="Output" xml:space="preserve">
     <value>Sortie</value>

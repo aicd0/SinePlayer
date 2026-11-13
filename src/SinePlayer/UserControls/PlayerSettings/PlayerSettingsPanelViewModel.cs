@@ -256,14 +256,25 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
-    private string _subtitleOutlineLabel = string.Empty;
-    public string SubtitleOutlineLabel
+    private string _subtitleOutlineWidthLabel = string.Empty;
+    public string SubtitleOutlineWidthLabel
     {
-        get => _subtitleOutlineLabel;
+        get => _subtitleOutlineWidthLabel;
         set
         {
-            _subtitleOutlineLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleOutlineLabel)));
+            _subtitleOutlineWidthLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleOutlineWidthLabel)));
+        }
+    }
+
+    private string _subtitleOutlineColorLabel = string.Empty;
+    public string SubtitleOutlineColorLabel
+    {
+        get => _subtitleOutlineColorLabel;
+        set
+        {
+            _subtitleOutlineColorLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleOutlineColorLabel)));
         }
     }
 
