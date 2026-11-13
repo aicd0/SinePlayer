@@ -1196,6 +1196,9 @@ $plugins</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>Функция сортировки</value>
   </data>
+  <data name="Speed" xml:space="preserve">
+    <value>Скорость</value>
+  </data>
   <data name="State" xml:space="preserve">
     <value>Состояние</value>
   </data>

@@ -15,6 +15,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
     private readonly MutableLiveData<bool> _settingsChangedLiveData = new();
     public readonly MutableLiveDataWithDelay<bool> SettingsChangedLiveData;
 
+    private string _generalTabTitle = string.Empty;
+    public string GeneralTabTitle
+    {
+        get => _generalTabTitle;
+        set
+        {
+            _generalTabTitle = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GeneralTabTitle)));
+        }
+    }
+
     private string _videoTabTitle = string.Empty;
     public string VideoTabTitle
     {
@@ -45,6 +56,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         {
             _subtitleTabTitle = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleTabTitle)));
+        }
+    }
+
+    private string _generalSpeedLabel = string.Empty;
+    public string GeneralSpeedLabel
+    {
+        get => _generalSpeedLabel;
+        set
+        {
+            _generalSpeedLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GeneralSpeedLabel)));
         }
     }
 

@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
@@ -67,6 +67,17 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     {
         InitializeComponent();
 
+        _categories.Add(_playerCategory = new()
+        {
+            Get = settings => settings.Player,
+            Set = (settings, value) =>
+            {
+                if (value is PlayerPresetSettingsModel playerSettings)
+                {
+                    settings.Player = playerSettings;
+                }
+            },
+        });
         _categories.Add(_videoCategory = new()
         {
             Get = settings => settings.Video,
@@ -101,9 +112,10 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             },
         });
 
-        _tabs.Add(_videoTab = new() { Key = "Video", Item = SelectorBarItem1, Content = VideoSettingsGrid, Category = _videoCategory });
-        _tabs.Add(_audioTab = new() { Key = "Audio", Item = SelectorBarItem2, Content = AudioSettingsGrid, Category = _audioCategory });
-        _tabs.Add(_subtitleTab = new() { Key = "Subtitle", Item = SelectorBarItem3, Content = SubtitleSettingsGrid, Category = _subtitleCategory });
+        _tabs.Add(_generalTab = new() { Key = "General", Item = SelectorBarItemGeneral, Content = GeneralSettingsGrid, Category = _playerCategory });
+        _tabs.Add(_videoTab = new() { Key = "Video", Item = SelectorBarItemVideo, Content = VideoSettingsGrid, Category = _videoCategory });
+        _tabs.Add(_audioTab = new() { Key = "Audio", Item = SelectorBarItemAudio, Content = AudioSettingsGrid, Category = _audioCategory });
+        _tabs.Add(_subtitleTab = new() { Key = "Subtitle", Item = SelectorBarItemSubtitle, Content = SubtitleSettingsGrid, Category = _subtitleCategory });
         _activeTab = _videoTab;
 
         Loaded += PlayerSettingsPanel_LoadedOrUnloaded;
@@ -142,12 +154,33 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    public void Apply(Action<PlayerSettingsModel> change)
+    public void ApplyPlayer(Action<PlayerPresetSettingsModel> change)
     {
-        change(_mediaSettings);
-        SaveSettings(null);
+        if (_updatingUI || _media is not { } media)
+        {
+            return;
+        }
+
+        change(_mediaSettings.Player);
+        PlayerSettingsStore.SetPlayerRecord(media, _mediaSettings.Player.ToRecordJson());
+        _presetSettings = LoadPresetSettings(_mediaSettings);
         DispatchDataChangeEvent();
         UpdateUI();
+    }
+
+    public void ApplyVideo(Action<VideoSettingsModel> change)
+    {
+        ApplyStream(_videoCategory, change);
+    }
+
+    public void ApplyAudio(Action<AudioSettingsModel> change)
+    {
+        ApplyStream(_audioCategory, change);
+    }
+
+    public void ApplySubtitle(Action<SubtitleSettingsModel> change)
+    {
+        ApplyStream(_subtitleCategory, change);
     }
 
     public bool NavigateTo(string path)
@@ -251,11 +284,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     #region Tab UI
 
     private readonly List<SettingsCategory> _categories = [];
+    private readonly SettingsCategory _playerCategory;
     private readonly SettingsCategory _videoCategory;
     private readonly SettingsCategory _audioCategory;
     private readonly SettingsCategory _subtitleCategory;
 
     private readonly List<SettingsTab> _tabs = [];
+    private readonly SettingsTab _generalTab;
     private readonly SettingsTab _videoTab;
     private readonly SettingsTab _audioTab;
     private readonly SettingsTab _subtitleTab;
@@ -275,6 +310,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         {
             tab.Content.Visibility = tab == selectedTab ? Visibility.Visible : Visibility.Collapsed;
         }
+
+        TrackScopeRow.Visibility = KindOf(selectedTab.Category) is null ? Visibility.Collapsed : Visibility.Visible;
 
         AppDB.MainRegistry.CreateKey(RegistryNames.STATE).Set(RegistryNames.StateKey.SELECTED_PLAYER_SETTINGS_TAB, selectedTab.Key);
 
@@ -314,7 +351,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (settings.PresetKey != presetKey)
         {
             // The dialog moved these settings onto a preset it created, so this scope follows it from now on.
-            SaveSettings(_activeTab.Category);
+            SaveCategory(_activeTab.Category);
         }
 
         LoadSettings();
@@ -328,7 +365,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         PresetSettingsModel current = category.Get(_mediaSettings);
         category.Set(_mediaSettings, KeepPreset(current, current.CreateDefault()));
 
-        SaveSettings(_activeTab.Category);
+        SaveCategory(_activeTab.Category);
         NotifySettingsChanged();
     }
 
@@ -387,7 +424,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         category.Set(_mediaSettings, settings);
-        SaveSettings(_activeTab.Category);
+        SaveCategory(_activeTab.Category);
         DispatchDataChangeEvent();
         UpdateUI();
     }
@@ -496,7 +533,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         foreach (SettingsCategory category in _categories)
         {
-            if (KindOf(category) is { } kind && PlayerSettingsStore.GetTrackScope(media, kind) is { } track)
+            if (KindOf(category) is { } kind && PlayerSettingsStore.GetStreamTrackScope(media, kind) is { } track)
             {
                 _trackScopes[kind] = track;
             }
@@ -516,7 +553,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         if (_media is { } media)
         {
-            PlayerSettingsStore.SetTrackScope(media, kind, track);
+            PlayerSettingsStore.SetStreamTrackScope(media, kind, track);
         }
     }
 
@@ -621,6 +658,20 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         PlayerSettingsModel settings = _mediaSettings;
         PlayerSettingsModel presetSettings = _presetSettings ?? settings;
+
+        {
+            bool tabModified = false;
+
+            {
+                bool modified = settings.Player.Speed != presetSettings.Player.Speed;
+                tabModified = tabModified || modified;
+                UpdateGeneralSpeed(settings);
+                ViewModel.GeneralSpeedLabel = GetLabel(StringResource.Speed, modified);
+            }
+
+            _playerCategory.IsModified = tabModified;
+            ViewModel.GeneralTabTitle = GetLabel(StringResource.General, tabModified);
+        }
 
         {
             bool tabModified = false;
@@ -821,6 +872,41 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             activeCategory.IsModified);
     }
 
+    private void GeneralSpeedNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = sender.Value;
+        if (double.IsNaN(value))
+        {
+            value = PlayerPresetSettingsModel.DefaultSpeed;
+        }
+
+        value = Math.Round(Math.Clamp(sender.Value, PlayerSession.MinimumPlaybackRate, PlayerSession.MaximumPlaybackRate), 2);
+        if (value != sender.Value)
+        {
+            sender.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Player.Speed - value) > 0.001)
+        {
+            ApplyPlayer(settings => settings.Speed = value);
+        }
+    }
+
+    private void UpdateGeneralSpeed(PlayerSettingsModel settings)
+    {
+        double value = settings.Player.Speed;
+        double shown = GeneralSpeedNumberBox.Value;
+        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        {
+            GeneralSpeedNumberBox.Value = value;
+        }
+    }
+
     private void UpdateVideoDecoder(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetVideoDecoderOptions()];
@@ -829,7 +915,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         {
             if (settings.Video.Decoder != key)
             {
-                Apply(target => target.Video.Decoder = key);
+                ApplyVideo(target => target.Decoder = key);
             }
         });
         VideoDecoderDropDownButton.Content = choice.Label;
@@ -843,7 +929,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         {
             if (settings.Video.Renderer != key)
             {
-                Apply(target => target.Video.Renderer = key);
+                ApplyVideo(target => target.Renderer = key);
             }
         });
         VideoRendererDropDownButton.Content = choice.Label;
@@ -859,7 +945,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         bool value = ((ToggleSwitch)sender).IsOn;
         if (_mediaSettings.Video.PreferHardwareDecoding != value)
         {
-            Apply(settings => settings.Video.PreferHardwareDecoding = value);
+            ApplyVideo(settings => settings.PreferHardwareDecoding = value);
         }
     }
 
@@ -878,7 +964,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         bool value = ((ToggleSwitch)sender).IsOn;
         if (_mediaSettings.Video.PreferHdr != value)
         {
-            Apply(settings => settings.Video.PreferHdr = value);
+            ApplyVideo(settings => settings.PreferHdr = value);
         }
     }
 
@@ -896,7 +982,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             VideoResizeMode mode = Enum.Parse<VideoResizeMode>(key);
             if (settings.Video.ResizeMode != mode)
             {
-                Apply(target => target.Video.ResizeMode = mode);
+                ApplyVideo(target => target.ResizeMode = mode);
             }
         });
         VideoStretchModeDropDownButton.Content = choice.Label;
@@ -911,7 +997,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             VideoScalingMode mode = Enum.Parse<VideoScalingMode>(key);
             if (settings.Video.ScalingMode != mode)
             {
-                Apply(target => target.Video.ScalingMode = mode);
+                ApplyVideo(target => target.ScalingMode = mode);
             }
         });
         VideoInterpolationDropDownButton.Content = choice.Label;
@@ -926,7 +1012,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             int degrees = int.Parse(key, CultureInfo.InvariantCulture);
             if (settings.Video.RotationDegrees != degrees)
             {
-                Apply(target => target.Video.RotationDegrees = degrees);
+                ApplyVideo(target => target.RotationDegrees = degrees);
             }
         });
         VideoRotationDropDownButton.Content = choice.Label;
@@ -942,7 +1028,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         bool value = ((ToggleSwitch)sender).IsOn;
         if (_mediaSettings.Video.FlipHorizontal != value)
         {
-            Apply(settings => settings.Video.FlipHorizontal = value);
+            ApplyVideo(settings => settings.FlipHorizontal = value);
         }
     }
 
@@ -961,7 +1047,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         bool value = ((ToggleSwitch)sender).IsOn;
         if (_mediaSettings.Video.FlipVertical != value)
         {
-            Apply(settings => settings.Video.FlipVertical = value);
+            ApplyVideo(settings => settings.FlipVertical = value);
         }
     }
 
@@ -978,7 +1064,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         {
             if (settings.Audio.Decoder != key)
             {
-                Apply(target => target.Audio.Decoder = key);
+                ApplyAudio(target => target.Decoder = key);
             }
         });
         AudioDecoderDropDownButton.Content = choice.Label;
@@ -992,7 +1078,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         {
             if (settings.Audio.Renderer != key)
             {
-                Apply(target => target.Audio.Renderer = key);
+                ApplyAudio(target => target.Renderer = key);
             }
         });
         AudioRendererDropDownButton.Content = choice.Label;
@@ -1006,7 +1092,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         {
             if (settings.Subtitle.Decoder != key)
             {
-                Apply(target => target.Subtitle.Decoder = key);
+                ApplySubtitle(target => target.Decoder = key);
             }
         });
         SubtitleDecoderDropDownButton.Content = choice.Label;
@@ -1020,7 +1106,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         {
             if (settings.Subtitle.Renderer != key)
             {
-                Apply(target => target.Subtitle.Renderer = key);
+                ApplySubtitle(target => target.Renderer = key);
             }
         });
         SubtitleRendererDropDownButton.Content = choice.Label;
@@ -1038,7 +1124,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             sender.Value = 0;
             if (_mediaSettings.Subtitle.Order != 0)
             {
-                Apply(settings => settings.Subtitle.Order = 0);
+                ApplySubtitle(settings => settings.Order = 0);
             }
 
             return;
@@ -1047,7 +1133,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         int value = (int)Math.Round(sender.Value);
         if (_mediaSettings.Subtitle.Order != value)
         {
-            Apply(settings => settings.Subtitle.Order = value);
+            ApplySubtitle(settings => settings.Order = value);
         }
     }
 
@@ -1073,7 +1159,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             sender.Value = 0;
             if (_mediaSettings.Subtitle.PanX != 0)
             {
-                Apply(settings => settings.Subtitle.PanX = 0);
+                ApplySubtitle(settings => settings.PanX = 0);
             }
 
             return;
@@ -1082,7 +1168,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         int value = (int)Math.Round(sender.Value);
         if (_mediaSettings.Subtitle.PanX != value)
         {
-            Apply(settings => settings.Subtitle.PanX = value);
+            ApplySubtitle(settings => settings.PanX = value);
         }
     }
 
@@ -1108,7 +1194,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             sender.Value = 0;
             if (_mediaSettings.Subtitle.PanY != 0)
             {
-                Apply(settings => settings.Subtitle.PanY = 0);
+                ApplySubtitle(settings => settings.PanY = 0);
             }
 
             return;
@@ -1117,7 +1203,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         int value = (int)Math.Round(sender.Value);
         if (_mediaSettings.Subtitle.PanY != value)
         {
-            Apply(settings => settings.Subtitle.PanY = value);
+            ApplySubtitle(settings => settings.PanY = value);
         }
     }
 
@@ -1145,7 +1231,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         if (_mediaSettings.Subtitle.Family != family)
         {
-            Apply(settings => settings.Subtitle.Family = family);
+            ApplySubtitle(settings => settings.Family = family);
         }
     }
 
@@ -1213,7 +1299,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         double value = size <= 0.0 ? 0.0 : Math.Clamp(size, MinimumSubtitleFontSize, MaximumSubtitleFontSize);
         if (_mediaSettings.Subtitle.Size != value)
         {
-            Apply(settings => settings.Subtitle.Size = value);
+            ApplySubtitle(settings => settings.Size = value);
             return;
         }
     }
@@ -1278,7 +1364,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         if (_mediaSettings.Subtitle.Weight != weight)
         {
-            Apply(settings => settings.Subtitle.Weight = weight);
+            ApplySubtitle(settings => settings.Weight = weight);
         }
     }
 
@@ -1346,7 +1432,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         string value = style.ToString();
         if (_mediaSettings.Subtitle.Style != value)
         {
-            Apply(settings => settings.Subtitle.Style = value);
+            ApplySubtitle(settings => settings.Style = value);
         }
     }
 
@@ -1387,7 +1473,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         Color color = args.NewColor;
         if (!_mediaSettings.Subtitle.FontColor.Equals(color))
         {
-            Apply(settings => settings.Subtitle.FontColor = color);
+            ApplySubtitle(settings => settings.FontColor = color);
         }
     }
 
@@ -1423,7 +1509,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         if (_mediaSettings.Subtitle.OutlineWidth != value)
         {
-            Apply(settings => settings.Subtitle.OutlineWidth = value);
+            ApplySubtitle(settings => settings.OutlineWidth = value);
         }
     }
 
@@ -1447,7 +1533,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         Color color = args.NewColor;
         if (!_mediaSettings.Subtitle.OutlineColor.Equals(color))
         {
-            Apply(settings => settings.Subtitle.OutlineColor = color);
+            ApplySubtitle(settings => settings.OutlineColor = color);
         }
     }
 
@@ -1472,7 +1558,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         int value = (int)Math.Round(e.NewValue);
         if (_mediaSettings.Subtitle.Opacity != value)
         {
-            Apply(settings => settings.Subtitle.Opacity = value);
+            ApplySubtitle(settings => settings.Opacity = value);
         }
     }
 
@@ -1491,6 +1577,16 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void LoadSettings()
     {
+        string? RecordOf(MediaModel media, SettingsCategory category)
+        {
+            if (category == _playerCategory)
+            {
+                return PlayerSettingsStore.GetPlayerRecord(media);
+            }
+
+            return KindOf(category) is { } kind ? PlayerSettingsStore.GetStreamRecord(media, kind, TrackOf(kind)) : null;
+        }
+
         if (_media is not { } media)
         {
             return;
@@ -1499,8 +1595,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         foreach (SettingsCategory category in _categories)
         {
             PresetSettingsModel current = category.Get(_mediaSettings);
-            string? record = KindOf(category) is { } kind ? PlayerSettingsStore.GetRecord(media, kind, TrackOf(kind)) : null;
-            category.Set(_mediaSettings, current.ResolveRecord(record));
+            category.Set(_mediaSettings, current.ResolveRecord(RecordOf(media, category)));
         }
 
         _presetSettings = LoadPresetSettings(_mediaSettings);
@@ -1518,50 +1613,76 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         return presets;
     }
 
-    private void SaveSettings(SettingsCategory? replacedCategory)
+    private void ApplyStream<TModel>(SettingsCategory category, Action<TModel> change) where TModel : PresetSettingsModel
+    {
+        if (_updatingUI || _media is not { } media || KindOf(category) is not { } kind)
+        {
+            return;
+        }
+
+        var settings = (TModel)category.Get(_mediaSettings);
+        // Tracks follow only the values this change replaces, so each one keeps the rest of its own settings.
+        string before = settings.ToValuesJson();
+        change(settings);
+
+        if (TrackOf(kind) is { } track)
+        {
+            PlayerSettingsStore.SetStreamTrackRecord(media, kind, track, settings.ToRecordJson());
+        }
+        else
+        {
+            string changedFields = ChangedJsonFields(before, settings.ToValuesJson());
+            if (changedFields != EmptyValues)
+            {
+                PropagateToTracks(media, kind, settings, changedFields);
+            }
+        }
+
+        _presetSettings = LoadPresetSettings(_mediaSettings);
+        DispatchDataChangeEvent();
+        UpdateUI();
+    }
+
+    private void SaveCategory(SettingsCategory category)
     {
         if (_updatingUI || _media is not { } media)
         {
             return;
         }
 
-        // A preset selection, Reset and a preset created in the dialog replace every value of one category, so it
-        // pushes all its values to the tracks while the others push just what changed.
-        foreach (SettingsCategory category in _categories)
+        PresetSettingsModel settings = category.Get(_mediaSettings);
+        if (category == _playerCategory)
         {
-            if (KindOf(category) is not { } kind)
+            PlayerSettingsStore.SetPlayerRecord(media, settings.ToRecordJson());
+        }
+        else if (KindOf(category) is { } kind)
+        {
+            if (TrackOf(kind) is { } track)
             {
-                continue;
+                PlayerSettingsStore.SetStreamTrackRecord(media, kind, track, settings.ToRecordJson());
             }
-
-            SaveCategory(media, kind, TrackOf(kind), category.Get(_mediaSettings), category == replacedCategory);
+            else
+            {
+                PropagateToTracks(media, kind, settings, settings.ToValuesJson());
+            }
         }
 
         _presetSettings = LoadPresetSettings(_mediaSettings);
     }
 
-    private static void SaveCategory(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track, PresetSettingsModel settings, bool allFields)
+    /// <summary>
+    /// Writes the media record and gives every recorded track those values. A track whose preset allows variation
+    /// keeps them as a variation over it; one whose preset allows none has them synced into the preset.
+    /// </summary>
+    private static void PropagateToTracks(MediaModel media, MediaStreamKind kind, PresetSettingsModel settings, string valuesJson)
     {
-        if (track is not null)
-        {
-            PlayerSettingsStore.SetTrackRecord(media, kind, track, settings.ToRecordJson());
-            return;
-        }
+        PlayerSettingsStore.SetStreamGlobalRecord(media, kind, settings.ToRecordJson());
 
-        string values = settings.ToValuesJson();
-        string fields = allFields ? values : ChangedJsonFields(settings.ResolveRecord(PlayerSettingsStore.GetGlobalRecord(media, kind)).ToValuesJson(), values);
-        if (fields == EmptyValues)
-        {
-            return;
-        }
-
-        PlayerSettingsStore.SetGlobalRecord(media, kind, settings.ToRecordJson());
-
-        foreach ((TrackIdentityModel recorded, string record) in PlayerSettingsStore.GetTrackRecords(media, kind))
+        foreach ((TrackIdentityModel track, string record) in PlayerSettingsStore.GetStreamTrackRecords(media, kind))
         {
             PresetSettingsModel trackSettings = settings.ResolveRecord(record);
-            trackSettings.ApplyValuesJson(fields);
-            PlayerSettingsStore.SetTrackRecord(media, kind, recorded, trackSettings.ToRecordJson());
+            trackSettings.ApplyValuesJson(valuesJson);
+            PlayerSettingsStore.SetStreamTrackRecord(media, kind, track, trackSettings.ToRecordJson());
         }
     }
 
@@ -1722,10 +1843,10 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         return 0.0;
     }
 
-    private static string ChangedJsonFields(string baseline, string values)
+    private static string ChangedJsonFields(string beforeJson, string afterJson)
     {
-        JsonObject before = JsonSerializer.Deserialize<JsonObject>(baseline) ?? [];
-        JsonObject after = JsonSerializer.Deserialize<JsonObject>(values) ?? [];
+        JsonObject before = JsonSerializer.Deserialize<JsonObject>(beforeJson) ?? [];
+        JsonObject after = JsonSerializer.Deserialize<JsonObject>(afterJson) ?? [];
 
         JsonObject changed = [];
         foreach (KeyValuePair<string, JsonNode?> property in after)

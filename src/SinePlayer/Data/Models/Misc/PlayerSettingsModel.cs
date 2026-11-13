@@ -7,6 +7,7 @@ namespace SinePlayer.Data.Models.Misc;
 
 internal sealed class PlayerSettingsModel
 {
+    public PlayerPresetSettingsModel Player { get; set; } = new();
     public VideoSettingsModel Video { get; set; } = new();
     public AudioSettingsModel Audio { get; set; } = new();
     public SubtitleSettingsModel Subtitle { get; set; } = new();

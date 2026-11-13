@@ -43,45 +43,51 @@
                 Padding="0,12,0,8"
                 SelectionChanged="SelectorBar_SelectionChanged">
                 <SelectorBarItem
-                    x:Name="SelectorBarItem1"
+                    x:Name="SelectorBarItemGeneral"
+                    Padding="12,0,12,4"
+                    Text="{x:Bind ViewModel.GeneralTabTitle, Mode=OneWay}" />
+                <SelectorBarItem
+                    x:Name="SelectorBarItemVideo"
                     Padding="12,0,12,4"
                     Text="{x:Bind ViewModel.VideoTabTitle, Mode=OneWay}" />
                 <SelectorBarItem
-                    x:Name="SelectorBarItem2"
+                    x:Name="SelectorBarItemAudio"
                     Padding="12,0,12,4"
                     Text="{x:Bind ViewModel.AudioTabTitle, Mode=OneWay}" />
                 <SelectorBarItem
-                    x:Name="SelectorBarItem3"
+                    x:Name="SelectorBarItemSubtitle"
                     Padding="12,0,12,4"
                     Text="{x:Bind ViewModel.SubtitleTabTitle, Mode=OneWay}" />
             </SelectorBar>
-            <Rectangle
-                Height="1"
+            <StackPanel
+                x:Name="TrackScopeRow"
                 Margin="0,0,0,8"
-                Fill="{ThemeResource MediaInfoSeparatorForeground}" />
-            <Grid Style="{StaticResource TallSettingRowStyle}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    Grid.Column="0"
-                    Margin="0,0,0,2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind StringResource.Track}" />
-                <ComboBox
-                    x:Name="TrackScopeComboBox"
-                    Grid.Column="3"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Center"
-                    SelectionChanged="ScopeComboBox_SelectionChanged" />
-            </Grid>
-            <Rectangle
-                Height="1"
-                Margin="0,8,0,0"
-                Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+                Orientation="Vertical">
+                <Rectangle
+                    Height="1"
+                    Margin="0,0,0,8"
+                    Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+                <Grid Style="{StaticResource TallSettingRowStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        Grid.Column="0"
+                        Margin="0,0,0,2"
+                        VerticalAlignment="Center"
+                        Text="{x:Bind StringResource.Track}" />
+                    <ComboBox
+                        x:Name="TrackScopeComboBox"
+                        Grid.Column="3"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        SelectionChanged="ScopeComboBox_SelectionChanged" />
+                </Grid>
+            </StackPanel>
+            <Rectangle Height="1" Fill="{ThemeResource MediaInfoSeparatorForeground}" />
         </StackPanel>
 
         <ScrollViewer
@@ -92,6 +98,42 @@
             VerticalScrollBarVisibility="Auto"
             VerticalScrollMode="Auto">
             <Grid MinWidth="360">
+                <StackPanel
+                    x:Name="GeneralSettingsGrid"
+                    Orientation="Vertical"
+                    Visibility="Collapsed">
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Playback}" SectionKey="Playback">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.GeneralSpeedLabel, Mode=OneWay}" />
+                                    <NumberBox
+                                        x:Name="GeneralSpeedNumberBox"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        LargeChange="0.5"
+                                        Maximum="8"
+                                        Minimum="0.1"
+                                        SmallChange="0.1"
+                                        SpinButtonPlacementMode="Inline"
+                                        ValueChanged="GeneralSpeedNumberBox_ValueChanged" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
+                </StackPanel>
+
                 <StackPanel x:Name="VideoSettingsGrid" Orientation="Vertical">
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Output}" SectionKey="Output">
                         <settings:PlayerSettingsSection.SectionContent>

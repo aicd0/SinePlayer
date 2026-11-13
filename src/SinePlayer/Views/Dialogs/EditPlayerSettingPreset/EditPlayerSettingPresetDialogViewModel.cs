@@ -181,13 +181,15 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
 
     #region Preset store
 
-    /// <summary>
-    /// The store a preset belongs to is decided by the kind of settings it is, not by where it was selected.
-    /// </summary>
     private static void SavePreset(PresetSettingsModel preset)
     {
         switch (preset)
         {
+            case PlayerPresetSettingsModel player:
+                Dictionary<string, PlayerPresetSettingsModel> players = AppSettingsModel.PlayerSettingPresets;
+                players[player.PresetKey] = player;
+                AppSettingsModel.PlayerSettingPresets = players;
+                break;
             case VideoSettingsModel video:
                 Dictionary<string, VideoSettingsModel> videos = AppSettingsModel.VideoSettingPresets;
                 videos[video.PresetKey] = video;
@@ -210,6 +212,14 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
     {
         switch (preset)
         {
+            case PlayerPresetSettingsModel player:
+                Dictionary<string, PlayerPresetSettingsModel> players = AppSettingsModel.PlayerSettingPresets;
+                if (players.Remove(player.PresetKey))
+                {
+                    AppSettingsModel.PlayerSettingPresets = players;
+                }
+
+                break;
             case VideoSettingsModel video:
                 Dictionary<string, VideoSettingsModel> videos = AppSettingsModel.VideoSettingPresets;
                 if (videos.Remove(video.PresetKey))
@@ -241,6 +251,7 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
     {
         return preset switch
         {
+            PlayerPresetSettingsModel => AppSettingsModel.DefaultPlayerSettingPresetKey,
             AudioSettingsModel => AppSettingsModel.DefaultAudioSettingPresetKey,
             SubtitleSettingsModel => AppSettingsModel.DefaultSubtitleSettingPresetKey,
             _ => AppSettingsModel.DefaultVideoSettingPresetKey,
@@ -251,6 +262,9 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
     {
         switch (preset)
         {
+            case PlayerPresetSettingsModel:
+                AppSettingsModel.DefaultPlayerSettingPresetKey = preset.PresetKey;
+                break;
             case AudioSettingsModel:
                 AppSettingsModel.DefaultAudioSettingPresetKey = preset.PresetKey;
                 break;
@@ -267,6 +281,7 @@ internal partial class EditPlayerSettingPresetDialogViewModel : INotifyPropertyC
     {
         return _presetModel switch
         {
+            PlayerPresetSettingsModel => AppSettingsModel.PlayerSettingPresets.Values.Any(preset => preset.PresetName == name),
             AudioSettingsModel => AppSettingsModel.AudioSettingPresets.Values.Any(preset => preset.PresetName == name),
             SubtitleSettingsModel => AppSettingsModel.SubtitleSettingPresets.Values.Any(preset => preset.PresetName == name),
             _ => AppSettingsModel.VideoSettingPresets.Values.Any(preset => preset.PresetName == name),

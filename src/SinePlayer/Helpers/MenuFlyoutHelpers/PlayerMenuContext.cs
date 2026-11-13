@@ -35,7 +35,11 @@ internal sealed class PlayerMenuContext
 
     public required PlayerSettingsModel Settings { get; init; }
 
-    public required Action<Action<PlayerSettingsModel>> UpdateSettings { get; init; }
+    public required Action<Action<VideoSettingsModel>> UpdateVideoSettings { get; init; }
+
+    public required Action<Action<AudioSettingsModel>> UpdateAudioSettings { get; init; }
+
+    public required Action<Action<SubtitleSettingsModel>> UpdateSubtitleSettings { get; init; }
 
     public PlayQueueModel.Builder? PlayQueue { get; init; }
 

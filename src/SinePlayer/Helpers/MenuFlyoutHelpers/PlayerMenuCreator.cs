@@ -134,7 +134,7 @@ internal static class PlayerMenuCreator
     private static List<BaseMenuFlyoutItemModel> CreateVideoMenuItems(PlayerMenuContext context)
     {
         PlayerSettingsModel settings = context.Settings;
-        Action<Action<PlayerSettingsModel>> applyChange = context.UpdateSettings;
+        Action<Action<VideoSettingsModel>> applyChange = context.UpdateVideoSettings;
 
         List<PlaybackComponentOption> decoderOptions = [.. PlaybackComponents.GetVideoDecoderOptions()];
         PlaybackComponentOption decoder = EnsureChoice(decoderOptions, settings.Video.Decoder);
@@ -166,7 +166,7 @@ internal static class PlayerMenuCreator
                 {
                     if (settings.Video.Decoder != key)
                     {
-                        applyChange(target => target.Video.Decoder = key);
+                        applyChange(target => target.Decoder = key);
                     }
                 }),
             },
@@ -177,7 +177,7 @@ internal static class PlayerMenuCreator
                 {
                     if (settings.Video.Renderer != key)
                     {
-                        applyChange(target => target.Video.Renderer = key);
+                        applyChange(target => target.Renderer = key);
                     }
                 }),
             },
@@ -185,13 +185,13 @@ internal static class PlayerMenuCreator
             {
                 Text = StringResourceProvider.Instance.PreferHardwareDecoding,
                 IsChecked = settings.Video.PreferHardwareDecoding,
-                Click = () => applyChange(target => target.Video.PreferHardwareDecoding = !settings.Video.PreferHardwareDecoding),
+                Click = () => applyChange(target => target.PreferHardwareDecoding = !settings.Video.PreferHardwareDecoding),
             },
             new ToggleMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.PreferHdr,
                 IsChecked = settings.Video.PreferHdr,
-                Click = () => applyChange(target => target.Video.PreferHdr = !settings.Video.PreferHdr),
+                Click = () => applyChange(target => target.PreferHdr = !settings.Video.PreferHdr),
             },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
@@ -202,7 +202,7 @@ internal static class PlayerMenuCreator
                     VideoResizeMode mode = Enum.Parse<VideoResizeMode>(key);
                     if (settings.Video.ResizeMode != mode)
                     {
-                        applyChange(target => target.Video.ResizeMode = mode);
+                        applyChange(target => target.ResizeMode = mode);
                     }
                 }),
             },
@@ -214,7 +214,7 @@ internal static class PlayerMenuCreator
                     int degrees = int.Parse(key, CultureInfo.InvariantCulture);
                     if (settings.Video.RotationDegrees != degrees)
                     {
-                        applyChange(target => target.Video.RotationDegrees = degrees);
+                        applyChange(target => target.RotationDegrees = degrees);
                     }
                 }),
             },
@@ -222,13 +222,13 @@ internal static class PlayerMenuCreator
             {
                 Text = StringResourceProvider.Instance.FlipVertically,
                 IsChecked = settings.Video.FlipVertical,
-                Click = () => applyChange(target => target.Video.FlipVertical = !settings.Video.FlipVertical),
+                Click = () => applyChange(target => target.FlipVertical = !settings.Video.FlipVertical),
             },
             new ToggleMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.FlipHorizontally,
                 IsChecked = settings.Video.FlipHorizontal,
-                Click = () => applyChange(target => target.Video.FlipHorizontal = !settings.Video.FlipHorizontal),
+                Click = () => applyChange(target => target.FlipHorizontal = !settings.Video.FlipHorizontal),
             },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
@@ -239,7 +239,7 @@ internal static class PlayerMenuCreator
                     VideoScalingMode mode = Enum.Parse<VideoScalingMode>(key);
                     if (settings.Video.ScalingMode != mode)
                     {
-                        applyChange(target => target.Video.ScalingMode = mode);
+                        applyChange(target => target.ScalingMode = mode);
                     }
                 }),
             },
@@ -249,7 +249,7 @@ internal static class PlayerMenuCreator
     private static List<BaseMenuFlyoutItemModel> CreateAudioMenuItems(PlayerMenuContext context)
     {
         PlayerSettingsModel settings = context.Settings;
-        Action<Action<PlayerSettingsModel>> applyChange = context.UpdateSettings;
+        Action<Action<AudioSettingsModel>> applyChange = context.UpdateAudioSettings;
 
         List<PlaybackComponentOption> decoderOptions = [.. PlaybackComponents.GetAudioDecoderOptions()];
         PlaybackComponentOption decoder = EnsureChoice(decoderOptions, settings.Audio.Decoder);
@@ -272,7 +272,7 @@ internal static class PlayerMenuCreator
                 {
                     if (settings.Audio.Decoder != key)
                     {
-                        applyChange(target => target.Audio.Decoder = key);
+                        applyChange(target => target.Decoder = key);
                     }
                 }),
             },
@@ -283,7 +283,7 @@ internal static class PlayerMenuCreator
                 {
                     if (settings.Audio.Renderer != key)
                     {
-                        applyChange(target => target.Audio.Renderer = key);
+                        applyChange(target => target.Renderer = key);
                     }
                 }),
             },
@@ -293,7 +293,7 @@ internal static class PlayerMenuCreator
     private static List<BaseMenuFlyoutItemModel> CreateSubtitleMenuItems(PlayerMenuContext context)
     {
         PlayerSettingsModel settings = context.Settings;
-        Action<Action<PlayerSettingsModel>> applyChange = context.UpdateSettings;
+        Action<Action<SubtitleSettingsModel>> applyChange = context.UpdateSubtitleSettings;
 
         List<PlaybackComponentOption> decoderOptions = [.. PlaybackComponents.GetSubtitleDecoderOptions()];
         PlaybackComponentOption decoder = EnsureChoice(decoderOptions, settings.Subtitle.Decoder);
@@ -316,7 +316,7 @@ internal static class PlayerMenuCreator
                 {
                     if (settings.Subtitle.Decoder != key)
                     {
-                        applyChange(target => target.Subtitle.Decoder = key);
+                        applyChange(target => target.Decoder = key);
                     }
                 }),
             },
@@ -327,7 +327,7 @@ internal static class PlayerMenuCreator
                 {
                     if (settings.Subtitle.Renderer != key)
                     {
-                        applyChange(target => target.Subtitle.Renderer = key);
+                        applyChange(target => target.Renderer = key);
                     }
                 }),
             },

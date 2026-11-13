@@ -1196,6 +1196,9 @@ $plugins</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>ソート機能</value>
   </data>
+  <data name="Speed" xml:space="preserve">
+    <value>速度</value>
+  </data>
   <data name="State" xml:space="preserve">
     <value>状態</value>
   </data>
