@@ -901,8 +901,11 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="OriginalSize" xml:space="preserve">
     <value>元のサイズ</value>
   </data>
-  <data name="Outline" xml:space="preserve">
-    <value>輪郭</value>
+  <data name="OutlineColor" xml:space="preserve">
+    <value>輪郭の色</value>
+  </data>
+  <data name="OutlineWidth" xml:space="preserve">
+    <value>輪郭の幅</value>
   </data>
   <data name="Output" xml:space="preserve">
     <value>出力</value>

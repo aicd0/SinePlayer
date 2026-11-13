@@ -234,7 +234,8 @@ public class StringResourceProvider
     public string OpenUserDataFolder => GetResourceString("OpenUserDataFolder");
     public string Order => GetResourceString("Order");
     public string OriginalSize => GetResourceString("OriginalSize");
-    public string Outline => GetResourceString("Outline");
+    public string OutlineColor => GetResourceString("OutlineColor");
+    public string OutlineWidth => GetResourceString("OutlineWidth");
     public string Output => GetResourceString("Output");
     public string OverwriteExistingEntries => GetResourceString("OverwriteExistingEntries");
     public string PanX => GetResourceString("PanX");

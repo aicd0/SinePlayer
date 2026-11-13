@@ -459,6 +459,36 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>
+    /// The border is drawn in the colour the host names, and in black when it names none. The words themselves are left
+    /// out of the picture here, so what is read back is the border alone.
+    /// </summary>
+    [Test]
+    public void DrawsTheBorderInTheColourItIsGiven()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        SubtitlePresentation borderOnly = new() { FontSize = 32.0, FontColor = Color.FromArgb(0, 0, 0, 0), OutlineWidth = 6.0 };
+
+        Color named = InkColour(RenderInk(device, 480, 240, borderOnly with { OutlineColor = Color.FromArgb(255, 0, 128, 0) }));
+        Color unnamed = InkColour(RenderInk(device, 480, 240, borderOnly));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(named, Is.EqualTo(Color.FromArgb(255, 0, 128, 0)), "the colour the host names is the colour of the border");
+            Assert.That(unnamed, Is.EqualTo(Color.FromArgb(255, 0, 0, 0)), "and none named is the black it has always been");
+        }
+    }
+
+    /// <summary>
     /// This drawing has no picture-relative coordinates: it lays lines out itself against the surface, so the frame a
     /// script would be placed in changes nothing about where the words go.
     /// </summary>

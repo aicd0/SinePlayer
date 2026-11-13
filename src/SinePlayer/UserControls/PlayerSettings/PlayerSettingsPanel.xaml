@@ -510,18 +510,66 @@
                                         </Button.Flyout>
                                     </Button>
                                 </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleOutlineWidthLabel, Mode=OneWay}" />
+                                    <NumberBox
+                                        x:Name="SubtitleOutlineWidthNumberBox"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        LargeChange="1"
+                                        Maximum="10"
+                                        Minimum="0"
+                                        SmallChange="0.1"
+                                        SpinButtonPlacementMode="Inline"
+                                        ValueChanged="SubtitleOutlineWidthNumberBox_ValueChanged" />
+                                </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleOutlineColorLabel, Mode=OneWay}" />
+                                    <Button
+                                        Grid.Column="3"
+                                        Padding="4"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                        <Border
+                                            x:Name="SubtitleOutlineColorPreview"
+                                            Width="36"
+                                            Height="20"
+                                            CornerRadius="2" />
+                                        <Button.Flyout>
+                                            <Flyout>
+                                                <ColorPicker
+                                                    x:Name="SubtitleOutlineColorPicker"
+                                                    ColorChanged="SubtitleOutlineColorPicker_ColorChanged"
+                                                    IsAlphaEnabled="False" />
+                                            </Flyout>
+                                        </Button.Flyout>
+                                    </Button>
+                                </Grid>
                                 <Rectangle
                                     Height="1"
                                     Margin="0,8"
                                     Fill="{ThemeResource MediaInfoSeparatorForeground}" />
-                                <settings:SliderSettingView
-                                    x:Name="SubtitleOutlineSlider"
-                                    DefaultValue="2"
-                                    Label="{x:Bind ViewModel.SubtitleOutlineLabel, Mode=OneWay}"
-                                    Maximum="10"
-                                    Minimum="0"
-                                    StepFrequency="0.1"
-                                    ValueChanged="SubtitleOutlineSlider_ValueChanged" />
                                 <settings:SliderSettingView
                                     x:Name="SubtitleOpacitySlider"
                                     DefaultValue="100"

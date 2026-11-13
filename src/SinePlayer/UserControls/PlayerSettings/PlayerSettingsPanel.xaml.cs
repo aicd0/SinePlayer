@@ -774,8 +774,15 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             {
                 bool modified = settings.Subtitle.OutlineWidth != presetSettings.Subtitle.OutlineWidth;
                 tabModified = tabModified || modified;
-                UpdateSubtitleOutline(settings);
-                ViewModel.SubtitleOutlineLabel = GetLabel(StringResource.Outline, modified);
+                UpdateSubtitleOutlineWidth(settings);
+                ViewModel.SubtitleOutlineWidthLabel = GetLabel(StringResource.OutlineWidth, modified);
+            }
+
+            {
+                bool modified = !settings.Subtitle.OutlineColor.Equals(presetSettings.Subtitle.OutlineColor);
+                tabModified = tabModified || modified;
+                UpdateSubtitleOutlineColor(settings);
+                ViewModel.SubtitleOutlineColorLabel = GetLabel(StringResource.OutlineColor, modified);
             }
 
             {
@@ -1394,27 +1401,64 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         SubtitleFontColorPreview.Background = new SolidColorBrush(color);
     }
 
-    private void SubtitleOutlineSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    private void SubtitleOutlineWidthNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        double value = e.NewValue;
+        if (double.IsNaN(sender.Value))
+        {
+            sender.Value = _mediaSettings.Subtitle.OutlineWidth;
+            return;
+        }
+
+        double value = Math.Round(sender.Value, 1);
+        if (value != sender.Value)
+        {
+            sender.Value = value;
+        }
+
         if (_mediaSettings.Subtitle.OutlineWidth != value)
         {
             Apply(settings => settings.Subtitle.OutlineWidth = value);
         }
     }
 
-    private void UpdateSubtitleOutline(PlayerSettingsModel settings)
+    private void UpdateSubtitleOutlineWidth(PlayerSettingsModel settings)
     {
         double value = settings.Subtitle.OutlineWidth;
-        if (Math.Abs(SubtitleOutlineSlider.Value - value) > 0.001)
+        double shown = SubtitleOutlineWidthNumberBox.Value;
+        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
         {
-            SubtitleOutlineSlider.Value = value;
+            SubtitleOutlineWidthNumberBox.Value = value;
         }
+    }
+
+    private void SubtitleOutlineColorPicker_ColorChanged(ColorPicker sender, ColorChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        Color color = args.NewColor;
+        if (!_mediaSettings.Subtitle.OutlineColor.Equals(color))
+        {
+            Apply(settings => settings.Subtitle.OutlineColor = color);
+        }
+    }
+
+    private void UpdateSubtitleOutlineColor(PlayerSettingsModel settings)
+    {
+        Color color = settings.Subtitle.OutlineColor;
+        if (!SubtitleOutlineColorPicker.Color.Equals(color))
+        {
+            SubtitleOutlineColorPicker.Color = color;
+        }
+
+        SubtitleOutlineColorPreview.Background = new SolidColorBrush(color);
     }
 
     private void SubtitleOpacitySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)

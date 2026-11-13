@@ -214,6 +214,7 @@ public partial class PlaybackPipelineTests
             FontWeight = new FontWeight { Weight = 700 },
             FontColor = Color.FromArgb(255, 12, 34, 56),
             OutlineWidth = 3.0,
+            OutlineColor = Color.FromArgb(255, 65, 43, 21),
             Opacity = 0.75,
         };
         pipeline.SubtitleChains[0].Presentation = presentation;

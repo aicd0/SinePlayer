@@ -299,7 +299,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
                 CanvasGeometry? outline = outlines.Get(device, body, format, width, height);
                 if (outline is not null)
                 {
-                    session.DrawGeometry(outline, origin, OutlineColor, (float)(2.0 * presentation.OutlineWidth * scale), OutlineStrokeStyle);
+                    session.DrawGeometry(outline, origin, presentation.OutlineColor ?? DefaultOutlineColor, (float)(2.0 * presentation.OutlineWidth * scale), OutlineStrokeStyle);
                 }
             }
 
@@ -349,7 +349,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
     #region Outline
 
     private static readonly Color DefaultTextColor = Color.FromArgb(255, 255, 255, 255);
-    private static readonly Color OutlineColor = Color.FromArgb(255, 0, 0, 0);
+    private static readonly Color DefaultOutlineColor = Color.FromArgb(255, 0, 0, 0);
     private static readonly CanvasStrokeStyle OutlineStrokeStyle = new() { LineJoin = CanvasLineJoin.Round };
 
     private sealed partial class OutlineCache : IDisposable
