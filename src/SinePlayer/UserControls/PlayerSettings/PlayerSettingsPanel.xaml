@@ -522,6 +522,14 @@
                                     Minimum="0"
                                     StepFrequency="0.1"
                                     ValueChanged="SubtitleOutlineSlider_ValueChanged" />
+                                <settings:SliderSettingView
+                                    x:Name="SubtitleOpacitySlider"
+                                    DefaultValue="100"
+                                    Label="{x:Bind ViewModel.SubtitleOpacityLabel, Mode=OneWay}"
+                                    Maximum="100"
+                                    Minimum="0"
+                                    StepFrequency="1"
+                                    ValueChanged="SubtitleOpacitySlider_ValueChanged" />
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>

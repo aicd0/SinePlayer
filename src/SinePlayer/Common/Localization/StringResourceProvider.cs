@@ -219,6 +219,7 @@ public class StringResourceProvider
     public string None => GetResourceString("None");
     public string OK => GetResourceString("OK");
     public string Off => GetResourceString("Off");
+    public string Opacity => GetResourceString("Opacity");
     public string Open => GetResourceString("Open");
     public string OpenHomePage => GetResourceString("OpenHomePage");
     public string OpenInCurrentTab => GetResourceString("OpenInCurrentTab");

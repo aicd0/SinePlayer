@@ -26,6 +26,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
     public int Weight { get; set; }
     public Color FontColor { get; set; } = Color.FromArgb(255, 255, 255, 255);
     public double OutlineWidth { get; set; } = 2.0;
+    public int Opacity { get; set; } = 100;
 
     public SubtitlePresentation ToPresentation()
     {
@@ -40,6 +41,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             FontWeight = ToFontWeight(),
             FontColor = FontColor,
             OutlineWidth = OutlineWidth,
+            Opacity = Opacity / 100.0,
         };
     }
 
@@ -81,6 +83,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
         Weight = model.FontWeight ?? Weight;
         FontColor = model.FontColor is { } value ? FromColorValue(value) : FontColor;
         OutlineWidth = model.OutlineWidth ?? OutlineWidth;
+        Opacity = model.Opacity ?? Opacity;
     }
 
     protected override JsonModel ToJsonModel()
@@ -98,6 +101,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             FontWeight = Weight,
             FontColor = ToColorValue(FontColor),
             OutlineWidth = OutlineWidth,
+            Opacity = Opacity,
         };
     }
 
@@ -145,5 +149,8 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 
         [JsonPropertyName("OutlineWidth")]
         public double? OutlineWidth { get; set; }
+
+        [JsonPropertyName("Opacity")]
+        public int? Opacity { get; set; }
     }
 }

@@ -30,5 +30,7 @@ public readonly record struct SubtitlePresentation
 
     public double OutlineWidth { get; init; }
 
+    public double? Opacity { get; init; }
+
     public SubtitleFrame Frame { get; init; }
 }

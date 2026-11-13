@@ -856,6 +856,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Off" xml:space="preserve">
     <value>Off</value>
   </data>
+  <data name="Opacity" xml:space="preserve">
+    <value>Opacity</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>Open</value>
   </data>

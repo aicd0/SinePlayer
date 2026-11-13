@@ -856,6 +856,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Off" xml:space="preserve">
     <value>Aus</value>
   </data>
+  <data name="Opacity" xml:space="preserve">
+    <value>Deckkraft</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>Öffnen</value>
   </data>

@@ -856,6 +856,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="Off" xml:space="preserve">
     <value>オフ</value>
   </data>
+  <data name="Opacity" xml:space="preserve">
+    <value>不透明度</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>開く</value>
   </data>

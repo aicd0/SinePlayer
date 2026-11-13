@@ -779,6 +779,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = settings.Subtitle.Opacity != presetSettings.Subtitle.Opacity;
+                tabModified = tabModified || modified;
+                UpdateSubtitleOpacity(settings);
+                ViewModel.SubtitleOpacityLabel = GetLabel(StringResource.Opacity, modified);
+            }
+
+            {
                 bool modified = settings.Subtitle.PanX != presetSettings.Subtitle.PanX;
                 tabModified = tabModified || modified;
                 UpdateSubtitlePanX(settings);
@@ -1407,6 +1414,29 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (Math.Abs(SubtitleOutlineSlider.Value - value) > 0.001)
         {
             SubtitleOutlineSlider.Value = value;
+        }
+    }
+
+    private void SubtitleOpacitySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        int value = (int)Math.Round(e.NewValue);
+        if (_mediaSettings.Subtitle.Opacity != value)
+        {
+            Apply(settings => settings.Subtitle.Opacity = value);
+        }
+    }
+
+    private void UpdateSubtitleOpacity(PlayerSettingsModel settings)
+    {
+        double value = settings.Subtitle.Opacity;
+        if (Math.Abs(SubtitleOpacitySlider.Value - value) > 0.5)
+        {
+            SubtitleOpacitySlider.Value = value;
         }
     }
 
