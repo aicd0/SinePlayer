@@ -348,6 +348,54 @@ internal static class AppSettingsModel
         }
     }
 
+    public static string DefaultPlayerSettingPresetKey
+    {
+        get
+        {
+            return _db.Read(model => model.DefaultPlayerSettingPresetKey ?? string.Empty);
+        }
+        set
+        {
+            _db.Write(model => model.DefaultPlayerSettingPresetKey = value);
+            _db.Save();
+        }
+    }
+
+    public static Dictionary<string, PlayerPresetSettingsModel> PlayerSettingPresets
+    {
+        get
+        {
+            return _db.Read(model =>
+            {
+                Dictionary<string, PlayerPresetSettingsModel> presets = [];
+                if (model.PlayerSettingPresets is not null)
+                {
+                    foreach (KeyValuePair<string, PresetJsonModel<PlayerPresetSettingsModel.JsonModel>?> kvp in model.PlayerSettingPresets)
+                    {
+                        if (kvp.Value is not null)
+                        {
+                            presets[kvp.Key] = PlayerPresetSettingsModel.FromPresetJsonModel(kvp.Key, kvp.Value);
+                        }
+                    }
+                }
+
+                return presets;
+            });
+        }
+        set
+        {
+            _db.Write(model =>
+            {
+                model.PlayerSettingPresets = [];
+                foreach (KeyValuePair<string, PlayerPresetSettingsModel> kvp in value)
+                {
+                    model.PlayerSettingPresets[kvp.Key] = kvp.Value.ToPresetJsonModel();
+                }
+            });
+            _db.Save();
+        }
+    }
+
     public static string DefaultVideoSettingPresetKey
     {
         get
@@ -960,6 +1008,12 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("PlaybackDefaultShuffle")]
         public bool? PlaybackDefaultShuffle { get; set; }
+
+        [JsonPropertyName("DefaultPlayerSettingPresetKey")]
+        public string? DefaultPlayerSettingPresetKey { get; set; }
+
+        [JsonPropertyName("PlayerSettingPresets")]
+        public Dictionary<string, PresetJsonModel<PlayerPresetSettingsModel.JsonModel>?>? PlayerSettingPresets { get; set; }
 
         [JsonPropertyName("DefaultVideoSettingPresetKey")]
         public string? DefaultVideoSettingPresetKey { get; set; }

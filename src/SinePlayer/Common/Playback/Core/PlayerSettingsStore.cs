@@ -17,12 +17,24 @@ internal static class PlayerSettingsStore
 {
     private const string TAG = nameof(PlayerSettingsStore);
 
-    public static string? GetRecord(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track)
+    public static string? GetPlayerRecord(MediaModel media)
     {
-        return track is null ? GetGlobalRecord(media, kind) : GetTrackRecord(media, kind, track) ?? GetGlobalRecord(media, kind);
+        return ToJson(Load(media).Player);
     }
 
-    public static string? GetGlobalRecord(MediaModel media, MediaStreamKind kind)
+    public static void SetPlayerRecord(MediaModel media, string recordJson)
+    {
+        PlayerSettingsJsonModel model = Load(media);
+        model.Player = FromJson<PlayerPresetSettingsModel.JsonModel>(recordJson);
+        Store(media, model);
+    }
+
+    public static string? GetStreamRecord(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track)
+    {
+        return track is null ? GetStreamGlobalRecord(media, kind) : GetStreamTrackRecord(media, kind, track) ?? GetStreamGlobalRecord(media, kind);
+    }
+
+    public static string? GetStreamGlobalRecord(MediaModel media, MediaStreamKind kind)
     {
         PlayerSettingsScopeJsonModel? scope = Load(media).Global;
         return kind switch
@@ -34,7 +46,7 @@ internal static class PlayerSettingsStore
         };
     }
 
-    public static void SetGlobalRecord(MediaModel media, MediaStreamKind kind, string recordJson)
+    public static void SetStreamGlobalRecord(MediaModel media, MediaStreamKind kind, string recordJson)
     {
         PlayerSettingsJsonModel model = Load(media);
         model.Global ??= new();
@@ -55,7 +67,7 @@ internal static class PlayerSettingsStore
         Store(media, model);
     }
 
-    public static string? GetTrackRecord(MediaModel media, MediaStreamKind kind, TrackIdentityModel track)
+    public static string? GetStreamTrackRecord(MediaModel media, MediaStreamKind kind, TrackIdentityModel track)
     {
         TrackSettingsJsonModel? tracks = Load(media).Tracks;
         return kind switch
@@ -67,7 +79,7 @@ internal static class PlayerSettingsStore
         };
     }
 
-    public static void SetTrackRecord(MediaModel media, MediaStreamKind kind, TrackIdentityModel track, string recordJson)
+    public static void SetStreamTrackRecord(MediaModel media, MediaStreamKind kind, TrackIdentityModel track, string recordJson)
     {
         PlayerSettingsJsonModel model = Load(media);
         model.Tracks ??= new();
@@ -91,7 +103,7 @@ internal static class PlayerSettingsStore
         Store(media, model);
     }
 
-    public static IReadOnlyList<(TrackIdentityModel Track, string RecordJson)> GetTrackRecords(MediaModel media, MediaStreamKind kind)
+    public static IReadOnlyList<(TrackIdentityModel Track, string RecordJson)> GetStreamTrackRecords(MediaModel media, MediaStreamKind kind)
     {
         List<(TrackIdentityModel Track, string RecordJson)> records = [];
         TrackSettingsJsonModel? tracks = Load(media).Tracks;
@@ -128,7 +140,7 @@ internal static class PlayerSettingsStore
         }
     }
 
-    public static TrackIdentityModel? GetTrackScope(MediaModel media, MediaStreamKind kind)
+    public static TrackIdentityModel? GetStreamTrackScope(MediaModel media, MediaStreamKind kind)
     {
         TrackScopeJsonModel? scope = Load(media).Scope;
         return kind switch
@@ -140,7 +152,7 @@ internal static class PlayerSettingsStore
         };
     }
 
-    public static void SetTrackScope(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track)
+    public static void SetStreamTrackScope(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track)
     {
         PlayerSettingsJsonModel model = Load(media);
         model.Scope ??= new();
@@ -247,6 +259,9 @@ internal sealed class PlayerSettingsJsonModel
 
     [JsonPropertyName("Scope")]
     public TrackScopeJsonModel? Scope { get; set; }
+
+    [JsonPropertyName("Player")]
+    public SettingsRecordJsonModel<PlayerPresetSettingsModel.JsonModel>? Player { get; set; }
 }
 
 internal sealed class TrackScopeJsonModel

@@ -224,28 +224,28 @@ internal sealed partial class PlayerSession : IDisposable
 
     public void ReloadSettings()
     {
+        ApplyPlayerSettings();
+
         PlaybackPipeline? pipeline = _pipeline;
-        if (pipeline is null)
+        if (pipeline is not null)
         {
-            return;
-        }
+            foreach (IVideoChain chain in pipeline.VideoChains)
+            {
+                ApplySettings(chain);
+            }
 
-        foreach (IVideoChain chain in pipeline.VideoChains)
-        {
-            ApplySettings(chain);
-        }
+            foreach (IAudioChain chain in pipeline.AudioChains)
+            {
+                ApplySettings(chain);
+            }
 
-        foreach (IAudioChain chain in pipeline.AudioChains)
-        {
-            ApplySettings(chain);
-        }
+            foreach (ISubtitleChain chain in pipeline.SubtitleChains)
+            {
+                ApplySettings(chain);
+            }
 
-        foreach (ISubtitleChain chain in pipeline.SubtitleChains)
-        {
-            ApplySettings(chain);
+            _pendingReconcile = true;
         }
-
-        _pendingReconcile = true;
     }
 
     public IReadOnlyList<(MediaSource Source, MediaStreamInfo Stream)> SelectedTracks(MediaStreamKind kind)
@@ -782,7 +782,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         var track = TrackIdentityModel.From(stream, PathOf(stream));
-        string? record = PlayerSettingsStore.GetRecord(media, kind, track);
+        string? record = PlayerSettingsStore.GetStreamRecord(media, kind, track);
 
         switch (kind)
         {
@@ -798,6 +798,17 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         return settings;
+    }
+
+    private void ApplyPlayerSettings()
+    {
+        if (_openedMedia is not { } media)
+        {
+            return;
+        }
+
+        var settings = PlayerPresetSettingsModel.FromRecordJson(PlayerSettingsStore.GetPlayerRecord(media));
+        SetPlaybackRate(settings.Speed);
     }
 
     private void ApplySettings(IVideoChain chain)

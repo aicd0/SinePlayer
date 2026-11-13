@@ -1196,6 +1196,9 @@ Start in Safe Mode?</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>Sorting function</value>
   </data>
+  <data name="Speed" xml:space="preserve">
+    <value>Speed</value>
+  </data>
   <data name="State" xml:space="preserve">
     <value>State</value>
   </data>

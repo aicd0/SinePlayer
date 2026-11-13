@@ -1196,6 +1196,9 @@ Démarrer en mode sans échec ?</value>
   <data name="SortingFunction" xml:space="preserve">
     <value>Fonction de tri</value>
   </data>
+  <data name="Speed" xml:space="preserve">
+    <value>Vitesse</value>
+  </data>
   <data name="State" xml:space="preserve">
     <value>État</value>
   </data>

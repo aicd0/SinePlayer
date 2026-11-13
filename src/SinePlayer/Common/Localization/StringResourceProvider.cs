@@ -326,6 +326,7 @@ public class StringResourceProvider
     public string Software => GetResourceString("Software");
     public string Sort => GetResourceString("Sort");
     public string SortingFunction => GetResourceString("SortingFunction");
+    public string Speed => GetResourceString("Speed");
     public string State => GetResourceString("State");
     public string Statistics => GetResourceString("Statistics");
     public string Stretch => GetResourceString("Stretch");
