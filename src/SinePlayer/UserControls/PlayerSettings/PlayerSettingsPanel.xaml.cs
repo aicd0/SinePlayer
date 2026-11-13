@@ -271,9 +271,9 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         bool value = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.VideoPreferHardwareDecoding != value)
+        if (_mediaSettings.Video.PreferHardwareDecoding != value)
         {
-            Apply(settings => settings.VideoPreferHardwareDecoding = value);
+            Apply(settings => settings.Video.PreferHardwareDecoding = value);
         }
     }
 
@@ -285,9 +285,9 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         bool value = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.VideoPreferHdr != value)
+        if (_mediaSettings.Video.PreferHdr != value)
         {
-            Apply(settings => settings.VideoPreferHdr = value);
+            Apply(settings => settings.Video.PreferHdr = value);
         }
     }
 
@@ -299,9 +299,9 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         bool value = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.VideoFlipHorizontal != value)
+        if (_mediaSettings.Video.FlipHorizontal != value)
         {
-            Apply(settings => settings.VideoFlipHorizontal = value);
+            Apply(settings => settings.Video.FlipHorizontal = value);
         }
     }
 
@@ -313,9 +313,9 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         bool value = ((ToggleSwitch)sender).IsOn;
-        if (_mediaSettings.VideoFlipVertical != value)
+        if (_mediaSettings.Video.FlipVertical != value)
         {
-            Apply(settings => settings.VideoFlipVertical = value);
+            Apply(settings => settings.Video.FlipVertical = value);
         }
     }
 
@@ -329,18 +329,18 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (double.IsNaN(sender.Value))
         {
             sender.Value = 0;
-            if (_mediaSettings.SubtitlePanX != 0)
+            if (_mediaSettings.Subtitle.PanX != 0)
             {
-                Apply(settings => settings.SubtitlePanX = 0);
+                Apply(settings => settings.Subtitle.PanX = 0);
             }
 
             return;
         }
 
         int value = (int)Math.Round(sender.Value);
-        if (_mediaSettings.SubtitlePanX != value)
+        if (_mediaSettings.Subtitle.PanX != value)
         {
-            Apply(settings => settings.SubtitlePanX = value);
+            Apply(settings => settings.Subtitle.PanX = value);
         }
     }
 
@@ -354,18 +354,18 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (double.IsNaN(sender.Value))
         {
             sender.Value = 0;
-            if (_mediaSettings.SubtitlePanY != 0)
+            if (_mediaSettings.Subtitle.PanY != 0)
             {
-                Apply(settings => settings.SubtitlePanY = 0);
+                Apply(settings => settings.Subtitle.PanY = 0);
             }
 
             return;
         }
 
         int value = (int)Math.Round(sender.Value);
-        if (_mediaSettings.SubtitlePanY != value)
+        if (_mediaSettings.Subtitle.PanY != value)
         {
-            Apply(settings => settings.SubtitlePanY = value);
+            Apply(settings => settings.Subtitle.PanY = value);
         }
     }
 
@@ -381,9 +381,9 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        if (_mediaSettings.SubtitleFontFamily != family)
+        if (_mediaSettings.Subtitle.Family != family)
         {
-            Apply(settings => settings.SubtitleFontFamily = family);
+            Apply(settings => settings.Subtitle.Family = family);
         }
     }
 
@@ -422,9 +422,9 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        if (_mediaSettings.SubtitleFontWeight != weight)
+        if (_mediaSettings.Subtitle.Weight != weight)
         {
-            Apply(settings => settings.SubtitleFontWeight = weight);
+            Apply(settings => settings.Subtitle.Weight = weight);
         }
     }
 
@@ -441,9 +441,9 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         string value = style.ToString();
-        if (_mediaSettings.SubtitleFontStyle != value)
+        if (_mediaSettings.Subtitle.Style != value)
         {
-            Apply(settings => settings.SubtitleFontStyle = value);
+            Apply(settings => settings.Subtitle.Style = value);
         }
     }
 
@@ -455,18 +455,18 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         double value = e.NewValue;
-        if (_mediaSettings.SubtitleOutlineWidth != value)
+        if (_mediaSettings.Subtitle.OutlineWidth != value)
         {
-            Apply(settings => settings.SubtitleOutlineWidth = value);
+            Apply(settings => settings.Subtitle.OutlineWidth = value);
         }
     }
 
     private void ApplySubtitleFontSize(double size)
     {
         double value = size <= 0.0 ? 0.0 : Math.Clamp(size, MinimumSubtitleFontSize, MaximumSubtitleFontSize);
-        if (_mediaSettings.SubtitleFontSize != value)
+        if (_mediaSettings.Subtitle.Size != value)
         {
-            Apply(settings => settings.SubtitleFontSize = value);
+            Apply(settings => settings.Subtitle.Size = value);
             return;
         }
     }
@@ -598,63 +598,63 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             bool tabModified = false;
 
             {
-                bool modified = settings.VideoDecoder != presetSettings.VideoDecoder;
+                bool modified = settings.Video.Decoder != presetSettings.Video.Decoder;
                 tabModified = tabModified || modified;
                 UpdateVideoDecoder(settings);
                 ViewModel.VideoDecoderLabel = GetLabel(StringResource.Decoder, modified);
             }
 
             {
-                bool modified = settings.VideoRenderer != presetSettings.VideoRenderer;
+                bool modified = settings.Video.Renderer != presetSettings.Video.Renderer;
                 tabModified = tabModified || modified;
                 UpdateVideoRenderer(settings);
                 ViewModel.VideoRendererLabel = GetLabel(StringResource.Renderer, modified);
             }
 
             {
-                bool modified = settings.VideoPreferHardwareDecoding != presetSettings.VideoPreferHardwareDecoding;
+                bool modified = settings.Video.PreferHardwareDecoding != presetSettings.Video.PreferHardwareDecoding;
                 tabModified = tabModified || modified;
                 UpdateVideoPreferHardwareDecoding(settings);
                 ViewModel.VideoPreferHardwareDecodingLabel = GetLabel(StringResource.PreferHardwareDecoding, modified);
             }
 
             {
-                bool modified = settings.VideoPreferHdr != presetSettings.VideoPreferHdr;
+                bool modified = settings.Video.PreferHdr != presetSettings.Video.PreferHdr;
                 tabModified = tabModified || modified;
                 UpdateVideoPreferHdr(settings);
                 ViewModel.VideoPreferHdrLabel = GetLabel(StringResource.PreferHdr, modified);
             }
 
             {
-                bool modified = settings.VideoResizeMode != presetSettings.VideoResizeMode;
+                bool modified = settings.Video.ResizeMode != presetSettings.Video.ResizeMode;
                 tabModified = tabModified || modified;
                 UpdateVideoStretchMode(settings);
                 ViewModel.VideoStretchModeLabel = GetLabel(StringResource.Scaling, modified);
             }
 
             {
-                bool modified = settings.VideoScalingMode != presetSettings.VideoScalingMode;
+                bool modified = settings.Video.ScalingMode != presetSettings.Video.ScalingMode;
                 tabModified = tabModified || modified;
                 UpdateVideoInterpolation(settings);
                 ViewModel.VideoInterpolationLabel = GetLabel(StringResource.ImageInterpolation, modified);
             }
 
             {
-                bool modified = settings.VideoRotationDegrees != presetSettings.VideoRotationDegrees;
+                bool modified = settings.Video.RotationDegrees != presetSettings.Video.RotationDegrees;
                 tabModified = tabModified || modified;
                 UpdateVideoRotation(settings);
                 ViewModel.VideoRotationLabel = GetLabel(StringResource.Rotation, modified);
             }
 
             {
-                bool modified = settings.VideoFlipHorizontal != presetSettings.VideoFlipHorizontal;
+                bool modified = settings.Video.FlipHorizontal != presetSettings.Video.FlipHorizontal;
                 tabModified = tabModified || modified;
                 UpdateVideoFlipHorizontal(settings);
                 ViewModel.VideoFlipHorizontalLabel = GetLabel(StringResource.FlipHorizontally, modified);
             }
 
             {
-                bool modified = settings.VideoFlipVertical != presetSettings.VideoFlipVertical;
+                bool modified = settings.Video.FlipVertical != presetSettings.Video.FlipVertical;
                 tabModified = tabModified || modified;
                 UpdateVideoFlipVertical(settings);
                 ViewModel.VideoFlipVerticalLabel = GetLabel(StringResource.FlipVertically, modified);
@@ -668,14 +668,14 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             bool tabModified = false;
 
             {
-                bool modified = settings.AudioDecoder != presetSettings.AudioDecoder;
+                bool modified = settings.Audio.Decoder != presetSettings.Audio.Decoder;
                 tabModified = tabModified || modified;
                 UpdateAudioDecoder(settings);
                 ViewModel.AudioDecoderLabel = GetLabel(StringResource.Decoder, modified);
             }
 
             {
-                bool modified = settings.AudioRenderer != presetSettings.AudioRenderer;
+                bool modified = settings.Audio.Renderer != presetSettings.Audio.Renderer;
                 tabModified = tabModified || modified;
                 UpdateAudioRenderer(settings);
                 ViewModel.AudioRendererLabel = GetLabel(StringResource.Renderer, modified);
@@ -689,63 +689,63 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             bool tabModified = false;
 
             {
-                bool modified = settings.SubtitleDecoder != presetSettings.SubtitleDecoder;
+                bool modified = settings.Subtitle.Decoder != presetSettings.Subtitle.Decoder;
                 tabModified = tabModified || modified;
                 UpdateSubtitleDecoder(settings);
                 ViewModel.SubtitleDecoderLabel = GetLabel(StringResource.Decoder, modified);
             }
 
             {
-                bool modified = settings.SubtitleRenderer != presetSettings.SubtitleRenderer;
+                bool modified = settings.Subtitle.Renderer != presetSettings.Subtitle.Renderer;
                 tabModified = tabModified || modified;
                 UpdateSubtitleRenderer(settings);
                 ViewModel.SubtitleRendererLabel = GetLabel(StringResource.Renderer, modified);
             }
 
             {
-                bool modified = settings.SubtitleFontFamily != presetSettings.SubtitleFontFamily;
+                bool modified = settings.Subtitle.Family != presetSettings.Subtitle.Family;
                 tabModified = tabModified || modified;
                 UpdateSubtitleFontFamily(settings);
                 ViewModel.SubtitleFontFamilyLabel = GetLabel(StringResource.FontFamily, modified);
             }
 
             {
-                bool modified = settings.SubtitleFontSize != presetSettings.SubtitleFontSize;
+                bool modified = settings.Subtitle.Size != presetSettings.Subtitle.Size;
                 tabModified = tabModified || modified;
                 UpdateSubtitleFontSize(settings);
                 ViewModel.SubtitleFontSizeLabel = GetLabel(StringResource.FontSize, modified);
             }
 
             {
-                bool modified = settings.SubtitleFontStyle != presetSettings.SubtitleFontStyle;
+                bool modified = settings.Subtitle.Style != presetSettings.Subtitle.Style;
                 tabModified = tabModified || modified;
                 UpdateSubtitleFontStyle(settings);
                 ViewModel.SubtitleFontStyleLabel = GetLabel(StringResource.FontStyle, modified);
             }
 
             {
-                bool modified = settings.SubtitleFontWeight != presetSettings.SubtitleFontWeight;
+                bool modified = settings.Subtitle.Weight != presetSettings.Subtitle.Weight;
                 tabModified = tabModified || modified;
                 UpdateSubtitleFontWeight(settings);
                 ViewModel.SubtitleFontWeightLabel = GetLabel(StringResource.FontWeight, modified);
             }
 
             {
-                bool modified = settings.SubtitleOutlineWidth != presetSettings.SubtitleOutlineWidth;
+                bool modified = settings.Subtitle.OutlineWidth != presetSettings.Subtitle.OutlineWidth;
                 tabModified = tabModified || modified;
                 UpdateSubtitleOutline(settings);
                 ViewModel.SubtitleOutlineLabel = GetLabel(StringResource.Outline, modified);
             }
 
             {
-                bool modified = settings.SubtitlePanX != presetSettings.SubtitlePanX;
+                bool modified = settings.Subtitle.PanX != presetSettings.Subtitle.PanX;
                 tabModified = tabModified || modified;
                 UpdateSubtitlePanX(settings);
                 ViewModel.SubtitlePanXLabel = GetLabel(StringResource.PanX, modified);
             }
 
             {
-                bool modified = settings.SubtitlePanY != presetSettings.SubtitlePanY;
+                bool modified = settings.Subtitle.PanY != presetSettings.Subtitle.PanY;
                 tabModified = tabModified || modified;
                 UpdateSubtitlePanY(settings);
                 ViewModel.SubtitlePanYLabel = GetLabel(StringResource.PanY, modified);
@@ -765,12 +765,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoDecoder(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetVideoDecoderOptions()];
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoDecoder);
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Video.Decoder);
         VideoDecoderDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
-            if (settings.VideoDecoder != key)
+            if (settings.Video.Decoder != key)
             {
-                Apply(target => target.VideoDecoder = key);
+                Apply(target => target.Video.Decoder = key);
             }
         });
         VideoDecoderDropDownButton.Content = choice.Label;
@@ -779,12 +779,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoRenderer(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetVideoRendererOptions()];
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoRenderer);
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Video.Renderer);
         VideoRendererDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
-            if (settings.VideoRenderer != key)
+            if (settings.Video.Renderer != key)
             {
-                Apply(target => target.VideoRenderer = key);
+                Apply(target => target.Video.Renderer = key);
             }
         });
         VideoRendererDropDownButton.Content = choice.Label;
@@ -792,24 +792,24 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateVideoPreferHardwareDecoding(PlayerSettingsModel settings)
     {
-        VideoPreferHardwareDecodingToggleSwitch.IsOn = settings.VideoPreferHardwareDecoding;
+        VideoPreferHardwareDecodingToggleSwitch.IsOn = settings.Video.PreferHardwareDecoding;
     }
 
     private void UpdateVideoPreferHdr(PlayerSettingsModel settings)
     {
-        VideoPreferHdrToggleSwitch.IsOn = settings.VideoPreferHdr;
+        VideoPreferHdrToggleSwitch.IsOn = settings.Video.PreferHdr;
     }
 
     private void UpdateVideoStretchMode(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = PlayerMenuCreator.GetStretchModeOptions();
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoResizeMode.ToString());
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Video.ResizeMode.ToString());
         VideoStretchModeDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
             VideoResizeMode mode = Enum.Parse<VideoResizeMode>(key);
-            if (settings.VideoResizeMode != mode)
+            if (settings.Video.ResizeMode != mode)
             {
-                Apply(target => target.VideoResizeMode = mode);
+                Apply(target => target.Video.ResizeMode = mode);
             }
         });
         VideoStretchModeDropDownButton.Content = choice.Label;
@@ -818,13 +818,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoInterpolation(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = PlayerMenuCreator.GetScalingModeOptions();
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoScalingMode.ToString());
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Video.ScalingMode.ToString());
         VideoInterpolationDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
             VideoScalingMode mode = Enum.Parse<VideoScalingMode>(key);
-            if (settings.VideoScalingMode != mode)
+            if (settings.Video.ScalingMode != mode)
             {
-                Apply(target => target.VideoScalingMode = mode);
+                Apply(target => target.Video.ScalingMode = mode);
             }
         });
         VideoInterpolationDropDownButton.Content = choice.Label;
@@ -833,13 +833,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoRotation(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = PlayerMenuCreator.GetRotationOptions();
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.VideoRotationDegrees.ToString(CultureInfo.InvariantCulture));
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Video.RotationDegrees.ToString(CultureInfo.InvariantCulture));
         VideoRotationDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
             int degrees = int.Parse(key, CultureInfo.InvariantCulture);
-            if (settings.VideoRotationDegrees != degrees)
+            if (settings.Video.RotationDegrees != degrees)
             {
-                Apply(target => target.VideoRotationDegrees = degrees);
+                Apply(target => target.Video.RotationDegrees = degrees);
             }
         });
         VideoRotationDropDownButton.Content = choice.Label;
@@ -847,23 +847,23 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateVideoFlipHorizontal(PlayerSettingsModel settings)
     {
-        VideoFlipHorizontalToggleSwitch.IsOn = settings.VideoFlipHorizontal;
+        VideoFlipHorizontalToggleSwitch.IsOn = settings.Video.FlipHorizontal;
     }
 
     private void UpdateVideoFlipVertical(PlayerSettingsModel settings)
     {
-        VideoFlipVerticalToggleSwitch.IsOn = settings.VideoFlipVertical;
+        VideoFlipVerticalToggleSwitch.IsOn = settings.Video.FlipVertical;
     }
 
     private void UpdateAudioDecoder(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetAudioDecoderOptions()];
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.AudioDecoder);
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Audio.Decoder);
         AudioDecoderDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
-            if (settings.AudioDecoder != key)
+            if (settings.Audio.Decoder != key)
             {
-                Apply(target => target.AudioDecoder = key);
+                Apply(target => target.Audio.Decoder = key);
             }
         });
         AudioDecoderDropDownButton.Content = choice.Label;
@@ -872,12 +872,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateAudioRenderer(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetAudioRendererOptions()];
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.AudioRenderer);
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Audio.Renderer);
         AudioRendererDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
-            if (settings.AudioRenderer != key)
+            if (settings.Audio.Renderer != key)
             {
-                Apply(target => target.AudioRenderer = key);
+                Apply(target => target.Audio.Renderer = key);
             }
         });
         AudioRendererDropDownButton.Content = choice.Label;
@@ -886,12 +886,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateSubtitleDecoder(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetSubtitleDecoderOptions()];
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.SubtitleDecoder);
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Subtitle.Decoder);
         SubtitleDecoderDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
-            if (settings.SubtitleDecoder != key)
+            if (settings.Subtitle.Decoder != key)
             {
-                Apply(target => target.SubtitleDecoder = key);
+                Apply(target => target.Subtitle.Decoder = key);
             }
         });
         SubtitleDecoderDropDownButton.Content = choice.Label;
@@ -900,12 +900,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateSubtitleRenderer(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetSubtitleRendererOptions()];
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.SubtitleRenderer);
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Subtitle.Renderer);
         SubtitleRendererDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
         {
-            if (settings.SubtitleRenderer != key)
+            if (settings.Subtitle.Renderer != key)
             {
-                Apply(target => target.SubtitleRenderer = key);
+                Apply(target => target.Subtitle.Renderer = key);
             }
         });
         SubtitleRendererDropDownButton.Content = choice.Label;
@@ -913,7 +913,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateSubtitlePanX(PlayerSettingsModel settings)
     {
-        double value = settings.SubtitlePanX;
+        double value = settings.Subtitle.PanX;
         double shown = SubtitlePanXNumberBox.Value;
         if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.5)
         {
@@ -923,7 +923,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateSubtitlePanY(PlayerSettingsModel settings)
     {
-        double value = settings.SubtitlePanY;
+        double value = settings.Subtitle.PanY;
         double shown = SubtitlePanYNumberBox.Value;
         if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.5)
         {
@@ -955,7 +955,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
         }
 
-        int index = IndexOfSubtitleFontFamily(settings.SubtitleFontFamily);
+        int index = IndexOfSubtitleFontFamily(settings.Subtitle.Family);
         if (index < 0)
         {
             index = 0;
@@ -978,7 +978,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
         }
 
-        double value = settings.SubtitleFontSize;
+        double value = settings.Subtitle.Size;
         int index = -1;
         int insertAt = SubtitleFontSizeComboBox.Items.Count;
         for (int i = 0; i < SubtitleFontSizeComboBox.Items.Count; i++)
@@ -1023,7 +1023,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
         }
 
-        var value = settings.ToFontStyle();
+        var value = settings.Subtitle.ToFontStyle();
         int index = 0;
         for (int i = 0; i < SubtitleFontStyleComboBox.Items.Count; i++)
         {
@@ -1042,17 +1042,17 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateSubtitleFontWeight(PlayerSettingsModel settings)
     {
-        if (!string.Equals(_subtitleFontWeightFamily, settings.SubtitleFontFamily, StringComparison.Ordinal))
+        if (!string.Equals(_subtitleFontWeightFamily, settings.Subtitle.Family, StringComparison.Ordinal))
         {
-            _subtitleFontWeightFamily = settings.SubtitleFontFamily;
+            _subtitleFontWeightFamily = settings.Subtitle.Family;
             SubtitleFontWeightComboBox.Items.Clear();
-            foreach (int weight in SubtitleFonts.GetWeights(settings.SubtitleFontFamily))
+            foreach (int weight in SubtitleFonts.GetWeights(settings.Subtitle.Family))
             {
                 SubtitleFontWeightComboBox.Items.Add(new ComboBoxItem { Content = FormatSubtitleFontWeight(weight), Tag = weight });
             }
         }
 
-        int value = settings.SubtitleFontWeight > 0 ? settings.SubtitleFontWeight : DefaultSubtitleFontWeight;
+        int value = settings.Subtitle.Weight > 0 ? settings.Subtitle.Weight : DefaultSubtitleFontWeight;
         int index = -1;
         int insertAt = SubtitleFontWeightComboBox.Items.Count;
         for (int i = 0; i < SubtitleFontWeightComboBox.Items.Count; i++)
@@ -1089,7 +1089,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateSubtitleOutline(PlayerSettingsModel settings)
     {
-        double value = settings.SubtitleOutlineWidth;
+        double value = settings.Subtitle.OutlineWidth;
         if (Math.Abs(SubtitleOutlineSlider.Value - value) > 0.001)
         {
             SubtitleOutlineSlider.Value = value;
