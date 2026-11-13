@@ -23,6 +23,10 @@ internal abstract class PresetSettingsModel
 
     public abstract string ToRecordJson();
 
+    public abstract string ToValuesJson();
+
+    public abstract void ApplyValuesJson(string valuesJson);
+
     public abstract PresetSettingsModel CreateDefault();
 
     public abstract PresetSettingsModel? FindPreset(string presetKey);
@@ -103,6 +107,19 @@ internal abstract class PresetSettingsModel<TSelf, TJson> : PresetSettingsModel
     public TSelf Clone()
     {
         return (TSelf)MemberwiseClone();
+    }
+
+    public override string ToValuesJson()
+    {
+        return JsonSerializer.Serialize(ToJsonModel());
+    }
+
+    public override void ApplyValuesJson(string valuesJson)
+    {
+        if (JsonSerializer.Deserialize<TJson>(valuesJson) is { } model)
+        {
+            ApplyJsonModel(model);
+        }
     }
 
     public override PresetSettingsModel CreateDefault()

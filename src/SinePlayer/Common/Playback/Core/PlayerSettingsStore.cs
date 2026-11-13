@@ -91,28 +91,41 @@ internal static class PlayerSettingsStore
         Store(media, model);
     }
 
-    public static void ClearTrackRecords(MediaModel media, MediaStreamKind kind)
+    public static IReadOnlyList<(TrackIdentityModel Track, string RecordJson)> GetTrackRecords(MediaModel media, MediaStreamKind kind)
     {
-        PlayerSettingsJsonModel model = Load(media);
-        if (model.Tracks is null)
-        {
-            return;
-        }
+        List<(TrackIdentityModel Track, string RecordJson)> records = [];
+        TrackSettingsJsonModel? tracks = Load(media).Tracks;
 
         switch (kind)
         {
             case MediaStreamKind.Video:
-                model.Tracks.Videos = null;
+                Add(tracks?.Videos, records);
                 break;
             case MediaStreamKind.Audio:
-                model.Tracks.Audios = null;
+                Add(tracks?.Audios, records);
                 break;
             case MediaStreamKind.Subtitle:
-                model.Tracks.Subtitles = null;
+                Add(tracks?.Subtitles, records);
                 break;
         }
 
-        Store(media, model);
+        return records;
+
+        static void Add<TJson>(List<TrackSettingsEntryJsonModel<TJson>>? entries, List<(TrackIdentityModel, string)> records) where TJson : class
+        {
+            if (entries is null)
+            {
+                return;
+            }
+
+            foreach (TrackSettingsEntryJsonModel<TJson> entry in entries)
+            {
+                if (entry.Record is { } record)
+                {
+                    records.Add((entry.Track, JsonSerializer.Serialize(record)));
+                }
+            }
+        }
     }
 
     public static TrackIdentityModel? GetTrackScope(MediaModel media, MediaStreamKind kind)

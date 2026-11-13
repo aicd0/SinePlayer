@@ -1,9 +1,11 @@
-// Copyright (c) aicd0. All rights reserved.
+﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -41,6 +43,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private const char SectionPathSeparator = '/';
     private const char CollapsedSectionsSeparator = ';';
 
+    private const string EmptyValues = "{}";
+
     private const double MinimumSubtitleFontSize = 4.0;
     private const double MaximumSubtitleFontSize = 200.0;
     private const int DefaultSubtitleFontWeight = 400;
@@ -63,7 +67,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     {
         InitializeComponent();
 
-        SettingsCategory video = new()
+        _categories.Add(_videoCategory = new()
         {
             Get = settings => settings.Video,
             Set = (settings, value) =>
@@ -73,8 +77,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                     settings.Video = videoSettings;
                 }
             },
-        };
-        SettingsCategory audio = new()
+        });
+        _categories.Add(_audioCategory = new()
         {
             Get = settings => settings.Audio,
             Set = (settings, value) =>
@@ -84,8 +88,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                     settings.Audio = audioSettings;
                 }
             },
-        };
-        SettingsCategory subtitle = new()
+        });
+        _categories.Add(_subtitleCategory = new()
         {
             Get = settings => settings.Subtitle,
             Set = (settings, value) =>
@@ -95,11 +99,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                     settings.Subtitle = subtitleSettings;
                 }
             },
-        };
+        });
 
-        _tabs.Add(_videoTab = new() { Key = "Video", Item = SelectorBarItem1, Content = VideoSettingsGrid, Category = video });
-        _tabs.Add(_audioTab = new() { Key = "Audio", Item = SelectorBarItem2, Content = AudioSettingsGrid, Category = audio });
-        _tabs.Add(_subtitleTab = new() { Key = "Subtitle", Item = SelectorBarItem3, Content = SubtitleSettingsGrid, Category = subtitle });
+        _tabs.Add(_videoTab = new() { Key = "Video", Item = SelectorBarItem1, Content = VideoSettingsGrid, Category = _videoCategory });
+        _tabs.Add(_audioTab = new() { Key = "Audio", Item = SelectorBarItem2, Content = AudioSettingsGrid, Category = _audioCategory });
+        _tabs.Add(_subtitleTab = new() { Key = "Subtitle", Item = SelectorBarItem3, Content = SubtitleSettingsGrid, Category = _subtitleCategory });
         _activeTab = _videoTab;
 
         Loaded += PlayerSettingsPanel_LoadedOrUnloaded;
@@ -141,7 +145,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     public void Apply(Action<PlayerSettingsModel> change)
     {
         change(_mediaSettings);
-        SaveSettings();
+        SaveSettings(null);
         DispatchDataChangeEvent();
         UpdateUI();
     }
@@ -237,7 +241,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         ViewModel.SettingsChangedLiveData.Observe(this, _ =>
         {
-            SaveSettings();
             UpdateUI();
             DispatchDataChangeEvent();
         }, options);
@@ -246,6 +249,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     #endregion
 
     #region Tab UI
+
+    private readonly List<SettingsCategory> _categories = [];
+    private readonly SettingsCategory _videoCategory;
+    private readonly SettingsCategory _audioCategory;
+    private readonly SettingsCategory _subtitleCategory;
 
     private readonly List<SettingsTab> _tabs = [];
     private readonly SettingsTab _videoTab;
@@ -284,7 +292,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private async void EditPresetButton_Click(object sender, RoutedEventArgs e)
     {
         IMainWindowAbility? windowAbility = _windowAbility;
-        if (_media is not { } media || windowAbility is null)
+        if (_media is null || windowAbility is null)
         {
             return;
         }
@@ -305,10 +313,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         if (settings.PresetKey != presetKey)
         {
-            if (KindOf(_activeTab) is { } kind)
-            {
-                SaveCategory(media, kind, TrackOf(kind), settings);
-            }
+            // The dialog moved these settings onto a preset it created, so this scope follows it from now on.
+            SaveSettings(_activeTab.Category);
         }
 
         LoadSettings();
@@ -322,12 +328,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         PresetSettingsModel current = category.Get(_mediaSettings);
         category.Set(_mediaSettings, KeepPreset(current, current.CreateDefault()));
 
-        if (_media is { } media && KindOf(_activeTab) is { } kind && TrackOf(kind) is null)
-        {
-            // Reset under Global means the media goes back to one set of values for every track.
-            PlayerSettingsStore.ClearTrackRecords(media, kind);
-        }
-
+        SaveSettings(_activeTab.Category);
         NotifySettingsChanged();
     }
 
@@ -386,7 +387,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         category.Set(_mediaSettings, settings);
-        SaveSettings();
+        SaveSettings(_activeTab.Category);
         DispatchDataChangeEvent();
         UpdateUI();
     }
@@ -459,24 +460,24 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private readonly Dictionary<MediaStreamKind, TrackIdentityModel> _trackScopes = [];
 
-    private MediaStreamKind? KindOf(SettingsTab tab)
+    private MediaStreamKind? KindOf(SettingsCategory category)
     {
-        if (tab == _videoTab)
+        if (category == _videoCategory)
         {
             return MediaStreamKind.Video;
         }
 
-        if (tab == _audioTab)
+        if (category == _audioCategory)
         {
             return MediaStreamKind.Audio;
         }
 
-        if (tab == _subtitleTab)
+        if (category == _subtitleCategory)
         {
             return MediaStreamKind.Subtitle;
         }
 
-        // Other tabs are not configured per media stream.
+        // Other settings are not configured per media stream.
         return null;
     }
 
@@ -493,9 +494,9 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        foreach (SettingsTab tab in _tabs)
+        foreach (SettingsCategory category in _categories)
         {
-            if (KindOf(tab) is { } kind && PlayerSettingsStore.GetTrackScope(media, kind) is { } track)
+            if (KindOf(category) is { } kind && PlayerSettingsStore.GetTrackScope(media, kind) is { } track)
             {
                 _trackScopes[kind] = track;
             }
@@ -525,7 +526,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         try
         {
             TrackScopeComboBox.Items.Clear();
-            if (KindOf(_activeTab) is not { } kind)
+            if (KindOf(_activeTab.Category) is not { } kind)
             {
                 return;
             }
@@ -577,7 +578,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        if (sender is not ComboBox comboBox || KindOf(_activeTab) is not { } kind)
+        if (sender is not ComboBox comboBox || KindOf(_activeTab.Category) is not { } kind)
         {
             return;
         }
@@ -687,7 +688,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 ViewModel.VideoFlipVerticalLabel = GetLabel(StringResource.FlipVertically, modified);
             }
 
-            _videoTab.Category.IsModified = tabModified;
+            _videoCategory.IsModified = tabModified;
             ViewModel.VideoTabTitle = GetLabel(StringResource.Video, tabModified);
         }
 
@@ -708,7 +709,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 ViewModel.AudioRendererLabel = GetLabel(StringResource.Renderer, modified);
             }
 
-            _audioTab.Category.IsModified = tabModified;
+            _audioCategory.IsModified = tabModified;
             ViewModel.AudioTabTitle = GetLabel(StringResource.Audio, tabModified);
         }
 
@@ -806,7 +807,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 ViewModel.SubtitlePanYLabel = GetLabel(StringResource.PanY, modified);
             }
 
-            _subtitleTab.Category.IsModified = tabModified;
+            _subtitleCategory.IsModified = tabModified;
             ViewModel.SubtitleTabTitle = GetLabel(StringResource.Subtitle, tabModified);
         }
 
@@ -1495,11 +1496,10 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        foreach (SettingsTab tab in _tabs)
+        foreach (SettingsCategory category in _categories)
         {
-            SettingsCategory category = tab.Category;
             PresetSettingsModel current = category.Get(_mediaSettings);
-            string? record = KindOf(tab) is { } kind ? PlayerSettingsStore.GetRecord(media, kind, TrackOf(kind)) : null;
+            string? record = KindOf(category) is { } kind ? PlayerSettingsStore.GetRecord(media, kind, TrackOf(kind)) : null;
             category.Set(_mediaSettings, current.ResolveRecord(record));
         }
 
@@ -1509,9 +1509,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private PlayerSettingsModel LoadPresetSettings(PlayerSettingsModel settings)
     {
         PlayerSettingsModel presets = new();
-        foreach (SettingsTab tab in _tabs)
+        foreach (SettingsCategory category in _categories)
         {
-            SettingsCategory category = tab.Category;
             PresetSettingsModel current = category.Get(settings);
             category.Set(presets, current.FindPreset(current.PresetKey) ?? current);
         }
@@ -1519,42 +1518,51 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         return presets;
     }
 
-    private void SaveSettings()
+    private void SaveSettings(SettingsCategory? replacedCategory)
     {
         if (_updatingUI || _media is not { } media)
         {
             return;
         }
 
-        foreach (SettingsTab tab in _tabs)
+        // A preset selection, Reset and a preset created in the dialog replace every value of one category, so it
+        // pushes all its values to the tracks while the others push just what changed.
+        foreach (SettingsCategory category in _categories)
         {
-            if (KindOf(tab) is not { } kind)
+            if (KindOf(category) is not { } kind)
             {
                 continue;
             }
 
-            SaveCategory(media, kind, TrackOf(kind), tab.Category.Get(_mediaSettings));
+            SaveCategory(media, kind, TrackOf(kind), category.Get(_mediaSettings), category == replacedCategory);
         }
 
         _presetSettings = LoadPresetSettings(_mediaSettings);
     }
 
-    private static void SaveCategory(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track, PresetSettingsModel settings)
+    private static void SaveCategory(MediaModel media, MediaStreamKind kind, TrackIdentityModel? track, PresetSettingsModel settings, bool allFields)
     {
-        string record = settings.ToRecordJson();
         if (track is not null)
         {
-            PlayerSettingsStore.SetTrackRecord(media, kind, track, record);
+            PlayerSettingsStore.SetTrackRecord(media, kind, track, settings.ToRecordJson());
             return;
         }
 
-        if (PlayerSettingsStore.GetGlobalRecord(media, kind) == record)
+        string values = settings.ToValuesJson();
+        string fields = allFields ? values : ChangedJsonFields(settings.ResolveRecord(PlayerSettingsStore.GetGlobalRecord(media, kind)).ToValuesJson(), values);
+        if (fields == EmptyValues)
         {
             return;
         }
 
-        PlayerSettingsStore.SetGlobalRecord(media, kind, record);
-        PlayerSettingsStore.ClearTrackRecords(media, kind);
+        PlayerSettingsStore.SetGlobalRecord(media, kind, settings.ToRecordJson());
+
+        foreach ((TrackIdentityModel recorded, string record) in PlayerSettingsStore.GetTrackRecords(media, kind))
+        {
+            PresetSettingsModel trackSettings = settings.ResolveRecord(record);
+            trackSettings.ApplyValuesJson(fields);
+            PlayerSettingsStore.SetTrackRecord(media, kind, recorded, trackSettings.ToRecordJson());
+        }
     }
 
     private void NotifySettingsChanged()
@@ -1712,6 +1720,23 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         return 0.0;
+    }
+
+    private static string ChangedJsonFields(string baseline, string values)
+    {
+        JsonObject before = JsonSerializer.Deserialize<JsonObject>(baseline) ?? [];
+        JsonObject after = JsonSerializer.Deserialize<JsonObject>(values) ?? [];
+
+        JsonObject changed = [];
+        foreach (KeyValuePair<string, JsonNode?> property in after)
+        {
+            if (!before.TryGetPropertyValue(property.Key, out JsonNode? value) || !JsonNode.DeepEquals(value, property.Value))
+            {
+                changed[property.Key] = property.Value?.DeepClone();
+            }
+        }
+
+        return changed.ToJsonString();
     }
 
     #endregion
