@@ -202,7 +202,17 @@ public partial class PlaybackPipelineTests
         using PlaybackPipeline pipeline = CreateSubtitlePipeline(script, subtitleRenderer);
 
         // Set before anything is drawn, so the very first call has to carry it: a renderer is never told twice.
-        SubtitlePresentation presentation = new(0.25, -0.5, default, "Segoe UI", 32.0, FontStyle.Italic, new FontWeight { Weight = 700 }, 3.0);
+        SubtitlePresentation presentation = new()
+        {
+            Order = 3,
+            OffsetX = 0.25,
+            OffsetY = -0.5,
+            FontFamily = "Segoe UI",
+            FontSize = 32.0,
+            FontStyle = FontStyle.Italic,
+            FontWeight = new FontWeight { Weight = 700 },
+            OutlineWidth = 3.0,
+        };
         pipeline.SubtitleChains[0].Presentation = presentation;
 
         Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);

@@ -5,21 +5,32 @@ using Windows.UI.Text;
 
 namespace SinePlayer.Core.Playback.Abstractions.Render;
 
-public readonly record struct SubtitlePresentation(
-    double OffsetX,
-    double OffsetY,
-    SubtitleInsets Insets = default,
-    string? FontFamily = null,
-    double FontSize = 0.0,
-    FontStyle FontStyle = FontStyle.Normal,
-    FontWeight FontWeight = default,
-    double OutlineWidth = 0.0)
+public readonly record struct SubtitlePresentation
 {
     public static SubtitlePresentation Identity => default;
+
+    public int Order { get; init; }
+
+    public double OffsetX { get; init; }
+
+    public double OffsetY { get; init; }
+
+    public SubtitleInsets Insets { get; init; }
+
+    public string? FontFamily { get; init; }
+
+    public double FontSize { get; init; }
+
+    public FontStyle FontStyle { get; init; }
+
+    public FontWeight FontWeight { get; init; }
+
+    public double OutlineWidth { get; init; }
 
     public SubtitleFrame Frame { get; init; }
 
     public bool IsIdentity =>
+        Order == 0 &&
         OffsetX == 0.0 &&
         OffsetY == 0.0 &&
         Insets.IsNone &&

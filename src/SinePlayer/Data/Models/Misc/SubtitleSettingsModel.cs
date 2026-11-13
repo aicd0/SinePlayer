@@ -16,6 +16,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 {
     public string Decoder { get; set; } = PlaybackComponents.AUTO;
     public string Renderer { get; set; } = PlaybackComponents.AUTO;
+    public int Order { get; set; }
     public int PanX { get; set; }
     public int PanY { get; set; }
     public string Family { get; set; } = string.Empty;
@@ -26,14 +27,17 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 
     public SubtitlePresentation ToPresentation()
     {
-        return new(
-            PanX,
-            PanY,
-            FontFamily: Family,
-            FontSize: Size,
-            FontStyle: ToFontStyle(),
-            FontWeight: ToFontWeight(),
-            OutlineWidth: OutlineWidth);
+        return new()
+        {
+            Order = Order,
+            OffsetX = PanX,
+            OffsetY = PanY,
+            FontFamily = Family,
+            FontSize = Size,
+            FontStyle = ToFontStyle(),
+            FontWeight = ToFontWeight(),
+            OutlineWidth = OutlineWidth,
+        };
     }
 
     public FontStyle ToFontStyle()
@@ -65,6 +69,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
     {
         Decoder = model.Decoder ?? Decoder;
         Renderer = model.Renderer ?? Renderer;
+        Order = model.Order ?? Order;
         PanX = model.PanX ?? PanX;
         PanY = model.PanY ?? PanY;
         Family = model.FontFamily ?? Family;
@@ -80,6 +85,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
         {
             Decoder = Decoder,
             Renderer = Renderer,
+            Order = Order,
             PanX = PanX,
             PanY = PanY,
             FontFamily = Family,
@@ -97,6 +103,9 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 
         [JsonPropertyName("Renderer")]
         public string? Renderer { get; set; }
+
+        [JsonPropertyName("Order")]
+        public int? Order { get; set; }
 
         [JsonPropertyName("PanX")]
         public int? PanX { get; set; }

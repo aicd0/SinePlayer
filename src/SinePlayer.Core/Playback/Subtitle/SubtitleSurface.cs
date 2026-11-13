@@ -91,6 +91,11 @@ internal sealed partial class SubtitleSurface : IDisposable
         return prepared;
     }
 
+    internal void SetOrder(int order)
+    {
+        _compositor?.SetLayerOrder(this, order);
+    }
+
     internal OperationResult DrawAndPresent(Action<CanvasDrawingSession, int, int> draw)
     {
         SubtitleCompositor? compositor = _compositor;

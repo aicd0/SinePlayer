@@ -889,6 +889,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="OpenUserDataFolder" xml:space="preserve">
     <value>Abrir la carpeta de datos del usuario</value>
   </data>
+  <data name="Order" xml:space="preserve">
+    <value>Orden</value>
+  </data>
   <data name="OriginalSize" xml:space="preserve">
     <value>Tamaño original</value>
   </data>

@@ -889,6 +889,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="OpenUserDataFolder" xml:space="preserve">
     <value>Open user data folder</value>
   </data>
+  <data name="Order" xml:space="preserve">
+    <value>Order</value>
+  </data>
   <data name="OriginalSize" xml:space="preserve">
     <value>Original size</value>
   </data>

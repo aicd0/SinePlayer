@@ -86,6 +86,7 @@ internal sealed partial class SubtitleCompositor : IDisposable
     private readonly IVideoRenderTarget _target;
     private readonly Lock _drawLock = new();
     private readonly List<object> _layers = [];
+    private readonly Dictionary<object, int> _orders = [];
     private readonly Dictionary<object, CanvasRenderTarget> _bitmaps = [];
     private CanvasDevice? _canvasDevice;
 
@@ -176,12 +177,24 @@ internal sealed partial class SubtitleCompositor : IDisposable
         lock (_drawLock)
         {
             _layers.Remove(key);
+            _orders.Remove(key);
 
             // The bitmap is the compositor's, so leaving the composition is what retires it — under the lock that excludes a
             // frame drawing into it.
             if (_bitmaps.Remove(key, out CanvasRenderTarget? bitmap))
             {
                 bitmap.Dispose();
+            }
+        }
+    }
+
+    internal void SetLayerOrder(object key, int order)
+    {
+        lock (_drawLock)
+        {
+            if (_layers.Contains(key))
+            {
+                _orders[key] = order;
             }
         }
     }
@@ -363,13 +376,7 @@ internal sealed partial class SubtitleCompositor : IDisposable
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Windows.UI.Color));
-                foreach (object key in _layers)
-                {
-                    if (_bitmaps.TryGetValue(key, out CanvasRenderTarget? bitmap))
-                    {
-                        session.DrawImage(bitmap);
-                    }
-                }
+                DrawLayers(session);
             }
 
             return swapChain.Present();
@@ -381,6 +388,17 @@ internal sealed partial class SubtitleCompositor : IDisposable
         finally
         {
             target?.Dispose();
+        }
+    }
+
+    private void DrawLayers(CanvasDrawingSession session)
+    {
+        foreach (object key in _layers.OrderByDescending(OrderOf))
+        {
+            if (_bitmaps.TryGetValue(key, out CanvasRenderTarget? bitmap))
+            {
+                session.DrawImage(bitmap);
+            }
         }
     }
 
@@ -406,5 +424,10 @@ internal sealed partial class SubtitleCompositor : IDisposable
         _surface = null;
         _swapChain?.Dispose();
         _swapChain = null;
+    }
+
+    private int OrderOf(object key)
+    {
+        return _orders.TryGetValue(key, out int order) ? order : 0;
     }
 }

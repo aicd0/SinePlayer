@@ -230,6 +230,7 @@ public class StringResourceProvider
     public string OpenPreviousItem => GetResourceString("OpenPreviousItem");
     public string OpenSidebar => GetResourceString("OpenSidebar");
     public string OpenUserDataFolder => GetResourceString("OpenUserDataFolder");
+    public string Order => GetResourceString("Order");
     public string OriginalSize => GetResourceString("OriginalSize");
     public string Outline => GetResourceString("Outline");
     public string Output => GetResourceString("Output");

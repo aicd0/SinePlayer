@@ -152,6 +152,7 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         (float shiftX, float shiftY) = SafeShift(presentation, frameX, frameY, frameWidth, frameHeight, width, height, scale);
         ShiftPixels((int)Math.Round(shiftX), (int)Math.Round(shiftY), width, height);
 
+        _surface.SetOrder(presentation.Order);
         return DrawPixels(offsetX, offsetY, width, height);
     }
 
