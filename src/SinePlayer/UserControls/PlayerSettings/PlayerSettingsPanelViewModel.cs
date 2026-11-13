@@ -267,6 +267,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleOpacityLabel = string.Empty;
+    public string SubtitleOpacityLabel
+    {
+        get => _subtitleOpacityLabel;
+        set
+        {
+            _subtitleOpacityLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleOpacityLabel)));
+        }
+    }
+
     private string _subtitlePanXLabel = string.Empty;
     public string SubtitlePanXLabel
     {

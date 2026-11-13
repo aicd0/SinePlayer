@@ -153,7 +153,8 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         ShiftPixels((int)Math.Round(shiftX), (int)Math.Round(shiftY), width, height);
 
         _surface.SetOrder(presentation.Order);
-        return DrawPixels(offsetX, offsetY, width, height);
+        float opacity = (float)Math.Clamp(presentation.Opacity ?? 1.0, 0.0, 1.0);
+        return DrawPixels(offsetX, offsetY, width, height, opacity);
     }
 
     #endregion
@@ -340,9 +341,10 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 
     /// <summary>
     /// Puts the composited frame on the surface. The offset is the host's own adjustment of where subtitles sit, applied to
-    /// the whole frame rather than to each bitmap, because libass has already finished deciding where things go.
+    /// the whole frame rather than to each bitmap, because libass has already finished deciding where things go — and so is
+    /// the opacity, which fades the frame as one picture.
     /// </summary>
-    private OperationResult DrawPixels(float offsetX, float offsetY, int width, int height)
+    private OperationResult DrawPixels(float offsetX, float offsetY, int width, int height, float opacity)
     {
         CanvasDevice device = _surface.CanvasDevice ??
             throw new InvalidOperationException("The subtitle surface is not bound to a target, so it has no device.");
@@ -356,7 +358,7 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
             CanvasAlphaMode.Premultiplied);
 
         Rect bounds = new(offsetX, offsetY, width, height);
-        return _surface.DrawAndPresent((session, _, _) => session.DrawImage(bitmap, bounds));
+        return _surface.DrawAndPresent((session, _, _) => session.DrawImage(bitmap, bounds, bitmap.Bounds, opacity));
     }
 
     #endregion

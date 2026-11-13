@@ -333,6 +333,39 @@ public class Win2DSubtitleRendererTests
         }
     }
 
+    /// <summary>
+    /// Opacity fades the whole drawing rather than the colour of its ink: at half, every pixel of the words is half as
+    /// present as it was, which is what a slider from 0 to 100 has to mean.
+    /// </summary>
+    [Test]
+    public void DrawsTheWordsAtTheOpacityItIsGiven()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 200;
+
+        int opaque = InkAlpha(RenderInk(device, width, height, new SubtitlePresentation { FontSize = 32.0 }));
+        int faded = InkAlpha(RenderInk(device, width, height, new SubtitlePresentation { FontSize = 32.0, Opacity = 0.5 }));
+        int gone = InkAlpha(RenderInk(device, width, height, new SubtitlePresentation { FontSize = 32.0, Opacity = 0.0 }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(opaque, Is.EqualTo(255), "the words are solid to begin with");
+            Assert.That(faded, Is.EqualTo(128).Within(2), "half opacity leaves them half as present");
+            Assert.That(gone, Is.Zero, "and none leaves nothing at all");
+        }
+    }
+
     /// <summary>How many rows of the surface carry ink, drawing one cue with the presentation given.</summary>
     private static int InkRows(CanvasDevice device, int width, int height, SubtitlePresentation presentation)
     {
@@ -815,6 +848,18 @@ public class Win2DSubtitleRendererTests
         }
 
         return Color.FromArgb(pixels[best + 3], pixels[best + 2], pixels[best + 1], pixels[best]);
+    }
+
+    /// <summary>The alpha of the most opaque pixel of a blue-green-red-alpha buffer, which is the ink at its strongest.</summary>
+    private static int InkAlpha(byte[] pixels)
+    {
+        int alpha = 0;
+        for (int index = 3; index < pixels.Length; index += 4)
+        {
+            alpha = Math.Max(alpha, pixels[index]);
+        }
+
+        return alpha;
     }
 
     /// <summary>An opaque white image in unmanaged memory, which is what a decoder hands over.</summary>

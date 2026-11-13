@@ -254,6 +254,11 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             WordWrapping = CanvasWordWrapping.NoWrap,
         };
 
+        // Opacity is the whole drawing's, not each part's: a layer fades the words and their border together, and a cue that
+        // overlaps another does not show through it because both were faded before they met.
+        double opacity = Math.Clamp(presentation.Opacity ?? 1.0, 0.0, 1.0);
+        using CanvasActiveLayer? faded = opacity < 1.0 ? session.CreateLayer((float)opacity) : null;
+
         foreach (SubtitleCue cue in cues)
         {
             if (cue.Image is { } image)
