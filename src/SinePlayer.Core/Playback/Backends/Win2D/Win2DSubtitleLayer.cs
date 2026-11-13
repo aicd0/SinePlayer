@@ -298,7 +298,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
                 }
             }
 
-            session.DrawTextLayout(layout, origin, Color.FromArgb(255, 255, 255, 255));
+            session.DrawTextLayout(layout, origin, presentation.FontColor ?? DefaultTextColor);
         }
     }
 
@@ -343,6 +343,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
 
     #region Outline
 
+    private static readonly Color DefaultTextColor = Color.FromArgb(255, 255, 255, 255);
     private static readonly Color OutlineColor = Color.FromArgb(255, 0, 0, 0);
     private static readonly CanvasStrokeStyle OutlineStrokeStyle = new() { LineJoin = CanvasLineJoin.Round };
 

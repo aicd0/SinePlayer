@@ -8,6 +8,7 @@ using System.Text.Json.Serialization;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Playback.Abstractions.Render;
 
+using Windows.UI;
 using Windows.UI.Text;
 
 namespace SinePlayer.Data.Models.Misc;
@@ -23,6 +24,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
     public double Size { get; set; }
     public string Style { get; set; } = nameof(FontStyle.Normal);
     public int Weight { get; set; }
+    public Color FontColor { get; set; } = Color.FromArgb(255, 255, 255, 255);
     public double OutlineWidth { get; set; } = 2.0;
 
     public SubtitlePresentation ToPresentation()
@@ -36,6 +38,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             FontSize = Size,
             FontStyle = ToFontStyle(),
             FontWeight = ToFontWeight(),
+            FontColor = FontColor,
             OutlineWidth = OutlineWidth,
         };
     }
@@ -76,6 +79,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
         Size = model.FontSize ?? Size;
         Style = model.FontStyle ?? Style;
         Weight = model.FontWeight ?? Weight;
+        FontColor = model.FontColor is { } value ? FromColorValue(value) : FontColor;
         OutlineWidth = model.OutlineWidth ?? OutlineWidth;
     }
 
@@ -92,8 +96,19 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             FontSize = Size,
             FontStyle = Style,
             FontWeight = Weight,
+            FontColor = ToColorValue(FontColor),
             OutlineWidth = OutlineWidth,
         };
+    }
+
+    private static Color FromColorValue(uint value)
+    {
+        return Color.FromArgb((byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value);
+    }
+
+    private static uint ToColorValue(Color color)
+    {
+        return ((uint)color.A << 24) | ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
     }
 
     public class JsonModel
@@ -124,6 +139,9 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 
         [JsonPropertyName("FontWeight")]
         public int? FontWeight { get; set; }
+
+        [JsonPropertyName("FontColor")]
+        public uint? FontColor { get; set; }
 
         [JsonPropertyName("OutlineWidth")]
         public double? OutlineWidth { get; set; }

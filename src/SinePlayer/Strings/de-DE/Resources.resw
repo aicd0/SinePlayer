@@ -573,6 +573,9 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   <data name="Font" xml:space="preserve">
     <value>Schrift</value>
   </data>
+  <data name="FontColor" xml:space="preserve">
+    <value>Schriftfarbe</value>
+  </data>
   <data name="FontFamily" xml:space="preserve">
     <value>Schriftart</value>
   </data>

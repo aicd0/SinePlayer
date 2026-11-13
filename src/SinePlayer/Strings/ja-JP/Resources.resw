@@ -573,6 +573,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="Font" xml:space="preserve">
     <value>フォント</value>
   </data>
+  <data name="FontColor" xml:space="preserve">
+    <value>文字色</value>
+  </data>
   <data name="FontFamily" xml:space="preserve">
     <value>フォント</value>
   </data>

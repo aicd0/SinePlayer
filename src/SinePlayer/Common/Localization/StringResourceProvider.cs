@@ -139,6 +139,7 @@ public class StringResourceProvider
     public string FlipVertically => GetResourceString("FlipVertically");
     public string Folders => GetResourceString("Folders");
     public string Font => GetResourceString("Font");
+    public string FontColor => GetResourceString("FontColor");
     public string FontFamily => GetResourceString("FontFamily");
     public string FontSize => GetResourceString("FontSize");
     public string FontStyle => GetResourceString("FontStyle");

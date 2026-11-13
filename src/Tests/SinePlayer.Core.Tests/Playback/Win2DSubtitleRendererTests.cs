@@ -302,6 +302,37 @@ public class Win2DSubtitleRendererTests
         }
     }
 
+    /// <summary>
+    /// The words are drawn in the colour the host names, and in white when it names none: the setting is the whole of what
+    /// that colour means, so nothing else may decide it.
+    /// </summary>
+    [Test]
+    public void DrawsTheWordsInTheColourItIsGiven()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 200;
+
+        Color named = InkColour(RenderInk(device, width, height, new SubtitlePresentation { FontSize = 32.0, FontColor = Color.FromArgb(255, 255, 0, 0) }));
+        Color unnamed = InkColour(RenderInk(device, width, height, new SubtitlePresentation { FontSize = 32.0 }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(named, Is.EqualTo(Color.FromArgb(255, 255, 0, 0)), "the colour the host names is the colour of the words");
+            Assert.That(unnamed, Is.EqualTo(Color.FromArgb(255, 255, 255, 255)), "and none named is the white the words have always been");
+        }
+    }
+
     /// <summary>How many rows of the surface carry ink, drawing one cue with the presentation given.</summary>
     private static int InkRows(CanvasDevice device, int width, int height, SubtitlePresentation presentation)
     {
@@ -769,6 +800,21 @@ public class Win2DSubtitleRendererTests
     private static byte AlphaAt(byte[] pixels, int width, int x, int y)
     {
         return pixels[((y * width) + x) * 4 + 3];
+    }
+
+    /// <summary>The colour of the most opaque pixel of a blue-green-red-alpha buffer, which is the ink itself.</summary>
+    private static Color InkColour(byte[] pixels)
+    {
+        int best = 0;
+        for (int index = 4; index < pixels.Length; index += 4)
+        {
+            if (pixels[index + 3] > pixels[best + 3])
+            {
+                best = index;
+            }
+        }
+
+        return Color.FromArgb(pixels[best + 3], pixels[best + 2], pixels[best + 1], pixels[best]);
     }
 
     /// <summary>An opaque white image in unmanaged memory, which is what a decoder hands over.</summary>

@@ -573,6 +573,9 @@ The expression will be evaluated in the following order:
   <data name="Font" xml:space="preserve">
     <value>Font</value>
   </data>
+  <data name="FontColor" xml:space="preserve">
+    <value>Font color</value>
+  </data>
   <data name="FontFamily" xml:space="preserve">
     <value>Font family</value>
   </data>

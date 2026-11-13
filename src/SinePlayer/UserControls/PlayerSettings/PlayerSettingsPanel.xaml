@@ -477,6 +477,39 @@
                                         VerticalAlignment="Center"
                                         SelectionChanged="SubtitleFontWeightComboBox_SelectionChanged" />
                                 </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleFontColorLabel, Mode=OneWay}" />
+                                    <Button
+                                        Grid.Column="3"
+                                        Height="32"
+                                        Padding="4,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                        <Border
+                                            x:Name="SubtitleFontColorPreview"
+                                            Width="36"
+                                            Height="20"
+                                            CornerRadius="2" />
+                                        <Button.Flyout>
+                                            <Flyout>
+                                                <ColorPicker
+                                                    x:Name="SubtitleFontColorPicker"
+                                                    ColorChanged="SubtitleFontColorPicker_ColorChanged"
+                                                    IsAlphaEnabled="False" />
+                                            </Flyout>
+                                        </Button.Flyout>
+                                    </Button>
+                                </Grid>
                                 <Rectangle
                                     Height="1"
                                     Margin="0,8"

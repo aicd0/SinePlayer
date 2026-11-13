@@ -8,6 +8,7 @@ using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Media;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
@@ -28,6 +29,7 @@ using SinePlayer.Helpers.MenuFlyoutHelpers;
 using SinePlayer.Helpers.Misc;
 using SinePlayer.Views.Dialogs.EditPlayerSettingPreset;
 
+using Windows.UI;
 using Windows.UI.Text;
 
 namespace SinePlayer.UserControls.PlayerSettings;
@@ -763,6 +765,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = !settings.Subtitle.FontColor.Equals(presetSettings.Subtitle.FontColor);
+                tabModified = tabModified || modified;
+                UpdateSubtitleFontColor(settings);
+                ViewModel.SubtitleFontColorLabel = GetLabel(StringResource.FontColor, modified);
+            }
+
+            {
                 bool modified = settings.Subtitle.OutlineWidth != presetSettings.Subtitle.OutlineWidth;
                 tabModified = tabModified || modified;
                 UpdateSubtitleOutline(settings);
@@ -1351,6 +1360,31 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         {
             SubtitleFontStyleComboBox.SelectedIndex = index;
         }
+    }
+
+    private void SubtitleFontColorPicker_ColorChanged(ColorPicker sender, ColorChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        Color color = args.NewColor;
+        if (!_mediaSettings.Subtitle.FontColor.Equals(color))
+        {
+            Apply(settings => settings.Subtitle.FontColor = color);
+        }
+    }
+
+    private void UpdateSubtitleFontColor(PlayerSettingsModel settings)
+    {
+        Color color = settings.Subtitle.FontColor;
+        if (!SubtitleFontColorPicker.Color.Equals(color))
+        {
+            SubtitleFontColorPicker.Color = color;
+        }
+
+        SubtitleFontColorPreview.Background = new SolidColorBrush(color);
     }
 
     private void SubtitleOutlineSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
