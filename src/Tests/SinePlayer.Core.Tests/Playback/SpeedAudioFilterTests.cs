@@ -224,7 +224,7 @@ public class SpeedAudioFilterTests
         foreach (double speed in new[] { 0.0, -2.0, double.NaN, double.PositiveInfinity })
         {
             filter.SetSpeed(speed);
-        filter.SetAlgorithm(AudioSpeedAlgorithm.None);
+            filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
             OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
             Assert.That(result.IsSuccessful, Is.True, result.Message);
