@@ -30,8 +30,7 @@
             <TextBlock
                 x:Name="LabelTextBlock"
                 Margin="0,0,0,2"
-                VerticalAlignment="Center"
-                Text="{Binding Label, ElementName=Root, Mode=OneWay}" />
+                VerticalAlignment="Center" />
             <FontIcon
                 x:Name="ExpandIcon"
                 Margin="6,0,0,0"

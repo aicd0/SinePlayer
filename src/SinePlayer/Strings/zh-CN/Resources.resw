@@ -784,6 +784,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="Miscellaneous" xml:space="preserve">
     <value>其他</value>
   </data>
+  <data name="Mixing" xml:space="preserve">
+    <value>混音</value>
+  </data>
   <data name="More" xml:space="preserve">
     <value>更多</value>
   </data>

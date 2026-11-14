@@ -23,6 +23,7 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
+using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.Win2D;
 using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Data.Database;
@@ -49,6 +50,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private const double MinimumSubtitleFontSize = 4.0;
     private const double MaximumSubtitleFontSize = 200.0;
     private const int DefaultSubtitleFontWeight = 400;
+    private const int MaximumMixLevel = 200;
 
     private static readonly double[] SubtitleFontSizePresets = [16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 48.0, 56.0, 64.0, 72.0];
 
@@ -631,6 +633,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     #region Settings UI
 
     private bool _updatingUI = false;
+    private readonly List<MixSliderEntry> _mixSliders = [];
+    private ChannelLayout? _mixLayout;
 
     private void UpdateUI()
     {
@@ -780,6 +784,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 tabModified = tabModified || modified;
                 UpdateAudioStretchMethod(settings);
                 ViewModel.AudioStretchMethodLabel = GetLabel(StringResource.StretchMethod, modified);
+            }
+
+            {
+                bool modified = !MixLevelsEqual(settings.Audio.MixLevels, presetSettings.Audio.MixLevels);
+                tabModified = tabModified || modified;
+                UpdateMixSliders(settings.Audio);
             }
 
             _audioCategory.IsModified = tabModified;
@@ -1245,6 +1255,96 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         {
             AudioStretchMethodComboBox.SelectedIndex = index;
         }
+    }
+
+    private void MixSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (sender is not FrameworkElement element || element.Tag is not string key)
+        {
+            return;
+        }
+
+        int value = (int)Math.Round(e.NewValue);
+        if (_mediaSettings.Audio.MixLevels.TryGetValue(key, out int current) && current == value)
+        {
+            return;
+        }
+
+        ApplyAudio(settings => settings.MixLevels[key] = value);
+    }
+
+    private void UpdateMixSliders(AudioSettingsModel settings)
+    {
+        ChannelLayout layout = SelectedAudioLayout();
+        if (layout != _mixLayout)
+        {
+            BuildMixSliders(layout);
+            _mixLayout = layout;
+        }
+
+        foreach (MixSliderEntry entry in _mixSliders)
+        {
+            double value = settings.MixLevels.TryGetValue(entry.Key, out int level) ? level : entry.DefaultLevel;
+            if (Math.Abs(entry.Slider.Value - value) > 0.5)
+            {
+                entry.Slider.Value = value;
+            }
+        }
+    }
+
+    private void BuildMixSliders(ChannelLayout layout)
+    {
+        MixSliderHost.Children.Clear();
+        _mixSliders.Clear();
+
+        foreach (DownmixChannelGroup group in DownmixMixer.Describe(layout))
+        {
+            SliderSettingView slider = new()
+            {
+                Label = group.Label,
+                Minimum = 0,
+                Maximum = MaximumMixLevel,
+                StepFrequency = 1,
+                DefaultValue = group.DefaultLevel,
+                Tag = group.Key,
+            };
+            slider.ValueChanged += MixSlider_ValueChanged;
+            MixSliderHost.Children.Add(slider);
+            _mixSliders.Add(new MixSliderEntry(group.Key, group.DefaultLevel, slider));
+        }
+    }
+
+    private ChannelLayout SelectedAudioLayout()
+    {
+        if (_session?.SelectedTracks(MediaStreamKind.Audio) is { Count: > 0 } tracks && tracks[0].Stream is AudioStreamInfo audio)
+        {
+            return audio.ChannelLayout;
+        }
+
+        return ChannelLayout.Stereo;
+    }
+
+    private static bool MixLevelsEqual(Dictionary<string, int> first, Dictionary<string, int> second)
+    {
+        if (first.Count != second.Count)
+        {
+            return false;
+        }
+
+        foreach (KeyValuePair<string, int> entry in first)
+        {
+            if (!second.TryGetValue(entry.Key, out int value) || value != entry.Value)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void SubtitleSyncNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
@@ -2054,6 +2154,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         public required Func<PlayerSettingsModel, PresetSettingsModel> Get { get; init; }
         public required Action<PlayerSettingsModel, PresetSettingsModel> Set { get; init; }
         public bool IsModified { get; set; }
+    }
+
+    private sealed class MixSliderEntry(string key, int defaultLevel, SliderSettingView slider)
+    {
+        public string Key { get; } = key;
+        public int DefaultLevel { get; } = defaultLevel;
+        public SliderSettingView Slider { get; } = slider;
     }
 
     private sealed class SettingsTab

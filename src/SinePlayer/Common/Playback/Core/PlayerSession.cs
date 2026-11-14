@@ -774,6 +774,9 @@ internal sealed partial class PlayerSession : IDisposable
 
     #region Settings
 
+    private const int MinimumMixLevel = 0;
+    private const int MaximumMixLevel = 200;
+
     private PlayerSettingsModel SettingsOf(MediaStreamKind kind, MediaStreamInfo stream)
     {
         PlayerSettingsModel settings = new();
@@ -836,6 +839,24 @@ internal sealed partial class PlayerSession : IDisposable
         settings.ToComponents().ApplyAudio(chain);
         chain.SpeedAlgorithm = settings.Audio.StretchMethod;
         chain.Offset = OffsetOf(settings.Audio.Sync);
+        ApplyMixLevels(chain, settings.Audio.MixLevels);
+    }
+
+    private void ApplyMixLevels(IAudioChain chain, Dictionary<string, int> levels)
+    {
+        AudioChainEntry? target = _audioChains.FirstOrDefault(entry => ReferenceEquals(entry.Chain, chain));
+        if (target is null)
+        {
+            return;
+        }
+
+        Dictionary<string, int> clamped = [with(levels.Count)];
+        foreach (KeyValuePair<string, int> level in levels)
+        {
+            clamped[level.Key] = Math.Clamp(level.Value, MinimumMixLevel, MaximumMixLevel);
+        }
+
+        target.Downmix.SetLevels(clamped);
     }
 
     private void ApplySettings(ISubtitleChain chain)
