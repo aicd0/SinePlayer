@@ -35,9 +35,15 @@ internal static class DxgiDisplay
 
         try
         {
-            Guid factoryId = typeof(IDXGIFactory2).GUID;
-            HRESULT factoryResult = PInvoke.CreateDXGIFactory2(default, factoryId, out object factoryObject);
-            if (factoryResult.Value < 0 || factoryObject is not IDXGIFactory1 factory)
+            HRESULT factoryResult;
+            object factoryObject;
+            unsafe
+            {
+                Guid factoryId = typeof(IDXGIFactory2).GUID;
+                factoryResult = PInvoke.CreateDXGIFactory2(default, &factoryId, out factoryObject);
+            }
+
+            if (factoryResult.Value < 0 || factoryObject is not IDXGIFactory2 factory)
             {
                 return result.Failure($"Unable to create a DXGI factory: {factoryResult}");
             }

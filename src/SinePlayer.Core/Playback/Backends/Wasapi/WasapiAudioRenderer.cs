@@ -195,15 +195,14 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
             var client = (IAudioClient)activated;
             InitializeStream(client, format);
             client.GetBufferSize(out uint bufferFrameCount);
-            client.GetService(typeof(IAudioRenderClient).GUID, out object renderService);
-            client.GetService(typeof(IAudioClock).GUID, out object clockService);
+            IAudioRenderClient renderService = GetService<IAudioRenderClient>(client);
+            IAudioClock clockService = GetService<IAudioClock>(client);
 
-            var audioClock = (IAudioClock)clockService;
-            audioClock.GetFrequency(out ulong frequency);
+            clockService.GetFrequency(out ulong frequency);
 
             _client = client;
-            _renderClient = (IAudioRenderClient)renderService;
-            _clock = new WasapiAudioClock(client, audioClock, frequency);
+            _renderClient = renderService;
+            _clock = new WasapiAudioClock(client, clockService, frequency);
             _format = format;
             _bufferFrameCount = (int)bufferFrameCount;
 
@@ -529,13 +528,28 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         _bufferFrameCount = 0;
     }
 
+    private static unsafe T GetService<T>(IAudioClient client) where T : class
+    {
+        Guid serviceId = typeof(T).GUID;
+        client.GetService(&serviceId, out void* service);
+
+        try
+        {
+            return (T)Marshal.GetObjectForIUnknown((nint)service);
+        }
+        finally
+        {
+            Marshal.Release((nint)service);
+        }
+    }
+
     /// <summary>
     /// One block being handed to the device. It writes what the device has room for and returns, so the
     /// caller owns every wait (<see cref="IAudioSubmit"/>); nothing here sleeps, retries or gives up.
     /// Its state is the block's own — the bytes, how far through them it is — so two hand-offs cannot
     /// share a buffer and an abandoned one leaves nothing behind in the renderer.
     /// </summary>
-    private sealed class WasapiAudioSubmit : IAudioSubmit
+    private sealed partial class WasapiAudioSubmit : IAudioSubmit
     {
         private readonly WasapiAudioRenderer _owner;
         private readonly IAudioRenderClient _renderClient;

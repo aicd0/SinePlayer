@@ -52,8 +52,14 @@ internal sealed partial class D3D11SwapChain : IDisposable
 
         try
         {
-            Guid factoryId = typeof(IDXGIFactory2).GUID;
-            HRESULT factoryResult = PInvoke.CreateDXGIFactory2(default, factoryId, out object factoryObject);
+            HRESULT factoryResult;
+            object factoryObject;
+            unsafe
+            {
+                Guid factoryId = typeof(IDXGIFactory2).GUID;
+                factoryResult = PInvoke.CreateDXGIFactory2(default, &factoryId, out factoryObject);
+            }
+
             if (factoryResult.Value < 0 || factoryObject is not IDXGIFactory2 factory)
             {
                 return result.Failure($"Unable to create a DXGI factory: {factoryResult}");
@@ -184,8 +190,16 @@ internal sealed partial class D3D11SwapChain : IDisposable
     private static unsafe ID3D11Texture2D GetBackBuffer(IDXGISwapChain1 swapChain)
     {
         Guid textureId = typeof(ID3D11Texture2D).GUID;
-        swapChain.GetBuffer(0, &textureId, out object surface);
-        return (ID3D11Texture2D)surface;
+        swapChain.GetBuffer(0, &textureId, out void* surface);
+
+        try
+        {
+            return (ID3D11Texture2D)Marshal.GetObjectForIUnknown((nint)surface);
+        }
+        finally
+        {
+            Marshal.Release((nint)surface);
+        }
     }
 
     private readonly D3D11Device _device;
