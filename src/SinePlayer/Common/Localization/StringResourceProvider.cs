@@ -104,6 +104,7 @@ public class StringResourceProvider
     public string EditImportExclusionList => GetResourceString("EditImportExclusionList");
     public string EditKeyboardShortcut => GetResourceString("EditKeyboardShortcut");
     public string EditPreset => GetResourceString("EditPreset");
+    public string Effects => GetResourceString("Effects");
     public string Enable => GetResourceString("Enable");
     public string EnableCompressedFileCache => GetResourceString("EnableCompressedFileCache");
     public string Enabled => GetResourceString("Enabled");
@@ -330,6 +331,7 @@ public class StringResourceProvider
     public string State => GetResourceString("State");
     public string Statistics => GetResourceString("Statistics");
     public string Stretch => GetResourceString("Stretch");
+    public string StretchMethod => GetResourceString("StretchMethod");
     public string Subtitle => GetResourceString("Subtitle");
     public string SubtitleForced => GetResourceString("SubtitleForced");
     public string SubtitleTypeBitmap => GetResourceString("SubtitleTypeBitmap");

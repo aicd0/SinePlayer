@@ -1,10 +1,12 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 using SinePlayer.Common.Playback.Core;
+using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Data.Models.Misc;
 
@@ -12,6 +14,7 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
 {
     public string Decoder { get; set; } = PlaybackComponents.AUTO;
     public string Renderer { get; set; } = PlaybackComponents.AUTO;
+    public AudioSpeedAlgorithm StretchMethod { get; set; } = AudioSpeedAlgorithm.WSOLA;
 
     protected override Dictionary<string, AudioSettingsModel> LoadPresets()
     {
@@ -32,6 +35,7 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
     {
         Decoder = model.Decoder ?? Decoder;
         Renderer = model.Renderer ?? Renderer;
+        StretchMethod = ParseStretchMethod(model.StretchMethod, StretchMethod);
     }
 
     protected override JsonModel ToJsonModel()
@@ -40,7 +44,18 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
         {
             Decoder = Decoder,
             Renderer = Renderer,
+            StretchMethod = StretchMethod.ToString(),
         };
+    }
+
+    private static AudioSpeedAlgorithm ParseStretchMethod(string? value, AudioSpeedAlgorithm fallback)
+    {
+        if (!string.IsNullOrEmpty(value) && Enum.TryParse(value, ignoreCase: true, out AudioSpeedAlgorithm method) && Enum.IsDefined(method))
+        {
+            return method;
+        }
+
+        return fallback;
     }
 
     public class JsonModel
@@ -50,5 +65,8 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
 
         [JsonPropertyName("Renderer")]
         public string? Renderer { get; set; }
+
+        [JsonPropertyName("StretchMethod")]
+        public string? StretchMethod { get; set; }
     }
 }

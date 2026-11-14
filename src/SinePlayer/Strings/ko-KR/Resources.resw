@@ -422,6 +422,9 @@ $files</value>
   <data name="EditPreset" xml:space="preserve">
     <value>프리셋 편집</value>
   </data>
+  <data name="Effects" xml:space="preserve">
+    <value>효과</value>
+  </data>
   <data name="Enable" xml:space="preserve">
     <value>활성화</value>
   </data>
@@ -1207,6 +1210,9 @@ $plugins</value>
   </data>
   <data name="Stretch" xml:space="preserve">
     <value>늘이기</value>
+  </data>
+  <data name="StretchMethod" xml:space="preserve">
+    <value>늘리기 방식</value>
   </data>
   <data name="Subtitle" xml:space="preserve">
     <value>자막</value>

@@ -422,6 +422,9 @@ $files</value>
   <data name="EditPreset" xml:space="preserve">
     <value>Voreinstellung bearbeiten</value>
   </data>
+  <data name="Effects" xml:space="preserve">
+    <value>Effekte</value>
+  </data>
   <data name="Enable" xml:space="preserve">
     <value>Aktivieren</value>
   </data>
@@ -1207,6 +1210,9 @@ Im abgesicherten Modus starten?</value>
   </data>
   <data name="Stretch" xml:space="preserve">
     <value>Strecken</value>
+  </data>
+  <data name="StretchMethod" xml:space="preserve">
+    <value>Dehnungsmethode</value>
   </data>
   <data name="Subtitle" xml:space="preserve">
     <value>Untertitel</value>

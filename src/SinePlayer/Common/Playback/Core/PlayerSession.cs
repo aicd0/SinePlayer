@@ -830,7 +830,9 @@ internal sealed partial class PlayerSession : IDisposable
             return;
         }
 
-        SettingsOf(MediaStreamKind.Audio, stream).ToComponents().ApplyAudio(chain);
+        PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Audio, stream);
+        settings.ToComponents().ApplyAudio(chain);
+        chain.SpeedAlgorithm = settings.Audio.StretchMethod;
     }
 
     private void ApplySettings(ISubtitleChain chain)

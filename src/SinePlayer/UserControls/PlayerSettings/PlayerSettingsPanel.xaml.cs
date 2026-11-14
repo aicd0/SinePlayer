@@ -24,6 +24,7 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Win2D;
+using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
@@ -760,6 +761,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 ViewModel.AudioRendererLabel = GetLabel(StringResource.Renderer, modified);
             }
 
+            {
+                bool modified = settings.Audio.StretchMethod != presetSettings.Audio.StretchMethod;
+                tabModified = tabModified || modified;
+                UpdateAudioStretchMethod(settings);
+                ViewModel.AudioStretchMethodLabel = GetLabel(StringResource.StretchMethod, modified);
+            }
+
             _audioCategory.IsModified = tabModified;
             ViewModel.AudioTabTitle = GetLabel(StringResource.Audio, tabModified);
         }
@@ -1082,6 +1090,49 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
         });
         AudioRendererDropDownButton.Content = choice.Label;
+    }
+
+    private void AudioStretchMethodComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (sender is not ComboBox comboBox || comboBox.SelectedItem is not ComboBoxItem item || item.Tag is not AudioSpeedAlgorithm method)
+        {
+            return;
+        }
+
+        if (_mediaSettings.Audio.StretchMethod != method)
+        {
+            ApplyAudio(settings => settings.StretchMethod = method);
+        }
+    }
+
+    private void UpdateAudioStretchMethod(PlayerSettingsModel settings)
+    {
+        if (AudioStretchMethodComboBox.Items.Count == 0)
+        {
+            AudioStretchMethodComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.None, Tag = AudioSpeedAlgorithm.None });
+            AudioStretchMethodComboBox.Items.Add(new ComboBoxItem { Content = nameof(AudioSpeedAlgorithm.WSOLA), Tag = AudioSpeedAlgorithm.WSOLA });
+        }
+
+        AudioSpeedAlgorithm method = settings.Audio.StretchMethod;
+        int index = -1;
+        for (int i = 0; i < AudioStretchMethodComboBox.Items.Count; i++)
+        {
+            if (AudioStretchMethodComboBox.Items[i] is ComboBoxItem item && item.Tag is AudioSpeedAlgorithm candidate && candidate == method)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (AudioStretchMethodComboBox.SelectedIndex != index)
+        {
+            AudioStretchMethodComboBox.SelectedIndex = index;
+        }
     }
 
     private void UpdateSubtitleDecoder(PlayerSettingsModel settings)

@@ -422,6 +422,9 @@ $files</value>
   <data name="EditPreset" xml:space="preserve">
     <value>编辑预设</value>
   </data>
+  <data name="Effects" xml:space="preserve">
+    <value>效果</value>
+  </data>
   <data name="Enable" xml:space="preserve">
     <value>启用</value>
   </data>
@@ -1207,6 +1210,9 @@ $plugins</value>
   </data>
   <data name="Stretch" xml:space="preserve">
     <value>拉伸</value>
+  </data>
+  <data name="StretchMethod" xml:space="preserve">
+    <value>伸缩方式</value>
   </data>
   <data name="Subtitle" xml:space="preserve">
     <value>字幕</value>

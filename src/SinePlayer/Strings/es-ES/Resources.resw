@@ -422,6 +422,9 @@ $files</value>
   <data name="EditPreset" xml:space="preserve">
     <value>Editar ajuste preestablecido</value>
   </data>
+  <data name="Effects" xml:space="preserve">
+    <value>Efectos</value>
+  </data>
   <data name="Enable" xml:space="preserve">
     <value>Habilitar</value>
   </data>
@@ -1207,6 +1210,9 @@ $plugins</value>
   </data>
   <data name="Stretch" xml:space="preserve">
     <value>Estirar</value>
+  </data>
+  <data name="StretchMethod" xml:space="preserve">
+    <value>Método de estiramiento</value>
   </data>
   <data name="Subtitle" xml:space="preserve">
     <value>Subtítulo</value>
