@@ -422,6 +422,9 @@ $files</value>
   <data name="EditPreset" xml:space="preserve">
     <value>Modifier le préréglage</value>
   </data>
+  <data name="Effects" xml:space="preserve">
+    <value>Effets</value>
+  </data>
   <data name="Enable" xml:space="preserve">
     <value>Activer</value>
   </data>
@@ -1207,6 +1210,9 @@ Démarrer en mode sans échec ?</value>
   </data>
   <data name="Stretch" xml:space="preserve">
     <value>Étirer</value>
+  </data>
+  <data name="StretchMethod" xml:space="preserve">
+    <value>Méthode d’étirement</value>
   </data>
   <data name="Subtitle" xml:space="preserve">
     <value>Sous-titre</value>

@@ -190,6 +190,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _audioStretchMethodLabel = string.Empty;
+    public string AudioStretchMethodLabel
+    {
+        get => _audioStretchMethodLabel;
+        set
+        {
+            _audioStretchMethodLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AudioStretchMethodLabel)));
+        }
+    }
+
     private string _subtitleDecoderLabel = string.Empty;
     public string SubtitleDecoderLabel
     {
