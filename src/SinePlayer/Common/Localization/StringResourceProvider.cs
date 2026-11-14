@@ -320,6 +320,7 @@ public class StringResourceProvider
     public string Settings => GetResourceString("Settings");
     public string Shadow => GetResourceString("Shadow");
     public string ShadowColor => GetResourceString("ShadowColor");
+    public string ShadowDistance => GetResourceString("ShadowDistance");
     public string ShowHiddenItems => GetResourceString("ShowHiddenItems");
     public string ShowInFileExplorer => GetResourceString("ShowInFileExplorer");
     public string ShowLogs => GetResourceString("ShowLogs");

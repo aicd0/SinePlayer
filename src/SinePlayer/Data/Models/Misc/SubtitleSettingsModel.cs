@@ -29,6 +29,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
     public double OutlineWidth { get; set; } = 2.0;
     public Color OutlineColor { get; set; } = Color.FromArgb(255, 0, 0, 0);
     public Color ShadowColor { get; set; } = Color.FromArgb(128, 0, 0, 0);
+    public double ShadowDistance { get; set; } = 0.06;
     public bool ShadowEnabled { get; set; } = true;
     public int Opacity { get; set; } = 100;
 
@@ -48,6 +49,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             OutlineColor = OutlineColor,
             ShadowEnabled = ShadowEnabled,
             ShadowColor = ShadowColor,
+            ShadowDistance = ShadowDistance,
             Opacity = Opacity / 100.0,
         };
     }
@@ -93,6 +95,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
         OutlineWidth = model.OutlineWidth ?? OutlineWidth;
         OutlineColor = model.OutlineColor is { } outlineColor ? FromColorValue(outlineColor) : OutlineColor;
         ShadowColor = model.ShadowColor is { } shadowColor ? FromColorValue(shadowColor) : ShadowColor;
+        ShadowDistance = model.ShadowDistance ?? ShadowDistance;
         ShadowEnabled = model.ShadowEnabled ?? ShadowEnabled;
         Opacity = model.Opacity ?? Opacity;
     }
@@ -115,6 +118,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             OutlineWidth = OutlineWidth,
             OutlineColor = ToColorValue(OutlineColor),
             ShadowColor = ToColorValue(ShadowColor),
+            ShadowDistance = ShadowDistance,
             ShadowEnabled = ShadowEnabled,
             Opacity = Opacity,
         };
@@ -173,6 +177,9 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 
         [JsonPropertyName("ShadowColor")]
         public uint? ShadowColor { get; set; }
+
+        [JsonPropertyName("ShadowDistance")]
+        public double? ShadowDistance { get; set; }
 
         [JsonPropertyName("ShadowEnabled")]
         public bool? ShadowEnabled { get; set; }

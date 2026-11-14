@@ -1178,6 +1178,9 @@ $plugins</value>
   <data name="ShadowColor" xml:space="preserve">
     <value>影の色</value>
   </data>
+  <data name="ShadowDistance" xml:space="preserve">
+    <value>影の距離</value>
+  </data>
   <data name="ShowHiddenItems" xml:space="preserve">
     <value>非表示の項目を表示</value>
   </data>

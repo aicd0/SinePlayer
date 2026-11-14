@@ -1178,6 +1178,9 @@ Démarrer en mode sans échec ?</value>
   <data name="ShadowColor" xml:space="preserve">
     <value>Couleur de l’ombre</value>
   </data>
+  <data name="ShadowDistance" xml:space="preserve">
+    <value>Distance de l’ombre</value>
+  </data>
   <data name="ShowHiddenItems" xml:space="preserve">
     <value>Afficher les éléments masqués</value>
   </data>

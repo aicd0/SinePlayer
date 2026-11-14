@@ -1178,6 +1178,9 @@ $plugins</value>
   <data name="ShadowColor" xml:space="preserve">
     <value>Цвет тени</value>
   </data>
+  <data name="ShadowDistance" xml:space="preserve">
+    <value>Расстояние тени</value>
+  </data>
   <data name="ShowHiddenItems" xml:space="preserve">
     <value>Показывать скрытые элементы</value>
   </data>

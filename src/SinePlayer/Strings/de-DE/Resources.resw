@@ -1178,6 +1178,9 @@ Im abgesicherten Modus starten?</value>
   <data name="ShadowColor" xml:space="preserve">
     <value>Schattenfarbe</value>
   </data>
+  <data name="ShadowDistance" xml:space="preserve">
+    <value>Schattenabstand</value>
+  </data>
   <data name="ShowHiddenItems" xml:space="preserve">
     <value>Versteckte Elemente anzeigen</value>
   </data>

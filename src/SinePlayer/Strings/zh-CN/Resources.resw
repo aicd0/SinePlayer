@@ -1178,6 +1178,9 @@ $plugins</value>
   <data name="ShadowColor" xml:space="preserve">
     <value>阴影颜色</value>
   </data>
+  <data name="ShadowDistance" xml:space="preserve">
+    <value>阴影距离</value>
+  </data>
   <data name="ShowHiddenItems" xml:space="preserve">
     <value>显示隐藏项目</value>
   </data>

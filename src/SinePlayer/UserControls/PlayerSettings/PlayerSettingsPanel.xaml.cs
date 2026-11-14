@@ -867,6 +867,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = settings.Subtitle.ShadowDistance != presetSettings.Subtitle.ShadowDistance;
+                tabModified = tabModified || modified;
+                UpdateSubtitleShadowDistance(settings);
+                ViewModel.SubtitleShadowDistanceLabel = GetLabel(StringResource.ShadowDistance, modified);
+            }
+
+            {
                 bool modified = !settings.Subtitle.ShadowColor.Equals(presetSettings.Subtitle.ShadowColor);
                 tabModified = tabModified || modified;
                 UpdateSubtitleShadowColor(settings);
@@ -1737,6 +1744,41 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         SubtitleOutlineColorPreview.Background = new SolidColorBrush(color);
+    }
+
+    private void SubtitleShadowDistanceNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = sender.Value;
+        if (double.IsNaN(value))
+        {
+            value = _mediaSettings.Subtitle.ShadowDistance;
+        }
+
+        value = Math.Round(Math.Clamp(value, sender.Minimum, sender.Maximum), 2);
+        if (value != sender.Value)
+        {
+            sender.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Subtitle.ShadowDistance - value) > 0.001)
+        {
+            ApplySubtitle(settings => settings.ShadowDistance = value);
+        }
+    }
+
+    private void UpdateSubtitleShadowDistance(PlayerSettingsModel settings)
+    {
+        double value = settings.Subtitle.ShadowDistance;
+        double shown = SubtitleShadowDistanceNumberBox.Value;
+        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        {
+            SubtitleShadowDistanceNumberBox.Value = value;
+        }
     }
 
     private void SubtitleShadowColorPicker_ColorChanged(ColorPicker sender, ColorChangedEventArgs args)

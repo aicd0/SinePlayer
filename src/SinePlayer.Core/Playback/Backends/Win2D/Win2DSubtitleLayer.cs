@@ -35,7 +35,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
     private const float MarginFraction = 0.03f;
     private const double MaximumInsetFraction = 0.9;
     private const float StackGapFraction = 0.15f;
-    private const float ShadowOffsetFraction = 0.06f;
+    private const float DefaultShadowDistanceFraction = 0.06f;
 
     #endregion
 
@@ -309,7 +309,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
                 Color shadowColor = presentation.ShadowColor ?? DefaultShadowColor;
                 using CanvasActiveLayer? shadowLayer = shadowColor.A < byte.MaxValue ? session.CreateLayer(shadowColor.A / 255.0f) : null;
                 var ink = Color.FromArgb(byte.MaxValue, shadowColor.R, shadowColor.G, shadowColor.B);
-                float offset = fontSize * ShadowOffsetFraction;
+                float offset = fontSize * (float)(presentation.ShadowDistance ?? DefaultShadowDistanceFraction);
                 Vector2 shadowOrigin = origin + new Vector2(offset, offset);
 
                 if (outline is not null)
