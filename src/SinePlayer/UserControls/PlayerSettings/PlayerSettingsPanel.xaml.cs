@@ -867,6 +867,20 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = !settings.Subtitle.ShadowColor.Equals(presetSettings.Subtitle.ShadowColor);
+                tabModified = tabModified || modified;
+                UpdateSubtitleShadowColor(settings);
+                ViewModel.SubtitleShadowColorLabel = GetLabel(StringResource.ShadowColor, modified);
+            }
+
+            {
+                bool modified = settings.Subtitle.ShadowEnabled != presetSettings.Subtitle.ShadowEnabled;
+                tabModified = tabModified || modified;
+                UpdateSubtitleShadowEnabled(settings);
+                ViewModel.SubtitleShadowLabel = GetLabel(StringResource.Shadow, modified);
+            }
+
+            {
                 bool modified = settings.Subtitle.Opacity != presetSettings.Subtitle.Opacity;
                 tabModified = tabModified || modified;
                 UpdateSubtitleOpacity(settings);
@@ -1723,6 +1737,50 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         SubtitleOutlineColorPreview.Background = new SolidColorBrush(color);
+    }
+
+    private void SubtitleShadowColorPicker_ColorChanged(ColorPicker sender, ColorChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        Color color = args.NewColor;
+        if (!_mediaSettings.Subtitle.ShadowColor.Equals(color))
+        {
+            ApplySubtitle(settings => settings.ShadowColor = color);
+        }
+    }
+
+    private void UpdateSubtitleShadowColor(PlayerSettingsModel settings)
+    {
+        Color color = settings.Subtitle.ShadowColor;
+        if (!SubtitleShadowColorPicker.Color.Equals(color))
+        {
+            SubtitleShadowColorPicker.Color = color;
+        }
+
+        SubtitleShadowColorPreview.Background = new SolidColorBrush(color);
+    }
+
+    private void SubtitleShadowToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool value = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.Subtitle.ShadowEnabled != value)
+        {
+            ApplySubtitle(settings => settings.ShadowEnabled = value);
+        }
+    }
+
+    private void UpdateSubtitleShadowEnabled(PlayerSettingsModel settings)
+    {
+        SubtitleShadowToggleSwitch.IsOn = settings.Subtitle.ShadowEnabled;
     }
 
     private void SubtitleOpacitySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)

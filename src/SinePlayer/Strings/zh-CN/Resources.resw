@@ -1172,6 +1172,12 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>设置</value>
   </data>
+  <data name="Shadow" xml:space="preserve">
+    <value>阴影</value>
+  </data>
+  <data name="ShadowColor" xml:space="preserve">
+    <value>阴影颜色</value>
+  </data>
   <data name="ShowHiddenItems" xml:space="preserve">
     <value>显示隐藏项目</value>
   </data>

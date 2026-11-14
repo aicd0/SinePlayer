@@ -35,6 +35,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
     private const float MarginFraction = 0.03f;
     private const double MaximumInsetFraction = 0.9;
     private const float StackGapFraction = 0.15f;
+    private const float ShadowOffsetFraction = 0.06f;
 
     #endregion
 
@@ -291,16 +292,37 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             taken[row] += (row == 2 ? moved : -moved) + (float)layout.LayoutBounds.Height + gap;
             origin = kept;
 
-            if (presentation.OutlineWidth > 0.0)
+            CanvasGeometry? outline = presentation.OutlineWidth > 0.0 ? outlines.Get(device, body, format, width, height) : null;
+
+            // The stroke runs down the middle of the glyph's edge, so half of it would be covered by the words. Twice the
+            // width is drawn and the words fill over the inner half, which leaves the border growing outwards by exactly
+            // the width asked for.
+            float strokeWidth = (float)(2.0 * presentation.OutlineWidth * scale);
+
+            if (presentation.ShadowEnabled)
             {
-                // The stroke runs down the middle of the glyph's edge, so half of it would be covered by the words. Twice
-                // the width is drawn and the words fill over the inner half, which leaves the border growing outwards by
-                // exactly the width asked for.
-                CanvasGeometry? outline = outlines.Get(device, body, format, width, height);
+                // The shadow is the whole outlined shape again, moved away from the words: the border is part of what casts
+                // it, so the shadow follows the silhouette the words are drawn with rather than the bare glyphs, which the
+                // border would then cover. Its border and its words overlap, and a shadow colour that is not opaque would be
+                // composed twice over that overlap and leave a darker rim, so both are drawn opaque into a layer carrying
+                // the colour's own alpha: the shadow as a whole is then composed once.
+                Color shadowColor = presentation.ShadowColor ?? DefaultShadowColor;
+                using CanvasActiveLayer? shadowLayer = shadowColor.A < byte.MaxValue ? session.CreateLayer(shadowColor.A / 255.0f) : null;
+                var ink = Color.FromArgb(byte.MaxValue, shadowColor.R, shadowColor.G, shadowColor.B);
+                float offset = fontSize * ShadowOffsetFraction;
+                Vector2 shadowOrigin = origin + new Vector2(offset, offset);
+
                 if (outline is not null)
                 {
-                    session.DrawGeometry(outline, origin, presentation.OutlineColor ?? DefaultOutlineColor, (float)(2.0 * presentation.OutlineWidth * scale), OutlineStrokeStyle);
+                    session.DrawGeometry(outline, shadowOrigin, ink, strokeWidth, OutlineStrokeStyle);
                 }
+
+                session.DrawTextLayout(layout, shadowOrigin, ink);
+            }
+
+            if (outline is not null)
+            {
+                session.DrawGeometry(outline, origin, presentation.OutlineColor ?? DefaultOutlineColor, strokeWidth, OutlineStrokeStyle);
             }
 
             session.DrawTextLayout(layout, origin, presentation.FontColor ?? DefaultTextColor);
@@ -350,6 +372,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
 
     private static readonly Color DefaultTextColor = Color.FromArgb(255, 255, 255, 255);
     private static readonly Color DefaultOutlineColor = Color.FromArgb(255, 0, 0, 0);
+    private static readonly Color DefaultShadowColor = Color.FromArgb(128, 0, 0, 0);
     private static readonly CanvasStrokeStyle OutlineStrokeStyle = new() { LineJoin = CanvasLineJoin.Round };
 
     private sealed partial class OutlineCache : IDisposable

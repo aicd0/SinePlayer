@@ -705,7 +705,7 @@
                                         Text="{x:Bind ViewModel.SubtitleOutlineColorLabel, Mode=OneWay}" />
                                     <Button
                                         Grid.Column="3"
-                                        Padding="4"
+                                        Padding="4,0"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Center">
                                         <Border
@@ -723,10 +723,61 @@
                                         </Button.Flyout>
                                     </Button>
                                 </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleShadowColorLabel, Mode=OneWay}" />
+                                    <Button
+                                        Grid.Column="3"
+                                        Padding="4,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                        <Border
+                                            x:Name="SubtitleShadowColorPreview"
+                                            Width="36"
+                                            Height="20"
+                                            CornerRadius="2" />
+                                        <Button.Flyout>
+                                            <Flyout>
+                                                <ColorPicker
+                                                    x:Name="SubtitleShadowColorPicker"
+                                                    ColorChanged="SubtitleShadowColorPicker_ColorChanged"
+                                                    IsAlphaEnabled="True" />
+                                            </Flyout>
+                                        </Button.Flyout>
+                                    </Button>
+                                </Grid>
                                 <Rectangle
                                     Height="1"
                                     Margin="0,8"
                                     Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+                                <Grid Style="{StaticResource CommonSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleShadowLabel, Mode=OneWay}" />
+                                    <ToggleSwitch
+                                        x:Name="SubtitleShadowToggleSwitch"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource CompatToggleSwitchStyle}"
+                                        Toggled="SubtitleShadowToggleSwitch_Toggled" />
+                                </Grid>
                                 <settings:SliderSettingView
                                     x:Name="SubtitleOpacitySlider"
                                     DefaultValue="100"
