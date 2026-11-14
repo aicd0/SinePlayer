@@ -495,6 +495,63 @@ public class Win2DSubtitleRendererTests
         }
     }
 
+    /// <summary>
+    /// The distance is how far the shadow is moved, as a fraction of the font size, so a larger one puts the shadow's ink
+    /// further out from the words.
+    /// </summary>
+    [Test]
+    public void MovesTheShadowByTheDistanceItIsGiven()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 240;
+
+        var shadowColour = Color.FromArgb(255, 0, 128, 0);
+        SubtitlePresentation near = new()
+        {
+            FontSize = 32.0,
+            ShadowEnabled = true,
+            ShadowColor = shadowColour,
+            ShadowDistance = 0.1,
+        };
+        SubtitlePresentation far = near with { ShadowDistance = 0.3 };
+
+        int nearRight = RightOfColour(device, width, height, near, shadowColour);
+        int farRight = RightOfColour(device, width, height, far, shadowColour);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nearRight, Is.GreaterThan(0), "the shadow is drawn");
+            Assert.That(farRight, Is.GreaterThan(nearRight), "and a larger distance sets it further out");
+        }
+    }
+
+    /// <summary>The rightmost column of the drawing that carries exactly the colour given, or -1 when it carries none.</summary>
+    private static int RightOfColour(CanvasDevice device, int width, int height, SubtitlePresentation presentation, Color colour)
+    {
+        byte[] pixels = RenderInk(device, width, height, presentation);
+        int right = -1;
+        for (int index = 0; index + 3 < pixels.Length; index += 4)
+        {
+            if (pixels[index] == colour.B && pixels[index + 1] == colour.G && pixels[index + 2] == colour.R && pixels[index + 3] == colour.A)
+            {
+                right = Math.Max(right, (index / 4) % width);
+            }
+        }
+
+        return right;
+    }
+
     /// <summary>Whether any pixel of the drawing carries exactly the colour given.</summary>
     private static bool HasColour(CanvasDevice device, int width, int height, SubtitlePresentation presentation, Color colour)
     {

@@ -1178,6 +1178,9 @@ Start in Safe Mode?</value>
   <data name="ShadowColor" xml:space="preserve">
     <value>Shadow color</value>
   </data>
+  <data name="ShadowDistance" xml:space="preserve">
+    <value>Shadow distance</value>
+  </data>
   <data name="ShowHiddenItems" xml:space="preserve">
     <value>Show hidden items</value>
   </data>

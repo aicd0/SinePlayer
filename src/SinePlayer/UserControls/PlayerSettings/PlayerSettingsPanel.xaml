@@ -705,6 +705,7 @@
                                         Text="{x:Bind ViewModel.SubtitleOutlineColorLabel, Mode=OneWay}" />
                                     <Button
                                         Grid.Column="3"
+                                        Height="32"
                                         Padding="4,0"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Center">
@@ -734,9 +735,34 @@
                                         Grid.Column="0"
                                         Margin="0,0,0,2"
                                         VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleShadowDistanceLabel, Mode=OneWay}" />
+                                    <NumberBox
+                                        x:Name="SubtitleShadowDistanceNumberBox"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        LargeChange="0.1"
+                                        Maximum="1"
+                                        Minimum="0"
+                                        SmallChange="0.01"
+                                        SpinButtonPlacementMode="Inline"
+                                        ValueChanged="SubtitleShadowDistanceNumberBox_ValueChanged" />
+                                </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
                                         Text="{x:Bind ViewModel.SubtitleShadowColorLabel, Mode=OneWay}" />
                                     <Button
                                         Grid.Column="3"
+                                        Height="32"
                                         Padding="4,0"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Center">

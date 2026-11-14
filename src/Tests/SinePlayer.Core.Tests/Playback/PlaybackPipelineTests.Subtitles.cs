@@ -217,6 +217,7 @@ public partial class PlaybackPipelineTests
             OutlineColor = Color.FromArgb(255, 65, 43, 21),
             ShadowEnabled = true,
             ShadowColor = Color.FromArgb(128, 12, 34, 56),
+            ShadowDistance = 0.12,
             Opacity = 0.75,
         };
         pipeline.SubtitleChains[0].Presentation = presentation;

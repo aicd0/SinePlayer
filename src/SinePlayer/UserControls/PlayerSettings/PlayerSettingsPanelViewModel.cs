@@ -344,6 +344,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleShadowDistanceLabel = string.Empty;
+    public string SubtitleShadowDistanceLabel
+    {
+        get => _subtitleShadowDistanceLabel;
+        set
+        {
+            _subtitleShadowDistanceLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleShadowDistanceLabel)));
+        }
+    }
+
     private string _subtitleShadowColorLabel = string.Empty;
     public string SubtitleShadowColorLabel
     {
