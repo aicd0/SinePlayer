@@ -72,6 +72,11 @@ internal static class ThirdPartyLauncher
         return OperationResultExt.Success(writeErr.Result);
     }
 
+    public static OperationResult OpenAssetsFile(string filename)
+    {
+        return OpenFile(Path.Combine(AppContext.BaseDirectory, "Assets", filename));
+    }
+
     public static OperationResult OpenFile(string path)
     {
         try
