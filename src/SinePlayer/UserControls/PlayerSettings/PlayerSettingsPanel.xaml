@@ -135,6 +135,36 @@
                 </StackPanel>
 
                 <StackPanel x:Name="VideoSettingsGrid" Orientation="Vertical">
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Playback}" SectionKey="Playback">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.VideoSyncLabel, Mode=OneWay}" />
+                                    <NumberBox
+                                        x:Name="VideoSyncNumberBox"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        LargeChange="1"
+                                        Maximum="3600"
+                                        Minimum="-3600"
+                                        SmallChange="0.1"
+                                        SpinButtonPlacementMode="Inline"
+                                        ValueChanged="VideoSyncNumberBox_ValueChanged" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Output}" SectionKey="Output">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">
@@ -328,6 +358,36 @@
                     x:Name="AudioSettingsGrid"
                     Orientation="Vertical"
                     Visibility="Collapsed">
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Playback}" SectionKey="Playback">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.AudioSyncLabel, Mode=OneWay}" />
+                                    <NumberBox
+                                        x:Name="AudioSyncNumberBox"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        LargeChange="1"
+                                        Maximum="3600"
+                                        Minimum="-3600"
+                                        SmallChange="0.1"
+                                        SpinButtonPlacementMode="Inline"
+                                        ValueChanged="AudioSyncNumberBox_ValueChanged" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Output}" SectionKey="Output">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">
@@ -399,6 +459,36 @@
                     x:Name="SubtitleSettingsGrid"
                     Orientation="Vertical"
                     Visibility="Collapsed">
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Playback}" SectionKey="Playback">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleSyncLabel, Mode=OneWay}" />
+                                    <NumberBox
+                                        x:Name="SubtitleSyncNumberBox"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        LargeChange="1"
+                                        Maximum="3600"
+                                        Minimum="-3600"
+                                        SmallChange="0.1"
+                                        SpinButtonPlacementMode="Inline"
+                                        ValueChanged="SubtitleSyncNumberBox_ValueChanged" />
+                                </Grid>
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Output}" SectionKey="Output">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">

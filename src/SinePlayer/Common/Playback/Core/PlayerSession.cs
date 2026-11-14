@@ -78,6 +78,7 @@ internal sealed partial class PlayerSession : IDisposable
 
     public const double MinimumPlaybackRate = 0.1;
     public const double MaximumPlaybackRate = 8.0;
+    private const double MaximumSyncSeconds = 3600.0;
 
     public static string NewId()
     {
@@ -821,6 +822,7 @@ internal sealed partial class PlayerSession : IDisposable
         PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Video, stream);
         settings.ToComponents().ApplyVideo(chain);
         chain.Transform = settings.Video.ToTransform();
+        chain.Offset = OffsetOf(settings.Video.Sync);
     }
 
     private void ApplySettings(IAudioChain chain)
@@ -833,6 +835,7 @@ internal sealed partial class PlayerSession : IDisposable
         PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Audio, stream);
         settings.ToComponents().ApplyAudio(chain);
         chain.SpeedAlgorithm = settings.Audio.StretchMethod;
+        chain.Offset = OffsetOf(settings.Audio.Sync);
     }
 
     private void ApplySettings(ISubtitleChain chain)
@@ -845,6 +848,12 @@ internal sealed partial class PlayerSession : IDisposable
         PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Subtitle, stream);
         settings.ToComponents().ApplySubtitle(chain);
         chain.Presentation = settings.Subtitle.ToPresentation() with { Insets = _subtitleInsets };
+        chain.Offset = OffsetOf(settings.Subtitle.Sync);
+    }
+
+    private static TimeSpan OffsetOf(double seconds)
+    {
+        return double.IsFinite(seconds) ? TimeSpan.FromSeconds(Math.Clamp(seconds, -MaximumSyncSeconds, MaximumSyncSeconds)) : TimeSpan.Zero;
     }
 
     #endregion

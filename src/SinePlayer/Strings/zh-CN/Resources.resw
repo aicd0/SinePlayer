@@ -1226,6 +1226,9 @@ $plugins</value>
   <data name="SubtitleTypeText" xml:space="preserve">
     <value>文本</value>
   </data>
+  <data name="Sync" xml:space="preserve">
+    <value>同步</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>标签</value>
   </data>

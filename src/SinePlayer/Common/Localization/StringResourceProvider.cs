@@ -336,6 +336,7 @@ public class StringResourceProvider
     public string SubtitleForced => GetResourceString("SubtitleForced");
     public string SubtitleTypeBitmap => GetResourceString("SubtitleTypeBitmap");
     public string SubtitleTypeText => GetResourceString("SubtitleTypeText");
+    public string Sync => GetResourceString("Sync");
     public string Tag => GetResourceString("Tag");
     public string TagLinkTip => GetResourceString("TagLinkTip");
     public string Tags => GetResourceString("Tags");

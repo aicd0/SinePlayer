@@ -14,6 +14,7 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
 {
     public string Decoder { get; set; } = PlaybackComponents.AUTO;
     public string Renderer { get; set; } = PlaybackComponents.AUTO;
+    public double Sync { get; set; }
     public bool PreferHardwareDecoding { get; set; } = true;
     public bool PreferHdr { get; set; } = true;
     public VideoResizeMode ResizeMode { get; set; } = VideoResizeMode.Fit;
@@ -54,6 +55,7 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
     {
         Decoder = model.Decoder ?? Decoder;
         Renderer = model.Renderer ?? Renderer;
+        Sync = model.Sync ?? Sync;
         PreferHardwareDecoding = model.PreferHardwareDecoding ?? PreferHardwareDecoding;
         PreferHdr = model.PreferHdr ?? PreferHdr;
         ResizeMode = ParseResizeMode(model.ResizeMode, ResizeMode);
@@ -69,6 +71,7 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
         {
             Decoder = Decoder,
             Renderer = Renderer,
+            Sync = Sync,
             PreferHardwareDecoding = PreferHardwareDecoding,
             PreferHdr = PreferHdr,
             ResizeMode = ResizeMode.ToString(),
@@ -111,6 +114,9 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
 
         [JsonPropertyName("Renderer")]
         public string? Renderer { get; set; }
+
+        [JsonPropertyName("Sync")]
+        public double? Sync { get; set; }
 
         [JsonPropertyName("PreferHardwareDecoding")]
         public bool? PreferHardwareDecoding { get; set; }

@@ -1226,6 +1226,9 @@ Démarrer en mode sans échec ?</value>
   <data name="SubtitleTypeText" xml:space="preserve">
     <value>Texte</value>
   </data>
+  <data name="Sync" xml:space="preserve">
+    <value>Synchronisation</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Étiquette</value>
   </data>

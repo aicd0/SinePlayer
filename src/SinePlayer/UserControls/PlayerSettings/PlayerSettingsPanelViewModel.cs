@@ -70,6 +70,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _videoSyncLabel = string.Empty;
+    public string VideoSyncLabel
+    {
+        get => _videoSyncLabel;
+        set
+        {
+            _videoSyncLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VideoSyncLabel)));
+        }
+    }
+
     private string _videoDecoderLabel = string.Empty;
     public string VideoDecoderLabel
     {
@@ -169,6 +180,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _audioSyncLabel = string.Empty;
+    public string AudioSyncLabel
+    {
+        get => _audioSyncLabel;
+        set
+        {
+            _audioSyncLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AudioSyncLabel)));
+        }
+    }
+
     private string _audioDecoderLabel = string.Empty;
     public string AudioDecoderLabel
     {
@@ -220,6 +242,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         {
             _subtitleRendererLabel = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleRendererLabel)));
+        }
+    }
+
+    private string _subtitleSyncLabel = string.Empty;
+    public string SubtitleSyncLabel
+    {
+        get => _subtitleSyncLabel;
+        set
+        {
+            _subtitleSyncLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleSyncLabel)));
         }
     }
 

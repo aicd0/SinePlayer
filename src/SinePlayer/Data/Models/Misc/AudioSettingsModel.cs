@@ -14,6 +14,7 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
 {
     public string Decoder { get; set; } = PlaybackComponents.AUTO;
     public string Renderer { get; set; } = PlaybackComponents.AUTO;
+    public double Sync { get; set; }
     public AudioSpeedAlgorithm StretchMethod { get; set; } = AudioSpeedAlgorithm.WSOLA;
 
     protected override Dictionary<string, AudioSettingsModel> LoadPresets()
@@ -35,6 +36,7 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
     {
         Decoder = model.Decoder ?? Decoder;
         Renderer = model.Renderer ?? Renderer;
+        Sync = model.Sync ?? Sync;
         StretchMethod = ParseStretchMethod(model.StretchMethod, StretchMethod);
     }
 
@@ -44,6 +46,7 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
         {
             Decoder = Decoder,
             Renderer = Renderer,
+            Sync = Sync,
             StretchMethod = StretchMethod.ToString(),
         };
     }
@@ -65,6 +68,9 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
 
         [JsonPropertyName("Renderer")]
         public string? Renderer { get; set; }
+
+        [JsonPropertyName("Sync")]
+        public double? Sync { get; set; }
 
         [JsonPropertyName("StretchMethod")]
         public string? StretchMethod { get; set; }

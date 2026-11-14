@@ -678,6 +678,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             bool tabModified = false;
 
             {
+                bool modified = settings.Video.Sync != presetSettings.Video.Sync;
+                tabModified = tabModified || modified;
+                UpdateVideoSync(settings);
+                ViewModel.VideoSyncLabel = GetLabel(StringResource.Sync, modified);
+            }
+
+            {
                 bool modified = settings.Video.Decoder != presetSettings.Video.Decoder;
                 tabModified = tabModified || modified;
                 UpdateVideoDecoder(settings);
@@ -748,6 +755,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             bool tabModified = false;
 
             {
+                bool modified = settings.Audio.Sync != presetSettings.Audio.Sync;
+                tabModified = tabModified || modified;
+                UpdateAudioSync(settings);
+                ViewModel.AudioSyncLabel = GetLabel(StringResource.Sync, modified);
+            }
+
+            {
                 bool modified = settings.Audio.Decoder != presetSettings.Audio.Decoder;
                 tabModified = tabModified || modified;
                 UpdateAudioDecoder(settings);
@@ -774,6 +788,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         {
             bool tabModified = false;
+
+            {
+                bool modified = settings.Subtitle.Sync != presetSettings.Subtitle.Sync;
+                tabModified = tabModified || modified;
+                UpdateSubtitleSync(settings);
+                ViewModel.SubtitleSyncLabel = GetLabel(StringResource.Sync, modified);
+            }
 
             {
                 bool modified = settings.Subtitle.Decoder != presetSettings.Subtitle.Decoder;
@@ -893,7 +914,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             value = PlayerPresetSettingsModel.DefaultSpeed;
         }
 
-        value = Math.Round(Math.Clamp(sender.Value, PlayerSession.MinimumPlaybackRate, PlayerSession.MaximumPlaybackRate), 2);
+        value = Math.Round(Math.Clamp(value, PlayerSession.MinimumPlaybackRate, PlayerSession.MaximumPlaybackRate), 2);
         if (value != sender.Value)
         {
             sender.Value = value;
@@ -912,6 +933,41 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
         {
             GeneralSpeedNumberBox.Value = value;
+        }
+    }
+
+    private void VideoSyncNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = sender.Value;
+        if (double.IsNaN(value))
+        {
+            value = _mediaSettings.Video.Sync;
+        }
+
+        value = Math.Round(Math.Clamp(value, sender.Minimum, sender.Maximum), 1);
+        if (value != sender.Value)
+        {
+            sender.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Video.Sync - value) > 0.001)
+        {
+            ApplyVideo(settings => settings.Sync = value);
+        }
+    }
+
+    private void UpdateVideoSync(PlayerSettingsModel settings)
+    {
+        double value = settings.Video.Sync;
+        double shown = VideoSyncNumberBox.Value;
+        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        {
+            VideoSyncNumberBox.Value = value;
         }
     }
 
@@ -1064,6 +1120,41 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         VideoFlipVerticalToggleSwitch.IsOn = settings.Video.FlipVertical;
     }
 
+    private void AudioSyncNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = sender.Value;
+        if (double.IsNaN(value))
+        {
+            value = _mediaSettings.Audio.Sync;
+        }
+
+        value = Math.Round(Math.Clamp(value, sender.Minimum, sender.Maximum), 1);
+        if (value != sender.Value)
+        {
+            sender.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Audio.Sync - value) > 0.001)
+        {
+            ApplyAudio(settings => settings.Sync = value);
+        }
+    }
+
+    private void UpdateAudioSync(PlayerSettingsModel settings)
+    {
+        double value = settings.Audio.Sync;
+        double shown = AudioSyncNumberBox.Value;
+        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        {
+            AudioSyncNumberBox.Value = value;
+        }
+    }
+
     private void UpdateAudioDecoder(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = [.. PlaybackComponents.GetAudioDecoderOptions()];
@@ -1132,6 +1223,41 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (AudioStretchMethodComboBox.SelectedIndex != index)
         {
             AudioStretchMethodComboBox.SelectedIndex = index;
+        }
+    }
+
+    private void SubtitleSyncNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = sender.Value;
+        if (double.IsNaN(value))
+        {
+            value = _mediaSettings.Subtitle.Sync;
+        }
+
+        value = Math.Round(Math.Clamp(value, sender.Minimum, sender.Maximum), 1);
+        if (value != sender.Value)
+        {
+            sender.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Subtitle.Sync - value) > 0.001)
+        {
+            ApplySubtitle(settings => settings.Sync = value);
+        }
+    }
+
+    private void UpdateSubtitleSync(PlayerSettingsModel settings)
+    {
+        double value = settings.Subtitle.Sync;
+        double shown = SubtitleSyncNumberBox.Value;
+        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        {
+            SubtitleSyncNumberBox.Value = value;
         }
     }
 
@@ -1546,13 +1672,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        if (double.IsNaN(sender.Value))
+        double value = sender.Value;
+        if (double.IsNaN(value))
         {
-            sender.Value = _mediaSettings.Subtitle.OutlineWidth;
-            return;
+            value = _mediaSettings.Subtitle.OutlineWidth;
         }
 
-        double value = Math.Round(sender.Value, 1);
+        value = Math.Round(Math.Clamp(value, sender.Minimum, sender.Maximum), 1);
         if (value != sender.Value)
         {
             sender.Value = value;

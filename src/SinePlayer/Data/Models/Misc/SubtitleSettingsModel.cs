@@ -17,6 +17,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 {
     public string Decoder { get; set; } = PlaybackComponents.AUTO;
     public string Renderer { get; set; } = PlaybackComponents.AUTO;
+    public double Sync { get; set; }
     public int Order { get; set; }
     public int PanX { get; set; }
     public int PanY { get; set; }
@@ -76,6 +77,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
     {
         Decoder = model.Decoder ?? Decoder;
         Renderer = model.Renderer ?? Renderer;
+        Sync = model.Sync ?? Sync;
         Order = model.Order ?? Order;
         PanX = model.PanX ?? PanX;
         PanY = model.PanY ?? PanY;
@@ -95,6 +97,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
         {
             Decoder = Decoder,
             Renderer = Renderer,
+            Sync = Sync,
             Order = Order,
             PanX = PanX,
             PanY = PanY,
@@ -126,6 +129,9 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 
         [JsonPropertyName("Renderer")]
         public string? Renderer { get; set; }
+
+        [JsonPropertyName("Sync")]
+        public double? Sync { get; set; }
 
         [JsonPropertyName("Order")]
         public int? Order { get; set; }
