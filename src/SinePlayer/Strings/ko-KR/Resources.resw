@@ -1226,6 +1226,9 @@ $plugins</value>
   <data name="SubtitleTypeText" xml:space="preserve">
     <value>텍스트</value>
   </data>
+  <data name="Sync" xml:space="preserve">
+    <value>동기화</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>꼬리표</value>
   </data>

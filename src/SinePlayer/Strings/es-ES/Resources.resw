@@ -1226,6 +1226,9 @@ $plugins</value>
   <data name="SubtitleTypeText" xml:space="preserve">
     <value>Texto</value>
   </data>
+  <data name="Sync" xml:space="preserve">
+    <value>Sincronización</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Etiqueta</value>
   </data>

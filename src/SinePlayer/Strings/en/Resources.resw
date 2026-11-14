@@ -1226,6 +1226,9 @@ Start in Safe Mode?</value>
   <data name="SubtitleTypeText" xml:space="preserve">
     <value>Text</value>
   </data>
+  <data name="Sync" xml:space="preserve">
+    <value>Sync</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Tag</value>
   </data>

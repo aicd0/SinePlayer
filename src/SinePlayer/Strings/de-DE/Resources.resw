@@ -1226,6 +1226,9 @@ Im abgesicherten Modus starten?</value>
   <data name="SubtitleTypeText" xml:space="preserve">
     <value>Text</value>
   </data>
+  <data name="Sync" xml:space="preserve">
+    <value>Synchronisierung</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Etikett</value>
   </data>
