@@ -95,6 +95,7 @@
             MaxHeight="400"
             HorizontalScrollBarVisibility="Disabled"
             HorizontalScrollMode="Disabled"
+            IsTabStop="True"
             VerticalScrollBarVisibility="Auto"
             VerticalScrollMode="Auto">
             <Grid MinWidth="360">
