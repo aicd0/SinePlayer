@@ -619,7 +619,7 @@ public class FFmpegVideoDecoderTests
                 Assert.That(IsSamePixels(hardwarePixels, softwarePixels), Is.True, "the padding rows must not be drawn");
 
                 using var enlarged = D3D11RenderTarget.CreateOffscreen(device, width, enlargedHeight);
-                byte[] enlargedHardwarePixels = RenderFrame(renderer, device, enlarged, frame);
+                byte[] enlargedHardwarePixels = RenderFrame(renderer, device, enlarged, frame!);
                 byte[] enlargedSoftwarePixels = RenderFrame(renderer, device, enlarged, software);
 
                 Assert.That(IsSamePixels(enlargedHardwarePixels, enlargedSoftwarePixels), Is.True, "nor be blended into the line drawn at the bottom of an enlarged picture");
