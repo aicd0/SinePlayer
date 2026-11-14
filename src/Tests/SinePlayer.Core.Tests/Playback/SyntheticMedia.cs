@@ -103,10 +103,10 @@ internal sealed class SyntheticMediaScript
     /// Subtitle events, as a real container carries them: one packet per event, timed by the event itself. Empty means
     /// the file has no subtitle track at all, which is every script that does not ask for one.
     /// </summary>
-    internal IReadOnlyList<ScriptedSubtitle> Subtitles { get; init; } = [];
+    internal ScriptedSubtitle[] Subtitles { get; init; } = [];
 
     /// <summary>What the file carries besides its streams, which for a real one is the fonts its script names.</summary>
-    internal IReadOnlyList<MediaAttachment> Attachments { get; init; } = [];
+    internal MediaAttachment[] Attachments { get; init; } = [];
 }
 
 /// <summary>One subtitle event of a scripted file.</summary>
@@ -299,7 +299,7 @@ internal sealed class SyntheticMediaSource : IMediaSource
             });
         }
 
-        if (script.Subtitles.Count > 0)
+        if (script.Subtitles.Length > 0)
         {
             streams.Add(new SubtitleStreamInfo { Index = SubtitleStreamIndex, CodecId = "synthetic-subtitle", Duration = script.Duration });
         }
@@ -719,8 +719,8 @@ internal sealed class SyntheticVideoDecoderFactory(int packetsBeforeFailure = 0)
 
             _hasReference = packet.IsKeyFrame || _hasReference;
 
-            frames =
-            [
+            frames = new RawVideoFrame[]
+            {
                 new RawVideoFrame
                 {
                     Timestamp = packet.Timestamp,
@@ -730,7 +730,7 @@ internal sealed class SyntheticVideoDecoderFactory(int packetsBeforeFailure = 0)
                     Format = PixelFormat.Yuv420P,
                     Buffer = new SyntheticMediaBuffer(),
                 },
-            ];
+            };
 
             return OperationResult.Success();
         }
@@ -777,8 +777,8 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
 
         public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawAudioBuffer> buffers)
         {
-            buffers =
-            [
+            buffers = new RawAudioBuffer[]
+            {
                 new RawAudioBuffer
                 {
                     Timestamp = packet.Timestamp,
@@ -789,7 +789,7 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
                     SampleCount = (int)(packet.Duration.TotalSeconds * stream.SampleRate),
                     Buffer = new SyntheticMediaBuffer((int)(packet.Duration.TotalSeconds * stream.SampleRate) * stream.ChannelCount * sizeof(short)),
                 },
-            ];
+            };
 
             return OperationResult.Success();
         }
@@ -840,15 +840,15 @@ internal sealed class SyntheticSubtitleDecoderFactory : ISubtitleDecoderFactory
 
         public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<SubtitleCue> cues)
         {
-            cues =
-            [
+            cues = new SubtitleCue[]
+            {
                 new SubtitleCue
                 {
                     Start = packet.Timestamp,
                     End = packet.Timestamp + packet.Duration,
                     Text = SyntheticSubtitleDecoderFactory.TextAt(packet.Timestamp),
                 },
-            ];
+            };
 
             return OperationResult.Success();
         }

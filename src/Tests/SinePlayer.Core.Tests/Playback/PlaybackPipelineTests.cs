@@ -418,7 +418,7 @@ public partial class PlaybackPipelineTests
         private readonly SyntheticVideoDecoderFactory _inner = new();
         private readonly List<bool> _hardwareRequests = [];
 
-        internal IReadOnlyList<bool> HardwareRequests
+        internal bool[] HardwareRequests
         {
             get
             {
@@ -1658,7 +1658,7 @@ public partial class PlaybackPipelineTests
         var waitedFor = Stopwatch.StartNew();
         while (waitedFor.ElapsedMilliseconds < 5000)
         {
-            if (warnings.Messages.Count > 0)
+            if (warnings.Messages.Length > 0)
             {
                 return;
             }
@@ -1683,7 +1683,7 @@ public partial class PlaybackPipelineTests
             pipeline.WarningRaised += Record;
         }
 
-        internal IReadOnlyList<WarningEntry> Entries
+        internal WarningEntry[] Entries
         {
             get
             {
@@ -1694,7 +1694,7 @@ public partial class PlaybackPipelineTests
             }
         }
 
-        internal IReadOnlyList<string> Messages
+        internal string[] Messages
         {
             get
             {
@@ -1809,7 +1809,7 @@ public partial class PlaybackPipelineTests
         private readonly List<int> _renderedWidths = [];
 
         /// <summary>The width of every frame handed over, in the order it was: which stream a frame came from.</summary>
-        public IReadOnlyList<int> RenderedWidths
+        public int[] RenderedWidths
         {
             get
             {
@@ -1824,7 +1824,7 @@ public partial class PlaybackPipelineTests
         /// The timestamp of every frame the pipeline handed over, in the order it did: what a test reads when
         /// the question is *which* frames were shown rather than how many.
         /// </summary>
-        public IReadOnlyList<TimeSpan> RenderedTimestamps
+        public TimeSpan[] RenderedTimestamps
         {
             get
             {
@@ -2275,7 +2275,7 @@ public partial class PlaybackPipelineTests
         /// is visible in, since the format the renderer was configured with says what it should be and this says what
         /// actually arrived.
         /// </summary>
-        public IReadOnlyList<int> SubmittedChannelCounts
+        public int[] SubmittedChannelCounts
         {
             get
             {
@@ -2292,7 +2292,7 @@ public partial class PlaybackPipelineTests
         /// The timestamp of every block the pipeline handed to the device, in the order it did â€” including the
         /// ones the device later let go of, because what a seek is asked about is what was offered at all.
         /// </summary>
-        public IReadOnlyList<TimeSpan> SubmittedTimestamps
+        public TimeSpan[] SubmittedTimestamps
         {
             get
             {
@@ -2755,8 +2755,8 @@ public partial class PlaybackPipelineTests
 
             public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<SubtitleCue> cues)
             {
-                cues =
-                [
+                cues = new SubtitleCue[]
+                {
                     new SubtitleCue
                     {
                         Start = packet.Timestamp,
@@ -2764,7 +2764,7 @@ public partial class PlaybackPipelineTests
                         Text = SyntheticSubtitleDecoderFactory.TextAt(packet.Timestamp),
                         Changes = [new SubtitleChange(instant, instant, false)],
                     },
-                ];
+                };
 
                 return OperationResult.Success();
             }
@@ -2845,7 +2845,7 @@ public partial class PlaybackPipelineTests
         public SubtitleStreamInfo? ConfiguredStream { get; private set; }
 
         /// <summary>The attachments the renderer was configured with, which is how a test reads what reached it.</summary>
-        public IReadOnlyList<MediaAttachment> ConfiguredAttachments { get; private set; } = [];
+        public MediaAttachment[] ConfiguredAttachments { get; private set; } = [];
 
         public IVideoRenderTarget? Target { get; private set; }
 
@@ -2862,7 +2862,7 @@ public partial class PlaybackPipelineTests
         }
 
         /// <summary>The presentation of every drawing, in order, so a test can check nothing was drawn without it.</summary>
-        public IReadOnlyList<SubtitlePresentation> Presentations
+        public SubtitlePresentation[] Presentations
         {
             get
             {
@@ -2886,7 +2886,7 @@ public partial class PlaybackPipelineTests
 
         public bool Disposed { get; private set; }
 
-        public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
+        public OperationResult Configure(SubtitleStreamInfo stream, MediaAttachment[] attachments, IVideoRenderTarget target)
         {
             ConfiguredStream = stream;
             ConfiguredAttachments = [.. attachments];

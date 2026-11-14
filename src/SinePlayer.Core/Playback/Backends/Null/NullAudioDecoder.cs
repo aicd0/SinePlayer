@@ -46,8 +46,8 @@ internal sealed partial class NullAudioDecoder : IAudioDecoder
             return OperationResult.Success();
         }
 
-        buffers =
-        [
+        buffers = new RawAudioBuffer[]
+        {
             new RawAudioBuffer
             {
                 Timestamp = packet.Timestamp,
@@ -58,7 +58,7 @@ internal sealed partial class NullAudioDecoder : IAudioDecoder
                 SampleCount = sampleCount,
                 Buffer = new NullPlanarAudioBuffer(_stream.SampleFormat, _stream.ChannelCount, sampleCount),
             },
-        ];
+        };
 
         return OperationResult.Success();
     }

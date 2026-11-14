@@ -110,7 +110,7 @@ internal sealed partial class MediaInfoPage : BasePage
             return;
         }
 
-        List<BaseMenuFlyoutItemModel> menuItems = MediaMenuCreator.CreateCompletionStatusMenuItems([media]);
+        List<BaseMenuFlyoutItemModel> menuItems = MediaMenuCreator.CreateCompletionStatusMenuItems(new[] { media });
 
         var flyout = new MenuFlyout();
         foreach (BaseMenuFlyoutItemModel item in menuItems)
@@ -205,7 +205,7 @@ internal sealed partial class MediaInfoPage : BasePage
             return;
         }
 
-        var dialog = new EditMediaInfoDialog([media]);
+        var dialog = new EditMediaInfoDialog(new[] { media });
         CoroutineUtils.Run(() => dialog.ShowAsync(WindowId));
     }
 

@@ -15,7 +15,7 @@ public sealed partial class SubtitleCue : IDisposable
 
     public SubtitleImage? Image { get; init; }
 
-    public IReadOnlyList<SubtitleChange>? Changes { get; init; }
+    public SubtitleChange[]? Changes { get; init; }
 
     public bool IsOpenEnded => End == OpenEnd;
 
@@ -26,7 +26,7 @@ public sealed partial class SubtitleCue : IDisposable
 
     public bool HasChanges(TimeSpan drawn, TimeSpan position)
     {
-        if (Changes is not { Count: > 0 } changes)
+        if (Changes is not { Length: > 0 } changes)
         {
             return false;
         }
@@ -44,7 +44,7 @@ public sealed partial class SubtitleCue : IDisposable
 
     public TimeSpan? TimeUntilChange(TimeSpan position)
     {
-        if (Changes is not { Count: > 0 } changes)
+        if (Changes is not { Length: > 0 } changes)
         {
             return null;
         }

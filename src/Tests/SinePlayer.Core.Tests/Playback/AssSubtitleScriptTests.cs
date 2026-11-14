@@ -24,7 +24,7 @@ public class AssSubtitleScriptTests
             Text = @"2,Sign,,10,20,30,{\pos(1,2)}Hello, world",
         };
 
-        string script = AssSubtitleScript.Compose(null, [cue]);
+        string script = AssSubtitleScript.Compose(null, new[] { cue });
 
         Assert.That(
             script,
@@ -42,7 +42,7 @@ public class AssSubtitleScriptTests
             Text = "0,Default,,0,0,0,,Hello",
         };
 
-        string script = AssSubtitleScript.Compose(null, [cue]);
+        string script = AssSubtitleScript.Compose(null, new[] { cue });
 
         using (Assert.EnterMultipleScope())
         {
@@ -75,7 +75,7 @@ public class AssSubtitleScriptTests
             End = TimeSpan.FromSeconds(1),
         };
 
-        string script = AssSubtitleScript.Compose(null, [bitmap]);
+        string script = AssSubtitleScript.Compose(null, new[] { bitmap });
 
         Assert.That(script, Does.Not.Contain("Dialogue:"), "a picture is not this renderer's work, and an empty line is not a cue");
     }
@@ -90,7 +90,7 @@ public class AssSubtitleScriptTests
             Text = "0,Default,,0,0,0,,Hi",
         };
 
-        string script = AssSubtitleScript.Compose(null, [cue]);
+        string script = AssSubtitleScript.Compose(null, new[] { cue });
 
         Assert.That(script, Does.Contain("Dialogue: 0,1:02:03.45,1:02:04.99,"), "the format carries hundredths and truncates the rest");
     }

@@ -20,12 +20,12 @@ public class AssSubtitleChangesTests
     [Test]
     public void ATimedTagBecomesAWindowInsideTheCue()
     {
-        IReadOnlyList<SubtitleChange>? changes = AssSubtitleChanges.Parse(@"0,Default,,0,0,0,,{\t(0,1000,\fs40)}Hello", sStart, sEnd);
+        SubtitleChange[]? changes = AssSubtitleChanges.Parse(@"0,Default,,0,0,0,,{\t(0,1000,\fs40)}Hello", sStart, sEnd);
 
         Assert.That(changes, Is.Not.Null);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(changes, Has.Count.EqualTo(1), "one \t is one window");
+            Assert.That(changes, Has.Length.EqualTo(1), "one \t is one window");
             Assert.That(changes![0].Start, Is.EqualTo(sStart), "the window is absolute, counted from the cue's start");
             Assert.That(changes[0].End, Is.EqualTo(sStart + TimeSpan.FromSeconds(1)), "and it ends when the tag says it does");
             Assert.That(changes[0].Continuous, Is.True, "a \t changes throughout its window, not only at its start");
@@ -35,7 +35,7 @@ public class AssSubtitleChangesTests
     [Test]
     public void AMoveWithItsOwnTimesUsesThem()
     {
-        IReadOnlyList<SubtitleChange>? changes = AssSubtitleChanges.Parse(@"0,Default,,0,0,0,,{\move(0,0,100,100,500,1500)}Hello", sStart, sEnd);
+        SubtitleChange[]? changes = AssSubtitleChanges.Parse(@"0,Default,,0,0,0,,{\move(0,0,100,100,500,1500)}Hello", sStart, sEnd);
 
         Assert.That(changes, Is.Not.Null);
         using (Assert.EnterMultipleScope())
@@ -48,7 +48,7 @@ public class AssSubtitleChangesTests
     [Test]
     public void AMoveWithoutTimesCoversTheWholeCue()
     {
-        IReadOnlyList<SubtitleChange>? changes = AssSubtitleChanges.Parse(@"0,Default,,0,0,0,,{\move(0,0,100,100)}Hello", sStart, sEnd);
+        SubtitleChange[]? changes = AssSubtitleChanges.Parse(@"0,Default,,0,0,0,,{\move(0,0,100,100)}Hello", sStart, sEnd);
 
         Assert.That(changes, Is.Not.Null);
         using (Assert.EnterMultipleScope())
@@ -61,12 +61,12 @@ public class AssSubtitleChangesTests
     [Test]
     public void KaraokeTurnsOverAtItsSyllables()
     {
-        IReadOnlyList<SubtitleChange>? changes = AssSubtitleChanges.Parse(@"0,Default,,0,0,0,,{\k20}He{\k30}llo", sStart, sEnd);
+        SubtitleChange[]? changes = AssSubtitleChanges.Parse(@"0,Default,,0,0,0,,{\k20}He{\k30}llo", sStart, sEnd);
 
         Assert.That(changes, Is.Not.Null);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(changes, Has.Count.EqualTo(2), "one turnover per syllable after the first");
+            Assert.That(changes, Has.Length.EqualTo(2), "one turnover per syllable after the first");
             Assert.That(changes![0].Start, Is.EqualTo(sStart + TimeSpan.FromMilliseconds(200)), "the durations accumulate");
             Assert.That(changes[1].Start, Is.EqualTo(sStart + TimeSpan.FromMilliseconds(500)));
             Assert.That(changes[0].Continuous, Is.False, "a syllable turns over at a moment, it does not animate");

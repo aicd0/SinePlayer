@@ -115,7 +115,7 @@ internal sealed partial class PlayerSession : IDisposable
 
     public IReadOnlyList<MediaSource> Sources => _pipeline?.Sources ?? [];
 
-    public IReadOnlyList<IAudioChain> AudioChains => [.. _audioChains.Select(entry => entry.Chain)];
+    public IAudioChain[] AudioChains => [.. _audioChains.Select(entry => entry.Chain)];
 
     public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;
 
@@ -997,7 +997,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
     }
 
-    private static async Task<IReadOnlyList<string>> FindSameNameSubtitlesAsync(string mediaPath)
+    private static async Task<string[]> FindSameNameSubtitlesAsync(string mediaPath)
     {
         if (string.IsNullOrEmpty(mediaPath))
         {
@@ -1377,7 +1377,7 @@ internal sealed partial class PlayerSession : IDisposable
                     : new SelectedTrackModel { Enabled = false };
             }
 
-            if (view.SubtitleChains.Count > 0)
+            if (view.SubtitleChains.Length > 0)
             {
                 entry.SubtitleSelections = [.. view.SubtitleChains
                     .Select(chain => chain.SelectedStream)

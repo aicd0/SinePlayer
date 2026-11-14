@@ -104,7 +104,7 @@ internal partial class PluginContext : IPluginContext
         SafeAction(() => _mediaEditedEventHandler?.Invoke(media));
     }
 
-    public IReadOnlyList<BaseMenuFlyoutItemModel> GetMainPageMoreMenuItems(IWindowContext windowContext)
+    public BaseMenuFlyoutItemModel[] GetMainPageMoreMenuItems(IWindowContext windowContext)
     {
         if (!IsActive)
         {
@@ -120,7 +120,7 @@ internal partial class PluginContext : IPluginContext
         return [.. SafeAction(() => creator.CreateMenuItems(windowContext), []).Select(CreateHostMenuFlyoutItem)];
     }
 
-    public IReadOnlyList<BaseMenuFlyoutItemModel> GetMediaMenuItems(IWindowContext windowContext, IMediaModel primary, IEnumerable<IMediaModel> selection)
+    public BaseMenuFlyoutItemModel[] GetMediaMenuItems(IWindowContext windowContext, IMediaModel primary, IEnumerable<IMediaModel> selection)
     {
         if (!IsActive)
         {
@@ -136,7 +136,7 @@ internal partial class PluginContext : IPluginContext
         return [.. SafeAction(() => creator.CreateMenuItems(windowContext, primary, selection), []).Select(CreateHostMenuFlyoutItem)];
     }
 
-    public IEnumerable<IVirtualProperty<IMediaModel>> GetAllMediaVirtualProperties()
+    public IVirtualProperty<IMediaModel>[] GetAllMediaVirtualProperties()
     {
         if (!IsActive)
         {
@@ -146,7 +146,7 @@ internal partial class PluginContext : IPluginContext
         return [.. _mediaVirtualProperties.Values];
     }
 
-    public IReadOnlyList<ISidebarPageProvider> GetAllSidebarPageProviders()
+    public ISidebarPageProvider[] GetAllSidebarPageProviders()
     {
         if (!IsActive)
         {
@@ -340,7 +340,7 @@ internal partial class PluginContext : IPluginContext
             {
                 Text = subItemMenuItem.Text,
                 Icon = subItemMenuItem.Icon,
-                Items = [.. subItemMenuItem.Items.Select(CreateHostMenuFlyoutItem)],
+                Items = subItemMenuItem.Items.Select(CreateHostMenuFlyoutItem).ToArray(),
             },
             _ => throw new NotSupportedException($"Unsupported menu item type: {item.GetType().FullName}"),
         };

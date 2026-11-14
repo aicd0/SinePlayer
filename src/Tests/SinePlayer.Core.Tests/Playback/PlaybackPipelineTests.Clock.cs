@@ -512,7 +512,7 @@ public partial class PlaybackPipelineTests
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
-            WaitFor(() => warnings.Messages.Count > 0, "the device to be found out");
+            WaitFor(() => warnings.Messages.Length > 0, "the device to be found out");
             TimeSpan positionAtFallback = pipeline.Position;
 
             // Enough wall time for the sound to have been handed over several times over, if nothing held it back.
@@ -533,7 +533,7 @@ public partial class PlaybackPipelineTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(warnings.Messages, Has.Count.EqualTo(1), "a device is reported once, not once per iteration");
+                Assert.That(warnings.Messages, Has.Length.EqualTo(1), "a device is reported once, not once per iteration");
                 Assert.That(pipeline.Position, Is.GreaterThan(positionAtFallback), "the position carries on at the clock's pace");
                 Assert.That(pipeline.Error, Is.Null, "a device that does not play is not a failed playback");
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "playback itself is still going");

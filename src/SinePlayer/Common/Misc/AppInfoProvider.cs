@@ -8,8 +8,8 @@ namespace SinePlayer.Common.Misc;
 
 internal static class AppInfoProvider
 {
-    private static readonly IReadOnlySet<string> _supportedImageExtensions = new HashSet<string>(
-    [
+    private static readonly IReadOnlySet<string> _supportedImageExtensions = new HashSet<string>
+    {
         ".avif",
         ".bmp",
         ".gif",
@@ -22,11 +22,11 @@ internal static class AppInfoProvider
         ".tif",
         ".tiff",
         ".webp",
-    ]);
+    };
     public static IReadOnlySet<string> SupportedImageExtensions => _supportedImageExtensions;
 
-    private static readonly IReadOnlySet<string> _supportedVideoExtensions = new HashSet<string>(
-    [
+    private static readonly IReadOnlySet<string> _supportedVideoExtensions = new HashSet<string>
+    {
         ".3gp",
         ".avi",
         ".flv",
@@ -40,11 +40,11 @@ internal static class AppInfoProvider
         ".ts",
         ".webm",
         ".wmv",
-    ]);
+    };
     public static IReadOnlySet<string> SupportedVideoExtensions => _supportedVideoExtensions;
 
-    private static readonly IReadOnlySet<string> _supportedAudioExtensions = new HashSet<string>(
-    [
+    private static readonly IReadOnlySet<string> _supportedAudioExtensions = new HashSet<string>
+    {
         ".aac",
         ".flac",
         ".m4a",
@@ -53,18 +53,18 @@ internal static class AppInfoProvider
         ".opus",
         ".wav",
         ".wma",
-    ]);
+    };
     public static IReadOnlySet<string> SupportedAudioExtensions => _supportedAudioExtensions;
 
-    private static readonly IReadOnlySet<string> _supportedSubtitleExtensions = new HashSet<string>(
-    [
+    private static readonly IReadOnlySet<string> _supportedSubtitleExtensions = new HashSet<string>
+    {
         ".ass",
         ".srt",
         ".ssa",
         ".sub",
         ".sup",
         ".vtt",
-    ]);
+    };
     public static IReadOnlySet<string> SupportedSubtitleExtensions => _supportedSubtitleExtensions;
 
     private static readonly Lazy<IReadOnlySet<string>> _supportedExternalFileExtensions = new(() =>

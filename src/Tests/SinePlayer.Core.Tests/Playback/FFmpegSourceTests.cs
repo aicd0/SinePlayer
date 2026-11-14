@@ -92,7 +92,7 @@ public class FFmpegSourceTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(source.Info.Attachments, Has.Count.EqualTo(1), "the file carries one attachment");
+            Assert.That(source.Info.Attachments, Has.Length.EqualTo(1), "the file carries one attachment");
 
             MediaAttachment attachment = source.Info.Attachments[0];
             Assert.That(attachment.Name, Is.EqualTo("fonts/Attached-Font.ttf"));

@@ -124,7 +124,7 @@ public class ObservableRingCollectionTests
         collection.PropertyChanged += (_, args) => propertyNames.Add(args.PropertyName ?? string.Empty);
         collection.CollectionChanged += (_, args) => changes.Add(args);
 
-        collection.ReplaceAll([4, 5]);
+        collection.ReplaceAll(new[] { 4, 5 });
 
         using (Assert.EnterMultipleScope())
         {

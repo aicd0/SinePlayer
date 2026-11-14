@@ -50,7 +50,7 @@ public sealed class AudioFilterChain
         {
             lock (_lock)
             {
-                return [.. _filters];
+                return _filters.ToArray();
             }
         }
     }

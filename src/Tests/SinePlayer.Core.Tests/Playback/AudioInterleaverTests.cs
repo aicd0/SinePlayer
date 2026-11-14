@@ -77,7 +77,7 @@ public class AudioInterleaverTests
         }
     }
 
-    private static RawAudioBuffer CreateBuffer(AudioSampleFormat format, int channelCount, int sampleCount, IReadOnlyList<byte[]> planes)
+    private static RawAudioBuffer CreateBuffer(AudioSampleFormat format, int channelCount, int sampleCount, byte[][] planes)
     {
         return new RawAudioBuffer
         {
@@ -96,7 +96,7 @@ public class AudioInterleaverTests
         private readonly List<nint> _planes = [];
         private readonly List<int> _byteCounts = [];
 
-        internal TestPlanarBuffer(IReadOnlyList<byte[]> planes)
+        internal TestPlanarBuffer(byte[][] planes)
         {
             foreach (byte[] plane in planes)
             {

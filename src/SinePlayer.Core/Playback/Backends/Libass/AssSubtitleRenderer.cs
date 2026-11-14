@@ -60,7 +60,7 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         _surface.Dispose();
     }
 
-    public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
+    public OperationResult Configure(SubtitleStreamInfo stream, MediaAttachment[] attachments, IVideoRenderTarget target)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(attachments);
@@ -419,7 +419,7 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
     }
 
     /// <summary>Whether the renderer holds exactly the fonts it was built with, which is what makes it reusable.</summary>
-    private bool SameAttachments(IReadOnlyList<MediaAttachment> attachments)
+    private bool SameAttachments(MediaAttachment[] attachments)
     {
         if (!_fontsConfigured)
         {
@@ -427,12 +427,12 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
             return true;
         }
 
-        if (_attachments.Count != attachments.Count)
+        if (_attachments.Count != attachments.Length)
         {
             return false;
         }
 
-        for (int i = 0; i < attachments.Count; i++)
+        for (int i = 0; i < attachments.Length; i++)
         {
             if (!string.Equals(_attachments[i].Name, attachments[i].Name, StringComparison.Ordinal) ||
                 _attachments[i].Data.Length != attachments[i].Data.Length)

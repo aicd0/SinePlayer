@@ -230,7 +230,7 @@ internal static class CollectionModel
         return ids;
     }
 
-    private static void DispatchUpdateEvent(IEnumerable<long> collectionIds)
+    private static void DispatchUpdateEvent(long[] collectionIds)
     {
         GlobalEvent.Instance.CollectionUpdated.Emit(collectionIds);
     }
