@@ -194,8 +194,16 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             ChannelLayout.Quad => 4,
             ChannelLayout.Surround50 => 5,
             ChannelLayout.Surround51 => 6,
+            ChannelLayout.Surround51Side => 6,
             ChannelLayout.Surround61 => 7,
+            ChannelLayout.Surround61Back => 7,
+            ChannelLayout.Surround61Front => 7,
+            ChannelLayout.Surround70 => 7,
+            ChannelLayout.Surround70Front => 7,
             ChannelLayout.Surround71 => 8,
+            ChannelLayout.Surround71Wide => 8,
+            ChannelLayout.Surround71WideSide => 8,
+            ChannelLayout.Surround512 => 8,
             _ => 0,
         };
 
@@ -211,28 +219,40 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
         left[0] = 1.0f;
         right[1] = 1.0f;
 
+        // The indices below are the order the decoder emits, which is the order the layout's channel mask puts the
+        // speakers in.
         switch (layout)
         {
-            case ChannelLayout.Quad:
+            case ChannelLayout.Quad:             // FL FR BL BR
                 left[2] = HalfPower;
                 right[3] = HalfPower;
                 break;
 
-            case ChannelLayout.Surround50:
+            case ChannelLayout.Surround50:       // FL FR FC BL BR
                 left[2] = HalfPower;
                 right[2] = HalfPower;
                 left[3] = HalfPower;
                 right[4] = HalfPower;
                 break;
 
-            case ChannelLayout.Surround51:
+            case ChannelLayout.Surround51:       // FL FR FC LFE BL BR
+            case ChannelLayout.Surround51Side:   // FL FR FC LFE SL SR
                 left[2] = HalfPower;
                 right[2] = HalfPower;
                 left[4] = HalfPower;
                 right[5] = HalfPower;
                 break;
 
-            case ChannelLayout.Surround61:
+            case ChannelLayout.Surround61:       // FL FR FC LFE BC SL SR
+                left[2] = HalfPower;
+                right[2] = HalfPower;
+                left[4] = HalfPower;
+                right[4] = HalfPower;
+                left[5] = HalfPower;
+                right[6] = HalfPower;
+                break;
+
+            case ChannelLayout.Surround61Back:   // FL FR FC LFE BL BR BC
                 left[2] = HalfPower;
                 right[2] = HalfPower;
                 left[4] = HalfPower;
@@ -241,7 +261,35 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
                 right[6] = HalfPower;
                 break;
 
-            case ChannelLayout.Surround71:
+            case ChannelLayout.Surround61Front:  // FL FR LFE FLC FRC SL SR
+                left[3] = HalfPower;
+                right[4] = HalfPower;
+                left[5] = HalfPower;
+                right[6] = HalfPower;
+                break;
+
+            case ChannelLayout.Surround70:       // FL FR FC BL BR SL SR
+            case ChannelLayout.Surround70Front:  // FL FR FC FLC FRC SL SR
+                left[2] = HalfPower;
+                right[2] = HalfPower;
+                left[3] = HalfPower;
+                right[4] = HalfPower;
+                left[5] = HalfPower;
+                right[6] = HalfPower;
+                break;
+
+            case ChannelLayout.Surround71:       // FL FR FC LFE BL BR SL SR
+                left[2] = HalfPower;
+                right[2] = HalfPower;
+                left[4] = HalfPower;
+                right[5] = HalfPower;
+                left[6] = HalfPower;
+                right[7] = HalfPower;
+                break;
+
+            case ChannelLayout.Surround71Wide:     // FL FR FC LFE BL BR FLC FRC
+            case ChannelLayout.Surround71WideSide: // FL FR FC LFE FLC FRC SL SR
+            case ChannelLayout.Surround512:        // FL FR FC LFE SL SR TFL TFR
                 left[2] = HalfPower;
                 right[2] = HalfPower;
                 left[4] = HalfPower;
