@@ -54,6 +54,21 @@ public class WasapiAudioFormatTests
     }
 
     [Test]
+    public void DescribesFivePointOneSideWithItsOwnMask()
+    {
+        // Side speakers and back speakers are different positions, so a device asked to play a 5.1 stream whose last
+        // pair is at the sides has to be told that rather than handed the back pair's mask.
+        OperationResult<WasapiAudioFormat.Descriptor> described = WasapiAudioFormat.TryDescribe(CreateStream(48000, 6, ChannelLayout.Surround51Side, AudioSampleFormat.Float32));
+        WasapiAudioFormat.Descriptor descriptor = described.Result;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(described.IsSuccessful, Is.True, described.Message);
+            Assert.That(descriptor.ChannelMask, Is.EqualTo(0x60F));
+        }
+    }
+
+    [Test]
     public void DescribesAFoldDownAsStereo()
     {
         // A surround stream is opened as a stereo stream once the mix has been folded down here, so the device
@@ -124,6 +139,31 @@ public class WasapiAudioFormatTests
             Assert.That(WasapiAudioFormat.GetBytesPerSample(AudioSampleFormat.Float64), Is.EqualTo(8));
             Assert.That(WasapiAudioFormat.GetBytesPerSample(AudioSampleFormat.Unknown), Is.EqualTo(0));
         }
+    }
+
+    [Test]
+    public void DescribesTheArrangementsThatAreNotTheCommonOnes()
+    {
+        // The channel count alone cannot say where the speakers are once a layout is not the common one, so each of
+        // these has to reach the device with the mask its own arrangement asserts.
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(MaskOf(ChannelLayout.Surround70, 7), Is.EqualTo(0x637));
+            Assert.That(MaskOf(ChannelLayout.Surround70Front, 7), Is.EqualTo(0x6C7));
+            Assert.That(MaskOf(ChannelLayout.Surround61, 7), Is.EqualTo(0x70F));
+            Assert.That(MaskOf(ChannelLayout.Surround61Back, 7), Is.EqualTo(0x13F));
+            Assert.That(MaskOf(ChannelLayout.Surround61Front, 7), Is.EqualTo(0x6CB));
+            Assert.That(MaskOf(ChannelLayout.Surround71Wide, 8), Is.EqualTo(0xFF));
+            Assert.That(MaskOf(ChannelLayout.Surround71WideSide, 8), Is.EqualTo(0x6CF));
+            Assert.That(MaskOf(ChannelLayout.Surround512, 8), Is.EqualTo(0x560F));
+        }
+    }
+
+    private static uint MaskOf(ChannelLayout layout, int channelCount)
+    {
+        OperationResult<WasapiAudioFormat.Descriptor> described = WasapiAudioFormat.TryDescribe(CreateStream(48000, channelCount, layout, AudioSampleFormat.Float32));
+        Assert.That(described.IsSuccessful, Is.True, described.Message);
+        return described.Result.ChannelMask;
     }
 
     private static AudioStreamInfo CreateStream(int sampleRate, int channelCount, ChannelLayout layout, AudioSampleFormat format)

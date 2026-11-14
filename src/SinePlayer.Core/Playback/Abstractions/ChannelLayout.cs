@@ -14,4 +14,12 @@ public enum ChannelLayout
     Surround51,
     Surround61,
     Surround71,
+    Surround51Side,
+    Surround70,
+    Surround70Front,
+    Surround71Wide,
+    Surround71WideSide,
+    Surround512,
+    Surround61Front,
+    Surround61Back,
 }

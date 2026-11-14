@@ -61,10 +61,10 @@ public class DownmixAudioFilterTests
     }
 
     [Test]
-    public void FoldsSixPointOneWithItsBackCentreOnBothSides()
+    public void FoldsFivePointOneWithItsSidePair()
     {
-        // The channel order the 6.1 mask asserts: front pair, centre, low frequency, back pair, then the back centre that
-        // makes this layout what it is. The back centre has no side of its own, so it reaches both.
+        // The side pair occupies the positions the back pair occupies in a 5.1 mix, so the fold has the same shape:
+        // what the extra layout buys is the name, and with it the settings the mixing UI will show for each pair.
         float[][] planes =
         [
             [0.5f],
@@ -73,7 +73,41 @@ public class DownmixAudioFilterTests
             [0.9f],
             [0.1f],
             [-0.1f],
+        ];
+
+        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround51Side, 6);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51Side, 6, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                Assert.That(ReadSamples(output), Is.EqualTo(new[]
+                {
+                    0.5 + (HalfPower * 0.2) + (HalfPower * 0.1),
+                    -0.5 + (HalfPower * 0.2) - (HalfPower * 0.1),
+                }).Within(1e-5));
+            }
+        }
+    }
+
+    [Test]
+    public void FoldsSixPointOneWithItsBackCentreFourth()
+    {
+        // FFmpeg's 6.1 is FL FR FC LFE BC SL SR: the back centre arrives before the side pair, and it has no side of
+        // its own so it reaches both. Reading it as the arrangement with a back pair would put the right side's
+        // content into the left channel.
+        float[][] planes =
+        [
+            [0.5f],
+            [-0.5f],
+            [0.2f],
+            [0.9f],
             [0.3f],
+            [0.1f],
+            [-0.1f],
         ];
 
         using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround61, 7);
@@ -85,12 +119,113 @@ public class DownmixAudioFilterTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(applied.IsSuccessful, Is.True, applied.Message);
-                Assert.That(output.ChannelCount, Is.EqualTo(2));
-                Assert.That(output.ChannelLayout, Is.EqualTo(ChannelLayout.Stereo));
+                Assert.That(ReadSamples(output), Is.EqualTo(new[]
+                {
+                    0.5 + (HalfPower * 0.2) + (HalfPower * 0.3) + (HalfPower * 0.1),
+                    -0.5 + (HalfPower * 0.2) + (HalfPower * 0.3) - (HalfPower * 0.1),
+                }).Within(1e-5));
+            }
+        }
+    }
+
+    [Test]
+    public void FoldsSixPointOneBackWithItsBackCentreLast()
+    {
+        // The other 6.1: front pair, centre, low frequency, back pair, then the back centre that makes this layout
+        // what it is. The back centre has no side of its own, so it reaches both.
+        float[][] planes =
+        [
+            [0.5f],
+            [-0.5f],
+            [0.2f],
+            [0.9f],
+            [0.1f],
+            [-0.1f],
+            [0.3f],
+        ];
+
+        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround61Back, 7);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround61Back, 7, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
                 Assert.That(ReadSamples(output), Is.EqualTo(new[]
                 {
                     0.5 + (HalfPower * 0.2) + (HalfPower * 0.1) + (HalfPower * 0.3),
                     -0.5 + (HalfPower * 0.2) - (HalfPower * 0.1) + (HalfPower * 0.3),
+                }).Within(1e-5));
+            }
+        }
+    }
+
+    [Test]
+    public void FoldsSevenPointZeroWhichHasNoLowFrequencyChannel()
+    {
+        // 7.0 is FL FR FC BL BR SL SR: the back pair starts one index earlier than it does in 7.1 because there is
+        // no channel to drop, and the side pair follows it.
+        float[][] planes =
+        [
+            [0.5f],
+            [-0.5f],
+            [0.2f],
+            [0.1f],
+            [-0.1f],
+            [0.3f],
+            [-0.3f],
+        ];
+
+        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround70, 7);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround70, 7, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                Assert.That(ReadSamples(output), Is.EqualTo(new[]
+                {
+                    0.5 + (HalfPower * 0.2) + (HalfPower * 0.1) + (HalfPower * 0.3),
+                    -0.5 + (HalfPower * 0.2) - (HalfPower * 0.1) - (HalfPower * 0.3),
+                }).Within(1e-5));
+            }
+        }
+    }
+
+    [Test]
+    public void FoldsTheHeightPairOfFivePointOnePointTwo()
+    {
+        // 5.1.2 spends its eighth channel above the front speakers; the pair arrives after the side pair and folds
+        // the same way, because a height speaker has no better place to go than the side of the listener under it.
+        float[][] planes =
+        [
+            [0.5f],
+            [-0.5f],
+            [0.2f],
+            [0.9f],
+            [0.1f],
+            [-0.1f],
+            [0.3f],
+            [-0.3f],
+        ];
+
+        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround512, 8);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround512, 8, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                Assert.That(ReadSamples(output), Is.EqualTo(new[]
+                {
+                    0.5 + (HalfPower * 0.2) + (HalfPower * 0.1) + (HalfPower * 0.3),
+                    -0.5 + (HalfPower * 0.2) - (HalfPower * 0.1) - (HalfPower * 0.3),
                 }).Within(1e-5));
             }
         }
