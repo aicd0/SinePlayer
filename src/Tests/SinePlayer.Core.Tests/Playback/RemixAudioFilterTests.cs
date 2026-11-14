@@ -7,7 +7,7 @@ using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
-using SinePlayer.Core.Playback.Backends.Downmix;
+using SinePlayer.Core.Playback.Backends.Remix;
 
 namespace SinePlayer.Core.Tests.Playback;
 
@@ -16,9 +16,13 @@ namespace SinePlayer.Core.Tests.Playback;
 /// engine's own conversion divides the level down for headroom, and it is precisely the front channels and the
 /// centre that suffer. So the coefficients are checked channel by channel, the samples are checked to leave in the
 /// format they arrived in, and a stream that already fits is checked to cost nothing.
+/// <para>
+/// A stream the device can play as it is is not folded: it is trimmed in place by the levels of the other set, and the
+/// two sets are checked never to be in charge of the same block.
+/// </para>
 /// </summary>
 [TestFixture]
-public class DownmixAudioFilterTests
+public class RemixAudioFilterTests
 {
     private const float GroupLevel = 0.71f;
     private const int SampleRate = 48000;
@@ -38,7 +42,7 @@ public class DownmixAudioFilterTests
             [-0.1f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -75,7 +79,7 @@ public class DownmixAudioFilterTests
             [-0.1f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround51Side, 6);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51Side, 6);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51Side, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -110,7 +114,7 @@ public class DownmixAudioFilterTests
             [-0.1f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround61, 7);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround61, 7);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround61, 7, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -144,7 +148,7 @@ public class DownmixAudioFilterTests
             [0.3f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround61Back, 7);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround61Back, 7);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround61Back, 7, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -178,7 +182,7 @@ public class DownmixAudioFilterTests
             [-0.3f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround70, 7);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround70, 7);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround70, 7, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -213,7 +217,7 @@ public class DownmixAudioFilterTests
             [-0.3f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround512, 8);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround512, 8);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround512, 8, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -244,7 +248,7 @@ public class DownmixAudioFilterTests
             [0.0f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -273,7 +277,7 @@ public class DownmixAudioFilterTests
             [-0.1f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, Levels(("center", 50), ("lfe", 50), ("back", 25)));
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Downmix, Levels(("center", 50), ("lfe", 50), ("back", 25)));
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -305,7 +309,7 @@ public class DownmixAudioFilterTests
             [0.0f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, Levels(("lfe", 50)));
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Downmix, Levels(("lfe", 50)));
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -334,7 +338,7 @@ public class DownmixAudioFilterTests
             [0.0f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult before = filter.Apply(buffer, out RawAudioBuffer first);
@@ -343,7 +347,7 @@ public class DownmixAudioFilterTests
             Assert.That(ReadSamples(first), Is.EqualTo(new[] { 0.4 * GroupLevel, 0.4 * GroupLevel }).Within(1e-5));
         }
 
-        filter.SetLevels(Levels(("center", 0)));
+        filter.SetLevels(RemixLevelSet.Downmix, Levels(("center", 0)));
         OperationResult after = filter.Apply(buffer, out RawAudioBuffer second);
         using (second)
         {
@@ -358,29 +362,22 @@ public class DownmixAudioFilterTests
     }
 
     [Test]
-    public void ScalesAStereoBlockByItsPairLevel()
+    public void FoldsToMonoByAveragingTheTwoSides()
     {
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Stereo, 2, Levels(("stereo", 50)));
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Stereo, 2, 1, [[0.4f], [-0.4f]]);
+        // A mono endpoint takes the stereo fold with its two sides averaged, so content panned to the middle keeps its
+        // level instead of arriving at twice it.
+        float[][] planes =
+        [
+            [0.5f],
+            [-0.5f],
+            [0.2f],
+            [0.9f],
+            [0.1f],
+            [-0.1f],
+        ];
 
-        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
-        using (output)
-        {
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
-                Assert.That(output.ChannelCount, Is.EqualTo(2));
-                Assert.That(output.ChannelLayout, Is.EqualTo(ChannelLayout.Stereo));
-                Assert.That(ReadSamples(output), Is.EqualTo(new[] { 0.2, -0.2 }).Within(1e-5));
-            }
-        }
-    }
-
-    [Test]
-    public void ScalesAMonoBlockWithoutChangingItsWidth()
-    {
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Mono, 1, Levels(("mono", 50)), targetChannelCount: 1);
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Mono, 1, 1, [[0.4f]]);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, targetChannelCount: 1);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
         using (output)
@@ -390,7 +387,7 @@ public class DownmixAudioFilterTests
                 Assert.That(applied.IsSuccessful, Is.True, applied.Message);
                 Assert.That(output.ChannelCount, Is.EqualTo(1));
                 Assert.That(output.ChannelLayout, Is.EqualTo(ChannelLayout.Mono));
-                Assert.That(ReadSamples(output), Is.EqualTo(new[] { 0.2 }).Within(1e-5));
+                Assert.That(ReadSamples(output), Is.EqualTo(new[] { GroupLevel * 0.2 }).Within(1e-5));
             }
         }
     }
@@ -408,7 +405,7 @@ public class DownmixAudioFilterTests
             [1.0f],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -455,7 +452,7 @@ public class DownmixAudioFilterTests
             }
         }
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround50, 5);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround50, 5);
         using RawAudioBuffer woven = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround50, 5, 4, [interleaved]);
         using RawAudioBuffer split = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround50, 5, 4, planar);
 
@@ -490,7 +487,7 @@ public class DownmixAudioFilterTests
             [0],
         ];
 
-        using DownmixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Int16, ChannelLayout.Surround51, 6, 1, ToBytes(planes));
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -509,7 +506,7 @@ public class DownmixAudioFilterTests
     [Test]
     public void LeavesAStreamThatAlreadyFitsAlone()
     {
-        using DownmixAudioFilter filter = new();
+        using RemixAudioFilter filter = new();
         AudioStreamInfo stereo = CreateStream(ChannelLayout.Stereo, 2);
         OperationResult configured = filter.Configure(stereo, stereo);
 
@@ -520,15 +517,120 @@ public class DownmixAudioFilterTests
         {
             Assert.That(configured.IsSuccessful, Is.True, configured.Message);
             Assert.That(filter.OutputFormat, Is.Null);
+            Assert.That(filter.ActiveLevelSet, Is.EqualTo(RemixLevelSet.Remix), "the set a stream that is not folded is trimmed with");
             Assert.That(applied.IsSuccessful, Is.True, applied.Message);
             Assert.That(output, Is.SameAs(buffer), "a block with nothing to fold is handed straight back");
         }
     }
 
     [Test]
+    public void TrimsEachChannelInPlace()
+    {
+        // A device that plays the arrangement as it is hears the same channels, each at the level of its group: the
+        // centre at half, the front pair and the low frequency untouched.
+        float[][] planes =
+        [
+            [0.5f],
+            [-0.5f],
+            [0.2f],
+            [0.9f],
+            [0.1f],
+            [-0.1f],
+        ];
+
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Remix, Levels(("center", 50)), targetChannelCount: 6);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+            Assert.That(output, Is.SameAs(buffer), "trimming keeps the layout, so the block is scaled where it lies");
+            Assert.That(filter.OutputFormat, Is.Null);
+            Assert.That(ReadPlanes(output).Select(plane => plane[0]), Is.EqualTo(new[] { 0.5, -0.5, 0.1, 0.9, 0.1, -0.1 }).Within(1e-6));
+        }
+    }
+
+    [Test]
+    public void TrimsTheStereoPairTogether()
+    {
+        float[][] planes =
+        [
+            [0.4f, -0.4f],
+            [0.2f, -0.2f],
+        ];
+
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Stereo, 2, RemixLevelSet.Remix, Levels(("stereo", 50)), targetChannelCount: 2);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Stereo, 2, 2, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (Assert.EnterMultipleScope())
+        {
+            double[][] trimmed = ReadPlanes(output);
+
+            Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+            Assert.That(output, Is.SameAs(buffer));
+            Assert.That(trimmed[0], Is.EqualTo(new[] { 0.2, -0.2 }).Within(1e-6));
+            Assert.That(trimmed[1], Is.EqualTo(new[] { 0.1, -0.1 }).Within(1e-6));
+        }
+    }
+
+    [Test]
+    public void KeepsTheLevelsOfTheSetThatIsNotInChargeOutOfTheMix()
+    {
+        // While a stream is folded, the levels the listener chose for an arrangement that is played as it is have no
+        // say: the centre keeps the share the fold gives it even though its trim level is zero.
+        float[][] planes =
+        [
+            [0.0f],
+            [0.0f],
+            [0.4f],
+            [0.0f],
+            [0.0f],
+            [0.0f],
+        ];
+
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Remix, Levels(("center", 0)));
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                Assert.That(filter.ActiveLevelSet, Is.EqualTo(RemixLevelSet.Downmix));
+                Assert.That(ReadSamples(output), Is.EqualTo(new[] { 0.4 * GroupLevel, 0.4 * GroupLevel }).Within(1e-5));
+            }
+        }
+    }
+
+    [Test]
+    public void SwitchesSetWhenTheTargetStopsBeingNarrower()
+    {
+        // The same levels, two devices: the arrangement is folded for the stereo one and trimmed for the six channel
+        // one, and the set in charge follows the device rather than the levels.
+        using RemixAudioFilter filter = new();
+        AudioStreamInfo stream = CreateStream(ChannelLayout.Surround51, 6);
+
+        OperationResult folded = filter.Configure(stream, stream.WithLayout(2, ChannelLayout.Stereo));
+        RemixLevelSet afterFold = filter.ActiveLevelSet;
+        OperationResult trimmed = filter.Configure(stream, stream);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(folded.IsSuccessful, Is.True, folded.Message);
+            Assert.That(trimmed.IsSuccessful, Is.True, trimmed.Message);
+            Assert.That(afterFold, Is.EqualTo(RemixLevelSet.Downmix));
+            Assert.That(filter.ActiveLevelSet, Is.EqualTo(RemixLevelSet.Remix));
+            Assert.That(filter.OutputFormat, Is.Null, "a stream that is not folded leaves its format alone");
+        }
+    }
+
+    [Test]
     public void RefusesALayoutItHasNoPositionsFor()
     {
-        using DownmixAudioFilter filter = new();
+        using RemixAudioFilter filter = new();
         AudioStreamInfo unknown = CreateStream(ChannelLayout.Unknown, 6);
         OperationResult configured = filter.Configure(unknown, unknown.WithLayout(2, ChannelLayout.Stereo));
 
@@ -538,7 +640,7 @@ public class DownmixAudioFilterTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(configured.IsSuccessful, Is.False);
-            Assert.That(configured.Message, Does.Contain("no fold down"));
+            Assert.That(configured.Message, Does.Contain("no downmix"));
             Assert.That(filter.OutputFormat, Is.Null);
             Assert.That(applied.IsSuccessful, Is.True);
             Assert.That(output, Is.SameAs(buffer));
@@ -548,7 +650,7 @@ public class DownmixAudioFilterTests
     [Test]
     public void RefusesABlockAfterBeingDisposed()
     {
-        DownmixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
+        RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
         filter.Dispose();
 
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, [[0.0f], [0.0f], [0.0f], [0.0f], [0.0f], [0.0f]]);
@@ -557,33 +659,45 @@ public class DownmixAudioFilterTests
         Assert.That(applied.IsSuccessful, Is.False);
     }
 
-    private static DownmixAudioFilter Prepare(ChannelLayout layout, int channelCount, int targetChannelCount = 2)
+    private static RemixAudioFilter Prepare(ChannelLayout layout, int channelCount, int targetChannelCount = 2)
     {
-        DownmixAudioFilter filter = new();
+        RemixAudioFilter filter = new();
         AudioStreamInfo stream = CreateStream(layout, channelCount);
-        AudioStreamInfo target = stream.WithLayout(targetChannelCount, targetChannelCount == 2 ? ChannelLayout.Stereo : ChannelLayout.Mono);
-        OperationResult configured = filter.Configure(stream, target);
+        OperationResult configured = filter.Configure(stream, TargetOf(stream, targetChannelCount));
         Assert.That(configured.IsSuccessful, Is.True, configured.Message);
         return filter;
     }
 
-    private static DownmixAudioFilter Prepare(ChannelLayout layout, int channelCount, IReadOnlyDictionary<string, int> levels, int targetChannelCount = 2)
+    private static RemixAudioFilter Prepare(ChannelLayout layout, int channelCount, RemixLevelSet set, IReadOnlyDictionary<string, int> levels, int targetChannelCount = 2)
     {
-        DownmixAudioFilter filter = new();
+        RemixAudioFilter filter = new();
 
         // Set before the layout is known, which is the order the player uses when a setting changes before a stream
         // has been selected.
-        filter.SetLevels(levels);
+        filter.SetLevels(set, levels);
         return Prepare(filter, layout, channelCount, targetChannelCount);
     }
 
-    private static DownmixAudioFilter Prepare(DownmixAudioFilter filter, ChannelLayout layout, int channelCount, int targetChannelCount)
+    private static RemixAudioFilter Prepare(RemixAudioFilter filter, ChannelLayout layout, int channelCount, int targetChannelCount)
     {
         AudioStreamInfo stream = CreateStream(layout, channelCount);
-        AudioStreamInfo target = stream.WithLayout(targetChannelCount, targetChannelCount == 2 ? ChannelLayout.Stereo : ChannelLayout.Mono);
-        OperationResult configured = filter.Configure(stream, target);
+        OperationResult configured = filter.Configure(stream, TargetOf(stream, targetChannelCount));
         Assert.That(configured.IsSuccessful, Is.True, configured.Message);
         return filter;
+    }
+
+    /// <summary>
+    /// The format of a device that takes this many channels. A target as wide as the stream is the stream itself, which
+    /// is how a device that plays the arrangement as it is hands it over.
+    /// </summary>
+    private static AudioStreamInfo TargetOf(AudioStreamInfo stream, int targetChannelCount)
+    {
+        if (targetChannelCount == stream.ChannelCount)
+        {
+            return stream;
+        }
+
+        return stream.WithLayout(targetChannelCount, targetChannelCount == 1 ? ChannelLayout.Mono : ChannelLayout.Stereo);
     }
 
     private static Dictionary<string, int> Levels(params (string Key, int Value)[] entries)
@@ -612,6 +726,22 @@ public class DownmixAudioFilterTests
         float[] values = new float[count];
         Marshal.Copy(pointer, values, 0, count);
         return [.. values.Select(value => (double)value)];
+    }
+
+    /// <summary>Every plane as the buffer holds it, for a block that was scaled where it lies.</summary>
+    private static double[][] ReadPlanes(RawAudioBuffer buffer)
+    {
+        var planar = (IPlanarAudioBuffer)buffer.Buffer;
+        double[][] planes = new double[planar.PlaneCount][];
+        for (int plane = 0; plane < planar.PlaneCount; plane++)
+        {
+            int count = planar.GetPlaneByteCount(plane) / sizeof(float);
+            float[] values = new float[count];
+            Marshal.Copy(planar.GetPlanePointer(plane), values, 0, count);
+            planes[plane] = [.. values.Select(value => (double)value)];
+        }
+
+        return planes;
     }
 
     private static RawAudioBuffer CreateBuffer(AudioSampleFormat format, ChannelLayout layout, int channelCount, int sampleCount, float[][] planes)

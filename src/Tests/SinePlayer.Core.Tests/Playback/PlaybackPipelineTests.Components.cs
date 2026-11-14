@@ -1,10 +1,10 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Filter;
-using SinePlayer.Core.Playback.Backends.Downmix;
+using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Hosting;
@@ -870,7 +870,7 @@ public partial class PlaybackPipelineTests
 
         try
         {
-            pipeline.AudioChains[0].Filters.Add(new DownmixAudioFilter());
+            pipeline.AudioChains[0].Filters.Add(new RemixAudioFilter());
             Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Video, pipeline.Sources[0].Info.VideoStreams[0]).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
@@ -915,7 +915,7 @@ public partial class PlaybackPipelineTests
 
         try
         {
-            pipeline.AudioChains[0].Filters.Add(new DownmixAudioFilter());
+            pipeline.AudioChains[0].Filters.Add(new RemixAudioFilter());
             Assert.That(Open(pipeline, SyntheticPath()).IsSuccessful, Is.True);
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
@@ -966,7 +966,7 @@ public partial class PlaybackPipelineTests
             WaitFor(() => renderer.SubmittedBuffers > 0, "the sound to be playing");
             Assert.That(renderer.ConfiguredStream?.ChannelCount, Is.EqualTo(6), "with no filter, the device is opened for the stream");
 
-            pipeline.AudioChains[0].Filters.Add(new DownmixAudioFilter());
+            pipeline.AudioChains[0].Filters.Add(new RemixAudioFilter());
 
             WaitFor(() => renderer.SubmittedChannelCounts.Contains(2), "the device to be reopened for the folded shape");
 
