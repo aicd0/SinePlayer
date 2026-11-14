@@ -2,28 +2,42 @@
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Playback.Abstractions;
-using SinePlayer.Core.Playback.Backends.Downmix;
+using SinePlayer.Core.Playback.Backends.Remix;
 
 namespace SinePlayer.Core.Tests.Playback;
 
 /// <summary>
 /// The mixer's table is the only place an arrangement's groups are written down, so what it says about each one is
-/// checked directly: the labels a mixing UI shows, the order it shows them in, and the level a group carries until it
-/// is changed. The fold reads the same table, so a wrong entry here would also be a wrong entry in the mix.
+/// checked directly: the labels a mixing UI shows, the order it shows them in, and the level a group carries in each
+/// of the two sets. Both matrices read the same table, so a wrong entry here would also be a wrong entry in the mix.
 /// </summary>
 [TestFixture]
-public class DownmixMixerTests
+public class RemixMixerTests
 {
     [Test]
     public void DescribesFivePointOneAsFourGroups()
     {
-        IReadOnlyList<DownmixChannelGroup> groups = DownmixMixer.Describe(ChannelLayout.Surround51);
+        IReadOnlyList<RemixChannelGroup> groups = RemixMixer.Describe(ChannelLayout.Surround51, RemixLevelSet.Downmix);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(groups.Select(group => group.Key), Is.EqualTo(new[] { "front", "center", "lfe", "back" }));
             Assert.That(groups.Select(group => group.Label), Is.EqualTo(new[] { "FL/FR", "FC", "LFE", "BL/BR" }));
             Assert.That(groups.Select(group => group.DefaultLevel), Is.EqualTo(new[] { 100, 71, 0, 71 }));
+        }
+    }
+
+    [Test]
+    public void DescribesEveryRemixGroupAtUnity()
+    {
+        // A stream that keeps its layout is untouched until the listener asks for something: every group starts at the
+        // level it already has.
+        foreach (ChannelLayout layout in new[] { ChannelLayout.Mono, ChannelLayout.Stereo, ChannelLayout.Surround51, ChannelLayout.Surround71 })
+        {
+            Assert.That(
+                RemixMixer.Describe(layout, RemixLevelSet.Remix).Select(group => group.DefaultLevel),
+                Is.All.EqualTo(RemixMixer.UnityLevel),
+                layout.ToString());
         }
     }
 
@@ -66,13 +80,13 @@ public class DownmixMixerTests
     {
         // The mixing section is never empty: an arrangement whose speakers are unknown still offers the pair whose
         // level a fold to stereo would apply to.
-        IReadOnlyList<DownmixChannelGroup> groups = DownmixMixer.Describe(ChannelLayout.Unknown);
+        IReadOnlyList<RemixChannelGroup> groups = RemixMixer.Describe(ChannelLayout.Unknown, RemixLevelSet.Remix);
 
         Assert.That(groups.Select(group => group.Label), Is.EqualTo(new[] { "L/R" }));
     }
 
     private static IEnumerable<string> Labels(ChannelLayout layout)
     {
-        return DownmixMixer.Describe(layout).Select(group => group.Label);
+        return RemixMixer.Describe(layout, RemixLevelSet.Downmix).Select(group => group.Label);
     }
 }

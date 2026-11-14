@@ -22,9 +22,9 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
-using SinePlayer.Core.Playback.Backends.Downmix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
+using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
@@ -56,6 +56,7 @@ internal sealed partial class PlayerSession : IDisposable
 
     private bool _pendingReconcile = false;
     private ReconcileResult? _lastReconcile;
+    private RemixLevelSet? _mixLevelSet;
 
     private PlayQueueModel _playQueue = PlayQueueModel.CreateEmpty();
     private bool _loaded;
@@ -70,7 +71,7 @@ internal sealed partial class PlayerSession : IDisposable
         Playback.PlayQueueChanged += Playback_PlayQueueChanged;
     }
 
-    private sealed record AudioChainEntry(IAudioChain Chain, GainAudioFilter Gain, DownmixAudioFilter Downmix);
+    private sealed record AudioChainEntry(IAudioChain Chain, GainAudioFilter Gain, RemixAudioFilter Remix);
 
     #endregion
 
@@ -92,6 +93,8 @@ internal sealed partial class PlayerSession : IDisposable
     public event Action<MediaModel?, OperationResult>? MediaChanged;
 
     public event Action? TrackSelectionChanged;
+
+    public event Action? MixLevelSetChanged;
 
     public event Action? PositionChanged;
 
@@ -116,6 +119,12 @@ internal sealed partial class PlayerSession : IDisposable
     public IReadOnlyList<MediaSource> Sources => _pipeline?.Sources ?? [];
 
     public IAudioChain[] AudioChains => [.. _audioChains.Select(entry => entry.Chain)];
+
+    /// <summary>
+    /// Which set of levels the audio chain is mixing with, or null before anything has been configured. The filter
+    /// decides it from the stream and the device, so this is the decision itself rather than a second guess at it.
+    /// </summary>
+    public RemixLevelSet? ActiveMixLevelSet => _audioChains.Count == 0 ? null : _audioChains[0].Remix.ActiveLevelSet;
 
     public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;
 
@@ -195,7 +204,7 @@ internal sealed partial class PlayerSession : IDisposable
         foreach (AudioChainEntry entry in _audioChains)
         {
             entry.Gain.Dispose();
-            entry.Downmix.Dispose();
+            entry.Remix.Dispose();
         }
 
         _audioChains.Clear();
@@ -539,6 +548,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         _pendingReconcile = false;
         _lastReconcile = reconciled.Result;
+        NotifyMixLevelSet();
         RaisePositionChanged();
         return reconciled;
     }
@@ -728,10 +738,10 @@ internal sealed partial class PlayerSession : IDisposable
         gainFilter.SetLevel(_volume, _muted);
         chain.Filters.Add(gainFilter);
 
-        DownmixAudioFilter downmixFilter = new();
-        chain.Filters.Add(downmixFilter);
+        RemixAudioFilter remixFilter = new();
+        chain.Filters.Add(remixFilter);
 
-        _audioChains.Add(new AudioChainEntry(chain, gainFilter, downmixFilter));
+        _audioChains.Add(new AudioChainEntry(chain, gainFilter, remixFilter));
         return chain;
     }
 
@@ -839,10 +849,11 @@ internal sealed partial class PlayerSession : IDisposable
         settings.ToComponents().ApplyAudio(chain);
         chain.SpeedAlgorithm = settings.Audio.StretchMethod;
         chain.Offset = OffsetOf(settings.Audio.Sync);
-        ApplyMixLevels(chain, settings.Audio.MixLevels);
+        ApplyMixLevels(chain, stream.ChannelLayout, settings.Audio.RemixLevels, RemixLevelSet.Remix);
+        ApplyMixLevels(chain, stream.ChannelLayout, settings.Audio.DownmixLevels, RemixLevelSet.Downmix);
     }
 
-    private void ApplyMixLevels(IAudioChain chain, Dictionary<string, int> levels)
+    private void ApplyMixLevels(IAudioChain chain, ChannelLayout layout, Dictionary<ChannelLayout, Dictionary<string, int>> levels, RemixLevelSet set)
     {
         AudioChainEntry? target = _audioChains.FirstOrDefault(entry => ReferenceEquals(entry.Chain, chain));
         if (target is null)
@@ -850,13 +861,16 @@ internal sealed partial class PlayerSession : IDisposable
             return;
         }
 
-        Dictionary<string, int> clamped = [with(levels.Count)];
-        foreach (KeyValuePair<string, int> level in levels)
+        Dictionary<string, int> clamped = [];
+        if (levels.TryGetValue(layout, out Dictionary<string, int>? saved))
         {
-            clamped[level.Key] = Math.Clamp(level.Value, MinimumMixLevel, MaximumMixLevel);
+            foreach (KeyValuePair<string, int> level in saved)
+            {
+                clamped[level.Key] = Math.Clamp(level.Value, MinimumMixLevel, MaximumMixLevel);
+            }
         }
 
-        target.Downmix.SetLevels(clamped);
+        target.Remix.SetLevels(set, clamped);
     }
 
     private void ApplySettings(ISubtitleChain chain)
@@ -1240,6 +1254,7 @@ internal sealed partial class PlayerSession : IDisposable
         {
             _pendingReconcile = false;
             _lastReconcile = reconciled.Result;
+            NotifyMixLevelSet();
         }
     }
 
@@ -1498,6 +1513,18 @@ internal sealed partial class PlayerSession : IDisposable
     #endregion
 
     #region Misc
+
+    private void NotifyMixLevelSet()
+    {
+        RemixLevelSet? current = ActiveMixLevelSet;
+        if (current == _mixLevelSet)
+        {
+            return;
+        }
+
+        _mixLevelSet = current;
+        MixLevelSetChanged?.Invoke();
+    }
 
     private void RaisePositionChanged()
     {
