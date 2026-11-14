@@ -147,9 +147,15 @@ internal static class FFmpegInterop
     private const ulong MaskSurround50 = 0x37;         // FL|FR|FC|BL|BR
     private const ulong MaskSurround51 = 0x3F;         // FL|FR|FC|LFE|BL|BR
     private const ulong MaskSurround51Side = 0x60F;    // FL|FR|FC|LFE|SL|SR
-    private const ulong MaskSurround61 = 0x70F;        // FL|FR|FC|LFE|BL|BR|BC
-    private const ulong MaskSurround61Back = 0x13F;    // FL|FR|FC|LFE|SL|SR|BC
+    private const ulong MaskSurround61 = 0x70F;        // FL|FR|FC|LFE|BC|SL|SR
+    private const ulong MaskSurround61Back = 0x13F;    // FL|FR|FC|LFE|BL|BR|BC
+    private const ulong MaskSurround61Front = 0x6CB;   // FL|FR|LFE|FLC|FRC|SL|SR
+    private const ulong MaskSurround70 = 0x637;        // FL|FR|FC|BL|BR|SL|SR
+    private const ulong MaskSurround70Front = 0x6C7;   // FL|FR|FC|FLC|FRC|SL|SR
     private const ulong MaskSurround71 = 0x63F;        // FL|FR|FC|LFE|BL|BR|SL|SR
+    private const ulong MaskSurround71Wide = 0xFF;     // FL|FR|FC|LFE|BL|BR|FLC|FRC
+    private const ulong MaskSurround71WideSide = 0x6CF; // FL|FR|FC|LFE|FLC|FRC|SL|SR
+    private const ulong MaskSurround512 = 0x560F;      // FL|FR|FC|LFE|SL|SR|TFL|TFR
 
     internal static ChannelLayout ToChannelLayout(AVChannelLayout channelLayout)
     {
@@ -163,10 +169,16 @@ internal static class FFmpegInterop
                 MaskQuad => ChannelLayout.Quad,
                 MaskSurround50 => ChannelLayout.Surround50,
                 MaskSurround51 => ChannelLayout.Surround51,
-                MaskSurround51Side => ChannelLayout.Surround51,
+                MaskSurround51Side => ChannelLayout.Surround51Side,
                 MaskSurround61 => ChannelLayout.Surround61,
-                MaskSurround61Back => ChannelLayout.Surround61,
+                MaskSurround61Back => ChannelLayout.Surround61Back,
+                MaskSurround61Front => ChannelLayout.Surround61Front,
+                MaskSurround70 => ChannelLayout.Surround70,
+                MaskSurround70Front => ChannelLayout.Surround70Front,
                 MaskSurround71 => ChannelLayout.Surround71,
+                MaskSurround71Wide => ChannelLayout.Surround71Wide,
+                MaskSurround71WideSide => ChannelLayout.Surround71WideSide,
+                MaskSurround512 => ChannelLayout.Surround512,
                 _ => ChannelLayout.Unknown,
             };
 

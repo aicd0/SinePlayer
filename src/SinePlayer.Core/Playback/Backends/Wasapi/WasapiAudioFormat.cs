@@ -15,9 +15,13 @@ internal static class WasapiAudioFormat
     private const uint SpeakerLowFrequency = 0x8;
     private const uint SpeakerBackLeft = 0x10;
     private const uint SpeakerBackRight = 0x20;
+    private const uint SpeakerFrontLeftOfCenter = 0x40;
+    private const uint SpeakerFrontRightOfCenter = 0x80;
     private const uint SpeakerBackCenter = 0x100;
     private const uint SpeakerSideLeft = 0x200;
     private const uint SpeakerSideRight = 0x400;
+    private const uint SpeakerTopFrontLeft = 0x1000;
+    private const uint SpeakerTopFrontRight = 0x4000;
 
     /// <summary>Whatever the device decides, which is what a stream with no declared layout asks for.</summary>
     internal const uint ChannelMaskUnspecified = 0;
@@ -139,8 +143,16 @@ internal static class WasapiAudioFormat
             ChannelLayout.Quad => SpeakerFrontLeft | SpeakerFrontRight | SpeakerBackLeft | SpeakerBackRight,
             ChannelLayout.Surround50 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerBackLeft | SpeakerBackRight,
             ChannelLayout.Surround51 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerBackLeft | SpeakerBackRight,
-            ChannelLayout.Surround61 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerBackLeft | SpeakerBackRight | SpeakerBackCenter,
+            ChannelLayout.Surround51Side => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerSideLeft | SpeakerSideRight,
+            ChannelLayout.Surround70 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerBackLeft | SpeakerBackRight | SpeakerSideLeft | SpeakerSideRight,
+            ChannelLayout.Surround70Front => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerFrontLeftOfCenter | SpeakerFrontRightOfCenter | SpeakerSideLeft | SpeakerSideRight,
+            ChannelLayout.Surround61 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerBackCenter | SpeakerSideLeft | SpeakerSideRight,
+            ChannelLayout.Surround61Back => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerBackLeft | SpeakerBackRight | SpeakerBackCenter,
+            ChannelLayout.Surround61Front => SpeakerFrontLeft | SpeakerFrontRight | SpeakerLowFrequency | SpeakerFrontLeftOfCenter | SpeakerFrontRightOfCenter | SpeakerSideLeft | SpeakerSideRight,
             ChannelLayout.Surround71 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerBackLeft | SpeakerBackRight | SpeakerSideLeft | SpeakerSideRight,
+            ChannelLayout.Surround71Wide => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerBackLeft | SpeakerBackRight | SpeakerFrontLeftOfCenter | SpeakerFrontRightOfCenter,
+            ChannelLayout.Surround71WideSide => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerFrontLeftOfCenter | SpeakerFrontRightOfCenter | SpeakerSideLeft | SpeakerSideRight,
+            ChannelLayout.Surround512 => SpeakerFrontLeft | SpeakerFrontRight | SpeakerFrontCenter | SpeakerLowFrequency | SpeakerSideLeft | SpeakerSideRight | SpeakerTopFrontLeft | SpeakerTopFrontRight,
             _ => ChannelMaskUnspecified,
         };
     }
