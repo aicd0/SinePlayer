@@ -23,7 +23,7 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
-using SinePlayer.Core.Playback.Backends.Downmix;
+using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Backends.Win2D;
 using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Data.Database;
@@ -50,7 +50,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private const double MinimumSubtitleFontSize = 4.0;
     private const double MaximumSubtitleFontSize = 200.0;
     private const int DefaultSubtitleFontWeight = 400;
-    private const int MaximumMixLevel = 200;
 
     private static readonly double[] SubtitleFontSizePresets = [16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 48.0, 56.0, 64.0, 72.0];
 
@@ -635,6 +634,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private bool _updatingUI = false;
     private readonly List<MixSliderEntry> _mixSliders = [];
     private ChannelLayout? _mixLayout;
+    private RemixLevelSet? _mixSet;
 
     private void UpdateUI()
     {
@@ -787,9 +787,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
-                bool modified = !MixLevelsEqual(settings.Audio.MixLevels, presetSettings.Audio.MixLevels);
-                tabModified = tabModified || modified;
                 UpdateMixSliders(settings.Audio);
+                RemixLevelSet set = _mixSet ?? RemixLevelSet.Remix;
+                ChannelLayout layout = _mixLayout ?? SelectedAudioLayout();
+                bool modified = !MixLevelsEqual(FindLevels(settings.Audio, set, layout), FindLevels(presetSettings.Audio, set, layout));
+                tabModified = tabModified || modified;
             }
 
             _audioCategory.IsModified = tabModified;
@@ -1270,26 +1272,32 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         int value = (int)Math.Round(e.NewValue);
-        if (_mediaSettings.Audio.MixLevels.TryGetValue(key, out int current) && current == value)
+        ChannelLayout layout = _mixLayout ?? SelectedAudioLayout();
+        RemixLevelSet set = _mixSet ?? RemixLevelSet.Remix;
+        Dictionary<string, int>? current = FindLevels(_mediaSettings.Audio, set, layout);
+        if (current is not null && current.TryGetValue(key, out int existing) && existing == value)
         {
             return;
         }
 
-        ApplyAudio(settings => settings.MixLevels[key] = value);
+        ApplyAudio(settings => EditableLevels(settings, set, layout)[key] = value);
     }
 
     private void UpdateMixSliders(AudioSettingsModel settings)
     {
         ChannelLayout layout = SelectedAudioLayout();
-        if (layout != _mixLayout)
+        RemixLevelSet set = _session?.ActiveMixLevelSet ?? RemixLevelSet.Remix;
+        if (layout != _mixLayout || set != _mixSet)
         {
-            BuildMixSliders(layout);
+            BuildMixSliders(layout, set);
             _mixLayout = layout;
+            _mixSet = set;
         }
 
+        Dictionary<string, int>? levels = FindLevels(settings, set, layout);
         foreach (MixSliderEntry entry in _mixSliders)
         {
-            double value = settings.MixLevels.TryGetValue(entry.Key, out int level) ? level : entry.DefaultLevel;
+            double value = levels is not null && levels.TryGetValue(entry.Key, out int level) ? level : entry.DefaultLevel;
             if (Math.Abs(entry.Slider.Value - value) > 0.5)
             {
                 entry.Slider.Value = value;
@@ -1297,18 +1305,18 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void BuildMixSliders(ChannelLayout layout)
+    private void BuildMixSliders(ChannelLayout layout, RemixLevelSet set)
     {
         MixSliderHost.Children.Clear();
         _mixSliders.Clear();
 
-        foreach (DownmixChannelGroup group in DownmixMixer.Describe(layout))
+        foreach (RemixChannelGroup group in RemixMixer.Describe(layout, set))
         {
             SliderSettingView slider = new()
             {
                 Label = group.Label,
                 Minimum = 0,
-                Maximum = MaximumMixLevel,
+                Maximum = RemixMixer.MaximumLevel,
                 StepFrequency = 1,
                 DefaultValue = group.DefaultLevel,
                 Tag = group.Key,
@@ -1317,34 +1325,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             MixSliderHost.Children.Add(slider);
             _mixSliders.Add(new MixSliderEntry(group.Key, group.DefaultLevel, slider));
         }
-    }
-
-    private ChannelLayout SelectedAudioLayout()
-    {
-        if (_session?.SelectedTracks(MediaStreamKind.Audio) is { Count: > 0 } tracks && tracks[0].Stream is AudioStreamInfo audio)
-        {
-            return audio.ChannelLayout;
-        }
-
-        return ChannelLayout.Stereo;
-    }
-
-    private static bool MixLevelsEqual(Dictionary<string, int> first, Dictionary<string, int> second)
-    {
-        if (first.Count != second.Count)
-        {
-            return false;
-        }
-
-        foreach (KeyValuePair<string, int> entry in first)
-        {
-            if (!second.TryGetValue(entry.Key, out int value) || value != entry.Value)
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private void SubtitleSyncNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
@@ -2087,6 +2067,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         session.TrackSelectionChanged -= Session_TrackSelectionChanged;
         session.TrackSelectionChanged += Session_TrackSelectionChanged;
+        session.MixLevelSetChanged -= Session_MixLevelSetChanged;
+        session.MixLevelSetChanged += Session_MixLevelSetChanged;
     }
 
     private void DetachSessionEvents()
@@ -2097,9 +2079,15 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         _session.TrackSelectionChanged -= Session_TrackSelectionChanged;
+        _session.MixLevelSetChanged -= Session_MixLevelSetChanged;
     }
 
     private void Session_TrackSelectionChanged()
+    {
+        CoroutineUtils.RunInMainThread(RefreshTracks);
+    }
+
+    private void Session_MixLevelSetChanged()
     {
         CoroutineUtils.RunInMainThread(RefreshTracks);
     }
@@ -2169,6 +2157,62 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         public required SelectorBarItem Item { get; init; }
         public required StackPanel Content { get; init; }
         public required SettingsCategory Category { get; init; }
+    }
+
+    #endregion
+
+    #region Mixing Settings
+
+    private static Dictionary<string, int>? FindLevels(AudioSettingsModel settings, RemixLevelSet set, ChannelLayout layout)
+    {
+        Dictionary<ChannelLayout, Dictionary<string, int>> levels = set == RemixLevelSet.Remix ? settings.RemixLevels : settings.DownmixLevels;
+        return levels.TryGetValue(layout, out Dictionary<string, int>? groups) ? groups : null;
+    }
+
+    private static Dictionary<string, int> EditableLevels(AudioSettingsModel settings, RemixLevelSet set, ChannelLayout layout)
+    {
+        Dictionary<ChannelLayout, Dictionary<string, int>> levels = set == RemixLevelSet.Remix ? settings.RemixLevels : settings.DownmixLevels;
+        if (!levels.TryGetValue(layout, out Dictionary<string, int>? groups))
+        {
+            groups = [];
+            levels[layout] = groups;
+        }
+
+        return groups;
+    }
+
+    private ChannelLayout SelectedAudioLayout()
+    {
+        if (_session?.SelectedTracks(MediaStreamKind.Audio) is { Count: > 0 } tracks && tracks[0].Stream is AudioStreamInfo audio)
+        {
+            return audio.ChannelLayout;
+        }
+
+        return ChannelLayout.Stereo;
+    }
+
+    private static bool MixLevelsEqual(Dictionary<string, int>? first, Dictionary<string, int>? second)
+    {
+        int firstCount = first?.Count ?? 0;
+        if (firstCount != (second?.Count ?? 0))
+        {
+            return false;
+        }
+
+        if (first is null || second is null)
+        {
+            return true;
+        }
+
+        foreach (KeyValuePair<string, int> entry in first)
+        {
+            if (!second.TryGetValue(entry.Key, out int value) || value != entry.Value)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     #endregion

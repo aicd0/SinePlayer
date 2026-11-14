@@ -25,7 +25,7 @@ using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
-using SinePlayer.Core.Playback.Backends.Downmix;
+using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Libass;
@@ -114,7 +114,7 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private PlaybackPipeline? _pipeline;
     private GainAudioFilter? _gain;
-    private DownmixAudioFilter? _downmix;
+    private RemixAudioFilter? _remix;
     private SwapChainPanelRenderTarget? _videoRenderTarget;
     private SwapChainPanelRenderTarget? _subtitleRenderTarget;
     private DispatcherQueueTimer? _statusTimer;
@@ -474,8 +474,8 @@ internal sealed partial class PlaybackLabPage : BasePage
         gain.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
         audio.Filters.Add(gain);
 
-        DownmixAudioFilter downmix = new();
-        audio.Filters.Add(downmix);
+        RemixAudioFilter remix = new();
+        audio.Filters.Add(remix);
 
         OperationResult reset = await pipeline.Reset();
         string? failure = reset.IsSuccessful ? null : reset.Message;
@@ -491,14 +491,14 @@ internal sealed partial class PlaybackLabPage : BasePage
             pipeline.WarningRaised -= Pipeline_WarningRaised;
             pipeline.Dispose();
             gain.Dispose();
-            downmix.Dispose();
+            remix.Dispose();
             Logger.E(TAG, $"Opening the file failed. {failure}");
             return;
         }
 
         _pipeline = pipeline;
         _gain = gain;
-        _downmix = downmix;
+        _remix = remix;
         PopulateTrackPickers();
 
         StartStatusTimer();
@@ -522,9 +522,9 @@ internal sealed partial class PlaybackLabPage : BasePage
         _gain = null;
         gain?.Dispose();
 
-        DownmixAudioFilter? downmix = _downmix;
-        _downmix = null;
-        downmix?.Dispose();
+        RemixAudioFilter? remix = _remix;
+        _remix = null;
+        remix?.Dispose();
 
         // The panel gives the surface back before the swap chain it is showing goes away.
         _videoRenderTarget?.DetachSurface();

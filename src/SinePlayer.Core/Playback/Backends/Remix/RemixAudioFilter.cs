@@ -10,22 +10,32 @@ using SinePlayer.Core.Playback.Abstractions.Filter;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Utils;
 
-using FoldMatrix = SinePlayer.Core.Playback.Backends.Downmix.DownmixMixer.FoldMatrix;
+using FoldMatrix = SinePlayer.Core.Playback.Backends.Remix.RemixMixer.FoldMatrix;
 
-namespace SinePlayer.Core.Playback.Backends.Downmix;
+namespace SinePlayer.Core.Playback.Backends.Remix;
 
-public sealed partial class DownmixAudioFilter : IAudioFilter
+public sealed partial class RemixAudioFilter : IAudioFilter
 {
     private const int TargetChannelCount = 2;
 
-    private readonly AtomicCell<FoldState> _state = new(new FoldState(ChannelLayout.Unknown, 0, 0, null, null));
+    private readonly AtomicCell<MixState> _state = new(new MixState(ChannelLayout.Unknown, 0, 0, null, null, null, null));
 
     private AudioStreamInfo? _outputFormat;
     private bool _disposed;
 
-    public string Name => "Downmix";
+    public string Name => "Remix";
 
     public AudioStreamInfo? OutputFormat => _outputFormat;
+
+    /// <summary>Which set of levels a block of the configured stream is mixed with.</summary>
+    public RemixLevelSet ActiveLevelSet
+    {
+        get
+        {
+            MixState state = _state.Read();
+            return IsDownmix(state.ChannelCount, state.TargetChannelCount) ? RemixLevelSet.Downmix : RemixLevelSet.Remix;
+        }
+    }
 
     public OperationResult Configure(AudioStreamInfo input, AudioStreamInfo target)
     {
@@ -38,30 +48,32 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
         }
 
         _outputFormat = null;
+        MixState current = _state.Read();
 
-        // The levels belong to the listener rather than to the stream, so a new arrangement keeps the ones already set.
-        IReadOnlyDictionary<string, int>? levels = _state.Read().Levels;
-
-        if (input.ChannelCount > target.ChannelCount)
+        if (IsDownmix(input.ChannelCount, target.ChannelCount))
         {
-            if (target.ChannelCount != TargetChannelCount)
+            if (!RemixMixer.TryCreateDownmix(input.ChannelLayout, input.ChannelCount, target.ChannelCount, current.DownmixLevels, out _))
             {
-                return OperationResult.Failure($"A target of {target.ChannelCount} channels is not one this filter can fold to; it produces {TargetChannelCount}.");
+                // Nothing is left behind that a later block could be mixed with: the chain has no filter to hand a
+                // block to once the configuration is refused.
+                _state.Write(_ => new MixState(input.ChannelLayout, input.ChannelCount, target.ChannelCount, current.RemixLevels, current.DownmixLevels, null, null));
+                return OperationResult.Failure($"The {input.ChannelCount} channel layout '{input.ChannelLayout}' has no downmix to {target.ChannelCount} channel(s).");
             }
 
-            if (!DownmixMixer.TryCreateFold(input.ChannelLayout, input.ChannelCount, levels, out _))
-            {
-                return OperationResult.Failure($"The {input.ChannelCount} channel layout '{input.ChannelLayout}' has no fold down to {TargetChannelCount} channels.");
-            }
-
-            _outputFormat = input.WithLayout(TargetChannelCount, ChannelLayout.Stereo);
+            _outputFormat = input.WithLayout(target.ChannelCount, target.ChannelCount == 1 ? ChannelLayout.Mono : ChannelLayout.Stereo);
         }
 
-        _state.Write(_ => new FoldState(input.ChannelLayout, input.ChannelCount, target.ChannelCount, levels, MatrixOf(input.ChannelLayout, input.ChannelCount, target.ChannelCount, levels)));
+        MixState next = new(input.ChannelLayout, input.ChannelCount, target.ChannelCount, current.RemixLevels, current.DownmixLevels, null, null);
+        _state.Write(_ => BuildMix(next));
         return OperationResult.Success();
     }
 
-    public void SetLevels(IReadOnlyDictionary<string, int> levels)
+    /// <summary>
+    /// The levels of one set, as percentages of full scale keyed by group. A group that is absent keeps the default the
+    /// mixer gives it; a value outside 0-200 is clamped. Nothing about the format changes, so the mix is rebuilt for the
+    /// arrangement the filter was configured with and the next block uses it without the device being reopened.
+    /// </summary>
+    public void SetLevels(RemixLevelSet set, IReadOnlyDictionary<string, int> levels)
     {
         ArgumentNullException.ThrowIfNull(levels);
 
@@ -70,9 +82,13 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             return;
         }
 
-        // Copied so the matrix is built from levels that cannot change under the thread building it.
+        // Copied so the mix is built from levels that cannot change under the thread building it.
         IReadOnlyDictionary<string, int> snapshot = new Dictionary<string, int>(levels);
-        _state.Write(state => new FoldState(state.Layout, state.ChannelCount, state.TargetChannelCount, snapshot, MatrixOf(state.Layout, state.ChannelCount, state.TargetChannelCount, snapshot)));
+        _state.Write(state =>
+        {
+            MixState next = set == RemixLevelSet.Remix ? state with { RemixLevels = snapshot } : state with { DownmixLevels = snapshot };
+            return BuildMix(next);
+        });
     }
 
     public OperationResult Apply(RawAudioBuffer input, out RawAudioBuffer output)
@@ -86,13 +102,13 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             return OperationResult.Failure("The filter has already been disposed.");
         }
 
-        FoldMatrix? matrix = _state.Read().Matrix;
-        if (matrix is null)
+        MixState state = _state.Read();
+        FoldMatrix? matrix = state.Matrix;
+        float[]? gains = state.Gains;
+        if (matrix is null && gains is null)
         {
             return OperationResult.Success();
         }
-
-        FoldMatrix fold = matrix.Value;
 
         if (input.Buffer is not IPlanarAudioBuffer planar)
         {
@@ -102,7 +118,7 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
         AudioSampleFormat format = input.SampleFormat;
         if (!IsSupported(format))
         {
-            return OperationResult.Failure($"The sample format '{format}' cannot be folded.");
+            return OperationResult.Failure($"The sample format '{format}' cannot be mixed.");
         }
 
         int channels = input.ChannelCount;
@@ -112,9 +128,11 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             return OperationResult.Failure("The audio buffer holds no samples.");
         }
 
-        if (fold.Left.Length < channels)
+        // Both paths take one coefficient per source channel; only the width of the result differs.
+        int expected = matrix?.Left.Length ?? gains!.Length;
+        if (expected < channels)
         {
-            return OperationResult.Failure($"The fold takes {fold.Left.Length} channel(s) but the buffer holds {channels}.");
+            return OperationResult.Failure($"The mix takes {expected} channel(s) but the buffer holds {channels}.");
         }
 
         bool interleaved = planar.PlaneCount == 1;
@@ -146,26 +164,50 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             planes[plane] = pointer;
         }
 
-        int outputChannels = fold.ChannelCount;
-        byte[] folded = new byte[bytesPerSample * outputChannels * samples];
-        Fold(planes, interleaved, format, bytesPerSample, channels, samples, fold, folded);
-
-        output = new RawAudioBuffer
+        if (matrix is { } fold)
         {
-            Timestamp = input.Timestamp,
-            SampleRate = input.SampleRate,
-            ChannelCount = outputChannels,
-            ChannelLayout = outputChannels == 1 ? ChannelLayout.Mono : ChannelLayout.Stereo,
-            SampleFormat = format,
-            SampleCount = samples,
-            Buffer = new FoldedBuffer(folded),
-        };
+            int outputChannels = fold.ChannelCount;
+            byte[] mixed = new byte[bytesPerSample * outputChannels * samples];
+            Fold(planes, interleaved, format, bytesPerSample, channels, samples, fold, mixed);
+
+            output = new RawAudioBuffer
+            {
+                Timestamp = input.Timestamp,
+                SampleRate = input.SampleRate,
+                ChannelCount = outputChannels,
+                ChannelLayout = outputChannels == 1 ? ChannelLayout.Mono : ChannelLayout.Stereo,
+                SampleFormat = format,
+                SampleCount = samples,
+                Buffer = new MixedBuffer(mixed),
+            };
+            return OperationResult.Success();
+        }
+
+        Scale(planes, interleaved, format, bytesPerSample, channels, samples, gains!);
         return OperationResult.Success();
     }
 
     public void Dispose()
     {
         Volatile.Write(ref _disposed, true);
+    }
+
+    private static MixState BuildMix(MixState state)
+    {
+        if (IsDownmix(state.ChannelCount, state.TargetChannelCount))
+        {
+            FoldMatrix? matrix = RemixMixer.TryCreateDownmix(state.Layout, state.ChannelCount, state.TargetChannelCount, state.DownmixLevels, out FoldMatrix built) ? built : null;
+            return state with { Matrix = matrix, Gains = null };
+        }
+
+        float[]? gains = RemixMixer.TryCreateRemix(state.Layout, state.ChannelCount, state.RemixLevels, out float[] trimmed) ? trimmed : null;
+        return state with { Matrix = null, Gains = gains };
+    }
+
+    /// <summary>Whether a stream of this width is folded down to the target rather than trimmed in place.</summary>
+    private static bool IsDownmix(int channelCount, int targetChannelCount)
+    {
+        return channelCount > targetChannelCount && targetChannelCount <= TargetChannelCount;
     }
 
     private static unsafe void Fold(nint[] planes, bool interleaved, AudioSampleFormat format, int bytesPerSample, int channels, int samples, FoldMatrix matrix, byte[] destination)
@@ -184,7 +226,10 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
                         : (byte*)planes[channel] + ((long)sample * bytesPerSample);
                     double value = ReadSample(address, format);
                     sumLeft += value * matrix.Left[channel];
-                    sumRight += value * matrix.Right[channel];
+                    if (matrix.ChannelCount > 1)
+                    {
+                        sumRight += value * matrix.Right[channel];
+                    }
                 }
 
                 byte* destinationFrame = target + ((long)sample * frameBytes);
@@ -193,6 +238,35 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
                 {
                     WriteSample(destinationFrame + bytesPerSample, format, sumRight);
                 }
+            }
+        }
+    }
+
+    /// <summary>Scales every sample in place by the gain of the channel it belongs to.</summary>
+    private static unsafe void Scale(nint[] planes, bool interleaved, AudioSampleFormat format, int bytesPerSample, int channels, int samples, float[] gains)
+    {
+        if (interleaved)
+        {
+            byte* start = (byte*)planes[0];
+            for (int sample = 0; sample < samples; sample++)
+            {
+                for (int channel = 0; channel < channels; channel++)
+                {
+                    byte* address = start + ((long)((sample * channels) + channel) * bytesPerSample);
+                    WriteSample(address, format, ReadSample(address, format) * gains[channel]);
+                }
+            }
+
+            return;
+        }
+
+        for (int channel = 0; channel < channels; channel++)
+        {
+            byte* start = (byte*)planes[channel];
+            for (int sample = 0; sample < samples; sample++)
+            {
+                byte* address = start + ((long)sample * bytesPerSample);
+                WriteSample(address, format, ReadSample(address, format) * gains[channel]);
             }
         }
     }
@@ -262,32 +336,14 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
         return (value & 0x800000) != 0 ? value | ~0xFFFFFF : value;
     }
 
-    private static FoldMatrix? MatrixOf(ChannelLayout layout, int channelCount, int targetChannelCount, IReadOnlyDictionary<string, int>? levels)
-    {
-        if (channelCount > targetChannelCount)
-        {
-            return DownmixMixer.TryCreateFold(layout, channelCount, levels, out FoldMatrix fold) ? fold : null;
-        }
-
-        if (channelCount == targetChannelCount && DownmixMixer.TryCreateIdentity(layout, channelCount, levels, out FoldMatrix identity))
-        {
-            return identity;
-        }
-
-        return null;
-    }
-
-    /// <summary>The arrangement the filter was configured for and the matrix that turns a block of it into output.</summary>
-    private sealed record FoldState(ChannelLayout Layout, int ChannelCount, int TargetChannelCount, IReadOnlyDictionary<string, int>? Levels, FoldMatrix? Matrix);
-
-    /// <summary>The folded block, interleaved so the renderer has nothing left to do but copy it to the device.</summary>
-    private sealed partial class FoldedBuffer : IPlanarAudioBuffer
+    /// <summary>The mixed block, interleaved so the renderer has nothing left to do but copy it to the device.</summary>
+    private sealed class MixedBuffer : IPlanarAudioBuffer
     {
         private readonly byte[] _bytes;
         private readonly GCHandle _handle;
         private bool _disposed;
 
-        internal FoldedBuffer(byte[] bytes)
+        internal MixedBuffer(byte[] bytes)
         {
             _bytes = bytes;
             _handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
@@ -300,12 +356,12 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
         public nint GetPlanePointer(int plane)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            return plane == 0 ? _handle.AddrOfPinnedObject() : throw new ArgumentOutOfRangeException(nameof(plane), plane, "A folded block has one plane.");
+            return plane == 0 ? _handle.AddrOfPinnedObject() : throw new ArgumentOutOfRangeException(nameof(plane), plane, "A mixed block has one plane.");
         }
 
         public int GetPlaneByteCount(int plane)
         {
-            return plane == 0 ? _bytes.Length : throw new ArgumentOutOfRangeException(nameof(plane), plane, "A folded block has one plane.");
+            return plane == 0 ? _bytes.Length : throw new ArgumentOutOfRangeException(nameof(plane), plane, "A mixed block has one plane.");
         }
 
         public void Dispose()
@@ -319,4 +375,14 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             _handle.Free();
         }
     }
+
+    /// <summary>The arrangement, both sets of levels, and the mix those levels produce for it.</summary>
+    private sealed record MixState(
+        ChannelLayout Layout,
+        int ChannelCount,
+        int TargetChannelCount,
+        IReadOnlyDictionary<string, int>? RemixLevels,
+        IReadOnlyDictionary<string, int>? DownmixLevels,
+        FoldMatrix? Matrix,
+        float[]? Gains);
 }
