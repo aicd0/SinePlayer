@@ -32,6 +32,10 @@ public readonly record struct SubtitlePresentation
 
     public Color? OutlineColor { get; init; }
 
+    public bool ShadowEnabled { get; init; }
+
+    public Color? ShadowColor { get; init; }
+
     public double? Opacity { get; init; }
 
     public SubtitleFrame Frame { get; init; }

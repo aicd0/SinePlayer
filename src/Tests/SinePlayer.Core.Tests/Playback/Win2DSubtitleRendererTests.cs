@@ -366,6 +366,157 @@ public class Win2DSubtitleRendererTests
         }
     }
 
+    /// <summary>
+    /// The shadow is the words drawn again, offset and behind everything else: turning it on adds ink around them, and the
+    /// ink it adds is the colour it was given. Without it the picture is what it was before the setting existed.
+    /// </summary>
+    [Test]
+    public void DrawsTheShadowBehindTheWordsWhenItIsTurnedOn()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 240;
+
+        var shadowColour = Color.FromArgb(255, 0, 128, 0);
+        SubtitlePresentation bare = new() { FontSize = 32.0 };
+        SubtitlePresentation shadowed = bare with { ShadowEnabled = true, ShadowColor = shadowColour };
+
+        int barePixels = InkPixels(device, width, height, bare);
+        int shadowedPixels = InkPixels(device, width, height, shadowed);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(barePixels, Is.GreaterThan(0), "the words alone are drawn");
+            Assert.That(HasColour(device, width, height, bare, shadowColour), Is.False, "words without a shadow carry no shadow colour");
+            Assert.That(shadowedPixels, Is.GreaterThan(barePixels), "a shadow adds ink around them");
+            Assert.That(HasColour(device, width, height, shadowed, shadowColour), Is.True, "and the ink it adds is the colour the host named");
+        }
+    }
+
+    /// <summary>
+    /// The border casts the shadow too: the shadow is the whole outlined shape moved rather than the bare glyphs, so a
+    /// border wider than the shadow's offset still leaves a shadow around itself instead of covering every trace of it.
+    /// </summary>
+    [Test]
+    public void ShadowsTheBorderAsWellAsTheWords()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        var shadowColour = Color.FromArgb(255, 0, 128, 0);
+
+        // Six pixels of border against a shadow offset of 6% of the font size, so the glyphs alone could not show through.
+        SubtitlePresentation wide = new() { FontSize = 32.0, OutlineWidth = 6.0, ShadowEnabled = true, ShadowColor = shadowColour };
+        SubtitlePresentation wideWithoutShadow = wide with { ShadowEnabled = false };
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(HasColour(device, 480, 240, wideWithoutShadow, shadowColour), Is.False, "the border alone is not the shadow");
+            Assert.That(HasColour(device, 480, 240, wide, shadowColour), Is.True, "but it casts one of its own");
+        }
+    }
+
+    /// <summary>
+    /// A shadow colour that is not opaque has to be composed once. The shadow is the border and the words together, so
+    /// painting them as two separate shapes would compose the colour twice wherever they overlap, and a fifty percent shadow
+    /// would show a darker rim at three quarters. The words are drawn opaque here, so the only ink that is neither their
+    /// colour nor transparent is the shadow's own.
+    /// </summary>
+    [Test]
+    public void ComposesAHalfTransparentShadowOnlyOnce()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 240;
+
+        SubtitlePresentation presentation = new()
+        {
+            FontSize = 32.0,
+            FontColor = Color.FromArgb(255, 255, 255, 255),
+            OutlineWidth = 0.5,
+            OutlineColor = Color.FromArgb(255, 255, 255, 255),
+            ShadowEnabled = true,
+            ShadowColor = Color.FromArgb(128, 0, 0, 0),
+        };
+
+        byte[] pixels = RenderInk(device, width, height, presentation);
+        int composedTwice = 0;
+        int shadowed = 0;
+        for (int index = 0; index + 3 < pixels.Length; index += 4)
+        {
+            bool black = pixels[index] == 0 && pixels[index + 1] == 0 && pixels[index + 2] == 0;
+            if (!black)
+            {
+                continue;
+            }
+
+            if (pixels[index + 3] > 140)
+            {
+                composedTwice++;
+            }
+            else if (pixels[index + 3] > 0)
+            {
+                shadowed++;
+            }
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(shadowed, Is.GreaterThan(0), "the shadow is drawn");
+            Assert.That(composedTwice, Is.Zero, "and no part of it is laid down twice");
+        }
+    }
+
+    /// <summary>Whether any pixel of the drawing carries exactly the colour given.</summary>
+    private static bool HasColour(CanvasDevice device, int width, int height, SubtitlePresentation presentation, Color colour)
+    {
+        return CountColour(device, width, height, presentation, colour) > 0;
+    }
+
+    /// <summary>How many pixels of the drawing carry exactly the colour given.</summary>
+    private static int CountColour(CanvasDevice device, int width, int height, SubtitlePresentation presentation, Color colour)
+    {
+        byte[] pixels = RenderInk(device, width, height, presentation);
+        int count = 0;
+        for (int index = 0; index + 3 < pixels.Length; index += 4)
+        {
+            if (pixels[index] == colour.B && pixels[index + 1] == colour.G && pixels[index + 2] == colour.R && pixels[index + 3] == colour.A)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     /// <summary>How many rows of the surface carry ink, drawing one cue with the presentation given.</summary>
     private static int InkRows(CanvasDevice device, int width, int height, SubtitlePresentation presentation)
     {

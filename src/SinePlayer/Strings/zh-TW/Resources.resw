@@ -1170,6 +1170,12 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>設定</value>
   </data>
+  <data name="Shadow" xml:space="preserve">
+    <value>陰影</value>
+  </data>
+  <data name="ShadowColor" xml:space="preserve">
+    <value>陰影色彩</value>
+  </data>
   <data name="ShowHiddenItems" xml:space="preserve">
     <value>顯示隱藏項目</value>
   </data>

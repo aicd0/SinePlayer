@@ -318,6 +318,8 @@ public class StringResourceProvider
     public string SetAsDefault => GetResourceString("SetAsDefault");
     public string SetCompletionState => GetResourceString("SetCompletionState");
     public string Settings => GetResourceString("Settings");
+    public string Shadow => GetResourceString("Shadow");
+    public string ShadowColor => GetResourceString("ShadowColor");
     public string ShowHiddenItems => GetResourceString("ShowHiddenItems");
     public string ShowInFileExplorer => GetResourceString("ShowInFileExplorer");
     public string ShowLogs => GetResourceString("ShowLogs");

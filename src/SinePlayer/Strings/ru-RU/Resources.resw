@@ -1172,6 +1172,12 @@ $plugins</value>
   <data name="Settings" xml:space="preserve">
     <value>Настройки</value>
   </data>
+  <data name="Shadow" xml:space="preserve">
+    <value>Тень</value>
+  </data>
+  <data name="ShadowColor" xml:space="preserve">
+    <value>Цвет тени</value>
+  </data>
   <data name="ShowHiddenItems" xml:space="preserve">
     <value>Показывать скрытые элементы</value>
   </data>

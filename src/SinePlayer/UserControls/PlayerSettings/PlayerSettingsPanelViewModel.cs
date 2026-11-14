@@ -344,6 +344,28 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleShadowColorLabel = string.Empty;
+    public string SubtitleShadowColorLabel
+    {
+        get => _subtitleShadowColorLabel;
+        set
+        {
+            _subtitleShadowColorLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleShadowColorLabel)));
+        }
+    }
+
+    private string _subtitleShadowLabel = string.Empty;
+    public string SubtitleShadowLabel
+    {
+        get => _subtitleShadowLabel;
+        set
+        {
+            _subtitleShadowLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleShadowLabel)));
+        }
+    }
+
     private string _subtitleOpacityLabel = string.Empty;
     public string SubtitleOpacityLabel
     {

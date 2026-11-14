@@ -28,6 +28,8 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
     public Color FontColor { get; set; } = Color.FromArgb(255, 255, 255, 255);
     public double OutlineWidth { get; set; } = 2.0;
     public Color OutlineColor { get; set; } = Color.FromArgb(255, 0, 0, 0);
+    public Color ShadowColor { get; set; } = Color.FromArgb(128, 0, 0, 0);
+    public bool ShadowEnabled { get; set; } = true;
     public int Opacity { get; set; } = 100;
 
     public SubtitlePresentation ToPresentation()
@@ -44,6 +46,8 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             FontColor = FontColor,
             OutlineWidth = OutlineWidth,
             OutlineColor = OutlineColor,
+            ShadowEnabled = ShadowEnabled,
+            ShadowColor = ShadowColor,
             Opacity = Opacity / 100.0,
         };
     }
@@ -88,6 +92,8 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
         FontColor = model.FontColor is { } value ? FromColorValue(value) : FontColor;
         OutlineWidth = model.OutlineWidth ?? OutlineWidth;
         OutlineColor = model.OutlineColor is { } outlineColor ? FromColorValue(outlineColor) : OutlineColor;
+        ShadowColor = model.ShadowColor is { } shadowColor ? FromColorValue(shadowColor) : ShadowColor;
+        ShadowEnabled = model.ShadowEnabled ?? ShadowEnabled;
         Opacity = model.Opacity ?? Opacity;
     }
 
@@ -108,6 +114,8 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             FontColor = ToColorValue(FontColor),
             OutlineWidth = OutlineWidth,
             OutlineColor = ToColorValue(OutlineColor),
+            ShadowColor = ToColorValue(ShadowColor),
+            ShadowEnabled = ShadowEnabled,
             Opacity = Opacity,
         };
     }
@@ -162,6 +170,12 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 
         [JsonPropertyName("OutlineColor")]
         public uint? OutlineColor { get; set; }
+
+        [JsonPropertyName("ShadowColor")]
+        public uint? ShadowColor { get; set; }
+
+        [JsonPropertyName("ShadowEnabled")]
+        public bool? ShadowEnabled { get; set; }
 
         [JsonPropertyName("Opacity")]
         public int? Opacity { get; set; }
