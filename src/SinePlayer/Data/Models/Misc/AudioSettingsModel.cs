@@ -16,6 +16,7 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
     public string Renderer { get; set; } = PlaybackComponents.AUTO;
     public double Sync { get; set; }
     public AudioSpeedAlgorithm StretchMethod { get; set; } = AudioSpeedAlgorithm.WSOLA;
+    public Dictionary<string, int> MixLevels { get; set; } = [];
 
     protected override Dictionary<string, AudioSettingsModel> LoadPresets()
     {
@@ -38,16 +39,34 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
         Renderer = model.Renderer ?? Renderer;
         Sync = model.Sync ?? Sync;
         StretchMethod = ParseStretchMethod(model.StretchMethod, StretchMethod);
+
+        if (model.MixLevels is { } levels)
+        {
+            foreach (KeyValuePair<string, int?> entry in levels)
+            {
+                if (entry.Value is int level)
+                {
+                    MixLevels[entry.Key] = level;
+                }
+            }
+        }
     }
 
     protected override JsonModel ToJsonModel()
     {
+        Dictionary<string, int?> levels = [];
+        foreach (KeyValuePair<string, int> entry in MixLevels)
+        {
+            levels[entry.Key] = entry.Value;
+        }
+
         return new()
         {
             Decoder = Decoder,
             Renderer = Renderer,
             Sync = Sync,
             StretchMethod = StretchMethod.ToString(),
+            MixLevels = levels,
         };
     }
 
@@ -74,5 +93,8 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
 
         [JsonPropertyName("StretchMethod")]
         public string? StretchMethod { get; set; }
+
+        [JsonPropertyName("MixLevels")]
+        public Dictionary<string, int?>? MixLevels { get; set; }
     }
 }
