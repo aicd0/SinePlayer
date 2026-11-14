@@ -784,6 +784,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="Miscellaneous" xml:space="preserve">
     <value>Otros</value>
   </data>
+  <data name="Mixing" xml:space="preserve">
+    <value>Mezcla</value>
+  </data>
   <data name="More" xml:space="preserve">
     <value>Más</value>
   </data>

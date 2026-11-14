@@ -784,6 +784,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Miscellaneous" xml:space="preserve">
     <value>Sonstiges</value>
   </data>
+  <data name="Mixing" xml:space="preserve">
+    <value>Mischung</value>
+  </data>
   <data name="More" xml:space="preserve">
     <value>Mehr</value>
   </data>

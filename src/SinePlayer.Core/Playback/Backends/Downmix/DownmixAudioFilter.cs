@@ -8,6 +8,9 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Filter;
 using SinePlayer.Core.Playback.Abstractions.Info;
+using SinePlayer.Core.Playback.Utils;
+
+using FoldMatrix = SinePlayer.Core.Playback.Backends.Downmix.DownmixMixer.FoldMatrix;
 
 namespace SinePlayer.Core.Playback.Backends.Downmix;
 
@@ -15,10 +18,8 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
 {
     private const int TargetChannelCount = 2;
 
-    private const float HalfPower = 0.70710678f;
+    private readonly AtomicCell<FoldState> _state = new(new FoldState(ChannelLayout.Unknown, 0, 0, null, null));
 
-    private float[]? _left;
-    private float[]? _right;
     private AudioStreamInfo? _outputFormat;
     private bool _disposed;
 
@@ -36,29 +37,42 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             return OperationResult.Failure("The filter has already been disposed.");
         }
 
-        _left = null;
-        _right = null;
         _outputFormat = null;
 
-        if (input.ChannelCount <= target.ChannelCount)
+        // The levels belong to the listener rather than to the stream, so a new arrangement keeps the ones already set.
+        IReadOnlyDictionary<string, int>? levels = _state.Read().Levels;
+
+        if (input.ChannelCount > target.ChannelCount)
         {
-            return OperationResult.Success();
+            if (target.ChannelCount != TargetChannelCount)
+            {
+                return OperationResult.Failure($"A target of {target.ChannelCount} channels is not one this filter can fold to; it produces {TargetChannelCount}.");
+            }
+
+            if (!DownmixMixer.TryCreateFold(input.ChannelLayout, input.ChannelCount, levels, out _))
+            {
+                return OperationResult.Failure($"The {input.ChannelCount} channel layout '{input.ChannelLayout}' has no fold down to {TargetChannelCount} channels.");
+            }
+
+            _outputFormat = input.WithLayout(TargetChannelCount, ChannelLayout.Stereo);
         }
 
-        if (target.ChannelCount != TargetChannelCount)
-        {
-            return OperationResult.Failure($"A target of {target.ChannelCount} channels is not one this filter can fold to; it produces {TargetChannelCount}.");
-        }
-
-        if (!TryCreateStereo(input.ChannelLayout, input.ChannelCount, out float[] left, out float[] right))
-        {
-            return OperationResult.Failure($"The {input.ChannelCount} channel layout '{input.ChannelLayout}' has no fold down to {TargetChannelCount} channels.");
-        }
-
-        _left = left;
-        _right = right;
-        _outputFormat = input.WithLayout(TargetChannelCount, ChannelLayout.Stereo);
+        _state.Write(_ => new FoldState(input.ChannelLayout, input.ChannelCount, target.ChannelCount, levels, MatrixOf(input.ChannelLayout, input.ChannelCount, target.ChannelCount, levels)));
         return OperationResult.Success();
+    }
+
+    public void SetLevels(IReadOnlyDictionary<string, int> levels)
+    {
+        ArgumentNullException.ThrowIfNull(levels);
+
+        if (Volatile.Read(ref _disposed))
+        {
+            return;
+        }
+
+        // Copied so the matrix is built from levels that cannot change under the thread building it.
+        IReadOnlyDictionary<string, int> snapshot = new Dictionary<string, int>(levels);
+        _state.Write(state => new FoldState(state.Layout, state.ChannelCount, state.TargetChannelCount, snapshot, MatrixOf(state.Layout, state.ChannelCount, state.TargetChannelCount, snapshot)));
     }
 
     public OperationResult Apply(RawAudioBuffer input, out RawAudioBuffer output)
@@ -72,12 +86,13 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             return OperationResult.Failure("The filter has already been disposed.");
         }
 
-        float[]? left = _left;
-        float[]? right = _right;
-        if (left is null || right is null)
+        FoldMatrix? matrix = _state.Read().Matrix;
+        if (matrix is null)
         {
             return OperationResult.Success();
         }
+
+        FoldMatrix fold = matrix.Value;
 
         if (input.Buffer is not IPlanarAudioBuffer planar)
         {
@@ -97,9 +112,9 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             return OperationResult.Failure("The audio buffer holds no samples.");
         }
 
-        if (left.Length < channels)
+        if (fold.Left.Length < channels)
         {
-            return OperationResult.Failure($"The fold takes {left.Length} channel(s) but the buffer holds {channels}.");
+            return OperationResult.Failure($"The fold takes {fold.Left.Length} channel(s) but the buffer holds {channels}.");
         }
 
         bool interleaved = planar.PlaneCount == 1;
@@ -131,15 +146,16 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
             planes[plane] = pointer;
         }
 
-        byte[] folded = new byte[bytesPerSample * TargetChannelCount * samples];
-        Fold(planes, interleaved, format, bytesPerSample, channels, samples, left, right, folded);
+        int outputChannels = fold.ChannelCount;
+        byte[] folded = new byte[bytesPerSample * outputChannels * samples];
+        Fold(planes, interleaved, format, bytesPerSample, channels, samples, fold, folded);
 
         output = new RawAudioBuffer
         {
             Timestamp = input.Timestamp,
             SampleRate = input.SampleRate,
-            ChannelCount = TargetChannelCount,
-            ChannelLayout = ChannelLayout.Stereo,
+            ChannelCount = outputChannels,
+            ChannelLayout = outputChannels == 1 ? ChannelLayout.Mono : ChannelLayout.Stereo,
             SampleFormat = format,
             SampleCount = samples,
             Buffer = new FoldedBuffer(folded),
@@ -152,9 +168,9 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
         Volatile.Write(ref _disposed, true);
     }
 
-    private static unsafe void Fold(nint[] planes, bool interleaved, AudioSampleFormat format, int bytesPerSample, int channels, int samples, float[] left, float[] right, byte[] destination)
+    private static unsafe void Fold(nint[] planes, bool interleaved, AudioSampleFormat format, int bytesPerSample, int channels, int samples, FoldMatrix matrix, byte[] destination)
     {
-        int frameBytes = bytesPerSample * TargetChannelCount;
+        int frameBytes = bytesPerSample * matrix.ChannelCount;
         fixed (byte* target = destination)
         {
             for (int sample = 0; sample < samples; sample++)
@@ -167,139 +183,18 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
                         ? (byte*)planes[0] + ((long)((sample * channels) + channel) * bytesPerSample)
                         : (byte*)planes[channel] + ((long)sample * bytesPerSample);
                     double value = ReadSample(address, format);
-                    sumLeft += value * left[channel];
-                    sumRight += value * right[channel];
+                    sumLeft += value * matrix.Left[channel];
+                    sumRight += value * matrix.Right[channel];
                 }
 
                 byte* destinationFrame = target + ((long)sample * frameBytes);
                 WriteSample(destinationFrame, format, sumLeft);
-                WriteSample(destinationFrame + bytesPerSample, format, sumRight);
+                if (matrix.ChannelCount > 1)
+                {
+                    WriteSample(destinationFrame + bytesPerSample, format, sumRight);
+                }
             }
         }
-    }
-
-    /// <summary>
-    /// The fold for a layout, or false when this is not a layout whose speaker positions are known here. A channel
-    /// count that does not match the layout is refused for the same reason as an unknown layout.
-    /// </summary>
-    private static bool TryCreateStereo(ChannelLayout layout, int channelCount, out float[] left, out float[] right)
-    {
-        left = [];
-        right = [];
-
-        int expected = layout switch
-        {
-            ChannelLayout.Stereo => 2,
-            ChannelLayout.Surround21 => 3,
-            ChannelLayout.Quad => 4,
-            ChannelLayout.Surround50 => 5,
-            ChannelLayout.Surround51 => 6,
-            ChannelLayout.Surround51Side => 6,
-            ChannelLayout.Surround61 => 7,
-            ChannelLayout.Surround61Back => 7,
-            ChannelLayout.Surround61Front => 7,
-            ChannelLayout.Surround70 => 7,
-            ChannelLayout.Surround70Front => 7,
-            ChannelLayout.Surround71 => 8,
-            ChannelLayout.Surround71Wide => 8,
-            ChannelLayout.Surround71WideSide => 8,
-            ChannelLayout.Surround512 => 8,
-            _ => 0,
-        };
-
-        if (expected == 0 || channelCount != expected)
-        {
-            return false;
-        }
-
-        // Indices follow the layout's own channel order, which is the order the decoder emits and the order the
-        // channel mask asserts: front pair, centre, low frequency, then the surrounds.
-        left = new float[channelCount];
-        right = new float[channelCount];
-        left[0] = 1.0f;
-        right[1] = 1.0f;
-
-        // The indices below are the order the decoder emits, which is the order the layout's channel mask puts the
-        // speakers in.
-        switch (layout)
-        {
-            case ChannelLayout.Quad:             // FL FR BL BR
-                left[2] = HalfPower;
-                right[3] = HalfPower;
-                break;
-
-            case ChannelLayout.Surround50:       // FL FR FC BL BR
-                left[2] = HalfPower;
-                right[2] = HalfPower;
-                left[3] = HalfPower;
-                right[4] = HalfPower;
-                break;
-
-            case ChannelLayout.Surround51:       // FL FR FC LFE BL BR
-            case ChannelLayout.Surround51Side:   // FL FR FC LFE SL SR
-                left[2] = HalfPower;
-                right[2] = HalfPower;
-                left[4] = HalfPower;
-                right[5] = HalfPower;
-                break;
-
-            case ChannelLayout.Surround61:       // FL FR FC LFE BC SL SR
-                left[2] = HalfPower;
-                right[2] = HalfPower;
-                left[4] = HalfPower;
-                right[4] = HalfPower;
-                left[5] = HalfPower;
-                right[6] = HalfPower;
-                break;
-
-            case ChannelLayout.Surround61Back:   // FL FR FC LFE BL BR BC
-                left[2] = HalfPower;
-                right[2] = HalfPower;
-                left[4] = HalfPower;
-                right[5] = HalfPower;
-                left[6] = HalfPower;
-                right[6] = HalfPower;
-                break;
-
-            case ChannelLayout.Surround61Front:  // FL FR LFE FLC FRC SL SR
-                left[3] = HalfPower;
-                right[4] = HalfPower;
-                left[5] = HalfPower;
-                right[6] = HalfPower;
-                break;
-
-            case ChannelLayout.Surround70:       // FL FR FC BL BR SL SR
-            case ChannelLayout.Surround70Front:  // FL FR FC FLC FRC SL SR
-                left[2] = HalfPower;
-                right[2] = HalfPower;
-                left[3] = HalfPower;
-                right[4] = HalfPower;
-                left[5] = HalfPower;
-                right[6] = HalfPower;
-                break;
-
-            case ChannelLayout.Surround71:       // FL FR FC LFE BL BR SL SR
-                left[2] = HalfPower;
-                right[2] = HalfPower;
-                left[4] = HalfPower;
-                right[5] = HalfPower;
-                left[6] = HalfPower;
-                right[7] = HalfPower;
-                break;
-
-            case ChannelLayout.Surround71Wide:     // FL FR FC LFE BL BR FLC FRC
-            case ChannelLayout.Surround71WideSide: // FL FR FC LFE FLC FRC SL SR
-            case ChannelLayout.Surround512:        // FL FR FC LFE SL SR TFL TFR
-                left[2] = HalfPower;
-                right[2] = HalfPower;
-                left[4] = HalfPower;
-                right[5] = HalfPower;
-                left[6] = HalfPower;
-                right[7] = HalfPower;
-                break;
-        }
-
-        return true;
     }
 
     private static bool IsSupported(AudioSampleFormat format)
@@ -367,8 +262,26 @@ public sealed partial class DownmixAudioFilter : IAudioFilter
         return (value & 0x800000) != 0 ? value | ~0xFFFFFF : value;
     }
 
+    private static FoldMatrix? MatrixOf(ChannelLayout layout, int channelCount, int targetChannelCount, IReadOnlyDictionary<string, int>? levels)
+    {
+        if (channelCount > targetChannelCount)
+        {
+            return DownmixMixer.TryCreateFold(layout, channelCount, levels, out FoldMatrix fold) ? fold : null;
+        }
+
+        if (channelCount == targetChannelCount && DownmixMixer.TryCreateIdentity(layout, channelCount, levels, out FoldMatrix identity))
+        {
+            return identity;
+        }
+
+        return null;
+    }
+
+    /// <summary>The arrangement the filter was configured for and the matrix that turns a block of it into output.</summary>
+    private sealed record FoldState(ChannelLayout Layout, int ChannelCount, int TargetChannelCount, IReadOnlyDictionary<string, int>? Levels, FoldMatrix? Matrix);
+
     /// <summary>The folded block, interleaved so the renderer has nothing left to do but copy it to the device.</summary>
-    private sealed class FoldedBuffer : IPlanarAudioBuffer
+    private sealed partial class FoldedBuffer : IPlanarAudioBuffer
     {
         private readonly byte[] _bytes;
         private readonly GCHandle _handle;

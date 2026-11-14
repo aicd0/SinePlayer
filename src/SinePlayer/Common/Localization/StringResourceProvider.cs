@@ -198,6 +198,7 @@ public class StringResourceProvider
     public string MediaOnThisDevice => GetResourceString("MediaOnThisDevice");
     public string MergeSingleItemGroups => GetResourceString("MergeSingleItemGroups");
     public string Miscellaneous => GetResourceString("Miscellaneous");
+    public string Mixing => GetResourceString("Mixing");
     public string More => GetResourceString("More");
     public string Mute => GetResourceString("Mute");
     public string NItems => GetResourceString("NItems");

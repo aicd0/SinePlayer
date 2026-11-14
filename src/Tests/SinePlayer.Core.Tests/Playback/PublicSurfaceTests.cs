@@ -100,6 +100,8 @@ public class PublicSurfaceTests
         "SinePlayer.Core.Playback.Abstractions.Timing.ISynchronizer",
         "SinePlayer.Core.Playback.Backends.Direct3D11.D3D11VideoRendererFactory",
         "SinePlayer.Core.Playback.Backends.Downmix.DownmixAudioFilter",
+        "SinePlayer.Core.Playback.Backends.Downmix.DownmixChannelGroup",
+        "SinePlayer.Core.Playback.Backends.Downmix.DownmixMixer",
         "SinePlayer.Core.Playback.Backends.FFmpeg.FFmpegAudioDecoderFactory",
         "SinePlayer.Core.Playback.Backends.FFmpeg.FFmpegRuntime",
         "SinePlayer.Core.Playback.Backends.FFmpeg.FFmpegSourceProviderFactory",

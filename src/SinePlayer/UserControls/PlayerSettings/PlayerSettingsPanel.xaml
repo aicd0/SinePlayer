@@ -454,6 +454,11 @@
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Mixing}" SectionKey="Mixing">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel x:Name="MixSliderHost" Orientation="Vertical" />
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
                 </StackPanel>
 
                 <StackPanel
