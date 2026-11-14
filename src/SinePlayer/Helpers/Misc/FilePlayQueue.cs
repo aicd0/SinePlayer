@@ -66,7 +66,7 @@ internal static class FilePlayQueue
         return paths;
     }
 
-    private static async Task<IReadOnlyList<MediaModel>?> CreateMediaAsync(IEnumerable<string> paths)
+    private static async Task<MediaModel[]?> CreateMediaAsync(IEnumerable<string> paths)
     {
         List<string> candidates = [];
         foreach (string path in paths)

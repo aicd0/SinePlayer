@@ -8,7 +8,7 @@ namespace SinePlayer.Common.Expression.Filter.Tokens;
 
 internal class FinalListTokenExtra : ITokenExtra
 {
-    public readonly IReadOnlyList<ExpressionToken> Expressions;
+    public readonly ExpressionToken[] Expressions;
 
     public FinalListTokenExtra(IEnumerable<ExpressionToken> expressions)
     {
@@ -26,7 +26,7 @@ internal class FinalListTokenExtra : ITokenExtra
     public void ToString(StringBuilder stringBuilder)
     {
         stringBuilder.Append('(');
-        for (int i = 0; i < Expressions.Count; i++)
+        for (int i = 0; i < Expressions.Length; i++)
         {
             if (i > 0)
             {

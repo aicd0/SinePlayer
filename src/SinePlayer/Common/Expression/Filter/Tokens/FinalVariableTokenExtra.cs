@@ -8,11 +8,11 @@ namespace SinePlayer.Common.Expression.Filter.Tokens;
 
 class FinalVariableTokenExtra(IEnumerable<string> path) : ITokenExtra
 {
-    public readonly IReadOnlyList<string> Path = [.. path];
+    public readonly string[] Path = [.. path];
 
     public void ToString(StringBuilder stringBuilder)
     {
-        for (int i = 0; i < Path.Count; i++)
+        for (int i = 0; i < Path.Length; i++)
         {
             if (i > 0)
             {

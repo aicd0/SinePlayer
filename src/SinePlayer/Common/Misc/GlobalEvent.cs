@@ -19,13 +19,13 @@ internal class GlobalEvent
 
     private GlobalEvent() { }
 
-    public MutableLiveDataWithDelay<IEnumerable<long>> CollectionUpdated = new(
-        EventBus.Default.With("CollectionUpdated", () => new MutableLiveData<IEnumerable<long>>() { Lossless = true }),
+    public MutableLiveDataWithDelay<long[]> CollectionUpdated = new(
+        EventBus.Default.With("CollectionUpdated", () => new MutableLiveData<long[]>() { Lossless = true }),
         1000,
         delay: 100,
         mergeFunc: static (a, b) => [.. a.Union(b)]);
-    public MutableLiveDataWithDelay<IEnumerable<long>> MediaUpdated = new(
-        EventBus.Default.With("MediaUpdated", () => new MutableLiveData<IEnumerable<long>>() { Lossless = true }),
+    public MutableLiveDataWithDelay<long[]> MediaUpdated = new(
+        EventBus.Default.With("MediaUpdated", () => new MutableLiveData<long[]>() { Lossless = true }),
         1000,
         delay: 100,
         mergeFunc: static (a, b) => [.. a.Union(b)]);

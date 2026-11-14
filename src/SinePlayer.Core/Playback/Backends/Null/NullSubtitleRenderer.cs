@@ -42,7 +42,7 @@ internal sealed partial class NullSubtitleRenderer : ISubtitleRenderer
         }
     }
 
-    public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
+    public OperationResult Configure(SubtitleStreamInfo stream, MediaAttachment[] attachments, IVideoRenderTarget target)
     {
         return OperationResult.Success();
     }

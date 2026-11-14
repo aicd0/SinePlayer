@@ -29,7 +29,7 @@ internal static class AssSubtitleChanges
     /// When the cue ends, or <see cref="SubtitleCue.OpenEnd"/> when that is not known yet. A fade's tail depends on it,
     /// so an open cue is treated as fading for its whole life instead of guessing.
     /// </param>
-    internal static IReadOnlyList<SubtitleChange>? Parse(string? eventLine, TimeSpan start, TimeSpan end)
+    internal static SubtitleChange[]? Parse(string? eventLine, TimeSpan start, TimeSpan end)
     {
         if (string.IsNullOrWhiteSpace(eventLine))
         {
@@ -72,7 +72,7 @@ internal static class AssSubtitleChanges
             }
         }
 
-        return changes;
+        return changes?.ToArray();
     }
 
     private static void ReadBlock(

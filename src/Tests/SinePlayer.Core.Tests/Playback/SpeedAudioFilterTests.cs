@@ -266,7 +266,7 @@ public class SpeedAudioFilterTests
 
         List<double> produced = Stretch(Blocks(frequency, 40), filter);
 
-        double measured = FrequencyOf(produced, skip: 8192);
+        double measured = FrequencyOf([.. produced], skip: 8192);
         Assert.That(measured, Is.EqualTo(expected).Within(expected * 0.05),
             "what a tone becomes says which of the two the filter did");
     }
@@ -327,7 +327,7 @@ public class SpeedAudioFilterTests
 
         List<double> produced = Stretch(Blocks(440.0, 10), filter);
 
-        Assert.That(FrequencyOf(produced, skip: 8192), Is.EqualTo(440.0).Within(22.0),
+        Assert.That(FrequencyOf([.. produced], skip: 8192), Is.EqualTo(440.0).Within(22.0),
             "the tone is still the tone, however slowly it is stretched");
     }
 
@@ -404,14 +404,14 @@ public class SpeedAudioFilterTests
     /// How often the samples cross zero, as a frequency: a tone played faster has more crossings per second, and one stretched
     /// rather than resampled has the same.
     /// </summary>
-    private static double FrequencyOf(IReadOnlyList<double> samples, int skip)
+    private static double FrequencyOf(double[] samples, int skip)
     {
-        Assert.That(samples.Count, Is.GreaterThan(skip + 1000), "there has to be something to measure");
+        Assert.That(samples.Length, Is.GreaterThan(skip + 1000), "there has to be something to measure");
 
         int crossings = 0;
         int first = -1;
         int last = -1;
-        for (int index = skip; index + 1 < samples.Count; index++)
+        for (int index = skip; index + 1 < samples.Length; index++)
         {
             double now = samples[index];
             double next = samples[index + 1];
@@ -446,7 +446,7 @@ public class SpeedAudioFilterTests
             copied.Add(bytes);
         }
 
-        return new TestPlanarBuffer(copied);
+        return new TestPlanarBuffer([.. copied]);
     }
 
     private static int Width(AudioSampleFormat format)
@@ -463,12 +463,12 @@ public class SpeedAudioFilterTests
         };
     }
 
-    private static byte[] Write(AudioSampleFormat format, IReadOnlyList<double> values)
+    private static byte[] Write(AudioSampleFormat format, double[] values)
     {
         int width = Width(format);
-        byte[] bytes = new byte[width * values.Count];
+        byte[] bytes = new byte[width * values.Length];
 
-        for (int index = 0; index < values.Count; index++)
+        for (int index = 0; index < values.Length; index++)
         {
             int offset = index * width;
             switch (format)
@@ -560,7 +560,7 @@ public class SpeedAudioFilterTests
         private readonly List<GCHandle> _handles = [];
         private bool _disposed;
 
-        internal TestPlanarBuffer(IReadOnlyList<byte[]> planes)
+        internal TestPlanarBuffer(byte[][] planes)
         {
             _planes = [.. planes];
             foreach (byte[] plane in _planes)

@@ -195,11 +195,11 @@ public partial class PlaybackPipelineTests
             var delay = TimeSpan.FromSeconds(20);
             pipeline.VideoChains[0].Offset = delay;
 
-            int submitted = audioRenderer.SubmittedTimestamps.Count;
+            int submitted = audioRenderer.SubmittedTimestamps.Length;
 
             // What matters is that reading did not park: the sound has to keep arriving, whatever the clock did when the shift
             // was taken (it can be carried by the sound, which makes the position jump rather than advance).
-            WaitFor(() => audioRenderer.SubmittedTimestamps.Count > submitted + 8,
+            WaitFor(() => audioRenderer.SubmittedTimestamps.Length > submitted + 8,
                 "the sound to keep arriving, which it cannot do if the reader parked", 10000);
             Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), pipeline.Error);
         }
@@ -459,8 +459,8 @@ public partial class PlaybackPipelineTests
 
             // Let go of what the device holds, without reading anything again.
             WaitFor(() => audioRenderer.FlushCount > flushes, "the sound to be let go of", 3000);
-            int marker = audioRenderer.SubmittedTimestamps.Count;
-            WaitFor(() => audioRenderer.SubmittedTimestamps.Count > marker, "the sound to carry on", 3000);
+            int marker = audioRenderer.SubmittedTimestamps.Length;
+            WaitFor(() => audioRenderer.SubmittedTimestamps.Length > marker, "the sound to carry on", 3000);
 
             TimeSpan resumed = audioRenderer.SubmittedTimestamps[marker];
             Assert.That(resumed, Is.GreaterThanOrEqualTo(before - advance - TimeSpan.FromMilliseconds(100)),

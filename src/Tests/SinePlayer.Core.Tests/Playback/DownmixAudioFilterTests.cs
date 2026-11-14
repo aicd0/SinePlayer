@@ -318,12 +318,12 @@ public class DownmixAudioFilterTests
         return [.. values.Select(value => (double)value)];
     }
 
-    private static RawAudioBuffer CreateBuffer(AudioSampleFormat format, ChannelLayout layout, int channelCount, int sampleCount, IReadOnlyList<float[]> planes)
+    private static RawAudioBuffer CreateBuffer(AudioSampleFormat format, ChannelLayout layout, int channelCount, int sampleCount, float[][] planes)
     {
         return CreateBuffer(format, layout, channelCount, sampleCount, ToBytes(planes));
     }
 
-    private static RawAudioBuffer CreateBuffer(AudioSampleFormat format, ChannelLayout layout, int channelCount, int sampleCount, IReadOnlyList<byte[]> planes)
+    private static RawAudioBuffer CreateBuffer(AudioSampleFormat format, ChannelLayout layout, int channelCount, int sampleCount, byte[][] planes)
     {
         return new RawAudioBuffer
         {
@@ -337,10 +337,10 @@ public class DownmixAudioFilterTests
         };
     }
 
-    private static byte[][] ToBytes(IReadOnlyList<float[]> planes)
+    private static byte[][] ToBytes(float[][] planes)
     {
-        byte[][] bytes = new byte[planes.Count][];
-        for (int plane = 0; plane < planes.Count; plane++)
+        byte[][] bytes = new byte[planes.Length][];
+        for (int plane = 0; plane < planes.Length; plane++)
         {
             bytes[plane] = new byte[planes[plane].Length * sizeof(float)];
             Buffer.BlockCopy(planes[plane], 0, bytes[plane], 0, bytes[plane].Length);
@@ -349,10 +349,10 @@ public class DownmixAudioFilterTests
         return bytes;
     }
 
-    private static byte[][] ToBytes(IReadOnlyList<short[]> planes)
+    private static byte[][] ToBytes(short[][] planes)
     {
-        byte[][] bytes = new byte[planes.Count][];
-        for (int plane = 0; plane < planes.Count; plane++)
+        byte[][] bytes = new byte[planes.Length][];
+        for (int plane = 0; plane < planes.Length; plane++)
         {
             bytes[plane] = new byte[planes[plane].Length * sizeof(short)];
             Buffer.BlockCopy(planes[plane], 0, bytes[plane], 0, bytes[plane].Length);
@@ -366,7 +366,7 @@ public class DownmixAudioFilterTests
         private readonly List<nint> _planes = [];
         private readonly List<int> _byteCounts = [];
 
-        internal TestPlanarBuffer(IReadOnlyList<byte[]> planes)
+        internal TestPlanarBuffer(byte[][] planes)
         {
             foreach (byte[] plane in planes)
             {

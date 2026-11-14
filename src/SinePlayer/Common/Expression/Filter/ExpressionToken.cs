@@ -91,7 +91,7 @@ internal sealed class ExpressionToken
         return new ExpressionToken(LEVEL_FINAL, TYPE_FINAL_EMPTY, null);
     }
 
-    public static ExpressionToken CreateFinalFunction(string name, IEnumerable<ExpressionToken> parameters)
+    public static ExpressionToken CreateFinalFunction(string name, ExpressionToken[] parameters)
     {
         return new ExpressionToken(LEVEL_FINAL, TYPE_FINAL_FUNCTION, new FinalFuncTokenExtra(name, parameters));
     }
@@ -121,7 +121,7 @@ internal sealed class ExpressionToken
         return new ExpressionToken(LEVEL_FINAL, TYPE_FINAL_VARIABLE, new FinalVariableTokenExtra(path));
     }
 
-    public static ExpressionToken CreateFinalList(IEnumerable<ExpressionToken> expressions)
+    public static ExpressionToken CreateFinalList(ExpressionToken[] expressions)
     {
         return new ExpressionToken(LEVEL_FINAL, TYPE_FINAL_LIST, new FinalListTokenExtra(expressions));
     }

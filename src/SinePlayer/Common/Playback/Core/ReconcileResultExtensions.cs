@@ -24,7 +24,7 @@ internal static class ReconcileResultExtensions
 
     public static OperationResult? Subtitle(this ReconcileResult result, PlayerView view)
     {
-        return view.SubtitleChains.Count == 0 ? null : Combine(result, view.SubtitleChains);
+        return view.SubtitleChains.Length == 0 ? null : Combine(result, view.SubtitleChains);
     }
 
     private static OperationResult? Combine(ReconcileResult result, MediaStreamKind kind)

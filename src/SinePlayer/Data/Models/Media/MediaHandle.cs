@@ -49,10 +49,11 @@ internal abstract partial class MediaHandle(MediaType type)
 
     public static ICondition CreateLibraryOnlyCondition()
     {
-        return new AndCondition([
+        return new AndCondition(new[]
+        {
             CreateMediaOnlyCondition(),
             CreateNonExternalCondition(),
-        ]);
+        });
     }
 
     public static Task Enqueue(Action action)
@@ -117,7 +118,7 @@ internal abstract partial class MediaHandle(MediaType type)
 
     private static MediaHandle? FromIdNoLock(long id)
     {
-        List<MediaHandle> result = BatchFromIdNoLock([id]);
+        List<MediaHandle> result = BatchFromIdNoLock(new[] { id });
         if (result.Count == 0)
         {
             return null;
@@ -596,7 +597,7 @@ internal abstract partial class MediaHandle(MediaType type)
     // DB Helpers
     //
 
-    private static readonly Lazy<IReadOnlyList<IColumnTypeless>> _allNonIdColumns = new(() =>
+    private static readonly Lazy<IColumnTypeless[]> _allNonIdColumns = new(() =>
     {
         return [
             MediaTable.ColumnType,

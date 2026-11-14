@@ -850,7 +850,7 @@ internal sealed partial class PlaybackLabPage : BasePage
             IAudioRendererFactory nullAudioRenderer = new NullAudioRendererFactory();
             allAudioRenderers.Add(nullAudioRenderer);
             audioRenderers.Add(new ComponentChoice("Nothing", [nullAudioRenderer]));
-            audioRenderers.Insert(0, new ComponentChoice("Auto", allAudioRenderers));
+            audioRenderers.Insert(0, new ComponentChoice("Auto", [.. allAudioRenderers]));
             AudioRendererPicker.ItemsSource = audioRenderers;
 
             RotationPicker.ItemsSource = new[] { "0°", "90°", "180°", "270°" };
@@ -1081,7 +1081,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         return GetAbility<IMainPageAbilityForTab>()!;
     }
 
-    private sealed record ComponentChoice(string Name, IReadOnlyList<IComponentFactory> Factories, bool? HardwareDecoding = null)
+    private sealed record ComponentChoice(string Name, IComponentFactory[] Factories, bool? HardwareDecoding = null)
     {
         public override string ToString()
         {

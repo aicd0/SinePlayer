@@ -259,7 +259,7 @@ public partial class PlaybackPipelineTests
 
         Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
 
-        Assert.That(subtitleRenderer.ConfiguredAttachments, Has.Count.EqualTo(1), "the renderer is told what the file holds");
+        Assert.That(subtitleRenderer.ConfiguredAttachments, Has.Length.EqualTo(1), "the renderer is told what the file holds");
         Assert.That(subtitleRenderer.ConfiguredAttachments[0].Name, Is.EqualTo("fonts/Track.ttf"));
         Assert.That(subtitleRenderer.ConfiguredAttachments[0].Data.ToArray(), Is.EqualTo(attachment.Data.ToArray()));
     }

@@ -260,7 +260,7 @@ internal class Evaluator
                         throw new ExpressionException($"Unexpected token after keyword '{functionName}': {nextToken}");
                     }
 
-                    LinkedListNode<ExpressionToken> newNode = tokens.AddBefore(previousNode, ExpressionToken.CreateFinalFunction(functionName, parameters));
+                    LinkedListNode<ExpressionToken> newNode = tokens.AddBefore(previousNode, ExpressionToken.CreateFinalFunction(functionName, [.. parameters]));
                     tokens.Remove(previousNode);
                     tokens.Remove(node);
                     tokens.Remove(nextNode);

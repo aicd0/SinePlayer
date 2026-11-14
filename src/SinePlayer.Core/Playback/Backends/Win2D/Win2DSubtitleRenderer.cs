@@ -37,7 +37,7 @@ internal sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         }
     }
 
-    public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
+    public OperationResult Configure(SubtitleStreamInfo stream, MediaAttachment[] attachments, IVideoRenderTarget target)
     {
         if (_disposed)
         {

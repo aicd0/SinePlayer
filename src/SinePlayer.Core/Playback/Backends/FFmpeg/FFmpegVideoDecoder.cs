@@ -45,7 +45,7 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
     private bool _hardware;
     private bool _disposed;
 
-    private FFmpegVideoDecoder(FFmpegSource source, VideoStreamInfo stream, nint parameters, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, IFFmpegHardwareBackend? hardwareBackend, int bufferedFrames, IReadOnlyList<string> candidates)
+    private FFmpegVideoDecoder(FFmpegSource source, VideoStreamInfo stream, nint parameters, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, IFFmpegHardwareBackend? hardwareBackend, int bufferedFrames, string[] candidates)
     {
         _source = source;
         Stream = stream;
@@ -119,7 +119,7 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
     /// Opens a decoder with the candidates named explicitly. This is how a test reaches the fallback for a
     /// decoder that opens and then produces nothing, which is otherwise a property of the FFmpeg build.
     /// </summary>
-    internal static OperationResult<FFmpegVideoDecoder> TryCreate(IMediaSource source, VideoStreamInfo stream, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, int bufferedFrames, IReadOnlyList<string> candidates)
+    internal static OperationResult<FFmpegVideoDecoder> TryCreate(IMediaSource source, VideoStreamInfo stream, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, int bufferedFrames, string[] candidates)
     {
         OperationResultCreator<FFmpegVideoDecoder> result = new();
 
@@ -176,7 +176,7 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
             }
         }
 
-        var decoder = new FFmpegVideoDecoder(ffmpegSource, stream, parameters, hardwareDecoding, gpuFrames, gpuDevice, hardwareBackend, bufferedFrames, [.. candidates]);
+        var decoder = new FFmpegVideoDecoder(ffmpegSource, stream, parameters, hardwareDecoding, gpuFrames, gpuDevice, hardwareBackend, bufferedFrames, candidates);
         OperationResult opened = decoder.TryOpenNextCandidate();
         if (!opened.IsSuccessful)
         {

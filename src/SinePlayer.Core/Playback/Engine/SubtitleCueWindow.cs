@@ -31,7 +31,7 @@ internal sealed class SubtitleCueWindow
         }
     }
 
-    public void Add(long epoch, IReadOnlyList<SubtitleCue> cues, TimeSpan position, bool discardStale = false)
+    public void Add(long epoch, SubtitleCue[] cues, TimeSpan position, bool discardStale = false)
     {
         lock (_lock)
         {

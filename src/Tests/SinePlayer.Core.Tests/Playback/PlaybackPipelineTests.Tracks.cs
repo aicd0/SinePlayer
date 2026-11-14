@@ -96,7 +96,7 @@ public partial class PlaybackPipelineTests
             // As with the sound: the renderer is configured for the new chain by the thread that adopts it.
             WaitFor(() => videoRenderer.ConfiguredStream?.Width == second.Width, "the renderer to be configured for the stream that was asked for");
 
-            int marker = videoRenderer.RenderedWidths.Count;
+            int marker = videoRenderer.RenderedWidths.Length;
             WaitForPresentedFrames(pipeline, pipeline.VideoChains[0].PresentedFrameCount + 2);
 
             IReadOnlyList<int> widths = videoRenderer.RenderedWidths;

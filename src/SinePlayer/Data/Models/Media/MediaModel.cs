@@ -72,7 +72,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
     public static async Task<MediaModel?> FromFile(string path)
     {
-        List<MediaModel> mediaItems = await FromFiles([path]);
+        List<MediaModel> mediaItems = await FromFiles(new[] { path });
         return mediaItems.Count > 0 ? mediaItems[0] : null;
     }
 
@@ -444,7 +444,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             await RemoveMediaInternal(collections);
         }
 
-        await TransitionToExternal([.. mediaItems.Where(x => !x.IsCollection)]);
+        await TransitionToExternal(mediaItems.Where(x => !x.IsCollection).ToArray());
     }
 
     public static Task<List<string>> GetAllTagCategories()
@@ -661,7 +661,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
             if (pendingPromotions.Count > 0)
             {
-                List<long> promotedIds = await PromoteToLibrary([.. pendingPromotions]);
+                List<long> promotedIds = await PromoteToLibrary(pendingPromotions.ToArray());
                 pendingPromotions.Clear();
                 changedMediaIds.UnionWith(promotedIds);
             }
@@ -716,7 +716,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
                     if (changedMediaIds.Count > 0)
                     {
-                        DispatchUpdateEvent(changedMediaIds);
+                        DispatchUpdateEvent([.. changedMediaIds]);
                         changedMediaIds.Clear();
                     }
 
@@ -859,7 +859,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
         if (changedMediaIds.Count > 0)
         {
-            DispatchUpdateEvent(changedMediaIds);
+            DispatchUpdateEvent([.. changedMediaIds]);
         }
     }
 
@@ -945,7 +945,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             }
         });
 
-        DispatchUpdateEvent(ids);
+        DispatchUpdateEvent([.. ids]);
     }
 
     private static async Task RemoveMediaInternal(IEnumerable<MediaModel> mediaItems)
@@ -1049,7 +1049,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             await UpdateCollections(triggerCollectionIds: affectedCollectionIds);
         }
 
-        DispatchUpdateEvent(ids);
+        DispatchUpdateEvent([.. ids]);
     }
 
     private static async Task<List<long>> GetEmptyAutoCollectionIds(IReadOnlyList<long> removingMediaIds)
@@ -1173,7 +1173,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         });
     }
 
-    private static void DispatchUpdateEvent(IEnumerable<long> mediaIds, int delay = 0)
+    private static void DispatchUpdateEvent(long[] mediaIds, int delay = 0)
     {
         List<long> filtered = [.. mediaIds.Where(x => x >= 0)];
         if (filtered.Count == 0)
@@ -1181,7 +1181,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             return;
         }
 
-        GlobalEvent.Instance.MediaUpdated.EmitDelayed(filtered, delay);
+        GlobalEvent.Instance.MediaUpdated.EmitDelayed([.. filtered], delay);
     }
 
     //

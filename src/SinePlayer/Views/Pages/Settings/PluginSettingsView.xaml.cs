@@ -93,7 +93,7 @@ internal sealed partial class PluginSettingsView : BaseUserControl
     {
         CoroutineUtils.Run(async () =>
         {
-            Windows.Storage.StorageFile? file = await FilePickerUtils.PickFile(ViewModel.Shared.WindowId, [".zip"]);
+            Windows.Storage.StorageFile? file = await FilePickerUtils.PickFile(ViewModel.Shared.WindowId, new[] { ".zip" });
             if (file is null)
             {
                 return;

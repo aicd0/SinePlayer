@@ -252,12 +252,12 @@ public class GainAudioFilterTests
         };
     }
 
-    private static byte[] Write(AudioSampleFormat format, IReadOnlyList<double> values)
+    private static byte[] Write(AudioSampleFormat format, double[] values)
     {
         int width = Width(format);
-        byte[] bytes = new byte[width * values.Count];
+        byte[] bytes = new byte[width * values.Length];
 
-        for (int index = 0; index < values.Count; index++)
+        for (int index = 0; index < values.Length; index++)
         {
             int offset = index * width;
             switch (format)
@@ -349,7 +349,7 @@ public class GainAudioFilterTests
         private readonly List<GCHandle> _handles = [];
         private bool _disposed;
 
-        internal TestPlanarBuffer(IReadOnlyList<byte[]> planes)
+        internal TestPlanarBuffer(byte[][] planes)
         {
             _planes = [.. planes];
             foreach (byte[] plane in _planes)

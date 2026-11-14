@@ -55,7 +55,7 @@ public class AssSubtitleRendererTests
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
+            drawn = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
         }
         finally
         {
@@ -91,7 +91,7 @@ public class AssSubtitleRendererTests
         {
             for (int index = 0; index < 4; index++)
             {
-                OperationResult drawn = renderer.Show([cue], TimeSpan.FromMilliseconds(index * 250), SubtitlePresentation.Identity);
+                OperationResult drawn = renderer.Show(new[] { cue }, TimeSpan.FromMilliseconds(index * 250), SubtitlePresentation.Identity);
                 Assert.That(drawn.IsSuccessful, Is.True, drawn.Message);
             }
         }
@@ -127,13 +127,13 @@ public class AssSubtitleRendererTests
 
         try
         {
-            OperationResult bare = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
+            OperationResult bare = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
             Assert.That(bare.IsSuccessful, Is.True, bare.Message);
             int drawn = InkHeight(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
 
             // What the player hands over while its overlay is up: the strips the chrome covers.
             SubtitlePresentation covered = new() { Insets = new SubtitleInsets(0.0, 40.0, 0.0, 90.0) };
-            OperationResult withChrome = renderer.Show([cue], TimeSpan.FromSeconds(1), covered);
+            OperationResult withChrome = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), covered);
             Assert.That(withChrome.IsSuccessful, Is.True, withChrome.Message);
 
             using (Assert.EnterMultipleScope())
@@ -188,7 +188,7 @@ public class AssSubtitleRendererTests
             Text = "0,Default,,0,0,0,,Visible words",
         };
 
-        OperationResult drawn = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
+        OperationResult drawn = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
         Assert.That(drawn.IsSuccessful, Is.True, drawn.Message);
         int withAttachment = InkHeight(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
         Assert.That(withAttachment, Is.GreaterThan(0), "the cue is drawn with the attached font available");
@@ -197,7 +197,7 @@ public class AssSubtitleRendererTests
         OperationResult reconfigured = renderer.Configure(Stream("ass"), [], target);
         Assert.That(reconfigured.IsSuccessful, Is.True, reconfigured.Message);
 
-        OperationResult drawnAgain = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
+        OperationResult drawnAgain = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
         Assert.That(drawnAgain.IsSuccessful, Is.True, drawnAgain.Message);
         Assert.That(InkHeight(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight), Is.GreaterThan(0), "and drawn again without them");
     }
@@ -264,7 +264,7 @@ public class AssSubtitleRendererTests
         SubtitleFrame picture = new(0.25, 0.25, 0.5, 0.5);
         SubtitlePresentation presentation = SubtitlePresentation.Identity with { Frame = picture };
 
-        OperationResult drawn = renderer.Show([cue], TimeSpan.FromSeconds(1), presentation);
+        OperationResult drawn = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), presentation);
         Assert.That(drawn.IsSuccessful, Is.True, drawn.Message);
 
         (int top, int bottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
@@ -305,14 +305,14 @@ public class AssSubtitleRendererTests
             Text = "0,Default,,0,0,0,,Visible words",
         };
 
-        OperationResult inside = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity with { Frame = new SubtitleFrame(0.0, 0.0, 1.0, 1.0) });
+        OperationResult inside = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), SubtitlePresentation.Identity with { Frame = new SubtitleFrame(0.0, 0.0, 1.0, 1.0) });
         Assert.That(inside.IsSuccessful, Is.True, inside.Message);
         (int insideTop, int insideBottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
         (int insideLeft, int insideRight) = InkColumns(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
 
         // 840 × 360 is as tall as the surface and wider than it, so the words are the size the box's height gives them and
         // the sides are cut off.
-        OperationResult wider = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity with { Frame = new SubtitleFrame(-0.15625, 0.0, 1.3125, 1.0) });
+        OperationResult wider = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), SubtitlePresentation.Identity with { Frame = new SubtitleFrame(-0.15625, 0.0, 1.3125, 1.0) });
         Assert.That(wider.IsSuccessful, Is.True, wider.Message);
         (int widerTop, int widerBottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
         (int widerLeft, int widerRight) = InkColumns(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
@@ -401,13 +401,13 @@ public class AssSubtitleRendererTests
             Text = "0,Default,,0,0,0,,Visible words",
         };
 
-        OperationResult bare = renderer.Show([cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
+        OperationResult bare = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
         Assert.That(bare.IsSuccessful, Is.True, bare.Message);
         (int bareTop, int bareBottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
 
         const int covered = 100;
         SubtitlePresentation withChrome = SubtitlePresentation.Identity with { Insets = new SubtitleInsets(0.0, 0.0, 0.0, covered) };
-        OperationResult shifted = renderer.Show([cue], TimeSpan.FromSeconds(1), withChrome);
+        OperationResult shifted = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), withChrome);
         Assert.That(shifted.IsSuccessful, Is.True, shifted.Message);
         (int shiftedTop, int shiftedBottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
 
@@ -452,7 +452,7 @@ public class AssSubtitleRendererTests
             Insets = new SubtitleInsets(0.0, 0.0, 0.0, 100.0),
         };
 
-        OperationResult drawn = renderer.Show([cue], TimeSpan.FromSeconds(1), presentation);
+        OperationResult drawn = renderer.Show(new[] { cue }, TimeSpan.FromSeconds(1), presentation);
         Assert.That(drawn.IsSuccessful, Is.True, drawn.Message);
 
         (int top, int bottom) = InkRows(renderer.CompositedFrame, target.SurfaceWidth, target.SurfaceHeight);
@@ -465,7 +465,7 @@ public class AssSubtitleRendererTests
         }
     }
 
-    private static IReadOnlyList<SubtitleChange> AssSubtitleChangesFor()
+    private static SubtitleChange[] AssSubtitleChangesFor()
     {
         return [new SubtitleChange(TimeSpan.Zero, TimeSpan.FromSeconds(5), true)];
     }

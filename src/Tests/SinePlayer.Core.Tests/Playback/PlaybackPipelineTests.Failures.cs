@@ -556,7 +556,7 @@ public partial class PlaybackPipelineTests
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
-            WaitFor(() => warnings.Messages.Count > 0, "the failed device to be reported");
+            WaitFor(() => warnings.Messages.Length > 0, "the failed device to be reported");
 
             using (Assert.EnterMultipleScope())
             {
@@ -640,7 +640,7 @@ public partial class PlaybackPipelineTests
             Assert.That(Select(pipeline, MediaStreamKind.Audio, pipeline.Sources[0].Info.AudioStreams[0]).IsSuccessful, Is.True, "the choice was answered before anything was opened");
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
-            WaitFor(() => warnings.Messages.Count > 0, "the device to be found out");
+            WaitFor(() => warnings.Messages.Length > 0, "the device to be found out");
 
             using (Assert.EnterMultipleScope())
             {

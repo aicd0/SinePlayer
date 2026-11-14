@@ -400,7 +400,7 @@ internal sealed partial class FFmpegSource : IMediaSource
             Duration = duration,
             Bitrate = context->BitRate,
             Streams = streams,
-            Attachments = attachments,
+            Attachments = [.. attachments],
         };
     }
 

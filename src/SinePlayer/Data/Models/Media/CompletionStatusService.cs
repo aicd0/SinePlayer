@@ -10,7 +10,7 @@ namespace SinePlayer.Data.Models.Media;
 
 internal static class CompletionStatusService
 {
-    public static readonly IReadOnlyList<CompletionStatusEnum> AllStatus = [
+    public static readonly CompletionStatusEnum[] AllStatus = [
         CompletionStatusEnum.Abandoned,
         CompletionStatusEnum.OnHold,
         CompletionStatusEnum.NotStarted,

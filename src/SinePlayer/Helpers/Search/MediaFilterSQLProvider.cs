@@ -148,10 +148,11 @@ internal class MediaFilterSQLProvider : ISQLCommandProvider
         return path1.ToLower() switch
         {
             MediaSQLProviderUtils.VAR_TAG => MediaSQLProviderUtils.CreateTagCondition(new BooleanCondition(true)),
-            MediaSQLProviderUtils.VAR_TITLE => new OrCondition([
+            MediaSQLProviderUtils.VAR_TITLE => new OrCondition(new[]
+            {
                 NotNullAndEmptyCondition(MediaTable.ColumnTitle1),
                 NotNullAndEmptyCondition(MediaTable.ColumnTitle2),
-            ]),
+            }),
             MediaSQLProviderUtils.VAR_RATING => new ComparisonCondition(ColumnOrValue.FromColumn(MediaTable.ColumnRating), ColumnOrValue.FromValue(0), ComparisonCondition.TypeEnum.GreaterThanOrEqual),
             MediaSQLProviderUtils.VAR_TITLE1 => NotNullAndEmptyCondition(MediaTable.ColumnTitle1),
             MediaSQLProviderUtils.VAR_TITLE2 => NotNullAndEmptyCondition(MediaTable.ColumnTitle2),
@@ -186,10 +187,11 @@ internal class MediaFilterSQLProvider : ISQLCommandProvider
         return path1.ToLower() switch
         {
             MediaSQLProviderUtils.VAR_TAG => MediaSQLProviderUtils.CreateTagCondition(conditionCreator(MediaTagTable.ColumnContent)),
-            MediaSQLProviderUtils.VAR_TITLE => new OrCondition([
+            MediaSQLProviderUtils.VAR_TITLE => new OrCondition(new[]
+            {
                 conditionCreator(MediaTable.ColumnTitle1),
                 conditionCreator(MediaTable.ColumnTitle2),
-            ]),
+            }),
             MediaSQLProviderUtils.VAR_RATING => conditionCreator(MediaTable.ColumnRating),
             MediaSQLProviderUtils.VAR_COMPLETION_STATUS => conditionCreator(MediaTable.ColumnCompletionStatus),
             MediaSQLProviderUtils.VAR_TITLE1 => conditionCreator(MediaTable.ColumnTitle1),
@@ -212,10 +214,11 @@ internal class MediaFilterSQLProvider : ISQLCommandProvider
 
     private static ICondition NotNullAndEmptyCondition(IColumnTypeless column)
     {
-        return new AndCondition([
+        return new AndCondition(new[]
+        {
             new ComparisonCondition(ColumnOrValue.FromColumn(column), ColumnOrValue.FromValue(null), ComparisonCondition.TypeEnum.IsNot),
             new ComparisonCondition(ColumnOrValue.FromColumn(column), ColumnOrValue.FromValue(""), ComparisonCondition.TypeEnum.NotEqual),
-        ]);
+        });
     }
 
     private static ComparisonCondition.TypeEnum ToSQLComparisonType(ComparisonTypeEnum type)

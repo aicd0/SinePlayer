@@ -68,7 +68,7 @@ internal class Optimizer
                     {
                         return expressions[0];
                     }
-                    return ExpressionToken.CreateFinalFunction(ParserUtils.KEYWORD_AND, expressions);
+                    return ExpressionToken.CreateFinalFunction(ParserUtils.KEYWORD_AND, [.. expressions]);
                 }
             case ParserUtils.KEYWORD_OR:
                 {
@@ -100,7 +100,7 @@ internal class Optimizer
                     {
                         return expressions[0];
                     }
-                    return ExpressionToken.CreateFinalFunction(ParserUtils.KEYWORD_OR, expressions);
+                    return ExpressionToken.CreateFinalFunction(ParserUtils.KEYWORD_OR, [.. expressions]);
                 }
             case ParserUtils.KEYWORD_NOT:
                 if (parameters.Count != 1)
@@ -123,7 +123,7 @@ internal class Optimizer
             default:
                 break;
         }
-        return ExpressionToken.CreateFinalFunction(extra.Name, parameters);
+        return ExpressionToken.CreateFinalFunction(extra.Name, [.. parameters]);
     }
 
     private static bool IsBooleanValueToken(ExpressionToken token, bool value)

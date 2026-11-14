@@ -259,7 +259,7 @@ internal class MediaPropertyModel
             return $"{progress / 10 * 10}%";
         }
 
-        IEnumerable<string> GetTagGroupNames(MediaModel media)
+        string[] GetTagGroupNames(MediaModel media)
         {
             if (!media.Tags.TryGetValue(Name, out MediaTagCategory? category))
             {
@@ -393,7 +393,7 @@ internal class MediaPropertyModel
         MediaGrouper CreateFallbackGrouper()
         {
             Logger.F(TAG, "Using fallback grouper");
-            return CreateGrouper(x => [new(StringResourceProvider.Instance.Ungrouped)]);
+            return CreateGrouper(x => (string[])[new(StringResourceProvider.Instance.Ungrouped)]);
         }
 
         MediaGrouper CreatePluginPropertyGrouper()
@@ -408,13 +408,13 @@ internal class MediaPropertyModel
 
         return Type switch
         {
-            PropertyTypeEnum.Title => CreateGrouper(x => [GetTitleGroupName(x)]),
-            PropertyTypeEnum.Progress => CreateGrouper(x => [GetProgressGroupName(x)]),
+            PropertyTypeEnum.Title => CreateGrouper(x => (string[])[GetTitleGroupName(x)]),
+            PropertyTypeEnum.Progress => CreateGrouper(x => (string[])[GetProgressGroupName(x)]),
             PropertyTypeEnum.Tag => CreateGrouper(GetTagGroupNames),
-            PropertyTypeEnum.Rating => CreateGrouper(x => [GetRatingGroupName(x)]),
-            PropertyTypeEnum.CompletionStatus => CreateGrouper(x => [GetCompletionStatusGroupName(x)]),
-            PropertyTypeEnum.LastVisitTime => CreateGrouper(x => [GetLastReadTimeGroupName(x)]),
-            PropertyTypeEnum.Duration => CreateGrouper(x => [GetDurationGroupName(x)]),
+            PropertyTypeEnum.Rating => CreateGrouper(x => (string[])[GetRatingGroupName(x)]),
+            PropertyTypeEnum.CompletionStatus => CreateGrouper(x => (string[])[GetCompletionStatusGroupName(x)]),
+            PropertyTypeEnum.LastVisitTime => CreateGrouper(x => (string[])[GetLastReadTimeGroupName(x)]),
+            PropertyTypeEnum.Duration => CreateGrouper(x => (string[])[GetDurationGroupName(x)]),
             PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertyGrouper(),
             _ => CreateFallbackGrouper(),
         };

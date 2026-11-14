@@ -157,7 +157,7 @@ public partial class PlaybackPipelineTests
             ReconcileResult result = reconciled.Result;
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(result.Results.Keys, Is.EqualTo<IEnumerable<IPlaybackChain>>([.. pipeline.VideoChains, .. pipeline.AudioChains, .. pipeline.SubtitleChains]),
+                Assert.That(result.Results.Keys, Is.EqualTo<IPlaybackChain[]>([.. pipeline.VideoChains, .. pipeline.AudioChains, .. pipeline.SubtitleChains]),
                     "one entry per chain, keyed by the chain");
                 Assert.That(result[pipeline.VideoChains[0]].IsSuccessful, Is.False, "the chain that could not be built says so");
                 Assert.That(result[pipeline.AudioChains[0]].IsSuccessful, Is.True, "another kind's chain is untouched by it");

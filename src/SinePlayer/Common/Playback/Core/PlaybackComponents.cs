@@ -38,7 +38,7 @@ internal sealed record PlaybackComponents(
     public const string LIBASS = "libass";
     private const string WASAPI_PREFIX = "wasapi:";
 
-    public static IReadOnlyList<PlaybackComponentOption> GetVideoDecoderOptions()
+    public static PlaybackComponentOption[] GetVideoDecoderOptions()
     {
         return
         [
@@ -48,7 +48,7 @@ internal sealed record PlaybackComponents(
         ];
     }
 
-    public static IReadOnlyList<PlaybackComponentOption> GetVideoRendererOptions()
+    public static PlaybackComponentOption[] GetVideoRendererOptions()
     {
         return
         [
@@ -58,7 +58,7 @@ internal sealed record PlaybackComponents(
         ];
     }
 
-    public static IReadOnlyList<PlaybackComponentOption> GetAudioDecoderOptions()
+    public static PlaybackComponentOption[] GetAudioDecoderOptions()
     {
         return
         [
@@ -91,7 +91,7 @@ internal sealed record PlaybackComponents(
         return options;
     }
 
-    public static IReadOnlyList<PlaybackComponentOption> GetSubtitleDecoderOptions()
+    public static PlaybackComponentOption[] GetSubtitleDecoderOptions()
     {
         return
         [
@@ -101,7 +101,7 @@ internal sealed record PlaybackComponents(
         ];
     }
 
-    public static IReadOnlyList<PlaybackComponentOption> GetSubtitleRendererOptions()
+    public static PlaybackComponentOption[] GetSubtitleRendererOptions()
     {
         return
         [
@@ -226,7 +226,7 @@ internal sealed record PlaybackComponents(
                         factories.Add(new WasapiAudioRendererFactory());
                     }
 
-                    SetAudioRenderers(chain, factories);
+                    SetAudioRenderers(chain, [.. factories]);
                     return;
                 }
         }
@@ -267,7 +267,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetVideoDecoders(IVideoChain chain, IEnumerable<IVideoDecoderFactory> factories)
+    private static void SetVideoDecoders(IVideoChain chain, IVideoDecoderFactory[] factories)
     {
         chain.Components.ClearDecoders();
         foreach (IVideoDecoderFactory factory in factories)
@@ -276,7 +276,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetVideoRenderers(IVideoChain chain, IEnumerable<IVideoRendererFactory> factories)
+    private static void SetVideoRenderers(IVideoChain chain, IVideoRendererFactory[] factories)
     {
         chain.Components.ClearRenderers();
         foreach (IVideoRendererFactory factory in factories)
@@ -285,7 +285,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetAudioDecoders(IAudioChain chain, IEnumerable<IAudioDecoderFactory> factories)
+    private static void SetAudioDecoders(IAudioChain chain, IAudioDecoderFactory[] factories)
     {
         chain.Components.ClearDecoders();
         foreach (IAudioDecoderFactory factory in factories)
@@ -294,7 +294,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetAudioRenderers(IAudioChain chain, IEnumerable<IAudioRendererFactory> factories)
+    private static void SetAudioRenderers(IAudioChain chain, IAudioRendererFactory[] factories)
     {
         chain.Components.ClearRenderers();
         foreach (IAudioRendererFactory factory in factories)
@@ -303,7 +303,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetSubtitleDecoders(ISubtitleChain chain, IEnumerable<ISubtitleDecoderFactory> factories)
+    private static void SetSubtitleDecoders(ISubtitleChain chain, ISubtitleDecoderFactory[] factories)
     {
         chain.Components.ClearDecoders();
         foreach (ISubtitleDecoderFactory factory in factories)
@@ -312,7 +312,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetSubtitleRenderers(ISubtitleChain chain, IEnumerable<ISubtitleRendererFactory> factories)
+    private static void SetSubtitleRenderers(ISubtitleChain chain, ISubtitleRendererFactory[] factories)
     {
         chain.Components.ClearRenderers();
         foreach (ISubtitleRendererFactory factory in factories)

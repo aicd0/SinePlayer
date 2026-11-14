@@ -173,7 +173,7 @@ public partial class PlaybackPipelineTests
 
             Assert.That(sources.Source!.LastSeekMode, Is.EqualTo(SeekMode.NextKeyframe), "the landing is looked for forward");
 
-            int marker = videoRenderer.RenderedTimestamps.Count;
+            int marker = videoRenderer.RenderedTimestamps.Length;
             WaitFor(() => pipeline.VideoChains[0].LastPresentedTimestamp >= keyframeAfter,
                 $"a forward seek offered the still of {pipeline.VideoChains[0].LastPresentedTimestamp:g}, before the keyframe it lands on ({keyframeAfter:g})");
             WaitForPresentedFrames(pipeline, pipeline.VideoChains[0].PresentedFrameCount + 2);
@@ -865,7 +865,7 @@ public partial class PlaybackPipelineTests
             WaitFor(() => pipeline.VideoChains[0].LastPresentedTimestamp >= target,
                 $"a precise seek offered the still of {pipeline.VideoChains[0].LastPresentedTimestamp:g}, before the position it asked for ({target:g})");
 
-            int marker = videoRenderer.RenderedTimestamps.Count;
+            int marker = videoRenderer.RenderedTimestamps.Length;
 
             WaitForPresentedFrames(pipeline, pipeline.VideoChains[0].PresentedFrameCount + 2);
 
@@ -929,9 +929,9 @@ public partial class PlaybackPipelineTests
             // so from here on the list holds the new position's sound alone.
             WaitFor(() => audioRenderer.FlushCount > flushed, "the device was never let go of the position playback left");
 
-            int marker = audioRenderer.SubmittedTimestamps.Count;
+            int marker = audioRenderer.SubmittedTimestamps.Length;
 
-            WaitFor(() => audioRenderer.SubmittedTimestamps.Count > marker + 2, "the sound has to carry on after a precise seek");
+            WaitFor(() => audioRenderer.SubmittedTimestamps.Length > marker + 2, "the sound has to carry on after a precise seek");
 
             using (Assert.EnterMultipleScope())
             {
@@ -1293,7 +1293,7 @@ public partial class PlaybackPipelineTests
             // offered there, and it is the still of the landing â€” the picture's last frame â€” rather than of nothing.
             Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
             WaitFor(() => pipeline.State == MediaEngineState.Paused, "the pipeline to stop");
-            int pictures = videoRenderer.RenderedTimestamps.Count;
+            int pictures = videoRenderer.RenderedTimestamps.Length;
 
             var target = TimeSpan.FromSeconds(2);
             Assert.That(Await(pipeline.Seek(target, SeekMode.PreviousKeyframe)).IsSuccessful, Is.True);
@@ -1304,7 +1304,7 @@ public partial class PlaybackPipelineTests
             int soundIndex = pipeline.Sources[0].Info.AudioStreams[0].Index;
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(videoRenderer.RenderedTimestamps.Count, Is.EqualTo(pictures),
+                Assert.That(videoRenderer.RenderedTimestamps.Length, Is.EqualTo(pictures),
                     "the picture has nothing at the position, so there is no still of it to show");
                 Assert.That(sources.Source?.LastSeekStreamIndex, Is.EqualTo(soundIndex),
                     "the landing is measured by the sound: by the picture it would fall back to its last keyframe, one second in");

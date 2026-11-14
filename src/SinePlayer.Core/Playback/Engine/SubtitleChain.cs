@@ -554,7 +554,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
             return OperationResult.Failure("The subtitle decoder returned no cues.");
         }
 
-        CueWindow.Add(epoch, cues, _timeline.Position, discardStale: !Renderer.HasComponent);
+        CueWindow.Add(epoch, [.. cues], _timeline.Position, discardStale: !Renderer.HasComponent);
         if (cues.Count > 0)
         {
             RenderNode.Wake();
