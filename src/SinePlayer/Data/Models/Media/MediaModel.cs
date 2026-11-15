@@ -451,16 +451,23 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     {
         return MediaHandle.Enqueue<List<string>>(() =>
         {
+            SelectCommand librarySubquery = SelectCommand.Create(MediaTable.Instance)
+                .AppendCondition(MediaHandle.CreateLibraryCondition());
+            librarySubquery.PutQueryInt64(MediaTable.ColumnId);
+
             HashSet<string> tags = [];
-            var command = SelectCommand.Create(MediaTagCategoryTable.Instance);
+            SelectCommand command = SelectCommand.Create(MediaTagCategoryTable.Instance)
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagCategoryTable.ColumnMediaId), librarySubquery));
             IReaderToken<string> nameToken = command.PutQueryString(MediaTagCategoryTable.ColumnName);
             command.Distinct();
+
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
                 string name = nameToken.GetValue();
                 tags.Add(name);
             }
+
             return [.. tags];
         });
     }
@@ -572,7 +579,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         await MediaHandle.Enqueue(() =>
         {
             SelectCommand command = SelectCommand.Create(MediaTable.Instance)
-                .AppendCondition(MediaHandle.CreateMediaOnlyCondition());
+                .AppendCondition(MediaHandle.CreateMediaCondition());
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             IReaderToken<string> locationToken = command.PutQueryString(MediaTable.ColumnLocation);
             IReaderToken<bool> externalToken = command.PutQueryBoolean(MediaTable.ColumnExternal);
@@ -782,7 +789,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
                         List<long> ids = [];
                         SelectCommand command = SelectCommand.Create(MediaTable.Instance)
                             .AppendCondition(MediaTable.ColumnLocation, location)
-                            .AppendCondition(MediaHandle.CreateMediaOnlyCondition());
+                            .AppendCondition(MediaHandle.CreateMediaCondition());
                         IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
                         using SelectCommand.IReader reader = command.Execute();
                         while (reader.Read())
@@ -871,7 +878,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             foreach (IEnumerable<string> locationChunk in SqlUtils.ChunkBy(locations))
             {
                 SelectCommand selectCommand = SelectCommand.Create(MediaTable.Instance)
-                    .AppendCondition(MediaHandle.CreateMediaOnlyCondition())
+                    .AppendCondition(MediaHandle.CreateMediaCondition())
                     .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnLocation), locationChunk))
                     .AppendCondition(MediaTable.ColumnExternal, true);
                 IReaderToken<long> idToken = selectCommand.PutQueryInt64(MediaTable.ColumnId);

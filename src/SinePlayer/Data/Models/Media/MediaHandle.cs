@@ -32,7 +32,7 @@ internal abstract partial class MediaHandle(MediaType type)
     // Static Methods
     //
 
-    public static ICondition CreateMediaOnlyCondition()
+    public static ICondition CreateMediaCondition()
     {
         return new ComparisonCondition(
             ColumnOrValue.FromColumn(MediaTable.ColumnType),
@@ -40,19 +40,19 @@ internal abstract partial class MediaHandle(MediaType type)
             ComparisonCondition.TypeEnum.NotEqual);
     }
 
-    public static ICondition CreateNonExternalCondition()
+    public static ICondition CreateLibraryCondition()
     {
         return new ComparisonCondition(
             ColumnOrValue.FromColumn(MediaTable.ColumnExternal),
             ColumnOrValue.FromValue(false));
     }
 
-    public static ICondition CreateLibraryOnlyCondition()
+    public static ICondition CreateLibraryMediaCondition()
     {
         return new AndCondition(new[]
         {
-            CreateMediaOnlyCondition(),
-            CreateNonExternalCondition(),
+            CreateMediaCondition(),
+            CreateLibraryCondition(),
         });
     }
 
@@ -88,7 +88,7 @@ internal abstract partial class MediaHandle(MediaType type)
         foreach (IEnumerable<string> locationChunk in SqlUtils.ChunkBy(locations))
         {
             SelectCommand command = SelectCommand.Create(MediaTable.Instance)
-                .AppendCondition(CreateMediaOnlyCondition())
+                .AppendCondition(CreateMediaCondition())
                 .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnLocation), locationChunk));
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             using SelectCommand.IReader reader = command.Execute();
