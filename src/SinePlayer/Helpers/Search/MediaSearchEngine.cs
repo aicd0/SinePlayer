@@ -160,11 +160,14 @@ internal class MediaSearchEngine
         }
 
         var matches = new List<Match>();
+        HashSet<long> matchedIds = [];
+        HashSet<long> matchedCollectionIds = [];
         await MediaHandle.Enqueue(() =>
         {
             SelectCommand command = SelectCommand.Create(MediaTable.Instance)
                 .AppendCondition(MediaHandle.CreateLibraryCondition());
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
+            IReaderToken<long> typeToken = command.PutQueryInt64(MediaTable.ColumnType);
             IReaderToken<string> title1Token = command.PutQueryString(MediaTable.ColumnTitle1);
             IReaderToken<string> title2Token = command.PutQueryString(MediaTable.ColumnTitle2);
 
@@ -181,11 +184,6 @@ internal class MediaSearchEngine
             if (customCondition is not null)
             {
                 command.AppendCondition(customCondition);
-            }
-
-            if (excludeInCollectionMedia)
-            {
-                command.AppendCondition(CreateExcludeInCollectionsCondition());
             }
 
             using SelectCommand.IReader reader = command.Execute();
@@ -205,18 +203,23 @@ internal class MediaSearchEngine
                     }
                 }
 
+                long id = idToken.GetValue();
                 matches.Add(new Match
                 {
-                    Id = idToken.GetValue(),
+                    Id = id,
                     Similarity = similarity,
                     SortTitle = title1 + " " + title2
                 });
+                matchedIds.Add(id);
+                if (typeToken.GetValue() == (long)MediaType.Collection)
+                {
+                    matchedCollectionIds.Add(id);
+                }
             }
 
-            var all = new List<long>(matches.Count);
-            foreach (Match match in matches)
+            if (excludeInCollectionMedia && matchedCollectionIds.Count > 0)
             {
-                all.Add(match.Id);
+                ExcludeMediaInMatchedCollections(matches, matchedIds, matchedCollectionIds);
             }
 
             return true;
@@ -236,11 +239,29 @@ internal class MediaSearchEngine
         return ids;
     }
 
-    private static ICondition CreateExcludeInCollectionsCondition()
+    private static void ExcludeMediaInMatchedCollections(List<Match> matches, HashSet<long> matchedIds, HashSet<long> matchedCollectionIds)
     {
-        var subquery = SelectCommand.Create(MediaCollectionTable.Instance);
-        _ = subquery.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
-        return new NotCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), subquery));
+        HashSet<long> containedMediaIds = [];
+        foreach (IEnumerable<long> collectionIdChunk in SqlUtils.ChunkBy(matchedCollectionIds))
+        {
+            SelectCommand command = SelectCommand.Create(MediaCollectionTable.Instance)
+                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnCollectionId), collectionIdChunk));
+            IReaderToken<long> mediaIdToken = command.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
+            using SelectCommand.IReader reader = command.Execute();
+            while (reader.Read())
+            {
+                long mediaId = mediaIdToken.GetValue();
+                if (matchedIds.Contains(mediaId))
+                {
+                    containedMediaIds.Add(mediaId);
+                }
+            }
+        }
+
+        if (containedMediaIds.Count > 0)
+        {
+            matches.RemoveAll(x => containedMediaIds.Contains(x.Id));
+        }
     }
 
     private class Match
