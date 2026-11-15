@@ -455,12 +455,12 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
                 .AppendCondition(MediaHandle.CreateLibraryCondition());
             librarySubquery.PutQueryInt64(MediaTable.ColumnId);
 
-            HashSet<string> tags = [];
             SelectCommand command = SelectCommand.Create(MediaTagCategoryTable.Instance)
                 .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaTagCategoryTable.ColumnMediaId), librarySubquery));
             IReaderToken<string> nameToken = command.PutQueryString(MediaTagCategoryTable.ColumnName);
             command.Distinct();
 
+            HashSet<string> tags = [];
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
