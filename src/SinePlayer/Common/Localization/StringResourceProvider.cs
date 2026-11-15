@@ -22,6 +22,16 @@ public class StringResourceProvider
     public string AddSubtitleTracks => GetResourceString("AddSubtitleTracks");
     public string AddToCollection => GetResourceString("AddToCollection");
     public string AddToFavorites => GetResourceString("AddToFavorites");
+    public string Alignment => GetResourceString("Alignment");
+    public string AlignmentBottomCenter => GetResourceString("AlignmentBottomCenter");
+    public string AlignmentBottomLeft => GetResourceString("AlignmentBottomLeft");
+    public string AlignmentBottomRight => GetResourceString("AlignmentBottomRight");
+    public string AlignmentMiddleCenter => GetResourceString("AlignmentMiddleCenter");
+    public string AlignmentMiddleLeft => GetResourceString("AlignmentMiddleLeft");
+    public string AlignmentMiddleRight => GetResourceString("AlignmentMiddleRight");
+    public string AlignmentTopCenter => GetResourceString("AlignmentTopCenter");
+    public string AlignmentTopLeft => GetResourceString("AlignmentTopLeft");
+    public string AlignmentTopRight => GetResourceString("AlignmentTopRight");
     public string AllHidden => GetResourceString("AllHidden");
     public string AllItems => GetResourceString("AllItems");
     public string AllMatchedResults => GetResourceString("AllMatchedResults");

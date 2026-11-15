@@ -85,6 +85,7 @@ public class PublicSurfaceTests
         "SinePlayer.Core.Playback.Abstractions.Render.SubtitleFrame",
         "SinePlayer.Core.Playback.Abstractions.Render.SubtitleInsets",
         "SinePlayer.Core.Playback.Abstractions.Render.SubtitlePresentation",
+        "SinePlayer.Core.Playback.Abstractions.Render.SubtitleTextAlignment",
         "SinePlayer.Core.Playback.Abstractions.Render.VideoOrientation",
         "SinePlayer.Core.Playback.Abstractions.Render.VideoResizeMode",
         "SinePlayer.Core.Playback.Abstractions.Render.VideoScalingMode",

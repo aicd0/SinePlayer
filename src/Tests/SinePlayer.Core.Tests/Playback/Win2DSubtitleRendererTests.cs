@@ -552,6 +552,93 @@ public class Win2DSubtitleRendererTests
         return right;
     }
 
+    /// <summary>
+    /// An anchor the host names places the words there whatever the cue says, at any of the nine positions; a host that
+    /// names none leaves the decision to the cue, which is bottom centre for a cue that states no alignment at all.
+    /// </summary>
+    [Test]
+    public void PlacesTheWordsAtTheAnchorTheHostNames()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 240;
+        const string word = "0,Default,,0,0,0,,Visible words";
+
+        SubtitlePresentation free = new() { FontSize = 24.0 };
+
+        (int _, int freeTop, int _, int freeBottom) = InkBounds(RenderInk(device, width, height, free, word), width, height);
+        (int topLeftLeft, int topLeftTop, int _, int _) = InkBounds(
+            RenderInk(device, width, height, free with { TextAlignment = SubtitleTextAlignment.TopLeft }, word), width, height);
+        (int _, int topRightTop, int topRightRight, int _) = InkBounds(
+            RenderInk(device, width, height, free with { TextAlignment = SubtitleTextAlignment.TopRight }, word), width, height);
+        (int centreLeft, int centreTop, int centreRight, int centreBottom) = InkBounds(
+            RenderInk(device, width, height, free with { TextAlignment = SubtitleTextAlignment.MiddleCenter }, word), width, height);
+        (int _, int bottomTop, int _, int bottomBottom) = InkBounds(
+            RenderInk(device, width, height, free with { TextAlignment = SubtitleTextAlignment.BottomCenter }, word), width, height);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(freeTop, Is.GreaterThan(centreBottom), "a cue that states no alignment sits below the middle");
+            Assert.That(height - freeBottom, Is.EqualTo(height - bottomBottom).Within(4), "and where bottom centre puts it");
+            Assert.That(topLeftTop, Is.LessThan(centreTop), "top is above the middle");
+            Assert.That(topLeftLeft, Is.LessThan(centreLeft), "left is left of the centre");
+            Assert.That(topRightTop, Is.LessThan(centreTop), "top right is at the top");
+            Assert.That(topRightRight, Is.GreaterThan(centreRight), "and at the right");
+            Assert.That(bottomTop, Is.GreaterThan(centreBottom), "bottom is below the middle");
+        }
+    }
+
+    /// <summary>
+    /// The alignment belongs to each line, not to the cue as a whole: a two-line cue set to the right has both lines ending
+    /// at the same edge, and one set to the left has both starting at the same edge. Laying the block out as one means
+    /// every line shares the block's left edge, which is right for only one of the three columns.
+    /// </summary>
+    [Test]
+    public void AlignsEachLineRatherThanTheWholeCue()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 240;
+        const string twoLines = "0,Default,,0,0,0,,A rather long first line\\NShort";
+
+        SubtitlePresentation free = new() { FontSize = 24.0 };
+        List<(int Top, int Bottom, int Left, int Right)> rightBands = InkBands(
+            RenderInk(device, width, height, free with { TextAlignment = SubtitleTextAlignment.BottomRight }, twoLines), width, height);
+        List<(int Top, int Bottom, int Left, int Right)> leftBands = InkBands(
+            RenderInk(device, width, height, free with { TextAlignment = SubtitleTextAlignment.BottomLeft }, twoLines), width, height);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(rightBands, Has.Count.EqualTo(2), "the cue has two lines");
+            Assert.That(leftBands, Has.Count.EqualTo(2), "with and without the alignment reversed");
+            Assert.That(rightBands[1].Right, Is.EqualTo(rightBands[0].Right).Within(3), "right puts the end of every line on one edge");
+            Assert.That(rightBands[1].Right - rightBands[1].Left, Is.LessThan(rightBands[0].Right - rightBands[0].Left),
+                "and the short line is the one that moved");
+            Assert.That(leftBands[1].Left, Is.EqualTo(leftBands[0].Left).Within(3), "left puts the start of every line on one edge");
+            Assert.That(rightBands[0].Right, Is.GreaterThan(leftBands[0].Right), "and the two columns are different places");
+        }
+    }
+
     /// <summary>Whether any pixel of the drawing carries exactly the colour given.</summary>
     private static bool HasColour(CanvasDevice device, int width, int height, SubtitlePresentation presentation, Color colour)
     {

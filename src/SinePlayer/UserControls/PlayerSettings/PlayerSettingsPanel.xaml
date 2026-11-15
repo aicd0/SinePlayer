@@ -684,6 +684,25 @@
                                         Grid.Column="0"
                                         Margin="0,0,0,2"
                                         VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleTextAlignmentLabel, Mode=OneWay}" />
+                                    <ComboBox
+                                        x:Name="SubtitleTextAlignmentComboBox"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        SelectionChanged="SubtitleTextAlignmentComboBox_SelectionChanged" />
+                                </Grid>
+                                <Grid Style="{StaticResource TallSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
                                         Text="{x:Bind ViewModel.SubtitleOutlineWidthLabel, Mode=OneWay}" />
                                     <NumberBox
                                         x:Name="SubtitleOutlineWidthNumberBox"

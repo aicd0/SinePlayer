@@ -275,10 +275,24 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             }
 
             string body = string.Join("\n", text.Lines);
-            using CanvasTextLayout layout = new(device, body, format, width, height);
 
-            int row = RowOf(text.Alignment);
-            Vector2 origin = Anchor(layout, row, text.Alignment, width, height, margin);
+            int alignment = presentation.TextAlignment is { } chosen ? (int)chosen : text.Alignment;
+            int row = RowOf(alignment);
+            int column = ColumnOf(alignment);
+
+            // The alignment is the line's, not the block's: the layout is given the width of its widest line, so a line
+            // shorter than that is set against the side the column names instead of all of them sharing one edge.
+            format.HorizontalAlignment = column switch
+            {
+                0 => CanvasHorizontalAlignment.Left,
+                2 => CanvasHorizontalAlignment.Right,
+                _ => CanvasHorizontalAlignment.Center,
+            };
+
+            float blockWidth = MeasureBlockWidth(device, body, format, width, height);
+            using CanvasTextLayout layout = new(device, body, format, blockWidth, height);
+
+            Vector2 origin = Anchor(layout, row, column, width, height, margin);
 
             // The bottom and middle bands grow upwards, the top band downwards: the first cue keeps the place its alignment
             // asked for, and the ones after it make room above or below rather than covering it.
@@ -292,7 +306,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             taken[row] += (row == 2 ? moved : -moved) + (float)layout.LayoutBounds.Height + gap;
             origin = kept;
 
-            CanvasGeometry? outline = presentation.OutlineWidth > 0.0 ? outlines.Get(device, body, format, width, height) : null;
+            CanvasGeometry? outline = presentation.OutlineWidth > 0.0 ? outlines.Get(device, body, format, blockWidth, height) : null;
 
             // The stroke runs down the middle of the glyph's edge, so half of it would be covered by the words. Twice the
             // width is drawn and the words fill over the inner half, which leaves the border growing outwards by exactly
@@ -382,7 +396,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         private readonly Dictionary<OutlineKey, CanvasGeometry> _outlines = [];
         private CanvasDevice? _device;
 
-        internal CanvasGeometry? Get(CanvasDevice device, string body, CanvasTextFormat format, int width, int height)
+        internal CanvasGeometry? Get(CanvasDevice device, string body, CanvasTextFormat format, float width, int height)
         {
             if (_device != device)
             {
@@ -390,7 +404,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
                 _device = device;
             }
 
-            OutlineKey key = new(body, format.FontFamily, format.FontSize, (int)format.FontStyle, format.FontWeight.Weight, width, height);
+            OutlineKey key = new(body, format.FontFamily, format.FontSize, (int)format.FontStyle, format.FontWeight.Weight, (int)format.HorizontalAlignment, width, height);
             if (_outlines.TryGetValue(key, out CanvasGeometry? cached))
             {
                 return cached;
@@ -430,8 +444,11 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             _outlines.Clear();
         }
 
-        /// <summary>What shapes one cue's outline: the words, and the style they are drawn in at the size of the surface.</summary>
-        private readonly record struct OutlineKey(string Text, string Family, float Size, int Style, ushort Weight, int Width, int Height);
+        /// <summary>
+        /// What shapes one cue's outline: the words, the style they are drawn in at the size of the surface, and the side they
+        /// are aligned to — which moves the glyphs inside the box and so moves the outline with them.
+        /// </summary>
+        private readonly record struct OutlineKey(string Text, string Family, float Size, int Style, ushort Weight, int Alignment, float Width, int Height);
     }
 
     #endregion
@@ -453,12 +470,25 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         return (Math.Clamp(alignment, 1, 9) - 1) / 3;
     }
 
+    private static int ColumnOf(int alignment)
+    {
+        return (Math.Clamp(alignment, 1, 9) - 1) % 3;
+    }
+
+    /// <summary>
+    /// The width of the widest line of the block, which is the width the block is laid out in so that its other lines can be
+    /// aligned within it. Measuring costs a layout of its own, and only the width is read from it.
+    /// </summary>
+    private static float MeasureBlockWidth(CanvasDevice device, string body, CanvasTextFormat format, int width, int height)
+    {
+        using CanvasTextLayout measured = new(device, body, format, width, height);
+        return Math.Max(1.0f, (float)measured.LayoutBounds.Width);
+    }
+
     private readonly record struct SubtitleArea(float Left, float Top, float Width, float Height);
 
-    private static Vector2 Anchor(CanvasTextLayout layout, int row, int alignment, int width, int height, float margin)
+    private static Vector2 Anchor(CanvasTextLayout layout, int row, int column, int width, int height, float margin)
     {
-        int column = (Math.Clamp(alignment, 1, 9) - 1) % 3;
-
         float x = column switch
         {
             0 => margin,

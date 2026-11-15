@@ -153,6 +153,36 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>高度な</value>
   </data>
+  <data name="Alignment" xml:space="preserve">
+    <value>配置</value>
+  </data>
+  <data name="AlignmentBottomCenter" xml:space="preserve">
+    <value>下中央</value>
+  </data>
+  <data name="AlignmentBottomLeft" xml:space="preserve">
+    <value>左下</value>
+  </data>
+  <data name="AlignmentBottomRight" xml:space="preserve">
+    <value>右下</value>
+  </data>
+  <data name="AlignmentMiddleCenter" xml:space="preserve">
+    <value>中央</value>
+  </data>
+  <data name="AlignmentMiddleLeft" xml:space="preserve">
+    <value>左中央</value>
+  </data>
+  <data name="AlignmentMiddleRight" xml:space="preserve">
+    <value>右中央</value>
+  </data>
+  <data name="AlignmentTopCenter" xml:space="preserve">
+    <value>上中央</value>
+  </data>
+  <data name="AlignmentTopLeft" xml:space="preserve">
+    <value>左上</value>
+  </data>
+  <data name="AlignmentTopRight" xml:space="preserve">
+    <value>右上</value>
+  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>すべての非表示アイテム</value>
   </data>
