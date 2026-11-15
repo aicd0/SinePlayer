@@ -831,7 +831,6 @@
                                 </Grid>
                                 <settings:SliderSettingView
                                     x:Name="SubtitleOpacitySlider"
-                                    DefaultValue="100"
                                     Label="{x:Bind ViewModel.SubtitleOpacityLabel, Mode=OneWay}"
                                     Maximum="100"
                                     Minimum="0"

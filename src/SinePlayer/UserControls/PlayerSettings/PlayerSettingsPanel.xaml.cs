@@ -787,10 +787,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
-                UpdateMixSliders(settings.Audio);
-                RemixLevelSet set = _mixSet ?? RemixLevelSet.Remix;
-                ChannelLayout layout = _mixLayout ?? SelectedAudioLayout();
-                bool modified = !MixLevelsEqual(FindLevels(settings.Audio, set, layout), FindLevels(presetSettings.Audio, set, layout));
+                UpdateMixSliders(settings.Audio, presetSettings.Audio);
+                bool modified = _mixSliders.Exists(entry => entry.Slider.Value != entry.Slider.DefaultValue);
                 tabModified = tabModified || modified;
             }
 
@@ -909,8 +907,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             {
                 bool modified = settings.Subtitle.Opacity != presetSettings.Subtitle.Opacity;
                 tabModified = tabModified || modified;
-                UpdateSubtitleOpacity(settings);
-                ViewModel.SubtitleOpacityLabel = GetLabel(StringResource.Opacity, modified);
+                UpdateSubtitleOpacity(settings, presetSettings);
+                ViewModel.SubtitleOpacityLabel = StringResource.Opacity;
             }
 
             {
@@ -1281,8 +1279,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         int value = (int)Math.Round(e.NewValue);
         ChannelLayout layout = _mixLayout ?? SelectedAudioLayout();
         RemixLevelSet set = _mixSet ?? RemixLevelSet.Remix;
-        Dictionary<string, int>? current = FindLevels(_mediaSettings.Audio, set, layout);
-        if (current is not null && current.TryGetValue(key, out int existing) && existing == value)
+
+        // The slider already shows what the media is set to, so a value that does not move it is not worth writing:
+        // an entry that only repeats what is inherited would make the media look edited for nothing.
+        MixSliderEntry? moved = _mixSliders.Find(candidate => ReferenceEquals(candidate.Slider, element));
+        if (moved is not null && moved.Level == value)
         {
             return;
         }
@@ -1290,7 +1291,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         ApplyAudio(settings => EditableLevels(settings, set, layout)[key] = value);
     }
 
-    private void UpdateMixSliders(AudioSettingsModel settings)
+    private void UpdateMixSliders(AudioSettingsModel settings, AudioSettingsModel preset)
     {
         ChannelLayout layout = SelectedAudioLayout();
         RemixLevelSet set = _session?.ActiveMixLevelSet ?? RemixLevelSet.Remix;
@@ -1302,12 +1303,18 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         Dictionary<string, int>? levels = FindLevels(settings, set, layout);
+        Dictionary<string, int>? presetLevels = FindLevels(preset, set, layout);
         foreach (MixSliderEntry entry in _mixSliders)
         {
-            double value = levels is not null && levels.TryGetValue(entry.Key, out int level) ? level : entry.DefaultLevel;
-            if (Math.Abs(entry.Slider.Value - value) > 0.5)
+            int level = LevelOf(levels, presetLevels, entry.Group);
+
+            // What the preset gives is what the slider compares against, so its own label says whether this media
+            // differs from the preset — the same question the tab's mark asks.
+            entry.Slider.DefaultValue = LevelOf(presetLevels, null, entry.Group);
+            entry.Level = level;
+            if (Math.Abs(entry.Slider.Value - level) > 0.5)
             {
-                entry.Slider.Value = value;
+                entry.Slider.Value = level;
             }
         }
     }
@@ -1325,12 +1332,11 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 Minimum = 0,
                 Maximum = RemixMixer.MaximumLevel,
                 StepFrequency = 1,
-                DefaultValue = group.DefaultLevel,
                 Tag = group.Key,
             };
             slider.ValueChanged += MixSlider_ValueChanged;
             MixSliderHost.Children.Add(slider);
-            _mixSliders.Add(new MixSliderEntry(group.Key, group.DefaultLevel, slider));
+            _mixSliders.Add(new MixSliderEntry(group, slider));
         }
     }
 
@@ -1979,8 +1985,10 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void UpdateSubtitleOpacity(PlayerSettingsModel settings)
+    private void UpdateSubtitleOpacity(PlayerSettingsModel settings, PlayerSettingsModel preset)
     {
+        SubtitleOpacitySlider.DefaultValue = preset.Subtitle.Opacity;
+
         double value = settings.Subtitle.Opacity;
         if (Math.Abs(SubtitleOpacitySlider.Value - value) > 0.5)
         {
@@ -2204,13 +2212,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         public bool IsModified { get; set; }
     }
 
-    private sealed class MixSliderEntry(string key, int defaultLevel, SliderSettingView slider)
-    {
-        public string Key { get; } = key;
-        public int DefaultLevel { get; } = defaultLevel;
-        public SliderSettingView Slider { get; } = slider;
-    }
-
     private sealed class SettingsTab
     {
         public required string Key { get; init; }
@@ -2251,28 +2252,21 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         return ChannelLayout.Stereo;
     }
 
-    private static bool MixLevelsEqual(Dictionary<string, int>? first, Dictionary<string, int>? second)
+    private static int LevelOf(Dictionary<string, int>? levels, Dictionary<string, int>? inherited, RemixChannelGroup group)
     {
-        int firstCount = first?.Count ?? 0;
-        if (firstCount != (second?.Count ?? 0))
+        if (levels is not null && levels.TryGetValue(group.Key, out int level))
         {
-            return false;
+            return level;
         }
 
-        if (first is null || second is null)
-        {
-            return true;
-        }
+        return inherited is not null && inherited.TryGetValue(group.Key, out int inheritedLevel) ? inheritedLevel : group.DefaultLevel;
+    }
 
-        foreach (KeyValuePair<string, int> entry in first)
-        {
-            if (!second.TryGetValue(entry.Key, out int value) || value != entry.Value)
-            {
-                return false;
-            }
-        }
-
-        return true;
+    private sealed class MixSliderEntry(RemixChannelGroup group, SliderSettingView slider)
+    {
+        public RemixChannelGroup Group { get; } = group;
+        public SliderSettingView Slider { get; } = slider;
+        public int Level { get; set; } = group.DefaultLevel;
     }
 
     #endregion

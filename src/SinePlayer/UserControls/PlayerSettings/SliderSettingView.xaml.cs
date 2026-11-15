@@ -85,6 +85,7 @@ internal sealed partial class SliderSettingView : BaseUserControl
     private static void OnDefaultValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var control = (SliderSettingView)d;
+        control.UpdateLabelText();
         control.UpdateRestoreButtonVisibility();
     }
 
@@ -191,6 +192,6 @@ internal sealed partial class SliderSettingView : BaseUserControl
 
     private void UpdateLabelText()
     {
-        LabelTextBlock.Text = $"{Label} ({Value:0})";
+        LabelTextBlock.Text = Value != DefaultValue ? $"{Label} ({Value:0}) *" : $"{Label} ({Value:0})";
     }
 }
