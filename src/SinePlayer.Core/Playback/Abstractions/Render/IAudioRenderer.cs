@@ -14,9 +14,13 @@ public interface IAudioRenderer : IDisposable
 
     bool IsDeviceAvailable { get; }
 
-    long UnderrunCount { get; }
-
     IPlaybackClock Clock { get; }
+
+    double Volume { get; set; }
+
+    bool IsMuted { get; set; }
+
+    long UnderrunCount { get; }
 
     long QueuedSampleCount { get; }
 

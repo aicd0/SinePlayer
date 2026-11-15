@@ -105,7 +105,6 @@ public class PublicSurfaceTests
         "SinePlayer.Core.Playback.Backends.FFmpeg.FFmpegSourceProviderFactory",
         "SinePlayer.Core.Playback.Backends.FFmpeg.FFmpegSubtitleDecoderFactory",
         "SinePlayer.Core.Playback.Backends.FFmpeg.FFmpegVideoDecoderFactory",
-        "SinePlayer.Core.Playback.Backends.Gain.GainAudioFilter",
         "SinePlayer.Core.Playback.Backends.Libass.AssSubtitleRendererFactory",
         "SinePlayer.Core.Playback.Backends.Null.NullAudioDecoderFactory",
         "SinePlayer.Core.Playback.Backends.Null.NullAudioRendererFactory",

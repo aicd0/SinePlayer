@@ -1,10 +1,10 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
-using SinePlayer.Core.Playback.Backends.Gain;
+using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Core.Playback.Selection;
 
@@ -157,7 +157,7 @@ public partial class PlaybackPipelineTests
             second.Components.Register(new FixedAudioRendererFactory(secondDevice));
 
             // What the two chains play is processed separately: a filter added to one is not something the other runs.
-            first.Filters.Add(new GainAudioFilter());
+            first.Filters.Add(new RemixAudioFilter());
 
             Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(firstPosition))).IsSuccessful, Is.True);

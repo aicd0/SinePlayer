@@ -2260,6 +2260,24 @@ public partial class PlaybackPipelineTests
             return OperationResult.Success();
         }
 
+        /// <summary>The level the pipeline has told this device to play at, and whether it was silenced.</summary>
+        public double Volume
+        {
+            get => _volume;
+            set
+            {
+                _volume = value;
+                VolumeChanges++;
+            }
+        }
+
+        private double _volume = 1.0;
+
+        public bool IsMuted { get; set; }
+
+        /// <summary>How many times a level has been given, whether or not it changed.</summary>
+        public int VolumeChanges { get; private set; }
+
         /// <summary>
         /// A submit leaves the clock alone: whether the device runs is the pipeline's decision, and a stand-in
         /// that started it would release a hold the picture depends on â€” which is what the real renderer used

@@ -30,6 +30,8 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     private volatile bool _starved;
     private long _endedEpoch = -1;
     private long _offsetTicks;
+    private long _volumeBits = BitConverter.DoubleToInt64Bits(1.0);
+    private volatile bool _muted;
     private readonly SpeedAudioFilter _speedFilter = new();
 
     public AudioChain(IChainHost host, PipelineTimeline timeline, PipelineEvents events)
@@ -62,6 +64,43 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     {
         get => _speedFilter.Algorithm;
         set => _speedFilter.SetAlgorithm(value);
+    }
+
+    public double Volume
+    {
+        get => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _volumeBits));
+        set
+        {
+            double level = double.IsFinite(value) ? Math.Clamp(value, 0.0, 1.0) : 1.0;
+            long bits = BitConverter.DoubleToInt64Bits(level);
+            if (Interlocked.Exchange(ref _volumeBits, bits) == bits)
+            {
+                return;
+            }
+
+            if (Renderer.CurrentComponent is { } renderer)
+            {
+                renderer.Volume = level;
+            }
+        }
+    }
+
+    public bool IsMuted
+    {
+        get => _muted;
+        set
+        {
+            if (_muted == value)
+            {
+                return;
+            }
+
+            _muted = value;
+            if (Renderer.CurrentComponent is { } renderer)
+            {
+                renderer.IsMuted = value;
+            }
+        }
     }
 
     public long Underruns => Renderer.CurrentComponent?.UnderrunCount ?? 0;
@@ -572,6 +611,13 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 deviceFormat = null;
                 filters = null;
                 playhead.Reset();
+
+                if (Renderer.CurrentComponent is { } renderer)
+                {
+                    renderer.Volume = Volume;
+                    renderer.IsMuted = IsMuted;
+                }
+
                 continue;
             }
 

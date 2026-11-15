@@ -6,7 +6,6 @@ using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Filter;
 using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
-using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Core.Tests.Playback;
@@ -1107,32 +1106,39 @@ public partial class PlaybackPipelineTests
     }
 
     /// <summary>
-    /// The level belongs to a filter the host added, so a filter added before anything is open is prepared for the
-    /// stream the open brings, and the very first block the device is handed has already been through it.
+    /// The level is the chain's, and the chain hands it to whatever device is playing: a change reaches the device
+    /// itself, so it applies to the audio the device already holds rather than waiting for the filter chain.
     /// </summary>
     [Test]
-    public void AppliesTheLevelOfAFilterAddedBeforeAnythingIsOpen()
+    public void GivesTheDeviceTheLevelTheChainIsSetTo()
     {
-        string path = CreateWaveFile();
+        string path = CreateWaveFile(sampleCount: SampleRate * 5);
         try
         {
-            CreatingAudioRendererFactory factory = new();
-            using PlaybackPipeline pipeline = CreatePipeline(factory);
-
-            GainAudioFilter gain = new();
-            gain.SetLevel(0.25, false);
-            pipeline.AudioChains[0].Filters.Add(gain);
+            // A device that always holds a second of audio, so the file cannot run out while the level is being changed.
+            FakeAudioRenderer audioRenderer = new() { QueuedSampleCount = SampleRate };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
 
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
-            WaitFor(() => factory.Created.Count == 1 && factory.Created[0].LastSamples is not null, "the device to be handed a block");
+            WaitFor(() => audioRenderer.VolumeChanges > 0, "the device to be given a level");
 
-            short[] samples = factory.Created[0].LastSamples!;
+            pipeline.AudioChains[0].Volume = 0.25;
+            pipeline.AudioChains[0].IsMuted = true;
+
+            // The device is told where the level is set, not on the audio thread's next pass: taking a level is not a
+            // device call, so nothing has to be scheduled for it.
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(audioRenderer.Volume, Is.EqualTo(0.25));
+                Assert.That(audioRenderer.IsMuted, Is.True);
+            }
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(samples.Any(sample => sample != 0), Is.True, "the block is the file's own sound, not silence");
-                Assert.That(samples.Max(Math.Abs), Is.LessThanOrEqualTo(1992), "the loudest sample of the file is 7967, and a quarter of it is 1992");
+                Assert.That(pipeline.AudioChains[0].Volume, Is.EqualTo(0.25));
+                Assert.That(audioRenderer.Volume, Is.EqualTo(0.25), "muting keeps the level, so unmuting needs nothing from the device");
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "a level is not a pause");
             }
         }
         finally
@@ -1142,12 +1148,43 @@ public partial class PlaybackPipelineTests
     }
 
     /// <summary>
-    /// The level survives a device swap, which is the point of moving it out of the renderer: the filter chain is
-    /// not rebuilt when only the device changes, so what the host set keeps applying to what the new device is
-    /// handed.
+    /// A level set before there is a device to carry it is not lost: the chain keeps it and the first device that opens
+    /// starts at it, rather than at whatever the device was left at.
     /// </summary>
     [Test]
-    public void KeepsTheLevelWhenTheAudioRendererIsSwapped()
+    public void GivesADeviceThatOpensLaterTheLevelSetBefore()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 5);
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { QueuedSampleCount = SampleRate };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            pipeline.AudioChains[0].Volume = 0.4;
+            pipeline.AudioChains[0].IsMuted = true;
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => audioRenderer.VolumeChanges > 0, "the device to be given the level it opened with");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(audioRenderer.Volume, Is.EqualTo(0.4));
+                Assert.That(audioRenderer.IsMuted, Is.True);
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// The level lives in the chain, so a device swapped in while playing is told it as soon as it is open: the filter
+    /// chain is not rebuilt for a device change, so nothing else would tell it.
+    /// </summary>
+    [Test]
+    public void GivesANewDeviceTheLevelTheChainAlreadyHas()
     {
         string path = CreateWaveFile(sampleCount: SampleRate * 5);
         try
@@ -1156,24 +1193,54 @@ public partial class PlaybackPipelineTests
             FakeAudioRenderer second = new() { Name = "second", QueuedSampleCount = SampleRate };
             using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), first);
 
-            GainAudioFilter gain = new();
-            gain.SetLevel(0.5, false);
-            pipeline.AudioChains[0].Filters.Add(gain);
-
             Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
-            WaitFor(() => first.LastSamples is not null, "the first device to be handed a block");
+            WaitFor(() => first.VolumeChanges > 0, "the first device to be given a level");
+
+            pipeline.AudioChains[0].Volume = 0.5;
 
             SwapAudioRenderer(pipeline, new FixedAudioRendererFactory(second));
             Assert.That(Await(pipeline.Reconcile()).IsSuccessful, Is.True);
-            WaitFor(() => second.LastSamples is not null, "the new device to be handed a block");
+            WaitFor(() => second.VolumeChanges > 0, "the new device to be given the level");
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(first.LastSamples!.Max(Math.Abs), Is.LessThanOrEqualTo(3984), "the level was applied before the swap");
-                Assert.That(second.LastSamples!.Max(Math.Abs), Is.LessThanOrEqualTo(3984), "and it still is after it");
-                Assert.That(second.LastSamples!.Any(sample => sample != 0), Is.True, "a level is not a silence");
+                Assert.That(second.Volume, Is.EqualTo(0.5), "the new device starts at the level the chain holds");
+                Assert.That(second.IsMuted, Is.False);
+                Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "changing the device is not a pause");
             }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// A level outside what a device can play is the chain's answer to give, not the device's: silence is 0 and full
+    /// scale is 1, and a value that is not a number is taken as full scale rather than as a level nobody asked for.
+    /// </summary>
+    [Test]
+    public void KeepsTheLevelWithinWhatADeviceCanPlay()
+    {
+        string path = CreateWaveFile(sampleCount: SampleRate * 5);
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { QueuedSampleCount = SampleRate };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => audioRenderer.VolumeChanges > 0, "the device to be given a level");
+
+            pipeline.AudioChains[0].Volume = 5.0;
+            Assert.That(pipeline.AudioChains[0].Volume, Is.EqualTo(1.0), "a level above full scale is full scale");
+
+            pipeline.AudioChains[0].Volume = -2.0;
+            Assert.That(pipeline.AudioChains[0].Volume, Is.EqualTo(0.0), "a level below silence is silence");
+
+            pipeline.AudioChains[0].Volume = double.NaN;
+            Assert.That(pipeline.AudioChains[0].Volume, Is.EqualTo(1.0), "a level that is not a number is no instruction at all");
         }
         finally
         {

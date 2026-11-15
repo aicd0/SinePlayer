@@ -14,8 +14,6 @@ internal sealed partial class NullAudioRenderer : IAudioRenderer
 {
     private readonly IPlaybackClock _clock = new StopwatchClock();
 
-    private long _submittedSampleCount;
-
     public string Name => "Null";
 
     public bool IsDeviceAvailable => true;
@@ -26,7 +24,9 @@ internal sealed partial class NullAudioRenderer : IAudioRenderer
 
     public long QueuedSampleCount => 0;
 
-    public long SubmittedSampleCount => Interlocked.Read(ref _submittedSampleCount);
+    public double Volume { get; set; } = 1.0;
+
+    public bool IsMuted { get; set; }
 
     public OperationResult<AudioStreamInfo> Negotiate(AudioStreamInfo stream)
     {
@@ -43,9 +43,6 @@ internal sealed partial class NullAudioRenderer : IAudioRenderer
 
     public IAudioSubmit Submit(RawAudioBuffer buffer)
     {
-        ArgumentNullException.ThrowIfNull(buffer);
-
-        Interlocked.Add(ref _submittedSampleCount, buffer.SampleCount);
         return AcceptedSubmit.Instance;
     }
 

@@ -10,6 +10,7 @@ using SinePlayer.Core.Playback.Abstractions.Decode;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Timing;
+using SinePlayer.Core.Playback.Audio;
 using SinePlayer.Core.Playback.Utils;
 
 using Windows.Win32;
@@ -35,6 +36,7 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
     private readonly string? _endpointName;
     private readonly bool _endpointIsDefault;
 
+    private readonly WasapiVolumeControl _volumeControl = new();
     private IAudioClient? _client;
     private IAudioRenderClient? _renderClient;
     private WasapiAudioClock? _clock;
@@ -44,6 +46,7 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
     private bool _disposed;
     private int _submittedBlocks;
     private long _underrunCount;
+    private bool _reportedVolumeFailure;
 
     public WasapiAudioRenderer(string? endpointId = null, string? endpointName = null, bool endpointIsDefault = false)
     {
@@ -78,11 +81,71 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         }
     }
 
+    public IPlaybackClock Clock => _clock ?? throw new InvalidOperationException("The audio renderer has not been configured.");
+
+    public double Volume
+    {
+        get => _volumeControl.Volume;
+        set => _volumeControl.Volume = value;
+    }
+
+    public bool IsMuted
+    {
+        get => _volumeControl.IsMuted;
+        set => _volumeControl.IsMuted = value;
+    }
+
     public long UnderrunCount => Interlocked.Read(ref _underrunCount);
+
+    public long QueuedSampleCount
+    {
+        get
+        {
+            IAudioClient? client = _client;
+            if (client is null)
+            {
+                return 0;
+            }
+
+            try
+            {
+                client.GetCurrentPadding(out uint padding);
+                return padding;
+            }
+            catch (Exception exception)
+            {
+                // The failure is preserved, not described: what the padding read threw is the diagnosis, and the
+                // next hand-off or flush reports it as a pipeline error rather than a crash.
+                _clock?.ReportDeviceLost(exception);
+                return 0;
+            }
+        }
+    }
 
     internal int BufferFrameCount => _bufferFrameCount;
 
-    public IPlaybackClock Clock => _clock ?? throw new InvalidOperationException("The audio renderer has not been configured.");
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        try
+        {
+            _client?.Stop();
+        }
+        catch (Exception exception)
+        {
+            // The device may already be gone; there is nothing left to stop in that case, and a dispose that
+            // threw would fault the teardown. The exception is written out whole all the same.
+            PlaybackLogger.W(TAG, $"Unable to stop the audio device: {exception}");
+        }
+
+        Release();
+    }
 
     public OperationResult<AudioStreamInfo> Negotiate(AudioStreamInfo stream)
     {
@@ -112,35 +175,8 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         return result.Success(stream.WithLayout(channels, layout));
     }
 
-    public long QueuedSampleCount
-    {
-        get
-        {
-            IAudioClient? client = _client;
-            if (client is null)
-            {
-                return 0;
-            }
-
-            try
-            {
-                client.GetCurrentPadding(out uint padding);
-                return padding;
-            }
-            catch (Exception exception)
-            {
-                // The failure is preserved, not described: what the padding read threw is the diagnosis, and the
-                // next hand-off or flush reports it as a pipeline error rather than a crash.
-                _clock?.ReportDeviceLost(exception);
-                return 0;
-            }
-        }
-    }
-
     public OperationResult Configure(AudioStreamInfo stream)
     {
-        ArgumentNullException.ThrowIfNull(stream);
-
         if (_disposed)
         {
             return OperationResult.Failure("The renderer has already been disposed.");
@@ -202,7 +238,18 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
 
             _client = client;
             _renderClient = renderService;
-            _clock = new WasapiAudioClock(client, clockService, frequency);
+            _clock = new WasapiAudioClock(client, clockService, frequency, ApplyVolume);
+
+            try
+            {
+                _volumeControl.Attach(GetService<IAudioStreamVolume>(client), format.ChannelCount);
+            }
+            catch (Exception exception)
+            {
+                _volumeControl.Attach(null, 0);
+                PlaybackLogger.W(TAG, $"Unable to reach the stream's volume, so the level is applied to the audio instead: {exception.Message}");
+            }
+
             _format = format;
             _bufferFrameCount = (int)bufferFrameCount;
 
@@ -211,24 +258,31 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
             _submittedBlocks = 0;
             Interlocked.Exchange(ref _underrunCount, 0);
 
-            // The endpoint and the enumerator hold no state we need: the client keeps its own reference.
-            return OperationResult.Success();
+            ApplyVolume();
         }
         catch (Exception exception)
         {
             Release();
             return OperationResult.Failure($"Unable to open the audio device: {exception.Message}");
         }
+
+        return OperationResult.Success();
     }
 
-    /// <inheritdoc/>
     public IAudioSubmit Submit(RawAudioBuffer buffer)
     {
-        ArgumentNullException.ThrowIfNull(buffer);
-
         if (_disposed)
         {
             return new FinishedAudioSubmit(OperationResult.Failure("The renderer has already been disposed."));
+        }
+
+        if (!_volumeControl.HasDevice && buffer.Buffer is IPlanarAudioBuffer planar)
+        {
+            OperationResult scaled = AudioVolumeScaler.TryApply(planar, buffer.SampleFormat, IsMuted ? 0.0 : Volume);
+            if (!scaled.IsSuccessful)
+            {
+                return new FinishedAudioSubmit(scaled);
+            }
         }
 
         IAudioRenderClient? renderClient = _renderClient;
@@ -337,27 +391,15 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         }
     }
 
-    public void Dispose()
+    private void Release()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-
-        try
-        {
-            _client?.Stop();
-        }
-        catch (Exception exception)
-        {
-            // The device may already be gone; there is nothing left to stop in that case, and a dispose that
-            // threw would fault the teardown. The exception is written out whole all the same.
-            PlaybackLogger.W(TAG, $"Unable to stop the audio device: {exception}");
-        }
-
-        Release();
+        _clock?.OnDeviceReleased();
+        _clock = null;
+        _volumeControl.Attach(null, 0);
+        _reportedVolumeFailure = false;
+        _renderClient = null;
+        _client = null;
+        _bufferFrameCount = 0;
     }
 
     /// <summary>
@@ -412,7 +454,7 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         return result.Success(channels);
     }
 
-    private static unsafe void InitializeStream(IAudioClient client, WasapiAudioFormat.Descriptor format)
+    private static void InitializeStream(IAudioClient client, WasapiAudioFormat.Descriptor format)
     {
         // The engine converts whatever it is handed, so the renderer never resamples.
         uint flags = PInvoke.AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | PInvoke.AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
@@ -478,15 +520,19 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
     }
 
     /// <summary>
-    /// A failure to use a device that has already refused once. The context says what was being attempted and
-    /// the exception is carried whole, because only its own message and stack can say what actually happened.
+    /// Gives the device the level playback is set to, if it is not already the one it has. Called from the thread that
+    /// owns the client, because the interface lives in the apartment that opened it.
     /// </summary>
-    private static OperationResult DeviceFailure(WasapiAudioClock clock, string context)
+    private void ApplyVolume()
     {
-        Exception? cause = clock.Cause;
-        return cause is null
-            ? OperationResult.Failure($"{context}: the audio device cannot be used.")
-            : OperationResult.Failure($"{context}: {cause.Message}", cause);
+        OperationResult applied = _volumeControl.Apply();
+        if (!applied.IsSuccessful && !_reportedVolumeFailure)
+        {
+            // A device that will not take a level is not a reason to stop playing: it is reported once, and the level
+            // is tried again the next time it changes.
+            _reportedVolumeFailure = true;
+            PlaybackLogger.W(TAG, applied.Message);
+        }
     }
 
     private uint GetFreeFrameCount()
@@ -517,15 +563,16 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         _submittedBlocks++;
     }
 
-    private void Release()
+    /// <summary>
+    /// A failure to use a device that has already refused once. The context says what was being attempted and
+    /// the exception is carried whole, because only its own message and stack can say what actually happened.
+    /// </summary>
+    private static OperationResult DeviceFailure(WasapiAudioClock clock, string context)
     {
-        // The clock is let go of before the device is: nothing outside the renderer reads it any more, and a reader
-        // that still holds it must not reach into a client this method is about to drop.
-        _clock?.OnDeviceReleased();
-        _clock = null;
-        _renderClient = null;
-        _client = null;
-        _bufferFrameCount = 0;
+        Exception? cause = clock.Error;
+        return cause is null
+            ? OperationResult.Failure($"{context}: the audio device cannot be used.")
+            : OperationResult.Failure($"{context}: {cause.Message}", cause);
     }
 
     private static unsafe T GetService<T>(IAudioClient client) where T : class
@@ -543,12 +590,6 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         }
     }
 
-    /// <summary>
-    /// One block being handed to the device. It writes what the device has room for and returns, so the
-    /// caller owns every wait (<see cref="IAudioSubmit"/>); nothing here sleeps, retries or gives up.
-    /// Its state is the block's own — the bytes, how far through them it is — so two hand-offs cannot
-    /// share a buffer and an abandoned one leaves nothing behind in the renderer.
-    /// </summary>
     private sealed partial class WasapiAudioSubmit : IAudioSubmit
     {
         private readonly WasapiAudioRenderer _owner;
@@ -578,6 +619,8 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
             {
                 return false;
             }
+
+            _owner.ApplyVolume();
 
             if (_owner._clock is WasapiAudioClock lost && lost.DeviceLost)
             {
@@ -640,10 +683,6 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
             }
         }
 
-        /// <summary>
-        /// Abandons a hand-off that is still suspended. What is already in the device stays there — a
-        /// renderer cannot take it back — which is why the caller flushes before it feeds another position.
-        /// </summary>
         public void Dispose()
         {
             ArrayPool<byte>.Shared.Return(_staging);
@@ -657,8 +696,7 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         }
     }
 
-    /// <summary>A hand-off that was over before it began: nothing to write, or something that went wrong.</summary>
-    private sealed class FinishedAudioSubmit : IAudioSubmit
+    private sealed partial class FinishedAudioSubmit : IAudioSubmit
     {
         private readonly OperationResult _result;
 
@@ -681,4 +719,3 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         }
     }
 }
-
