@@ -865,6 +865,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = settings.Subtitle.TextAlignment != presetSettings.Subtitle.TextAlignment;
+                tabModified = tabModified || modified;
+                UpdateSubtitleTextAlignment(settings);
+                ViewModel.SubtitleTextAlignmentLabel = GetLabel(StringResource.Alignment, modified);
+            }
+
+            {
                 bool modified = settings.Subtitle.OutlineWidth != presetSettings.Subtitle.OutlineWidth;
                 tabModified = tabModified || modified;
                 UpdateSubtitleOutlineWidth(settings);
@@ -1788,6 +1795,59 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (_mediaSettings.Subtitle.OutlineWidth != value)
         {
             ApplySubtitle(settings => settings.OutlineWidth = value);
+        }
+    }
+
+    private void SubtitleTextAlignmentComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        if (sender is not ComboBox comboBox || comboBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+
+        SubtitleTextAlignment? value = item.Tag is SubtitleTextAlignment alignment ? alignment : null;
+        if (_mediaSettings.Subtitle.TextAlignment != value)
+        {
+            ApplySubtitle(settings => settings.TextAlignment = value);
+        }
+    }
+
+    private void UpdateSubtitleTextAlignment(PlayerSettingsModel settings)
+    {
+        if (SubtitleTextAlignmentComboBox.Items.Count == 0)
+        {
+            SubtitleTextAlignmentComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.Default, Tag = null });
+            SubtitleTextAlignmentComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.AlignmentBottomLeft, Tag = SubtitleTextAlignment.BottomLeft });
+            SubtitleTextAlignmentComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.AlignmentBottomCenter, Tag = SubtitleTextAlignment.BottomCenter });
+            SubtitleTextAlignmentComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.AlignmentBottomRight, Tag = SubtitleTextAlignment.BottomRight });
+            SubtitleTextAlignmentComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.AlignmentMiddleLeft, Tag = SubtitleTextAlignment.MiddleLeft });
+            SubtitleTextAlignmentComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.AlignmentMiddleCenter, Tag = SubtitleTextAlignment.MiddleCenter });
+            SubtitleTextAlignmentComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.AlignmentMiddleRight, Tag = SubtitleTextAlignment.MiddleRight });
+            SubtitleTextAlignmentComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.AlignmentTopLeft, Tag = SubtitleTextAlignment.TopLeft });
+            SubtitleTextAlignmentComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.AlignmentTopCenter, Tag = SubtitleTextAlignment.TopCenter });
+            SubtitleTextAlignmentComboBox.Items.Add(new ComboBoxItem { Content = StringResourceProvider.Instance.AlignmentTopRight, Tag = SubtitleTextAlignment.TopRight });
+        }
+
+        SubtitleTextAlignment? value = settings.Subtitle.TextAlignment;
+        int index = 0;
+        for (int i = 0; i < SubtitleTextAlignmentComboBox.Items.Count; i++)
+        {
+            object? tag = (SubtitleTextAlignmentComboBox.Items[i] as ComboBoxItem)?.Tag;
+            if (value is { } chosen ? Equals(tag, chosen) : tag is null)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (SubtitleTextAlignmentComboBox.SelectedIndex != index)
+        {
+            SubtitleTextAlignmentComboBox.SelectedIndex = index;
         }
     }
 

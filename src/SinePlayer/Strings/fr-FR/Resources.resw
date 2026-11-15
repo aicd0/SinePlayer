@@ -153,6 +153,36 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>Avancé</value>
   </data>
+  <data name="Alignment" xml:space="preserve">
+    <value>Alignement</value>
+  </data>
+  <data name="AlignmentBottomCenter" xml:space="preserve">
+    <value>En bas au centre</value>
+  </data>
+  <data name="AlignmentBottomLeft" xml:space="preserve">
+    <value>En bas à gauche</value>
+  </data>
+  <data name="AlignmentBottomRight" xml:space="preserve">
+    <value>En bas à droite</value>
+  </data>
+  <data name="AlignmentMiddleCenter" xml:space="preserve">
+    <value>Au centre</value>
+  </data>
+  <data name="AlignmentMiddleLeft" xml:space="preserve">
+    <value>Au milieu à gauche</value>
+  </data>
+  <data name="AlignmentMiddleRight" xml:space="preserve">
+    <value>Au milieu à droite</value>
+  </data>
+  <data name="AlignmentTopCenter" xml:space="preserve">
+    <value>En haut au centre</value>
+  </data>
+  <data name="AlignmentTopLeft" xml:space="preserve">
+    <value>En haut à gauche</value>
+  </data>
+  <data name="AlignmentTopRight" xml:space="preserve">
+    <value>En haut à droite</value>
+  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>Tous les objets cachés</value>
   </data>

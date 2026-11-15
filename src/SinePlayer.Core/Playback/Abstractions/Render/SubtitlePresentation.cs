@@ -28,6 +28,8 @@ public readonly record struct SubtitlePresentation
 
     public Color? FontColor { get; init; }
 
+    public SubtitleTextAlignment? TextAlignment { get; init; }
+
     public double OutlineWidth { get; init; }
 
     public Color? OutlineColor { get; init; }

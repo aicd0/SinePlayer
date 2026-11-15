@@ -153,6 +153,36 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>고급의</value>
   </data>
+  <data name="Alignment" xml:space="preserve">
+    <value>정렬</value>
+  </data>
+  <data name="AlignmentBottomCenter" xml:space="preserve">
+    <value>가운데 아래</value>
+  </data>
+  <data name="AlignmentBottomLeft" xml:space="preserve">
+    <value>왼쪽 아래</value>
+  </data>
+  <data name="AlignmentBottomRight" xml:space="preserve">
+    <value>오른쪽 아래</value>
+  </data>
+  <data name="AlignmentMiddleCenter" xml:space="preserve">
+    <value>가운데</value>
+  </data>
+  <data name="AlignmentMiddleLeft" xml:space="preserve">
+    <value>왼쪽 가운데</value>
+  </data>
+  <data name="AlignmentMiddleRight" xml:space="preserve">
+    <value>오른쪽 가운데</value>
+  </data>
+  <data name="AlignmentTopCenter" xml:space="preserve">
+    <value>가운데 위</value>
+  </data>
+  <data name="AlignmentTopLeft" xml:space="preserve">
+    <value>왼쪽 위</value>
+  </data>
+  <data name="AlignmentTopRight" xml:space="preserve">
+    <value>오른쪽 위</value>
+  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>모든 숨겨진 항목</value>
   </data>

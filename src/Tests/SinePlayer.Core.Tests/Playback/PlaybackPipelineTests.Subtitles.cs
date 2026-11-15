@@ -212,6 +212,7 @@ public partial class PlaybackPipelineTests
             FontSize = 32.0,
             FontStyle = FontStyle.Italic,
             FontWeight = new FontWeight { Weight = 700 },
+            TextAlignment = SubtitleTextAlignment.TopRight,
             FontColor = Color.FromArgb(255, 12, 34, 56),
             OutlineWidth = 3.0,
             OutlineColor = Color.FromArgb(255, 65, 43, 21),

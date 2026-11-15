@@ -322,6 +322,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleTextAlignmentLabel = string.Empty;
+    public string SubtitleTextAlignmentLabel
+    {
+        get => _subtitleTextAlignmentLabel;
+        set
+        {
+            _subtitleTextAlignmentLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleTextAlignmentLabel)));
+        }
+    }
+
     private string _subtitleOutlineWidthLabel = string.Empty;
     public string SubtitleOutlineWidthLabel
     {

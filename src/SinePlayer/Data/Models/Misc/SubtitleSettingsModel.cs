@@ -25,6 +25,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
     public double Size { get; set; }
     public string Style { get; set; } = nameof(FontStyle.Normal);
     public int Weight { get; set; }
+    public SubtitleTextAlignment? TextAlignment { get; set; }
     public Color FontColor { get; set; } = Color.FromArgb(255, 255, 255, 255);
     public double OutlineWidth { get; set; } = 2.0;
     public Color OutlineColor { get; set; } = Color.FromArgb(255, 0, 0, 0);
@@ -44,6 +45,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             FontSize = Size,
             FontStyle = ToFontStyle(),
             FontWeight = ToFontWeight(),
+            TextAlignment = TextAlignment,
             FontColor = FontColor,
             OutlineWidth = OutlineWidth,
             OutlineColor = OutlineColor,
@@ -91,6 +93,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
         Size = model.FontSize ?? Size;
         Style = model.FontStyle ?? Style;
         Weight = model.FontWeight ?? Weight;
+        TextAlignment = ParseTextAlignment(model.TextAlignment, TextAlignment);
         FontColor = model.FontColor is { } value ? FromColorValue(value) : FontColor;
         OutlineWidth = model.OutlineWidth ?? OutlineWidth;
         OutlineColor = model.OutlineColor is { } outlineColor ? FromColorValue(outlineColor) : OutlineColor;
@@ -114,6 +117,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             FontSize = Size,
             FontStyle = Style,
             FontWeight = Weight,
+            TextAlignment = TextAlignment?.ToString(),
             FontColor = ToColorValue(FontColor),
             OutlineWidth = OutlineWidth,
             OutlineColor = ToColorValue(OutlineColor),
@@ -122,6 +126,16 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             ShadowEnabled = ShadowEnabled,
             Opacity = Opacity,
         };
+    }
+
+    private static SubtitleTextAlignment? ParseTextAlignment(string? value, SubtitleTextAlignment? fallback)
+    {
+        if (!string.IsNullOrEmpty(value) && Enum.TryParse(value, ignoreCase: true, out SubtitleTextAlignment alignment) && Enum.IsDefined(alignment))
+        {
+            return alignment;
+        }
+
+        return fallback;
     }
 
     private static Color FromColorValue(uint value)
@@ -165,6 +179,9 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 
         [JsonPropertyName("FontWeight")]
         public int? FontWeight { get; set; }
+
+        [JsonPropertyName("TextAlignment")]
+        public string? TextAlignment { get; set; }
 
         [JsonPropertyName("FontColor")]
         public uint? FontColor { get; set; }

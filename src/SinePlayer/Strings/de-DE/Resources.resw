@@ -153,6 +153,36 @@
   <data name="AdvancedExpander.Header" xml:space="preserve">
     <value>Fortschrittlich</value>
   </data>
+  <data name="Alignment" xml:space="preserve">
+    <value>Ausrichtung</value>
+  </data>
+  <data name="AlignmentBottomCenter" xml:space="preserve">
+    <value>Unten Mitte</value>
+  </data>
+  <data name="AlignmentBottomLeft" xml:space="preserve">
+    <value>Unten links</value>
+  </data>
+  <data name="AlignmentBottomRight" xml:space="preserve">
+    <value>Unten rechts</value>
+  </data>
+  <data name="AlignmentMiddleCenter" xml:space="preserve">
+    <value>Mitte</value>
+  </data>
+  <data name="AlignmentMiddleLeft" xml:space="preserve">
+    <value>Mitte links</value>
+  </data>
+  <data name="AlignmentMiddleRight" xml:space="preserve">
+    <value>Mitte rechts</value>
+  </data>
+  <data name="AlignmentTopCenter" xml:space="preserve">
+    <value>Oben Mitte</value>
+  </data>
+  <data name="AlignmentTopLeft" xml:space="preserve">
+    <value>Oben links</value>
+  </data>
+  <data name="AlignmentTopRight" xml:space="preserve">
+    <value>Oben rechts</value>
+  </data>
   <data name="AllHidden" xml:space="preserve">
     <value>Alle versteckten Elemente</value>
   </data>
