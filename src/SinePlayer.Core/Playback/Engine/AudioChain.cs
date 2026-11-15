@@ -511,6 +511,16 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
             inFlightBuffer = null;
         }
 
+        void DequeueAndDispose()
+        {
+            if (!BufferQueue.TryDequeue(out AudioEntry entry))
+            {
+                return;
+            }
+
+            entry.Buffer?.Dispose();
+        }
+
         TimeSpan? DevicePositionOf(IAudioRenderer renderer)
         {
             try
@@ -709,7 +719,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 }
             }
 
-            if (BufferQueue.IsEmpty)
+            if (!BufferQueue.TryPeek(out AudioEntry entry))
             {
                 bool ending = endingEpoch == epoch;
                 bool starved = deviceAvailable && !hasDeviceAudio && !ending && !isStreamSpent(epoch, position);
@@ -742,8 +752,13 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 continue;
             }
 
-            if (!BufferQueue.TryPeek(out AudioEntry entry))
+            if (epoch != entry.Epoch)
             {
+                if (entry.Epoch < epoch)
+                {
+                    DequeueAndDispose();
+                }
+
                 continue;
             }
 
@@ -754,36 +769,29 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 continue;
             }
 
-            if (!BufferQueue.TryDequeue(out _))
+            if (verdict == VersionVerdict.Drop)
             {
+                DequeueAndDispose();
                 continue;
             }
 
             RawAudioBuffer? buffer = entry.Buffer;
-            long bufferEpoch = entry.Epoch;
-
-            if (verdict == VersionVerdict.Drop)
-            {
-                buffer?.Dispose();
-                continue;
-            }
-
-            if (epoch != bufferEpoch)
-            {
-                buffer?.Dispose();
-                continue;
-            }
-
             if (buffer is null)
             {
                 endingEpoch = entry.Epoch;
+                DequeueAndDispose();
                 continue;
             }
 
             TimeSpan timestamp = buffer.Timestamp + offset;
             if (startTime.HasValue && timestamp < startTime)
             {
-                buffer.Dispose();
+                DequeueAndDispose();
+                continue;
+            }
+
+            if (!BufferQueue.TryDequeue(out _))
+            {
                 continue;
             }
 

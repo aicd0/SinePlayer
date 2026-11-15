@@ -32,6 +32,12 @@ internal sealed class SyntheticMediaScript
     /// <summary>Video packets are withheld from here on, as a source that has stopped carrying the stream is.</summary>
     internal TimeSpan VideoStopsAt { get; init; } = TimeSpan.MaxValue;
 
+    /// <summary>
+    /// Where the picture starts, which for a real file is where the first packet of it is: nothing before this instant
+    /// is read from it, so a test that wants a moment with nothing to show can have one.
+    /// </summary>
+    internal TimeSpan VideoStartsAt { get; init; } = TimeSpan.Zero;
+
     /// <summary>The second picture stream's packets are withheld from here on, when the script has one.</summary>
     internal TimeSpan SecondVideoStopsAt { get; init; } = TimeSpan.MaxValue;
 
@@ -72,6 +78,12 @@ internal sealed class SyntheticMediaScript
     /// trying: it can be asked to move, it just will not.
     /// </summary>
     internal bool RefusesToSeek { get; init; }
+
+    /// <summary>
+    /// How long a read takes, which is what a source that is not the local disk in front of the reader is: a test about
+    /// what has been read by the time something else happens needs reads that take a measurable while.
+    /// </summary>
+    internal int ReadDelayMilliseconds { get; init; }
 
     internal int FrameRate { get; init; } = 30;
 
@@ -239,7 +251,8 @@ internal sealed class SyntheticMediaSource : IMediaSource
         };
 
         int frameCount = (int)(script.Duration.TotalSeconds * script.FrameRate);
-        for (int index = 0; index < frameCount; index++)
+        int firstFrame = (int)Math.Ceiling(script.VideoStartsAt.TotalSeconds * script.FrameRate);
+        for (int index = firstFrame; index < frameCount; index++)
         {
             bool keyFrame = index % Math.Max(script.KeyFrameInterval, 1) == 0;
             _timeline.Add(new ScriptedPacket(true, false, keyFrame, TimeSpan.FromSeconds((double)index / script.FrameRate), TimeSpan.FromSeconds(1.0 / script.FrameRate)));
@@ -595,6 +608,13 @@ internal sealed class SyntheticMediaSource : IMediaSource
                 : scripted.Timestamp >= _script.AudioStopsAt)
             {
                 continue;
+            }
+
+            // A source that takes a moment over each packet, which is what a file on a share in front of the reader is:
+            // how much it has read by the time something else happens is then a fact rather than a race.
+            if (_script.ReadDelayMilliseconds > 0)
+            {
+                _closed.Wait(_script.ReadDelayMilliseconds);
             }
 
             packet = new MediaPacket

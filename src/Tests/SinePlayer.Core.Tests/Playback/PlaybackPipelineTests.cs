@@ -1896,8 +1896,17 @@ public partial class PlaybackPipelineTests
         {
             RefreshedSurfaces++;
             LastRefreshedTransform = transform;
+
+            // Run on the thread that is presenting, at the one moment a test can be sure it is between reading the
+            // position and taking a frame: a seek asked for here lands before this thread looks at the queue.
+            RefreshAction?.Invoke();
+            RefreshAction = null;
+
             return OperationResult.Success();
         }
+
+        /// <summary>A one-shot hook run while the surface is being refreshed, before the thread looks at the queue.</summary>
+        public Action? RefreshAction { get; set; }
 
         /// <summary>
         /// How many times the pipeline told this renderer to empty the surface, which is what it does when the picture
