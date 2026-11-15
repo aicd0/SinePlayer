@@ -39,7 +39,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<None Include="native\$(NativeRid)\*.dll">
+		<None Include="Native\$(NativeRid)\*.dll">
 			<Link>runtimes\$(NativeRid)\native\%(Filename)%(Extension)</Link>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

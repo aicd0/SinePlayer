@@ -19,7 +19,7 @@ internal abstract class PresetSettingsModel
 
     public string PresetKey { get; set; } = string.Empty;
     public string PresetName { get; set; } = "?";
-    public bool AllowVariation { get; set; }
+    public bool AllowVariation { get; set; } = true;
 
     public abstract string ToRecordJson();
 
@@ -333,9 +333,6 @@ internal abstract class PresetSettingsModel<TSelf, TJson> : PresetSettingsModel
     }
 }
 
-/// <summary>
-/// What a media or a track keeps of a category: the preset it follows, and only the values that differ from it.
-/// </summary>
 internal sealed class SettingsRecordJsonModel<TJson> where TJson : class
 {
     [JsonPropertyName("PresetKey")]
@@ -346,9 +343,6 @@ internal sealed class SettingsRecordJsonModel<TJson> where TJson : class
     public TJson? Settings { get; set; }
 }
 
-/// <summary>
-/// A stored preset: its name, whether a media may deviate from it, and its values.
-/// </summary>
 internal sealed class PresetJsonModel<TJson> where TJson : class
 {
     [JsonPropertyName("PresetName")]
