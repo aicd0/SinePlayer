@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Common.ErrorHandling;
@@ -1312,6 +1312,169 @@ public partial class PlaybackPipelineTests
 
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
             WaitFor(() => pipeline.Position >= target, "playback to stand where the seek asked, not where the picture ended", 3000);
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A backward landing can be farther behind the position than the read-ahead reaches, and then the reader has read
+    /// nothing that is still ahead: counting the position that was asked for as read would leave it waiting for
+    /// read-ahead it never delivered, with every queue empty and nothing left to move the clock off the landing.
+    /// </summary>
+    [Test]
+    public void KeepsReadingWhenTheSeekLandsFartherBackThanTheReadAhead()
+    {
+        string path = SyntheticPath("long-gop");
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(path, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(40),
+            KeyFrameInterval = 300,
+            LandsOnKeyframes = true,
+            ReadDelayMilliseconds = 2,
+        });
+
+        PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, new FakeSubtitleRenderer());
+        try
+        {
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(path))).IsSuccessful, Is.True);
+
+            MediaInfo info = pipeline.Sources[0].Info;
+
+            // Only the picture, so the landing is measured by its keyframes: the sound has none, and a landing by the
+            // sound would be at the position asked for, which is not what this test is about.
+            Assert.That(Select(pipeline, MediaStreamKind.Video, info.VideoStreams[0]).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(200), "playback to start");
+
+            // The keyframes are ten seconds apart, so asking for 29.5 s lands on the one at 20 s: more than the eight
+            // seconds of read-ahead the reader waits for.
+            SeekAndWait(pipeline, TimeSpan.FromSeconds(29.5));
+
+            WaitFor(() => pipeline.Position > TimeSpan.FromSeconds(21), "the reader to carry on past the frame the seek landed on", 3000);
+            Assert.That(pipeline.Error, Is.Null);
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A forward keyframe seek lands on the keyframe <em>after</em> the position, so the first packet read is already a
+    /// whole group of pictures past where playback stands. Counting that gap as read-ahead stops the reader at that
+    /// first packet — and while nothing is playing nothing anchors the clock, so nothing ever gets read again.
+    /// </summary>
+    [Test]
+    public void KeepsReadingWhenTheSeekLandsAheadByMoreThanTheReadAhead()
+    {
+        string path = SyntheticPath("long-gop-next");
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(path, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(60),
+            KeyFrameInterval = 300,
+            LandsOnKeyframes = true,
+        });
+
+        PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, new FakeSubtitleRenderer());
+        try
+        {
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(path))).IsSuccessful, Is.True);
+
+            MediaInfo info = pipeline.Sources[0].Info;
+
+            // Only the picture, so the landing is measured by its keyframes: ten seconds apart, so asking for 21 s
+            // lands on the keyframe at 30 s.
+            Assert.That(Select(pipeline, MediaStreamKind.Video, info.VideoStreams[0]).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.Position > TimeSpan.FromMilliseconds(200), "playback to start");
+
+            // Paused, because a paused pipeline anchors nothing: the clock stays where the seek put it, so the gap the
+            // landing left is the only thing the read-ahead can be measured against.
+            Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.State == MediaEngineState.Paused, "the pipeline to stop");
+
+            SeekAndWait(pipeline, TimeSpan.FromSeconds(21), SeekMode.NextKeyframe);
+
+            var video = (SinePlayer.Core.Playback.Engine.VideoChain)pipeline.VideoChains[0];
+            WaitFor(() => TimeSpan.FromTicks(video.ReadTail.Ticks) >= TimeSpan.FromSeconds(31), "the reader to carry on past the frame the seek landed on", 3000);
+            Assert.That(pipeline.Error, Is.Null);
+        }
+        finally
+        {
+            sources.Release();
+            pipeline.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A frame of the position a seek moved to can be queued while the presenting thread is between reading the
+    /// position and taking a frame — refreshing the surface is a long moment, and a seek asked for then lands inside
+    /// it. That frame is not stale: the position is taken up on the next pass, and it is the frame that position
+    /// starts with. Dropping it makes the still of a paused seek the frame after, which is the picture that position
+    /// was not asked for.
+    /// </summary>
+    [Test]
+    public void KeepsTheFirstFrameOfAPositionThatArrivesWhileTheSurfaceIsRefreshed()
+    {
+        string path = SyntheticPath("frame-of-the-new-position");
+        SyntheticMultiSourceProviderFactory sources = new();
+        sources.Add(path, new SyntheticMediaScript
+        {
+            Duration = TimeSpan.FromSeconds(30),
+
+            // The picture starts twenty seconds in, which is past what the reader reads ahead: nothing has been decoded
+            // yet, so the queue is empty and the frame the seek brings is the only one there is.
+            VideoStartsAt = TimeSpan.FromSeconds(20),
+        });
+
+        FakeVideoRenderer videoRenderer = new();
+        PlaybackPipeline pipeline = CreateMultiSourcePipeline(sources, new FakeSubtitleRenderer(), videoRenderer);
+        try
+        {
+            Assert.That(Await(pipeline.Reset()).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.AddSource(MediaLocator.Parse(path))).IsSuccessful, Is.True);
+
+            MediaInfo info = pipeline.Sources[0].Info;
+            Assert.That(Select(pipeline, MediaStreamKind.Video, info.VideoStreams[0]).IsSuccessful, Is.True);
+            Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
+
+            // Nothing has been shown yet and nothing is waiting to be: the picture starts at a second, so pausing here
+            // leaves the frame queue empty and the position without a picture of its own.
+            Thread.Sleep(200);
+            Assert.That(Await(pipeline.Pause()).IsSuccessful, Is.True);
+            WaitFor(() => pipeline.State == MediaEngineState.Paused, "the pipeline to stop");
+
+            var chain = (SinePlayer.Core.Playback.Engine.VideoChain)pipeline.VideoChains[0];
+
+            // The presenting thread parks while the file is paused, so it is woken the way the host wakes it: a surface
+            // that changed size. That puts this test inside the paused pass, where the redraw happens before the queue
+            // is looked at.
+            FakeRenderTarget renderTarget = new();
+            chain.Target = renderTarget;
+
+            // Frames are a thirtieth of a second apart, so a whole second is one of them: the still of a precise seek
+            // is that frame and not the one after.
+            var seekTarget = TimeSpan.FromSeconds(20);
+            videoRenderer.RefreshAction = () =>
+            {
+                SeekAndWait(pipeline, seekTarget, SeekMode.Precise);
+                WaitFor(() => chain.FrameQueue.TryPeek(out SinePlayer.Core.Playback.Engine.FrameEntry head) && head.Frame is not null && head.Frame.Timestamp >= seekTarget, "the new position's frame to reach the queue");
+            };
+            renderTarget.RaiseSizeChanged();
+
+            WaitFor(() => videoRenderer.RenderedTimestamps.Any(timestamp => timestamp >= seekTarget), "the new position's picture to be shown", 3000);
+
+            TimeSpan[] shown = [.. videoRenderer.RenderedTimestamps.Where(timestamp => timestamp >= seekTarget)];
+            Assert.That(shown.FirstOrDefault(), Is.EqualTo(seekTarget), "the frame the position starts with is the one it shows");
         }
         finally
         {

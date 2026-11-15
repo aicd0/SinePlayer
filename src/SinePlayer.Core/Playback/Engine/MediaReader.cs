@@ -170,7 +170,7 @@ internal sealed class MediaReader(
             {
                 if (!tails.TryGetValue(candidate, out SourceTail? tail))
                 {
-                    tail = new SourceTail { Tail = epochGate.SeekPosition + epochGate.ReadOffset };
+                    tail = new SourceTail();
                     tails[candidate] = tail;
                 }
 
@@ -237,10 +237,7 @@ internal sealed class MediaReader(
                 continue;
             }
 
-            if (packet.Timestamp > chosenTail.Tail)
-            {
-                chosenTail.Tail = packet.Timestamp;
-            }
+            chosenTail.Report(packet.Timestamp);
 
             foreach (KeyValuePair<IChainFeed, ComponentSlot<MediaSource>> entry in bindings)
             {
@@ -300,6 +297,11 @@ internal sealed class MediaReader(
         SourceTail tail,
         IReadOnlyList<KeyValuePair<IChainFeed, ComponentSlot<MediaSource>>> bindings)
     {
+        if (!tail.HasRead)
+        {
+            return false;
+        }
+
         TimeSpan position = timeline.Position;
         TimeSpan furthest = TimeSpan.MinValue;
         TimeSpan closest = TimeSpan.MaxValue;
@@ -314,7 +316,7 @@ internal sealed class MediaReader(
             }
 
             TimeSpan offset = entry.Key.Offset;
-            TimeSpan readAhead = tail.Tail - (position - offset);
+            TimeSpan readAhead = tail.Tail - TimeSpan.FromTicks(Math.Max((position - offset).Ticks, tail.Origin.Ticks));
             furthest = TimeSpan.FromTicks(Math.Max(furthest.Ticks, readAhead.Ticks));
             closest = TimeSpan.FromTicks(Math.Min(closest.Ticks, readAhead.Ticks));
             mostDelayed = TimeSpan.FromTicks(Math.Max(mostDelayed.Ticks, offset.Ticks));
@@ -351,10 +353,27 @@ internal sealed class MediaReader(
 
     private sealed class SourceTail
     {
-        public TimeSpan Tail { get; set; }
+        public TimeSpan Tail { get; private set; } = TimeSpan.MinValue;
+
+        public TimeSpan Origin { get; private set; } = TimeSpan.MinValue;
+
+        public bool HasRead { get; private set; }
 
         public bool Ended { get; set; }
 
         public bool IsBuffered { get; set; }
+
+        public void Report(TimeSpan timestamp)
+        {
+            if (HasRead)
+            {
+                Tail = TimeSpan.FromTicks(Math.Max(Tail.Ticks, timestamp.Ticks));
+                return;
+            }
+
+            Origin = timestamp;
+            Tail = timestamp;
+            HasRead = true;
+        }
     }
 }

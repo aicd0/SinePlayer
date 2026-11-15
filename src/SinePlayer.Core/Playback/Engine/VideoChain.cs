@@ -649,7 +649,11 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
 
             if (entry.Value.Epoch != epoch)
             {
-                DequeueAndDispose();
+                if (entry.Value.Epoch < epoch)
+                {
+                    DequeueAndDispose();
+                }
+
                 continue;
             }
 
