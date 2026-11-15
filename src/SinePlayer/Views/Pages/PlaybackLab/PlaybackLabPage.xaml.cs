@@ -27,7 +27,6 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.Direct3D11;
 using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
-using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Libass;
 using SinePlayer.Core.Playback.Backends.Null;
 using SinePlayer.Core.Playback.Backends.Wasapi;
@@ -113,7 +112,7 @@ internal sealed partial class PlaybackLabPage : BasePage
     }
 
     private PlaybackPipeline? _pipeline;
-    private GainAudioFilter? _gain;
+    private IAudioChain? _audio;
     private RemixAudioFilter? _remix;
     private SwapChainPanelRenderTarget? _videoRenderTarget;
     private SwapChainPanelRenderTarget? _subtitleRenderTarget;
@@ -470,12 +469,11 @@ internal sealed partial class PlaybackLabPage : BasePage
         pipeline.StateChanged += Pipeline_StateChanged;
         pipeline.WarningRaised += Pipeline_WarningRaised;
 
-        GainAudioFilter gain = new();
-        gain.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
-        audio.Filters.Add(gain);
-
         RemixAudioFilter remix = new();
         audio.Filters.Add(remix);
+
+        audio.Volume = VolumeSlider.Value / 100.0;
+        audio.IsMuted = MuteToggle.IsChecked == true;
 
         OperationResult reset = await pipeline.Reset();
         string? failure = reset.IsSuccessful ? null : reset.Message;
@@ -490,14 +488,13 @@ internal sealed partial class PlaybackLabPage : BasePage
             pipeline.StateChanged -= Pipeline_StateChanged;
             pipeline.WarningRaised -= Pipeline_WarningRaised;
             pipeline.Dispose();
-            gain.Dispose();
             remix.Dispose();
             Logger.E(TAG, $"Opening the file failed. {failure}");
             return;
         }
 
         _pipeline = pipeline;
-        _gain = gain;
+        _audio = audio;
         _remix = remix;
         PopulateTrackPickers();
 
@@ -518,13 +515,11 @@ internal sealed partial class PlaybackLabPage : BasePage
             pipeline.Dispose();
         }
 
-        GainAudioFilter? gain = _gain;
-        _gain = null;
-        gain?.Dispose();
-
         RemixAudioFilter? remix = _remix;
         _remix = null;
         remix?.Dispose();
+
+        _audio = null;
 
         // The panel gives the surface back before the swap chain it is showing goes away.
         _videoRenderTarget?.DetachSurface();
@@ -627,7 +622,11 @@ internal sealed partial class PlaybackLabPage : BasePage
 
     private void ApplyLevel()
     {
-        _gain?.SetLevel(VolumeSlider.Value / 100.0, MuteToggle.IsChecked == true);
+        if (_audio is { } audio)
+        {
+            audio.Volume = VolumeSlider.Value / 100.0;
+            audio.IsMuted = MuteToggle.IsChecked == true;
+        }
     }
 
     private AudioSpeedAlgorithm ChosenSpeedAlgorithm()

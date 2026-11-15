@@ -14,6 +14,10 @@ public interface IAudioChain : IPlaybackChain<AudioStreamInfo>
 
     AudioSpeedAlgorithm SpeedAlgorithm { get; set; }
 
+    double Volume { get; set; }
+
+    bool IsMuted { get; set; }
+
     long Underruns { get; }
 
     bool OwnsClock { get; }

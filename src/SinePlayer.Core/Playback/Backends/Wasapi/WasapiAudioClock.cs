@@ -9,42 +9,30 @@ namespace SinePlayer.Core.Playback.Backends.Wasapi;
 
 internal sealed class WasapiAudioClock : IPlaybackClock
 {
+    private readonly Lock _lock = new();
     private readonly IWasapiClockDevice _device;
     private readonly ulong _frequency;
-    private readonly object _lock = new();
+    private readonly Action? _beforeStart;
 
     private TimeSpan _base;
     private TimeSpan _lastPosition;
     private ulong _basePosition;
     private volatile bool _deviceLost;
-    private Exception? _cause;
+    private Exception? _error;
 
-    /// <summary>
-    /// A clock over the device it wraps, or over a stand-in whose failures are what a test is after.
-    /// </summary>
-    internal WasapiAudioClock(IWasapiClockDevice device, ulong frequency)
+    internal WasapiAudioClock(IWasapiClockDevice device, ulong frequency, Action? beforeStart = null)
     {
         _device = device;
         _frequency = frequency > 0 ? frequency : 1;
+        _beforeStart = beforeStart;
     }
 
-    internal WasapiAudioClock(IAudioClient client, IAudioClock audioClock, ulong frequency)
-        : this(new DeviceClock(client, audioClock), frequency)
+    internal WasapiAudioClock(IAudioClient client, IAudioClock audioClock, ulong frequency, Action? beforeStart = null)
+        : this(new DeviceClock(client, audioClock), frequency, beforeStart)
     {
     }
 
-    /// <summary>
-    /// Whether a device call has failed. A lost clock reads as the position it was last put at: time has
-    /// stopped because the device has.
-    /// </summary>
     public bool DeviceLost => _deviceLost;
-
-    /// <summary>
-    /// The first failure, exactly as it was thrown — the exception type, its message and its stack are the
-    /// diagnosis, and this class is in no position to improve on them. Later failures do not replace it: the
-    /// first one is the origin, and everything after it is a consequence.
-    /// </summary>
-    internal Exception? Cause => _cause;
 
     public TimeSpan Position
     {
@@ -78,6 +66,8 @@ internal sealed class WasapiAudioClock : IPlaybackClock
 
     public bool IsRunning { get; private set; }
 
+    internal Exception? Error => _error;
+
     public void Start()
     {
         if (IsRunning || _deviceLost)
@@ -87,6 +77,7 @@ internal sealed class WasapiAudioClock : IPlaybackClock
 
         try
         {
+            _beforeStart?.Invoke();
             _device.Start();
             IsRunning = true;
         }
@@ -116,17 +107,6 @@ internal sealed class WasapiAudioClock : IPlaybackClock
         }
     }
 
-    /// <summary>
-    /// Points the clock at a new position, from wherever the device is now. The device's own position is
-    /// taken as the zero point rather than assumed to be one: whoever asks for this cannot know whether the
-    /// device has been reset, because the reset belongs to the thread that owns it — a seek is asked for on
-    /// one thread and taken up on another, and the clock is read in between.
-    /// <para>
-    /// That is also what makes this honest while a device still holds audio for the position playback has
-    /// just left: time reads as the position that was asked for, instead of the position plus everything the
-    /// device has played since it was last reset.
-    /// </para>
-    /// </summary>
     public void SetPosition(TimeSpan position)
     {
         lock (_lock)
@@ -183,11 +163,10 @@ internal sealed class WasapiAudioClock : IPlaybackClock
     /// </summary>
     private void MarkLost(Exception exception)
     {
-        _cause ??= exception;
+        _error ??= exception;
         _deviceLost = true;
     }
 
-    /// <summary>The real device, in the three calls the clock makes of it.</summary>
     private sealed class DeviceClock : IWasapiClockDevice
     {
         private readonly IAudioClient _client;

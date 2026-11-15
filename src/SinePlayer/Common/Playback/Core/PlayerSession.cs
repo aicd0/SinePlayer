@@ -23,7 +23,6 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
-using SinePlayer.Core.Playback.Backends.Gain;
 using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Data.Models.Media;
@@ -71,7 +70,7 @@ internal sealed partial class PlayerSession : IDisposable
         Playback.PlayQueueChanged += Playback_PlayQueueChanged;
     }
 
-    private sealed record AudioChainEntry(IAudioChain Chain, GainAudioFilter Gain, RemixAudioFilter Remix);
+    private sealed record AudioChainEntry(IAudioChain Chain, RemixAudioFilter Remix);
 
     #endregion
 
@@ -203,7 +202,6 @@ internal sealed partial class PlayerSession : IDisposable
 
         foreach (AudioChainEntry entry in _audioChains)
         {
-            entry.Gain.Dispose();
             entry.Remix.Dispose();
         }
 
@@ -672,7 +670,8 @@ internal sealed partial class PlayerSession : IDisposable
     {
         foreach (AudioChainEntry entry in _audioChains)
         {
-            entry.Gain.SetLevel(_volume, _muted);
+            entry.Chain.Volume = _volume;
+            entry.Chain.IsMuted = _muted;
         }
     }
 
@@ -734,14 +733,13 @@ internal sealed partial class PlayerSession : IDisposable
     {
         IAudioChain chain = await pipeline.AddAudioChain();
 
-        GainAudioFilter gainFilter = new();
-        gainFilter.SetLevel(_volume, _muted);
-        chain.Filters.Add(gainFilter);
-
         RemixAudioFilter remixFilter = new();
         chain.Filters.Add(remixFilter);
 
-        _audioChains.Add(new AudioChainEntry(chain, gainFilter, remixFilter));
+        chain.Volume = _volume;
+        chain.IsMuted = _muted;
+
+        _audioChains.Add(new AudioChainEntry(chain, remixFilter));
         return chain;
     }
 
