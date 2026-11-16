@@ -49,7 +49,7 @@ internal static class MediaMenuCreator
     {
         if (selectedItems is null)
         {
-            selectedItems = new[] { primaryItem };
+            selectedItems = (List<MediaModel>)[primaryItem];
         }
         else
         {
@@ -60,7 +60,7 @@ internal static class MediaMenuCreator
             }
             else
             {
-                selectedItems = new[] { primaryItem };
+                selectedItems = (List<MediaModel>)[primaryItem];
             }
         }
 
@@ -486,7 +486,7 @@ internal static class MediaMenuCreator
                 {
                     var collection = MediaModel.CreateCollection();
                     await collection.SetTitle1(StringResourceProvider.Instance.NewCollection);
-                    var dialog = new EditMediaInfoDialog(new[] { collection });
+                    var dialog = new EditMediaInfoDialog((List<MediaModel>)[collection]);
                     await dialog.ShowAsync(windowId);
                     if (!collection.IsPersistent)
                     {

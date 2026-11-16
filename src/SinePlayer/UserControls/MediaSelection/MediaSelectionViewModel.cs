@@ -134,9 +134,9 @@ internal sealed partial class MediaSelectionViewModel(Func<int> totalItemCountPr
         UpdateCommandBarButtonStates();
     }
 
-    public MediaModel[] GetSelectedMedia()
+    public IReadOnlyList<MediaModel> GetSelectedMedia()
     {
-        return [.. _selectedItems.Select(x => x.Media)];
+        return (List<MediaModel>)[.. _selectedItems.Select(x => x.Media)];
     }
 
     public void UpdateCommandBarButtonStates()

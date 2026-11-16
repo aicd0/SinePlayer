@@ -210,12 +210,12 @@ public partial class PlaybackPipelineTests
         sources.Add(playing, new SyntheticMediaScript
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         });
         sources.Add(words, new SyntheticMediaScript
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(1.0), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(1.0), TimeSpan.FromSeconds(3))],
         });
 
         FakeSubtitleRenderer firstRenderer = new();
@@ -287,7 +287,7 @@ public partial class PlaybackPipelineTests
         {
             Duration = TimeSpan.FromSeconds(3),
             Subtitles =
-            [
+            (List<ScriptedSubtitle>)[
                 new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(0.9)),
                 new ScriptedSubtitle(TimeSpan.FromSeconds(1.2), TimeSpan.FromSeconds(1.9)),
             ],
@@ -350,7 +350,7 @@ public partial class PlaybackPipelineTests
             Duration = TimeSpan.FromSeconds(30),
             ReportsTheEndOfTheFile = false,
             Subtitles =
-            [
+            (List<ScriptedSubtitle>)[
                 new ScriptedSubtitle(TimeSpan.FromSeconds(0.4), TimeSpan.FromSeconds(0.9)),
                 new ScriptedSubtitle(TimeSpan.FromSeconds(1.4), TimeSpan.FromSeconds(1.9)),
             ],

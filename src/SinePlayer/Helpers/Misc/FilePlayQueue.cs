@@ -66,7 +66,7 @@ internal static class FilePlayQueue
         return paths;
     }
 
-    private static async Task<MediaModel[]?> CreateMediaAsync(IEnumerable<string> paths)
+    private static async Task<IReadOnlyList<MediaModel>?> CreateMediaAsync(IEnumerable<string> paths)
     {
         List<string> candidates = [];
         foreach (string path in paths)
@@ -91,6 +91,6 @@ internal static class FilePlayQueue
             return null;
         }
 
-        return [.. mediaItems.OrderBy(x => StringUtils.SmartFileNameKeySelector(x.Title), StringUtils.SmartFileNameComparer)];
+        return (List<MediaModel>)[.. mediaItems.OrderBy(x => StringUtils.SmartFileNameKeySelector(x.Title), StringUtils.SmartFileNameComparer)];
     }
 }

@@ -26,7 +26,7 @@ public class SpeedAudioFilterTests
     public void LeavesTheBlockAloneAtItsOwnSpeed()
     {
         using SpeedAudioFilter filter = new();
-        using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float32, [0.25, -0.25])]);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float32, (List<double>)[0.25, -0.25])]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, sampleCount: 2, channelCount: 1);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
@@ -48,7 +48,7 @@ public class SpeedAudioFilterTests
         filter.SetSpeed(speed);
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
-        using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float32, [.. Enumerable.Repeat(0.5, Frames)])]);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float32, (List<double>)[.. Enumerable.Repeat(0.5, Frames)])]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, Frames, channelCount: 1);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
@@ -79,7 +79,7 @@ public class SpeedAudioFilterTests
         filter.SetSpeed(2.0);
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
-        using TestPlanarBuffer planar = new([Write(format, [.. Enumerable.Repeat(value, Frames)])]);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(format, (List<double>)[.. Enumerable.Repeat(value, Frames)])]);
         using RawAudioBuffer buffer = CreateBuffer(format, planar, Frames, channelCount: 1);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
@@ -101,7 +101,7 @@ public class SpeedAudioFilterTests
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         double[] ramp = [0.0, 0.5, 0.25, 0.75];
-        using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, ramp)]);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, ramp)]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, ramp.Length, channelCount: 1);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
@@ -121,7 +121,7 @@ public class SpeedAudioFilterTests
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         double[] ramp = [0.0, 0.5, 0.25, 0.75];
-        using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, ramp)]);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, ramp)]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, ramp.Length, channelCount: 1);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
@@ -147,7 +147,7 @@ public class SpeedAudioFilterTests
         double value = 0.25;
         for (int block = 0; block < 40; block++)
         {
-            using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, [.. Enumerable.Repeat(value, Frames)])]);
+            using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, (List<double>)[.. Enumerable.Repeat(value, Frames)])]);
             using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, Frames, channelCount: 1);
 
             OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
@@ -169,7 +169,7 @@ public class SpeedAudioFilterTests
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         double[] interleaved = [1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
-        using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, interleaved)]);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, interleaved)]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, sampleCount: 4, channelCount: 2);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
@@ -193,9 +193,9 @@ public class SpeedAudioFilterTests
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         using TestPlanarBuffer planar = new(
-        [
-            Write(AudioSampleFormat.Float64, [0.5, 0.5, 0.5, 0.5]),
-            Write(AudioSampleFormat.Float64, [-0.5, -0.5, -0.5, -0.5]),
+        (List<byte[]>)[
+            Write(AudioSampleFormat.Float64, (List<double>)[0.5, 0.5, 0.5, 0.5]),
+            Write(AudioSampleFormat.Float64, (List<double>)[-0.5, -0.5, -0.5, -0.5]),
         ]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, sampleCount: 4, channelCount: 2);
 
@@ -218,7 +218,7 @@ public class SpeedAudioFilterTests
     {
         using SpeedAudioFilter filter = new();
 
-        using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, [0.25, 0.25])]);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, (List<double>)[0.25, 0.25])]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, sampleCount: 2, channelCount: 1);
 
         foreach (double speed in new[] { 0.0, -2.0, double.NaN, double.PositiveInfinity })
@@ -239,7 +239,7 @@ public class SpeedAudioFilterTests
         filter.SetSpeed(2.0);
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
-        using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, [0.25, 0.25])]);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, (List<double>)[0.25, 0.25])]);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Unknown, planar, sampleCount: 2, channelCount: 1);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
@@ -266,7 +266,7 @@ public class SpeedAudioFilterTests
 
         List<double> produced = Stretch(Blocks(frequency, 40), filter);
 
-        double measured = FrequencyOf([.. produced], skip: 8192);
+        double measured = FrequencyOf(produced, skip: 8192);
         Assert.That(measured, Is.EqualTo(expected).Within(expected * 0.05),
             "what a tone becomes says which of the two the filter did");
     }
@@ -327,7 +327,7 @@ public class SpeedAudioFilterTests
 
         List<double> produced = Stretch(Blocks(440.0, 10), filter);
 
-        Assert.That(FrequencyOf([.. produced], skip: 8192), Is.EqualTo(440.0).Within(22.0),
+        Assert.That(FrequencyOf(produced, skip: 8192), Is.EqualTo(440.0).Within(22.0),
             "the tone is still the tone, however slowly it is stretched");
     }
 
@@ -343,9 +343,9 @@ public class SpeedAudioFilterTests
         for (int block = 0; block < 8; block++)
         {
             using TestPlanarBuffer planar = new(
-            [
-                Write(AudioSampleFormat.Float64, [.. Enumerable.Repeat(0.5, Frames)]),
-                Write(AudioSampleFormat.Float64, [.. Enumerable.Repeat(-0.5, Frames)]),
+            (List<byte[]>)[
+                Write(AudioSampleFormat.Float64, (List<double>)[.. Enumerable.Repeat(0.5, Frames)]),
+                Write(AudioSampleFormat.Float64, (List<double>)[.. Enumerable.Repeat(-0.5, Frames)]),
             ]);
             using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, Frames, channelCount: 2);
 
@@ -387,7 +387,7 @@ public class SpeedAudioFilterTests
         List<double> produced = [];
         foreach (double[] block in blocks)
         {
-            using TestPlanarBuffer planar = new([Write(AudioSampleFormat.Float64, block)]);
+            using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, block)]);
             using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, block.Length, channelCount: 1);
 
             OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
@@ -404,14 +404,14 @@ public class SpeedAudioFilterTests
     /// How often the samples cross zero, as a frequency: a tone played faster has more crossings per second, and one stretched
     /// rather than resampled has the same.
     /// </summary>
-    private static double FrequencyOf(double[] samples, int skip)
+    private static double FrequencyOf(IReadOnlyList<double> samples, int skip)
     {
-        Assert.That(samples.Length, Is.GreaterThan(skip + 1000), "there has to be something to measure");
+        Assert.That(samples.Count, Is.GreaterThan(skip + 1000), "there has to be something to measure");
 
         int crossings = 0;
         int first = -1;
         int last = -1;
-        for (int index = skip; index + 1 < samples.Length; index++)
+        for (int index = skip; index + 1 < samples.Count; index++)
         {
             double now = samples[index];
             double next = samples[index + 1];
@@ -446,7 +446,7 @@ public class SpeedAudioFilterTests
             copied.Add(bytes);
         }
 
-        return new TestPlanarBuffer([.. copied]);
+        return new TestPlanarBuffer(copied);
     }
 
     private static int Width(AudioSampleFormat format)
@@ -463,12 +463,12 @@ public class SpeedAudioFilterTests
         };
     }
 
-    private static byte[] Write(AudioSampleFormat format, double[] values)
+    private static byte[] Write(AudioSampleFormat format, IReadOnlyList<double> values)
     {
         int width = Width(format);
-        byte[] bytes = new byte[width * values.Length];
+        byte[] bytes = new byte[width * values.Count];
 
-        for (int index = 0; index < values.Length; index++)
+        for (int index = 0; index < values.Count; index++)
         {
             int offset = index * width;
             switch (format)
@@ -560,7 +560,7 @@ public class SpeedAudioFilterTests
         private readonly List<GCHandle> _handles = [];
         private bool _disposed;
 
-        internal TestPlanarBuffer(byte[][] planes)
+        internal TestPlanarBuffer(IReadOnlyList<byte[]> planes)
         {
             _planes = [.. planes];
             foreach (byte[] plane in _planes)

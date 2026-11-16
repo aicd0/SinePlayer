@@ -22,7 +22,7 @@ public class AudioInterleaverTests
     public void CopiesInterleavedSamplesUnchanged()
     {
         byte[] source = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Int16, 2, 2, [source]);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Int16, 2, 2, (List<byte[]>)[source]);
         byte[] destination = new byte[source.Length];
 
         OperationResult<int> interleaved = AudioInterleaver.TryInterleave(buffer, destination);
@@ -41,7 +41,7 @@ public class AudioInterleaverTests
         // Two channels of float samples, laid out one channel per plane.
         byte[] left = [0x11, 0x11, 0x11, 0x11, 0x22, 0x22, 0x22, 0x22];
         byte[] right = [0x33, 0x33, 0x33, 0x33, 0x44, 0x44, 0x44, 0x44];
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, 2, 2, [left, right]);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, 2, 2, (List<byte[]>)[left, right]);
         byte[] destination = new byte[left.Length + right.Length];
 
         OperationResult<int> interleaved = AudioInterleaver.TryInterleave(buffer, destination);
@@ -62,7 +62,7 @@ public class AudioInterleaverTests
     public void RefusesWhatItCannotLayOut()
     {
         byte[] samples = new byte[8];
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Int16, 2, 2, [samples]);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Int16, 2, 2, (List<byte[]>)[samples]);
 
         using (Assert.EnterMultipleScope())
         {
@@ -70,14 +70,14 @@ public class AudioInterleaverTests
             Assert.That(small.IsSuccessful, Is.False);
             Assert.That(small.Message, Does.Contain("needed"));
 
-            using RawAudioBuffer mismatched = CreateBuffer(AudioSampleFormat.Int16, 4, 2, [new byte[16], new byte[16]]);
+            using RawAudioBuffer mismatched = CreateBuffer(AudioSampleFormat.Int16, 4, 2, (List<byte[]>)[new byte[16], new byte[16]]);
             OperationResult<int> planes = AudioInterleaver.TryInterleave(mismatched, new byte[16]);
             Assert.That(planes.IsSuccessful, Is.False);
             Assert.That(planes.Message, Does.Contain("plane"));
         }
     }
 
-    private static RawAudioBuffer CreateBuffer(AudioSampleFormat format, int channelCount, int sampleCount, byte[][] planes)
+    private static RawAudioBuffer CreateBuffer(AudioSampleFormat format, int channelCount, int sampleCount, IReadOnlyList<byte[]> planes)
     {
         return new RawAudioBuffer
         {
@@ -96,7 +96,7 @@ public class AudioInterleaverTests
         private readonly List<nint> _planes = [];
         private readonly List<int> _byteCounts = [];
 
-        internal TestPlanarBuffer(byte[][] planes)
+        internal TestPlanarBuffer(IReadOnlyList<byte[]> planes)
         {
             foreach (byte[] plane in planes)
             {

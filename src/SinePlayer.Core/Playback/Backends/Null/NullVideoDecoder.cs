@@ -28,10 +28,8 @@ internal sealed partial class NullVideoDecoder : IVideoDecoder
 
     public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<RawVideoFrame> frames)
     {
-        ArgumentNullException.ThrowIfNull(packet);
-
-        frames = new RawVideoFrame[]
-        {
+        frames =
+        (List<RawVideoFrame>)[
             new RawVideoFrame
             {
                 Timestamp = packet.Timestamp,
@@ -41,7 +39,7 @@ internal sealed partial class NullVideoDecoder : IVideoDecoder
                 Format = PixelFormat.Yuv420P,
                 Buffer = new NullPlanarVideoBuffer(),
             },
-        };
+        ];
 
         return OperationResult.Success();
     }

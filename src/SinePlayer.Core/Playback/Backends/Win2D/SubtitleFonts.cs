@@ -54,7 +54,7 @@ public static class SubtitleFonts
                 return [];
             }
 
-            return families.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToArray();
+            return (List<string>)[.. families.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase)];
         }
         catch (Exception ex)
         {
@@ -99,7 +99,7 @@ public static class SubtitleFonts
 
             foreach (KeyValuePair<string, HashSet<int>> pair in collected)
             {
-                weights[pair.Key] = pair.Value.Order().ToArray();
+                weights[pair.Key] = (List<int>)[.. pair.Value.Order()];
             }
         }
         catch (Exception ex)

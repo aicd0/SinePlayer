@@ -63,7 +63,7 @@ internal static class TrackSelection
             }
 
             return selection.Track is { } track && Find(sources, kind, track) is { } stream
-                ? [stream]
+                ? (List<MediaStreamInfo>)[stream]
                 : opening ? Defaults(sources, kind) : [];
         }
 
@@ -115,7 +115,7 @@ internal static class TrackSelection
     /// The sources this media's remembered tracks name, so one that is not part of the media — an external subtitle file —
     /// can be added before anything is resolved.
     /// </summary>
-    public static string[] PathsOf(TrackSelectionModel? model)
+    public static IReadOnlyList<string> PathsOf(TrackSelectionModel? model)
     {
         if (model is null)
         {
@@ -144,14 +144,14 @@ internal static class TrackSelection
             paths.AddRange(audios.Select(entry => entry.Path));
         }
 
-        return [.. paths.Where(path => !string.IsNullOrEmpty(path)).Distinct()];
+        return (List<string>)[.. paths.Where(path => !string.IsNullOrEmpty(path)).Distinct()];
     }
 
     /// <summary>
     /// A set of streams: an absent list is no preference, an empty one is "show none", and entries that no longer resolve
     /// are dropped — with the default standing in only when this view opened the media and nothing survived.
     /// </summary>
-    private static MediaStreamInfo[] Choose(List<TrackIdentityModel>? entries, bool opening, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
+    private static IReadOnlyList<MediaStreamInfo> Choose(List<TrackIdentityModel>? entries, bool opening, MediaStreamKind kind, IReadOnlyList<MediaSource> sources)
     {
         if (entries is null)
         {
@@ -177,12 +177,12 @@ internal static class TrackSelection
             chosen.AddRange(Defaults(sources, kind));
         }
 
-        return [.. chosen];
+        return chosen;
     }
 
-    private static MediaStreamInfo[] Defaults(IReadOnlyList<MediaSource> sources, MediaStreamKind kind)
+    private static IReadOnlyList<MediaStreamInfo> Defaults(IReadOnlyList<MediaSource> sources, MediaStreamKind kind)
     {
-        return Default(sources, kind) is { } stream ? [stream] : [];
+        return Default(sources, kind) is { } stream ? (List<MediaStreamInfo>)[stream] : [];
     }
 
     private static ViewTrackSelectionModel? ViewAt(TrackSelectionModel? model, int index)

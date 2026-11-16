@@ -81,7 +81,7 @@ public class Win2DSubtitleRendererTests
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show(new[] { cue }, TimeSpan.Zero, SubtitlePresentation.Identity);
+            drawn = renderer.Show((List<SubtitleCue>)[cue], TimeSpan.Zero, SubtitlePresentation.Identity);
         }
         finally
         {
@@ -135,7 +135,7 @@ public class Win2DSubtitleRendererTests
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show(new[] { cue }, TimeSpan.Zero, SubtitlePresentation.Identity);
+            drawn = renderer.Show((List<SubtitleCue>)[cue], TimeSpan.Zero, SubtitlePresentation.Identity);
         }
         finally
         {
@@ -173,7 +173,7 @@ public class Win2DSubtitleRendererTests
         OperationResult drawn;
         try
         {
-            drawn = renderer.Show(new[] { cue }, TimeSpan.Zero, new SubtitlePresentation { OffsetX = -50.0, OffsetY = 50.0 });
+            drawn = renderer.Show((List<SubtitleCue>)[cue], TimeSpan.Zero, new SubtitlePresentation { OffsetX = -50.0, OffsetY = 50.0 });
         }
         finally
         {
@@ -219,7 +219,7 @@ public class Win2DSubtitleRendererTests
                 using (CanvasDrawingSession session = target.CreateDrawingSession())
                 {
                     session.Clear(default(Color));
-                    Win2DSubtitleLayer.DrawCues(session, device, new[] { cue }, SubtitlePresentation.Identity, width, height);
+                    Win2DSubtitleLayer.DrawCues(session, device, (List<SubtitleCue>)[cue], SubtitlePresentation.Identity, width, height);
                 }
 
                 Assert.That(DrawnPixels(target.GetPixelBytes()), Is.GreaterThan(0), "the cue has to reach the target as pixels");
@@ -712,7 +712,7 @@ public class Win2DSubtitleRendererTests
         using (CanvasDrawingSession session = target.CreateDrawingSession())
         {
             session.Clear(default(Color));
-            Win2DSubtitleLayer.DrawCues(session, device, new[] { cue }, presentation, width, height);
+            Win2DSubtitleLayer.DrawCues(session, device, (List<SubtitleCue>)[cue], presentation, width, height);
         }
 
         return target.GetPixelBytes();
@@ -876,7 +876,7 @@ public class Win2DSubtitleRendererTests
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Color));
-                Win2DSubtitleLayer.DrawCues(session, device, new[] { cue }, SubtitlePresentation.Identity, width, height);
+                Win2DSubtitleLayer.DrawCues(session, device, (List<SubtitleCue>)[cue], SubtitlePresentation.Identity, width, height);
             }
 
             byte[] pixels = target.GetPixelBytes();
@@ -925,7 +925,7 @@ public class Win2DSubtitleRendererTests
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Color));
-                Win2DSubtitleLayer.DrawCues(session, device, new[] { first, second }, SubtitlePresentation.Identity, width, height);
+                Win2DSubtitleLayer.DrawCues(session, device, (List<SubtitleCue>)[first, second], SubtitlePresentation.Identity, width, height);
             }
 
             byte[] pixels = target.GetPixelBytes();
@@ -984,7 +984,7 @@ public class Win2DSubtitleRendererTests
             using (CanvasDrawingSession session = target.CreateDrawingSession())
             {
                 session.Clear(default(Color));
-                Win2DSubtitleLayer.DrawCues(session, device, new[] { first, second }, presentation, width, height);
+                Win2DSubtitleLayer.DrawCues(session, device, (List<SubtitleCue>)[first, second], presentation, width, height);
             }
 
             List<(int Top, int Bottom, int Left, int Right)> bands = InkBands(target.GetPixelBytes(), width, height);
@@ -1114,7 +1114,7 @@ public class Win2DSubtitleRendererTests
             Text = "0,Default,,0,0,0,,Growing",
         };
 
-        OperationResult first = renderer.Show(new[] { cue }, TimeSpan.Zero, SubtitlePresentation.Identity);
+        OperationResult first = renderer.Show((List<SubtitleCue>)[cue], TimeSpan.Zero, SubtitlePresentation.Identity);
         Assert.That(first.IsSuccessful, Is.True, first.Message);
         nint firstChain = target.Attached;
         Assert.That(firstChain, Is.Not.Zero, "the host was handed a chain to compose");
@@ -1122,7 +1122,7 @@ public class Win2DSubtitleRendererTests
         target.SetSize(800, 450);
         target.RaiseSizeChanged();
 
-        OperationResult grown = renderer.Show(new[] { cue }, TimeSpan.Zero, SubtitlePresentation.Identity);
+        OperationResult grown = renderer.Show((List<SubtitleCue>)[cue], TimeSpan.Zero, SubtitlePresentation.Identity);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(grown.IsSuccessful, Is.True, grown.Message);
@@ -1132,7 +1132,7 @@ public class Win2DSubtitleRendererTests
         target.SetSize(640, 360);
         target.RaiseSizeChanged();
 
-        OperationResult shrunk = renderer.Show(new[] { cue }, TimeSpan.Zero, SubtitlePresentation.Identity);
+        OperationResult shrunk = renderer.Show((List<SubtitleCue>)[cue], TimeSpan.Zero, SubtitlePresentation.Identity);
         Assert.That(shrunk.IsSuccessful, Is.True, shrunk.Message);
     }
 

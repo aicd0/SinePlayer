@@ -12,21 +12,21 @@ public class SpreadDetectionTest
     {
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(IsSpreadPage(1.0F, [1.0F]), Is.False);
-            Assert.That(IsSpreadPage(1.1F, [0.9F, 1.1F]), Is.False);
-            Assert.That(IsSpreadPage(0.9F, [0.9F, 1.5F]), Is.False);
-            Assert.That(IsSpreadPage(1.5F, [0.9F, 1.5F]), Is.False); // Samples too few
-            Assert.That(IsSpreadPage(1.4F, [0.7F, 1.0F, 1.4F]), Is.False);
-            Assert.That(IsSpreadPage(1.0F, [0.7F, 1.0F, 1.6F]), Is.False);
-            Assert.That(IsSpreadPage(1.6F, [0.7F, 1.0F, 1.6F]), Is.True);
-            Assert.That(IsSpreadPage(1.5F, [0.6F, 0.7F, 1.5F, 1.6F, 1.7F]), Is.True);
-            Assert.That(IsSpreadPage(1.5F, [0.4F, 0.5F, 0.6F, 0.7F, 1.5F, 1.6F, 1.7F]), Is.True);
-            Assert.That(IsSpreadPage(0.3F, [0.1F, 0.2F, 0.3F]), Is.False); // Too narrow
-            Assert.That(IsSpreadPage(1.6F, [0.3F, 0.4F, 0.5F, 1.5F, 1.6F]), Is.False); // Too narrow for previous group
+            Assert.That(IsSpreadPage(1.0F, (List<float>)[1.0F]), Is.False);
+            Assert.That(IsSpreadPage(1.1F, (List<float>)[0.9F, 1.1F]), Is.False);
+            Assert.That(IsSpreadPage(0.9F, (List<float>)[0.9F, 1.5F]), Is.False);
+            Assert.That(IsSpreadPage(1.5F, (List<float>)[0.9F, 1.5F]), Is.False); // Samples too few
+            Assert.That(IsSpreadPage(1.4F, (List<float>)[0.7F, 1.0F, 1.4F]), Is.False);
+            Assert.That(IsSpreadPage(1.0F, (List<float>)[0.7F, 1.0F, 1.6F]), Is.False);
+            Assert.That(IsSpreadPage(1.6F, (List<float>)[0.7F, 1.0F, 1.6F]), Is.True);
+            Assert.That(IsSpreadPage(1.5F, (List<float>)[0.6F, 0.7F, 1.5F, 1.6F, 1.7F]), Is.True);
+            Assert.That(IsSpreadPage(1.5F, (List<float>)[0.4F, 0.5F, 0.6F, 0.7F, 1.5F, 1.6F, 1.7F]), Is.True);
+            Assert.That(IsSpreadPage(0.3F, (List<float>)[0.1F, 0.2F, 0.3F]), Is.False); // Too narrow
+            Assert.That(IsSpreadPage(1.6F, (List<float>)[0.3F, 0.4F, 0.5F, 1.5F, 1.6F]), Is.False); // Too narrow for previous group
         }
     }
 
-    private static bool IsSpreadPage(float aspectRatio, float[] samples)
+    private static bool IsSpreadPage(float aspectRatio, IEnumerable<float> samples)
     {
         SpreadDetectionHelper.PageSamples pageSamples = new();
         foreach (float item in samples)

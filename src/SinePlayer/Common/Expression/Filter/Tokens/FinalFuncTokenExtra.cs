@@ -9,7 +9,7 @@ namespace SinePlayer.Common.Expression.Filter.Tokens;
 class FinalFuncTokenExtra : ITokenExtra
 {
     public readonly string Name;
-    public readonly ExpressionToken[] Parameters;
+    public readonly IReadOnlyList<ExpressionToken> Parameters;
 
     public FinalFuncTokenExtra(string name, IEnumerable<ExpressionToken> parameters)
     {
@@ -22,13 +22,13 @@ class FinalFuncTokenExtra : ITokenExtra
         }
 
         Name = name;
-        Parameters = [.. parameters];
+        Parameters = (List<ExpressionToken>)[.. parameters];
     }
 
     public void ToString(StringBuilder stringBuilder)
     {
         stringBuilder.Append(Name).Append('(');
-        for (int i = 0; i < Parameters.Length; i++)
+        for (int i = 0; i < Parameters.Count; i++)
         {
             if (i > 0)
             {
