@@ -64,7 +64,7 @@ internal sealed partial class CollectionPage : BasePage
 
         if (collectionId >= 0)
         {
-            CoroutineUtils.Run(() => MediaModel.UpdateCollections(triggerCollectionIds: new[] { collectionId }));
+            CoroutineUtils.Run(() => MediaModel.UpdateCollections(triggerCollectionIds: (List<long>)[collectionId]));
         }
     }
 
@@ -132,7 +132,7 @@ internal sealed partial class CollectionPage : BasePage
             return;
         }
 
-        var dialog = new EditMediaInfoDialog(new[] { collection });
+        var dialog = new EditMediaInfoDialog((List<MediaModel>)[collection]);
         CoroutineUtils.Run(() => dialog.ShowAsync(WindowId));
     }
 

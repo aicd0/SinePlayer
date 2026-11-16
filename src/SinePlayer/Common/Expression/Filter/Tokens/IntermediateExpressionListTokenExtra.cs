@@ -8,12 +8,12 @@ namespace SinePlayer.Common.Expression.Filter.Tokens;
 
 class IntermediateExpressionListTokenExtra(IEnumerable<ExpressionToken> expressions) : ITokenExtra
 {
-    public readonly ExpressionToken[] Expressions = [.. expressions];
+    public readonly IReadOnlyList<ExpressionToken> Expressions = (List<ExpressionToken>)[.. expressions];
 
     public void ToString(StringBuilder stringBuilder)
     {
         stringBuilder.Append('(');
-        for (int i = 0; i < Expressions.Length; i++)
+        for (int i = 0; i < Expressions.Count; i++)
         {
             if (i > 0)
             {

@@ -772,10 +772,10 @@ internal sealed partial class PlaybackLabPage : BasePage
             IVideoDecoderFactory nullVideoDecoder = new NullVideoDecoderFactory();
             VideoDecoderPicker.ItemsSource = new ComponentChoice[]
             {
-                new("Auto", [ffmpegVideoDecoder], HardwareDecoding: true),
-                new("FFmpeg (hardware)", [ffmpegVideoDecoder], HardwareDecoding: true),
-                new("FFmpeg (software)", [ffmpegVideoDecoder], HardwareDecoding: false),
-                new("Nothing", [nullVideoDecoder]),
+                new("Auto", (List<IComponentFactory>)[ffmpegVideoDecoder], HardwareDecoding: true),
+                new("FFmpeg (hardware)", (List<IComponentFactory>)[ffmpegVideoDecoder], HardwareDecoding: true),
+                new("FFmpeg (software)", (List<IComponentFactory>)[ffmpegVideoDecoder], HardwareDecoding: false),
+                new("Nothing", (List<IComponentFactory>)[nullVideoDecoder]),
             };
 
             IVideoRendererFactory d3d11VideoRenderer = new D3D11VideoRendererFactory(VideoSurfacePreference.Sdr);
@@ -784,29 +784,29 @@ internal sealed partial class PlaybackLabPage : BasePage
             IVideoRendererFactory d3d11HdrContainer = new D3D11VideoRendererFactory(VideoSurfacePreference.Hdr10);
             VideoRendererPicker.ItemsSource = new ComponentChoice[]
             {
-                new("Auto", [d3d11VideoRenderer]),
-                new("Direct3D 11 (SDR)", [d3d11VideoRenderer]),
-                new("Direct3D 11 (Auto)", [d3d11AutoContainer]),
-                new("Direct3D 11 (HDR10)", [d3d11HdrContainer]),
-                new("Nothing", [nullVideoRenderer]),
+                new("Auto", (List<IComponentFactory>)[d3d11VideoRenderer]),
+                new("Direct3D 11 (SDR)", (List<IComponentFactory>)[d3d11VideoRenderer]),
+                new("Direct3D 11 (Auto)", (List<IComponentFactory>)[d3d11AutoContainer]),
+                new("Direct3D 11 (HDR10)", (List<IComponentFactory>)[d3d11HdrContainer]),
+                new("Nothing", (List<IComponentFactory>)[nullVideoRenderer]),
             };
 
             IAudioDecoderFactory ffmpegAudioDecoder = new FFmpegAudioDecoderFactory();
             IAudioDecoderFactory nullAudioDecoder = new NullAudioDecoderFactory();
             AudioDecoderPicker.ItemsSource = new ComponentChoice[]
             {
-                new("Auto", [ffmpegAudioDecoder, nullAudioDecoder]),
-                new("FFmpeg", [ffmpegAudioDecoder]),
-                new("Nothing", [nullAudioDecoder]),
+                new("Auto", (List<IComponentFactory>)[ffmpegAudioDecoder, nullAudioDecoder]),
+                new("FFmpeg", (List<IComponentFactory>)[ffmpegAudioDecoder]),
+                new("Nothing", (List<IComponentFactory>)[nullAudioDecoder]),
             };
 
             ISubtitleDecoderFactory ffmpegSubtitleDecoder = new FFmpegSubtitleDecoderFactory();
             ISubtitleDecoderFactory nullSubtitleDecoder = new NullSubtitleDecoderFactory();
             SubtitleDecoderPicker.ItemsSource = new ComponentChoice[]
             {
-                new("Auto", [ffmpegSubtitleDecoder]),
-                new("FFmpeg", [ffmpegSubtitleDecoder]),
-                new("Nothing", [nullSubtitleDecoder]),
+                new("Auto", (List<IComponentFactory>)[ffmpegSubtitleDecoder]),
+                new("FFmpeg", (List<IComponentFactory>)[ffmpegSubtitleDecoder]),
+                new("Nothing", (List<IComponentFactory>)[nullSubtitleDecoder]),
             };
 
             ISubtitleRendererFactory assSubtitleRenderer = new AssSubtitleRendererFactory();
@@ -814,10 +814,10 @@ internal sealed partial class PlaybackLabPage : BasePage
             ISubtitleRendererFactory nullSubtitleRenderer = new NullSubtitleRendererFactory();
             SubtitleRendererPicker.ItemsSource = new ComponentChoice[]
             {
-                new("Auto", [assSubtitleRenderer, win2dSubtitleRenderer]),
-                new("libass", [assSubtitleRenderer]),
-                new("Win2D", [win2dSubtitleRenderer]),
-                new("Nothing", [nullSubtitleRenderer]),
+                new("Auto", (List<IComponentFactory>)[assSubtitleRenderer, win2dSubtitleRenderer]),
+                new("libass", (List<IComponentFactory>)[assSubtitleRenderer]),
+                new("Win2D", (List<IComponentFactory>)[win2dSubtitleRenderer]),
+                new("Nothing", (List<IComponentFactory>)[nullSubtitleRenderer]),
             };
 
             List<ComponentChoice> audioRenderers = [];
@@ -831,7 +831,7 @@ internal sealed partial class PlaybackLabPage : BasePage
                     allAudioRenderers.Add(device);
                     audioRenderers.Add(new ComponentChoice(
                         endpoint.IsDefault ? $"WASAPI [{endpoint.Name}] (default)" : $"WASAPI {endpoint.Name}",
-                        [device]));
+                        (List<IComponentFactory>)[device]));
                 }
             }
             else
@@ -843,13 +843,13 @@ internal sealed partial class PlaybackLabPage : BasePage
             {
                 IAudioRendererFactory defaultDevice = new WasapiAudioRendererFactory();
                 allAudioRenderers.Add(defaultDevice);
-                audioRenderers.Add(new ComponentChoice("WASAPI (default)", [defaultDevice]));
+                audioRenderers.Add(new ComponentChoice("WASAPI (default)", (List<IComponentFactory>)[defaultDevice]));
             }
 
             IAudioRendererFactory nullAudioRenderer = new NullAudioRendererFactory();
             allAudioRenderers.Add(nullAudioRenderer);
-            audioRenderers.Add(new ComponentChoice("Nothing", [nullAudioRenderer]));
-            audioRenderers.Insert(0, new ComponentChoice("Auto", [.. allAudioRenderers]));
+            audioRenderers.Add(new ComponentChoice("Nothing", (List<IComponentFactory>)[nullAudioRenderer]));
+            audioRenderers.Insert(0, new ComponentChoice("Auto", allAudioRenderers));
             AudioRendererPicker.ItemsSource = audioRenderers;
 
             RotationPicker.ItemsSource = new[] { "0°", "90°", "180°", "270°" };
@@ -1080,7 +1080,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         return GetAbility<IMainPageAbilityForTab>()!;
     }
 
-    private sealed record ComponentChoice(string Name, IComponentFactory[] Factories, bool? HardwareDecoding = null)
+    private sealed record ComponentChoice(string Name, IReadOnlyList<IComponentFactory> Factories, bool? HardwareDecoding = null)
     {
         public override string ToString()
         {

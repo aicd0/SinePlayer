@@ -24,7 +24,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(1.5))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(1.5))],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -50,7 +50,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(20),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(20))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(20))],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -80,7 +80,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(20),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(20))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(20))],
         };
 
         FakeSubtitleRenderer first = new();
@@ -118,7 +118,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(6),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(6))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(6))],
         };
 
         FakeSubtitleRenderer renderer = new();
@@ -147,7 +147,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         };
 
         FakeSubtitleRenderer renderer = new();
@@ -174,7 +174,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -196,7 +196,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -251,8 +251,8 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
-            Attachments = [attachment],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Attachments = (List<MediaAttachment>)[attachment],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -260,7 +260,7 @@ public partial class PlaybackPipelineTests
 
         Assert.That(OpenForSubtitles(pipeline).IsSuccessful, Is.True);
 
-        Assert.That(subtitleRenderer.ConfiguredAttachments, Has.Length.EqualTo(1), "the renderer is told what the file holds");
+        Assert.That(subtitleRenderer.ConfiguredAttachments, Has.Count.EqualTo(1), "the renderer is told what the file holds");
         Assert.That(subtitleRenderer.ConfiguredAttachments[0].Name, Is.EqualTo("fonts/Track.ttf"));
         Assert.That(subtitleRenderer.ConfiguredAttachments[0].Data.ToArray(), Is.EqualTo(attachment.Data.ToArray()));
     }
@@ -276,7 +276,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -311,7 +311,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -382,7 +382,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -428,7 +428,7 @@ public partial class PlaybackPipelineTests
         sources.Add(playing, new SyntheticMediaScript
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         });
 
         FakeSubtitleRenderer words = new();
@@ -487,7 +487,7 @@ public partial class PlaybackPipelineTests
         sources.Add(playing, new SyntheticMediaScript
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         });
 
         FakeSubtitleRenderer words = new();
@@ -535,7 +535,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -562,7 +562,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -589,7 +589,7 @@ public partial class PlaybackPipelineTests
         SyntheticMediaScript script = new()
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(1))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(1))],
         };
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -628,7 +628,7 @@ public partial class PlaybackPipelineTests
         sources.Add(subtitles, new SyntheticMediaScript
         {
             Duration = TimeSpan.FromSeconds(3),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(3))],
         });
 
         FakeSubtitleRenderer subtitleRenderer = new();
@@ -684,7 +684,7 @@ public partial class PlaybackPipelineTests
         sources.Add(wordsPosition, new SyntheticMediaScript
         {
             Duration = TimeSpan.FromSeconds(10),
-            Subtitles = [new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(10))],
+            Subtitles = (List<ScriptedSubtitle>)[new ScriptedSubtitle(TimeSpan.FromSeconds(0.2), TimeSpan.FromSeconds(10))],
         });
 
         FakeVideoRenderer leavingRenderer = new();

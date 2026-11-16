@@ -72,7 +72,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
     public static async Task<MediaModel?> FromFile(string path)
     {
-        List<MediaModel> mediaItems = await FromFiles(new[] { path });
+        List<MediaModel> mediaItems = await FromFiles((List<string>)[path]);
         return mediaItems.Count > 0 ? mediaItems[0] : null;
     }
 
@@ -444,7 +444,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             await RemoveMediaInternal(collections);
         }
 
-        await TransitionToExternal(mediaItems.Where(x => !x.IsCollection).ToArray());
+        await TransitionToExternal((List<MediaModel>)[.. mediaItems.Where(x => !x.IsCollection)]);
     }
 
     public static Task<List<string>> GetAllTagCategories()
@@ -668,7 +668,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
             if (pendingPromotions.Count > 0)
             {
-                List<long> promotedIds = await PromoteToLibrary(pendingPromotions.ToArray());
+                List<long> promotedIds = await PromoteToLibrary((List<string>)[.. pendingPromotions]);
                 pendingPromotions.Clear();
                 changedMediaIds.UnionWith(promotedIds);
             }
@@ -723,7 +723,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
                     if (changedMediaIds.Count > 0)
                     {
-                        DispatchUpdateEvent([.. changedMediaIds]);
+                        DispatchUpdateEvent(changedMediaIds);
                         changedMediaIds.Clear();
                     }
 
@@ -866,7 +866,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
         if (changedMediaIds.Count > 0)
         {
-            DispatchUpdateEvent([.. changedMediaIds]);
+            DispatchUpdateEvent(changedMediaIds);
         }
     }
 
@@ -952,7 +952,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             }
         });
 
-        DispatchUpdateEvent([.. ids]);
+        DispatchUpdateEvent(ids);
     }
 
     private static async Task RemoveMediaInternal(IEnumerable<MediaModel> mediaItems)
@@ -1056,7 +1056,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             await UpdateCollections(triggerCollectionIds: affectedCollectionIds);
         }
 
-        DispatchUpdateEvent([.. ids]);
+        DispatchUpdateEvent(ids);
     }
 
     private static async Task<List<long>> GetEmptyAutoCollectionIds(IReadOnlyList<long> removingMediaIds)
@@ -1180,7 +1180,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         });
     }
 
-    private static void DispatchUpdateEvent(long[] mediaIds, int delay = 0)
+    private static void DispatchUpdateEvent(IEnumerable<long> mediaIds, int delay = 0)
     {
         List<long> filtered = [.. mediaIds.Where(x => x >= 0)];
         if (filtered.Count == 0)
@@ -1188,7 +1188,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             return;
         }
 
-        GlobalEvent.Instance.MediaUpdated.EmitDelayed([.. filtered], delay);
+        GlobalEvent.Instance.MediaUpdated.EmitDelayed(filtered, delay);
     }
 
     //
@@ -1305,13 +1305,13 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             _idPool.Set(Id, this);
         }
 
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     public void SetExt(string key, string? value)
     {
         _internalModel.SetExt(key, value);
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     public async Task FlushExt()
@@ -1322,19 +1322,19 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     public async Task SetTitle1(string title)
     {
         await _internalModel.SetTitle1(title);
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     public async Task SetTitle2(string title)
     {
         await _internalModel.SetTitle2(title);
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     public async Task SetDescription(string description)
     {
         await _internalModel.SetDescription(description);
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     public async Task SetRating(int rating)
@@ -1345,13 +1345,13 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         }
 
         await _internalModel.SetRating(rating);
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     public async Task SetTags<T>(IEnumerable<KeyValuePair<string, T>> tags) where T : IEnumerable<string>
     {
         await _internalModel.SetTags(tags);
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     public async Task SetCompletionStatus(CompletionStatusEnum status)
@@ -1380,7 +1380,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
 
         if (updated)
         {
-            DispatchUpdateEvent([Id]);
+            DispatchUpdateEvent((List<long>)[Id]);
         }
     }
 
@@ -1393,7 +1393,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
             await _internalModel.SaveCompletionStatus(CompletionStatusEnum.Ongoing);
         }
 
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     public async Task SetProgress(int progress, long lastPositionMs)
@@ -1404,7 +1404,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         }
 
         await _internalModel.SetProgress(progress, lastPositionMs);
-        DispatchUpdateEvent([Id], delay: 5000);
+        DispatchUpdateEvent((List<long>)[Id], delay: 5000);
     }
 
     public async Task SetHidden(bool isHidden)
@@ -1415,7 +1415,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         }
 
         await _internalModel.SaveHiddenAsync(isHidden);
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     public async Task SetLocation(string location)
@@ -1444,7 +1444,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
                 .Execute();
         });
 
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     //
@@ -1564,7 +1564,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     {
         CompletionStatusEnum convertedStatus = CompletionStatusService.SDKEnumToHostEnum(status);
         await _internalModel.SaveCompletionStatus(convertedStatus);
-        DispatchUpdateEvent([Id]);
+        DispatchUpdateEvent((List<long>)[Id]);
     }
 
     //

@@ -418,13 +418,13 @@ public partial class PlaybackPipelineTests
         private readonly SyntheticVideoDecoderFactory _inner = new();
         private readonly List<bool> _hardwareRequests = [];
 
-        internal bool[] HardwareRequests
+        internal IReadOnlyList<bool> HardwareRequests
         {
             get
             {
                 lock (_hardwareRequests)
                 {
-                    return [.. _hardwareRequests];
+                    return (List<bool>)[.. _hardwareRequests];
                 }
             }
         }
@@ -1658,7 +1658,7 @@ public partial class PlaybackPipelineTests
         var waitedFor = Stopwatch.StartNew();
         while (waitedFor.ElapsedMilliseconds < 5000)
         {
-            if (warnings.Messages.Length > 0)
+            if (warnings.Messages.Count > 0)
             {
                 return;
             }
@@ -1683,24 +1683,24 @@ public partial class PlaybackPipelineTests
             pipeline.WarningRaised += Record;
         }
 
-        internal WarningEntry[] Entries
+        internal IReadOnlyList<WarningEntry> Entries
         {
             get
             {
                 lock (_lock)
                 {
-                    return [.. _entries];
+                    return (List<WarningEntry>)[.. _entries];
                 }
             }
         }
 
-        internal string[] Messages
+        internal IReadOnlyList<string> Messages
         {
             get
             {
                 lock (_lock)
                 {
-                    return [.. _entries.Select(entry => entry.Message)];
+                    return (List<string>)[.. _entries.Select(entry => entry.Message)];
                 }
             }
         }
@@ -1809,13 +1809,13 @@ public partial class PlaybackPipelineTests
         private readonly List<int> _renderedWidths = [];
 
         /// <summary>The width of every frame handed over, in the order it was: which stream a frame came from.</summary>
-        public int[] RenderedWidths
+        public IReadOnlyList<int> RenderedWidths
         {
             get
             {
                 lock (_renderedWidths)
                 {
-                    return [.. _renderedWidths];
+                    return (List<int>)[.. _renderedWidths];
                 }
             }
         }
@@ -1824,13 +1824,13 @@ public partial class PlaybackPipelineTests
         /// The timestamp of every frame the pipeline handed over, in the order it did: what a test reads when
         /// the question is *which* frames were shown rather than how many.
         /// </summary>
-        public TimeSpan[] RenderedTimestamps
+        public IReadOnlyList<TimeSpan> RenderedTimestamps
         {
             get
             {
                 lock (_renderedTimestamps)
                 {
-                    return [.. _renderedTimestamps];
+                    return (List<TimeSpan>)[.. _renderedTimestamps];
                 }
             }
         }
@@ -2302,13 +2302,13 @@ public partial class PlaybackPipelineTests
         /// is visible in, since the format the renderer was configured with says what it should be and this says what
         /// actually arrived.
         /// </summary>
-        public int[] SubmittedChannelCounts
+        public IReadOnlyList<int> SubmittedChannelCounts
         {
             get
             {
                 lock (_submittedTimestamps)
                 {
-                    return [.. _submittedChannelCounts];
+                    return (List<int>)[.. _submittedChannelCounts];
                 }
             }
         }
@@ -2319,13 +2319,13 @@ public partial class PlaybackPipelineTests
         /// The timestamp of every block the pipeline handed to the device, in the order it did â€” including the
         /// ones the device later let go of, because what a seek is asked about is what was offered at all.
         /// </summary>
-        public TimeSpan[] SubmittedTimestamps
+        public IReadOnlyList<TimeSpan> SubmittedTimestamps
         {
             get
             {
                 lock (_submittedTimestamps)
                 {
-                    return [.. _submittedTimestamps];
+                    return (List<TimeSpan>)[.. _submittedTimestamps];
                 }
             }
         }
@@ -2782,16 +2782,16 @@ public partial class PlaybackPipelineTests
 
             public OperationResult TryDecode(MediaPacket packet, out IReadOnlyList<SubtitleCue> cues)
             {
-                cues = new SubtitleCue[]
-                {
+                cues =
+                (List<SubtitleCue>)[
                     new SubtitleCue
                     {
                         Start = packet.Timestamp,
                         End = packet.Timestamp + packet.Duration,
                         Text = SyntheticSubtitleDecoderFactory.TextAt(packet.Timestamp),
-                        Changes = [new SubtitleChange(instant, instant, false)],
+                        Changes = (List<SubtitleChange>)[new SubtitleChange(instant, instant, false)],
                     },
-                };
+                ];
 
                 return OperationResult.Success();
             }
@@ -2872,7 +2872,7 @@ public partial class PlaybackPipelineTests
         public SubtitleStreamInfo? ConfiguredStream { get; private set; }
 
         /// <summary>The attachments the renderer was configured with, which is how a test reads what reached it.</summary>
-        public MediaAttachment[] ConfiguredAttachments { get; private set; } = [];
+        public IReadOnlyList<MediaAttachment> ConfiguredAttachments { get; private set; } = [];
 
         public IVideoRenderTarget? Target { get; private set; }
 
@@ -2889,13 +2889,13 @@ public partial class PlaybackPipelineTests
         }
 
         /// <summary>The presentation of every drawing, in order, so a test can check nothing was drawn without it.</summary>
-        public SubtitlePresentation[] Presentations
+        public IReadOnlyList<SubtitlePresentation> Presentations
         {
             get
             {
                 lock (_lock)
                 {
-                    return [.. _presentations];
+                    return (List<SubtitlePresentation>)[.. _presentations];
                 }
             }
         }
@@ -2913,10 +2913,10 @@ public partial class PlaybackPipelineTests
 
         public bool Disposed { get; private set; }
 
-        public OperationResult Configure(SubtitleStreamInfo stream, MediaAttachment[] attachments, IVideoRenderTarget target)
+        public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
         {
             ConfiguredStream = stream;
-            ConfiguredAttachments = [.. attachments];
+            ConfiguredAttachments = (List<MediaAttachment>)[.. attachments];
             Target = target;
             return OperationResult.Success();
         }

@@ -160,10 +160,10 @@ internal class MediaSearchEngine
         }
 
         var matches = new List<Match>();
-        HashSet<long> matchedIds = [];
-        HashSet<long> matchedCollectionIds = [];
         await MediaHandle.Enqueue(() =>
         {
+            HashSet<long> matchedIds = [];
+            HashSet<long> matchedCollectionIds = [];
             SelectCommand command = SelectCommand.Create(MediaTable.Instance)
                 .AppendCondition(MediaHandle.CreateLibraryCondition());
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);

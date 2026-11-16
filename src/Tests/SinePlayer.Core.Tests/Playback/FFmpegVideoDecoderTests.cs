@@ -680,7 +680,7 @@ public class FFmpegVideoDecoderTests
             VideoStreamInfo stream = source.Info.VideoStreams[0];
             Assert.That(stream.CodecId, Is.EqualTo("av1"));
 
-            OperationResult<FFmpegVideoDecoder> createdDecoder = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: false, gpuFrames: false, gpuDevice: null, bufferedFrames: 0, candidates: ["av1", "libdav1d"]);
+            OperationResult<FFmpegVideoDecoder> createdDecoder = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: false, gpuFrames: false, gpuDevice: null, bufferedFrames: 0, candidates: (List<string>)["av1", "libdav1d"]);
             Assert.That(createdDecoder.IsSuccessful, Is.True, createdDecoder.Message);
 
             using FFmpegVideoDecoder owned = createdDecoder.Result;
@@ -715,7 +715,7 @@ public class FFmpegVideoDecoderTests
 
             using var source = (FFmpegSource)opened!;
             VideoStreamInfo stream = source.Info.VideoStreams[0];
-            OperationResult<FFmpegVideoDecoder> createdDecoder = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: false, gpuFrames: false, gpuDevice: null, bufferedFrames: 0, candidates: ["h264", "libdav1d"]);
+            OperationResult<FFmpegVideoDecoder> createdDecoder = FFmpegVideoDecoder.TryCreate(source, stream, hardwareDecoding: false, gpuFrames: false, gpuDevice: null, bufferedFrames: 0, candidates: (List<string>)["h264", "libdav1d"]);
             Assert.That(createdDecoder.IsSuccessful, Is.True, createdDecoder.Message);
 
             using FFmpegVideoDecoder owned = createdDecoder.Result;

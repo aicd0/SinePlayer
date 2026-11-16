@@ -259,15 +259,15 @@ internal class MediaPropertyModel
             return $"{progress / 10 * 10}%";
         }
 
-        string[] GetTagGroupNames(MediaModel media)
+        IEnumerable<string> GetTagGroupNames(MediaModel media)
         {
             if (!media.Tags.TryGetValue(Name, out MediaTagCategory? category))
             {
                 string name = StringResourceProvider.Instance.Ungrouped;
-                return [name];
+                return (List<string>)[name];
             }
 
-            return [.. category.Tags];
+            return (List<string>)[.. category.Tags];
         }
 
         string GetRatingGroupName(MediaModel media)
@@ -393,7 +393,7 @@ internal class MediaPropertyModel
         MediaGrouper CreateFallbackGrouper()
         {
             Logger.F(TAG, "Using fallback grouper");
-            return CreateGrouper(x => (string[])[new(StringResourceProvider.Instance.Ungrouped)]);
+            return CreateGrouper(x => (List<string>)[new(StringResourceProvider.Instance.Ungrouped)]);
         }
 
         MediaGrouper CreatePluginPropertyGrouper()
@@ -408,13 +408,13 @@ internal class MediaPropertyModel
 
         return Type switch
         {
-            PropertyTypeEnum.Title => CreateGrouper(x => (string[])[GetTitleGroupName(x)]),
-            PropertyTypeEnum.Progress => CreateGrouper(x => (string[])[GetProgressGroupName(x)]),
+            PropertyTypeEnum.Title => CreateGrouper(x => (List<string>)[GetTitleGroupName(x)]),
+            PropertyTypeEnum.Progress => CreateGrouper(x => (List<string>)[GetProgressGroupName(x)]),
             PropertyTypeEnum.Tag => CreateGrouper(GetTagGroupNames),
-            PropertyTypeEnum.Rating => CreateGrouper(x => (string[])[GetRatingGroupName(x)]),
-            PropertyTypeEnum.CompletionStatus => CreateGrouper(x => (string[])[GetCompletionStatusGroupName(x)]),
-            PropertyTypeEnum.LastVisitTime => CreateGrouper(x => (string[])[GetLastReadTimeGroupName(x)]),
-            PropertyTypeEnum.Duration => CreateGrouper(x => (string[])[GetDurationGroupName(x)]),
+            PropertyTypeEnum.Rating => CreateGrouper(x => (List<string>)[GetRatingGroupName(x)]),
+            PropertyTypeEnum.CompletionStatus => CreateGrouper(x => (List<string>)[GetCompletionStatusGroupName(x)]),
+            PropertyTypeEnum.LastVisitTime => CreateGrouper(x => (List<string>)[GetLastReadTimeGroupName(x)]),
+            PropertyTypeEnum.Duration => CreateGrouper(x => (List<string>)[GetDurationGroupName(x)]),
             PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertyGrouper(),
             _ => CreateFallbackGrouper(),
         };

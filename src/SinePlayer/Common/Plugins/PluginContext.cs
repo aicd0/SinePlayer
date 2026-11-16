@@ -104,7 +104,7 @@ internal partial class PluginContext : IPluginContext
         SafeAction(() => _mediaEditedEventHandler?.Invoke(media));
     }
 
-    public BaseMenuFlyoutItemModel[] GetMainPageMoreMenuItems(IWindowContext windowContext)
+    public IReadOnlyList<BaseMenuFlyoutItemModel> GetMainPageMoreMenuItems(IWindowContext windowContext)
     {
         if (!IsActive)
         {
@@ -117,10 +117,10 @@ internal partial class PluginContext : IPluginContext
             return [];
         }
 
-        return [.. SafeAction(() => creator.CreateMenuItems(windowContext), []).Select(CreateHostMenuFlyoutItem)];
+        return (List<BaseMenuFlyoutItemModel>)[.. SafeAction(() => creator.CreateMenuItems(windowContext), []).Select(CreateHostMenuFlyoutItem)];
     }
 
-    public BaseMenuFlyoutItemModel[] GetMediaMenuItems(IWindowContext windowContext, IMediaModel primary, IEnumerable<IMediaModel> selection)
+    public IReadOnlyList<BaseMenuFlyoutItemModel> GetMediaMenuItems(IWindowContext windowContext, IMediaModel primary, IEnumerable<IMediaModel> selection)
     {
         if (!IsActive)
         {
@@ -133,27 +133,27 @@ internal partial class PluginContext : IPluginContext
             return [];
         }
 
-        return [.. SafeAction(() => creator.CreateMenuItems(windowContext, primary, selection), []).Select(CreateHostMenuFlyoutItem)];
+        return (List<BaseMenuFlyoutItemModel>)[.. SafeAction(() => creator.CreateMenuItems(windowContext, primary, selection), []).Select(CreateHostMenuFlyoutItem)];
     }
 
-    public IVirtualProperty<IMediaModel>[] GetAllMediaVirtualProperties()
+    public IEnumerable<IVirtualProperty<IMediaModel>> GetAllMediaVirtualProperties()
     {
         if (!IsActive)
         {
             return [];
         }
 
-        return [.. _mediaVirtualProperties.Values];
+        return (List<IVirtualProperty<IMediaModel>>)[.. _mediaVirtualProperties.Values];
     }
 
-    public ISidebarPageProvider[] GetAllSidebarPageProviders()
+    public IReadOnlyList<ISidebarPageProvider> GetAllSidebarPageProviders()
     {
         if (!IsActive)
         {
             return [];
         }
 
-        return [.. _sidebarPageProviders];
+        return (List<ISidebarPageProvider>)[.. _sidebarPageProviders];
     }
 
     public void SetForegroundMedia(PluginWindowContext windowContext, IMediaModel? media)
@@ -340,7 +340,7 @@ internal partial class PluginContext : IPluginContext
             {
                 Text = subItemMenuItem.Text,
                 Icon = subItemMenuItem.Icon,
-                Items = subItemMenuItem.Items.Select(CreateHostMenuFlyoutItem).ToArray(),
+                Items = (List<BaseMenuFlyoutItemModel>)[.. subItemMenuItem.Items.Select(CreateHostMenuFlyoutItem)],
             },
             _ => throw new NotSupportedException($"Unsupported menu item type: {item.GetType().FullName}"),
         };

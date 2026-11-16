@@ -38,30 +38,30 @@ internal sealed record PlaybackComponents(
     public const string LIBASS = "libass";
     private const string WASAPI_PREFIX = "wasapi:";
 
-    public static PlaybackComponentOption[] GetVideoDecoderOptions()
+    public static IReadOnlyList<PlaybackComponentOption> GetVideoDecoderOptions()
     {
         return
-        [
+        (List<PlaybackComponentOption>)[
             new(AUTO, StringResourceProvider.Instance.Auto),
             new(FFMPEG, "FFmpeg"),
             new(NONE, StringResourceProvider.Instance.None),
         ];
     }
 
-    public static PlaybackComponentOption[] GetVideoRendererOptions()
+    public static IReadOnlyList<PlaybackComponentOption> GetVideoRendererOptions()
     {
         return
-        [
+        (List<PlaybackComponentOption>)[
             new(AUTO, StringResourceProvider.Instance.Auto),
             new(DIRECT3D11, "Direct3D 11"),
             new(NONE, StringResourceProvider.Instance.None),
         ];
     }
 
-    public static PlaybackComponentOption[] GetAudioDecoderOptions()
+    public static IReadOnlyList<PlaybackComponentOption> GetAudioDecoderOptions()
     {
         return
-        [
+        (List<PlaybackComponentOption>)[
             new(AUTO, StringResourceProvider.Instance.Auto),
             new(FFMPEG, "FFmpeg"),
             new(NONE, StringResourceProvider.Instance.None),
@@ -91,20 +91,20 @@ internal sealed record PlaybackComponents(
         return options;
     }
 
-    public static PlaybackComponentOption[] GetSubtitleDecoderOptions()
+    public static IReadOnlyList<PlaybackComponentOption> GetSubtitleDecoderOptions()
     {
         return
-        [
+        (List<PlaybackComponentOption>)[
             new(AUTO, StringResourceProvider.Instance.Auto),
             new(FFMPEG, "FFmpeg"),
             new(NONE, StringResourceProvider.Instance.None),
         ];
     }
 
-    public static PlaybackComponentOption[] GetSubtitleRendererOptions()
+    public static IReadOnlyList<PlaybackComponentOption> GetSubtitleRendererOptions()
     {
         return
-        [
+        (List<PlaybackComponentOption>)[
             new(AUTO, StringResourceProvider.Instance.Auto),
             new(WIN2D, "Win2D"),
             new(LIBASS, "libass"),
@@ -135,13 +135,13 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case FFMPEG:
-                SetVideoDecoders(chain, [new FFmpegVideoDecoderFactory()]);
+                SetVideoDecoders(chain, (List<IVideoDecoderFactory>)[new FFmpegVideoDecoderFactory()]);
                 break;
             case NONE:
-                SetVideoDecoders(chain, [new NullVideoDecoderFactory()]);
+                SetVideoDecoders(chain, (List<IVideoDecoderFactory>)[new NullVideoDecoderFactory()]);
                 break;
             default:
-                SetVideoDecoders(chain, [new FFmpegVideoDecoderFactory()]);
+                SetVideoDecoders(chain, (List<IVideoDecoderFactory>)[new FFmpegVideoDecoderFactory()]);
                 break;
         }
 
@@ -155,13 +155,13 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case DIRECT3D11:
-                SetVideoRenderers(chain, [new D3D11VideoRendererFactory(surface)]);
+                SetVideoRenderers(chain, (List<IVideoRendererFactory>)[new D3D11VideoRendererFactory(surface)]);
                 break;
             case NONE:
-                SetVideoRenderers(chain, [new NullVideoRendererFactory()]);
+                SetVideoRenderers(chain, (List<IVideoRendererFactory>)[new NullVideoRendererFactory()]);
                 break;
             default:
-                SetVideoRenderers(chain, [new D3D11VideoRendererFactory(surface)]);
+                SetVideoRenderers(chain, (List<IVideoRendererFactory>)[new D3D11VideoRendererFactory(surface)]);
                 break;
         }
     }
@@ -171,13 +171,13 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case FFMPEG:
-                SetAudioDecoders(chain, [new FFmpegAudioDecoderFactory()]);
+                SetAudioDecoders(chain, (List<IAudioDecoderFactory>)[new FFmpegAudioDecoderFactory()]);
                 break;
             case NONE:
-                SetAudioDecoders(chain, [new NullAudioDecoderFactory()]);
+                SetAudioDecoders(chain, (List<IAudioDecoderFactory>)[new NullAudioDecoderFactory()]);
                 break;
             default:
-                SetAudioDecoders(chain, [new FFmpegAudioDecoderFactory()]);
+                SetAudioDecoders(chain, (List<IAudioDecoderFactory>)[new FFmpegAudioDecoderFactory()]);
                 break;
         }
     }
@@ -194,7 +194,7 @@ internal sealed record PlaybackComponents(
                 {
                     if (endpoint.Id == endpointId)
                     {
-                        SetAudioRenderers(chain, [WasapiAudioRendererFactory.For(endpoint)]);
+                        SetAudioRenderers(chain, (List<IAudioRendererFactory>)[WasapiAudioRendererFactory.For(endpoint)]);
                         return;
                     }
                 }
@@ -206,7 +206,7 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case NONE:
-                SetAudioRenderers(chain, [new NullAudioRendererFactory()]);
+                SetAudioRenderers(chain, (List<IAudioRendererFactory>)[new NullAudioRendererFactory()]);
                 return;
             case AUTO:
             default:
@@ -226,7 +226,7 @@ internal sealed record PlaybackComponents(
                         factories.Add(new WasapiAudioRendererFactory());
                     }
 
-                    SetAudioRenderers(chain, [.. factories]);
+                    SetAudioRenderers(chain, factories);
                     return;
                 }
         }
@@ -237,13 +237,13 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case FFMPEG:
-                SetSubtitleDecoders(chain, [new FFmpegSubtitleDecoderFactory()]);
+                SetSubtitleDecoders(chain, (List<ISubtitleDecoderFactory>)[new FFmpegSubtitleDecoderFactory()]);
                 break;
             case NONE:
-                SetSubtitleDecoders(chain, [new NullSubtitleDecoderFactory()]);
+                SetSubtitleDecoders(chain, (List<ISubtitleDecoderFactory>)[new NullSubtitleDecoderFactory()]);
                 break;
             default:
-                SetSubtitleDecoders(chain, [new FFmpegSubtitleDecoderFactory()]);
+                SetSubtitleDecoders(chain, (List<ISubtitleDecoderFactory>)[new FFmpegSubtitleDecoderFactory()]);
                 break;
         }
     }
@@ -253,21 +253,21 @@ internal sealed record PlaybackComponents(
         switch (key)
         {
             case WIN2D:
-                SetSubtitleRenderers(chain, [new Win2DSubtitleRendererFactory()]);
+                SetSubtitleRenderers(chain, (List<ISubtitleRendererFactory>)[new Win2DSubtitleRendererFactory()]);
                 break;
             case LIBASS:
-                SetSubtitleRenderers(chain, [new AssSubtitleRendererFactory()]);
+                SetSubtitleRenderers(chain, (List<ISubtitleRendererFactory>)[new AssSubtitleRendererFactory()]);
                 break;
             case NONE:
-                SetSubtitleRenderers(chain, [new NullSubtitleRendererFactory()]);
+                SetSubtitleRenderers(chain, (List<ISubtitleRendererFactory>)[new NullSubtitleRendererFactory()]);
                 break;
             default:
-                SetSubtitleRenderers(chain, [new AssSubtitleRendererFactory(), new Win2DSubtitleRendererFactory()]);
+                SetSubtitleRenderers(chain, (List<ISubtitleRendererFactory>)[new AssSubtitleRendererFactory(), new Win2DSubtitleRendererFactory()]);
                 break;
         }
     }
 
-    private static void SetVideoDecoders(IVideoChain chain, IVideoDecoderFactory[] factories)
+    private static void SetVideoDecoders(IVideoChain chain, IEnumerable<IVideoDecoderFactory> factories)
     {
         chain.Components.ClearDecoders();
         foreach (IVideoDecoderFactory factory in factories)
@@ -276,7 +276,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetVideoRenderers(IVideoChain chain, IVideoRendererFactory[] factories)
+    private static void SetVideoRenderers(IVideoChain chain, IEnumerable<IVideoRendererFactory> factories)
     {
         chain.Components.ClearRenderers();
         foreach (IVideoRendererFactory factory in factories)
@@ -285,7 +285,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetAudioDecoders(IAudioChain chain, IAudioDecoderFactory[] factories)
+    private static void SetAudioDecoders(IAudioChain chain, IEnumerable<IAudioDecoderFactory> factories)
     {
         chain.Components.ClearDecoders();
         foreach (IAudioDecoderFactory factory in factories)
@@ -294,7 +294,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetAudioRenderers(IAudioChain chain, IAudioRendererFactory[] factories)
+    private static void SetAudioRenderers(IAudioChain chain, IEnumerable<IAudioRendererFactory> factories)
     {
         chain.Components.ClearRenderers();
         foreach (IAudioRendererFactory factory in factories)
@@ -303,7 +303,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetSubtitleDecoders(ISubtitleChain chain, ISubtitleDecoderFactory[] factories)
+    private static void SetSubtitleDecoders(ISubtitleChain chain, IEnumerable<ISubtitleDecoderFactory> factories)
     {
         chain.Components.ClearDecoders();
         foreach (ISubtitleDecoderFactory factory in factories)
@@ -312,7 +312,7 @@ internal sealed record PlaybackComponents(
         }
     }
 
-    private static void SetSubtitleRenderers(ISubtitleChain chain, ISubtitleRendererFactory[] factories)
+    private static void SetSubtitleRenderers(ISubtitleChain chain, IEnumerable<ISubtitleRendererFactory> factories)
     {
         chain.Components.ClearRenderers();
         foreach (ISubtitleRendererFactory factory in factories)

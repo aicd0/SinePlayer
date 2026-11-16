@@ -148,7 +148,7 @@ internal static class CollectionModel
 
         if (insertedCount > 0)
         {
-            DispatchUpdateEvent([collectionId]);
+            DispatchUpdateEvent((List<long>)[collectionId]);
         }
     }
 
@@ -185,7 +185,7 @@ internal static class CollectionModel
 
         if (removedCount > 0)
         {
-            DispatchUpdateEvent([collectionId]);
+            DispatchUpdateEvent((List<long>)[collectionId]);
         }
     }
 
@@ -230,7 +230,7 @@ internal static class CollectionModel
         return ids;
     }
 
-    private static void DispatchUpdateEvent(long[] collectionIds)
+    private static void DispatchUpdateEvent(IEnumerable<long> collectionIds)
     {
         GlobalEvent.Instance.CollectionUpdated.Emit(collectionIds);
     }

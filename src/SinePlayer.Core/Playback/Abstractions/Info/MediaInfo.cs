@@ -13,13 +13,13 @@ public sealed class MediaInfo
 
     public required IReadOnlyList<MediaStreamInfo> Streams { get; init; }
 
-    public MediaAttachment[] Attachments { get; init; } = [];
+    public IReadOnlyList<MediaAttachment> Attachments { get; init; } = [];
 
-    public IReadOnlyList<VideoStreamInfo> VideoStreams => Streams.OfType<VideoStreamInfo>().ToArray();
+    public IReadOnlyList<VideoStreamInfo> VideoStreams => (List<VideoStreamInfo>)[.. Streams.OfType<VideoStreamInfo>()];
 
-    public IReadOnlyList<AudioStreamInfo> AudioStreams => Streams.OfType<AudioStreamInfo>().ToArray();
+    public IReadOnlyList<AudioStreamInfo> AudioStreams => (List<AudioStreamInfo>)[.. Streams.OfType<AudioStreamInfo>()];
 
-    public IReadOnlyList<SubtitleStreamInfo> SubtitleStreams => Streams.OfType<SubtitleStreamInfo>().ToArray();
+    public IReadOnlyList<SubtitleStreamInfo> SubtitleStreams => (List<SubtitleStreamInfo>)[.. Streams.OfType<SubtitleStreamInfo>()];
 
     public MediaStreamInfo? FindStream(int index)
     {

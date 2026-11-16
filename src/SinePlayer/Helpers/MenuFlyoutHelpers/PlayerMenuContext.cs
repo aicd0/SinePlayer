@@ -287,7 +287,7 @@ internal sealed class PlayerMenuContext
                 return;
             }
 
-            OperationResult added = await SubtitleSourceLoader.AddAndSelect(session, view, Media, files.Select(file => file.Path).ToArray());
+            OperationResult added = await SubtitleSourceLoader.AddAndSelect(session, view, Media, (List<string>)[.. files.Select(file => file.Path)]);
             if (!added.IsSuccessful)
             {
                 PromptInfo?.Invoke(added.Message);

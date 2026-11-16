@@ -39,7 +39,7 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
 
     public IVideoChain? VideoChain => _videoChain;
 
-    public ISubtitleChain[] SubtitleChains => [.. _subtitleChains];
+    public IReadOnlyList<ISubtitleChain> SubtitleChains => (List<ISubtitleChain>)[.. _subtitleChains];
 
     public void Dispose()
     {
