@@ -13,6 +13,7 @@
 
     <Grid>
         <Grid
+            x:Name="VideoGrid"
             AllowDrop="True"
             Background="Black"
             ContextRequested="VideoGrid_ContextRequested"
