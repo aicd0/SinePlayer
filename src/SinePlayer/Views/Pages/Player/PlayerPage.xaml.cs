@@ -167,7 +167,7 @@ internal sealed partial class PlayerPage : BasePage
         StopPromptTimer();
         _navigationBar = null;
         GetMainPageAbility().SetCustomCenteredNavigationBar(null);
-        ShowCursor();
+        ReleaseHiddenCursor();
         RemoveFromActiveTabs();
     }
 
@@ -1310,6 +1310,7 @@ internal sealed partial class PlayerPage : BasePage
     private long _hideCursorDeadline = -1;
     private bool _waitingToHideCursor = false;
     private Windows.Foundation.Point? _lastPointerPosition = null;
+    private InputCursor? _hiddenCursor = null;
 
     private void KeepCursorVisible()
     {
@@ -1369,11 +1370,29 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        _isCursorHidden = true;
+        if (_hiddenCursor is null)
+        {
+            try
+            {
+                _hiddenCursor = CursorUtils.CreateTransparentCursor();
+            }
+            catch (Exception exception)
+            {
+                Logger.W(TAG, $"The pointer stays visible because a cursor that draws nothing could not be made: {exception.Message}");
+                return;
+            }
+        }
 
-        InputCursor cursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
-        cursor.Dispose();
-        ProtectedCursor = cursor;
+        _isCursorHidden = true;
+        ProtectedCursor = _hiddenCursor;
+    }
+
+    private void ReleaseHiddenCursor()
+    {
+        ShowCursor();
+
+        _hiddenCursor?.Dispose();
+        _hiddenCursor = null;
     }
 
     #endregion
