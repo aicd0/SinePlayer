@@ -4,28 +4,16 @@
 using System;
 using System.Threading.Tasks;
 
+using Microsoft.UI.Input;
+
 using SinePlayer.Core.Common.Utils;
 
 using Windows.Foundation;
 
 namespace SinePlayer.Views.Pages.Player;
 
-/// <summary>
-/// Turns a press or drag on the picture into one of the four things it can do: seek, change the volume, change the
-/// display brightness, or play faster for as long as the pointer is held. A drag's effect is decided by the first
-/// movement past the drag threshold — horizontally it is a seek, vertically the side of the picture the drag started
-/// on decides — and stays decided until the pointer is lifted, so that a slightly diagonal drag does not switch
-/// between them halfway. Holding still without crossing that threshold for <see cref="LongPressMilliseconds"/> is the
-/// speed gesture instead.
-/// <para>
-/// What the gesture started from is kept here rather than by the caller: the amounts are measured from the position
-/// the media and the volume had when the drag began, not from what they are by the time a request is handled.
-/// </para>
-/// </summary>
 internal sealed class PlayerGestureController
 {
-    // Only decides whether there is a gesture at all; the amounts are always measured from where the pointer went down,
-    // so crossing it costs the gesture none of its travel.
     private const double DragThresholdDips = 20.0;
     private const double VolumeSensitivity = 2.0;
     private const double BrightnessSensitivity = 2.0;
@@ -60,7 +48,7 @@ internal sealed class PlayerGestureController
     /// <summary>The rate to play at: the multiplier while the hold lasts, then the rate it had before.</summary>
     public event Action<double>? SpeedRequested;
 
-    public void Begin(uint pointerId, Point position, Context context)
+    public void Begin(uint pointerId, Point position, Context context, PointerDeviceType deviceType)
     {
         // A second pointer landing on the picture does not take over a gesture that is already running.
         if (_mode != Mode.None && pointerId != _pointerId)
@@ -77,7 +65,11 @@ internal sealed class PlayerGestureController
         _context = context;
         _appliedVolume = context.Volume;
         _appliedBrightness = context.Brightness;
-        StartLongPress();
+
+        if (deviceType == PointerDeviceType.Mouse)
+        {
+            StartLongPress();
+        }
     }
 
     public void Move(uint pointerId, Point position)
