@@ -19,6 +19,7 @@
             ContextRequested="VideoGrid_ContextRequested"
             Drop="VideoGrid_Drop"
             PointerCanceled="VideoGrid_PointerCanceled"
+            PointerCaptureLost="VideoGrid_PointerCaptureLost"
             PointerEntered="VideoGrid_PointerEntered"
             PointerExited="VideoGrid_PointerExited"
             PointerMoved="VideoGrid_PointerMoved"
@@ -36,6 +37,10 @@
             Opacity="0.6"
             Visibility="{x:Bind ViewModel.IsAudio, Mode=OneWay}" />
         <player:PlayerTransportBar x:Name="TransportBar" VerticalAlignment="Bottom" />
+        <player:PlayerGestureHint
+            x:Name="GestureHint"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center" />
         <TextBlock
             x:Name="PromptText"
             HorizontalAlignment="Left"

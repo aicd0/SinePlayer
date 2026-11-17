@@ -12,6 +12,8 @@ namespace SinePlayer.Core.Common.AppEnvironment;
 
 internal class ManagementClassFactory
 {
+    private const string WmiScope = @"root\WMI";
+
     private static ManagementClassFactory _instanceField;
 
     //
@@ -32,5 +34,15 @@ internal class ManagementClassFactory
     public ManagementClass GetOperatingSystemClass()
     {
         return new ManagementClass("Win32_OperatingSystem");
+    }
+
+    public ManagementClass GetWmiMonitorBrightnessClass()
+    {
+        return new ManagementClass(WmiScope, "WmiMonitorBrightness", null);
+    }
+
+    public ManagementClass GetWmiMonitorBrightnessMethodsClass()
+    {
+        return new ManagementClass(WmiScope, "WmiMonitorBrightnessMethods", null);
     }
 }
