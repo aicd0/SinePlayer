@@ -39,6 +39,7 @@ DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG
 DXGI_SWAP_CHAIN_DESC1
 DXGI_SWAP_CHAIN_FLAG
 DXGI_SWAP_EFFECT
+DestroyPhysicalMonitors
 DwmGetWindowAttribute
 FindClose
 FindFirstFileExFromApp
@@ -46,7 +47,10 @@ FindNextFile
 GetActiveWindow
 GetCursorPos
 GetDpiForWindow
+GetMonitorBrightness
 GetMonitorInfo
+GetNumberOfPhysicalMonitorsFromHMONITOR
+GetPhysicalMonitorsFromHMONITOR
 GetWindowPlacement
 GetWindowRect
 IAudioClient
@@ -77,11 +81,13 @@ IMMDeviceEnumerator
 INVALID_HANDLE_VALUE
 IPropertyStore
 LocalFree
+MC_CAPS_BRIGHTNESS
 MONITORINFOEXW
 MessageBox
 MonitorFromPoint
 MonitorFromRect
 MonitorFromWindow
+PHYSICAL_MONITOR
 PKEY_Device_FriendlyName
 PROPERTYKEY
 PROPVARIANT
@@ -91,6 +97,7 @@ RegisterHotKey
 STGM
 ScreenToClient
 SetForegroundWindow
+SetMonitorBrightness
 SetWindowLongPtr
 SetWindowPlacement
 SetWindowPos
