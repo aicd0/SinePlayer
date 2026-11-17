@@ -811,14 +811,18 @@ internal sealed partial class PlayerPage : BasePage
         PointerPoint gesturePoint = e.GetCurrentPoint(VideoGrid);
         if (e.Pointer.PointerDeviceType != PointerDeviceType.Mouse || gesturePoint.Properties.IsLeftButtonPressed)
         {
-            _dragGesture.Begin(e.Pointer.PointerId, gesturePoint.Position, new PlayerGestureController.Context(
-                VideoGrid.ActualWidth,
-                VideoGrid.ActualHeight,
-                ViewModel.VolumeLiveData.Value,
-                GetGestureStartPositionMs(),
-                ViewModel.DurationMs,
-                DisplayBrightnessController.Shared.Level,
-                GetGesturePlaybackRate()));
+            _dragGesture.Begin(
+                e.Pointer.PointerId,
+                gesturePoint.Position,
+                new PlayerGestureController.Context(
+                    VideoGrid.ActualWidth,
+                    VideoGrid.ActualHeight,
+                    ViewModel.VolumeLiveData.Value,
+                    GetGestureStartPositionMs(),
+                    ViewModel.DurationMs,
+                    DisplayBrightnessController.Shared.Level,
+                    GetGesturePlaybackRate()),
+                e.Pointer.PointerDeviceType);
         }
     }
 
