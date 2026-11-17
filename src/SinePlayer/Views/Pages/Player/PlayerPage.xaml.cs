@@ -818,7 +818,7 @@ internal sealed partial class PlayerPage : BasePage
         {
             for (var element = source as DependencyObject; element is not null; element = VisualTreeHelper.GetParent(element))
             {
-                if (element == VideoHost)
+                if (element == VideoGrid)
                 {
                     return true;
                 }
