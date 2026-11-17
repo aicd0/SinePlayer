@@ -7,6 +7,7 @@ CloseHandle
 CoCreateInstance
 CoInitializeEx
 CommandLineToArgvW
+CreateCursor
 CreateDXGIFactory2
 CreateDirect3D11DeviceFromDXGIDevice
 CreateDirect3D11SurfaceFromDXGISurface
@@ -39,6 +40,7 @@ DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG
 DXGI_SWAP_CHAIN_DESC1
 DXGI_SWAP_CHAIN_FLAG
 DXGI_SWAP_EFFECT
+DestroyCursor
 DestroyPhysicalMonitors
 DwmGetWindowAttribute
 FindClose
@@ -94,6 +96,7 @@ PROPVARIANT
 PropVariantClear
 PropVariantToStringAlloc
 RegisterHotKey
+RoGetActivationFactory
 STGM
 ScreenToClient
 SetForegroundWindow
@@ -107,3 +110,5 @@ WAVEFORMATEX
 WAVEFORMATEXTENSIBLE
 WHEEL_DELTA
 WaitForSingleObject
+WindowsCreateString
+WindowsDeleteString

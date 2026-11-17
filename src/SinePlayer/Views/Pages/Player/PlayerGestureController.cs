@@ -26,11 +26,10 @@ internal sealed class PlayerGestureController
 {
     // Only decides whether there is a gesture at all; the amounts are always measured from where the pointer went down,
     // so crossing it costs the gesture none of its travel.
-    private const double DragThresholdDips = 50.0;
+    private const double DragThresholdDips = 20.0;
     private const double VolumeSensitivity = 2.0;
     private const double BrightnessSensitivity = 2.0;
-    private const double SeekSensitivity = 0.4;
-    private const long MinimumSeekMilliseconds = 500;
+    private const double SeekMillisecondsPerDip = 100.0;
     private const int LongPressMilliseconds = 300;
     private const double SpeedMultiplier = 2.0;
 
@@ -233,28 +232,17 @@ internal sealed class PlayerGestureController
 
     private long GetSeekDelta()
     {
-        if (_context.Width <= 0 || _context.DurationMs <= 0)
-        {
-            return 0;
-        }
-
-        double ratio = (_lastPosition.X - _startPosition.X) / _context.Width;
-        return (long)Math.Round(ratio * _context.DurationMs * SeekSensitivity, MidpointRounding.AwayFromZero);
+        double deltaMs = (_lastPosition.X - _startPosition.X) * SeekMillisecondsPerDip;
+        return (long)Math.Round(deltaMs, MidpointRounding.AwayFromZero);
     }
 
     private bool TryGetSeek(out SeekRequest request)
     {
         request = default;
 
-        long deltaMs = GetSeekDelta();
-        if (Math.Abs(deltaMs) < MinimumSeekMilliseconds)
-        {
-            return false;
-        }
-
         // Clamped to the media, so what is left is how far it actually moves; the sign is the direction the drag
         // meant, whatever the position has become by now.
-        long offsetMs = Math.Clamp(_context.PositionMs + deltaMs, 0, _context.DurationMs) - _context.PositionMs;
+        long offsetMs = Math.Clamp(_context.PositionMs + GetSeekDelta(), 0, _context.DurationMs) - _context.PositionMs;
         if (offsetMs == 0)
         {
             return false;
