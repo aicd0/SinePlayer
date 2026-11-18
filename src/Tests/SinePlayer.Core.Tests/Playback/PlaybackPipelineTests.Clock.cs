@@ -1024,7 +1024,7 @@ public partial class PlaybackPipelineTests
             Assert.That(Await(pipeline.Play()).IsSuccessful, Is.True);
 
             WaitFor(() => leavingDevice.SubmittedBuffers > 1 && stayingDevice.SubmittedBuffers > 1, "both chains to be playing");
-            Assert.That(leaving.OwnsClock, Is.True, "the chain that arrived first keeps the clock");
+            Assert.That(pipeline.ClockOwner, Is.SameAs(leaving), "the chain that arrived first keeps the clock");
 
             // The reader and one for each sound.
             WaitFor(() => PipelineThread.LiveCount - baseline == 3, $"both chains to be running (was {PipelineThread.LiveCount - baseline})");
@@ -1037,7 +1037,7 @@ public partial class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(pipeline.State, Is.EqualTo(MediaEngineState.Playing), "removing a chain is not a stop");
-                Assert.That(staying.OwnsClock, Is.True, "the clock falls to the sound that is left");
+                Assert.That(pipeline.ClockOwner, Is.SameAs(staying), "the clock falls to the sound that is left");
             }
 
             WaitFor(() => PipelineThread.LiveCount - baseline == 2, $"the sound that went to cost no thread (was {PipelineThread.LiveCount - baseline})");

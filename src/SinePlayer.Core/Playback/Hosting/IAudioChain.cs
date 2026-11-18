@@ -21,6 +21,4 @@ public interface IAudioChain : IPlaybackChain<AudioStreamInfo>
     long Underruns { get; }
 
     long ClippedSamples { get; }
-
-    bool OwnsClock { get; }
 }
