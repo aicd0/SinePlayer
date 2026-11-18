@@ -829,6 +829,25 @@
                                         Style="{StaticResource CompatToggleSwitchStyle}"
                                         Toggled="SubtitleShadowToggleSwitch_Toggled" />
                                 </Grid>
+                                <Grid Style="{StaticResource CommonSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleFixedSizeLabel, Mode=OneWay}" />
+                                    <ToggleSwitch
+                                        x:Name="SubtitleFixedSizeToggleSwitch"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource CompatToggleSwitchStyle}"
+                                        Toggled="SubtitleFixedSizeToggleSwitch_Toggled" />
+                                </Grid>
                                 <settings:SliderSettingView
                                     x:Name="SubtitleOpacitySlider"
                                     Label="{x:Bind ViewModel.SubtitleOpacityLabel, Mode=OneWay}"

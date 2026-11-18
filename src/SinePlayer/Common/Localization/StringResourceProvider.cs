@@ -145,6 +145,7 @@ public class StringResourceProvider
     public string FilteredBy => GetResourceString("FilteredBy");
     public string FinishPercentage => GetResourceString("FinishPercentage");
     public string Fit => GetResourceString("Fit");
+    public string FixedFontSize => GetResourceString("FixedFontSize");
     public string FlipHorizontally => GetResourceString("FlipHorizontally");
     public string FlipImage => GetResourceString("FlipImage");
     public string FlipVertically => GetResourceString("FlipVertically");

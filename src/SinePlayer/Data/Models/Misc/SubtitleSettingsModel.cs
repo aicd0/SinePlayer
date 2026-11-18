@@ -23,6 +23,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
     public int PanY { get; set; }
     public string Family { get; set; } = string.Empty;
     public double Size { get; set; }
+    public bool FixedSize { get; set; }
     public string Style { get; set; } = nameof(FontStyle.Normal);
     public int Weight { get; set; }
     public SubtitleTextAlignment? TextAlignment { get; set; }
@@ -43,6 +44,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             OffsetY = PanY,
             FontFamily = Family,
             FontSize = Size,
+            FixedFontSize = FixedSize,
             FontStyle = ToFontStyle(),
             FontWeight = ToFontWeight(),
             TextAlignment = TextAlignment,
@@ -91,6 +93,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
         PanY = model.PanY ?? PanY;
         Family = model.FontFamily ?? Family;
         Size = model.FontSize ?? Size;
+        FixedSize = model.FixedFontSize ?? FixedSize;
         Style = model.FontStyle ?? Style;
         Weight = model.FontWeight ?? Weight;
         TextAlignment = ParseTextAlignment(model.TextAlignment, TextAlignment);
@@ -115,6 +118,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             PanY = PanY,
             FontFamily = Family,
             FontSize = Size,
+            FixedFontSize = FixedSize,
             FontStyle = Style,
             FontWeight = Weight,
             TextAlignment = TextAlignment?.ToString(),
@@ -173,6 +177,9 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 
         [JsonPropertyName("FontSize")]
         public double? FontSize { get; set; }
+
+        [JsonPropertyName("FixedFontSize")]
+        public bool? FixedFontSize { get; set; }
 
         [JsonPropertyName("FontStyle")]
         public string? FontStyle { get; set; }

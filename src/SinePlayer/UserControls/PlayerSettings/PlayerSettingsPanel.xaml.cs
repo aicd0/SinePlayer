@@ -842,6 +842,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = settings.Subtitle.FixedSize != presetSettings.Subtitle.FixedSize;
+                tabModified = tabModified || modified;
+                UpdateSubtitleFixedSize(settings);
+                ViewModel.SubtitleFixedSizeLabel = GetLabel(StringResource.FixedFontSize, modified);
+            }
+
+            {
                 bool modified = settings.Subtitle.Style != presetSettings.Subtitle.Style;
                 tabModified = tabModified || modified;
                 UpdateSubtitleFontStyle(settings);
@@ -1639,6 +1646,25 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         {
             SubtitleFontSizeComboBox.SelectedIndex = index;
         }
+    }
+
+    private void SubtitleFixedSizeToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool value = ((ToggleSwitch)sender).IsOn;
+        if (_mediaSettings.Subtitle.FixedSize != value)
+        {
+            ApplySubtitle(settings => settings.FixedSize = value);
+        }
+    }
+
+    private void UpdateSubtitleFixedSize(PlayerSettingsModel settings)
+    {
+        SubtitleFixedSizeToggleSwitch.IsOn = settings.Subtitle.FixedSize;
     }
 
     private void SubtitleFontWeightComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -272,11 +272,13 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>
-    /// Zero means "work it out from the surface", which is what the drawing did before a size could be asked for: an
-    /// explicit size of the value it works out for itself has to draw the same picture.
+    /// Unless a size is fixed, sizes are written against a surface of the reference height (720 in the drawing), so the same
+    /// setting draws the words larger on a taller surface and smaller on a shorter one, and what they take of the picture
+    /// stays the same. A fixed size is the size named on screen whatever the surface, and its Default is a size of its own
+    /// rather than a share of the surface.
     /// </summary>
     [Test]
-    public void KeepsTheSizeItWorksOutForItselfWhenToldNone()
+    public void FollowsTheSurfaceHeightUnlessTheSizeIsFixed()
     {
         CanvasDevice device;
         try
@@ -289,16 +291,31 @@ public class Win2DSubtitleRendererTests
             return;
         }
 
-        const int height = 300;
-        double automatic = Math.Clamp(height * 0.045, 12.0, 72.0);
+        const int width = 480;
+        const int reference = 720;
+        const int half = reference / 2;
 
-        int unspecified = InkRows(device, 480, height, SubtitlePresentation.Identity);
-        int sameSize = InkRows(device, 480, height, new SubtitlePresentation { FontSize = automatic });
+        int atReference = InkRows(device, width, reference, new SubtitlePresentation { FontSize = 32.0 });
+        int fixedAtReference = InkRows(device, width, reference, AtFixedSize(32.0));
+        int atHalfHeight = InkRows(device, width, half, new SubtitlePresentation { FontSize = 32.0 });
+        int doubledAtHalfHeight = InkRows(device, width, half, new SubtitlePresentation { FontSize = 64.0 });
+        int fixedAtHalfHeight = InkRows(device, width, half, AtFixedSize(32.0));
+        int automaticAtReference = InkRows(device, width, reference, SubtitlePresentation.Identity);
+        int automaticAtHalfHeight = InkRows(device, width, half, SubtitlePresentation.Identity);
+        int fixedAutomaticAtReference = InkRows(device, width, reference, new SubtitlePresentation { FixedFontSize = true });
+        int fixedAutomaticAtHalfHeight = InkRows(device, width, half, new SubtitlePresentation { FixedFontSize = true });
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(unspecified, Is.GreaterThan(0), "an automatic size still draws");
-            Assert.That(unspecified, Is.EqualTo(sameSize).Within(1), "and it is the size the surface alone gives");
+            Assert.That(atReference, Is.GreaterThan(0), "the words are drawn");
+            Assert.That(atReference, Is.EqualTo(fixedAtReference).Within(1),
+                "a size named is the size it is on a surface of the reference height");
+            Assert.That(atReference / (double)atHalfHeight, Is.EqualTo(2.0).Within(0.35), "half the height is half the size");
+            Assert.That(doubledAtHalfHeight, Is.EqualTo(atReference).Within(1), "twice the number at half the height is that same size");
+            Assert.That(fixedAtHalfHeight, Is.EqualTo(atReference).Within(1), "a fixed size stays the size named on any surface");
+            Assert.That(automaticAtReference, Is.GreaterThan(automaticAtHalfHeight), "an automatic size follows the surface");
+            Assert.That(fixedAutomaticAtReference, Is.EqualTo(fixedAutomaticAtHalfHeight).Within(1),
+                "unless the size is fixed, in which case Default is a size of its own");
         }
     }
 
@@ -323,8 +340,8 @@ public class Win2DSubtitleRendererTests
         const int width = 480;
         const int height = 200;
 
-        Color named = InkColour(RenderInk(device, width, height, new SubtitlePresentation { FontSize = 32.0, FontColor = Color.FromArgb(255, 255, 0, 0) }));
-        Color unnamed = InkColour(RenderInk(device, width, height, new SubtitlePresentation { FontSize = 32.0 }));
+        Color named = InkColour(RenderInk(device, width, height, AtFixedSize(32.0) with { FontColor = Color.FromArgb(255, 255, 0, 0) }));
+        Color unnamed = InkColour(RenderInk(device, width, height, AtFixedSize(32.0)));
 
         using (Assert.EnterMultipleScope())
         {
@@ -354,9 +371,9 @@ public class Win2DSubtitleRendererTests
         const int width = 480;
         const int height = 200;
 
-        int opaque = InkAlpha(RenderInk(device, width, height, new SubtitlePresentation { FontSize = 32.0 }));
-        int faded = InkAlpha(RenderInk(device, width, height, new SubtitlePresentation { FontSize = 32.0, Opacity = 0.5 }));
-        int gone = InkAlpha(RenderInk(device, width, height, new SubtitlePresentation { FontSize = 32.0, Opacity = 0.0 }));
+        int opaque = InkAlpha(RenderInk(device, width, height, AtFixedSize(32.0)));
+        int faded = InkAlpha(RenderInk(device, width, height, AtFixedSize(32.0) with { Opacity = 0.5 }));
+        int gone = InkAlpha(RenderInk(device, width, height, AtFixedSize(32.0) with { Opacity = 0.0 }));
 
         using (Assert.EnterMultipleScope())
         {
@@ -388,7 +405,7 @@ public class Win2DSubtitleRendererTests
         const int height = 240;
 
         var shadowColour = Color.FromArgb(255, 0, 128, 0);
-        SubtitlePresentation bare = new() { FontSize = 32.0 };
+        SubtitlePresentation bare = AtFixedSize(32.0);
         SubtitlePresentation shadowed = bare with { ShadowEnabled = true, ShadowColor = shadowColour };
 
         int barePixels = InkPixels(device, width, height, bare);
@@ -424,7 +441,7 @@ public class Win2DSubtitleRendererTests
         var shadowColour = Color.FromArgb(255, 0, 128, 0);
 
         // Six pixels of border against a shadow offset of 6% of the font size, so the glyphs alone could not show through.
-        SubtitlePresentation wide = new() { FontSize = 32.0, OutlineWidth = 6.0, ShadowEnabled = true, ShadowColor = shadowColour };
+        SubtitlePresentation wide = AtFixedSize(32.0) with { OutlineWidth = 6.0, ShadowEnabled = true, ShadowColor = shadowColour };
         SubtitlePresentation wideWithoutShadow = wide with { ShadowEnabled = false };
 
         using (Assert.EnterMultipleScope())
@@ -457,9 +474,8 @@ public class Win2DSubtitleRendererTests
         const int width = 480;
         const int height = 240;
 
-        SubtitlePresentation presentation = new()
+        SubtitlePresentation presentation = AtFixedSize(32.0) with
         {
-            FontSize = 32.0,
             FontColor = Color.FromArgb(255, 255, 255, 255),
             OutlineWidth = 0.5,
             OutlineColor = Color.FromArgb(255, 255, 255, 255),
@@ -517,9 +533,8 @@ public class Win2DSubtitleRendererTests
         const int height = 240;
 
         var shadowColour = Color.FromArgb(255, 0, 128, 0);
-        SubtitlePresentation near = new()
+        SubtitlePresentation near = AtFixedSize(32.0) with
         {
-            FontSize = 32.0,
             ShadowEnabled = true,
             ShadowColor = shadowColour,
             ShadowDistance = 0.1,
@@ -574,7 +589,7 @@ public class Win2DSubtitleRendererTests
         const int height = 240;
         const string word = "0,Default,,0,0,0,,Visible words";
 
-        SubtitlePresentation free = new() { FontSize = 24.0 };
+        SubtitlePresentation free = AtFixedSize(24.0);
 
         (int _, int freeTop, int _, int freeBottom) = InkBounds(RenderInk(device, width, height, free, word), width, height);
         (int topLeftLeft, int topLeftTop, int _, int _) = InkBounds(
@@ -621,7 +636,7 @@ public class Win2DSubtitleRendererTests
         const int height = 240;
         const string twoLines = "0,Default,,0,0,0,,A rather long first line\\NShort";
 
-        SubtitlePresentation free = new() { FontSize = 24.0 };
+        SubtitlePresentation free = AtFixedSize(24.0);
         List<(int Top, int Bottom, int Left, int Right)> rightBands = InkBands(
             RenderInk(device, width, height, free with { TextAlignment = SubtitleTextAlignment.BottomRight }, twoLines), width, height);
         List<(int Top, int Bottom, int Left, int Right)> leftBands = InkBands(
@@ -659,6 +674,15 @@ public class Win2DSubtitleRendererTests
         }
 
         return count;
+    }
+
+    /// <summary>
+    /// A size in device independent pixels, which is what a check of the drawing's own pixels wants: the words are then the
+    /// size named rather than a share of the surface, so a small surface still draws them large enough to read a colour from.
+    /// </summary>
+    private static SubtitlePresentation AtFixedSize(double size)
+    {
+        return new() { FontSize = size, FixedFontSize = true };
     }
 
     /// <summary>How many rows of the surface carry ink, drawing one cue with the presentation given.</summary>
@@ -737,7 +761,7 @@ public class Win2DSubtitleRendererTests
             return;
         }
 
-        SubtitlePresentation plain = new() { FontSize = 24.0 };
+        SubtitlePresentation plain = AtFixedSize(24.0);
         SubtitlePresentation bordered = plain with { OutlineWidth = 6.0 };
 
         int plainPixels = InkPixels(device, 480, 240, plain);
@@ -771,7 +795,7 @@ public class Win2DSubtitleRendererTests
             return;
         }
 
-        SubtitlePresentation borderOnly = new() { FontSize = 32.0, FontColor = Color.FromArgb(0, 0, 0, 0), OutlineWidth = 6.0 };
+        SubtitlePresentation borderOnly = AtFixedSize(32.0) with { FontColor = Color.FromArgb(0, 0, 0, 0), OutlineWidth = 6.0 };
 
         Color named = InkColour(RenderInk(device, 480, 240, borderOnly with { OutlineColor = Color.FromArgb(255, 0, 128, 0) }));
         Color unnamed = InkColour(RenderInk(device, 480, 240, borderOnly));
