@@ -702,7 +702,7 @@ internal sealed partial class MainPage : BasePage
         if (tabInfo?.PendingTitle is { } pendingTitle)
         {
             tabInfo.PendingTitle = null;
-            item.Header = pendingTitle;
+            SetTabTitle(tabInfo, pendingTitle);
         }
     }
 
@@ -931,6 +931,42 @@ internal sealed partial class MainPage : BasePage
         }
 
         tabInfo.Ability.RestoreStates();
+        UpdateWindowTitle();
+    }
+
+    private void SetTabTitle(TabInfo tab, string title)
+    {
+        if (!tab.Item.IsLoaded)
+        {
+            // An empty header assigned to an item whose template is still being realized breaks that
+            // realization: the item's own content presenter then takes the tab's frame away from
+            // TabContentPresenter, which is left with no children, and its next measure returns E_INVALIDARG
+            // ("Value does not fall within the expected range") — fatal for the app. A non-empty header at the
+            // same moment is harmless, but the title may well be cleared before the media is known, so hold it
+            // until the item has loaded.
+            tab.PendingTitle = title;
+            return;
+        }
+
+        tab.Item.Header = title;
+        if (tab == _currentTab)
+        {
+            UpdateWindowTitle();
+        }
+    }
+
+    private void UpdateWindowTitle()
+    {
+        string title = _currentTab?.Title ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            title = StringResource.AppDisplayName;
+        }
+
+        if (_currentWindow is not null)
+        {
+            _currentWindow.Title = title;
+        }
     }
 
     //
@@ -1431,19 +1467,12 @@ internal sealed partial class MainPage : BasePage
                 return;
             }
 
-            if (!tab.Item.IsLoaded)
+            if (!_parent.TryGetTarget(out MainPage? parent))
             {
-                // An empty header assigned to an item whose template is still being realized breaks that
-                // realization: the item's own content presenter then takes the tab's frame away from
-                // TabContentPresenter, which is left with no children, and its next measure returns E_INVALIDARG
-                // ("Value does not fall within the expected range") — fatal for the app. A non-empty header at the
-                // same moment is harmless, but the title may well be cleared before the media is known, so hold it
-                // until the item has loaded.
-                tab.PendingTitle = title;
                 return;
             }
 
-            tab.Item.Header = title;
+            parent.SetTabTitle(tab, title);
         }
 
         public void SetIcon(IconSource icon)
@@ -1658,7 +1687,7 @@ internal sealed partial class MainPage : BasePage
 
         string ITabInfo.Id => Id;
 
-        string ITabInfo.Title => Item.Header as string ?? string.Empty;
+        public string Title => Item.Header as string ?? string.Empty;
     }
 
     public class MainPageStateJsonModel
