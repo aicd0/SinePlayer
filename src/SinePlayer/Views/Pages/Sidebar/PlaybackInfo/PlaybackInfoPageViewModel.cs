@@ -75,13 +75,13 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             Add("video.resolution", StringResource.Resolution, video.Width + " x " + video.Height);
             if (video.FrameRate > 0)
             {
-                Add("video.framerate", StringResource.FrameRate, video.FrameRate.ToString("0.###", CultureInfo.InvariantCulture) + " fps");
+                Add("video.framerate", StringResource.FrameRate, FormatNumber(video.FrameRate) + " fps");
             }
 
             Add("video.pixelformat", StringResource.PixelFormat, video.PixelFormat.ToString().ToLowerInvariant());
             if (video.BitDepth > 0)
             {
-                Add("video.bitdepth", StringResource.BitDepth, video.BitDepth.ToString(CultureInfo.InvariantCulture));
+                Add("video.bitdepth", StringResource.BitDepth, FormatNumber(video.BitDepth));
             }
 
             if (video.Bitrate > 0)
@@ -92,6 +92,11 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             Add("video.decoder", StringResource.Decoder, info.VideoDecoderName ?? StringResource.None);
             Add("video.decoder.mode", StringResource.DecodeMode, info.IsVideoHardwareAccelerated ? StringResource.Hardware : StringResource.Software);
             Add("video.renderer", StringResource.Renderer, info.VideoRendererName ?? StringResource.None);
+            Add("video.presented", StringResource.PresentedFrames, FormatNumber(info.PresentedFrames));
+            Add("video.dropped", StringResource.DroppedFrames, FormatNumber(info.DroppedFrames));
+            Add("video.lag", StringResource.PictureLag, FormatMilliseconds(info.PictureLag.TotalMilliseconds));
+            Add("video.decodetime", StringResource.VideoDecodeTime, FormatMilliseconds(info.AverageVideoDecodeMilliseconds));
+            Add("video.rendertime", StringResource.VideoRenderTime, FormatMilliseconds(info.AverageVideoRenderMilliseconds));
         }
 
         IAudioChain[] audioChains = [.. info.AudioChains.Where(chain => chain.SelectedStream is not null)];
@@ -107,8 +112,8 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             string key = $"audio#{index + 1}";
             Group($"group.{key}", StringResource.Audio + suffix);
             Add($"{key}.codec", StringResource.Codec, FormatCodec(audio));
-            Add($"{key}.samplerate", StringResource.SampleRate, audio.SampleRate.ToString(CultureInfo.InvariantCulture) + " Hz");
-            Add($"{key}.channels", StringResource.Channels, audio.ChannelCount.ToString(CultureInfo.InvariantCulture));
+            Add($"{key}.samplerate", StringResource.SampleRate, FormatNumber(audio.SampleRate) + " Hz");
+            Add($"{key}.channels", StringResource.Channels, FormatNumber(audio.ChannelCount));
             Add($"{key}.layout", StringResource.ChannelLayout, audio.ChannelLayout.ToString().ToLowerInvariant());
             Add($"{key}.sampleformat", StringResource.SampleFormat, audio.SampleFormat.ToString().ToLowerInvariant());
             if (audio.Bitrate > 0)
@@ -119,7 +124,7 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             Add($"{key}.decoder", StringResource.Decoder, chain.DecoderName ?? StringResource.None);
             Add($"{key}.decoder.mode", StringResource.DecodeMode, chain.IsHardwareAccelerated ? StringResource.Hardware : StringResource.Software);
             Add($"{key}.renderer", StringResource.Renderer, chain.RendererName ?? StringResource.None);
-            Add($"{key}.clipped", StringResource.AudioClippedSamples, chain.ClippedSamples.ToString(CultureInfo.InvariantCulture));
+            Add($"{key}.clipped", StringResource.AudioClippedSamples, FormatNumber(chain.ClippedSamples));
         }
 
         ISubtitleChain[] subtitleChains = [.. info.SubtitleChains.Where(chain => chain.SelectedStream is not null)];
@@ -159,13 +164,7 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
         Group("group.playback", StringResource.Playback);
         Add("playback.state", StringResource.State, info.State.ToString() + (string.IsNullOrEmpty(info.Error) ? string.Empty : $" ({info.Error})"));
         Add("playback.position", StringResource.Position, FormatTime(info.Position));
-        Add("playback.presented", StringResource.PresentedFrames, info.PresentedFrames.ToString(CultureInfo.InvariantCulture));
-        Add("playback.dropped", StringResource.DroppedFrames, info.DroppedFrames.ToString(CultureInfo.InvariantCulture));
-
-        Add("playback.lag", StringResource.PictureLag, FormatMilliseconds(info.PictureLag.TotalMilliseconds));
-        Add("playback.decode.video", StringResource.VideoDecodeTime, FormatMilliseconds(info.AverageVideoDecodeMilliseconds));
-        Add("playback.render.video", StringResource.VideoRenderTime, FormatMilliseconds(info.AverageVideoRenderMilliseconds));
-        Add("playback.underruns", StringResource.AudioUnderruns, info.AudioChains.Sum(chain => chain.Underruns).ToString(CultureInfo.InvariantCulture));
+        Add("playback.underruns", StringResource.AudioUnderruns, FormatNumber(info.AudioChains.Sum(chain => chain.Underruns)));
 
         Rows = rows;
     }
@@ -193,12 +192,22 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
     private static string FormatBitrate(long bitsPerSecond)
     {
         return bitsPerSecond >= 1_000_000
-            ? (bitsPerSecond / 1_000_000.0).ToString("0.##", CultureInfo.InvariantCulture) + " Mbps"
-            : (bitsPerSecond / 1000).ToString(CultureInfo.InvariantCulture) + " kbps";
+            ? FormatNumber(bitsPerSecond / 1_000_000.0) + " Mbps"
+            : FormatNumber(bitsPerSecond / 1000.0) + " kbps";
     }
 
     private static string FormatMilliseconds(double milliseconds)
     {
-        return milliseconds.ToString("0.0", CultureInfo.InvariantCulture) + " ms";
+        return milliseconds.ToString("N2", CultureInfo.InvariantCulture) + " ms";
+    }
+
+    private static string FormatNumber(long value)
+    {
+        return value.ToString("N0", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatNumber(double value)
+    {
+        return value.ToString("#,##0.###", CultureInfo.InvariantCulture);
     }
 }
