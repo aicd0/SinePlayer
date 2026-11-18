@@ -112,8 +112,6 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
     public long ClippedSamples => _clampFilter.ClippedSamples;
 
-    public bool OwnsClock => _timeline.DeviceOwner == this;
-
     public ChainTail ReadTail { get; } = new();
 
     public bool IsConsuming => Decoder.HasComponent;

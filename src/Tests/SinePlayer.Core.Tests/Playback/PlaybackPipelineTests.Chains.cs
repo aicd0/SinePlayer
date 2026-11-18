@@ -178,8 +178,8 @@ public partial class PlaybackPipelineTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(secondDevice.SubmittedBuffers, Is.Zero, "the jammed device has taken nothing");
-                Assert.That(first.OwnsClock, Is.True, "the sound that arrived first is what moves the clock");
-                Assert.That(second.OwnsClock, Is.False, "a second sound plays alongside it");
+                Assert.That(pipeline.ClockOwner, Is.SameAs(first), "the sound that arrived first is what moves the clock");
+                Assert.That(pipeline.ClockOwner, Is.Not.SameAs(second), "a second sound plays alongside it");
                 Assert.That(first.Filters.Count, Is.EqualTo(1), "the filter belongs to the chain it was added to");
                 Assert.That(second.Filters.Count, Is.Zero, "and never reaches the other");
             }

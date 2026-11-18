@@ -122,6 +122,8 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
         teardown.Wait();
     }
 
+    internal AudioChain? ClockOwner => _timeline.DeviceOwner;
+
     public Task<OperationResult> Reset()
     {
         return _events.SubmitAndLog(nameof(Reset), ResetCore);
