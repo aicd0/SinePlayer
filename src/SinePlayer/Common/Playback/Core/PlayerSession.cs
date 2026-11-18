@@ -784,6 +784,8 @@ internal sealed partial class PlayerSession : IDisposable
 
     private const int MinimumMixLevel = 0;
     private const int MaximumMixLevel = 200;
+    private const int MinimumPan = -100;
+    private const int MaximumPan = 100;
 
     private PlayerSettingsModel SettingsOf(MediaStreamKind kind, MediaStreamInfo stream)
     {
@@ -849,6 +851,7 @@ internal sealed partial class PlayerSession : IDisposable
         chain.Offset = OffsetOf(settings.Audio.Sync);
         ApplyMixLevels(chain, stream.ChannelLayout, settings.Audio.RemixLevels, RemixLevelSet.Remix);
         ApplyMixLevels(chain, stream.ChannelLayout, settings.Audio.DownmixLevels, RemixLevelSet.Downmix);
+        ApplyMixBalance(chain, settings.Audio.Pan, settings.Audio.InvertLeftAndRight);
     }
 
     private void ApplyMixLevels(IAudioChain chain, ChannelLayout layout, Dictionary<ChannelLayout, Dictionary<string, int>> levels, RemixLevelSet set)
@@ -859,16 +862,28 @@ internal sealed partial class PlayerSession : IDisposable
             return;
         }
 
-        Dictionary<string, int> clamped = [];
+        Dictionary<string, float> clamped = [];
         if (levels.TryGetValue(layout, out Dictionary<string, int>? saved))
         {
             foreach (KeyValuePair<string, int> level in saved)
             {
-                clamped[level.Key] = Math.Clamp(level.Value, MinimumMixLevel, MaximumMixLevel);
+                clamped[level.Key] = Math.Clamp(level.Value, MinimumMixLevel, MaximumMixLevel) / 100.0f;
             }
         }
 
         target.Remix.SetLevels(set, clamped);
+    }
+
+    private void ApplyMixBalance(IAudioChain chain, int pan, bool invertLeftAndRight)
+    {
+        AudioChainEntry? target = _audioChains.FirstOrDefault(entry => ReferenceEquals(entry.Chain, chain));
+        if (target is null)
+        {
+            return;
+        }
+
+        target.Remix.Pan = Math.Clamp(pan, MinimumPan, MaximumPan) / 100.0f;
+        target.Remix.InvertLeftAndRight = invertLeftAndRight;
     }
 
     private void ApplySettings(ISubtitleChain chain)

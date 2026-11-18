@@ -160,7 +160,19 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         }
 
         int channels = endpointChannels.Result;
-        if (channels <= 0 || channels >= stream.ChannelCount)
+        if (channels <= 0)
+        {
+            return result.Success(stream);
+        }
+
+        // A one-channel stream is widened to a pair the endpoint has, so that the mix has two sides for a balance to
+        // work on; anything else narrower than the endpoint is folded down to it.
+        if (stream.ChannelCount == 1 && channels >= 2)
+        {
+            return result.Success(stream.WithLayout(2, ChannelLayout.Stereo));
+        }
+
+        if (channels >= stream.ChannelCount)
         {
             return result.Success(stream);
         }

@@ -24,7 +24,7 @@ namespace SinePlayer.Core.Tests.Playback;
 [TestFixture]
 public class RemixAudioFilterTests
 {
-    private const float GroupLevel = 0.71f;
+    private static readonly float GroupLevel = MathF.Sqrt(0.5f);
     private const int SampleRate = 48000;
 
     [Test]
@@ -277,7 +277,7 @@ public class RemixAudioFilterTests
             [-0.1f],
         ];
 
-        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Downmix, Levels(("center", 50), ("lfe", 50), ("back", 25)));
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Downmix, Levels(("center", 0.5f), ("lfe", 0.5f), ("back", 0.25f)));
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -309,7 +309,7 @@ public class RemixAudioFilterTests
             [0.0f],
         ];
 
-        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Downmix, Levels(("lfe", 50)));
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Downmix, Levels(("lfe", 0.5f)));
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -347,7 +347,7 @@ public class RemixAudioFilterTests
             Assert.That(ReadSamples(first), Is.EqualTo(new[] { 0.4 * GroupLevel, 0.4 * GroupLevel }).Within(1e-5));
         }
 
-        filter.SetLevels(RemixLevelSet.Downmix, Levels(("center", 0)));
+        filter.SetLevels(RemixLevelSet.Downmix, Levels(("center", 0.0f)));
         OperationResult after = filter.Apply(buffer, out RawAudioBuffer second);
         using (second)
         {
@@ -539,7 +539,7 @@ public class RemixAudioFilterTests
             [-0.1f],
         ];
 
-        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Remix, Levels(("center", 50)), targetChannelCount: 6);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Remix, Levels(("center", 0.5f)), targetChannelCount: 6);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -561,7 +561,7 @@ public class RemixAudioFilterTests
             [0.2f, -0.2f],
         ];
 
-        using RemixAudioFilter filter = Prepare(ChannelLayout.Stereo, 2, RemixLevelSet.Remix, Levels(("stereo", 50)), targetChannelCount: 2);
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Stereo, 2, RemixLevelSet.Remix, Levels(("stereo", 0.5f)), targetChannelCount: 2);
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Stereo, 2, 2, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -591,7 +591,7 @@ public class RemixAudioFilterTests
             [0.0f],
         ];
 
-        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Remix, Levels(("center", 0)));
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, RemixLevelSet.Remix, Levels(("center", 0.0f)));
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
@@ -669,7 +669,7 @@ public class RemixAudioFilterTests
         return filter;
     }
 
-    private static RemixAudioFilter Prepare(ChannelLayout layout, int channelCount, RemixLevelSet set, IReadOnlyDictionary<string, int> levels, int targetChannelCount = 2)
+    private static RemixAudioFilter Prepare(ChannelLayout layout, int channelCount, RemixLevelSet set, IReadOnlyDictionary<string, float> levels, int targetChannelCount = 2)
     {
         RemixAudioFilter filter = new();
 
@@ -688,6 +688,344 @@ public class RemixAudioFilterTests
     }
 
     /// <summary>
+    /// The balance is the last step of the mix, so a hard pan silences the whole side the sound has been moved away
+    /// from — including the centre the fold put into it — while the other side keeps every level it had.
+    /// </summary>
+    [Test]
+    public void SilencesTheWholeSideTheSoundIsMovedAwayFrom()
+    {
+        float[][] planes =
+        [
+            [0.5f],
+            [-0.25f],
+            [0.2f],
+            [0.0f],
+            [0.1f],
+            [0.1f],
+        ];
+
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
+        filter.Pan = -1.0f;
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            double[] samples = ReadSamples(output);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                Assert.That(samples[0], Is.EqualTo(0.5 + (GroupLevel * 0.2) + (GroupLevel * 0.1)).Within(1e-5), "the left side keeps the whole fold");
+                Assert.That(samples[1], Is.EqualTo(0.0).Within(1e-6), "and the right one is gone, centre included");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Every channel that belongs to a side is moved, not only the front pair: in a 5.1 mix the front and back pairs
+    /// both carry a left and a right, and the centre and the low frequency carry neither.
+    /// </summary>
+    [Test]
+    public void PansEveryChannelThatBelongsToASide()
+    {
+        float[][] planes = [[0.5f], [0.5f], [0.5f], [0.5f], [0.5f], [0.5f]];
+
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, targetChannelCount: 6);
+        filter.Pan = -1.0f;
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+            Assert.That(ReadPlanes(output), Is.EqualTo(new[] { new[] { 0.5 }, new[] { 0.0 }, new[] { 0.5 }, new[] { 0.5 }, new[] { 0.5 }, new[] { 0.0 } }).Within(1e-6),
+                "the sound moved left, so the front right and the back right give way; the left pair, the centre and the low frequency do not");
+        }
+    }
+
+    /// <summary>And in a 7.1 mix there are three pairs to move: front, side and back.</summary>
+    [Test]
+    public void PansEveryPairOfASevenPointOneMix()
+    {
+        float[][] planes = [[1.0f], [1.0f], [1.0f], [1.0f], [1.0f], [1.0f], [1.0f], [1.0f]];
+
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround71, 8, targetChannelCount: 8);
+        filter.Pan = 1.0f;
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround71, 8, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+            Assert.That(ReadPlanes(output), Is.EqualTo(new[]
+            {
+                new[] { 0.0 }, new[] { 1.0 }, new[] { 1.0 }, new[] { 1.0 }, new[] { 0.0 }, new[] { 1.0 }, new[] { 0.0 }, new[] { 1.0 },
+            }).Within(1e-6), "the sound moved right, so the front left, the back left and the side left give way");
+        }
+    }
+
+    /// <summary>
+    /// Halfway to the right is half the level on the left and nothing taken from the right, which is what makes the
+    /// formula a balance rather than an automatic reduction of both sides.
+    /// </summary>
+    [Test]
+    public void HalfwayToOneSideQuietensOnlyThatSide()
+    {
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Stereo, 2);
+        filter.Pan = 0.5f;
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Stereo, 2, 1, [[0.4f], [0.4f]]);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+            Assert.That(ReadPlanes(output), Is.EqualTo(new[] { new[] { 0.2 }, new[] { 0.4 } }).Within(1e-6));
+        }
+    }
+
+    /// <summary>
+    /// A stream the level table has no arrangement for is still panned: the balance needs no coefficients of its own,
+    /// so there is nothing about an unknown layout that could stop it.
+    /// </summary>
+    [Test]
+    public void PansAStreamTheLevelTableDoesNotDescribe()
+    {
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Unknown, 2);
+        filter.Pan = -0.5f;
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Unknown, 2, 1, [[0.4f], [0.4f]]);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+            Assert.That(ReadPlanes(output), Is.EqualTo(new[] { new[] { 0.4 }, new[] { 0.2 } }).Within(1e-6));
+        }
+    }
+
+    /// <summary>
+    /// A one-channel stream is widened to the two sides the target has, at the level the mono group carries, so that a
+    /// balance has somewhere to move the sound to.
+    /// </summary>
+    [Test]
+    public void WidensAMonoStreamToTheTwoSidesTheTargetHas()
+    {
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Mono, 1, targetChannelCount: 2);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Mono, 1, 2, [[0.5f, -0.5f]]);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                Assert.That(output.ChannelCount, Is.EqualTo(2));
+                Assert.That(output.ChannelLayout, Is.EqualTo(ChannelLayout.Stereo));
+                Assert.That(ReadSamples(output), Is.EqualTo(new[] { 0.5, 0.5, -0.5, -0.5 }).Within(1e-6), "the same signal on both sides");
+            }
+        }
+    }
+
+    /// <summary>And the balance then moves between them, which is what the widening is for.</summary>
+    [Test]
+    public void PansTheTwoSidesOfAWidenedMonoStream()
+    {
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Mono, 1, targetChannelCount: 2);
+        filter.Pan = 1.0f;
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Mono, 1, 2, [[0.5f, -0.5f]]);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                Assert.That(ReadSamples(output), Is.EqualTo(new[] { 0.0, 0.5, 0.0, -0.5 }).Within(1e-6), "the sound moved right, so the left side is gone");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A target with a single channel has no other side for the sound to lean towards, so the block is left as it is
+    /// and the mixing UI is told there is nothing to show a balance for.
+    /// </summary>
+    [Test]
+    public void LeavesAMonoTargetAloneWhateverTheBalanceIs()
+    {
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Mono, 1, targetChannelCount: 1);
+        filter.Pan = 1.0f;
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Mono, 1, 2, [[0.5f, -0.5f]]);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+            Assert.That(output, Is.SameAs(buffer), "nothing about a single channel can be panned");
+        }
+    }
+
+    /// <summary>A balance outside the range it can mean is clamped, not taken as a reason to stop playing.</summary>
+    [Test]
+    public void ClampsTheBalanceToItsRange()
+    {
+        using RemixAudioFilter filter = new();
+
+        filter.Pan = 9.0f;
+        Assert.That(filter.Pan, Is.EqualTo(1.0f));
+
+        filter.Pan = -9.0f;
+        Assert.That(filter.Pan, Is.EqualTo(-1.0f));
+    }
+
+    /// <summary>
+    /// A stereo stream on a wider target is widened the same way: what is on the left reaches every channel of the
+    /// target that sits on the left, what is on the right reaches the right ones, and a channel that belongs to neither
+    /// — the low frequency, the centre — is given nothing.
+    /// </summary>
+    [Test]
+    public void WidensAStereoStreamToTheSidesOfAWiderTarget()
+    {
+        using RemixAudioFilter filter = PrepareFor(ChannelLayout.Stereo, 2, ChannelLayout.Surround51, 6);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Stereo, 2, 2, [[0.5f, 0.25f], [0.3f, -0.1f]]);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                Assert.That(output.ChannelCount, Is.EqualTo(6));
+                Assert.That(output.ChannelLayout, Is.EqualTo(ChannelLayout.Surround51));
+                Assert.That(ReadSamples(output),
+                    Is.EqualTo(new[] { 0.5, 0.3, 0.0, 0.0, 0.5, 0.3, 0.25, -0.1, 0.0, 0.0, 0.25, -0.1 }).Within(1e-6),
+                    "front left and back left carry the left channel, front right and back right the right one, centre and low frequency nothing");
+            }
+        }
+    }
+
+    /// <summary>
+    /// And the balance moves the widened sides: at the far left the channels that carry the right channel are silent,
+    /// while the ones carrying the left channel keep the level they had.
+    /// </summary>
+    [Test]
+    public void PansTheSidesOfAWidenedStereoStream()
+    {
+        using RemixAudioFilter filter = PrepareFor(ChannelLayout.Stereo, 2, ChannelLayout.Surround51, 6);
+        filter.Pan = -1.0f;
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Stereo, 2, 2, [[0.5f, 0.25f], [0.3f, -0.1f]]);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+        using (output)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                Assert.That(ReadSamples(output),
+                    Is.EqualTo(new[] { 0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.25, 0.0, 0.0, 0.0, 0.25, 0.0 }).Within(1e-6),
+                    "the sound moved left, so everything that carried the right channel gives way");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Inverting is the other half of the last step: the two sides come out exchanged, so a device whose speakers are
+    /// wired the other way round plays what it is given the right way round.
+    /// </summary>
+    [Test]
+    public void ExchangesTheTwoSidesOfAFold()
+    {
+        float[][] planes =
+        [
+            [0.5f],
+            [-0.25f],
+            [0.2f],
+            [0.0f],
+            [0.1f],
+            [0.1f],
+        ];
+
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6);
+        using RawAudioBuffer plain = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
+
+        OperationResult applied = filter.Apply(plain, out RawAudioBuffer straight);
+        using (straight)
+        {
+            filter.InvertLeftAndRight = true;
+            Assert.That(filter.Apply(buffer, out RawAudioBuffer output).IsSuccessful, Is.True);
+
+            using (output)
+            {
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+                    Assert.That(ReadSamples(output), Is.EqualTo(new[] { ReadSamples(straight)[1], ReadSamples(straight)[0] }).Within(1e-6),
+                        "the right side comes out of the left channel, and the other way round");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// And a wider output has a pair to exchange in every group that has one, while the centre and the low frequency stay
+    /// where they are because they belong to neither side.
+    /// </summary>
+    [Test]
+    public void ExchangesEveryPairOfAWiderOutput()
+    {
+        float[][] planes = [[0.1f], [0.2f], [0.3f], [0.4f], [0.5f], [0.6f]];
+
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Surround51, 6, targetChannelCount: 6);
+        filter.InvertLeftAndRight = true;
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Surround51, 6, 1, planes);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+            Assert.That(ReadPlanes(output), Is.EqualTo(new[] { new[] { 0.2 }, new[] { 0.1 }, new[] { 0.3 }, new[] { 0.4 }, new[] { 0.6 }, new[] { 0.5 } }).Within(1e-6),
+                "the front and back pairs are exchanged; the centre and the low frequency are not");
+        }
+    }
+
+    /// <summary>
+    /// Inverting is the exchange of the two sides, and it comes before the balance so that the balance always quietens the
+    /// side the listener moved the sound away from, whatever the device does with it.
+    /// </summary>
+    [Test]
+    public void ExchangesTheSidesBeforeTheBalance()
+    {
+        using RemixAudioFilter filter = Prepare(ChannelLayout.Stereo, 2);
+        filter.InvertLeftAndRight = true;
+        filter.Pan = -1.0f;
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, ChannelLayout.Stereo, 2, 1, [[0.4f], [0.3f]]);
+
+        OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(applied.IsSuccessful, Is.True, applied.Message);
+            Assert.That(ReadPlanes(output), Is.EqualTo(new[] { new[] { 0.3 }, new[] { 0.0 } }).Within(1e-6),
+                "the exchange put the right channel on the left, and the balance silenced the right one as it always does");
+        }
+    }
+
+    private static RemixAudioFilter PrepareFor(ChannelLayout layout, int channelCount, ChannelLayout targetLayout, int targetChannelCount)
+    {
+        RemixAudioFilter filter = new();
+        AudioStreamInfo stream = CreateStream(layout, channelCount);
+        OperationResult configured = filter.Configure(stream, stream.WithLayout(targetChannelCount, targetLayout));
+        Assert.That(configured.IsSuccessful, Is.True, configured.Message);
+        return filter;
+    }
+
+    /// <summary>
     /// The format of a device that takes this many channels. A target as wide as the stream is the stream itself, which
     /// is how a device that plays the arrangement as it is hands it over.
     /// </summary>
@@ -701,7 +1039,7 @@ public class RemixAudioFilterTests
         return stream.WithLayout(targetChannelCount, targetChannelCount == 1 ? ChannelLayout.Mono : ChannelLayout.Stereo);
     }
 
-    private static Dictionary<string, int> Levels(params (string Key, int Value)[] entries)
+    private static Dictionary<string, float> Levels(params (string Key, float Value)[] entries)
     {
         return entries.ToDictionary(entry => entry.Key, entry => entry.Value);
     }

@@ -820,6 +820,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Miscellaneous" xml:space="preserve">
     <value>Sonstiges</value>
   </data>
+  <data name="MixInvertLeftAndRight" xml:space="preserve">
+    <value>Links und rechts vertauschen</value>
+  </data>
   <data name="Mixing" xml:space="preserve">
     <value>Mischung</value>
   </data>
@@ -954,6 +957,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Dieser Vorgang überschreibt vorhandene Einträge.</value>
+  </data>
+  <data name="Pan" xml:space="preserve">
+    <value>Panorama</value>
   </data>
   <data name="PanX" xml:space="preserve">
     <value>X-Verschiebung</value>

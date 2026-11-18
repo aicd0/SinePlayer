@@ -7,4 +7,4 @@ namespace SinePlayer.Core.Playback.Backends.Remix;
 /// One group of speakers that the fold treats as one: the label a mixing UI shows for it, the key the listener's level
 /// for it is stored under, and the level it carries until that level is changed, in percent of full scale.
 /// </summary>
-public readonly record struct RemixChannelGroup(string Key, string Label, int DefaultLevel);
+public readonly record struct RemixChannelGroup(string Key, string Label, float DefaultLevel);

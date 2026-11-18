@@ -818,6 +818,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="Miscellaneous" xml:space="preserve">
     <value>其他</value>
   </data>
+  <data name="MixInvertLeftAndRight" xml:space="preserve">
+    <value>左右反轉</value>
+  </data>
   <data name="Mixing" xml:space="preserve">
     <value>混音</value>
   </data>
@@ -952,6 +955,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>此操作將覆蓋現有條目。</value>
+  </data>
+  <data name="Pan" xml:space="preserve">
+    <value>聲像</value>
   </data>
   <data name="PanX" xml:space="preserve">
     <value>水平平移</value>

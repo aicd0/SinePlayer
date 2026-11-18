@@ -223,6 +223,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _mixInvertLeftAndRightLabel = string.Empty;
+    public string MixInvertLeftAndRightLabel
+    {
+        get => _mixInvertLeftAndRightLabel;
+        set
+        {
+            _mixInvertLeftAndRightLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MixInvertLeftAndRightLabel)));
+        }
+    }
+
     private string _subtitleDecoderLabel = string.Empty;
     public string SubtitleDecoderLabel
     {
