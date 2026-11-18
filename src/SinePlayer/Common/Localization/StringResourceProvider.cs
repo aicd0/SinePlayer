@@ -46,6 +46,7 @@ public class StringResourceProvider
     public string ApplyOnNextLaunch => GetResourceString("ApplyOnNextLaunch");
     public string Ascending => GetResourceString("Ascending");
     public string Audio => GetResourceString("Audio");
+    public string AudioClippedSamples => GetResourceString("AudioClippedSamples");
     public string AudioUnderruns => GetResourceString("AudioUnderruns");
     public string Auto => GetResourceString("Auto");
     public string AutoDetectCollections => GetResourceString("AutoDetectCollections");

@@ -17,10 +17,13 @@ internal sealed partial class ClampAudioFilter : IAudioFilter
     private AudioStreamInfo? _outputFormat;
     private bool _disposed;
     private bool _reportedNonFinite;
+    private long _clippedSamples;
 
     public string Name => "Clamp";
 
     public AudioStreamInfo? OutputFormat => _outputFormat;
+
+    public long ClippedSamples => Interlocked.Read(ref _clippedSamples);
 
     public OperationResult Configure(AudioStreamInfo input, AudioStreamInfo target)
     {
@@ -85,6 +88,7 @@ internal sealed partial class ClampAudioFilter : IAudioFilter
 
     private void Clamp(nint pointer, int valueCount)
     {
+        int clipped = 0;
         bool silenced = false;
         unsafe
         {
@@ -92,15 +96,24 @@ internal sealed partial class ClampAudioFilter : IAudioFilter
             for (int index = 0; index < valueCount; index++)
             {
                 float value = values[index];
-                if (float.IsFinite(value))
+                if (!float.IsFinite(value))
                 {
-                    values[index] = Math.Clamp(value, -1.0f, 1.0f);
+                    values[index] = 0.0f;
+                    silenced = true;
                     continue;
                 }
 
-                values[index] = 0.0f;
-                silenced = true;
+                if (value > 1.0f || value < -1.0f)
+                {
+                    values[index] = value > 0.0f ? 1.0f : -1.0f;
+                    clipped++;
+                }
             }
+        }
+
+        if (clipped > 0)
+        {
+            Interlocked.Add(ref _clippedSamples, clipped);
         }
 
         if (silenced)

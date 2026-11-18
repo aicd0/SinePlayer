@@ -234,6 +234,9 @@
   <data name="Audio" xml:space="preserve">
     <value>Audio</value>
   </data>
+  <data name="AudioClippedSamples" xml:space="preserve">
+    <value>Muestras recortadas</value>
+  </data>
   <data name="AudioUnderruns" xml:space="preserve">
     <value>Interrupciones por falta de audio</value>
   </data>

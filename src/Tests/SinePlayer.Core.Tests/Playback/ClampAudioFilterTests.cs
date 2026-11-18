@@ -38,7 +38,8 @@ public class ClampAudioFilterTests
 
     /// <summary>
     /// A value that is not a number has no level to be clamped to, and no stage is supposed to produce one: it is
-    /// silenced so the block can still play, and the fault is reported rather than averaged into the sound.
+    /// silenced so the block can still play, and the fault is reported rather than averaged into the sound. It is not
+    /// counted as clipping — nothing about it was too loud.
     /// </summary>
     [Test]
     public void SilencesSamplesThatAreNotNumbers()
@@ -47,7 +48,30 @@ public class ClampAudioFilterTests
         using RawAudioBuffer block = CreateBlock(float.NaN, float.PositiveInfinity, float.NegativeInfinity, 0.5f);
 
         Assert.That(filter.Apply(block, out RawAudioBuffer output).IsSuccessful, Is.True);
-        Assert.That(ReadSamples(output), Is.EqualTo(new[] { 0.0, 0.0, 0.0, 0.5 }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ReadSamples(output), Is.EqualTo(new[] { 0.0, 0.0, 0.0, 0.5 }));
+            Assert.That(filter.ClippedSamples, Is.Zero, "a fault is not a level that was too loud");
+        }
+    }
+
+    /// <summary>
+    /// What the stage clips is counted as it goes, which is the figure a listener can read as "the mix is louder than
+    /// the samples can hold": the samples that went past full scale, and only those, over the life of the stage.
+    /// </summary>
+    [Test]
+    public void CountsTheSamplesItClips()
+    {
+        using ClampAudioFilter filter = new();
+        using RawAudioBuffer first = CreateBlock(2.0f, -3.0f, 0.5f, -0.25f);
+
+        Assert.That(filter.Apply(first, out _).IsSuccessful, Is.True);
+        Assert.That(filter.ClippedSamples, Is.EqualTo(2), "only the two that went past full scale");
+
+        using RawAudioBuffer second = CreateBlock(-1.5f, 0.0f, 0.0f, 0.0f);
+        Assert.That(filter.Apply(second, out _).IsSuccessful, Is.True);
+        Assert.That(filter.ClippedSamples, Is.EqualTo(3), "and the figure keeps counting across blocks");
     }
 
     /// <summary>

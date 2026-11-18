@@ -119,6 +119,7 @@ internal sealed partial class PlaybackInfoPageViewModel : BaseViewModel, INotify
             Add($"{key}.decoder", StringResource.Decoder, chain.DecoderName ?? StringResource.None);
             Add($"{key}.decoder.mode", StringResource.DecodeMode, chain.IsHardwareAccelerated ? StringResource.Hardware : StringResource.Software);
             Add($"{key}.renderer", StringResource.Renderer, chain.RendererName ?? StringResource.None);
+            Add($"{key}.clipped", StringResource.AudioClippedSamples, chain.ClippedSamples.ToString(CultureInfo.InvariantCulture));
         }
 
         ISubtitleChain[] subtitleChains = [.. info.SubtitleChains.Where(chain => chain.SelectedStream is not null)];

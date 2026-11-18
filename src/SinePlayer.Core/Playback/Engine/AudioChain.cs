@@ -110,6 +110,8 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
     public long Underruns => Renderer.CurrentComponent?.UnderrunCount ?? 0;
 
+    public long ClippedSamples => _clampFilter.ClippedSamples;
+
     public bool OwnsClock => _timeline.DeviceOwner == this;
 
     public ChainTail ReadTail { get; } = new();
