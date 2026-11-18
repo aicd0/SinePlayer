@@ -907,6 +907,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="Open" xml:space="preserve">
     <value>Ouvrir</value>
   </data>
+  <data name="OpenFile" xml:space="preserve">
+    <value>Ouvrir un fichier</value>
+  </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Ouvrir la page d’accueil</value>
   </data>

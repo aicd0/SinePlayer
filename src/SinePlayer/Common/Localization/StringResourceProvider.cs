@@ -236,6 +236,7 @@ public class StringResourceProvider
     public string Off => GetResourceString("Off");
     public string Opacity => GetResourceString("Opacity");
     public string Open => GetResourceString("Open");
+    public string OpenFile => GetResourceString("OpenFile");
     public string OpenHomePage => GetResourceString("OpenHomePage");
     public string OpenInCurrentTab => GetResourceString("OpenInCurrentTab");
     public string OpenInLastActivePlayerTab => GetResourceString("OpenInLastActivePlayerTab");

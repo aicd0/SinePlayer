@@ -907,6 +907,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="Open" xml:space="preserve">
     <value>열기</value>
   </data>
+  <data name="OpenFile" xml:space="preserve">
+    <value>파일 열기</value>
+  </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>홈페이지 열기</value>
   </data>
