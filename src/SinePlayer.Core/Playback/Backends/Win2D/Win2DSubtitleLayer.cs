@@ -307,14 +307,17 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             // The bottom and middle bands grow upwards, the top band downwards: the first cue keeps the place its alignment
             // asked for, and the ones after it make room above or below rather than covering it.
             origin.Y += row == 2 ? taken[row] : -taken[row];
-            origin += new Vector2((float)(presentation.OffsetX * scale), (float)(presentation.OffsetY * scale));
 
             // What the safe region costs is only what it takes to be inside it, and the band grows from where the cue ended
             // up rather than from where it would have gone, so cues of one band stay apart when the chrome moves them.
             Vector2 kept = KeepInsideArea(origin, layout, safe);
             float moved = kept.Y - origin.Y;
             taken[row] += (row == 2 ? moved : -moved) + (float)layout.LayoutBounds.Height + gap;
-            origin = kept;
+
+            // The placement a chain asks for is that chain's own and moves nothing else: it is applied once the room this
+            // cue takes has been counted, so panning one chain's words — including the part of the pan the edge cuts short —
+            // leaves the words another chain stacks in the same band exactly where they were.
+            origin = KeepInsideArea(kept + new Vector2((float)(presentation.OffsetX * scale), (float)(presentation.OffsetY * scale)), layout, safe);
 
             CanvasGeometry? outline = presentation.OutlineWidth > 0.0 ? outlines.Get(device, body, format, blockWidth, height) : null;
 
