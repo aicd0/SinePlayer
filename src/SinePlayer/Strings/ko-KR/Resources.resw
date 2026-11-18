@@ -234,6 +234,9 @@
   <data name="Audio" xml:space="preserve">
     <value>오디오</value>
   </data>
+  <data name="AudioClippedSamples" xml:space="preserve">
+    <value>클리핑된 샘플</value>
+  </data>
   <data name="AudioUnderruns" xml:space="preserve">
     <value>오디오 버퍼 부족</value>
   </data>

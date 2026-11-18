@@ -234,6 +234,9 @@
   <data name="Audio" xml:space="preserve">
     <value>オーディオ</value>
   </data>
+  <data name="AudioClippedSamples" xml:space="preserve">
+    <value>クリップしたサンプル数</value>
+  </data>
   <data name="AudioUnderruns" xml:space="preserve">
     <value>音声バッファー不足</value>
   </data>

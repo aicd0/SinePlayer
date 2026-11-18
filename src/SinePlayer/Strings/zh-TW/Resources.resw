@@ -234,6 +234,9 @@
   <data name="Audio" xml:space="preserve">
     <value>音訊</value>
   </data>
+  <data name="AudioClippedSamples" xml:space="preserve">
+    <value>削波取樣數</value>
+  </data>
   <data name="AudioUnderruns" xml:space="preserve">
     <value>音訊緩衝不足次數</value>
   </data>
