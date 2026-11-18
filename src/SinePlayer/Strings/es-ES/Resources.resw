@@ -591,6 +591,9 @@ La evaluación se realizará en el siguiente orden:
   <data name="Fit" xml:space="preserve">
     <value>Ajustar</value>
   </data>
+  <data name="FixedFontSize" xml:space="preserve">
+    <value>Tamaño de fuente fijo</value>
+  </data>
   <data name="FlipHorizontally" xml:space="preserve">
     <value>Voltear horizontalmente</value>
   </data>

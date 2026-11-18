@@ -591,6 +591,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="Fit" xml:space="preserve">
     <value>适应</value>
   </data>
+  <data name="FixedFontSize" xml:space="preserve">
+    <value>固定字体大小</value>
+  </data>
   <data name="FlipHorizontally" xml:space="preserve">
     <value>水平翻转</value>
   </data>

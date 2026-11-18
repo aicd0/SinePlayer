@@ -591,6 +591,9 @@ The expression will be evaluated in the following order:
   <data name="Fit" xml:space="preserve">
     <value>Fit</value>
   </data>
+  <data name="FixedFontSize" xml:space="preserve">
+    <value>Fixed font size</value>
+  </data>
   <data name="FlipHorizontally" xml:space="preserve">
     <value>Flip horizontally</value>
   </data>

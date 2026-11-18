@@ -22,6 +22,8 @@ public readonly record struct SubtitlePresentation
 
     public double FontSize { get; init; }
 
+    public bool FixedFontSize { get; init; }
+
     public FontStyle FontStyle { get; init; }
 
     public FontWeight FontWeight { get; init; }

@@ -32,6 +32,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
     private const float FontSizeFraction = 0.045f;
     private const float MinimumFontSize = 12.0f;
     private const float MaximumFontSize = 72.0f;
+    private const float ReferenceSurfaceHeight = 720.0f;
     private const float MarginFraction = 0.03f;
     private const double MaximumInsetFraction = 0.9;
     private const float StackGapFraction = 0.15f;
@@ -231,11 +232,20 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             return;
         }
 
-        // An explicit size is in device independent pixels, so it is scaled to the surface it lands on; the automatic one
-        // stays a share of the surface's own pixels, which is what it has always been.
-        float fontSize = presentation.FontSize > 0.0
-            ? (float)(presentation.FontSize * scale)
-            : Math.Clamp(height * FontSizeFraction, MinimumFontSize, MaximumFontSize);
+        float fontSize;
+        if (presentation.FixedFontSize)
+        {
+            fontSize = presentation.FontSize > 0.0
+                ? (float)(presentation.FontSize * scale)
+                : (float)Math.Clamp(ReferenceSurfaceHeight * scale * FontSizeFraction, MinimumFontSize, MaximumFontSize);
+        }
+        else
+        {
+            fontSize = presentation.FontSize > 0.0
+                ? (float)Math.Max(1.0, presentation.FontSize * height / ReferenceSurfaceHeight)
+                : Math.Clamp(height * FontSizeFraction, MinimumFontSize, MaximumFontSize);
+        }
+
         float margin = height * MarginFraction;
         float gap = fontSize * StackGapFraction;
         SubtitleArea safe = SafeAreaOf(presentation, scale, width, height);

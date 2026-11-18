@@ -289,6 +289,17 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _subtitleFixedSizeLabel = string.Empty;
+    public string SubtitleFixedSizeLabel
+    {
+        get => _subtitleFixedSizeLabel;
+        set
+        {
+            _subtitleFixedSizeLabel = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleFixedSizeLabel)));
+        }
+    }
+
     private string _subtitleFontStyleLabel = string.Empty;
     public string SubtitleFontStyleLabel
     {

@@ -591,6 +591,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="Fit" xml:space="preserve">
     <value>Вписать</value>
   </data>
+  <data name="FixedFontSize" xml:space="preserve">
+    <value>Фиксированный размер шрифта</value>
+  </data>
   <data name="FlipHorizontally" xml:space="preserve">
     <value>Отразить по горизонтали</value>
   </data>

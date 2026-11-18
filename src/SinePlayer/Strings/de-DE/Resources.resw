@@ -591,6 +591,9 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   <data name="Fit" xml:space="preserve">
     <value>Einpassen</value>
   </data>
+  <data name="FixedFontSize" xml:space="preserve">
+    <value>Feste Schriftgröße</value>
+  </data>
   <data name="FlipHorizontally" xml:space="preserve">
     <value>Horizontal spiegeln</value>
   </data>

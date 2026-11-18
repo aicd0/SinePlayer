@@ -591,6 +591,9 @@ L'évaluation s'effectuera dans l'ordre suivant :
   <data name="Fit" xml:space="preserve">
     <value>Ajuster</value>
   </data>
+  <data name="FixedFontSize" xml:space="preserve">
+    <value>Taille de police fixe</value>
+  </data>
   <data name="FlipHorizontally" xml:space="preserve">
     <value>Retourner horizontalement</value>
   </data>
