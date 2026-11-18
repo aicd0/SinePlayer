@@ -907,6 +907,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="Open" xml:space="preserve">
     <value>打开</value>
   </data>
+  <data name="OpenFile" xml:space="preserve">
+    <value>打开文件</value>
+  </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>打开主页</value>
   </data>

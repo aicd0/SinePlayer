@@ -907,6 +907,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Open" xml:space="preserve">
     <value>Öffnen</value>
   </data>
+  <data name="OpenFile" xml:space="preserve">
+    <value>Datei öffnen</value>
+  </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Startseite öffnen</value>
   </data>
