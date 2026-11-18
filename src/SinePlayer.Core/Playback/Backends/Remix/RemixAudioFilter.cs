@@ -116,7 +116,7 @@ public sealed partial class RemixAudioFilter : IAudioFilter
         }
 
         AudioSampleFormat format = input.SampleFormat;
-        if (!IsSupported(format))
+        if (format != AudioSampleFormat.Float32)
         {
             return OperationResult.Failure($"The sample format '{format}' cannot be mixed.");
         }
@@ -141,20 +141,11 @@ public sealed partial class RemixAudioFilter : IAudioFilter
             return OperationResult.Failure($"The source has {planar.PlaneCount} plane(s) for {channels} channel(s).");
         }
 
-        // The sample width is read from the buffer rather than from a table: the block says what it holds, and a
-        // format whose width is derived from its own data cannot disagree with the arithmetic that follows.
-        int firstPlaneBytes = planar.GetPlaneByteCount(0);
-        int bytesPerSample = firstPlaneBytes / (interleaved ? samples * channels : samples);
-        if (bytesPerSample <= 0)
-        {
-            return OperationResult.Failure($"Plane 0 holds {firstPlaneBytes} byte(s), which is no whole sample.");
-        }
-
         int planeCount = interleaved ? 1 : channels;
         nint[] planes = new nint[planeCount];
         for (int plane = 0; plane < planeCount; plane++)
         {
-            int needed = bytesPerSample * (interleaved ? channels : 1) * samples;
+            int needed = sizeof(float) * (interleaved ? channels : 1) * samples;
             nint pointer = planar.GetPlanePointer(plane);
             if (pointer == 0 || planar.GetPlaneByteCount(plane) < needed)
             {
@@ -167,8 +158,8 @@ public sealed partial class RemixAudioFilter : IAudioFilter
         if (matrix is { } fold)
         {
             int outputChannels = fold.ChannelCount;
-            byte[] mixed = new byte[bytesPerSample * outputChannels * samples];
-            Fold(planes, interleaved, format, bytesPerSample, channels, samples, fold, mixed);
+            byte[] mixed = new byte[sizeof(float) * outputChannels * samples];
+            Fold(planes, interleaved, channels, samples, fold, mixed);
 
             output = new RawAudioBuffer
             {
@@ -183,7 +174,7 @@ public sealed partial class RemixAudioFilter : IAudioFilter
             return OperationResult.Success();
         }
 
-        Scale(planes, interleaved, format, bytesPerSample, channels, samples, gains!);
+        Scale(planes, interleaved, channels, samples, gains!);
         return OperationResult.Success();
     }
 
@@ -210,9 +201,9 @@ public sealed partial class RemixAudioFilter : IAudioFilter
         return channelCount > targetChannelCount && targetChannelCount <= TargetChannelCount;
     }
 
-    private static unsafe void Fold(nint[] planes, bool interleaved, AudioSampleFormat format, int bytesPerSample, int channels, int samples, FoldMatrix matrix, byte[] destination)
+    private static unsafe void Fold(nint[] planes, bool interleaved, int channels, int samples, FoldMatrix matrix, byte[] destination)
     {
-        int frameBytes = bytesPerSample * matrix.ChannelCount;
+        int frameBytes = sizeof(float) * matrix.ChannelCount;
         fixed (byte* target = destination)
         {
             for (int sample = 0; sample < samples; sample++)
@@ -221,10 +212,10 @@ public sealed partial class RemixAudioFilter : IAudioFilter
                 double sumRight = 0.0;
                 for (int channel = 0; channel < channels; channel++)
                 {
-                    byte* address = interleaved
-                        ? (byte*)planes[0] + ((long)((sample * channels) + channel) * bytesPerSample)
-                        : (byte*)planes[channel] + ((long)sample * bytesPerSample);
-                    double value = ReadSample(address, format);
+                    float* address = interleaved
+                        ? (float*)planes[0] + ((sample * channels) + channel)
+                        : (float*)planes[channel] + sample;
+                    double value = *address;
                     sumLeft += value * matrix.Left[channel];
                     if (matrix.ChannelCount > 1)
                     {
@@ -232,28 +223,27 @@ public sealed partial class RemixAudioFilter : IAudioFilter
                     }
                 }
 
-                byte* destinationFrame = target + ((long)sample * frameBytes);
-                WriteSample(destinationFrame, format, sumLeft);
+                float* destinationFrame = (float*)(target + ((long)sample * frameBytes));
+                *destinationFrame = (float)sumLeft;
                 if (matrix.ChannelCount > 1)
                 {
-                    WriteSample(destinationFrame + bytesPerSample, format, sumRight);
+                    *(destinationFrame + 1) = (float)sumRight;
                 }
             }
         }
     }
 
     /// <summary>Scales every sample in place by the gain of the channel it belongs to.</summary>
-    private static unsafe void Scale(nint[] planes, bool interleaved, AudioSampleFormat format, int bytesPerSample, int channels, int samples, float[] gains)
+    private static unsafe void Scale(nint[] planes, bool interleaved, int channels, int samples, float[] gains)
     {
         if (interleaved)
         {
-            byte* start = (byte*)planes[0];
+            float* start = (float*)planes[0];
             for (int sample = 0; sample < samples; sample++)
             {
                 for (int channel = 0; channel < channels; channel++)
                 {
-                    byte* address = start + ((long)((sample * channels) + channel) * bytesPerSample);
-                    WriteSample(address, format, ReadSample(address, format) * gains[channel]);
+                    start[(sample * channels) + channel] *= gains[channel];
                 }
             }
 
@@ -262,82 +252,15 @@ public sealed partial class RemixAudioFilter : IAudioFilter
 
         for (int channel = 0; channel < channels; channel++)
         {
-            byte* start = (byte*)planes[channel];
+            float* start = (float*)planes[channel];
             for (int sample = 0; sample < samples; sample++)
             {
-                byte* address = start + ((long)sample * bytesPerSample);
-                WriteSample(address, format, ReadSample(address, format) * gains[channel]);
+                start[sample] *= gains[channel];
             }
         }
     }
 
-    private static bool IsSupported(AudioSampleFormat format)
-    {
-        return format is AudioSampleFormat.UInt8
-            or AudioSampleFormat.Int16
-            or AudioSampleFormat.Int24
-            or AudioSampleFormat.Int32
-            or AudioSampleFormat.Float32
-            or AudioSampleFormat.Float64;
-    }
-
-    /// <summary>A stored sample as a level, so formats mix with the same arithmetic whatever they store.</summary>
-    private static unsafe double ReadSample(byte* address, AudioSampleFormat format)
-    {
-        return format switch
-        {
-            AudioSampleFormat.UInt8 => (*address - 128) / 128.0,
-            AudioSampleFormat.Int16 => *(short*)address / 32768.0,
-            AudioSampleFormat.Int24 => ReadInt24(address) / 8388608.0,
-            AudioSampleFormat.Int32 => *(int*)address / 2147483648.0,
-            AudioSampleFormat.Float32 => *(float*)address,
-            AudioSampleFormat.Float64 => *(double*)address,
-            _ => 0.0,
-        };
-    }
-
-    private static unsafe void WriteSample(byte* address, AudioSampleFormat format, double value)
-    {
-        double clamped = Math.Clamp(value, -1.0, 1.0);
-        switch (format)
-        {
-            case AudioSampleFormat.UInt8:
-                *address = (byte)Math.Clamp(Math.Round((clamped * 128.0) + 128.0), 0.0, 255.0);
-                break;
-
-            case AudioSampleFormat.Int16:
-                *(short*)address = (short)Math.Clamp(Math.Round(clamped * 32767.0), short.MinValue, short.MaxValue);
-                break;
-
-            case AudioSampleFormat.Int24:
-                int value24 = (int)Math.Clamp(Math.Round(clamped * 8388607.0), -8388608.0, 8388607.0);
-                address[0] = (byte)value24;
-                address[1] = (byte)(value24 >> 8);
-                address[2] = (byte)(value24 >> 16);
-                break;
-
-            case AudioSampleFormat.Int32:
-                *(int*)address = (int)Math.Clamp(Math.Round(clamped * 2147483647.0), int.MinValue, int.MaxValue);
-                break;
-
-            case AudioSampleFormat.Float32:
-                *(float*)address = (float)clamped;
-                break;
-
-            case AudioSampleFormat.Float64:
-                *(double*)address = clamped;
-                break;
-        }
-    }
-
-    private static unsafe int ReadInt24(byte* address)
-    {
-        int value = address[0] | (address[1] << 8) | (address[2] << 16);
-        return (value & 0x800000) != 0 ? value | ~0xFFFFFF : value;
-    }
-
-    /// <summary>The mixed block, interleaved so the renderer has nothing left to do but copy it to the device.</summary>
-    private sealed class MixedBuffer : IPlanarAudioBuffer
+    private sealed partial class MixedBuffer : IPlanarAudioBuffer
     {
         private readonly byte[] _bytes;
         private readonly GCHandle _handle;
@@ -376,7 +299,6 @@ public sealed partial class RemixAudioFilter : IAudioFilter
         }
     }
 
-    /// <summary>The arrangement, both sets of levels, and the mix those levels produce for it.</summary>
     private sealed record MixState(
         ChannelLayout Layout,
         int ChannelCount,

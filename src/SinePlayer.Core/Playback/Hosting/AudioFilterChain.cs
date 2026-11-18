@@ -26,11 +26,24 @@ public sealed class AudioFilterChain
             && first.SampleFormat == second.SampleFormat;
     }
 
+    private static bool IsSameShape(AudioStreamInfo? first, AudioStreamInfo? second)
+    {
+        if (first is null || second is null)
+        {
+            return first is null && second is null;
+        }
+
+        return first.SampleRate == second.SampleRate
+            && first.ChannelCount == second.ChannelCount
+            && first.ChannelLayout == second.ChannelLayout;
+    }
+
     private readonly Lock _lock = new();
     private IAudioFilter[] _filters = [];
-    private IAudioFilter[] _forced = [];
-    private AudioStreamInfo? _inputFormat;
-    private AudioStreamInfo? _targetFormat;
+    private IAudioFilter[] _preForced = [];
+    private IAudioFilter[] _postForced = [];
+    private AudioStreamInfo? _stream;
+    private AudioStreamInfo? _target;
     private volatile AudioFilterChainSnapshot _snapshot = AudioFilterChainSnapshot.Empty;
 
     public int Count
@@ -69,7 +82,7 @@ public sealed class AudioFilterChain
             }
 
             _filters = [.. _filters, filter];
-            PrepareRunning();
+            Reprepare();
         }
     }
 
@@ -84,7 +97,7 @@ public sealed class AudioFilterChain
             }
 
             _filters = [.. _filters[..index], .. _filters[(index + 1)..]];
-            PrepareRunning();
+            Reprepare();
             return true;
         }
     }
@@ -94,48 +107,83 @@ public sealed class AudioFilterChain
         lock (_lock)
         {
             _filters = [];
-            PrepareRunning();
+            Reprepare();
         }
     }
 
-    internal void Configure(AudioStreamInfo stream, AudioStreamInfo target)
+    internal OperationResult Configure(AudioStreamInfo stream, AudioStreamInfo target)
     {
         lock (_lock)
         {
-            if (IsSameFormat(_inputFormat, stream) && IsSameFormat(_targetFormat, target))
+            if (IsSameShape(_stream, stream) && IsSameFormat(_target, target))
             {
-                return;
+                return OperationResult.Success();
             }
 
-            _inputFormat = stream;
-            _targetFormat = target;
-            PrepareRunning();
+            _stream = stream;
+            _target = target;
+            return PrepareRunning();
         }
     }
 
-    internal void SetForcedFilters(params IAudioFilter[] filters)
+    internal void SetPreForcedFilters(params IAudioFilter[] filters)
     {
         lock (_lock)
         {
-            _forced = [.. filters];
-            PrepareRunning();
+            _preForced = [.. filters];
+            Reprepare();
         }
     }
 
-    private void PrepareRunning()
+    internal void SetPostForcedFilters(params IAudioFilter[] filters)
     {
-        AudioStreamInfo? stream = _inputFormat;
-        AudioStreamInfo? target = _targetFormat;
+        lock (_lock)
+        {
+            _postForced = [.. filters];
+            Reprepare();
+        }
+    }
+
+    private void Reprepare()
+    {
+        OperationResult prepared = PrepareRunning();
+        if (!prepared.IsSuccessful)
+        {
+            PlaybackLogger.W(TAG, $"The audio chain was left as it was: {prepared.Message}");
+        }
+    }
+
+    private OperationResult PrepareRunning()
+    {
+        AudioStreamInfo? stream = _stream;
+        AudioStreamInfo? target = _target;
         if (stream is null || target is null)
         {
-            return;
+            return OperationResult.Success();
         }
 
         AudioStreamInfo output = stream;
         List<IAudioFilter> running = [];
-        Collect(_filters, running, ref output, target);
-        Collect(_forced, running, ref output, target);
+        OperationResult prepared = Collect(_preForced, running, ref output, target, required: true);
+        if (prepared.IsSuccessful)
+        {
+            prepared = Collect(_filters, running, ref output, target, required: false);
+        }
+
+        if (prepared.IsSuccessful)
+        {
+            prepared = Collect(_postForced, running, ref output, target, required: true);
+        }
+
+        if (!prepared.IsSuccessful)
+        {
+            // Nothing is published: the chain keeps answering with what was last whole rather than with a working
+            // set that is missing a stage the pipeline depends on.
+            return prepared;
+        }
+
         Publish([.. running], output);
+        return OperationResult.Success();
     }
 
     private void Publish(IAudioFilter[] filters, AudioStreamInfo? format)
@@ -143,12 +191,19 @@ public sealed class AudioFilterChain
         _snapshot = new AudioFilterChainSnapshot(filters, format, _snapshot.Version + 1);
     }
 
-    private static void Collect(IAudioFilter[] filters, List<IAudioFilter> running, ref AudioStreamInfo output, AudioStreamInfo target)
+    private static OperationResult Collect(IAudioFilter[] filters, List<IAudioFilter> running, ref AudioStreamInfo output, AudioStreamInfo target, bool required)
     {
         foreach (IAudioFilter filter in filters)
         {
-            if (!TryConfigure(filter, output, target))
+            OperationResult configured = TryConfigure(filter, output, target);
+            if (!configured.IsSuccessful)
             {
+                if (required)
+                {
+                    return OperationResult.Failure($"{filter.Name} could not be prepared for the audio chain: {configured.Message}", configured.Exception);
+                }
+
+                PlaybackLogger.W(TAG, $"{filter.Name} was left out of the audio chain: {configured.Message}");
                 continue;
             }
 
@@ -158,25 +213,19 @@ public sealed class AudioFilterChain
                 output = produced;
             }
         }
+
+        return OperationResult.Success();
     }
 
-    private static bool TryConfigure(IAudioFilter filter, AudioStreamInfo input, AudioStreamInfo target)
+    private static OperationResult TryConfigure(IAudioFilter filter, AudioStreamInfo input, AudioStreamInfo target)
     {
         try
         {
-            OperationResult configured = filter.Configure(input, target);
-            if (configured.IsSuccessful)
-            {
-                return true;
-            }
-
-            PlaybackLogger.W(TAG, $"{filter.Name} was left out of the audio chain: {configured.Message}");
-            return false;
+            return filter.Configure(input, target);
         }
         catch (Exception exception)
         {
-            PlaybackLogger.W(TAG, $"{filter.Name} was left out of the audio chain: {exception.Message}");
-            return false;
+            return OperationResult.Failure(exception);
         }
     }
 }

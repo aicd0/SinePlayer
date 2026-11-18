@@ -278,7 +278,7 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
 
         if (!_volumeControl.HasDevice && buffer.Buffer is IPlanarAudioBuffer planar)
         {
-            OperationResult scaled = AudioVolumeScaler.TryApply(planar, buffer.SampleFormat, IsMuted ? 0.0 : Volume);
+            OperationResult scaled = AudioVolumeScaler.TryApply(planar, IsMuted ? 0.0 : Volume);
             if (!scaled.IsSuccessful)
             {
                 return new FinishedAudioSubmit(scaled);

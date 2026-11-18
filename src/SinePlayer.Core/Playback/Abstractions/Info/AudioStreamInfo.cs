@@ -17,6 +17,16 @@ public sealed class AudioStreamInfo : MediaStreamInfo
 
     public AudioStreamInfo WithLayout(int channelCount, ChannelLayout channelLayout)
     {
+        return With(channelCount, channelLayout, SampleFormat);
+    }
+
+    public AudioStreamInfo WithSampleFormat(AudioSampleFormat sampleFormat)
+    {
+        return With(ChannelCount, ChannelLayout, sampleFormat);
+    }
+
+    private AudioStreamInfo With(int channelCount, ChannelLayout channelLayout, AudioSampleFormat sampleFormat)
+    {
         return new AudioStreamInfo
         {
             Index = Index,
@@ -31,7 +41,7 @@ public sealed class AudioStreamInfo : MediaStreamInfo
             SampleRate = SampleRate,
             ChannelCount = channelCount,
             ChannelLayout = channelLayout,
-            SampleFormat = SampleFormat,
+            SampleFormat = sampleFormat,
         };
     }
 }
