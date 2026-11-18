@@ -820,6 +820,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="Miscellaneous" xml:space="preserve">
     <value>Divers</value>
   </data>
+  <data name="MixInvertLeftAndRight" xml:space="preserve">
+    <value>Inverser gauche et droite</value>
+  </data>
   <data name="Mixing" xml:space="preserve">
     <value>Mixage</value>
   </data>
@@ -954,6 +957,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>Cette opération écrasera les entrées existantes.</value>
+  </data>
+  <data name="Pan" xml:space="preserve">
+    <value>Panoramique</value>
   </data>
   <data name="PanX" xml:space="preserve">
     <value>Décalage X</value>

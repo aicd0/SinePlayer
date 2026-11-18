@@ -820,6 +820,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Miscellaneous" xml:space="preserve">
     <value>Miscellaneous</value>
   </data>
+  <data name="MixInvertLeftAndRight" xml:space="preserve">
+    <value>Invert left and right</value>
+  </data>
   <data name="Mixing" xml:space="preserve">
     <value>Mixing</value>
   </data>
@@ -954,6 +957,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>This operation will overwrite existing entries.</value>
+  </data>
+  <data name="Pan" xml:space="preserve">
+    <value>Pan</value>
   </data>
   <data name="PanX" xml:space="preserve">
     <value>Pan X</value>

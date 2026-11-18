@@ -23,7 +23,7 @@ public class RemixMixerTests
         {
             Assert.That(groups.Select(group => group.Key), Is.EqualTo(new[] { "front", "center", "lfe", "back" }));
             Assert.That(groups.Select(group => group.Label), Is.EqualTo(new[] { "FL/FR", "FC", "LFE", "BL/BR" }));
-            Assert.That(groups.Select(group => group.DefaultLevel), Is.EqualTo(new[] { 100, 71, 0, 71 }));
+            Assert.That(groups.Select(group => group.DefaultLevel), Is.EqualTo(new[] { 1.0f, RemixMixer.DownmixLevel, 0.0f, RemixMixer.DownmixLevel }));
         }
     }
 

@@ -210,6 +210,7 @@ public class StringResourceProvider
     public string MediaOnThisDevice => GetResourceString("MediaOnThisDevice");
     public string MergeSingleItemGroups => GetResourceString("MergeSingleItemGroups");
     public string Miscellaneous => GetResourceString("Miscellaneous");
+    public string MixInvertLeftAndRight => GetResourceString("MixInvertLeftAndRight");
     public string Mixing => GetResourceString("Mixing");
     public string More => GetResourceString("More");
     public string Mute => GetResourceString("Mute");
@@ -252,6 +253,7 @@ public class StringResourceProvider
     public string OutlineWidth => GetResourceString("OutlineWidth");
     public string Output => GetResourceString("Output");
     public string OverwriteExistingEntries => GetResourceString("OverwriteExistingEntries");
+    public string Pan => GetResourceString("Pan");
     public string PanX => GetResourceString("PanX");
     public string PanY => GetResourceString("PanY");
     public string Pause => GetResourceString("Pause");

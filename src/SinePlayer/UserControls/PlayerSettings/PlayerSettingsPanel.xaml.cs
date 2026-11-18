@@ -50,6 +50,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private const double MinimumSubtitleFontSize = 4.0;
     private const double MaximumSubtitleFontSize = 200.0;
     private const int DefaultSubtitleFontWeight = 400;
+    private const int MaximumMixLevel = 200;
 
     private static readonly double[] SubtitleFontSizePresets = [16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 48.0, 56.0, 64.0, 72.0];
 
@@ -788,7 +789,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
             {
                 UpdateMixSliders(settings.Audio, presetSettings.Audio);
-                bool modified = _mixSliders.Exists(entry => entry.Slider.Value != entry.Slider.DefaultValue);
+                bool inverseModified = settings.Audio.InvertLeftAndRight != presetSettings.Audio.InvertLeftAndRight;
+                UpdateMixInvertLeftAndRight(settings.Audio);
+                ViewModel.MixInvertLeftAndRightLabel = GetLabel(StringResource.MixInvertLeftAndRight, inverseModified);
+
+                bool modified = _mixSliders.Exists(entry => entry.Slider.Value != entry.Slider.DefaultValue)
+                    || MixPanSlider.Value != MixPanSlider.DefaultValue
+                    || inverseModified;
                 tabModified = tabModified || modified;
             }
 
@@ -1271,6 +1278,20 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
+    private void MixPanSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        int value = (int)Math.Round(e.NewValue);
+        if (_mediaSettings.Audio.Pan != value)
+        {
+            ApplyAudio(settings => settings.Pan = value);
+        }
+    }
+
     private void MixSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
         if (_updatingUI)
@@ -1296,6 +1317,28 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         ApplyAudio(settings => EditableLevels(settings, set, layout)[key] = value);
+    }
+
+    private void MixInvertLeftAndRightToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        bool value = MixInvertLeftAndRightToggleSwitch.IsOn;
+        if (_mediaSettings.Audio.InvertLeftAndRight != value)
+        {
+            ApplyAudio(settings => settings.InvertLeftAndRight = value);
+        }
+    }
+
+    private void UpdateMixInvertLeftAndRight(AudioSettingsModel settings)
+    {
+        if (MixInvertLeftAndRightToggleSwitch.IsOn != settings.InvertLeftAndRight)
+        {
+            MixInvertLeftAndRightToggleSwitch.IsOn = settings.InvertLeftAndRight;
+        }
     }
 
     private void UpdateMixSliders(AudioSettingsModel settings, AudioSettingsModel preset)
@@ -1324,6 +1367,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 entry.Slider.Value = level;
             }
         }
+
+        MixPanSlider.DefaultValue = preset.Pan;
+        if (Math.Abs(MixPanSlider.Value - settings.Pan) > 0.5)
+        {
+            MixPanSlider.Value = settings.Pan;
+        }
     }
 
     private void BuildMixSliders(ChannelLayout layout, RemixLevelSet set)
@@ -1337,7 +1386,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             {
                 Label = group.Label,
                 Minimum = 0,
-                Maximum = RemixMixer.MaximumLevel,
+                Maximum = MaximumMixLevel,
                 StepFrequency = 1,
                 Tag = group.Key,
             };
@@ -2285,14 +2334,14 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return level;
         }
 
-        return inherited is not null && inherited.TryGetValue(group.Key, out int inheritedLevel) ? inheritedLevel : group.DefaultLevel;
+        return inherited is not null && inherited.TryGetValue(group.Key, out int inheritedLevel) ? inheritedLevel : (int)Math.Round(group.DefaultLevel * 100);
     }
 
     private sealed class MixSliderEntry(RemixChannelGroup group, SliderSettingView slider)
     {
         public RemixChannelGroup Group { get; } = group;
         public SliderSettingView Slider { get; } = slider;
-        public int Level { get; set; } = group.DefaultLevel;
+        public int Level { get; set; } = (int)Math.Round(group.DefaultLevel * 100);
     }
 
     #endregion

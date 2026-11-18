@@ -820,6 +820,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="Miscellaneous" xml:space="preserve">
     <value>その他</value>
   </data>
+  <data name="MixInvertLeftAndRight" xml:space="preserve">
+    <value>左右を反転</value>
+  </data>
   <data name="Mixing" xml:space="preserve">
     <value>ミキシング</value>
   </data>
@@ -954,6 +957,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>この操作により既存のエントリが上書きされます。</value>
+  </data>
+  <data name="Pan" xml:space="preserve">
+    <value>パン</value>
   </data>
   <data name="PanX" xml:space="preserve">
     <value>X 移動</value>

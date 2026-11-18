@@ -820,6 +820,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="Miscellaneous" xml:space="preserve">
     <value>기타</value>
   </data>
+  <data name="MixInvertLeftAndRight" xml:space="preserve">
+    <value>좌우 반전</value>
+  </data>
   <data name="Mixing" xml:space="preserve">
     <value>믹싱</value>
   </data>
@@ -954,6 +957,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   </data>
   <data name="OverwriteExistingEntries" xml:space="preserve">
     <value>이 작업을 수행하면 기존 항목이 덮어쓰여집니다.</value>
+  </data>
+  <data name="Pan" xml:space="preserve">
+    <value>팬</value>
   </data>
   <data name="PanX" xml:space="preserve">
     <value>X 이동</value>

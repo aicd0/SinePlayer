@@ -19,6 +19,8 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
     public AudioSpeedAlgorithm StretchMethod { get; set; } = AudioSpeedAlgorithm.WSOLA;
     public Dictionary<ChannelLayout, Dictionary<string, int>> RemixLevels { get; set; } = [];
     public Dictionary<ChannelLayout, Dictionary<string, int>> DownmixLevels { get; set; } = [];
+    public int Pan { get; set; }
+    public bool InvertLeftAndRight { get; set; }
 
     protected override Dictionary<string, AudioSettingsModel> LoadPresets()
     {
@@ -43,6 +45,8 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
         StretchMethod = ParseStretchMethod(model.StretchMethod, StretchMethod);
         MergeLevels(model.RemixLevels, RemixLevels);
         MergeLevels(model.DownmixLevels, DownmixLevels);
+        Pan = model.Pan ?? Pan;
+        InvertLeftAndRight = model.InvertLeftAndRight ?? InvertLeftAndRight;
     }
 
     protected override JsonModel ToJsonModel()
@@ -55,6 +59,8 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
             StretchMethod = StretchMethod.ToString(),
             RemixLevels = ToJsonLevels(RemixLevels),
             DownmixLevels = ToJsonLevels(DownmixLevels),
+            Pan = Pan,
+            InvertLeftAndRight = InvertLeftAndRight,
         };
     }
 
@@ -150,5 +156,11 @@ internal sealed class AudioSettingsModel : PresetSettingsModel<AudioSettingsMode
 
         [JsonPropertyName("DownmixLevels")]
         public Dictionary<string, Dictionary<string, int?>?>? DownmixLevels { get; set; }
+
+        [JsonPropertyName("Pan")]
+        public int? Pan { get; set; }
+
+        [JsonPropertyName("InvertLeftAndRight")]
+        public bool? InvertLeftAndRight { get; set; }
     }
 }

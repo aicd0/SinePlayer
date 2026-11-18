@@ -456,7 +456,35 @@
                     </settings:PlayerSettingsSection>
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Mixing}" SectionKey="Mixing">
                         <settings:PlayerSettingsSection.SectionContent>
-                            <StackPanel x:Name="MixSliderHost" Orientation="Vertical" />
+                            <StackPanel Orientation="Vertical">
+                                <settings:SliderSettingView
+                                    x:Name="MixPanSlider"
+                                    Label="{x:Bind StringResource.Pan}"
+                                    Maximum="100"
+                                    Minimum="-100"
+                                    StepFrequency="1"
+                                    ValueChanged="MixPanSlider_ValueChanged" />
+                                <StackPanel x:Name="MixSliderHost" Orientation="Vertical" />
+                                <Grid Style="{StaticResource CommonSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.MixInvertLeftAndRightLabel, Mode=OneWay}" />
+                                    <ToggleSwitch
+                                        x:Name="MixInvertLeftAndRightToggleSwitch"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource CompatToggleSwitchStyle}"
+                                        Toggled="MixInvertLeftAndRightToggleSwitch_Toggled" />
+                                </Grid>
+                            </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
                 </StackPanel>
