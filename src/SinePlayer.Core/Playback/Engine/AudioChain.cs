@@ -8,6 +8,8 @@ using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Abstractions.Timing;
+using SinePlayer.Core.Playback.Backends.Clamp;
+using SinePlayer.Core.Playback.Backends.Conversion;
 using SinePlayer.Core.Playback.Backends.Speed;
 using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Core.Playback.Selection;
@@ -32,14 +34,17 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     private long _offsetTicks;
     private long _volumeBits = BitConverter.DoubleToInt64Bits(1.0);
     private volatile bool _muted;
+    private readonly ConversionAudioFilter _conversionFilter = new();
     private readonly SpeedAudioFilter _speedFilter = new();
+    private readonly ClampAudioFilter _clampFilter = new();
 
     public AudioChain(IChainHost host, PipelineTimeline timeline, PipelineEvents events)
     {
         _host = host;
         _timeline = timeline;
         _events = events;
-        Filters.SetForcedFilters(_speedFilter);
+        Filters.SetPreForcedFilters(_conversionFilter);
+        Filters.SetPostForcedFilters(_speedFilter, _clampFilter);
     }
 
     public MediaStreamKind Kind => MediaStreamKind.Audio;
@@ -261,7 +266,11 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
 
                 if (negotiatedFormat is not null)
                 {
-                    Filters.Configure(audioStream, negotiatedFormat);
+                    OperationResult configured = Filters.Configure(audioStream, negotiatedFormat);
+                    if (!configured.IsSuccessful)
+                    {
+                        return result.Failure(configured.Message, configured.Exception);
+                    }
                 }
             }
             else

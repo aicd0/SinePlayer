@@ -393,8 +393,10 @@ public class RemixAudioFilterTests
     }
 
     [Test]
-    public void ClampsWhatTheMixPushesPastFullScale()
+    public void KeepsWhatTheMixPushesPastFullScale()
     {
+        // The mix hands on what its coefficients produce, even above full scale: deciding what a peak becomes belongs
+        // to the end of the chain, where it is decided once rather than in every stage the signal passes.
         float[][] planes =
         [
             [1.0f],
@@ -411,10 +413,13 @@ public class RemixAudioFilterTests
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
         using (output)
         {
+            double[] samples = ReadSamples(output);
+
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(applied.IsSuccessful, Is.True, applied.Message);
-                Assert.That(ReadSamples(output), Is.EqualTo(new[] { 1.0, 1.0 }));
+                Assert.That(samples, Is.All.GreaterThan(1.0), "the fold's own level is handed on, not what a later stage will make of it");
+                Assert.That(samples[0], Is.EqualTo(samples[1]).Within(1e-6), "a symmetric mix folds to the same level on both sides");
             }
         }
     }
@@ -473,10 +478,10 @@ public class RemixAudioFilterTests
     }
 
     [Test]
-    public void KeepsTheSampleFormatItWasHanded()
+    public void RefusesABlockInAnyOtherFormat()
     {
-        // A block of 16 bit samples folds into 16 bit samples: the renderer opened the device for the format the
-        // decoder produced, and the filter is not the place that changes it.
+        // The chain works in floats from end to end, so a block of 16 bit samples here is a chain that is not the one
+        // this filter was prepared for: mixing it would mean reading whole samples as levels.
         short[][] planes =
         [
             [16000],
@@ -491,15 +496,11 @@ public class RemixAudioFilterTests
         using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Int16, ChannelLayout.Surround51, 6, 1, ToBytes(planes));
 
         OperationResult applied = filter.Apply(buffer, out RawAudioBuffer output);
-        using (output)
+
+        using (Assert.EnterMultipleScope())
         {
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(applied.IsSuccessful, Is.True, applied.Message);
-                Assert.That(output.SampleFormat, Is.EqualTo(AudioSampleFormat.Int16));
-                Assert.That(output.Buffer, Is.AssignableTo<IPlanarAudioBuffer>());
-                Assert.That(((IPlanarAudioBuffer)output.Buffer).GetPlaneByteCount(0), Is.EqualTo(sizeof(short) * 2));
-            }
+            Assert.That(applied.IsSuccessful, Is.False);
+            Assert.That(output, Is.SameAs(buffer), "the block is handed back as it came in");
         }
     }
 

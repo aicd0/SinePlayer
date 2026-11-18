@@ -65,29 +65,23 @@ public class SpeedAudioFilterTests
         }
     }
 
-    [TestCase(AudioSampleFormat.UInt8, 192)]
-    [TestCase(AudioSampleFormat.Int16, 16384)]
-    [TestCase(AudioSampleFormat.Int24, 4194304)]
-    [TestCase(AudioSampleFormat.Int32, 1073741824)]
-    [TestCase(AudioSampleFormat.Float32, 0.5)]
-    [TestCase(AudioSampleFormat.Float64, 0.5)]
-    public void KeepsAFormatItUnderstandsIntact(AudioSampleFormat format, double value)
+    [Test]
+    public void KeepsAConstantSignalConstant()
     {
-        // A constant signal is what every format has in common: resampled, it has to still be that constant, which is what makes
-        // the read and write of each format testable without depending on the interpolation itself.
+        // A constant signal is what a resampler must not invent shape in: resampled, it has to still be that constant.
         using SpeedAudioFilter filter = new();
         filter.SetSpeed(2.0);
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
-        using TestPlanarBuffer planar = new((List<byte[]>)[Write(format, (List<double>)[.. Enumerable.Repeat(value, Frames)])]);
-        using RawAudioBuffer buffer = CreateBuffer(format, planar, Frames, channelCount: 1);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float32, (List<double>)[.. Enumerable.Repeat(0.5, Frames)])]);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, Frames, channelCount: 1);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
-        using TestPlanarBuffer read = Read(format, output);
-        Assert.That(Read(format, read.Plane(0), output.SampleCount), Is.All.EqualTo(value).Within(1),
+        using TestPlanarBuffer read = Read(AudioSampleFormat.Float32, output);
+        Assert.That(Read(AudioSampleFormat.Float32, read.Plane(0), output.SampleCount), Is.All.EqualTo(0.5).Within(1e-6),
             "a constant stays constant through any speed");
     }
 
@@ -101,15 +95,15 @@ public class SpeedAudioFilterTests
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         double[] ramp = [0.0, 0.5, 0.25, 0.75];
-        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, ramp)]);
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, ramp.Length, channelCount: 1);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float32, ramp)]);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, ramp.Length, channelCount: 1);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
-        using TestPlanarBuffer read = Read(AudioSampleFormat.Float64, output);
-        Assert.That(Read(AudioSampleFormat.Float64, read.Plane(0), output.SampleCount), Is.EqualTo(new[] { 0.25, 0.5 }));
+        using TestPlanarBuffer read = Read(AudioSampleFormat.Float32, output);
+        Assert.That(Read(AudioSampleFormat.Float32, read.Plane(0), output.SampleCount), Is.EqualTo(new[] { 0.25, 0.5 }));
     }
 
     [Test]
@@ -121,15 +115,15 @@ public class SpeedAudioFilterTests
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         double[] ramp = [0.0, 0.5, 0.25, 0.75];
-        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, ramp)]);
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, ramp.Length, channelCount: 1);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float32, ramp)]);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, ramp.Length, channelCount: 1);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
-        using TestPlanarBuffer read = Read(AudioSampleFormat.Float64, output);
-        Assert.That(Read(AudioSampleFormat.Float64, read.Plane(0), 5),
+        using TestPlanarBuffer read = Read(AudioSampleFormat.Float32, output);
+        Assert.That(Read(AudioSampleFormat.Float32, read.Plane(0), 5),
             Is.EqualTo(new[] { 0.0, 0.25, 0.5, 0.375, 0.25 }));
     }
 
@@ -147,14 +141,14 @@ public class SpeedAudioFilterTests
         double value = 0.25;
         for (int block = 0; block < 40; block++)
         {
-            using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, (List<double>)[.. Enumerable.Repeat(value, Frames)])]);
-            using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, Frames, channelCount: 1);
+            using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float32, (List<double>)[.. Enumerable.Repeat(value, Frames)])]);
+            using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, Frames, channelCount: 1);
 
             OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
             Assert.That(result.IsSuccessful, Is.True, result.Message);
 
-            using TestPlanarBuffer read = Read(AudioSampleFormat.Float64, output);
-            double[] samples = Read(AudioSampleFormat.Float64, read.Plane(0), output.SampleCount);
+            using TestPlanarBuffer read = Read(AudioSampleFormat.Float32, output);
+            double[] samples = Read(AudioSampleFormat.Float32, read.Plane(0), output.SampleCount);
 
             Assert.That(samples, Is.All.EqualTo(value).Within(1e-12), $"block {block} drifted away from the sound it was given");
         }
@@ -169,8 +163,8 @@ public class SpeedAudioFilterTests
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
         double[] interleaved = [1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
-        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, interleaved)]);
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, sampleCount: 4, channelCount: 2);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float32, interleaved)]);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, sampleCount: 4, channelCount: 2);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
 
@@ -180,8 +174,8 @@ public class SpeedAudioFilterTests
             Assert.That(output.SampleCount, Is.EqualTo(2), "two frames of four");
         }
 
-        using TestPlanarBuffer read = Read(AudioSampleFormat.Float64, output);
-        Assert.That(Read(AudioSampleFormat.Float64, read.Plane(0), 4), Is.EqualTo(new[] { 1.0, -1.0, 1.0, -1.0 }),
+        using TestPlanarBuffer read = Read(AudioSampleFormat.Float32, output);
+        Assert.That(Read(AudioSampleFormat.Float32, read.Plane(0), 4), Is.EqualTo(new[] { 1.0, -1.0, 1.0, -1.0 }),
             "each channel keeps its own samples");
     }
 
@@ -194,21 +188,21 @@ public class SpeedAudioFilterTests
 
         using TestPlanarBuffer planar = new(
         (List<byte[]>)[
-            Write(AudioSampleFormat.Float64, (List<double>)[0.5, 0.5, 0.5, 0.5]),
-            Write(AudioSampleFormat.Float64, (List<double>)[-0.5, -0.5, -0.5, -0.5]),
+            Write(AudioSampleFormat.Float32, (List<double>)[0.5, 0.5, 0.5, 0.5]),
+            Write(AudioSampleFormat.Float32, (List<double>)[-0.5, -0.5, -0.5, -0.5]),
         ]);
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, sampleCount: 4, channelCount: 2);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, sampleCount: 4, channelCount: 2);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
-        using TestPlanarBuffer read = Read(AudioSampleFormat.Float64, output);
+        using TestPlanarBuffer read = Read(AudioSampleFormat.Float32, output);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(read.PlaneCount, Is.EqualTo(2));
-            Assert.That(Read(AudioSampleFormat.Float64, read.Plane(0), output.SampleCount), Is.All.EqualTo(0.5));
-            Assert.That(Read(AudioSampleFormat.Float64, read.Plane(1), output.SampleCount), Is.All.EqualTo(-0.5),
+            Assert.That(Read(AudioSampleFormat.Float32, read.Plane(0), output.SampleCount), Is.All.EqualTo(0.5));
+            Assert.That(Read(AudioSampleFormat.Float32, read.Plane(1), output.SampleCount), Is.All.EqualTo(-0.5),
                 "a plane is not resampled from its neighbour");
         }
     }
@@ -218,8 +212,8 @@ public class SpeedAudioFilterTests
     {
         using SpeedAudioFilter filter = new();
 
-        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, (List<double>)[0.25, 0.25])]);
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, sampleCount: 2, channelCount: 1);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float32, (List<double>)[0.25, 0.25])]);
+        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, sampleCount: 2, channelCount: 1);
 
         foreach (double speed in new[] { 0.0, -2.0, double.NaN, double.PositiveInfinity })
         {
@@ -232,21 +226,28 @@ public class SpeedAudioFilterTests
         }
     }
 
-    [Test]
-    public void RefusesABlockItCannotRead()
+    [TestCase(AudioSampleFormat.UInt8)]
+    [TestCase(AudioSampleFormat.Int16)]
+    [TestCase(AudioSampleFormat.Int24)]
+    [TestCase(AudioSampleFormat.Int32)]
+    [TestCase(AudioSampleFormat.Float64)]
+    [TestCase(AudioSampleFormat.Unknown)]
+    public void RefusesABlockItCannotRead(AudioSampleFormat format)
     {
+        // The chain works in floats from end to end: anything else here is a chain that is not the one this stage was
+        // prepared for, so it fails rather than resampling whole samples as if they were levels.
         using SpeedAudioFilter filter = new();
         filter.SetSpeed(2.0);
         filter.SetAlgorithm(AudioSpeedAlgorithm.None);
 
-        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, (List<double>)[0.25, 0.25])]);
-        using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Unknown, planar, sampleCount: 2, channelCount: 1);
+        using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float32, (List<double>)[0.25, 0.25])]);
+        using RawAudioBuffer buffer = CreateBuffer(format, planar, sampleCount: 2, channelCount: 1);
 
         OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.IsSuccessful, Is.False, "a format with no sample size cannot be resampled");
+            Assert.That(result.IsSuccessful, Is.False);
             Assert.That(output, Is.SameAs(buffer), "and the block is handed back as it came in");
         }
     }
@@ -344,17 +345,17 @@ public class SpeedAudioFilterTests
         {
             using TestPlanarBuffer planar = new(
             (List<byte[]>)[
-                Write(AudioSampleFormat.Float64, (List<double>)[.. Enumerable.Repeat(0.5, Frames)]),
-                Write(AudioSampleFormat.Float64, (List<double>)[.. Enumerable.Repeat(-0.5, Frames)]),
+                Write(AudioSampleFormat.Float32, (List<double>)[.. Enumerable.Repeat(0.5, Frames)]),
+                Write(AudioSampleFormat.Float32, (List<double>)[.. Enumerable.Repeat(-0.5, Frames)]),
             ]);
-            using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, Frames, channelCount: 2);
+            using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, Frames, channelCount: 2);
 
             OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
             Assert.That(result.IsSuccessful, Is.True, result.Message);
 
-            using TestPlanarBuffer read = Read(AudioSampleFormat.Float64, output);
-            left.AddRange(Read(AudioSampleFormat.Float64, read.Plane(0), output.SampleCount));
-            right.AddRange(Read(AudioSampleFormat.Float64, read.Plane(1), output.SampleCount));
+            using TestPlanarBuffer read = Read(AudioSampleFormat.Float32, output);
+            left.AddRange(Read(AudioSampleFormat.Float32, read.Plane(0), output.SampleCount));
+            right.AddRange(Read(AudioSampleFormat.Float32, read.Plane(1), output.SampleCount));
         }
 
         Assert.That(left.Skip(left.Count / 2), Is.All.EqualTo(0.5).Within(0.02), "each plane keeps its own sound");
@@ -387,14 +388,14 @@ public class SpeedAudioFilterTests
         List<double> produced = [];
         foreach (double[] block in blocks)
         {
-            using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float64, block)]);
-            using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float64, planar, block.Length, channelCount: 1);
+            using TestPlanarBuffer planar = new((List<byte[]>)[Write(AudioSampleFormat.Float32, block)]);
+            using RawAudioBuffer buffer = CreateBuffer(AudioSampleFormat.Float32, planar, block.Length, channelCount: 1);
 
             OperationResult result = filter.Apply(buffer, out RawAudioBuffer output);
             Assert.That(result.IsSuccessful, Is.True, result.Message);
 
-            using TestPlanarBuffer read = Read(AudioSampleFormat.Float64, output);
-            produced.AddRange(Read(AudioSampleFormat.Float64, read.Plane(0), output.SampleCount));
+            using TestPlanarBuffer read = Read(AudioSampleFormat.Float32, output);
+            produced.AddRange(Read(AudioSampleFormat.Float32, read.Plane(0), output.SampleCount));
         }
 
         return produced;

@@ -179,17 +179,20 @@ public class AudioFilterChainTests
     }
 
     /// <summary>
-    /// The forced filters are the owner's stages rather than the host's, so they run after everything the host added and the
-    /// host is told about none of them: they are not counted, not listed, and a later addition still goes in ahead of them.
+    /// The forced filters are the owner's stages rather than the host's: one set runs before anything the host added and
+    /// one after, and the host is told about neither — they are not counted, not listed, and a later addition still goes
+    /// in between them.
     /// </summary>
     [Test]
-    public void RunsTheForcedFiltersAfterTheOnesTheHostAdded()
+    public void RunsTheOwnersStagesAroundTheOnesTheHostAdded()
     {
         List<string> order = [];
         AudioFilterChain chain = new();
-        RecordingFilter forcedFirst = new("forced-first", order);
-        RecordingFilter forcedSecond = new("forced-second", order);
-        chain.SetForcedFilters(forcedFirst, forcedSecond);
+        RecordingFilter before = new("before", order);
+        RecordingFilter afterFirst = new("after-first", order);
+        RecordingFilter afterSecond = new("after-second", order);
+        chain.SetPreForcedFilters(before);
+        chain.SetPostForcedFilters(afterFirst, afterSecond);
 
         RecordingFilter hostFirst = new("host-first", order);
         RecordingFilter hostSecond = new("host-second", order);
@@ -203,28 +206,30 @@ public class AudioFilterChainTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(order, Is.EqualTo(new[] { "host-first", "host-second", "forced-first", "forced-second" }));
+            Assert.That(order, Is.EqualTo(new[] { "before", "host-first", "host-second", "after-first", "after-second" }));
             Assert.That(chain.Count, Is.EqualTo(2), "the host counts only what it added");
             Assert.That(chain.Filters, Is.EqualTo(new IAudioFilter[] { hostFirst, hostSecond }));
         }
     }
 
     /// <summary>
-    /// Clearing is the host taking back its own filters, which says nothing about the forced ones: they stay, and they are not the
-    /// host's to remove either, because they were never theirs to add.
+    /// Clearing is the host taking back its own filters, which says nothing about the owner's stages: they stay — on both
+    /// sides — and they are not the host's to remove either, because they were never theirs to add.
     /// </summary>
     [Test]
-    public void KeepsTheForcedFiltersWhenTheHostClearsTheChain()
+    public void KeepsTheOwnersStagesWhenTheHostClearsTheChain()
     {
         List<string> order = [];
         AudioFilterChain chain = new();
-        RecordingFilter forced = new("forced", order);
+        RecordingFilter before = new("before", order);
+        RecordingFilter after = new("after", order);
         RecordingFilter host = new("host", order);
-        chain.SetForcedFilters(forced);
+        chain.SetPreForcedFilters(before);
+        chain.SetPostForcedFilters(after);
         chain.Add(host);
         Prepare(chain);
 
-        Assert.That(chain.Remove(forced), Is.False, "a forced filter is not the host's to take out");
+        Assert.That(chain.Remove(before), Is.False, "a forced filter is not the host's to take out");
 
         chain.Clear();
 
@@ -235,8 +240,88 @@ public class AudioFilterChainTests
         {
             Assert.That(chain.Count, Is.Zero);
             Assert.That(chain.Filters, Is.Empty);
-            Assert.That(order, Is.EqualTo(new[] { "forced" }), "what the host added is gone and what the owner forced still runs");
-            Assert.That(forced.Disposed || host.Disposed, Is.False);
+            Assert.That(order, Is.EqualTo(new[] { "before", "after" }), "what the host added is gone and what the owner forced still runs");
+            Assert.That(before.Disposed || after.Disposed || host.Disposed, Is.False);
+        }
+    }
+
+    /// <summary>
+    /// A stage the owner forced is part of what the pipeline was prepared for, so one that cannot be prepared fails the
+    /// call: a chain that went on without it would hand the device a shape nothing downstream expects.
+    /// </summary>
+    [Test]
+    public void FailsTheConfigurationWhenAForcedStageRefusesTheStream()
+    {
+        AudioFilterChain chain = new();
+        RecordingFilter host = new("host");
+        RecordingFilter before = new("before") { RefuseConfigure = true };
+        chain.Add(host);
+        chain.SetPreForcedFilters(before);
+
+        AudioStreamInfo stream = CreateStream();
+        OperationResult configured = chain.Configure(stream, stream);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(configured.IsSuccessful, Is.False);
+            Assert.That(configured.Message, Does.Contain("before"));
+            Assert.That(chain.Snapshot().OutputFormat, Is.Null, "nothing is published, so nothing is prepared for a chain missing a stage");
+            Assert.That(host.AppliedBlocks, Is.Zero);
+        }
+    }
+
+    /// <summary>
+    /// And the same on the far side: the host's filters were prepared for what the post stages produce, so one of them
+    /// refusing is the whole chain failing rather than a shorter chain.
+    /// </summary>
+    [Test]
+    public void FailsTheConfigurationWhenATrailingForcedStageRefusesTheStream()
+    {
+        AudioFilterChain chain = new();
+        RecordingFilter after = new("after") { RefuseConfigure = true };
+        chain.SetPostForcedFilters(after);
+
+        AudioStreamInfo stream = CreateStream();
+        OperationResult configured = chain.Configure(stream, stream);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(configured.IsSuccessful, Is.False);
+            Assert.That(configured.Message, Does.Contain("after"));
+            Assert.That(chain.Snapshot().OutputFormat, Is.Null);
+        }
+    }
+
+    /// <summary>
+    /// What the file declares its samples to be says nothing about what the decoder will hand over, so a change to it
+    /// alone is not a reason to prepare anything again: the filters are prepared for the shape, not for the format.
+    /// </summary>
+    [Test]
+    public void IgnoresTheDeclaredSampleFormatWhenDecidingWhetherAnythingChanged()
+    {
+        AudioFilterChain chain = new();
+        RecordingFilter filter = new("host");
+        chain.Add(filter);
+
+        AudioStreamInfo stream = CreateStream();
+        chain.Configure(stream, stream);
+        long version = chain.Version;
+
+        AudioStreamInfo redeclared = new()
+        {
+            Index = stream.Index,
+            CodecId = "pcm_f32le",
+            SampleRate = stream.SampleRate,
+            ChannelCount = stream.ChannelCount,
+            ChannelLayout = stream.ChannelLayout,
+            SampleFormat = AudioSampleFormat.Float32,
+        };
+        chain.Configure(redeclared, stream);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(chain.Version, Is.EqualTo(version), "a declared format that changed decides nothing");
+            Assert.That(filter.ConfiguredStream, Is.SameAs(stream), "and nothing was prepared again");
         }
     }
 

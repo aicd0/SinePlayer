@@ -104,6 +104,37 @@ public partial class PlaybackPipelineTests
         }
     }
 
+    /// <summary>
+    /// Whatever the file holds, the device is opened for the one format the chain works in: the conversion stage is the
+    /// first thing a block passes, so a 16 bit file reaches the device as floats and the mix has headroom to work in
+    /// from the first block to the last.
+    /// </summary>
+    [Test]
+    public void OpensTheDeviceForTheFormatTheChainWorksInWhateverTheFileHolds()
+    {
+        string path = CreateWaveFile();
+        try
+        {
+            FakeAudioRenderer audioRenderer = new() { PlaysWhatItIsGiven = true };
+            using PlaybackPipeline pipeline = CreatePipeline(new FakeVideoRenderer(), audioRenderer);
+
+            OperationResult opened = Open(pipeline, path);
+            Assert.That(opened.IsSuccessful, Is.True, opened.Message);
+
+            WaitFor(() => audioRenderer.ConfiguredStream is not null, "the device to be configured");
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(audioRenderer.ConfiguredStream!.SampleFormat, Is.EqualTo(AudioSampleFormat.Float32), "the chain hands on floats");
+                Assert.That(audioRenderer.ConfiguredStream.ChannelCount, Is.EqualTo(ChannelCount), "and the shape the file has");
+                Assert.That(audioRenderer.ConfiguredStream.SampleRate, Is.EqualTo(SampleRate));
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     /// <summary>The picture's output is resolved the same way, so a device that cannot be made is skipped.</summary>
     [Test]
     public void LetsTheNextVideoRendererServeTheFileWhenTheFirstOneRefuses()
