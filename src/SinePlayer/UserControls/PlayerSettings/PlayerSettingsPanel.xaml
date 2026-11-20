@@ -66,7 +66,7 @@
                 <Rectangle
                     Height="1"
                     Margin="0,0,0,8"
-                    Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+                    Fill="{ThemeResource AppSeperator2}" />
                 <Grid Style="{StaticResource TallSettingRowStyle}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -87,7 +87,7 @@
                         SelectionChanged="ScopeComboBox_SelectionChanged" />
                 </Grid>
             </StackPanel>
-            <Rectangle Height="1" Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+            <Rectangle Height="1" Fill="{ThemeResource AppSeperator2}" />
         </StackPanel>
 
         <ScrollViewer
@@ -206,7 +206,7 @@
                                 <Rectangle
                                     Height="1"
                                     Margin="0,8"
-                                    Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+                                    Fill="{ThemeResource AppSeperator2}" />
                                 <Grid Style="{StaticResource CommonSettingRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -288,7 +288,7 @@
                                 <Rectangle
                                     Height="1"
                                     Margin="0,8"
-                                    Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+                                    Fill="{ThemeResource AppSeperator2}" />
                                 <Grid Style="{StaticResource CommonSettingRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -837,7 +837,7 @@
                                 <Rectangle
                                     Height="1"
                                     Margin="0,8"
-                                    Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+                                    Fill="{ThemeResource AppSeperator2}" />
                                 <Grid Style="{StaticResource CommonSettingRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -945,7 +945,7 @@
         </ScrollViewer>
 
         <StackPanel Grid.Row="2">
-            <Rectangle Height="1" Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+            <Rectangle Height="1" Fill="{ThemeResource AppSeperator2}" />
             <Grid Margin="14,12,14,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />

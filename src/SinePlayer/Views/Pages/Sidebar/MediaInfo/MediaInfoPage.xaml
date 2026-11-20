@@ -76,7 +76,7 @@
                     <Rectangle
                         Height="1"
                         Margin="0,18"
-                        Fill="{ThemeResource MediaInfoSeparatorForeground}" />
+                        Fill="{ThemeResource AppSeperator2}" />
                     <!--  Directory  -->
                     <RichTextBlock Margin="0,0,0,0" VerticalAlignment="Center">
                         <Paragraph>
@@ -126,7 +126,7 @@
                     <Rectangle
                         Height="1"
                         Margin="0,20"
-                        Fill="{ThemeResource MediaInfoSeparatorForeground}"
+                        Fill="{ThemeResource AppSeperator2}"
                         Visibility="{x:Bind ViewModel.HasAnyTags, Mode=OneWay}" />
                     <!--  Tags  -->
                     <controls:MediaTagsView Tags="{x:Bind ViewModel.MediaTags}" />

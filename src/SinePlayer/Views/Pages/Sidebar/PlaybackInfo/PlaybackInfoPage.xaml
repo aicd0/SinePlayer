@@ -22,7 +22,7 @@
                 <Setter Property="Margin" Value="0,16,0,4" />
                 <Setter Property="FontSize" Value="14" />
                 <Setter Property="FontWeight" Value="Bold" />
-                <Setter Property="Foreground" Value="{ThemeResource ForegroundGrey2}" />
+                <Setter Property="Foreground" Value="{ThemeResource AppSecondaryText}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
 
@@ -30,7 +30,7 @@
                 <Setter Property="Margin" Value="0,4,16,0" />
                 <Setter Property="FontSize" Value="14" />
                 <Setter Property="FontWeight" Value="SemiLight" />
-                <Setter Property="Foreground" Value="{ThemeResource ForegroundGrey2}" />
+                <Setter Property="Foreground" Value="{ThemeResource AppSecondaryText}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
 

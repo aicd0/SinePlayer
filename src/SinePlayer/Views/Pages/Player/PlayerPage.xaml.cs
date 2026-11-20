@@ -1183,15 +1183,18 @@ internal sealed partial class PlayerPage : BasePage
 
     private void UpdatePinRelatedUI()
     {
+        Thickness margin = ViewModel.IsPinned
+            ? new Thickness(0, _topOverlayHeight, _rightOverlayWidth, _bottomGridHeight)
+            : new Thickness(0);
+        VideoHost.Margin = margin;
+        SubtitleHost.Margin = margin;
+
         if (ViewModel.IsPinned)
         {
-            VideoHost.Margin = new Thickness(0, _topOverlayHeight, _rightOverlayWidth, _bottomGridHeight);
             ShowOverlay();
         }
-        else
-        {
-            VideoHost.Margin = new Thickness(0);
-        }
+
+        UpdateSubtitlePresentation();
     }
 
     #endregion
@@ -1467,7 +1470,7 @@ internal sealed partial class PlayerPage : BasePage
 
     private void UpdateSubtitlePresentation()
     {
-        SubtitleInsets insets = _isOverlayVisible
+        SubtitleInsets insets = _isOverlayVisible && !ViewModel.IsPinned
             ? new SubtitleInsets(0.0, _topOverlayHeight, _rightOverlayWidth, _bottomGridHeight)
             : SubtitleInsets.None;
         _subtitleInsets = insets;

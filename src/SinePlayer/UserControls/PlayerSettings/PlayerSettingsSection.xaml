@@ -13,7 +13,7 @@
     <StackPanel Orientation="Vertical">
         <Grid
             x:Name="HeaderRow"
-            Background="{ThemeResource MediaInfoSeparatorForeground}"
+            Background="{ThemeResource AppSeperator2}"
             Tapped="HeaderRow_Tapped">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
