@@ -121,11 +121,9 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
     /// </summary>
     internal static OperationResult<FFmpegVideoDecoder> TryCreate(IMediaSource source, VideoStreamInfo stream, bool hardwareDecoding, bool gpuFrames, IGpuDevice? gpuDevice, int bufferedFrames, IReadOnlyList<string> candidates)
     {
-        OperationResultCreator<FFmpegVideoDecoder> result = new();
-
         if (source is not FFmpegSource ffmpegSource)
         {
-            return result.Failure("The video stream does not come from an FFmpeg source.");
+            return OperationResult<FFmpegVideoDecoder>.Failure("The video stream does not come from an FFmpeg source.");
         }
 
         try
@@ -134,12 +132,12 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
         }
         catch (Exception exception)
         {
-            return result.Failure(exception);
+            return OperationResult<FFmpegVideoDecoder>.Failure(exception);
         }
 
         if (!ffmpegSource.TryGetCodecParameters(stream.Index, out nint parameters))
         {
-            return result.Failure($"Stream {stream.Index} exposes no codec parameters.");
+            return OperationResult<FFmpegVideoDecoder>.Failure($"Stream {stream.Index} exposes no codec parameters.");
         }
 
         // The API to decode on is settled once, before anything is opened: a device the pipeline offers names it, and
@@ -150,7 +148,7 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
             OperationResult<IFFmpegHardwareBackend> created = FFmpegHardwareBackends.TryCreate(gpuDevice);
             if (!created.IsSuccessful)
             {
-                return result.Failure(created);
+                return OperationResult<FFmpegVideoDecoder>.Failure(created);
             }
 
             hardwareBackend = created.Result;
@@ -171,7 +169,7 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
                 if (!displayable.IsSuccessful)
                 {
                     hardwareBackend.Dispose();
-                    return result.Failure($"The stream is decoded into {layout} frames: {displayable.Message}");
+                    return OperationResult<FFmpegVideoDecoder>.Failure($"The stream is decoded into {layout} frames: {displayable.Message}");
                 }
             }
         }
@@ -181,10 +179,10 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
         if (!opened.IsSuccessful)
         {
             decoder.Dispose();
-            return result.Failure(opened);
+            return OperationResult<FFmpegVideoDecoder>.Failure(opened);
         }
 
-        return result.Success(decoder);
+        return OperationResult<FFmpegVideoDecoder>.Success(decoder);
     }
 
     /// <summary>
@@ -244,19 +242,17 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
     /// </summary>
     private static OperationResult<nint> TryOpenContext(string name, nint codec, nint parameters, IFFmpegHardwareBackend? hardware, int bufferedFrames)
     {
-        OperationResultCreator<nint> result = new();
-
         nint context = FFmpegNative.avcodec_alloc_context3(codec);
         if (context == 0)
         {
-            return result.Failure("Unable to allocate an FFmpeg codec context.");
+            return OperationResult<nint>.Failure("Unable to allocate an FFmpeg codec context.");
         }
 
         int applied = FFmpegNative.avcodec_parameters_to_context(context, parameters);
         if (applied < 0)
         {
             FFmpegNative.avcodec_free_context(ref context);
-            return result.Failure($"Unable to apply the stream's codec parameters: {FFmpegInterop.GetErrorMessage(applied)}");
+            return OperationResult<nint>.Failure($"Unable to apply the stream's codec parameters: {FFmpegInterop.GetErrorMessage(applied)}");
         }
 
         if (hardware is not null)
@@ -265,7 +261,7 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
             if (!attached.IsSuccessful)
             {
                 FFmpegNative.avcodec_free_context(ref context);
-                return result.Failure(attached);
+                return OperationResult<nint>.Failure(attached);
             }
         }
 
@@ -291,10 +287,10 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
         if (opened < 0)
         {
             FFmpegNative.avcodec_free_context(ref context);
-            return result.Failure($"Unable to open the '{name}' decoder: {FFmpegInterop.GetErrorMessage(opened)}");
+            return OperationResult<nint>.Failure($"Unable to open the '{name}' decoder: {FFmpegInterop.GetErrorMessage(opened)}");
         }
 
-        return result.Success(context);
+        return OperationResult<nint>.Success(context);
     }
 
     /// <summary>
@@ -490,8 +486,6 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
 
     private OperationResult<RawVideoFrame> TryTakeFrame()
     {
-        OperationResultCreator<RawVideoFrame> result = new();
-
         bool hardware = _hardwareBackend is not null && GetFrameFormat(_receiveFrame) == _hardwareBackend.FramePixelFormat;
         if (hardware)
         {
@@ -506,7 +500,7 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
         nint owned = FFmpegNative.av_frame_alloc();
         if (owned == 0)
         {
-            return result.Failure("Unable to allocate an FFmpeg frame.");
+            return OperationResult<RawVideoFrame>.Failure("Unable to allocate an FFmpeg frame.");
         }
 
         if (hardware)
@@ -524,7 +518,7 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
             if (transferred < 0)
             {
                 FFmpegNative.av_frame_free(ref owned);
-                return result.Failure($"Unable to copy a decoded frame out of the GPU: {FFmpegInterop.GetErrorMessage(transferred)}");
+                return OperationResult<RawVideoFrame>.Failure($"Unable to copy a decoded frame out of the GPU: {FFmpegInterop.GetErrorMessage(transferred)}");
             }
 
             unsafe
@@ -541,7 +535,7 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
         var format = FFmpegInterop.ToPixelFormat(GetFrameFormat(owned));
         _outputFormat = format;
 
-        return result.Success(new RawVideoFrame
+        return OperationResult<RawVideoFrame>.Success(new RawVideoFrame
         {
             Timestamp = ResolveTimestamp(owned),
             Duration = _frameDuration,
@@ -560,12 +554,10 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
     /// </summary>
     private OperationResult<RawVideoFrame> TryTakeGpuFrame()
     {
-        OperationResultCreator<RawVideoFrame> result = new();
-
         nint owned = FFmpegNative.av_frame_alloc();
         if (owned == 0)
         {
-            return result.Failure("Unable to allocate an FFmpeg frame.");
+            return OperationResult<RawVideoFrame>.Failure("Unable to allocate an FFmpeg frame.");
         }
 
         FFmpegNative.av_frame_move_ref(owned, _receiveFrame);
@@ -575,13 +567,13 @@ internal sealed partial class FFmpegVideoDecoder : IVideoDecoder
         if (!FFmpegHardwareFrames.TryReadLayout(_context, out int layout))
         {
             FFmpegNative.av_frame_free(ref owned);
-            return result.Failure($"'{Name}' produced a frame with no frames context, so there is no texture layout to report.");
+            return OperationResult<RawVideoFrame>.Failure($"'{Name}' produced a frame with no frames context, so there is no texture layout to report.");
         }
 
         var format = FFmpegInterop.ToPixelFormat(layout);
         _outputFormat = format;
 
-        return result.Success(new RawVideoFrame
+        return OperationResult<RawVideoFrame>.Success(new RawVideoFrame
         {
             Timestamp = ResolveTimestamp(owned),
             Duration = _frameDuration,

@@ -221,33 +221,31 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
 
     private OperationResult<MediaSource> AddSourceCore(MediaLocator locator)
     {
-        OperationResultCreator<MediaSource> result = new();
-
         if (_disposed)
         {
-            return result.Failure("The pipeline has already been disposed.");
+            return OperationResult<MediaSource>.Failure("The pipeline has already been disposed.");
         }
 
         ISourceProviderFactory? sourceFactory = SourceFactory;
         if (sourceFactory is null)
         {
-            return result.Failure("No source provider factory was registered.");
+            return OperationResult<MediaSource>.Failure("No source provider factory was registered.");
         }
 
         OperationResult opened = sourceFactory.TryOpen(locator, out IMediaSource? source);
         if (!opened.IsSuccessful)
         {
-            return result.Failure(opened);
+            return OperationResult<MediaSource>.Failure(opened);
         }
 
         if (source is null)
         {
-            return result.Failure("The source opened nothing to play.");
+            return OperationResult<MediaSource>.Failure("The source opened nothing to play.");
         }
 
         MediaSource added = new(source, locator);
         _sources = [.. _sources, added];
-        return result.Success(added);
+        return OperationResult<MediaSource>.Success(added);
     }
 
     private VideoChain AddVideoChainCore(IVideoRenderTarget target)
@@ -441,16 +439,14 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
             return reconciled.IsSuccessful && reconciled.Result != ChainChange.None;
         }
 
-        OperationResultCreator<ReconcileResult> result = new();
-
         if (_disposed)
         {
-            return result.Failure("The pipeline has already been disposed.");
+            return OperationResult<ReconcileResult>.Failure("The pipeline has already been disposed.");
         }
 
         if (!_events.CheckState(out MediaEngineState state, MediaEngineState.Paused, MediaEngineState.Playing, MediaEngineState.Ended))
         {
-            return result.Failure($"Cannot change the pipeline's components when the state is {state}.");
+            return OperationResult<ReconcileResult>.Failure($"Cannot change the pipeline's components when the state is {state}.");
         }
 
         FlushChainRemoval();
@@ -488,7 +484,7 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
             StartThreads();
         }
 
-        return result.Success(new ReconcileResult
+        return OperationResult<ReconcileResult>.Success(new ReconcileResult
         {
             Results = results,
         });

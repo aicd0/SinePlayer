@@ -16,7 +16,7 @@ public sealed class FFmpegSubtitleDecoderFactory : ISubtitleDecoderFactory
         ArgumentNullException.ThrowIfNull(stream);
 
         SubtitleCueFormat format = stream.IsBitmap ? SubtitleCueFormat.BitmapBgra : SubtitleCueFormat.Ass;
-        return new OperationResultCreator<IComponentCreator<ISubtitleDecoder>>().Success(new Creator(source, stream, format));
+        return OperationResult<IComponentCreator<ISubtitleDecoder>>.Success(new Creator(source, stream, format));
     }
 
     private sealed class Creator(IMediaSource source, SubtitleStreamInfo stream, SubtitleCueFormat format) : IComponentCreator<ISubtitleDecoder>

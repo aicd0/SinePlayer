@@ -21,7 +21,7 @@ public sealed class NullSubtitleRendererFactory : ISubtitleRendererFactory
 
     public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format)
     {
-        return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Success(new Creator(_signature));
+        return OperationResult<IComponentCreator<ISubtitleRenderer>>.Success(new Creator(_signature));
     }
 
     private sealed class Creator(string signature) : IComponentCreator<ISubtitleRenderer>

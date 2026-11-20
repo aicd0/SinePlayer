@@ -10,8 +10,6 @@ internal static class FFmpegHardwareBackends
 {
     internal static OperationResult<IFFmpegHardwareBackend> TryCreate(IGpuDevice? device)
     {
-        OperationResultCreator<IFFmpegHardwareBackend> result = new();
-
         if (device is ID3D11GpuDevice d3d11)
         {
             return FFmpegD3D11Hardware.TryCreate(d3d11);
@@ -19,7 +17,7 @@ internal static class FFmpegHardwareBackends
 
         if (device is not null)
         {
-            return result.Failure($"FFmpeg has no decoder for the device a renderer offered ({device.GetType().Name}).");
+            return OperationResult<IFFmpegHardwareBackend>.Failure($"FFmpeg has no decoder for the device a renderer offered ({device.GetType().Name}).");
         }
 
         return FFmpegD3D11Hardware.TryCreate(null);

@@ -13,14 +13,12 @@ public sealed class Win2DSubtitleRendererFactory : ISubtitleRendererFactory
 {
     public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format)
     {
-        OperationResultCreator<IComponentCreator<ISubtitleRenderer>> result = new();
-
         if (format is not (SubtitleCueFormat.Ass or SubtitleCueFormat.BitmapBgra))
         {
-            return result.Failure($"This renderer draws text and bitmap subtitles, not {format} cues.");
+            return OperationResult<IComponentCreator<ISubtitleRenderer>>.Failure($"This renderer draws text and bitmap subtitles, not {format} cues.");
         }
 
-        return result.Success(new Creator(format));
+        return OperationResult<IComponentCreator<ISubtitleRenderer>>.Success(new Creator(format));
     }
 
     private sealed class Creator(SubtitleCueFormat format) : IComponentCreator<ISubtitleRenderer>

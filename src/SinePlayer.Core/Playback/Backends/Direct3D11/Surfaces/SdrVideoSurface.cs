@@ -23,8 +23,6 @@ internal sealed partial class SdrVideoSurface : SwapChainVideoSurface
 
     internal static OperationResult<SdrVideoSurface> TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode)
     {
-        OperationResultCreator<SdrVideoSurface> result = new();
-
         OperationResult<D3D11SwapChain> created = D3D11SwapChain.Create(
             device,
             width,
@@ -35,9 +33,9 @@ internal sealed partial class SdrVideoSurface : SwapChainVideoSurface
 
         if (!created.IsSuccessful)
         {
-            return result.Failure(created);
+            return OperationResult<SdrVideoSurface>.Failure(created);
         }
 
-        return result.Success(new SdrVideoSurface(created.Result));
+        return OperationResult<SdrVideoSurface>.Success(new SdrVideoSurface(created.Result));
     }
 }

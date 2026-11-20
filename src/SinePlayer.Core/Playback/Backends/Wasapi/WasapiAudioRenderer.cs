@@ -151,30 +151,28 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        OperationResultCreator<AudioStreamInfo> result = new();
-
         OperationResult<int> endpointChannels = TryGetEndpointChannelCount();
         if (!endpointChannels.IsSuccessful)
         {
-            return result.Failure(endpointChannels);
+            return OperationResult<AudioStreamInfo>.Failure(endpointChannels);
         }
 
         int channels = endpointChannels.Result;
         if (channels <= 0)
         {
-            return result.Success(stream);
+            return OperationResult<AudioStreamInfo>.Success(stream);
         }
 
         // A one-channel stream is widened to a pair the endpoint has, so that the mix has two sides for a balance to
         // work on; anything else narrower than the endpoint is folded down to it.
         if (stream.ChannelCount == 1 && channels >= 2)
         {
-            return result.Success(stream.WithLayout(2, ChannelLayout.Stereo));
+            return OperationResult<AudioStreamInfo>.Success(stream.WithLayout(2, ChannelLayout.Stereo));
         }
 
         if (channels >= stream.ChannelCount)
         {
-            return result.Success(stream);
+            return OperationResult<AudioStreamInfo>.Success(stream);
         }
 
         ChannelLayout layout = channels switch
@@ -184,7 +182,7 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
             _ => stream.ChannelLayout,
         };
 
-        return result.Success(stream.WithLayout(channels, layout));
+        return OperationResult<AudioStreamInfo>.Success(stream.WithLayout(channels, layout));
     }
 
     public OperationResult Configure(AudioStreamInfo stream)
@@ -421,11 +419,9 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
     /// </summary>
     private unsafe OperationResult<int> TryGetEndpointChannelCount()
     {
-        OperationResultCreator<int> result = new();
-
         if (_deviceChannelCount is int known)
         {
-            return result.Success(known);
+            return OperationResult<int>.Success(known);
         }
 
         int channels;
@@ -459,11 +455,11 @@ internal sealed partial class WasapiAudioRenderer : IAudioRenderer
         {
             // Not remembered: a device that has gone away can come back, and a cached "no" would outlive it.
             PlaybackLogger.W(TAG, $"Unable to read the format the audio device mixes in: {exception.Message}");
-            return result.Failure($"Unable to reach the audio output device: {exception.Message}");
+            return OperationResult<int>.Failure($"Unable to reach the audio output device: {exception.Message}");
         }
 
         _deviceChannelCount = channels;
-        return result.Success(channels);
+        return OperationResult<int>.Success(channels);
     }
 
     private static void InitializeStream(IAudioClient client, WasapiAudioFormat.Descriptor format)

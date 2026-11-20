@@ -43,11 +43,9 @@ internal sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
 
     public static OperationResult<FFmpegSubtitleDecoder> Create(IMediaSource source, SubtitleStreamInfo stream)
     {
-        OperationResultCreator<FFmpegSubtitleDecoder> result = new();
-
         if (source is not FFmpegSource ffmpegSource)
         {
-            return result.Failure("The subtitle stream does not come from an FFmpeg source.");
+            return OperationResult<FFmpegSubtitleDecoder>.Failure("The subtitle stream does not come from an FFmpeg source.");
         }
 
         try
@@ -56,12 +54,12 @@ internal sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
         }
         catch (Exception exception)
         {
-            return result.Failure(exception);
+            return OperationResult<FFmpegSubtitleDecoder>.Failure(exception);
         }
 
         if (!ffmpegSource.TryGetCodecParameters(stream.Index, out nint parameters))
         {
-            return result.Failure($"Stream {stream.Index} exposes no codec parameters.");
+            return OperationResult<FFmpegSubtitleDecoder>.Failure($"Stream {stream.Index} exposes no codec parameters.");
         }
 
         // Subtitles are looked up by codec id rather than by name: the container names a codec the way FFmpeg does
@@ -69,7 +67,7 @@ internal sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
         OperationResult<(nint Codec, string Name)> found = TryFindDecoder(stream.CodecId);
         if (!found.IsSuccessful)
         {
-            return result.Failure(found);
+            return OperationResult<FFmpegSubtitleDecoder>.Failure(found);
         }
 
         (nint codec, string decoderName) = found.Result;
@@ -77,21 +75,21 @@ internal sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
         nint context = FFmpegNative.avcodec_alloc_context3(codec);
         if (context == 0)
         {
-            return result.Failure("Unable to allocate an FFmpeg codec context.");
+            return OperationResult<FFmpegSubtitleDecoder>.Failure("Unable to allocate an FFmpeg codec context.");
         }
 
         int applied = FFmpegNative.avcodec_parameters_to_context(context, parameters);
         if (applied < 0)
         {
             FFmpegNative.avcodec_free_context(ref context);
-            return result.Failure($"Unable to apply the stream's codec parameters: {FFmpegInterop.GetErrorMessage(applied)}");
+            return OperationResult<FFmpegSubtitleDecoder>.Failure($"Unable to apply the stream's codec parameters: {FFmpegInterop.GetErrorMessage(applied)}");
         }
 
         int opened = FFmpegNative.avcodec_open2(context, codec, 0);
         if (opened < 0)
         {
             FFmpegNative.avcodec_free_context(ref context);
-            return result.Failure($"Unable to open the subtitle decoder: {FFmpegInterop.GetErrorMessage(opened)}");
+            return OperationResult<FFmpegSubtitleDecoder>.Failure($"Unable to open the subtitle decoder: {FFmpegInterop.GetErrorMessage(opened)}");
         }
 
         int canvasWidth = 0;
@@ -106,7 +104,7 @@ internal sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
             }
         }
 
-        return result.Success(new FFmpegSubtitleDecoder(
+        return OperationResult<FFmpegSubtitleDecoder>.Success(new FFmpegSubtitleDecoder(
             stream,
             context,
             decoderName,
@@ -476,27 +474,25 @@ internal sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
 
     private static unsafe OperationResult<(nint Codec, string Name)> TryFindDecoder(string codecId)
     {
-        OperationResultCreator<(nint Codec, string Name)> result = new();
-
         nint descriptorPointer = FFmpegNative.avcodec_descriptor_get_by_name(codecId);
         if (descriptorPointer == 0)
         {
-            return result.Failure($"FFmpeg knows no codec named '{codecId}'.");
+            return OperationResult<(nint Codec, string Name)>.Failure($"FFmpeg knows no codec named '{codecId}'.");
         }
 
         var descriptor = (AVCodecDescriptor*)descriptorPointer;
         if (descriptor->Type != FFmpegConstants.MediaTypeSubtitle)
         {
-            return result.Failure($"Codec '{codecId}' is not a subtitle codec.");
+            return OperationResult<(nint Codec, string Name)>.Failure($"Codec '{codecId}' is not a subtitle codec.");
         }
 
         nint codec = FFmpegNative.avcodec_find_decoder(descriptor->Id);
         if (codec == 0)
         {
-            return result.Failure($"FFmpeg has no subtitle decoder for '{codecId}'.");
+            return OperationResult<(nint Codec, string Name)>.Failure($"FFmpeg has no subtitle decoder for '{codecId}'.");
         }
 
         nint name = FFmpegNative.avcodec_get_name(descriptor->Id);
-        return result.Success((codec, name == 0 ? "subtitle" : Marshal.PtrToStringUTF8(name) ?? "subtitle"));
+        return OperationResult<(nint Codec, string Name)>.Success((codec, name == 0 ? "subtitle" : Marshal.PtrToStringUTF8(name) ?? "subtitle"));
     }
 }

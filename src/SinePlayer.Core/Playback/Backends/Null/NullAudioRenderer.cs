@@ -31,8 +31,7 @@ internal sealed partial class NullAudioRenderer : IAudioRenderer
     public OperationResult<AudioStreamInfo> Negotiate(AudioStreamInfo stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
-        OperationResultCreator<AudioStreamInfo> result = new();
-        return result.Success(stream);
+        return OperationResult<AudioStreamInfo>.Success(stream);
     }
 
     public OperationResult Configure(AudioStreamInfo stream)

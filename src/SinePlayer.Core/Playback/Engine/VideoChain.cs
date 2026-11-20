@@ -252,8 +252,6 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
     {
         VideoComponentResolver resolver = Components.Clone();
 
-        OperationResultCreator<ChainChange> result = new();
-
         StreamBinding<VideoStreamInfo>? chosen = Selected;
         bool sourceChanged = chosen?.Source != Source.Latest?.Component || chosen?.Stream != Source.Latest?.Stream;
         ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
@@ -269,7 +267,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
                 IVideoRenderTarget? videoTarget = Target;
                 if (videoTarget is null)
                 {
-                    return result.Failure("The file has video but no presentation surface was supplied.");
+                    return OperationResult<ChainChange>.Failure("The file has video but no presentation surface was supplied.");
                 }
 
                 // Resolve video renderer
@@ -282,7 +280,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
                     "video renderer");
                 if (!rendererResolved.IsSuccessful)
                 {
-                    return result.Failure(rendererResolved.Message);
+                    return OperationResult<ChainChange>.Failure(rendererResolved.Message);
                 }
 
                 renderer = rendererResolved.Result;
@@ -291,7 +289,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
                     OperationResult configured = renderer.Component.Configure(videoStream, videoTarget);
                     if (!configured.IsSuccessful)
                     {
-                        return result.Failure(configured.Message);
+                        return OperationResult<ChainChange>.Failure(configured.Message);
                     }
 
                     changed |= ChainChange.Renderer;
@@ -308,7 +306,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
                     "video decoder");
                 if (!decoderResolved.IsSuccessful)
                 {
-                    return result.Failure(decoderResolved.Message);
+                    return OperationResult<ChainChange>.Failure(decoderResolved.Message);
                 }
 
                 decoder = decoderResolved.Result;
@@ -362,7 +360,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
                 }
             }
 
-            return result.Success(changed);
+            return OperationResult<ChainChange>.Success(changed);
         }
         finally
         {

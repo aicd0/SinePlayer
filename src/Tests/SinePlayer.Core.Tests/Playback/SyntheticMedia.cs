@@ -697,7 +697,7 @@ internal sealed class SyntheticVideoDecoderFactory(int packetsBeforeFailure = 0)
     public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
     {
         IComponentCreator<IVideoDecoder> creator = new FixedCreator<IVideoDecoder>(Signature, () => new Decoder(stream, packetsBeforeFailure));
-        return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
+        return OperationResult<IComponentCreator<IVideoDecoder>>.Success(creator);
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>
@@ -778,7 +778,7 @@ internal sealed class SyntheticAudioDecoderFactory : IAudioDecoderFactory
     public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
     {
         IComponentCreator<IAudioDecoder> creator = new FixedCreator<IAudioDecoder>(Signature, () => new Decoder(stream));
-        return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Success(creator);
+        return OperationResult<IComponentCreator<IAudioDecoder>>.Success(creator);
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>
@@ -842,7 +842,7 @@ internal sealed class SyntheticSubtitleDecoderFactory : ISubtitleDecoderFactory
     public OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource source, SubtitleStreamInfo stream)
     {
         IComponentCreator<ISubtitleDecoder> creator = new FixedCreator<ISubtitleDecoder>(Signature, () => new Decoder(stream));
-        return new OperationResultCreator<IComponentCreator<ISubtitleDecoder>>().Success(creator);
+        return OperationResult<IComponentCreator<ISubtitleDecoder>>.Success(creator);
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says which one this is and no more.</summary>

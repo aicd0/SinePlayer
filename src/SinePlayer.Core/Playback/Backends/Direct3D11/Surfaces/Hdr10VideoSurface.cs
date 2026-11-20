@@ -32,8 +32,6 @@ internal sealed class Hdr10VideoSurface : SwapChainVideoSurface
 
     internal static OperationResult<Hdr10VideoSurface> TryCreate(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode)
     {
-        OperationResultCreator<Hdr10VideoSurface> result = new();
-
         OperationResult<D3D11SwapChain> created = D3D11SwapChain.Create(
             device,
             width,
@@ -44,7 +42,7 @@ internal sealed class Hdr10VideoSurface : SwapChainVideoSurface
 
         if (!created.IsSuccessful)
         {
-            return result.Failure(created);
+            return OperationResult<Hdr10VideoSurface>.Failure(created);
         }
 
         D3D11SwapChain swapChain = created.Result;
@@ -52,9 +50,9 @@ internal sealed class Hdr10VideoSurface : SwapChainVideoSurface
         if (!declared.IsSuccessful)
         {
             swapChain.Dispose();
-            return result.Failure(declared);
+            return OperationResult<Hdr10VideoSurface>.Failure(declared);
         }
 
-        return result.Success(new Hdr10VideoSurface(swapChain));
+        return OperationResult<Hdr10VideoSurface>.Success(new Hdr10VideoSurface(swapChain));
     }
 }

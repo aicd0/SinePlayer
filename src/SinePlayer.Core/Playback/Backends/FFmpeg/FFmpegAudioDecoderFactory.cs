@@ -16,7 +16,7 @@ public sealed class FFmpegAudioDecoderFactory : IAudioDecoderFactory
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
-        return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Success(new Creator(source, stream));
+        return OperationResult<IComponentCreator<IAudioDecoder>>.Success(new Creator(source, stream));
     }
 
     /// <summary>One backend, one kind of decoder, so the signature says nothing more than which backend it is.</summary>

@@ -37,8 +37,6 @@ public static class WasapiAudioEndpoints
     /// </summary>
     public static OperationResult<IReadOnlyList<WasapiAudioEndpoint>> TryGetRenderEndpoints()
     {
-        OperationResultCreator<IReadOnlyList<WasapiAudioEndpoint>> result = new();
-
         try
         {
             // The engine creates its objects on threads of its own, and a caller may reach this from any of
@@ -96,11 +94,11 @@ public static class WasapiAudioEndpoints
                 found.Insert(0, defaultEndpoint);
             }
 
-            return result.Success(found);
+            return OperationResult<IReadOnlyList<WasapiAudioEndpoint>>.Success(found);
         }
         catch (Exception exception)
         {
-            return result.Failure($"Unable to list the audio output devices: {exception.Message}");
+            return OperationResult<IReadOnlyList<WasapiAudioEndpoint>>.Failure($"Unable to list the audio output devices: {exception.Message}");
         }
     }
 

@@ -29,7 +29,7 @@ public sealed class NullAudioDecoderFactory : IAudioDecoderFactory
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
-        return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Success(new Creator(stream, _signature));
+        return OperationResult<IComponentCreator<IAudioDecoder>>.Success(new Creator(stream, _signature));
     }
 
     private sealed class Creator(AudioStreamInfo stream, string signature) : IComponentCreator<IAudioDecoder>

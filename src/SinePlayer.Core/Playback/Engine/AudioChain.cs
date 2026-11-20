@@ -204,8 +204,6 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
     {
         AudioComponentResolver resolver = Components.Clone();
 
-        OperationResultCreator<ChainChange> result = new();
-
         StreamBinding<AudioStreamInfo>? chosen = Selected;
         bool sourceChanged = chosen?.Source != Source.Latest?.Component || chosen?.Stream != Source.Latest?.Stream;
         ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
@@ -229,7 +227,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                     "audio renderer");
                 if (!rendererResolved.IsSuccessful)
                 {
-                    return result.Failure(rendererResolved.Message);
+                    return OperationResult<ChainChange>.Failure(rendererResolved.Message);
                 }
 
                 renderer = rendererResolved.Result;
@@ -238,7 +236,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                     OperationResult<AudioStreamInfo> negotiated = renderer.Component.Negotiate(audioStream);
                     if (!negotiated.IsSuccessful)
                     {
-                        return result.Failure(negotiated.Message);
+                        return OperationResult<ChainChange>.Failure(negotiated.Message);
                     }
 
                     negotiatedFormat = negotiated.Result;
@@ -255,7 +253,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                     "audio decoder");
                 if (!decoderResolved.IsSuccessful)
                 {
-                    return result.Failure(decoderResolved.Message);
+                    return OperationResult<ChainChange>.Failure(decoderResolved.Message);
                 }
 
                 decoder = decoderResolved.Result;
@@ -269,7 +267,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                     OperationResult configured = Filters.Configure(audioStream, negotiatedFormat);
                     if (!configured.IsSuccessful)
                     {
-                        return result.Failure(configured.Message, configured.Exception);
+                        return OperationResult<ChainChange>.Failure(configured.Message, configured.Exception);
                     }
                 }
             }
@@ -318,7 +316,7 @@ internal sealed class AudioChain : IAudioChain, IChainFeed, IPipelineWakeTarget
                 }
             }
 
-            return result.Success(changed);
+            return OperationResult<ChainChange>.Success(changed);
         }
         finally
         {

@@ -26,7 +26,7 @@ public sealed class FFmpegVideoDecoderFactory : IVideoDecoderFactory
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
-        return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(new Creator(source, stream, options));
+        return OperationResult<IComponentCreator<IVideoDecoder>>.Success(new Creator(source, stream, options));
     }
 
     /// <summary>

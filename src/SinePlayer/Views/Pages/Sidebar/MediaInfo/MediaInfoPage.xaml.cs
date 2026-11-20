@@ -194,7 +194,7 @@ internal sealed partial class MediaInfoPage : BasePage
             return OperationResultExt.Failure(innerErr);
         }
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     private void OnEditInfoClick(object sender, RoutedEventArgs e)

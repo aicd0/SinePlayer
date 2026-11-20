@@ -61,7 +61,6 @@ internal sealed class AudioFilterChainSnapshot
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        OperationResultCreator<RawAudioBuffer> result = new();
         RawAudioBuffer current = input;
         foreach (IAudioFilter filter in _filters)
         {
@@ -84,7 +83,7 @@ internal sealed class AudioFilterChainSnapshot
                     current.Dispose();
                 }
 
-                return result.Failure($"{filter.Name} could not transform the audio block: {applied.Message}", applied.Exception);
+                return OperationResult<RawAudioBuffer>.Failure($"{filter.Name} could not transform the audio block: {applied.Message}", applied.Exception);
             }
 
             if (!ReferenceEquals(produced, current))
@@ -94,6 +93,6 @@ internal sealed class AudioFilterChainSnapshot
             }
         }
 
-        return result.Success(current);
+        return OperationResult<RawAudioBuffer>.Success(current);
     }
 }

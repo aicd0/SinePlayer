@@ -30,7 +30,7 @@ internal static class TestCreators
             return offered;
         }
 
-        return new OperationResultCreator<IComponentCreator<TComponent>>().Success(new DecoratingCreator<TComponent>(offered.Result, decorate));
+        return OperationResult<IComponentCreator<TComponent>>.Success(new DecoratingCreator<TComponent>(offered.Result, decorate));
     }
 
     private sealed class DecoratingCreator<TComponent>(IComponentCreator<TComponent> inner, Func<TComponent, TComponent> decorate) : IComponentCreator<TComponent>

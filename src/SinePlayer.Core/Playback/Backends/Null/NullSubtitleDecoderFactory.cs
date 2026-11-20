@@ -23,7 +23,7 @@ public sealed class NullSubtitleDecoderFactory : ISubtitleDecoderFactory
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        return new OperationResultCreator<IComponentCreator<ISubtitleDecoder>>().Success(new Creator(stream, _signature));
+        return OperationResult<IComponentCreator<ISubtitleDecoder>>.Success(new Creator(stream, _signature));
     }
 
     private sealed class Creator(SubtitleStreamInfo stream, string signature) : IComponentCreator<ISubtitleDecoder>

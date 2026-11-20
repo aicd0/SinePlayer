@@ -77,22 +77,20 @@ internal static class WasapiAudioFormat
     /// </summary>
     internal static OperationResult<Descriptor> TryDescribe(AudioStreamInfo stream, int channelCount, ChannelLayout channelLayout)
     {
-        OperationResultCreator<Descriptor> result = new();
-
         if (stream.SampleRate <= 0)
         {
-            return result.Failure("The stream declares no sample rate.");
+            return OperationResult<Descriptor>.Failure("The stream declares no sample rate.");
         }
 
         if (channelCount <= 0)
         {
-            return result.Failure("The stream declares no channels.");
+            return OperationResult<Descriptor>.Failure("The stream declares no channels.");
         }
 
         int bitsPerSample = GetBitsPerSample(stream.SampleFormat);
         if (bitsPerSample == 0)
         {
-            return result.Failure(stream.SampleFormat == AudioSampleFormat.Int24
+            return OperationResult<Descriptor>.Failure(stream.SampleFormat == AudioSampleFormat.Int24
                 ? "A 24 bit stream is not described in the 24-in-32 layout WASAPI expects."
                 : $"The sample format '{stream.SampleFormat}' has no WASAPI equivalent.");
         }
@@ -103,11 +101,11 @@ internal static class WasapiAudioFormat
         {
             // Guessing positions for a layout we cannot name would decide for the device which speaker
             // gets which channel. Refusing is more honest than producing a plausible lie.
-            return result.Failure($"No speaker layout is known for {channelCount} channels of layout '{channelLayout}'.");
+            return OperationResult<Descriptor>.Failure($"No speaker layout is known for {channelCount} channels of layout '{channelLayout}'.");
         }
 
         int blockAlign = (bitsPerSample / 8) * channelCount;
-        return result.Success(new Descriptor
+        return OperationResult<Descriptor>.Success(new Descriptor
         {
             SampleRate = stream.SampleRate,
             ChannelCount = channelCount,

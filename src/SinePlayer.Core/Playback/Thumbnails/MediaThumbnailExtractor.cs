@@ -36,21 +36,19 @@ public static class MediaThumbnailExtractor
         TimeSpan? position,
         int maxEdge)
     {
-        OperationResultCreator<MediaThumbnail> result = new();
-
         ArgumentNullException.ThrowIfNull(sourceFactory);
         ArgumentNullException.ThrowIfNull(decoderFactory);
         ArgumentNullException.ThrowIfNull(locator);
 
         if (maxEdge <= 0)
         {
-            return result.Failure("A thumbnail needs a size to be made at.");
+            return OperationResult<MediaThumbnail>.Failure("A thumbnail needs a size to be made at.");
         }
 
         OperationResult opened = sourceFactory.TryOpen(locator, out IMediaSource? source);
         if (!opened.IsSuccessful || source is null)
         {
-            return result.Failure($"Unable to open the media file: {opened}");
+            return OperationResult<MediaThumbnail>.Failure($"Unable to open the media file: {opened}");
         }
 
         using (source)
@@ -65,13 +63,11 @@ public static class MediaThumbnailExtractor
         TimeSpan? position,
         int maxEdge)
     {
-        OperationResultCreator<MediaThumbnail> result = new();
-
         MediaInfo info = source.Info;
         IReadOnlyList<VideoStreamInfo> videoStreams = info.VideoStreams;
         if (videoStreams.Count == 0)
         {
-            return result.Failure("The file has no video stream.");
+            return OperationResult<MediaThumbnail>.Failure("The file has no video stream.");
         }
 
         VideoStreamInfo stream = videoStreams[0];
@@ -88,7 +84,7 @@ public static class MediaThumbnailExtractor
             OperationResult sought = source.Seek(samplePosition, stream.Index, SeekMode.Precise);
             if (!sought.IsSuccessful)
             {
-                return result.Failure($"Unable to seek to the frame to draw: {sought}");
+                return OperationResult<MediaThumbnail>.Failure($"Unable to seek to the frame to draw: {sought}");
             }
         }
 
@@ -98,13 +94,13 @@ public static class MediaThumbnailExtractor
             new DecoderOptions { HardwareDecoding = false });
         if (!created.IsSuccessful || created.Result is null)
         {
-            return result.Failure($"Unable to create a decoder for the video stream: {created}");
+            return OperationResult<MediaThumbnail>.Failure($"Unable to create a decoder for the video stream: {created}");
         }
 
         OperationResult decoderCreated = created.Result.Create(out IVideoDecoder? decoder);
         if (!decoderCreated.IsSuccessful || decoder is null)
         {
-            return result.Failure($"Unable to create a decoder for the video stream: {decoderCreated}");
+            return OperationResult<MediaThumbnail>.Failure($"Unable to create a decoder for the video stream: {decoderCreated}");
         }
 
         using (decoder)
@@ -120,8 +116,6 @@ public static class MediaThumbnailExtractor
         TimeSpan samplePosition,
         int maxEdge)
     {
-        OperationResultCreator<MediaThumbnail> result = new();
-
         // Kept as the picture to fall back on when the file ends before the target is reached.
         RawVideoFrame? lastPicture = null;
         bool restarted = false;
@@ -132,7 +126,7 @@ public static class MediaThumbnailExtractor
                 OperationResult read = source.TryReadPacket(out MediaPacket? packet);
                 if (!read.IsSuccessful)
                 {
-                    return result.Failure($"Unable to read a packet of the video stream: {read}");
+                    return OperationResult<MediaThumbnail>.Failure($"Unable to read a packet of the video stream: {read}");
                 }
 
                 if (packet is null)
@@ -162,7 +156,7 @@ public static class MediaThumbnailExtractor
                     OperationResult decoded = decoder.TryDecode(packet, out IReadOnlyList<RawVideoFrame> frames);
                     if (!decoded.IsSuccessful)
                     {
-                        return result.Failure($"Unable to decode the video stream: {decoded}");
+                        return OperationResult<MediaThumbnail>.Failure($"Unable to decode the video stream: {decoded}");
                     }
 
                     RawVideoFrame? picture = TakeFrame(frames, samplePosition, ref lastPicture);
@@ -170,7 +164,7 @@ public static class MediaThumbnailExtractor
                     {
                         try
                         {
-                            return Convert(picture, stream, maxEdge, result);
+                            return Convert(picture, stream, maxEdge);
                         }
                         finally
                         {
@@ -184,7 +178,7 @@ public static class MediaThumbnailExtractor
             OperationResult drained = decoder.Drain(out IReadOnlyList<RawVideoFrame> held);
             if (!drained.IsSuccessful)
             {
-                return result.Failure($"Unable to drain the video decoder: {drained}");
+                return OperationResult<MediaThumbnail>.Failure($"Unable to drain the video decoder: {drained}");
             }
 
             RawVideoFrame? heldPicture = TakeFrame(held, samplePosition, ref lastPicture);
@@ -192,7 +186,7 @@ public static class MediaThumbnailExtractor
             {
                 try
                 {
-                    return Convert(heldPicture, stream, maxEdge, result);
+                    return Convert(heldPicture, stream, maxEdge);
                 }
                 finally
                 {
@@ -202,8 +196,8 @@ public static class MediaThumbnailExtractor
 
             // Nothing reached the target: the last frame decoded is nearer to it than no picture at all.
             return lastPicture is null
-                ? result.Failure("No picture came out of the video stream.")
-                : Convert(lastPicture, stream, maxEdge, result);
+                ? OperationResult<MediaThumbnail>.Failure("No picture came out of the video stream.")
+                : Convert(lastPicture, stream, maxEdge);
         }
         finally
         {
@@ -238,12 +232,12 @@ public static class MediaThumbnailExtractor
         return null;
     }
 
-    private static OperationResult<MediaThumbnail> Convert(RawVideoFrame frame, VideoStreamInfo stream, int maxEdge, OperationResultCreator<MediaThumbnail> result)
+    private static OperationResult<MediaThumbnail> Convert(RawVideoFrame frame, VideoStreamInfo stream, int maxEdge)
     {
         MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, maxEdge, stream.Orientation);
         return thumbnail is null
-            ? result.Failure($"The frame is in a pixel format a thumbnail cannot be made from: {frame.Format}.")
-            : result.Success(thumbnail);
+            ? OperationResult<MediaThumbnail>.Failure($"The frame is in a pixel format a thumbnail cannot be made from: {frame.Format}.")
+            : OperationResult<MediaThumbnail>.Success(thumbnail);
     }
 
     private static TimeSpan ResolveSamplePosition(TimeSpan duration)

@@ -19,7 +19,7 @@ public sealed class NullVideoRendererFactory : IVideoRendererFactory
 
     public OperationResult<IComponentCreator<IVideoRenderer>> Create()
     {
-        return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Success(new Creator(_signature));
+        return OperationResult<IComponentCreator<IVideoRenderer>>.Success(new Creator(_signature));
     }
 
     private sealed class Creator(string signature) : IComponentCreator<IVideoRenderer>

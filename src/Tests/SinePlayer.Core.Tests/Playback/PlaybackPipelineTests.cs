@@ -348,7 +348,7 @@ public partial class PlaybackPipelineTests
         public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
             IComponentCreator<IVideoDecoder> creator = new Creator();
-            return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
+            return OperationResult<IComponentCreator<IVideoDecoder>>.Success(creator);
         }
 
         private sealed class Creator : IComponentCreator<IVideoDecoder>
@@ -452,7 +452,7 @@ public partial class PlaybackPipelineTests
             }
 
             IComponentCreator<IVideoDecoder> creator = new Creator(offered.Result, hardware, signature);
-            return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
+            return OperationResult<IComponentCreator<IVideoDecoder>>.Success(creator);
         }
 
         private sealed class Creator(IComponentCreator<IVideoDecoder> inner, bool hardware, string signature) : IComponentCreator<IVideoDecoder>
@@ -515,7 +515,7 @@ public partial class PlaybackPipelineTests
 
         public OperationResult<IComponentCreator<IAudioRenderer>> Create()
         {
-            return new OperationResultCreator<IComponentCreator<IAudioRenderer>>().Success(new FixedCreator<IAudioRenderer>(_signature, () => _renderer));
+            return OperationResult<IComponentCreator<IAudioRenderer>>.Success(new FixedCreator<IAudioRenderer>(_signature, () => _renderer));
         }
     }
 
@@ -578,7 +578,7 @@ public partial class PlaybackPipelineTests
                 Created.Add(renderer);
             }
 
-            return new OperationResultCreator<IComponentCreator<IAudioRenderer>>().Success(new FixedCreator<IAudioRenderer>(_signature, () => renderer));
+            return OperationResult<IComponentCreator<IAudioRenderer>>.Success(new FixedCreator<IAudioRenderer>(_signature, () => renderer));
         }
     }
 
@@ -594,7 +594,7 @@ public partial class PlaybackPipelineTests
         {
             if (stream.Index == RefusedIndex)
             {
-                return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Failure($"Stream {stream.Index} cannot be decoded.");
+                return OperationResult<IComponentCreator<IVideoDecoder>>.Failure($"Stream {stream.Index} cannot be decoded.");
             }
 
             return _inner.Create(source, stream, options);
@@ -968,7 +968,7 @@ public partial class PlaybackPipelineTests
         public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
             IComponentCreator<IVideoDecoder> creator = new FixedCreator<IVideoDecoder>("silent:video", () => new SilentVideoDecoder(stream));
-            return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
+            return OperationResult<IComponentCreator<IVideoDecoder>>.Success(creator);
         }
 
         private sealed class SilentVideoDecoder(VideoStreamInfo stream) : IVideoDecoder
@@ -1218,7 +1218,7 @@ public partial class PlaybackPipelineTests
 
         public OperationResult<IComponentCreator<IVideoRenderer>> Create()
         {
-            return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Success(new FixedCreator<IVideoRenderer>(_signature, () => _renderer));
+            return OperationResult<IComponentCreator<IVideoRenderer>>.Success(new FixedCreator<IVideoRenderer>(_signature, () => _renderer));
         }
     }
 
@@ -1945,7 +1945,7 @@ public partial class PlaybackPipelineTests
     {
         public OperationResult<IComponentCreator<IAudioRenderer>> Create()
         {
-            return new OperationResultCreator<IComponentCreator<IAudioRenderer>>().Failure("This audio device refuses to be opened.");
+            return OperationResult<IComponentCreator<IAudioRenderer>>.Failure("This audio device refuses to be opened.");
         }
     }
 
@@ -1958,7 +1958,7 @@ public partial class PlaybackPipelineTests
     {
         public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
         {
-            return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Success(new Creator());
+            return OperationResult<IComponentCreator<IAudioDecoder>>.Success(new Creator());
         }
 
         private sealed class Creator : IComponentCreator<IAudioDecoder>
@@ -1977,7 +1977,7 @@ public partial class PlaybackPipelineTests
     {
         public OperationResult<IComponentCreator<IAudioDecoder>> Create(IMediaSource source, AudioStreamInfo stream, DecoderOptions options)
         {
-            return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Failure("This audio decoder refuses the stream.");
+            return OperationResult<IComponentCreator<IAudioDecoder>>.Failure("This audio decoder refuses the stream.");
         }
     }
 
@@ -2013,7 +2013,7 @@ public partial class PlaybackPipelineTests
             }
 
             IComponentCreator<IAudioDecoder> creator = new SignatureCreator(offered.Result, _signature);
-            return new OperationResultCreator<IComponentCreator<IAudioDecoder>>().Success(creator);
+            return OperationResult<IComponentCreator<IAudioDecoder>>.Success(creator);
         }
 
         /// <summary>Passes everything through but the signature, which is the only thing that makes this a change.</summary>
@@ -2032,7 +2032,7 @@ public partial class PlaybackPipelineTests
     {
         public OperationResult<IComponentCreator<IVideoRenderer>> Create()
         {
-            return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Failure("This renderer refuses to be made.");
+            return OperationResult<IComponentCreator<IVideoRenderer>>.Failure("This renderer refuses to be made.");
         }
     }
 
@@ -2041,7 +2041,7 @@ public partial class PlaybackPipelineTests
     {
         public OperationResult<IComponentCreator<IVideoRenderer>> Create()
         {
-            return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Success(new Creator(signature));
+            return OperationResult<IComponentCreator<IVideoRenderer>>.Success(new Creator(signature));
         }
 
         private sealed class Creator(string signature) : IComponentCreator<IVideoRenderer>
@@ -2229,20 +2229,19 @@ public partial class PlaybackPipelineTests
 
         public OperationResult<AudioStreamInfo> Negotiate(AudioStreamInfo stream)
         {
-            OperationResultCreator<AudioStreamInfo> result = new();
             if (!CanConfigure)
             {
                 // The device that will not be opened cannot be described either, which is how a selection comes to be
                 // refused before anything is played.
-                return result.Failure(RefusalReason);
+                return OperationResult<AudioStreamInfo>.Failure(RefusalReason);
             }
 
             if (ChannelCapacity is not int capacity || capacity <= 0 || capacity >= stream.ChannelCount)
             {
-                return result.Success(stream);
+                return OperationResult<AudioStreamInfo>.Success(stream);
             }
 
-            return result.Success(stream.WithLayout(capacity, capacity == 2 ? ChannelLayout.Stereo : stream.ChannelLayout));
+            return OperationResult<AudioStreamInfo>.Success(stream.WithLayout(capacity, capacity == 2 ? ChannelLayout.Stereo : stream.ChannelLayout));
         }
 
         /// <summary>How many times the device has been opened: more than one is a device that was reopened mid-stream.</summary>
@@ -2707,14 +2706,13 @@ public partial class PlaybackPipelineTests
     private static OperationResult<SubtitleStreamInfo> AddSubtitleFile(PlaybackPipeline pipeline, string path)
     {
         OperationResult<MediaSource> added = Await(pipeline.AddSource(MediaLocator.Parse(path)));
-        OperationResultCreator<SubtitleStreamInfo> result = new();
         if (!added.IsSuccessful)
         {
-            return result.Failure(added);
+            return OperationResult<SubtitleStreamInfo>.Failure(added);
         }
 
         SubtitleStreamInfo? stream = added.Result.Info.Streams.OfType<SubtitleStreamInfo>().FirstOrDefault();
-        return stream is null ? result.Failure("The file holds no subtitle track.") : result.Success(stream);
+        return stream is null ? OperationResult<SubtitleStreamInfo>.Failure("The file holds no subtitle track.") : OperationResult<SubtitleStreamInfo>.Success(stream);
     }
 
     private static readonly SubtitleSurface SubtitleSurfaceTarget = new();
@@ -2767,7 +2765,7 @@ public partial class PlaybackPipelineTests
         public OperationResult<IComponentCreator<ISubtitleDecoder>> Create(IMediaSource source, SubtitleStreamInfo stream)
         {
             IComponentCreator<ISubtitleDecoder> creator = new FixedCreator<ISubtitleDecoder>("instant:subtitle", () => new Decoder(stream, instant));
-            return new OperationResultCreator<IComponentCreator<ISubtitleDecoder>>().Success(creator);
+            return OperationResult<IComponentCreator<ISubtitleDecoder>>.Success(creator);
         }
 
         private sealed class Decoder(SubtitleStreamInfo stream, TimeSpan instant) : ISubtitleDecoder
@@ -2823,7 +2821,7 @@ public partial class PlaybackPipelineTests
         public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format)
         {
             RequestedFormat = format;
-            return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Success(new FixedCreator<ISubtitleRenderer>(_signature, () => renderer));
+            return OperationResult<IComponentCreator<ISubtitleRenderer>>.Success(new FixedCreator<ISubtitleRenderer>(_signature, () => renderer));
         }
     }
 
@@ -2832,7 +2830,7 @@ public partial class PlaybackPipelineTests
     {
         public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format)
         {
-            return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Failure($"This renderer does not draw {format} cues.");
+            return OperationResult<IComponentCreator<ISubtitleRenderer>>.Failure($"This renderer does not draw {format} cues.");
         }
     }
 
@@ -2857,7 +2855,7 @@ public partial class PlaybackPipelineTests
 
         public OperationResult<IComponentCreator<ISubtitleRenderer>> Create(SubtitleStreamInfo stream, SubtitleCueFormat format)
         {
-            return new OperationResultCreator<IComponentCreator<ISubtitleRenderer>>().Success(new FixedCreator<ISubtitleRenderer>(_signature, () => _renderer));
+            return OperationResult<IComponentCreator<ISubtitleRenderer>>.Success(new FixedCreator<ISubtitleRenderer>(_signature, () => _renderer));
         }
     }
 

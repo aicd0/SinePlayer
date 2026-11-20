@@ -33,19 +33,17 @@ public sealed class AssSubtitleRendererFactory : ISubtitleRendererFactory
     {
         ArgumentNullException.ThrowIfNull(stream);
 
-        OperationResultCreator<IComponentCreator<ISubtitleRenderer>> result = new();
-
         if (format != SubtitleCueFormat.Ass)
         {
-            return result.Failure($"This renderer draws ASS scripts, not {format} cues.");
+            return OperationResult<IComponentCreator<ISubtitleRenderer>>.Failure($"This renderer draws ASS scripts, not {format} cues.");
         }
 
         if (!IsAssScript(stream.CodecId))
         {
-            return result.Failure($"The {stream.CodecId} track is not an ASS or SSA script.");
+            return OperationResult<IComponentCreator<ISubtitleRenderer>>.Failure($"The {stream.CodecId} track is not an ASS or SSA script.");
         }
 
-        return result.Success(new Creator());
+        return OperationResult<IComponentCreator<ISubtitleRenderer>>.Success(new Creator());
     }
 
     private sealed class Creator : IComponentCreator<ISubtitleRenderer>

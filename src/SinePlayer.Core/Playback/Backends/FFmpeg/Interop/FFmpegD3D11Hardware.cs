@@ -32,25 +32,21 @@ internal sealed partial class FFmpegD3D11Hardware : IFFmpegHardwareBackend
 
     internal static OperationResult<IFFmpegHardwareBackend> TryCreate(ID3D11GpuDevice? device)
     {
-        OperationResultCreator<IFFmpegHardwareBackend> result = new();
-
         int pixelFormat = FFmpegNative.av_get_pix_fmt(PixelFormatName);
         if (pixelFormat == PixelFormatNone)
         {
-            return result.Failure($"This FFmpeg build has no {PixelFormatName} pixel format.");
+            return OperationResult<IFFmpegHardwareBackend>.Failure($"This FFmpeg build has no {PixelFormatName} pixel format.");
         }
 
-        return result.Success(new FFmpegD3D11Hardware(device, pixelFormat));
+        return OperationResult<IFFmpegHardwareBackend>.Success(new FFmpegD3D11Hardware(device, pixelFormat));
     }
 
     private static OperationResult<(nint Reference, nint LockHandle)> TryBuildDeviceContext(ID3D11GpuDevice gpuDevice)
     {
-        OperationResultCreator<(nint Reference, nint LockHandle)> result = new();
-
         nint reference = FFmpegNative.av_hwdevice_ctx_alloc(DeviceTypeD3D11Va);
         if (reference == 0)
         {
-            return result.Failure("Unable to allocate an FFmpeg hardware device context.");
+            return OperationResult<(nint Reference, nint LockHandle)>.Failure("Unable to allocate an FFmpeg hardware device context.");
         }
 
         AVBufferRef buffer = Marshal.PtrToStructure<AVBufferRef>(reference);
@@ -70,10 +66,10 @@ internal sealed partial class FFmpegD3D11Hardware : IFFmpegHardwareBackend
         {
             FFmpegNative.av_buffer_unref(ref reference);
             FreeLockHandle(lockHandle);
-            return result.Failure($"Unable to use the supplied Direct3D 11 device: {FFmpegInterop.GetErrorMessage(initialised)}");
+            return OperationResult<(nint Reference, nint LockHandle)>.Failure($"Unable to use the supplied Direct3D 11 device: {FFmpegInterop.GetErrorMessage(initialised)}");
         }
 
-        return result.Success((reference, lockHandle));
+        return OperationResult<(nint Reference, nint LockHandle)>.Success((reference, lockHandle));
     }
 
     private static void FreeLockHandle(nint lockHandle)

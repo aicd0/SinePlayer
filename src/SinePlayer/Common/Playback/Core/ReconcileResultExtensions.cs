@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
+using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Hosting;
@@ -31,7 +32,7 @@ internal static class ReconcileResultExtensions
     {
         List<OperationResult> failures =
             [.. result.Results.Where(entry => entry.Key.Kind == kind).Select(entry => entry.Value).Where(it => !it.IsSuccessful)];
-        return failures.Count == 0 ? OperationResult.Success() : failures[0];
+        return failures.Count == 0 ? OperationResultExt.Success() : failures[0];
     }
 
     private static OperationResult? Combine(ReconcileResult result, IReadOnlyList<ISubtitleChain> chains)
@@ -40,6 +41,6 @@ internal static class ReconcileResultExtensions
             [.. chains.Select(chain => result.Results.TryGetValue(chain, out OperationResult? single) ? single : null)
                 .OfType<OperationResult>()
                 .Where(it => !it.IsSuccessful)];
-        return failures.Count == 0 ? OperationResult.Success() : failures[0];
+        return failures.Count == 0 ? OperationResultExt.Success() : failures[0];
     }
 }

@@ -46,7 +46,7 @@ public sealed class WasapiAudioRendererFactory : IAudioRendererFactory
 
     public OperationResult<IComponentCreator<IAudioRenderer>> Create()
     {
-        return new OperationResultCreator<IComponentCreator<IAudioRenderer>>().Success(new Creator(_endpointId, _endpointName, _endpointIsDefault));
+        return OperationResult<IComponentCreator<IAudioRenderer>>.Success(new Creator(_endpointId, _endpointName, _endpointIsDefault));
     }
 
     private sealed class Creator(string? endpointId, string? endpointName, bool endpointIsDefault) : IComponentCreator<IAudioRenderer>

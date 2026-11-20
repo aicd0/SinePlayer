@@ -19,7 +19,7 @@ public sealed class NullAudioRendererFactory : IAudioRendererFactory
 
     public OperationResult<IComponentCreator<IAudioRenderer>> Create()
     {
-        return new OperationResultCreator<IComponentCreator<IAudioRenderer>>().Success(new Creator(_signature));
+        return OperationResult<IComponentCreator<IAudioRenderer>>.Success(new Creator(_signature));
     }
 
     private sealed class Creator(string signature) : IComponentCreator<IAudioRenderer>

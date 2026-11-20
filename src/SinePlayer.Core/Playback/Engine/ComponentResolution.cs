@@ -15,25 +15,24 @@ internal static class ComponentResolution
         MediaStreamInfo stream,
         string role) where T : class, IDisposable
     {
-        OperationResultCreator<PipelineComponent<T>?> result = new();
         string error = $"No {role} could be offered.";
 
         foreach (IComponentCreator<T> creator in creators)
         {
             if (creator.Signature == runningSignature)
             {
-                return result.Success(null);
+                return OperationResult<PipelineComponent<T>?>.Success(null);
             }
 
             OperationResult created = creator.Create(out T? made);
             if (created.IsSuccessful && made is not null)
             {
-                return result.Success(new(made, stream, creator.Signature));
+                return OperationResult<PipelineComponent<T>?>.Success(new(made, stream, creator.Signature));
             }
 
             error = created.IsSuccessful ? $"{creator.Signature} made no {role}." : created.Message;
         }
 
-        return result.Failure(error);
+        return OperationResult<PipelineComponent<T>?>.Failure(error);
     }
 }

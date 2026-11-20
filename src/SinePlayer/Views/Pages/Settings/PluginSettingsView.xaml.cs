@@ -86,7 +86,7 @@ internal sealed partial class PluginSettingsView : BaseUserControl
             return OperationResultExt.Failure(nameof(OpenPluginsFolder), ex);
         }
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     private void InstallPluginButton_Click(object sender, RoutedEventArgs e)
@@ -141,7 +141,7 @@ internal sealed partial class PluginSettingsView : BaseUserControl
             return OperationResultExt.Failure(nameof(InstallPlugin), ex);
         }
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     private void DownloadPluginsFromGitHubButton_Click(object sender, RoutedEventArgs e)

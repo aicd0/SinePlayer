@@ -190,7 +190,7 @@ public class ComponentResolverTests
 
         public OperationResult<IComponentCreator<IVideoRenderer>> Create()
         {
-            return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Failure($"{name} cannot serve this machine.");
+            return OperationResult<IComponentCreator<IVideoRenderer>>.Failure($"{name} cannot serve this machine.");
         }
     }
 
@@ -200,7 +200,7 @@ public class ComponentResolverTests
         public OperationResult<IComponentCreator<IVideoDecoder>> Create(IMediaSource source, VideoStreamInfo stream, DecoderOptions options)
         {
             IComponentCreator<IVideoDecoder> creator = new FixedCreator<IVideoDecoder>(options.HardwareDecoding ? "hardware:decoder" : "software:decoder", () => null);
-            return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(creator);
+            return OperationResult<IComponentCreator<IVideoDecoder>>.Success(creator);
         }
     }
 }

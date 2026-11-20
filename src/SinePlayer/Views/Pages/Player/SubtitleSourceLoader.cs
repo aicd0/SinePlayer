@@ -87,7 +87,7 @@ internal static class SubtitleSourceLoader
             return OperationResultExt.Failure(built);
         }
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     private static async Task<MediaSource?> AddSource(PlayerSession session, string path)
