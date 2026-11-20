@@ -254,7 +254,7 @@ internal sealed partial class MediaInfoPage : BasePage
 
     private void NewTagTipButton_Click(object sender, RoutedEventArgs e)
     {
-        ThirdPartyLauncher.OpenTemporaryTextFile("NewTagsHelp.txt", StringResourceProvider.Instance.EnterNewTagsHint);
+        CoroutineUtils.Run(() => ThirdPartyLauncher.OpenTemporaryTextFile("NewTagsHelp.txt", StringResourceProvider.Instance.EnterNewTagsHint));
     }
 
     private List<string> SearchTagHistory(string query)

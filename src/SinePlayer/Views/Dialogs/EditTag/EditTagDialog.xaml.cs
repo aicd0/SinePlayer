@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.Utils;
+using SinePlayer.Core.Common.Utils;
 
 namespace SinePlayer.Views.Dialogs.EditTag;
 
@@ -51,6 +52,6 @@ internal sealed partial class EditTagDialog : BaseContentDialog
 
     private void LinksTipButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
-        ThirdPartyLauncher.OpenTemporaryTextFile("TagLinkHelp.txt", StringResource.TagLinkTip);
+        CoroutineUtils.Run(() => ThirdPartyLauncher.OpenTemporaryTextFile("TagLinkHelp.txt", StringResource.TagLinkTip));
     }
 }

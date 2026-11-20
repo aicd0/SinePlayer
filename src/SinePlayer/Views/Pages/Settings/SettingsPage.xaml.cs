@@ -134,7 +134,7 @@ internal sealed partial class SettingsPage : BasePage
 
     private void LicenseHyperlink_Click(Hyperlink sender, HyperlinkClickEventArgs args)
     {
-        ThirdPartyLauncher.OpenAssetsFile("License.txt");
+        CoroutineUtils.Run(() => ThirdPartyLauncher.OpenAssetsFile("License.txt"));
     }
 
     private void GithubHyperlink_Click(Hyperlink sender, HyperlinkClickEventArgs args)
