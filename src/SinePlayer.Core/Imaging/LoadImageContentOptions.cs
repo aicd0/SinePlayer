@@ -1,0 +1,23 @@
+// Copyright (c) aicd0. All rights reserved.
+// Licensed under the GNU General Public License v3.0 or later.
+
+using SinePlayer.Core.Common.Utils;
+
+namespace SinePlayer.Core.Imaging;
+
+public class LoadImageContentOptions
+{
+    public ImageLoaderSchedulerGroup? SchedulerGroup { get; set; }
+    public int Priority { get; set; } = 0;
+    public CancellationSession.IToken? Token { get; set; }
+
+    public LoadImageContentOptions Clone()
+    {
+        return new()
+        {
+            SchedulerGroup = SchedulerGroup,
+            Priority = Priority,
+            Token = Token,
+        };
+    }
+}

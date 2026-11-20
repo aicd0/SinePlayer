@@ -1,18 +1,14 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System;
 using System.Globalization;
 using System.Management;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 
 using SinePlayer.Core.Common.DebugTools;
 
 using Windows.Win32;
 using Windows.Win32.Devices.Display;
-using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Gdi;
 
 namespace SinePlayer.Core.Common.AppEnvironment;

@@ -33,7 +33,7 @@ public static partial class ImageLoader
 
     private static string _cacheDirectoryPath = string.Empty;
     private static ImageCacheDatabase? sImageCacheDatabase;
-    private static readonly object sLock = new();
+    private static readonly Lock sLock = new();
     private static volatile LRUCache? sImageCache;
 
     private static int sPostMainThreadTask = 0;
@@ -85,6 +85,12 @@ public static partial class ImageLoader
     {
         Database.Clear();
         sImageCache?.Clear();
+        ImageLoaderScheduler.ClearBuffer();
+    }
+
+    public static void SetMemoryCacheCapacity(long bytes)
+    {
+        ImageLoaderScheduler.SetBufferCapacity(bytes);
     }
 
     public static Task LoadImage(IImageSource source, LoadImageOptions options)
@@ -93,15 +99,22 @@ public static partial class ImageLoader
         ArgumentNullException.ThrowIfNull(options);
 
         options = options.Clone();
-        ImageLoaderSchedulerGroup group = options.SchedulerGroup ?? source.PreferredSchedulerGroup;
-        return ImageLoaderScheduler.Submit(async () =>
+        ImageLoaderScheduler.Request request = new()
+        {
+            Group = options.SchedulerGroup ?? source.PreferredSchedulerGroup,
+            Priority = options.Priority,
+            Uri = source.Uri,
+            Sequence = ImageLoaderScheduler.NewSequence(),
+            Token = options.Token,
+        };
+        return TaskDispatcher.DefaultThreadPool.SubmitAsync(async () =>
         {
             using ImageLoaderContext context = new(source);
-            if (!await LoadImageCore(context, options))
+            if (!await LoadImageCore(context, options, request))
             {
                 CoroutineUtils.RunInMainThread(options.Handler.OnFailure);
             }
-        }, group, options.Priority);
+        });
     }
 
     public static Task LoadImage(ImageLoaderContext loaderContext, LoadImageOptions options)
@@ -110,14 +123,42 @@ public static partial class ImageLoader
         ArgumentNullException.ThrowIfNull(options);
 
         options = options.Clone();
-        ImageLoaderSchedulerGroup group = options.SchedulerGroup ?? loaderContext.Source.PreferredSchedulerGroup;
-        return ImageLoaderScheduler.Submit(async () =>
+        ImageLoaderScheduler.Request request = new()
         {
-            if (!await LoadImageCore(loaderContext, options))
+            Group = options.SchedulerGroup ?? loaderContext.Source.PreferredSchedulerGroup,
+            Priority = options.Priority,
+            Uri = loaderContext.Source.Uri,
+            Sequence = ImageLoaderScheduler.NewSequence(),
+            Token = options.Token,
+        };
+        return TaskDispatcher.DefaultThreadPool.SubmitAsync(async () =>
+        {
+            if (!await LoadImageCore(loaderContext, options, request))
             {
                 CoroutineUtils.RunInMainThread(options.Handler.OnFailure);
             }
-        }, group, options.Priority);
+        });
+    }
+
+    public static Task<ImageContent?> LoadImageContent(IImageSource source, LoadImageContentOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(options);
+
+        options = options.Clone();
+        ImageLoaderScheduler.Request request = new()
+        {
+            Group = options.SchedulerGroup ?? source.PreferredSchedulerGroup,
+            Priority = options.Priority,
+            Uri = source.Uri,
+            Sequence = ImageLoaderScheduler.NewSequence(),
+            Token = options.Token,
+        };
+        return TaskDispatcher.DefaultThreadPool.SubmitAsync(async () =>
+        {
+            using ImageLoaderContext context = new(source);
+            return await LoadImageContentCore(context, request);
+        });
     }
 
     public static Task<ImageMeta?> LoadImageMeta(IImageSource source, LoadImageMetaOptions options)
@@ -126,12 +167,19 @@ public static partial class ImageLoader
         ArgumentNullException.ThrowIfNull(options);
 
         options = options.Clone();
-        ImageLoaderSchedulerGroup group = options.SchedulerGroup ?? source.PreferredSchedulerGroup;
-        return ImageLoaderScheduler.Submit(async () =>
+        ImageLoaderScheduler.Request request = new()
+        {
+            Group = options.SchedulerGroup ?? source.PreferredSchedulerGroup,
+            Priority = options.Priority,
+            Uri = source.Uri,
+            Sequence = ImageLoaderScheduler.NewSequence(),
+            Token = options.Token,
+        };
+        return TaskDispatcher.DefaultThreadPool.SubmitAsync(async () =>
         {
             using ImageLoaderContext context = new(source);
-            return await GetImageMeta(context);
-        }, group, options.Priority);
+            return await GetImageMeta(context, request);
+        });
     }
 
     public static Task<ImageMeta?> LoadImageMeta(ImageLoaderContext loaderContext, LoadImageMetaOptions options)
@@ -140,11 +188,37 @@ public static partial class ImageLoader
         ArgumentNullException.ThrowIfNull(options);
 
         options = options.Clone();
-        ImageLoaderSchedulerGroup group = options.SchedulerGroup ?? loaderContext.Source.PreferredSchedulerGroup;
-        return ImageLoaderScheduler.Submit(() => GetImageMeta(loaderContext), group, options.Priority);
+        ImageLoaderScheduler.Request request = new()
+        {
+            Group = options.SchedulerGroup ?? loaderContext.Source.PreferredSchedulerGroup,
+            Priority = options.Priority,
+            Uri = loaderContext.Source.Uri,
+            Sequence = ImageLoaderScheduler.NewSequence(),
+            Token = options.Token,
+        };
+        return TaskDispatcher.DefaultThreadPool.SubmitAsync(
+            () => GetImageMeta(loaderContext, request));
     }
 
-    private static async Task<ImageMeta?> GetImageMeta(ImageLoaderContext context)
+    private static async Task<ImageContent?> LoadImageContentCore(ImageLoaderContext context, ImageLoaderScheduler.Request request)
+    {
+        Stream? stream = await context.GetSourceStream(request);
+        if (stream is null)
+        {
+            return null;
+        }
+
+        ImageMeta? meta = await GetImageMeta(context, request);
+
+        if (stream.CanSeek)
+        {
+            stream.Position = 0;
+        }
+
+        return new ImageContent(stream, meta);
+    }
+
+    private static async Task<ImageMeta?> GetImageMeta(ImageLoaderContext context, ImageLoaderScheduler.Request request)
     {
         ImageCacheDatabase.CacheRecord? record = await context.GetOrCreateCache();
         if (record is null)
@@ -161,21 +235,15 @@ public static partial class ImageLoader
                 return meta;
             }
 
-            Stream? stream = await context.GetSourceStream();
-            if (stream is null)
-            {
-                return null;
-            }
-
-            BitmapDecoder? decoder = await context.GetBitmapDecoder();
-            if (decoder is null)
+            meta = await context.GetImageMeta(request);
+            if (meta is null)
             {
                 return null;
             }
 
             fingerprint ??= await context.GetFingerprint();
             record.Clear();
-            ImageLoaderContext.SaveImageMetaToCacheRecord(record, fingerprint, stream.Length, decoder);
+            ImageLoaderContext.SaveImageMetaToCacheRecord(record, fingerprint, meta);
             record.Save();
 
             meta = CreateImageMetaFromCacheRecord(record, fingerprint);
@@ -298,17 +366,17 @@ public static partial class ImageLoader
         };
     }
 
-    private static async Task<bool> LoadImageCore(ImageLoaderContext context, LoadImageOptions options)
+    private static async Task<bool> LoadImageCore(ImageLoaderContext context, LoadImageOptions options, ImageLoaderScheduler.Request request)
     {
-        if (options.Token.IsCancellationRequested)
+        if (request.IsCancellationRequested)
         {
             return false;
         }
 
         long startTime = GetCurrentTick();
 
-        ImageMeta? meta = await GetImageMeta(context);
-        if (meta is null)
+        ImageMeta? meta = await GetImageMeta(context, request);
+        if (meta is null || request.IsCancellationRequested)
         {
             return false;
         }
@@ -348,9 +416,7 @@ public static partial class ImageLoader
             }
             else
             {
-                Stream? stream = await context.GetSourceStream();
-                context.UnrefSourceStream();
-
+                Stream? stream = await context.GetSourceStream(request);
                 if (stream is null)
                 {
                     return false;
@@ -414,7 +480,7 @@ public static partial class ImageLoader
                         {
                             string cacheEntryKey = cacheEntryKeys[0];
                             fingerprint ??= await context.GetFingerprint();
-                            await SaveThumbnail(context, cacheEntryKey, fingerprint, originalSize, imageCache, record);
+                            await SaveThumbnail(context, request, cacheEntryKey, fingerprint, originalSize, imageCache, record);
                         }
 
                         IVectorImageService? vectorService = await context.GetVectorService();
@@ -439,9 +505,7 @@ public static partial class ImageLoader
                         }
                         else
                         {
-                            Stream? stream = await context.GetSourceStream();
-                            context.UnrefSourceStream();
-
+                            Stream? stream = await context.GetSourceStream(request);
                             if (stream is null)
                             {
                                 return null;
@@ -573,7 +637,7 @@ public static partial class ImageLoader
         return null;
     }
 
-    private static async Task SaveThumbnail(ImageLoaderContext context, string cacheEntryKey, string fingerprint,
+    private static async Task SaveThumbnail(ImageLoaderContext context, ImageLoaderScheduler.Request request, string cacheEntryKey, string fingerprint,
         Size originalSize, LRUCache imageCache, ImageCacheDatabase.CacheRecord record)
     {
         if (!CalculateDesiredThumbnailSize(cacheEntryKey, originalSize, out Size thumbnailSize))
@@ -589,13 +653,27 @@ public static partial class ImageLoader
         }
         else
         {
-            BitmapDecoder? decoder = await context.GetBitmapDecoder();
-            if (decoder is null)
+            Stream? content = await context.GetSourceStream(request);
+            if (content is null)
             {
                 return;
             }
 
-            thumbnailBitmap = await CreateScaledSoftwareBitmap(decoder, thumbnailSize.Width, thumbnailSize.Height);
+            using (content)
+            {
+                BitmapDecoder decoder;
+                try
+                {
+                    decoder = await BitmapDecoder.CreateAsync(content.AsRandomAccessStream());
+                }
+                catch (Exception ex)
+                {
+                    Logger.E(TAG, ex);
+                    return;
+                }
+
+                thumbnailBitmap = await CreateScaledSoftwareBitmap(decoder, thumbnailSize.Width, thumbnailSize.Height);
+            }
         }
 
         if (thumbnailBitmap is null)

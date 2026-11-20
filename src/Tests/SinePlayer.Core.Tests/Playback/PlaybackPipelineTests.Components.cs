@@ -4,8 +4,8 @@
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Filter;
-using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
+using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Hosting;
 
 namespace SinePlayer.Core.Tests.Playback;
