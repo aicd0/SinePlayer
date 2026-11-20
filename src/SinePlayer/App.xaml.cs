@@ -184,7 +184,7 @@ public partial class App : Application
         string cmd = string.Join(' ', cmdArgs);
         Logger.I(TAG, $"OnActivated: fromLaunch={fromLaunch}, cmd={cmd}");
 
-        CoroutineUtils.RunInMainThreadAsync(async () =>
+        CoroutineUtils.RunInMainThread(async () =>
         {
             if (fromLaunch && !InitTaskManager.Instance.SafeMode && AppSettingsModel.RestoreWindowState)
             {
