@@ -101,7 +101,11 @@ internal sealed partial class PlaybackInfoPage : BasePage
             return;
         }
 
-        ThirdPartyLauncher.OpenFile(filePaths[^1]).ShowErrorMessage(PageActionHandler);
+        CoroutineUtils.Run(async () =>
+        {
+            OperationResult opened = await ThirdPartyLauncher.OpenFile(filePaths[^1]);
+            opened.ShowErrorMessage(PageActionHandler);
+        });
     }
 
     private void Refresh()

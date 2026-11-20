@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Common.Storage;
+using SinePlayer.Core.Common.Threading;
 
 using Windows.Storage;
 using Windows.System;
@@ -52,48 +53,38 @@ internal static class ThirdPartyLauncher
             return OperationResultExt.Failure(TAG, ex);
         }
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
-    public static OperationResult<string> OpenTemporaryTextFile(string filename, string text)
+    public static async Task<OperationResult<string>> OpenTemporaryTextFile(string filename, string text)
     {
         OperationResult<string> writeErr = WriteTemporaryTextFile(filename, text);
         if (!writeErr.IsSuccessful)
         {
-            return OperationResultExt.Failure<string>(writeErr);
+            return OperationResult<string>.Failure(writeErr);
         }
 
-        OperationResult openErr = OpenFile(writeErr.Result);
+        OperationResult openErr = await OpenFile(writeErr.Result);
         if (!openErr.IsSuccessful)
         {
-            return OperationResultExt.Failure<string>(openErr);
+            return OperationResult<string>.Failure(openErr);
         }
 
-        return OperationResultExt.Success(writeErr.Result);
+        return OperationResult<string>.Success(writeErr.Result);
     }
 
-    public static OperationResult OpenAssetsFile(string filename)
+    public static async Task<OperationResult> OpenAssetsFile(string filename)
     {
-        return OpenFile(Path.Combine(AppContext.BaseDirectory, "Assets", filename));
+        return await OpenFile(Path.Combine(AppContext.BaseDirectory, "Assets", filename));
     }
 
-    public static OperationResult OpenFile(string path)
+    public static async Task<OperationResult> OpenFile(string path)
     {
-        try
+        return await StartProcess(new ProcessStartInfo
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = path,
-                UseShellExecute = true
-            };
-            Process.Start(psi);
-        }
-        catch (Exception ex)
-        {
-            return OperationResultExt.Failure(TAG, ex);
-        }
-
-        return OperationResult.Success();
+            FileName = path,
+            UseShellExecute = true
+        }, waitForExit: false);
     }
 
     public static async Task<OperationResult<string>> EditTemporaryTextFileAsync(string filename, IEnumerable<string> lines)
@@ -102,32 +93,23 @@ internal static class ThirdPartyLauncher
         OperationResult<string> writeErr = WriteTemporaryTextFile(filename, text);
         if (!writeErr.IsSuccessful)
         {
-            return OperationResultExt.Failure<string>(writeErr);
+            return OperationResultExt<string>.Failure(writeErr);
         }
 
         string filePath = writeErr.Result;
-        try
+        OperationResult started = await StartProcess(new ProcessStartInfo
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "notepad.exe",
-                Arguments = $"\"{filePath}\"",
-                UseShellExecute = false,
-            };
-            using var process = Process.Start(psi);
-            if (process is null)
-            {
-                return OperationResultExt.Failure<string>(TAG, "Failed to launch notepad.");
-            }
+            FileName = "notepad.exe",
+            Arguments = $"\"{filePath}\"",
+            UseShellExecute = false,
+        }, waitForExit: true);
 
-            await process.WaitForExitAsync();
-        }
-        catch (Exception ex)
+        if (!started.IsSuccessful)
         {
-            return OperationResultExt.Failure<string>(TAG, ex);
+            return OperationResultExt<string>.Failure(started);
         }
 
-        return OperationResultExt.Success(filePath);
+        return OperationResultExt<string>.Success(filePath);
     }
 
     private static OperationResult<string> WriteTemporaryTextFile(string filename, string text)
@@ -139,7 +121,7 @@ internal static class ThirdPartyLauncher
         }
         catch (Exception ex)
         {
-            return OperationResultExt.Failure<string>(TAG, ex);
+            return OperationResultExt<string>.Failure(TAG, ex);
         }
 
         string filePath = Path.Combine(directoryPath, filename);
@@ -150,9 +132,35 @@ internal static class ThirdPartyLauncher
         }
         catch (Exception ex)
         {
-            return OperationResultExt.Failure<string>(TAG, ex);
+            return OperationResultExt<string>.Failure(TAG, ex);
         }
 
-        return OperationResultExt.Success(filePath);
+        return OperationResultExt<string>.Success(filePath);
+    }
+
+    private static Task<OperationResult> StartProcess(ProcessStartInfo info, bool waitForExit)
+    {
+        return MainThreadUtils.PostInMainThreadAsync(async () =>
+        {
+            try
+            {
+                using var process = Process.Start(info);
+                if (process is null)
+                {
+                    return OperationResultExt.Failure(TAG, "Failed to launch notepad.");
+                }
+
+                if (waitForExit)
+                {
+                    await process.WaitForExitAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                return OperationResultExt.Failure(TAG, ex);
+            }
+
+            return OperationResultExt.Success();
+        });
     }
 }

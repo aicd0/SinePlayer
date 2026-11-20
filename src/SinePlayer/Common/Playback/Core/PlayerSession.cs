@@ -311,7 +311,7 @@ internal sealed partial class PlayerSession : IDisposable
     {
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
         {
-            return OperationResultExt.Failure<MediaSource>(TAG, $"Media file not found: '{filePath}'.");
+            return OperationResultExt<MediaSource>.Failure(TAG, $"Media file not found: '{filePath}'.");
         }
 
         PlaybackPipeline pipeline = EnsurePipeline();
@@ -320,13 +320,13 @@ internal sealed partial class PlayerSession : IDisposable
         MediaSource? existing = pipeline.Sources.FirstOrDefault(source => string.Equals(source.Locator.Value, locator.Value, StringComparison.Ordinal));
         if (existing is not null)
         {
-            return OperationResultExt.Success(existing);
+            return OperationResultExt<MediaSource>.Success(existing);
         }
 
         OperationResult<MediaSource> added = await pipeline.AddSource(locator);
         if (!added.IsSuccessful)
         {
-            return OperationResultExt.Failure<MediaSource>(
+            return OperationResultExt<MediaSource>.Failure(
                 TAG,
                 $"Unable to open media file '{filePath}': {added.Message}",
                 added.Exception,
@@ -525,12 +525,12 @@ internal sealed partial class PlayerSession : IDisposable
         PlaybackPipeline? pipeline = _pipeline;
         if (pipeline is null)
         {
-            return OperationResultExt.Failure<ReconcileResult>(TAG, "There is nothing open to build.");
+            return OperationResultExt<ReconcileResult>.Failure(TAG, "There is nothing open to build.");
         }
 
         if (!_pendingReconcile && _lastReconcile is not null)
         {
-            return OperationResultExt.Success(_lastReconcile);
+            return OperationResultExt<ReconcileResult>.Success(_lastReconcile);
         }
 
         OperationResult<ReconcileResult> reconciled;
@@ -541,7 +541,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         if (!reconciled.IsSuccessful)
         {
-            return OperationResultExt.Failure<ReconcileResult>(TAG, $"What was chosen could not be built. {reconciled.Message}");
+            return OperationResultExt<ReconcileResult>.Failure(TAG, $"What was chosen could not be built. {reconciled.Message}");
         }
 
         _pendingReconcile = false;
