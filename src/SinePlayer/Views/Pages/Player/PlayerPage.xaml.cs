@@ -1075,7 +1075,7 @@ internal sealed partial class PlayerPage : BasePage
 
     private void ToggleOverlayHold()
     {
-        _isOverlayHold = !_isOverlayHold;
+        _isOverlayHold = !_isOverlayVisible;
         if (_isOverlayHold)
         {
             ShowOverlay();
