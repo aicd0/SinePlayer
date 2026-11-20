@@ -140,7 +140,7 @@ internal static class ThirdPartyLauncher
 
     private static Task<OperationResult> StartProcess(ProcessStartInfo info, bool waitForExit)
     {
-        return MainThreadUtils.PostInMainThreadAsync(async () =>
+        return MainThreadUtils.PostInMainThread(async () =>
         {
             try
             {
