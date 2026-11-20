@@ -31,8 +31,6 @@ internal static class DxgiDisplay
 {
     internal static OperationResult<DisplayHdrState> TryQuery()
     {
-        OperationResultCreator<DisplayHdrState> result = new();
-
         try
         {
             HRESULT factoryResult;
@@ -45,18 +43,18 @@ internal static class DxgiDisplay
 
             if (factoryResult.Value < 0 || factoryObject is not IDXGIFactory2 factory)
             {
-                return result.Failure($"Unable to create a DXGI factory: {factoryResult}");
+                return OperationResult<DisplayHdrState>.Failure($"Unable to create a DXGI factory: {factoryResult}");
             }
 
             HRESULT adapterResult = factory.EnumAdapters1(0, out IDXGIAdapter1 adapter);
             if (adapterResult.Value < 0)
             {
-                return result.Failure($"Unable to reach the graphics adapter: {adapterResult}");
+                return OperationResult<DisplayHdrState>.Failure($"Unable to reach the graphics adapter: {adapterResult}");
             }
 
             try
             {
-                return TryReadOutput(adapter, result);
+                return TryReadOutput(adapter);
             }
             finally
             {
@@ -65,11 +63,11 @@ internal static class DxgiDisplay
         }
         catch (Exception exception)
         {
-            return result.Failure($"Unable to read what the display supports: {exception.Message}");
+            return OperationResult<DisplayHdrState>.Failure($"Unable to read what the display supports: {exception.Message}");
         }
     }
 
-    private static unsafe OperationResult<DisplayHdrState> TryReadOutput(IDXGIAdapter1 adapter, OperationResultCreator<DisplayHdrState> result)
+    private static unsafe OperationResult<DisplayHdrState> TryReadOutput(IDXGIAdapter1 adapter)
     {
         DisplayHdrState found = default;
         bool haveFound = false;
@@ -121,7 +119,7 @@ internal static class DxgiDisplay
         }
 
         return haveFound
-            ? result.Success(found)
-            : result.Failure("No display attached to the desktop answered what it can show.");
+            ? OperationResult<DisplayHdrState>.Success(found)
+            : OperationResult<DisplayHdrState>.Failure("No display attached to the desktop answered what it can show.");
     }
 }

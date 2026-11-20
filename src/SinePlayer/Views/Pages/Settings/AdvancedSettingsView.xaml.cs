@@ -111,7 +111,7 @@ internal sealed partial class AdvancedSettingsView : BaseUserControl
             return OperationResultExt.Failure(nameof(OpenUserDataFolder), ex);
         }
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     private void ResetAllSettingsButton_Click(object sender, RoutedEventArgs e)

@@ -534,12 +534,10 @@ float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
 
     internal static OperationResult<D3D11VideoShaders> Create(D3D11Device device)
     {
-        OperationResultCreator<D3D11VideoShaders> result = new();
-
         OperationResult<ID3DBlob> vertexCompiled = Compile("VSMain", "vs_5_0");
         if (!vertexCompiled.IsSuccessful)
         {
-            return result.Failure(vertexCompiled);
+            return OperationResult<D3D11VideoShaders>.Failure(vertexCompiled);
         }
 
         D3D11VideoShaders created = new(device);
@@ -635,10 +633,10 @@ float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
         catch (Exception exception)
         {
             created.Dispose();
-            return result.Failure($"Unable to create the shader programme: {exception.Message}");
+            return OperationResult<D3D11VideoShaders>.Failure($"Unable to create the shader programme: {exception.Message}");
         }
 
-        return result.Success(created);
+        return OperationResult<D3D11VideoShaders>.Success(created);
     }
 
     internal OperationResult<ID3D11PixelShader> GetPixelShader(PixelFormat format, VideoSurfaceTransform transform)
@@ -649,13 +647,13 @@ float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
 
             if (_pixelShaders.TryGetValue((format, transform), out ID3D11PixelShader? pixelShader))
             {
-                return new OperationResultCreator<ID3D11PixelShader>().Success(pixelShader);
+                return OperationResult<ID3D11PixelShader>.Success(pixelShader);
             }
 
             string? entryPoint = Resolve(_pixelShaderEntries, (format, transform), (format, VideoSurfaceTransform.None));
             if (entryPoint is null)
             {
-                return new OperationResultCreator<ID3D11PixelShader>().Failure($"There is no programme that reads {format}.");
+                return OperationResult<ID3D11PixelShader>.Failure($"There is no programme that reads {format}.");
             }
 
             OperationResult<ID3D11PixelShader> created = Create(entryPoint);
@@ -677,13 +675,13 @@ float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
 
             if (_arrayShaders.TryGetValue(transform, out ID3D11PixelShader? pixelShader))
             {
-                return new OperationResultCreator<ID3D11PixelShader>().Success(pixelShader);
+                return OperationResult<ID3D11PixelShader>.Success(pixelShader);
             }
 
             string? entryPoint = Resolve(_arrayShaderEntries, transform, VideoSurfaceTransform.None);
             if (entryPoint is null)
             {
-                return new OperationResultCreator<ID3D11PixelShader>().Failure("There is no programme that reads a hardware frame.");
+                return OperationResult<ID3D11PixelShader>.Failure("There is no programme that reads a hardware frame.");
             }
 
             OperationResult<ID3D11PixelShader> created = Create(entryPoint);
@@ -746,14 +744,14 @@ float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
         {
             if (sBytecode.TryGetValue((entryPoint, target), out ID3DBlob? cached))
             {
-                return new OperationResultCreator<ID3DBlob>().Success(cached);
+                return OperationResult<ID3DBlob>.Success(cached);
             }
         }
 
         OperationResult<ID3DBlob> compiled = D3D11Interop.TryCompileShader(ShaderSource, entryPoint, target);
         if (!compiled.IsSuccessful)
         {
-            return new OperationResultCreator<ID3DBlob>().Failure(compiled);
+            return OperationResult<ID3DBlob>.Failure(compiled);
         }
 
         lock (sBytecodeLock)
@@ -766,21 +764,19 @@ float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
 
     private OperationResult<ID3D11PixelShader> Create(string entryPoint)
     {
-        OperationResultCreator<ID3D11PixelShader> result = new();
-
         OperationResult<ID3DBlob> compiled = Compile(entryPoint, "ps_5_0");
         if (!compiled.IsSuccessful)
         {
-            return result.Failure(compiled);
+            return OperationResult<ID3D11PixelShader>.Failure(compiled);
         }
 
         try
         {
-            return result.Success(D3D11Interop.CreatePixelShader(_device.Device, compiled.Result));
+            return OperationResult<ID3D11PixelShader>.Success(D3D11Interop.CreatePixelShader(_device.Device, compiled.Result));
         }
         catch (Exception exception)
         {
-            return result.Failure($"Unable to create the programme '{entryPoint}': {exception.Message}");
+            return OperationResult<ID3D11PixelShader>.Failure($"Unable to create the programme '{entryPoint}': {exception.Message}");
         }
     }
 }

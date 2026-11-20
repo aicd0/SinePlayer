@@ -40,15 +40,13 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
     internal static OperationResult<D3D11VideoRenderer> Create(D3D11Device device, VideoSurfacePreference surfacePreference)
     {
-        OperationResultCreator<D3D11VideoRenderer> result = new();
-
         OperationResult<D3D11VideoShaders> shaders = D3D11VideoShaders.Create(device);
         if (!shaders.IsSuccessful)
         {
-            return result.Failure(shaders);
+            return OperationResult<D3D11VideoRenderer>.Failure(shaders);
         }
 
-        return result.Success(new D3D11VideoRenderer(device, shaders.Result, surfacePreference));
+        return OperationResult<D3D11VideoRenderer>.Success(new D3D11VideoRenderer(device, shaders.Result, surfacePreference));
     }
 
     private bool _disposed;

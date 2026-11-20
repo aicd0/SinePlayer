@@ -187,8 +187,6 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     {
         SubtitleComponentResolver resolver = Components.Clone();
 
-        OperationResultCreator<ChainChange> result = new();
-
         StreamBinding<SubtitleStreamInfo>? chosen = Selected;
         bool sourceChanged = chosen?.Source != Source.Latest?.Component || chosen?.Stream != Source.Latest?.Stream;
         ChainChange changed = sourceChanged ? ChainChange.Source : ChainChange.None;
@@ -204,7 +202,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                 IVideoRenderTarget? subtitleTarget = Target;
                 if (subtitleTarget is null)
                 {
-                    return result.Failure("The file has a subtitle track but no subtitle surface was supplied.");
+                    return OperationResult<ChainChange>.Failure("The file has a subtitle track but no subtitle surface was supplied.");
                 }
 
                 // Resolve subtitle decoder
@@ -217,7 +215,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                     "subtitle decoder");
                 if (!decoderResolved.IsSuccessful)
                 {
-                    return result.Failure(decoderResolved.Message);
+                    return OperationResult<ChainChange>.Failure(decoderResolved.Message);
                 }
 
                 decoder = decoderResolved.Result;
@@ -230,7 +228,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                 PipelineComponent<ISubtitleDecoder>? runningDecoder = decoder ?? latestDecoder;
                 if (runningDecoder is null)
                 {
-                    return result.Failure("The track has no decoder to say what its cues are made of.");
+                    return OperationResult<ChainChange>.Failure("The track has no decoder to say what its cues are made of.");
                 }
 
                 SubtitleCueFormat format = runningDecoder.Component.CueFormat;
@@ -243,7 +241,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                     "subtitle renderer");
                 if (!rendererResolved.IsSuccessful)
                 {
-                    return result.Failure(rendererResolved.Message);
+                    return OperationResult<ChainChange>.Failure(rendererResolved.Message);
                 }
 
                 renderer = rendererResolved.Result;
@@ -252,7 +250,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                     OperationResult configured = renderer.Component.Configure(subtitleStream, subtitleSource.Info.Attachments, subtitleTarget);
                     if (!configured.IsSuccessful)
                     {
-                        return result.Failure(configured.Message);
+                        return OperationResult<ChainChange>.Failure(configured.Message);
                     }
 
                     changed |= ChainChange.Renderer;
@@ -303,7 +301,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                 }
             }
 
-            return result.Success(changed);
+            return OperationResult<ChainChange>.Success(changed);
         }
         finally
         {

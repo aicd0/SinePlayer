@@ -44,8 +44,6 @@ internal sealed partial class D3D11SwapChain : IDisposable
     /// </param>
     internal static OperationResult<D3D11SwapChain> Create(D3D11Device device, int width, int height, double compositionScale, DXGI_ALPHA_MODE alphaMode, DXGI_FORMAT format)
     {
-        OperationResultCreator<D3D11SwapChain> result = new();
-
         width = Math.Max(1, width);
         height = Math.Max(1, height);
         compositionScale = NormalizeScale(compositionScale);
@@ -62,7 +60,7 @@ internal sealed partial class D3D11SwapChain : IDisposable
 
             if (factoryResult.Value < 0 || factoryObject is not IDXGIFactory2 factory)
             {
-                return result.Failure($"Unable to create a DXGI factory: {factoryResult}");
+                return OperationResult<D3D11SwapChain>.Failure($"Unable to create a DXGI factory: {factoryResult}");
             }
 
             DXGI_SWAP_CHAIN_DESC1 description = new()
@@ -82,14 +80,14 @@ internal sealed partial class D3D11SwapChain : IDisposable
             Graphics_Dxgi_IDXGIFactory2_Extensions.CreateSwapChainForComposition(factory, device.Device, description, null, out IDXGISwapChain1 created);
             if (created is null)
             {
-                return result.Failure("Unable to create a composition swap chain.");
+                return OperationResult<D3D11SwapChain>.Failure("Unable to create a composition swap chain.");
             }
 
             OperationResult scaled = TrySetCompositionScale(created, compositionScale);
             if (!scaled.IsSuccessful)
             {
                 D3D11Interop.Release(created);
-                return result.Failure(scaled);
+                return OperationResult<D3D11SwapChain>.Failure(scaled);
             }
 
             ID3D11Texture2D backBuffer = GetBackBuffer(created);
@@ -106,11 +104,11 @@ internal sealed partial class D3D11SwapChain : IDisposable
                 CompositionScale = compositionScale
             };
 
-            return result.Success(chain);
+            return OperationResult<D3D11SwapChain>.Success(chain);
         }
         catch (Exception exception)
         {
-            return result.Failure($"Unable to create a composition swap chain: {exception.Message}");
+            return OperationResult<D3D11SwapChain>.Failure($"Unable to create a composition swap chain: {exception.Message}");
         }
     }
 

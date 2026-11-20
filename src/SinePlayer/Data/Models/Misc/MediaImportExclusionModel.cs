@@ -128,7 +128,7 @@ internal class MediaImportExclusionModel
 
         Refresh(locations);
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     private void Refresh(IEnumerable<string> locations)

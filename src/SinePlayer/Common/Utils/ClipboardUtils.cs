@@ -33,7 +33,7 @@ internal static class ClipboardUtils
             return OperationResultExt.Failure(nameof(SetText), ex);
         }
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     public static async Task<OperationResult> SetImage(Stream stream)
@@ -66,7 +66,7 @@ internal static class ClipboardUtils
             return OperationResultExt.Failure(nameof(SetImage), ex);
         }
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     public static async Task<OperationResult> SetFile(string path)
@@ -128,6 +128,6 @@ internal static class ClipboardUtils
             return OperationResultExt.Failure(nameof(SetFile), ex);
         }
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 }

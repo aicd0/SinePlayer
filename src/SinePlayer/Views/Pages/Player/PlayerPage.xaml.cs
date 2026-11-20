@@ -612,7 +612,7 @@ internal sealed partial class PlayerPage : BasePage
 
         bool playing = videoResult?.IsSuccessful == true || result.Audio()?.IsSuccessful == true;
         return playing
-            ? OperationResult.Success()
+            ? OperationResultExt.Success()
             : OperationResultExt.Failure(TAG, $"Unable to play media file '{media.Location}': neither the picture nor the sound could be played.");
     }
 

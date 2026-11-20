@@ -227,7 +227,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         _hasSource = false;
         _pendingReconcile = true;
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     public void ReloadSettings()
@@ -407,7 +407,7 @@ internal sealed partial class PlayerSession : IDisposable
         _pendingReconcile = true;
         SaveRecord();
         TrackSelectionChanged?.Invoke();
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     public async Task<OperationResult> AddAudioStream(MediaStreamInfo stream)
@@ -420,7 +420,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         if (_audioChains.Any(entry => entry.Chain.SelectedStream?.Equals(stream) == true))
         {
-            return OperationResult.Success();
+            return OperationResultExt.Success();
         }
 
         IAudioChain? chain = _audioChains.FirstOrDefault(entry => entry.Chain.SelectedStream is null)?.Chain;
@@ -436,7 +436,7 @@ internal sealed partial class PlayerSession : IDisposable
         _pendingReconcile = true;
         SaveRecord();
         TrackSelectionChanged?.Invoke();
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     public async Task<OperationResult> RemoveAudioStream(MediaStreamInfo stream)
@@ -450,7 +450,7 @@ internal sealed partial class PlayerSession : IDisposable
         AudioChainEntry? entry = _audioChains.FirstOrDefault(candidate => candidate.Chain.SelectedStream?.Equals(stream) == true);
         if (entry is null)
         {
-            return OperationResult.Success();
+            return OperationResultExt.Success();
         }
 
         OperationResult cleared = await entry.Chain.SelectStream(null);
@@ -462,7 +462,7 @@ internal sealed partial class PlayerSession : IDisposable
         _pendingReconcile = true;
         SaveRecord();
         TrackSelectionChanged?.Invoke();
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     public async Task<OperationResult> AddSubtitleStream(PlayerView view, MediaStreamInfo stream)
@@ -475,7 +475,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         if (view.SubtitleChains.Any(chain => chain.SelectedStream?.Equals(stream) == true))
         {
-            return OperationResult.Success();
+            return OperationResultExt.Success();
         }
 
         ISubtitleChain? chain = view.SubtitleChains.FirstOrDefault(candidate => candidate.SelectedStream is null);
@@ -491,7 +491,7 @@ internal sealed partial class PlayerSession : IDisposable
         _pendingReconcile = true;
         SaveRecord();
         TrackSelectionChanged?.Invoke();
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     public async Task<OperationResult> RemoveSubtitleStream(PlayerView view, MediaStreamInfo stream)
@@ -505,7 +505,7 @@ internal sealed partial class PlayerSession : IDisposable
         ISubtitleChain? chain = view.SubtitleChains.FirstOrDefault(candidate => candidate.SelectedStream?.Equals(stream) == true);
         if (chain is null)
         {
-            return OperationResult.Success();
+            return OperationResultExt.Success();
         }
 
         OperationResult cleared = await chain.SelectStream(null);
@@ -517,7 +517,7 @@ internal sealed partial class PlayerSession : IDisposable
         _pendingReconcile = true;
         SaveRecord();
         TrackSelectionChanged?.Invoke();
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     public async Task<OperationResult<ReconcileResult>> Reconcile()
@@ -960,7 +960,7 @@ internal sealed partial class PlayerSession : IDisposable
         {
             _openedMedia = null;
             _startPositionMs = 0;
-            RaiseMediaChanged(null, OperationResult.Success());
+            RaiseMediaChanged(null, OperationResultExt.Success());
             return;
         }
 
@@ -986,7 +986,7 @@ internal sealed partial class PlayerSession : IDisposable
         OperationResult<MediaSource> loaded = await AddSource(media.Location);
         if (!loaded.IsSuccessful)
         {
-            return OperationResult.Failure(loaded);
+            return OperationResultExt.Failure(loaded);
         }
 
         RecordOpen(media);
@@ -1007,7 +1007,7 @@ internal sealed partial class PlayerSession : IDisposable
             RaisePositionChanged();
         }
 
-        return OperationResult.Success();
+        return OperationResultExt.Success();
     }
 
     private async Task AddRememberedSourcesAsync(MediaModel media)

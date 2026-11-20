@@ -52,7 +52,6 @@ internal sealed partial class D3D11Device : IDisposable
 
     internal static OperationResult<D3D11Device> Create()
     {
-        OperationResultCreator<D3D11Device> result = new();
         string refused = string.Empty;
 
         foreach (D3D_DRIVER_TYPE driverType in sDriverTypes)
@@ -72,13 +71,11 @@ internal sealed partial class D3D11Device : IDisposable
             return created;
         }
 
-        return result.Failure($"Unable to create a Direct3D 11 device. {refused}");
+        return OperationResult<D3D11Device>.Failure($"Unable to create a Direct3D 11 device. {refused}");
     }
 
     internal static OperationResult<D3D11Device> Create(D3D_DRIVER_TYPE driverType)
     {
-        OperationResultCreator<D3D11Device> result = new();
-
         // Video support is asked for on the accelerated path only: it makes creation fail outright when the driver is
         // older than WDDM 1.2, which is a fault that should be reported rather than found later as a decode error.
         // The software rasterizer has no video hardware at all, so demanding it there would only lose the fallback.
@@ -103,10 +100,10 @@ internal sealed partial class D3D11Device : IDisposable
         {
             D3D11Interop.Release(createdContext);
             D3D11Interop.Release(createdDevice);
-            return result.Failure($"Unable to create a Direct3D 11 device: {created}");
+            return OperationResult<D3D11Device>.Failure($"Unable to create a Direct3D 11 device: {created}");
         }
 
-        return result.Success(new D3D11Device(createdDevice, createdContext, featureLevel, driverType));
+        return OperationResult<D3D11Device>.Success(new D3D11Device(createdDevice, createdContext, featureLevel, driverType));
     }
 
     /// <summary>

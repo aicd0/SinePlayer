@@ -25,7 +25,7 @@ public sealed class NullVideoDecoderFactory : IVideoDecoderFactory
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(options);
 
-        return new OperationResultCreator<IComponentCreator<IVideoDecoder>>().Success(new Creator(stream, _signature));
+        return OperationResult<IComponentCreator<IVideoDecoder>>.Success(new Creator(stream, _signature));
     }
 
     private sealed class Creator(VideoStreamInfo stream, string signature) : IComponentCreator<IVideoDecoder>

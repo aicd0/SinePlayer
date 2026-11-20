@@ -42,11 +42,9 @@ internal sealed partial class FFmpegAudioDecoder : IAudioDecoder
 
     public static OperationResult<FFmpegAudioDecoder> Create(IMediaSource source, AudioStreamInfo stream)
     {
-        OperationResultCreator<FFmpegAudioDecoder> result = new();
-
         if (source is not FFmpegSource ffmpegSource)
         {
-            return result.Failure("The audio stream does not come from an FFmpeg source.");
+            return OperationResult<FFmpegAudioDecoder>.Failure("The audio stream does not come from an FFmpeg source.");
         }
 
         try
@@ -55,12 +53,12 @@ internal sealed partial class FFmpegAudioDecoder : IAudioDecoder
         }
         catch (Exception exception)
         {
-            return result.Failure(exception);
+            return OperationResult<FFmpegAudioDecoder>.Failure(exception);
         }
 
         if (!ffmpegSource.TryGetCodecParameters(stream.Index, out nint parameters))
         {
-            return result.Failure($"Stream {stream.Index} exposes no codec parameters.");
+            return OperationResult<FFmpegAudioDecoder>.Failure($"Stream {stream.Index} exposes no codec parameters.");
         }
 
         string lastError = string.Empty;
@@ -100,10 +98,10 @@ internal sealed partial class FFmpegAudioDecoder : IAudioDecoder
                 continue;
             }
 
-            return result.Success(new FFmpegAudioDecoder(stream, context, receiveFrame, ffmpegSource.GetTimeBase(stream.Index), name));
+            return OperationResult<FFmpegAudioDecoder>.Success(new FFmpegAudioDecoder(stream, context, receiveFrame, ffmpegSource.GetTimeBase(stream.Index), name));
         }
 
-        return result.Failure(string.IsNullOrEmpty(lastError)
+        return OperationResult<FFmpegAudioDecoder>.Failure(string.IsNullOrEmpty(lastError)
             ? $"No FFmpeg decoder handles codec '{stream.CodecId}' (id {CodecIdOf(parameters)}), so this build cannot decode it."
             : lastError);
     }
@@ -241,12 +239,10 @@ internal sealed partial class FFmpegAudioDecoder : IAudioDecoder
 
     private OperationResult<RawAudioBuffer> TryTakeBuffer()
     {
-        OperationResultCreator<RawAudioBuffer> result = new();
-
         nint owned = FFmpegNative.av_frame_alloc();
         if (owned == 0)
         {
-            return result.Failure("Unable to allocate an FFmpeg frame.");
+            return OperationResult<RawAudioBuffer>.Failure("Unable to allocate an FFmpeg frame.");
         }
 
         // Moves the buffer references across; the receive frame is blank again afterwards.
@@ -258,7 +254,7 @@ internal sealed partial class FFmpegAudioDecoder : IAudioDecoder
         if (bytesPerSample <= 0 || sampleFormat == AudioSampleFormat.Unknown)
         {
             FFmpegNative.av_frame_free(ref owned);
-            return result.Failure($"The decoder produced an unsupported sample format (FFmpeg format {format}).");
+            return OperationResult<RawAudioBuffer>.Failure($"The decoder produced an unsupported sample format (FFmpeg format {format}).");
         }
 
         int sampleCount = GetFrameSampleCount(owned);
@@ -272,7 +268,7 @@ internal sealed partial class FFmpegAudioDecoder : IAudioDecoder
             ? bytesPerSample * sampleCount
             : bytesPerSample * sampleCount * channelCount;
 
-        return result.Success(new RawAudioBuffer
+        return OperationResult<RawAudioBuffer>.Success(new RawAudioBuffer
         {
             Timestamp = ResolveTimestamp(owned),
             SampleRate = _stream.SampleRate,

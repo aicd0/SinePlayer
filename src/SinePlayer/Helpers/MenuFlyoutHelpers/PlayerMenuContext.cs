@@ -374,7 +374,7 @@ internal sealed class PlayerMenuContext
             }
         }
 
-        return stream is null ? OperationResult.Success() : await session.AddAudioStream(stream);
+        return stream is null ? OperationResultExt.Success() : await session.AddAudioStream(stream);
     }
 
     private static async Task<OperationResult> SelectSoleSubtitleStream(PlayerSession session, PlayerView view, MediaStreamInfo? stream)
@@ -394,7 +394,7 @@ internal sealed class PlayerMenuContext
             }
         }
 
-        return stream is null ? OperationResult.Success() : await session.AddSubtitleStream(view, stream);
+        return stream is null ? OperationResultExt.Success() : await session.AddSubtitleStream(view, stream);
     }
 
     private static IReadOnlyList<MediaStreamInfo> StreamsOf(MediaSource source, MediaStreamKind kind)

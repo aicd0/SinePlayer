@@ -13,8 +13,6 @@ internal static class VideoSurfaceFactory
 {
     internal static OperationResult<IVideoSurface> Create(D3D11Device device, int width, int height, double compositionScale, VideoSurfacePreference preference, ColourInfo content)
     {
-        OperationResultCreator<IVideoSurface> result = new();
-
         if (ShouldTryHdr(preference, content))
         {
             OperationResult<Hdr10VideoSurface> hdr = Hdr10VideoSurface.TryCreate(
@@ -26,12 +24,12 @@ internal static class VideoSurfaceFactory
 
             if (hdr.IsSuccessful)
             {
-                return result.Success(hdr.Result);
+                return OperationResult<IVideoSurface>.Success(hdr.Result);
             }
 
             if (preference == VideoSurfacePreference.Hdr10)
             {
-                return result.Failure(hdr);
+                return OperationResult<IVideoSurface>.Failure(hdr);
             }
         }
 
@@ -42,7 +40,7 @@ internal static class VideoSurfaceFactory
             compositionScale,
             DXGI_ALPHA_MODE.DXGI_ALPHA_MODE_IGNORE);
 
-        return sdr.IsSuccessful ? result.Success(sdr.Result) : result.Failure(sdr);
+        return sdr.IsSuccessful ? OperationResult<IVideoSurface>.Success(sdr.Result) : OperationResult<IVideoSurface>.Failure(sdr);
     }
 
     internal static bool ShouldTryHdr(VideoSurfacePreference preference, ColourInfo content)

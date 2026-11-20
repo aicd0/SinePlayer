@@ -20,7 +20,7 @@ public sealed class D3D11VideoRendererFactory : IVideoRendererFactory
 
     public OperationResult<IComponentCreator<IVideoRenderer>> Create()
     {
-        return new OperationResultCreator<IComponentCreator<IVideoRenderer>>().Success(new Creator(_signature, _surfacePreference));
+        return OperationResult<IComponentCreator<IVideoRenderer>>.Success(new Creator(_signature, _surfacePreference));
     }
 
     private sealed class Creator(string signature, VideoSurfacePreference surfacePreference) : IComponentCreator<IVideoRenderer>

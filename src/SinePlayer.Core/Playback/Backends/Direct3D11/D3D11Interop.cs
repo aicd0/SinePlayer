@@ -272,8 +272,6 @@ internal static class D3D11Interop
 
     internal static unsafe OperationResult<ID3DBlob> TryCompileShader(string source, string entryPoint, string target)
     {
-        OperationResultCreator<ID3DBlob> result = new();
-
         byte[] sourceBytes = Encoding.UTF8.GetBytes(source);
 
         HRESULT compiled = PInvoke.D3DCompile(
@@ -290,10 +288,10 @@ internal static class D3D11Interop
 
         if (compiled.Value < 0 || code is null)
         {
-            return result.Failure(ReadBlobText(errors) ?? $"Shader compilation failed: {compiled}");
+            return OperationResult<ID3DBlob>.Failure(ReadBlobText(errors) ?? $"Shader compilation failed: {compiled}");
         }
 
-        return result.Success(code);
+        return OperationResult<ID3DBlob>.Success(code);
     }
 
     internal static unsafe ID3D11VertexShader CreateVertexShader(ID3D11Device device, ID3DBlob bytecode)

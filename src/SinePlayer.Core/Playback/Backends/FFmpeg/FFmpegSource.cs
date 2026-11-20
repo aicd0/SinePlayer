@@ -113,39 +113,37 @@ internal sealed partial class FFmpegSource : IMediaSource
 
     public static OperationResult<FFmpegSource> TryOpen(MediaLocator locator)
     {
-        OperationResultCreator<FFmpegSource> result = new();
-
         try
         {
             FFmpegRuntime.EnsureInitialized();
         }
         catch (Exception exception)
         {
-            return result.Failure(exception);
+            return OperationResult<FFmpegSource>.Failure(exception);
         }
 
         int opened = FFmpegNative.avformat_open_input(out nint context, locator.Value, 0, 0);
         if (opened < 0)
         {
-            return result.Failure($"Unable to open '{locator.Value}': {FFmpegInterop.GetErrorMessage(opened)}");
+            return OperationResult<FFmpegSource>.Failure($"Unable to open '{locator.Value}': {FFmpegInterop.GetErrorMessage(opened)}");
         }
 
         int stacked = FFmpegNative.avformat_find_stream_info(context, 0);
         if (stacked < 0)
         {
             FFmpegNative.avformat_close_input(ref context);
-            return result.Failure($"Unable to read stream information from '{locator.Value}': {FFmpegInterop.GetErrorMessage(stacked)}");
+            return OperationResult<FFmpegSource>.Failure($"Unable to read stream information from '{locator.Value}': {FFmpegInterop.GetErrorMessage(stacked)}");
         }
 
         nint readPacket = FFmpegNative.av_packet_alloc();
         if (readPacket == 0)
         {
             FFmpegNative.avformat_close_input(ref context);
-            return result.Failure("Unable to allocate an FFmpeg packet.");
+            return OperationResult<FFmpegSource>.Failure("Unable to allocate an FFmpeg packet.");
         }
 
         MediaInfo info = CreateInfo(context, out AVRational[] timeBases);
-        return result.Success(new FFmpegSource(context, readPacket, info, timeBases));
+        return OperationResult<FFmpegSource>.Success(new FFmpegSource(context, readPacket, info, timeBases));
     }
 
     public bool TryChooseSeekStream(IReadOnlyList<int> streamIndexes, TimeSpan position, SeekMode mode, out int streamIndex)
