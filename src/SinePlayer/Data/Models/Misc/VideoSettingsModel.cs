@@ -23,6 +23,9 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
     public bool FlipHorizontal { get; set; }
     public bool FlipVertical { get; set; }
     public double Zoom { get; set; } = 1.0;
+    public double HorizontalStretch { get; set; }
+    public double VerticalStretch { get; set; }
+    public double AspectRatio { get; set; }
     public double PanX { get; set; }
     public double PanY { get; set; }
 
@@ -30,6 +33,9 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
     {
         int quarterTurns = (int)Math.Round(RotationDegrees / 90.0);
         double zoom = double.IsFinite(Zoom) && Zoom > 0.0 ? Zoom : 1.0;
+        double offsetX = double.IsFinite(HorizontalStretch) ? HorizontalStretch : 0.0;
+        double offsetY = double.IsFinite(VerticalStretch) ? VerticalStretch : 0.0;
+        double aspectRatio = double.IsFinite(AspectRatio) && AspectRatio > 0.0 ? AspectRatio : 0.0;
         double panX = double.IsFinite(PanX) ? PanX : 0.0;
         double panY = double.IsFinite(PanY) ? PanY : 0.0;
 
@@ -38,9 +44,12 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
             Orientation = VideoOrientation.FromDegrees(quarterTurns * 90, FlipHorizontal, FlipVertical),
             ResizeMode = ResizeMode,
             Zoom = zoom,
+            HorizontalStretch = offsetX,
+            VerticalStretch = offsetY,
             PanX = panX,
             PanY = panY,
             Scaling = ScalingMode,
+            TargetAspectRatio = aspectRatio,
         };
     }
 
@@ -72,8 +81,15 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
         FlipHorizontal = model.FlipHorizontal ?? FlipHorizontal;
         FlipVertical = model.FlipVertical ?? FlipVertical;
         Zoom = model.Zoom ?? Zoom;
+        HorizontalStretch = model.HorizontalStretch ?? HorizontalStretch;
+        VerticalStretch = model.VerticalStretch ?? VerticalStretch;
         PanX = model.PanX ?? PanX;
         PanY = model.PanY ?? PanY;
+
+        if (model.AspectRatio is { } aspectRatio && double.IsFinite(aspectRatio))
+        {
+            AspectRatio = aspectRatio > 0.0 ? aspectRatio : 0.0;
+        }
     }
 
     protected override JsonModel ToJsonModel()
@@ -91,6 +107,9 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
             FlipHorizontal = FlipHorizontal,
             FlipVertical = FlipVertical,
             Zoom = Zoom,
+            HorizontalStretch = HorizontalStretch,
+            VerticalStretch = VerticalStretch,
+            AspectRatio = AspectRatio,
             PanX = PanX,
             PanY = PanY,
         };
@@ -155,6 +174,15 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
 
         [JsonPropertyName("Zoom")]
         public double? Zoom { get; set; }
+
+        [JsonPropertyName("HorizontalStretch")]
+        public double? HorizontalStretch { get; set; }
+
+        [JsonPropertyName("VerticalStretch")]
+        public double? VerticalStretch { get; set; }
+
+        [JsonPropertyName("AspectRatio")]
+        public double? AspectRatio { get; set; }
 
         [JsonPropertyName("PanX")]
         public double? PanX { get; set; }

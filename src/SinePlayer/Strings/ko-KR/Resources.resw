@@ -696,6 +696,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="Horizontal" xml:space="preserve">
     <value>수평의</value>
   </data>
+  <data name="HorizontalStretch" xml:space="preserve">
+    <value>수평 방향 늘이기</value>
+  </data>
   <data name="Image" xml:space="preserve">
     <value>이미지</value>
   </data>
@@ -1382,6 +1385,9 @@ $info</value>
   </data>
   <data name="Vertical" xml:space="preserve">
     <value>수직의</value>
+  </data>
+  <data name="VerticalStretch" xml:space="preserve">
+    <value>수직 방향 늘이기</value>
   </data>
   <data name="Video" xml:space="preserve">
     <value>비디오</value>

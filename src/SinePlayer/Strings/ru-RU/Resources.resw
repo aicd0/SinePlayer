@@ -696,6 +696,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="Horizontal" xml:space="preserve">
     <value>Горизонтальный</value>
   </data>
+  <data name="HorizontalStretch" xml:space="preserve">
+    <value>Растяжение по горизонтали</value>
+  </data>
   <data name="Image" xml:space="preserve">
     <value>Изображение</value>
   </data>
@@ -1382,6 +1385,9 @@ $info</value>
   </data>
   <data name="Vertical" xml:space="preserve">
     <value>Вертикальный</value>
+  </data>
+  <data name="VerticalStretch" xml:space="preserve">
+    <value>Растяжение по вертикали</value>
   </data>
   <data name="Video" xml:space="preserve">
     <value>Видео</value>

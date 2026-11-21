@@ -179,6 +179,7 @@ public class StringResourceProvider
     public string HideCursorAutomatically => GetResourceString("HideCursorAutomatically");
     public string History => GetResourceString("History");
     public string Horizontal => GetResourceString("Horizontal");
+    public string HorizontalStretch => GetResourceString("HorizontalStretch");
     public string Image => GetResourceString("Image");
     public string ImageBrightness => GetResourceString("ImageBrightness");
     public string ImageContrast => GetResourceString("ImageContrast");
@@ -382,6 +383,7 @@ public class StringResourceProvider
     public string UseFolderNameAsTitle => GetResourceString("UseFolderNameAsTitle");
     public string UseSystemLanguage => GetResourceString("UseSystemLanguage");
     public string Vertical => GetResourceString("Vertical");
+    public string VerticalStretch => GetResourceString("VerticalStretch");
     public string Video => GetResourceString("Video");
     public string VideoDecodeTime => GetResourceString("VideoDecodeTime");
     public string VideoRenderTime => GetResourceString("VideoRenderTime");

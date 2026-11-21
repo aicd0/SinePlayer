@@ -23,6 +23,21 @@ namespace SinePlayer.Helpers.MenuFlyoutHelpers;
 
 internal static class PlayerMenuCreator
 {
+    private static readonly (string Key, double Value)[] AspectRatioOptions =
+    [
+        ("2.39:1", 2.39),
+        ("2.35:1", 2.35),
+        ("2:1", 2.0),
+        ("1.85:1", 1.85),
+        ("16:9", 16.0 / 9.0),
+        ("16:10", 1.6),
+        ("3:2", 1.5),
+        ("4:3", 4.0 / 3.0),
+        ("1:1", 1.0),
+        ("4:5", 0.8),
+        ("9:16", 9.0 / 16.0),
+    ];
+
     public static async Task<List<BaseMenuFlyoutItemModel>> CreateVideoHostMenuItems(PlayerMenuContext context)
     {
         List<BaseMenuFlyoutItemModel> mediaItems = await MediaMenuCreator.CreateMediaMenuItems(
@@ -68,6 +83,41 @@ internal static class PlayerMenuCreator
         ];
     }
 
+    public static List<BaseMenuFlyoutItemModel> CreateStretchModeItems(VideoSettingsModel settings, Action<Action<VideoSettingsModel>> applyChange)
+    {
+        void Select(VideoResizeMode resizeMode, double aspectRatio)
+        {
+            if (settings.ResizeMode == resizeMode && Math.Abs(settings.AspectRatio - aspectRatio) < 0.001)
+            {
+                return;
+            }
+
+            applyChange(target =>
+            {
+                target.ResizeMode = resizeMode;
+                target.AspectRatio = aspectRatio;
+            });
+        }
+
+        return
+        [
+            CreateStretchModeSubItem(StringResourceProvider.Instance.Fit, VideoResizeMode.Fit, settings, Select),
+            CreateStretchModeSubItem(StringResourceProvider.Instance.Fill, VideoResizeMode.Fill, settings, Select),
+            new ToggleMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Stretch,
+                IsChecked = settings.ResizeMode == VideoResizeMode.Stretch,
+                Click = () => Select(VideoResizeMode.Stretch, 0.0),
+            },
+            new ToggleMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.OriginalSize,
+                IsChecked = settings.ResizeMode == VideoResizeMode.OriginalSize,
+                Click = () => Select(VideoResizeMode.OriginalSize, 0.0),
+            },
+        ];
+    }
+
     public static List<BaseMenuFlyoutItemModel> CreateChoiceItems(IReadOnlyList<PlaybackComponentOption> options, string? selectedKey, Action<string> select)
     {
         List<BaseMenuFlyoutItemModel> items = [];
@@ -100,15 +150,18 @@ internal static class PlayerMenuCreator
         return unavailable;
     }
 
-    public static List<PlaybackComponentOption> GetStretchModeOptions()
+    public static string GetStretchModeLabel(VideoResizeMode resizeMode, double aspectRatio)
     {
-        return
-        [
-            new(nameof(VideoResizeMode.Fit), StringResourceProvider.Instance.Fit),
-            new(nameof(VideoResizeMode.Stretch), StringResourceProvider.Instance.Stretch),
-            new(nameof(VideoResizeMode.Fill), StringResourceProvider.Instance.Fill),
-            new(nameof(VideoResizeMode.OriginalSize), StringResourceProvider.Instance.OriginalSize),
-        ];
+        string label = resizeMode switch
+        {
+            VideoResizeMode.Fill => StringResourceProvider.Instance.Fill,
+            VideoResizeMode.Stretch => StringResourceProvider.Instance.Stretch,
+            VideoResizeMode.OriginalSize => StringResourceProvider.Instance.OriginalSize,
+            _ => StringResourceProvider.Instance.Fit,
+        };
+
+        string? aspectRatioKey = GetAspectRatioKey(aspectRatio);
+        return aspectRatioKey is null ? label : $"{label} ({aspectRatioKey})";
     }
 
     public static List<PlaybackComponentOption> GetScalingModeOptions()
@@ -141,9 +194,6 @@ internal static class PlayerMenuCreator
 
         List<PlaybackComponentOption> rendererOptions = [.. PlaybackComponents.GetVideoRendererOptions()];
         PlaybackComponentOption renderer = EnsureChoice(rendererOptions, settings.Video.Renderer);
-
-        List<PlaybackComponentOption> stretchModeOptions = GetStretchModeOptions();
-        PlaybackComponentOption stretchMode = EnsureChoice(stretchModeOptions, settings.Video.ResizeMode.ToString());
 
         List<PlaybackComponentOption> rotationOptions = GetRotationOptions();
         PlaybackComponentOption rotation = EnsureChoice(rotationOptions, settings.Video.RotationDegrees.ToString(CultureInfo.InvariantCulture));
@@ -197,14 +247,7 @@ internal static class PlayerMenuCreator
             new SubItemMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.Scaling,
-                Items = CreateChoiceItems(stretchModeOptions, stretchMode.Key, key =>
-                {
-                    VideoResizeMode mode = Enum.Parse<VideoResizeMode>(key);
-                    if (settings.Video.ResizeMode != mode)
-                    {
-                        applyChange(target => target.ResizeMode = mode);
-                    }
-                }),
+                Items = CreateStretchModeItems(settings.Video, applyChange),
             },
             new SubItemMenuFlyoutItemModel()
             {
@@ -497,6 +540,49 @@ internal static class PlayerMenuCreator
         });
 
         return items;
+    }
+
+    private static SubItemMenuFlyoutItemModel CreateStretchModeSubItem(string text, VideoResizeMode resizeMode, VideoSettingsModel settings, Action<VideoResizeMode, double> select)
+    {
+        List<BaseMenuFlyoutItemModel> items =
+        [
+            new ToggleMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Default,
+                IsChecked = settings.ResizeMode == resizeMode && settings.AspectRatio == 0.0,
+                Click = () => select(resizeMode, 0.0),
+            },
+        ];
+
+        foreach ((string key, double value) in AspectRatioOptions)
+        {
+            double aspectRatio = value;
+            items.Add(new ToggleMenuFlyoutItemModel()
+            {
+                Text = key,
+                IsChecked = settings.ResizeMode == resizeMode && Math.Abs(settings.AspectRatio - aspectRatio) < 0.001,
+                Click = () => select(resizeMode, aspectRatio),
+            });
+        }
+
+        return new SubItemMenuFlyoutItemModel()
+        {
+            Text = text,
+            Items = items,
+        };
+    }
+
+    private static string? GetAspectRatioKey(double aspectRatio)
+    {
+        foreach ((string key, double value) in AspectRatioOptions)
+        {
+            if (Math.Abs(value - aspectRatio) < 0.001)
+            {
+                return key;
+            }
+        }
+
+        return null;
     }
 
     private static void OpenInNewWindow(PlayerMenuContext context)

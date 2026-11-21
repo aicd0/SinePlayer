@@ -694,6 +694,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="Horizontal" xml:space="preserve">
     <value>橫向</value>
   </data>
+  <data name="HorizontalStretch" xml:space="preserve">
+    <value>橫向延展</value>
+  </data>
   <data name="Image" xml:space="preserve">
     <value>圖像</value>
   </data>
@@ -1380,6 +1383,9 @@ $info</value>
   </data>
   <data name="Vertical" xml:space="preserve">
     <value>縱向</value>
+  </data>
+  <data name="VerticalStretch" xml:space="preserve">
+    <value>縱向延展</value>
   </data>
   <data name="Video" xml:space="preserve">
     <value>影片</value>
