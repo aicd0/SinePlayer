@@ -64,6 +64,12 @@ internal sealed partial class NumberBoxSettingView : BaseUserControl
         set => Entry.RestoreValue = value;
     }
 
+    public double ResetValue
+    {
+        get => Entry.ResetValue;
+        set => Entry.ResetValue = value;
+    }
+
     public double Maximum
     {
         get => MainNumberBox.Maximum;

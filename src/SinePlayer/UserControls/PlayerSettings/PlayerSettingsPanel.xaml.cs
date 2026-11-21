@@ -63,6 +63,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private MediaModel? _media;
     private PlayerSession? _session;
     private readonly PlayerSettingsModel _mediaSettings = new();
+    private readonly PlayerSettingsModel _defaultSettings = new();
     private PlayerSettingsModel? _presetSettings;
 
     public PlayerSettingsPanel()
@@ -988,6 +989,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateGeneralSpeed(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         GeneralSpeedNumberBox.RestoreValue = presetSettings.Player.Speed;
+        GeneralSpeedNumberBox.ResetValue = _defaultSettings.Player.Speed;
 
         double value = settings.Player.Speed;
         if (Math.Abs(GeneralSpeedNumberBox.Value - value) > 0.001)
@@ -1024,6 +1026,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoSync(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         VideoSyncNumberBox.RestoreValue = presetSettings.Video.Sync;
+        VideoSyncNumberBox.ResetValue = _defaultSettings.Video.Sync;
 
         double value = settings.Video.Sync;
         if (Math.Abs(VideoSyncNumberBox.Value - value) > 0.001)
@@ -1171,6 +1174,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoZoom(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         VideoZoomNumberBox.RestoreValue = presetSettings.Video.Zoom;
+        VideoZoomNumberBox.ResetValue = _defaultSettings.Video.Zoom;
 
         double value = settings.Video.Zoom;
         if (Math.Abs(VideoZoomNumberBox.Value - value) > 0.001)
@@ -1207,6 +1211,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoPanX(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         VideoPanXNumberBox.RestoreValue = presetSettings.Video.PanX;
+        VideoPanXNumberBox.ResetValue = _defaultSettings.Video.PanX;
 
         double value = settings.Video.PanX;
         if (Math.Abs(VideoPanXNumberBox.Value - value) > 0.001)
@@ -1243,6 +1248,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoPanY(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         VideoPanYNumberBox.RestoreValue = presetSettings.Video.PanY;
+        VideoPanYNumberBox.ResetValue = _defaultSettings.Video.PanY;
 
         double value = settings.Video.PanY;
         if (Math.Abs(VideoPanYNumberBox.Value - value) > 0.001)
@@ -1317,6 +1323,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateAudioSync(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         AudioSyncNumberBox.RestoreValue = presetSettings.Audio.Sync;
+        AudioSyncNumberBox.ResetValue = _defaultSettings.Audio.Sync;
 
         double value = settings.Audio.Sync;
         if (Math.Abs(AudioSyncNumberBox.Value - value) > 0.001)
@@ -1472,6 +1479,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
         Dictionary<string, int>? levels = FindLevels(settings, set, layout);
         Dictionary<string, int>? presetLevels = FindLevels(preset, set, layout);
+        Dictionary<string, int>? defaultLevels = FindLevels(_defaultSettings.Audio, set, layout);
         foreach (MixSliderEntry entry in _mixSliders)
         {
             int level = LevelOf(levels, presetLevels, entry.Group);
@@ -1479,6 +1487,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             // What the preset gives is what the slider compares against, so its own label says whether this media
             // differs from the preset — the same question the tab's mark asks.
             entry.Slider.RestoreValue = LevelOf(presetLevels, null, entry.Group);
+            entry.Slider.ResetValue = LevelOf(defaultLevels, null, entry.Group);
             entry.Level = level;
             if (Math.Abs(entry.Slider.Value - level) > 0.5)
             {
@@ -1487,6 +1496,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
 
         MixPanSlider.RestoreValue = preset.Pan;
+        MixPanSlider.ResetValue = _defaultSettings.Audio.Pan;
         if (Math.Abs(MixPanSlider.Value - settings.Pan) > 0.5)
         {
             MixPanSlider.Value = settings.Pan;
@@ -1542,6 +1552,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateSubtitleSync(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         SubtitleSyncNumberBox.RestoreValue = presetSettings.Subtitle.Sync;
+        SubtitleSyncNumberBox.ResetValue = _defaultSettings.Subtitle.Sync;
 
         double value = settings.Subtitle.Sync;
         if (Math.Abs(SubtitleSyncNumberBox.Value - value) > 0.001)
@@ -1606,6 +1617,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateSubtitleOrder(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         SubtitleOrderNumberBox.RestoreValue = presetSettings.Subtitle.Order;
+        SubtitleOrderNumberBox.ResetValue = _defaultSettings.Subtitle.Order;
 
         double value = settings.Subtitle.Order;
         if (Math.Abs(SubtitleOrderNumberBox.Value - value) > 0.5)
@@ -1642,6 +1654,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateSubtitlePanX(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         SubtitlePanXNumberBox.RestoreValue = presetSettings.Subtitle.PanX;
+        SubtitlePanXNumberBox.ResetValue = _defaultSettings.Subtitle.PanX;
 
         double value = settings.Subtitle.PanX;
         if (Math.Abs(SubtitlePanXNumberBox.Value - value) > 0.5)
@@ -1678,6 +1691,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateSubtitlePanY(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         SubtitlePanYNumberBox.RestoreValue = presetSettings.Subtitle.PanY;
+        SubtitlePanYNumberBox.ResetValue = _defaultSettings.Subtitle.PanY;
 
         double value = settings.Subtitle.PanY;
         if (Math.Abs(SubtitlePanYNumberBox.Value - value) > 0.5)
@@ -2057,6 +2071,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateSubtitleOutlineWidth(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         SubtitleOutlineWidthNumberBox.RestoreValue = presetSettings.Subtitle.OutlineWidth;
+        SubtitleOutlineWidthNumberBox.ResetValue = _defaultSettings.Subtitle.OutlineWidth;
 
         double value = settings.Subtitle.OutlineWidth;
         if (Math.Abs(SubtitleOutlineWidthNumberBox.Value - value) > 0.001)
@@ -2118,6 +2133,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateSubtitleShadowDistance(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
         SubtitleShadowDistanceNumberBox.RestoreValue = presetSettings.Subtitle.ShadowDistance;
+        SubtitleShadowDistanceNumberBox.ResetValue = _defaultSettings.Subtitle.ShadowDistance;
 
         double value = settings.Subtitle.ShadowDistance;
         if (Math.Abs(SubtitleShadowDistanceNumberBox.Value - value) > 0.001)
@@ -2187,6 +2203,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateSubtitleOpacity(PlayerSettingsModel settings, PlayerSettingsModel preset)
     {
         SubtitleOpacitySlider.RestoreValue = preset.Subtitle.Opacity;
+        SubtitleOpacitySlider.ResetValue = _defaultSettings.Subtitle.Opacity;
 
         double value = settings.Subtitle.Opacity;
         if (Math.Abs(SubtitleOpacitySlider.Value - value) > 0.5)

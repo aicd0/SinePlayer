@@ -11,10 +11,6 @@ using SinePlayer.Common.BaseUI;
 
 namespace SinePlayer.UserControls.PlayerSettings;
 
-/// <summary>
-/// The row every player setting entry shares: a label that expands the entry into two rows, the editor put in it,
-/// the default the editor restores to, and the marker showing that the value is not that default.
-/// </summary>
 internal sealed partial class SettingEntryView : BaseUserControl
 {
     public event EventHandler? ValueChanged;
@@ -85,7 +81,7 @@ internal sealed partial class SettingEntryView : BaseUserControl
     {
         var control = (SettingEntryView)d;
         control.UpdateLabelText();
-        control.UpdateRestoreButtonVisibility();
+        control.UpdateLinkVisibility();
         control.ValueChanged?.Invoke(control, EventArgs.Empty);
     }
 
@@ -105,7 +101,25 @@ internal sealed partial class SettingEntryView : BaseUserControl
     {
         var control = (SettingEntryView)d;
         control.UpdateLabelText();
-        control.UpdateRestoreButtonVisibility();
+        control.UpdateLinkVisibility();
+    }
+
+    public double ResetValue
+    {
+        get => (double)GetValue(ResetValueProperty);
+        set => SetValue(ResetValueProperty, value);
+    }
+
+    public static readonly DependencyProperty ResetValueProperty = DependencyProperty.Register(
+        nameof(ResetValue),
+        typeof(double),
+        typeof(SettingEntryView),
+        new PropertyMetadata(0.0, OnResetValueChanged));
+
+    private static void OnResetValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var control = (SettingEntryView)d;
+        control.UpdateLinkVisibility();
     }
 
     public double RowHeight
@@ -181,6 +195,11 @@ internal sealed partial class SettingEntryView : BaseUserControl
         Value = RestoreValue;
     }
 
+    private void ResetButton_Click(object sender, RoutedEventArgs e)
+    {
+        Value = ResetValue;
+    }
+
     //
     // UI
     //
@@ -197,13 +216,14 @@ internal sealed partial class SettingEntryView : BaseUserControl
         Grid.SetRow(EditorHost, _isExpanded ? 1 : 0);
         Grid.SetColumn(EditorHost, _isExpanded ? 0 : 3);
         Grid.SetColumnSpan(EditorHost, _isExpanded ? 4 : 1);
-        UpdateRestoreButtonVisibility();
+        UpdateLinkVisibility();
     }
 
-    private void UpdateRestoreButtonVisibility()
+    private void UpdateLinkVisibility()
     {
-        bool visible = _isExpanded && Value != RestoreValue;
-        RestoreButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        bool visible = _isExpanded;
+        RestoreButton.Visibility = visible && Value != RestoreValue ? Visibility.Visible : Visibility.Collapsed;
+        ResetButton.Visibility = visible && Value != ResetValue ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void UpdateLabelText()
