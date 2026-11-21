@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System;
 using System.Collections.Generic;
 
 using Microsoft.UI.Xaml;
@@ -102,5 +103,58 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         {
             AppSettingsModel.KeepScreenOnBehavior = behavior;
         }
+    }
+
+    private void SeekForwardNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.SeekForwardSeconds);
+        if (AppSettingsModel.SeekForwardSeconds != value)
+        {
+            AppSettingsModel.SeekForwardSeconds = value;
+        }
+    }
+
+    private void SeekBackwardNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.SeekBackwardSeconds);
+        if (AppSettingsModel.SeekBackwardSeconds != value)
+        {
+            AppSettingsModel.SeekBackwardSeconds = value;
+        }
+    }
+
+    private void VolumeUpNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.VolumeUpPercent);
+        if (AppSettingsModel.VolumeUpPercent != value)
+        {
+            AppSettingsModel.VolumeUpPercent = value;
+        }
+    }
+
+    private void VolumeDownNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.VolumeDownPercent);
+        if (AppSettingsModel.VolumeDownPercent != value)
+        {
+            AppSettingsModel.VolumeDownPercent = value;
+        }
+    }
+
+    private static double ReadStep(NumberBox box, double fallback)
+    {
+        if (double.IsNaN(box.Value))
+        {
+            box.Value = fallback;
+            return fallback;
+        }
+
+        double value = Math.Round(Math.Clamp(box.Value, box.Minimum, box.Maximum));
+        if (box.Value != value)
+        {
+            box.Value = value;
+        }
+
+        return value;
     }
 }

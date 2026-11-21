@@ -1006,6 +1006,12 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="PlaybackInformation" xml:space="preserve">
     <value>Wiedergabeinformationen</value>
   </data>
+  <data name="PlaybackPaused" xml:space="preserve">
+    <value>Wiedergabe pausiert</value>
+  </data>
+  <data name="PlaybackResumed" xml:space="preserve">
+    <value>Wiedergabe fortgesetzt</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Allgemeine Player-Einstellungen</value>
   </data>

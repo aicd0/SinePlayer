@@ -181,6 +181,58 @@ internal static class AppSettingsModel
         }
     }
 
+    public static double SeekForwardSeconds
+    {
+        get
+        {
+            return _db.Read(model => model.SeekForwardSeconds ?? 5.0);
+        }
+        set
+        {
+            _db.Write(model => model.SeekForwardSeconds = value);
+            _db.Save();
+        }
+    }
+
+    public static double SeekBackwardSeconds
+    {
+        get
+        {
+            return _db.Read(model => model.SeekBackwardSeconds ?? 5.0);
+        }
+        set
+        {
+            _db.Write(model => model.SeekBackwardSeconds = value);
+            _db.Save();
+        }
+    }
+
+    public static double VolumeUpPercent
+    {
+        get
+        {
+            return _db.Read(model => model.VolumeUpPercent ?? 5.0);
+        }
+        set
+        {
+            _db.Write(model => model.VolumeUpPercent = value);
+            _db.Save();
+        }
+    }
+
+    public static double VolumeDownPercent
+    {
+        get
+        {
+            return _db.Read(model => model.VolumeDownPercent ?? 5.0);
+        }
+        set
+        {
+            _db.Write(model => model.VolumeDownPercent = value);
+            _db.Save();
+        }
+    }
+
     public static CloseLastTabBehaviorEnum CloseLastTabBehavior
     {
         get
@@ -1041,6 +1093,18 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("PreciseSeeking")]
         public bool? PreciseSeeking { get; set; }
+
+        [JsonPropertyName("SeekForwardSeconds")]
+        public double? SeekForwardSeconds { get; set; }
+
+        [JsonPropertyName("SeekBackwardSeconds")]
+        public double? SeekBackwardSeconds { get; set; }
+
+        [JsonPropertyName("VolumeUpPercent")]
+        public double? VolumeUpPercent { get; set; }
+
+        [JsonPropertyName("VolumeDownPercent")]
+        public double? VolumeDownPercent { get; set; }
 
         [JsonPropertyName("PromptBeforeRemovingMedia")]
         public bool? PromptBeforeRemovingMedia { get; set; }

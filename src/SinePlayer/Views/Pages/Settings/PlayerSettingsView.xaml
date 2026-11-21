@@ -70,6 +70,126 @@
                 SelectedIndex="{x:Bind ViewModel.KeepScreenOnBehaviorIndex, Mode=TwoWay}"
                 SelectionChanged="KeepScreenOnBehaviorComboBox_SelectionChanged" />
         </Grid>
+
+        <Rectangle
+            Height="1"
+            Margin="0,16"
+            Fill="{ThemeResource AppSeperator1}" />
+
+        <Grid RowSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                Grid.Row="0"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.SeekForward}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="0"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="SeekForwardNumberBox"
+                    MinWidth="120"
+                    LargeChange="10"
+                    Maximum="600"
+                    Minimum="1"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="SeekForwardNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.SeekForwardSeconds, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="s" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="1"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.SeekBackward}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="1"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="SeekBackwardNumberBox"
+                    MinWidth="120"
+                    LargeChange="10"
+                    Maximum="600"
+                    Minimum="1"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="SeekBackwardNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.SeekBackwardSeconds, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="s" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="2"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.VolumeUp}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="2"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="VolumeUpNumberBox"
+                    MinWidth="120"
+                    LargeChange="5"
+                    Maximum="50"
+                    Minimum="1"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="VolumeUpNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.VolumeUpPercent, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="%" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="3"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.VolumeDown}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="3"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="VolumeDownNumberBox"
+                    MinWidth="120"
+                    LargeChange="5"
+                    Maximum="50"
+                    Minimum="1"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="VolumeDownNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.VolumeDownPercent, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="%" />
+            </StackPanel>
+        </Grid>
     </StackPanel>
 
 </base:BaseUserControl>

@@ -124,6 +124,50 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private double _seekForwardSeconds = AppSettingsModel.SeekForwardSeconds;
+    public double SeekForwardSeconds
+    {
+        get => _seekForwardSeconds;
+        set
+        {
+            _seekForwardSeconds = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SeekForwardSeconds)));
+        }
+    }
+
+    private double _seekBackwardSeconds = AppSettingsModel.SeekBackwardSeconds;
+    public double SeekBackwardSeconds
+    {
+        get => _seekBackwardSeconds;
+        set
+        {
+            _seekBackwardSeconds = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SeekBackwardSeconds)));
+        }
+    }
+
+    private double _volumeUpPercent = AppSettingsModel.VolumeUpPercent;
+    public double VolumeUpPercent
+    {
+        get => _volumeUpPercent;
+        set
+        {
+            _volumeUpPercent = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VolumeUpPercent)));
+        }
+    }
+
+    private double _volumeDownPercent = AppSettingsModel.VolumeDownPercent;
+    public double VolumeDownPercent
+    {
+        get => _volumeDownPercent;
+        set
+        {
+            _volumeDownPercent = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VolumeDownPercent)));
+        }
+    }
+
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
@@ -147,6 +191,10 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             AutoPlayOnOpenExceptAppLaunch = AppSettingsModel.AutoPlayOnOpenExceptAppLaunch;
             PauseOnLeaveTab = AppSettingsModel.PauseOnLeaveTab;
             PreciseSeeking = AppSettingsModel.PreciseSeeking;
+            SeekForwardSeconds = AppSettingsModel.SeekForwardSeconds;
+            SeekBackwardSeconds = AppSettingsModel.SeekBackwardSeconds;
+            VolumeUpPercent = AppSettingsModel.VolumeUpPercent;
+            VolumeDownPercent = AppSettingsModel.VolumeDownPercent;
         });
     }
 

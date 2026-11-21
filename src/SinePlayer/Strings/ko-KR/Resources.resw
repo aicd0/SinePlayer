@@ -1006,6 +1006,12 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="PlaybackInformation" xml:space="preserve">
     <value>재생 정보</value>
   </data>
+  <data name="PlaybackPaused" xml:space="preserve">
+    <value>재생 일시 정지됨</value>
+  </data>
+  <data name="PlaybackResumed" xml:space="preserve">
+    <value>재생 다시 시작됨</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>플레이어 전역 설정</value>
   </data>

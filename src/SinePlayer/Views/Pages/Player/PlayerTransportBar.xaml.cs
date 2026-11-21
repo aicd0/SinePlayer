@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml.Input;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.HotKey;
+using SinePlayer.Common.Utils;
 using SinePlayer.Data.Models.Playback;
 
 namespace SinePlayer.Views.Pages.Player;
@@ -310,17 +311,6 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
 
     private void UpdatePositionText(long positionMs)
     {
-        PositionTextBlock.Text = $"{FormatTime(positionMs)} / {FormatTime(_durationMs)}";
-    }
-
-    private static string FormatTime(long milliseconds)
-    {
-        if (milliseconds < 0)
-        {
-            milliseconds = 0;
-        }
-
-        var time = TimeSpan.FromMilliseconds(milliseconds);
-        return time.TotalHours >= 1.0 ? time.ToString(@"h\:mm\:ss") : time.ToString(@"m\:ss");
+        PositionTextBlock.Text = $"{StringUtils.FormatTime(positionMs)} / {StringUtils.FormatTime(_durationMs)}";
     }
 }
