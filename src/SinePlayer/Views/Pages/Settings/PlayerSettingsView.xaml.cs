@@ -159,6 +159,15 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
+    private void FastForwardNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.FastForwardSpeed, decimals: 2);
+        if (AppSettingsModel.FastForwardSpeed != value)
+        {
+            AppSettingsModel.FastForwardSpeed = value;
+        }
+    }
+
     private static double ReadStep(NumberBox box, double fallback, int decimals = 0)
     {
         if (double.IsNaN(box.Value))

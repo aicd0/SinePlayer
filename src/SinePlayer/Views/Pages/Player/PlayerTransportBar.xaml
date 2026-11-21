@@ -112,6 +112,15 @@
                                 Glyph="&#xE8B1;" />
                         </ToggleButton.Content>
                     </ToggleButton>
+                    <Button
+                        x:Name="MoreButton"
+                        Click="OnMoreClick"
+                        Style="{StaticResource PlaybackControlButtonStyle}"
+                        ToolTipService.ToolTip="{x:Bind StringResource.More}">
+                        <Button.Content>
+                            <FontIcon FontSize="14" Glyph="&#xE712;" />
+                        </Button.Content>
+                    </Button>
                 </StackPanel>
                 <StackPanel
                     HorizontalAlignment="Right"

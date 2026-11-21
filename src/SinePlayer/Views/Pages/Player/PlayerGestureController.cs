@@ -23,7 +23,6 @@ internal sealed class PlayerGestureController
     private const double BrightnessSensitivity = 2.0;
     private const double SeekMillisecondsPerDip = 100.0;
     private const int LongPressMilliseconds = 300;
-    private const double SpeedMultiplier = 2.0;
     private const double MaximumPan = 2000.0;
 
     // Long enough for the second tap of a double tap to take over, short enough not to feel late on its own.
@@ -139,10 +138,7 @@ internal sealed class PlayerGestureController
         _appliedVolume = context.Volume;
         _appliedBrightness = context.Brightness;
 
-        if (point.PointerDeviceType == PointerDeviceType.Mouse)
-        {
-            StartLongPress();
-        }
+        StartLongPress();
     }
 
     public void Move(IList<PointerPoint> points)
@@ -541,15 +537,21 @@ internal sealed class PlayerGestureController
             return;
         }
 
+        double speed = AppSettingsModel.FastForwardSpeed;
+        if (!double.IsFinite(speed) || speed <= 0.0)
+        {
+            return;
+        }
+
         // Faster than the hold would make it: there is nothing to do, and a drag that follows still can be one.
-        if (_context.PlaybackRate > SpeedMultiplier)
+        if (_context.PlaybackRate > speed)
         {
             return;
         }
 
         _mode = Mode.Speed;
         EffectChanged?.Invoke(ToEffect(_mode));
-        SpeedRequested?.Invoke(SpeedMultiplier);
+        SpeedRequested?.Invoke(speed);
     }
 
     private void ApplyBrightness()

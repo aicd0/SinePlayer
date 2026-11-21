@@ -561,6 +561,9 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   <data name="ExpressionValid" xml:space="preserve">
     <value>SQL-Abfrage: $query</value>
   </data>
+  <data name="FastForward" xml:space="preserve">
+    <value>Vorspulgeschwindigkeit</value>
+  </data>
   <data name="Favorite" xml:space="preserve">
     <value>Favorit</value>
   </data>

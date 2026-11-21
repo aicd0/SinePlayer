@@ -559,6 +559,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="ExpressionValid" xml:space="preserve">
     <value>SQL查詢語句：$query</value>
   </data>
+  <data name="FastForward" xml:space="preserve">
+    <value>快進</value>
+  </data>
   <data name="Favorite" xml:space="preserve">
     <value>收藏</value>
   </data>

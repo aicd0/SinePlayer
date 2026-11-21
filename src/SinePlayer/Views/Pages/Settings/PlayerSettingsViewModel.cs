@@ -190,6 +190,17 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private double _fastForwardSpeed = AppSettingsModel.FastForwardSpeed;
+    public double FastForwardSpeed
+    {
+        get => _fastForwardSpeed;
+        set
+        {
+            _fastForwardSpeed = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FastForwardSpeed)));
+        }
+    }
+
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
@@ -219,6 +230,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             VolumeDownPercent = AppSettingsModel.VolumeDownPercent;
             ZoomInStep = AppSettingsModel.ZoomInStep;
             ZoomOutStep = AppSettingsModel.ZoomOutStep;
+            FastForwardSpeed = AppSettingsModel.FastForwardSpeed;
         });
     }
 

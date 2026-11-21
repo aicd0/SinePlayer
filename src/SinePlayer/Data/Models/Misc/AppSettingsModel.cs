@@ -259,6 +259,19 @@ internal static class AppSettingsModel
         }
     }
 
+    public static double FastForwardSpeed
+    {
+        get
+        {
+            return _db.Read(model => model.FastForwardSpeed ?? 2.0);
+        }
+        set
+        {
+            _db.Write(model => model.FastForwardSpeed = value);
+            _db.Save();
+        }
+    }
+
     public static CloseLastTabBehaviorEnum CloseLastTabBehavior
     {
         get
@@ -1137,6 +1150,9 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("ZoomOutStep")]
         public double? ZoomOutStep { get; set; }
+
+        [JsonPropertyName("FastForwardSpeed")]
+        public double? FastForwardSpeed { get; set; }
 
         [JsonPropertyName("PromptBeforeRemovingMedia")]
         public bool? PromptBeforeRemovingMedia { get; set; }
