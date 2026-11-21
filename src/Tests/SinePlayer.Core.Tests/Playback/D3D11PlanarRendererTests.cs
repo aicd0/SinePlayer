@@ -638,7 +638,7 @@ public class D3D11PlanarRendererTests
             {
                 using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
                 _renderer.SetOutput(target.View, width, height);
-                OperationResult rendered = _renderer.Render(frame, new VideoTransform(VideoOrientation.Identity, VideoResizeMode.Stretch, 1.0, 0.0, 0.0));
+                OperationResult rendered = _renderer.Render(frame, new VideoTransform { Orientation = VideoOrientation.Identity, ResizeMode = VideoResizeMode.Stretch });
                 Assert.That(rendered.IsSuccessful, Is.True, rendered.Message);
 
                 byte[] pixels = target.ReadPixels(_device);

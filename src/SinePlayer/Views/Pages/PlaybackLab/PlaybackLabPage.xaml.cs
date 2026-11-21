@@ -643,12 +643,14 @@ internal sealed partial class PlaybackLabPage : BasePage
 
         VideoResizeMode resizeMode = FittingPicker.SelectedItem is VideoResizeMode mode ? mode : VideoResizeMode.Fit;
 
-        return new VideoTransform(
-            orientation,
-            resizeMode,
-            ZoomSlider.Value / 100.0,
-            PanXSlider.Value / 100.0,
-            PanYSlider.Value / 100.0);
+        return new VideoTransform
+        {
+            Orientation = orientation,
+            ResizeMode = resizeMode,
+            Zoom = ZoomSlider.Value / 100.0,
+            PanX = PanXSlider.Value,
+            PanY = PanYSlider.Value,
+        };
     }
 
     private void ApplyTransform()

@@ -72,15 +72,25 @@ public enum VideoScalingMode
 
 internal readonly record struct PlacedPicture(double Width, double Height, double CenterX, double CenterY);
 
-public readonly record struct VideoTransform(
-    VideoOrientation Orientation,
-    VideoResizeMode ResizeMode,
-    double Zoom,
-    double PanX,
-    double PanY,
-    VideoScalingMode Scaling = VideoScalingMode.Bilinear)
+public readonly record struct VideoTransform
 {
-    public static VideoTransform Identity => new(VideoOrientation.Identity, VideoResizeMode.Fit, 1.0, 0.0, 0.0);
+    public static VideoTransform Identity => new();
+
+    public VideoTransform()
+    {
+    }
+
+    public VideoOrientation Orientation { get; init; }
+
+    public VideoResizeMode ResizeMode { get; init; }
+
+    public double Zoom { get; init; } = 1.0;
+
+    public double PanX { get; init; }
+
+    public double PanY { get; init; }
+
+    public VideoScalingMode Scaling { get; init; } = VideoScalingMode.Bilinear;
 
     public bool IsIdentity => Orientation.IsIdentity && ResizeMode == VideoResizeMode.Fit && Zoom == 1.0 && PanX == 0.0 && PanY == 0.0;
 
@@ -147,8 +157,8 @@ public readonly record struct VideoTransform(
         double squareWidth = swapsAxes ? height : width;
         double squareHeight = swapsAxes ? width : height;
 
-        double centerX = surfaceWidth / 2.0 + PanX * surfaceWidth / 2.0;
-        double centerY = surfaceHeight / 2.0 + PanY * surfaceHeight / 2.0;
+        double centerX = surfaceWidth / 2.0 + PanX;
+        double centerY = surfaceHeight / 2.0 + PanY;
 
         return new PlacedPicture(squareWidth, squareHeight, centerX, centerY);
     }

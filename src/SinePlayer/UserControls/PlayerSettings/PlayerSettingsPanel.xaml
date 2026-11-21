@@ -106,30 +106,14 @@
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Playback}" SectionKey="Playback">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">
-                                <Grid Style="{StaticResource TallSettingRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Margin="0,0,0,2"
-                                        VerticalAlignment="Center"
-                                        Text="{x:Bind ViewModel.GeneralSpeedLabel, Mode=OneWay}" />
-                                    <NumberBox
-                                        x:Name="GeneralSpeedNumberBox"
-                                        Grid.Column="3"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        LargeChange="0.5"
-                                        Maximum="8"
-                                        Minimum="0.1"
-                                        SmallChange="0.1"
-                                        SpinButtonPlacementMode="Inline"
-                                        ValueChanged="GeneralSpeedNumberBox_ValueChanged" />
-                                </Grid>
+                                <settings:NumberBoxSettingView
+                                    x:Name="GeneralSpeedNumberBox"
+                                    Label="{x:Bind StringResource.Speed}"
+                                    LargeChange="0.5"
+                                    Maximum="8"
+                                    Minimum="0.1"
+                                    SmallChange="0.1"
+                                    ValueChanged="GeneralSpeedNumberBox_ValueChanged" />
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
@@ -139,30 +123,14 @@
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Playback}" SectionKey="Playback">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">
-                                <Grid Style="{StaticResource TallSettingRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Margin="0,0,0,2"
-                                        VerticalAlignment="Center"
-                                        Text="{x:Bind ViewModel.VideoSyncLabel, Mode=OneWay}" />
-                                    <NumberBox
-                                        x:Name="VideoSyncNumberBox"
-                                        Grid.Column="3"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        LargeChange="1"
-                                        Maximum="3600"
-                                        Minimum="-3600"
-                                        SmallChange="0.1"
-                                        SpinButtonPlacementMode="Inline"
-                                        ValueChanged="VideoSyncNumberBox_ValueChanged" />
-                                </Grid>
+                                <settings:NumberBoxSettingView
+                                    x:Name="VideoSyncNumberBox"
+                                    Label="{x:Bind StringResource.Sync}"
+                                    LargeChange="1"
+                                    Maximum="3600"
+                                    Minimum="-3600"
+                                    SmallChange="0.1"
+                                    ValueChanged="VideoSyncNumberBox_ValueChanged" />
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
@@ -285,6 +253,30 @@
                                         Grid.Column="3"
                                         HorizontalAlignment="Right" />
                                 </Grid>
+                                <settings:NumberBoxSettingView
+                                    x:Name="VideoZoomNumberBox"
+                                    Label="{x:Bind StringResource.Zoom}"
+                                    LargeChange="0.1"
+                                    Maximum="8"
+                                    Minimum="0.1"
+                                    SmallChange="0.01"
+                                    ValueChanged="VideoZoomNumberBox_ValueChanged" />
+                                <settings:NumberBoxSettingView
+                                    x:Name="VideoPanXNumberBox"
+                                    Label="{x:Bind StringResource.PanX}"
+                                    LargeChange="50"
+                                    Maximum="2000"
+                                    Minimum="-2000"
+                                    SmallChange="5"
+                                    ValueChanged="VideoPanXNumberBox_ValueChanged" />
+                                <settings:NumberBoxSettingView
+                                    x:Name="VideoPanYNumberBox"
+                                    Label="{x:Bind StringResource.PanY}"
+                                    LargeChange="50"
+                                    Maximum="2000"
+                                    Minimum="-2000"
+                                    SmallChange="5"
+                                    ValueChanged="VideoPanYNumberBox_ValueChanged" />
                                 <Rectangle
                                     Height="1"
                                     Margin="0,8"
@@ -362,30 +354,14 @@
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Playback}" SectionKey="Playback">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">
-                                <Grid Style="{StaticResource TallSettingRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Margin="0,0,0,2"
-                                        VerticalAlignment="Center"
-                                        Text="{x:Bind ViewModel.AudioSyncLabel, Mode=OneWay}" />
-                                    <NumberBox
-                                        x:Name="AudioSyncNumberBox"
-                                        Grid.Column="3"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        LargeChange="1"
-                                        Maximum="3600"
-                                        Minimum="-3600"
-                                        SmallChange="0.1"
-                                        SpinButtonPlacementMode="Inline"
-                                        ValueChanged="AudioSyncNumberBox_ValueChanged" />
-                                </Grid>
+                                <settings:NumberBoxSettingView
+                                    x:Name="AudioSyncNumberBox"
+                                    Label="{x:Bind StringResource.Sync}"
+                                    LargeChange="1"
+                                    Maximum="3600"
+                                    Minimum="-3600"
+                                    SmallChange="0.1"
+                                    ValueChanged="AudioSyncNumberBox_ValueChanged" />
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
@@ -496,30 +472,14 @@
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Playback}" SectionKey="Playback">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">
-                                <Grid Style="{StaticResource TallSettingRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Margin="0,0,0,2"
-                                        VerticalAlignment="Center"
-                                        Text="{x:Bind ViewModel.SubtitleSyncLabel, Mode=OneWay}" />
-                                    <NumberBox
-                                        x:Name="SubtitleSyncNumberBox"
-                                        Grid.Column="3"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        LargeChange="1"
-                                        Maximum="3600"
-                                        Minimum="-3600"
-                                        SmallChange="0.1"
-                                        SpinButtonPlacementMode="Inline"
-                                        ValueChanged="SubtitleSyncNumberBox_ValueChanged" />
-                                </Grid>
+                                <settings:NumberBoxSettingView
+                                    x:Name="SubtitleSyncNumberBox"
+                                    Label="{x:Bind StringResource.Sync}"
+                                    LargeChange="1"
+                                    Maximum="3600"
+                                    Minimum="-3600"
+                                    SmallChange="0.1"
+                                    ValueChanged="SubtitleSyncNumberBox_ValueChanged" />
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
@@ -560,30 +520,14 @@
                                         Grid.Column="3"
                                         HorizontalAlignment="Right" />
                                 </Grid>
-                                <Grid Style="{StaticResource TallSettingRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Margin="0,0,0,2"
-                                        VerticalAlignment="Center"
-                                        Text="{x:Bind ViewModel.SubtitleOrderLabel, Mode=OneWay}" />
-                                    <NumberBox
-                                        x:Name="SubtitleOrderNumberBox"
-                                        Grid.Column="3"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        LargeChange="10"
-                                        Maximum="100"
-                                        Minimum="-100"
-                                        SmallChange="1"
-                                        SpinButtonPlacementMode="Inline"
-                                        ValueChanged="SubtitleOrderNumberBox_ValueChanged" />
-                                </Grid>
+                                <settings:NumberBoxSettingView
+                                    x:Name="SubtitleOrderNumberBox"
+                                    Label="{x:Bind StringResource.Order}"
+                                    LargeChange="10"
+                                    Maximum="100"
+                                    Minimum="-100"
+                                    SmallChange="1"
+                                    ValueChanged="SubtitleOrderNumberBox_ValueChanged" />
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
@@ -720,30 +664,14 @@
                                         VerticalAlignment="Center"
                                         SelectionChanged="SubtitleTextAlignmentComboBox_SelectionChanged" />
                                 </Grid>
-                                <Grid Style="{StaticResource TallSettingRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Margin="0,0,0,2"
-                                        VerticalAlignment="Center"
-                                        Text="{x:Bind ViewModel.SubtitleOutlineWidthLabel, Mode=OneWay}" />
-                                    <NumberBox
-                                        x:Name="SubtitleOutlineWidthNumberBox"
-                                        Grid.Column="3"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        LargeChange="1"
-                                        Maximum="10"
-                                        Minimum="0"
-                                        SmallChange="0.1"
-                                        SpinButtonPlacementMode="Inline"
-                                        ValueChanged="SubtitleOutlineWidthNumberBox_ValueChanged" />
-                                </Grid>
+                                <settings:NumberBoxSettingView
+                                    x:Name="SubtitleOutlineWidthNumberBox"
+                                    Label="{x:Bind StringResource.OutlineWidth}"
+                                    LargeChange="1"
+                                    Maximum="10"
+                                    Minimum="0"
+                                    SmallChange="0.1"
+                                    ValueChanged="SubtitleOutlineWidthNumberBox_ValueChanged" />
                                 <Grid Style="{StaticResource TallSettingRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -777,30 +705,14 @@
                                         </Button.Flyout>
                                     </Button>
                                 </Grid>
-                                <Grid Style="{StaticResource TallSettingRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Margin="0,0,0,2"
-                                        VerticalAlignment="Center"
-                                        Text="{x:Bind ViewModel.SubtitleShadowDistanceLabel, Mode=OneWay}" />
-                                    <NumberBox
-                                        x:Name="SubtitleShadowDistanceNumberBox"
-                                        Grid.Column="3"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        LargeChange="0.1"
-                                        Maximum="1"
-                                        Minimum="0"
-                                        SmallChange="0.01"
-                                        SpinButtonPlacementMode="Inline"
-                                        ValueChanged="SubtitleShadowDistanceNumberBox_ValueChanged" />
-                                </Grid>
+                                <settings:NumberBoxSettingView
+                                    x:Name="SubtitleShadowDistanceNumberBox"
+                                    Label="{x:Bind StringResource.ShadowDistance}"
+                                    LargeChange="0.1"
+                                    Maximum="1"
+                                    Minimum="0"
+                                    SmallChange="0.01"
+                                    ValueChanged="SubtitleShadowDistanceNumberBox_ValueChanged" />
                                 <Grid Style="{StaticResource TallSettingRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -878,7 +790,7 @@
                                 </Grid>
                                 <settings:SliderSettingView
                                     x:Name="SubtitleOpacitySlider"
-                                    Label="{x:Bind ViewModel.SubtitleOpacityLabel, Mode=OneWay}"
+                                    Label="{x:Bind StringResource.Opacity}"
                                     Maximum="100"
                                     Minimum="0"
                                     StepFrequency="1"
@@ -889,54 +801,22 @@
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Transform}" SectionKey="Transform">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">
-                                <Grid Style="{StaticResource TallSettingRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Margin="0,0,0,2"
-                                        VerticalAlignment="Center"
-                                        Text="{x:Bind ViewModel.SubtitlePanXLabel, Mode=OneWay}" />
-                                    <NumberBox
-                                        x:Name="SubtitlePanXNumberBox"
-                                        Grid.Column="3"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        LargeChange="20"
-                                        Maximum="2000"
-                                        Minimum="-2000"
-                                        SmallChange="5"
-                                        SpinButtonPlacementMode="Inline"
-                                        ValueChanged="SubtitlePanXNumberBox_ValueChanged" />
-                                </Grid>
-                                <Grid Style="{StaticResource TallSettingRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Margin="0,0,0,2"
-                                        VerticalAlignment="Center"
-                                        Text="{x:Bind ViewModel.SubtitlePanYLabel, Mode=OneWay}" />
-                                    <NumberBox
-                                        x:Name="SubtitlePanYNumberBox"
-                                        Grid.Column="3"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        LargeChange="20"
-                                        Maximum="2000"
-                                        Minimum="-2000"
-                                        SmallChange="5"
-                                        SpinButtonPlacementMode="Inline"
-                                        ValueChanged="SubtitlePanYNumberBox_ValueChanged" />
-                                </Grid>
+                                <settings:NumberBoxSettingView
+                                    x:Name="SubtitlePanXNumberBox"
+                                    Label="{x:Bind StringResource.PanX}"
+                                    LargeChange="20"
+                                    Maximum="2000"
+                                    Minimum="-2000"
+                                    SmallChange="5"
+                                    ValueChanged="SubtitlePanXNumberBox_ValueChanged" />
+                                <settings:NumberBoxSettingView
+                                    x:Name="SubtitlePanYNumberBox"
+                                    Label="{x:Bind StringResource.PanY}"
+                                    LargeChange="20"
+                                    Maximum="2000"
+                                    Minimum="-2000"
+                                    SmallChange="5"
+                                    ValueChanged="SubtitlePanYNumberBox_ValueChanged" />
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
