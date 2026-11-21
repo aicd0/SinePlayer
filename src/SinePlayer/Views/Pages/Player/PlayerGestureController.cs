@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Input;
 
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Data.Models.Misc;
 
 using Windows.Foundation;
 
@@ -23,15 +24,10 @@ internal sealed class PlayerGestureController
     private const double SeekMillisecondsPerDip = 100.0;
     private const int LongPressMilliseconds = 300;
     private const double SpeedMultiplier = 2.0;
+    private const double MaximumPan = 2000.0;
 
     // Long enough for the second tap of a double tap to take over, short enough not to feel late on its own.
     private const int SingleTapMilliseconds = 100;
-
-    // The ranges the Video settings keep Zoom and PanX/PanY in. Pan is in the surface's pixels, which the gesture
-    // converts its DIPs into.
-    private const double MinimumZoom = 0.1;
-    private const double MaximumZoom = 8.0;
-    private const double MaximumPan = 2000.0;
 
     // A pinch is measured from the contacts, so they have to be this far apart to divide by.
     private const double MinimumPinchDistanceDips = 1.0;
@@ -406,7 +402,7 @@ internal sealed class PlayerGestureController
                 scale = 1.0;
             }
 
-            zoom = Math.Round(Math.Clamp(startZoom * scale, MinimumZoom, MaximumZoom), 2);
+            zoom = Math.Round(Math.Clamp(startZoom * scale, VideoSettingsModel.MinimumZoom, VideoSettingsModel.MaximumZoom), 2);
 
             // The point that was between the fingers stays between them: what the new scale did not keep of its
             // offset from the picture's centre is added to the pan, which is how a zoom reaches where it was aimed.

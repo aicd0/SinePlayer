@@ -1444,4 +1444,10 @@ $info</value>
   <data name="Zoom" xml:space="preserve">
     <value>縮放</value>
   </data>
+  <data name="ZoomIn" xml:space="preserve">
+    <value>放大</value>
+  </data>
+  <data name="ZoomOut" xml:space="preserve">
+    <value>縮小</value>
+  </data>
 </root>

@@ -88,6 +88,8 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock
@@ -188,6 +190,54 @@
                     ValueChanged="VolumeDownNumberBox_ValueChanged"
                     Value="{x:Bind ViewModel.VolumeDownPercent, Mode=TwoWay}" />
                 <TextBlock VerticalAlignment="Center" Text="%" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="4"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.ZoomIn}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="4"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="ZoomInNumberBox"
+                    MinWidth="120"
+                    LargeChange="0.1"
+                    Maximum="1"
+                    Minimum="0.01"
+                    SmallChange="0.01"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="ZoomInNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.ZoomInStep, Mode=TwoWay}" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="5"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.ZoomOut}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="5"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="ZoomOutNumberBox"
+                    MinWidth="120"
+                    LargeChange="0.1"
+                    Maximum="1"
+                    Minimum="0.01"
+                    SmallChange="0.01"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="ZoomOutNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.ZoomOutStep, Mode=TwoWay}" />
             </StackPanel>
         </Grid>
     </StackPanel>

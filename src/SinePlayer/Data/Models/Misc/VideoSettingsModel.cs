@@ -12,6 +12,9 @@ namespace SinePlayer.Data.Models.Misc;
 
 internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsModel, VideoSettingsModel.JsonModel>
 {
+    public const double MinimumZoom = 0.1;
+    public const double MaximumZoom = 8.0;
+
     public string Decoder { get; set; } = PlaybackComponents.AUTO;
     public string Renderer { get; set; } = PlaybackComponents.AUTO;
     public double Sync { get; set; }

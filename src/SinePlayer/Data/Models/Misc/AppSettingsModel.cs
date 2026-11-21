@@ -233,6 +233,32 @@ internal static class AppSettingsModel
         }
     }
 
+    public static double ZoomInStep
+    {
+        get
+        {
+            return _db.Read(model => model.ZoomInStep ?? 0.1);
+        }
+        set
+        {
+            _db.Write(model => model.ZoomInStep = value);
+            _db.Save();
+        }
+    }
+
+    public static double ZoomOutStep
+    {
+        get
+        {
+            return _db.Read(model => model.ZoomOutStep ?? 0.1);
+        }
+        set
+        {
+            _db.Write(model => model.ZoomOutStep = value);
+            _db.Save();
+        }
+    }
+
     public static CloseLastTabBehaviorEnum CloseLastTabBehavior
     {
         get
@@ -1105,6 +1131,12 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("VolumeDownPercent")]
         public double? VolumeDownPercent { get; set; }
+
+        [JsonPropertyName("ZoomInStep")]
+        public double? ZoomInStep { get; set; }
+
+        [JsonPropertyName("ZoomOutStep")]
+        public double? ZoomOutStep { get; set; }
 
         [JsonPropertyName("PromptBeforeRemovingMedia")]
         public bool? PromptBeforeRemovingMedia { get; set; }

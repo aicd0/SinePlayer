@@ -402,6 +402,8 @@ public class StringResourceProvider
     public string WindowN => GetResourceString("WindowN");
     public string Yes => GetResourceString("Yes");
     public string Zoom => GetResourceString("Zoom");
+    public string ZoomIn => GetResourceString("ZoomIn");
+    public string ZoomOut => GetResourceString("ZoomOut");
     //// SECTION MARKER - DO NOT MOVE ////
 
     private StringResourceProvider() { }

@@ -141,7 +141,25 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
-    private static double ReadStep(NumberBox box, double fallback)
+    private void ZoomInNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.ZoomInStep, decimals: 2);
+        if (AppSettingsModel.ZoomInStep != value)
+        {
+            AppSettingsModel.ZoomInStep = value;
+        }
+    }
+
+    private void ZoomOutNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.ZoomOutStep, decimals: 2);
+        if (AppSettingsModel.ZoomOutStep != value)
+        {
+            AppSettingsModel.ZoomOutStep = value;
+        }
+    }
+
+    private static double ReadStep(NumberBox box, double fallback, int decimals = 0)
     {
         if (double.IsNaN(box.Value))
         {
@@ -149,7 +167,7 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
             return fallback;
         }
 
-        double value = Math.Round(Math.Clamp(box.Value, box.Minimum, box.Maximum));
+        double value = Math.Round(Math.Clamp(box.Value, box.Minimum, box.Maximum), decimals);
         if (box.Value != value)
         {
             box.Value = value;
