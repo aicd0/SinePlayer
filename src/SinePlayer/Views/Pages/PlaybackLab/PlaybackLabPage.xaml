@@ -157,8 +157,8 @@
                 <Slider
                     x:Name="PanXSlider"
                     Width="110"
-                    Maximum="100"
-                    Minimum="-100"
+                    Maximum="1000"
+                    Minimum="-1000"
                     ValueChanged="TransformSlider_ValueChanged"
                     Value="0" />
             </StackPanel>
@@ -170,8 +170,8 @@
                 <Slider
                     x:Name="PanYSlider"
                     Width="110"
-                    Maximum="100"
-                    Minimum="-100"
+                    Maximum="1000"
+                    Minimum="-1000"
                     ValueChanged="TransformSlider_ValueChanged"
                     Value="0" />
             </StackPanel>

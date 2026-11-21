@@ -397,6 +397,7 @@ public class StringResourceProvider
     public string WhilePlayingVideos => GetResourceString("WhilePlayingVideos");
     public string WindowN => GetResourceString("WindowN");
     public string Yes => GetResourceString("Yes");
+    public string Zoom => GetResourceString("Zoom");
     //// SECTION MARKER - DO NOT MOVE ////
 
     private StringResourceProvider() { }

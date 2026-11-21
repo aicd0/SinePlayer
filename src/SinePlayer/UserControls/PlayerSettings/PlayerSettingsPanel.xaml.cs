@@ -9,7 +9,6 @@ using System.Text.Json.Nodes;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 
 using SinePlayer.Common.BaseUI;
@@ -671,8 +670,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             {
                 bool modified = settings.Player.Speed != presetSettings.Player.Speed;
                 tabModified = tabModified || modified;
-                UpdateGeneralSpeed(settings);
-                ViewModel.GeneralSpeedLabel = GetLabel(StringResource.Speed, modified);
+                UpdateGeneralSpeed(settings, presetSettings);
             }
 
             _playerCategory.IsModified = tabModified;
@@ -685,8 +683,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             {
                 bool modified = settings.Video.Sync != presetSettings.Video.Sync;
                 tabModified = tabModified || modified;
-                UpdateVideoSync(settings);
-                ViewModel.VideoSyncLabel = GetLabel(StringResource.Sync, modified);
+                UpdateVideoSync(settings, presetSettings);
             }
 
             {
@@ -739,6 +736,24 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = settings.Video.Zoom != presetSettings.Video.Zoom;
+                tabModified = tabModified || modified;
+                UpdateVideoZoom(settings, presetSettings);
+            }
+
+            {
+                bool modified = settings.Video.PanX != presetSettings.Video.PanX;
+                tabModified = tabModified || modified;
+                UpdateVideoPanX(settings, presetSettings);
+            }
+
+            {
+                bool modified = settings.Video.PanY != presetSettings.Video.PanY;
+                tabModified = tabModified || modified;
+                UpdateVideoPanY(settings, presetSettings);
+            }
+
+            {
                 bool modified = settings.Video.FlipHorizontal != presetSettings.Video.FlipHorizontal;
                 tabModified = tabModified || modified;
                 UpdateVideoFlipHorizontal(settings);
@@ -762,8 +777,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             {
                 bool modified = settings.Audio.Sync != presetSettings.Audio.Sync;
                 tabModified = tabModified || modified;
-                UpdateAudioSync(settings);
-                ViewModel.AudioSyncLabel = GetLabel(StringResource.Sync, modified);
+                UpdateAudioSync(settings, presetSettings);
             }
 
             {
@@ -793,8 +807,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 UpdateMixInvertLeftAndRight(settings.Audio);
                 ViewModel.MixInvertLeftAndRightLabel = GetLabel(StringResource.MixInvertLeftAndRight, inverseModified);
 
-                bool modified = _mixSliders.Exists(entry => entry.Slider.Value != entry.Slider.DefaultValue)
-                    || MixPanSlider.Value != MixPanSlider.DefaultValue
+                bool modified = _mixSliders.Exists(entry => entry.Slider.Value != entry.Slider.RestoreValue)
+                    || MixPanSlider.Value != MixPanSlider.RestoreValue
                     || inverseModified;
                 tabModified = tabModified || modified;
             }
@@ -809,8 +823,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             {
                 bool modified = settings.Subtitle.Sync != presetSettings.Subtitle.Sync;
                 tabModified = tabModified || modified;
-                UpdateSubtitleSync(settings);
-                ViewModel.SubtitleSyncLabel = GetLabel(StringResource.Sync, modified);
+                UpdateSubtitleSync(settings, presetSettings);
             }
 
             {
@@ -830,8 +843,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             {
                 bool modified = settings.Subtitle.Order != presetSettings.Subtitle.Order;
                 tabModified = tabModified || modified;
-                UpdateSubtitleOrder(settings);
-                ViewModel.SubtitleOrderLabel = GetLabel(StringResource.Order, modified);
+                UpdateSubtitleOrder(settings, presetSettings);
             }
 
             {
@@ -886,8 +898,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             {
                 bool modified = settings.Subtitle.OutlineWidth != presetSettings.Subtitle.OutlineWidth;
                 tabModified = tabModified || modified;
-                UpdateSubtitleOutlineWidth(settings);
-                ViewModel.SubtitleOutlineWidthLabel = GetLabel(StringResource.OutlineWidth, modified);
+                UpdateSubtitleOutlineWidth(settings, presetSettings);
             }
 
             {
@@ -900,8 +911,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             {
                 bool modified = settings.Subtitle.ShadowDistance != presetSettings.Subtitle.ShadowDistance;
                 tabModified = tabModified || modified;
-                UpdateSubtitleShadowDistance(settings);
-                ViewModel.SubtitleShadowDistanceLabel = GetLabel(StringResource.ShadowDistance, modified);
+                UpdateSubtitleShadowDistance(settings, presetSettings);
             }
 
             {
@@ -922,21 +932,18 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 bool modified = settings.Subtitle.Opacity != presetSettings.Subtitle.Opacity;
                 tabModified = tabModified || modified;
                 UpdateSubtitleOpacity(settings, presetSettings);
-                ViewModel.SubtitleOpacityLabel = StringResource.Opacity;
             }
 
             {
                 bool modified = settings.Subtitle.PanX != presetSettings.Subtitle.PanX;
                 tabModified = tabModified || modified;
-                UpdateSubtitlePanX(settings);
-                ViewModel.SubtitlePanXLabel = GetLabel(StringResource.PanX, modified);
+                UpdateSubtitlePanX(settings, presetSettings);
             }
 
             {
                 bool modified = settings.Subtitle.PanY != presetSettings.Subtitle.PanY;
                 tabModified = tabModified || modified;
-                UpdateSubtitlePanY(settings);
-                ViewModel.SubtitlePanYLabel = GetLabel(StringResource.PanY, modified);
+                UpdateSubtitlePanY(settings, presetSettings);
             }
 
             _subtitleCategory.IsModified = tabModified;
@@ -953,23 +960,23 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             activeCategory.IsModified);
     }
 
-    private void GeneralSpeedNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void GeneralSpeedNumberBox_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        double value = sender.Value;
+        double value = GeneralSpeedNumberBox.Value;
         if (double.IsNaN(value))
         {
             value = PlayerPresetSettingsModel.DefaultSpeed;
         }
 
         value = Math.Round(Math.Clamp(value, PlayerSession.MinimumPlaybackRate, PlayerSession.MaximumPlaybackRate), 2);
-        if (value != sender.Value)
+        if (value != GeneralSpeedNumberBox.Value)
         {
-            sender.Value = value;
+            GeneralSpeedNumberBox.Value = value;
         }
 
         if (Math.Abs(_mediaSettings.Player.Speed - value) > 0.001)
@@ -978,33 +985,34 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void UpdateGeneralSpeed(PlayerSettingsModel settings)
+    private void UpdateGeneralSpeed(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
+        GeneralSpeedNumberBox.RestoreValue = presetSettings.Player.Speed;
+
         double value = settings.Player.Speed;
-        double shown = GeneralSpeedNumberBox.Value;
-        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        if (Math.Abs(GeneralSpeedNumberBox.Value - value) > 0.001)
         {
             GeneralSpeedNumberBox.Value = value;
         }
     }
 
-    private void VideoSyncNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void VideoSyncNumberBox_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        double value = sender.Value;
+        double value = VideoSyncNumberBox.Value;
         if (double.IsNaN(value))
         {
             value = _mediaSettings.Video.Sync;
         }
 
-        value = Math.Round(Math.Clamp(value, sender.Minimum, sender.Maximum), 1);
-        if (value != sender.Value)
+        value = Math.Round(Math.Clamp(value, VideoSyncNumberBox.Minimum, VideoSyncNumberBox.Maximum), 1);
+        if (value != VideoSyncNumberBox.Value)
         {
-            sender.Value = value;
+            VideoSyncNumberBox.Value = value;
         }
 
         if (Math.Abs(_mediaSettings.Video.Sync - value) > 0.001)
@@ -1013,11 +1021,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void UpdateVideoSync(PlayerSettingsModel settings)
+    private void UpdateVideoSync(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
+        VideoSyncNumberBox.RestoreValue = presetSettings.Video.Sync;
+
         double value = settings.Video.Sync;
-        double shown = VideoSyncNumberBox.Value;
-        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        if (Math.Abs(VideoSyncNumberBox.Value - value) > 0.001)
         {
             VideoSyncNumberBox.Value = value;
         }
@@ -1134,6 +1143,114 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         VideoRotationDropDownButton.Content = choice.Label;
     }
 
+    private void VideoZoomNumberBox_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = VideoZoomNumberBox.Value;
+        if (double.IsNaN(value))
+        {
+            value = _mediaSettings.Video.Zoom;
+        }
+
+        value = Math.Round(Math.Clamp(value, VideoZoomNumberBox.Minimum, VideoZoomNumberBox.Maximum), 2);
+        if (value != VideoZoomNumberBox.Value)
+        {
+            VideoZoomNumberBox.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Video.Zoom - value) > 0.001)
+        {
+            ApplyVideo(settings => settings.Zoom = value);
+        }
+    }
+
+    private void UpdateVideoZoom(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
+    {
+        VideoZoomNumberBox.RestoreValue = presetSettings.Video.Zoom;
+
+        double value = settings.Video.Zoom;
+        if (Math.Abs(VideoZoomNumberBox.Value - value) > 0.001)
+        {
+            VideoZoomNumberBox.Value = value;
+        }
+    }
+
+    private void VideoPanXNumberBox_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = VideoPanXNumberBox.Value;
+        if (double.IsNaN(value))
+        {
+            value = 0.0;
+        }
+
+        value = Math.Round(Math.Clamp(value, VideoPanXNumberBox.Minimum, VideoPanXNumberBox.Maximum), 2);
+        if (value != VideoPanXNumberBox.Value)
+        {
+            VideoPanXNumberBox.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Video.PanX - value) > 0.001)
+        {
+            ApplyVideo(settings => settings.PanX = value);
+        }
+    }
+
+    private void UpdateVideoPanX(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
+    {
+        VideoPanXNumberBox.RestoreValue = presetSettings.Video.PanX;
+
+        double value = settings.Video.PanX;
+        if (Math.Abs(VideoPanXNumberBox.Value - value) > 0.001)
+        {
+            VideoPanXNumberBox.Value = value;
+        }
+    }
+
+    private void VideoPanYNumberBox_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = VideoPanYNumberBox.Value;
+        if (double.IsNaN(value))
+        {
+            value = 0.0;
+        }
+
+        value = Math.Round(Math.Clamp(value, VideoPanYNumberBox.Minimum, VideoPanYNumberBox.Maximum), 2);
+        if (value != VideoPanYNumberBox.Value)
+        {
+            VideoPanYNumberBox.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Video.PanY - value) > 0.001)
+        {
+            ApplyVideo(settings => settings.PanY = value);
+        }
+    }
+
+    private void UpdateVideoPanY(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
+    {
+        VideoPanYNumberBox.RestoreValue = presetSettings.Video.PanY;
+
+        double value = settings.Video.PanY;
+        if (Math.Abs(VideoPanYNumberBox.Value - value) > 0.001)
+        {
+            VideoPanYNumberBox.Value = value;
+        }
+    }
+
     private void VideoFlipHorizontalToggleSwitch_Toggled(object sender, RoutedEventArgs e)
     {
         if (_updatingUI)
@@ -1172,23 +1289,23 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         VideoFlipVerticalToggleSwitch.IsOn = settings.Video.FlipVertical;
     }
 
-    private void AudioSyncNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void AudioSyncNumberBox_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        double value = sender.Value;
+        double value = AudioSyncNumberBox.Value;
         if (double.IsNaN(value))
         {
             value = _mediaSettings.Audio.Sync;
         }
 
-        value = Math.Round(Math.Clamp(value, sender.Minimum, sender.Maximum), 1);
-        if (value != sender.Value)
+        value = Math.Round(Math.Clamp(value, AudioSyncNumberBox.Minimum, AudioSyncNumberBox.Maximum), 1);
+        if (value != AudioSyncNumberBox.Value)
         {
-            sender.Value = value;
+            AudioSyncNumberBox.Value = value;
         }
 
         if (Math.Abs(_mediaSettings.Audio.Sync - value) > 0.001)
@@ -1197,11 +1314,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void UpdateAudioSync(PlayerSettingsModel settings)
+    private void UpdateAudioSync(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
+        AudioSyncNumberBox.RestoreValue = presetSettings.Audio.Sync;
+
         double value = settings.Audio.Sync;
-        double shown = AudioSyncNumberBox.Value;
-        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        if (Math.Abs(AudioSyncNumberBox.Value - value) > 0.001)
         {
             AudioSyncNumberBox.Value = value;
         }
@@ -1278,39 +1396,39 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void MixPanSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    private void MixPanSlider_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        int value = (int)Math.Round(e.NewValue);
+        int value = (int)Math.Round(MixPanSlider.Value);
         if (_mediaSettings.Audio.Pan != value)
         {
             ApplyAudio(settings => settings.Pan = value);
         }
     }
 
-    private void MixSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    private void MixSlider_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        if (sender is not FrameworkElement element || element.Tag is not string key)
+        if (sender is not SliderSettingView slider || slider.Tag is not string key)
         {
             return;
         }
 
-        int value = (int)Math.Round(e.NewValue);
+        int value = (int)Math.Round(slider.Value);
         ChannelLayout layout = _mixLayout ?? SelectedAudioLayout();
         RemixLevelSet set = _mixSet ?? RemixLevelSet.Remix;
 
         // The slider already shows what the media is set to, so a value that does not move it is not worth writing:
         // an entry that only repeats what is inherited would make the media look edited for nothing.
-        MixSliderEntry? moved = _mixSliders.Find(candidate => ReferenceEquals(candidate.Slider, element));
+        MixSliderEntry? moved = _mixSliders.Find(candidate => ReferenceEquals(candidate.Slider, slider));
         if (moved is not null && moved.Level == value)
         {
             return;
@@ -1360,7 +1478,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
             // What the preset gives is what the slider compares against, so its own label says whether this media
             // differs from the preset — the same question the tab's mark asks.
-            entry.Slider.DefaultValue = LevelOf(presetLevels, null, entry.Group);
+            entry.Slider.RestoreValue = LevelOf(presetLevels, null, entry.Group);
             entry.Level = level;
             if (Math.Abs(entry.Slider.Value - level) > 0.5)
             {
@@ -1368,7 +1486,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
         }
 
-        MixPanSlider.DefaultValue = preset.Pan;
+        MixPanSlider.RestoreValue = preset.Pan;
         if (Math.Abs(MixPanSlider.Value - settings.Pan) > 0.5)
         {
             MixPanSlider.Value = settings.Pan;
@@ -1396,23 +1514,23 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void SubtitleSyncNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void SubtitleSyncNumberBox_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        double value = sender.Value;
+        double value = SubtitleSyncNumberBox.Value;
         if (double.IsNaN(value))
         {
             value = _mediaSettings.Subtitle.Sync;
         }
 
-        value = Math.Round(Math.Clamp(value, sender.Minimum, sender.Maximum), 1);
-        if (value != sender.Value)
+        value = Math.Round(Math.Clamp(value, SubtitleSyncNumberBox.Minimum, SubtitleSyncNumberBox.Maximum), 1);
+        if (value != SubtitleSyncNumberBox.Value)
         {
-            sender.Value = value;
+            SubtitleSyncNumberBox.Value = value;
         }
 
         if (Math.Abs(_mediaSettings.Subtitle.Sync - value) > 0.001)
@@ -1421,11 +1539,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void UpdateSubtitleSync(PlayerSettingsModel settings)
+    private void UpdateSubtitleSync(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
+        SubtitleSyncNumberBox.RestoreValue = presetSettings.Subtitle.Sync;
+
         double value = settings.Subtitle.Sync;
-        double shown = SubtitleSyncNumberBox.Value;
-        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        if (Math.Abs(SubtitleSyncNumberBox.Value - value) > 0.001)
         {
             SubtitleSyncNumberBox.Value = value;
         }
@@ -1459,16 +1578,16 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         SubtitleRendererDropDownButton.Content = choice.Label;
     }
 
-    private void SubtitleOrderNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void SubtitleOrderNumberBox_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        if (double.IsNaN(sender.Value))
+        if (double.IsNaN(SubtitleOrderNumberBox.Value))
         {
-            sender.Value = 0;
+            SubtitleOrderNumberBox.Value = 0;
             if (_mediaSettings.Subtitle.Order != 0)
             {
                 ApplySubtitle(settings => settings.Order = 0);
@@ -1477,33 +1596,34 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        int value = (int)Math.Round(sender.Value);
+        int value = (int)Math.Round(SubtitleOrderNumberBox.Value);
         if (_mediaSettings.Subtitle.Order != value)
         {
             ApplySubtitle(settings => settings.Order = value);
         }
     }
 
-    private void UpdateSubtitleOrder(PlayerSettingsModel settings)
+    private void UpdateSubtitleOrder(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
+        SubtitleOrderNumberBox.RestoreValue = presetSettings.Subtitle.Order;
+
         double value = settings.Subtitle.Order;
-        double shown = SubtitleOrderNumberBox.Value;
-        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.5)
+        if (Math.Abs(SubtitleOrderNumberBox.Value - value) > 0.5)
         {
             SubtitleOrderNumberBox.Value = value;
         }
     }
 
-    private void SubtitlePanXNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void SubtitlePanXNumberBox_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        if (double.IsNaN(sender.Value))
+        if (double.IsNaN(SubtitlePanXNumberBox.Value))
         {
-            sender.Value = 0;
+            SubtitlePanXNumberBox.Value = 0;
             if (_mediaSettings.Subtitle.PanX != 0)
             {
                 ApplySubtitle(settings => settings.PanX = 0);
@@ -1512,33 +1632,34 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        int value = (int)Math.Round(sender.Value);
+        int value = (int)Math.Round(SubtitlePanXNumberBox.Value);
         if (_mediaSettings.Subtitle.PanX != value)
         {
             ApplySubtitle(settings => settings.PanX = value);
         }
     }
 
-    private void UpdateSubtitlePanX(PlayerSettingsModel settings)
+    private void UpdateSubtitlePanX(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
+        SubtitlePanXNumberBox.RestoreValue = presetSettings.Subtitle.PanX;
+
         double value = settings.Subtitle.PanX;
-        double shown = SubtitlePanXNumberBox.Value;
-        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.5)
+        if (Math.Abs(SubtitlePanXNumberBox.Value - value) > 0.5)
         {
             SubtitlePanXNumberBox.Value = value;
         }
     }
 
-    private void SubtitlePanYNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void SubtitlePanYNumberBox_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        if (double.IsNaN(sender.Value))
+        if (double.IsNaN(SubtitlePanYNumberBox.Value))
         {
-            sender.Value = 0;
+            SubtitlePanYNumberBox.Value = 0;
             if (_mediaSettings.Subtitle.PanY != 0)
             {
                 ApplySubtitle(settings => settings.PanY = 0);
@@ -1547,18 +1668,19 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             return;
         }
 
-        int value = (int)Math.Round(sender.Value);
+        int value = (int)Math.Round(SubtitlePanYNumberBox.Value);
         if (_mediaSettings.Subtitle.PanY != value)
         {
             ApplySubtitle(settings => settings.PanY = value);
         }
     }
 
-    private void UpdateSubtitlePanY(PlayerSettingsModel settings)
+    private void UpdateSubtitlePanY(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
+        SubtitlePanYNumberBox.RestoreValue = presetSettings.Subtitle.PanY;
+
         double value = settings.Subtitle.PanY;
-        double shown = SubtitlePanYNumberBox.Value;
-        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.5)
+        if (Math.Abs(SubtitlePanYNumberBox.Value - value) > 0.5)
         {
             SubtitlePanYNumberBox.Value = value;
         }
@@ -1854,23 +1976,23 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         SubtitleFontColorPreview.Background = new SolidColorBrush(color);
     }
 
-    private void SubtitleOutlineWidthNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void SubtitleOutlineWidthNumberBox_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        double value = sender.Value;
+        double value = SubtitleOutlineWidthNumberBox.Value;
         if (double.IsNaN(value))
         {
             value = _mediaSettings.Subtitle.OutlineWidth;
         }
 
-        value = Math.Round(Math.Clamp(value, sender.Minimum, sender.Maximum), 1);
-        if (value != sender.Value)
+        value = Math.Round(Math.Clamp(value, SubtitleOutlineWidthNumberBox.Minimum, SubtitleOutlineWidthNumberBox.Maximum), 1);
+        if (value != SubtitleOutlineWidthNumberBox.Value)
         {
-            sender.Value = value;
+            SubtitleOutlineWidthNumberBox.Value = value;
         }
 
         if (_mediaSettings.Subtitle.OutlineWidth != value)
@@ -1932,11 +2054,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void UpdateSubtitleOutlineWidth(PlayerSettingsModel settings)
+    private void UpdateSubtitleOutlineWidth(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
+        SubtitleOutlineWidthNumberBox.RestoreValue = presetSettings.Subtitle.OutlineWidth;
+
         double value = settings.Subtitle.OutlineWidth;
-        double shown = SubtitleOutlineWidthNumberBox.Value;
-        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        if (Math.Abs(SubtitleOutlineWidthNumberBox.Value - value) > 0.001)
         {
             SubtitleOutlineWidthNumberBox.Value = value;
         }
@@ -1967,23 +2090,23 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         SubtitleOutlineColorPreview.Background = new SolidColorBrush(color);
     }
 
-    private void SubtitleShadowDistanceNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    private void SubtitleShadowDistanceNumberBox_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        double value = sender.Value;
+        double value = SubtitleShadowDistanceNumberBox.Value;
         if (double.IsNaN(value))
         {
             value = _mediaSettings.Subtitle.ShadowDistance;
         }
 
-        value = Math.Round(Math.Clamp(value, sender.Minimum, sender.Maximum), 2);
-        if (value != sender.Value)
+        value = Math.Round(Math.Clamp(value, SubtitleShadowDistanceNumberBox.Minimum, SubtitleShadowDistanceNumberBox.Maximum), 2);
+        if (value != SubtitleShadowDistanceNumberBox.Value)
         {
-            sender.Value = value;
+            SubtitleShadowDistanceNumberBox.Value = value;
         }
 
         if (Math.Abs(_mediaSettings.Subtitle.ShadowDistance - value) > 0.001)
@@ -1992,11 +2115,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         }
     }
 
-    private void UpdateSubtitleShadowDistance(PlayerSettingsModel settings)
+    private void UpdateSubtitleShadowDistance(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
     {
+        SubtitleShadowDistanceNumberBox.RestoreValue = presetSettings.Subtitle.ShadowDistance;
+
         double value = settings.Subtitle.ShadowDistance;
-        double shown = SubtitleShadowDistanceNumberBox.Value;
-        if (double.IsNaN(shown) || Math.Abs(shown - value) > 0.001)
+        if (Math.Abs(SubtitleShadowDistanceNumberBox.Value - value) > 0.001)
         {
             SubtitleShadowDistanceNumberBox.Value = value;
         }
@@ -2046,14 +2170,14 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         SubtitleShadowToggleSwitch.IsOn = settings.Subtitle.ShadowEnabled;
     }
 
-    private void SubtitleOpacitySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    private void SubtitleOpacitySlider_ValueChanged(object? sender, EventArgs e)
     {
         if (_updatingUI)
         {
             return;
         }
 
-        int value = (int)Math.Round(e.NewValue);
+        int value = (int)Math.Round(SubtitleOpacitySlider.Value);
         if (_mediaSettings.Subtitle.Opacity != value)
         {
             ApplySubtitle(settings => settings.Opacity = value);
@@ -2062,7 +2186,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateSubtitleOpacity(PlayerSettingsModel settings, PlayerSettingsModel preset)
     {
-        SubtitleOpacitySlider.DefaultValue = preset.Subtitle.Opacity;
+        SubtitleOpacitySlider.RestoreValue = preset.Subtitle.Opacity;
 
         double value = settings.Subtitle.Opacity;
         if (Math.Abs(SubtitleOpacitySlider.Value - value) > 0.5)

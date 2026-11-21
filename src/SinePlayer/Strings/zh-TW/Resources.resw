@@ -1429,4 +1429,7 @@ $info</value>
   <data name="Yes" xml:space="preserve">
     <value>是</value>
   </data>
+  <data name="Zoom" xml:space="preserve">
+    <value>縮放</value>
+  </data>
 </root>

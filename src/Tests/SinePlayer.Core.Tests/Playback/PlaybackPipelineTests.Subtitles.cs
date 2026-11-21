@@ -354,14 +354,14 @@ public partial class PlaybackPipelineTests
             Assert.That(small.Top, Is.EqualTo(0.3125).Within(0.001));
         }
 
-        // Panned, the box follows the picture's centre: a quarter of the way to the right moves it by 40 of the 160 pixels
-        // the picture is wide, which is an eighth of the surface.
-        video.Transform = VideoTransform.Identity with { Zoom = 0.5, PanX = 0.25 };
+        // Panned 40 pixels to the right, the box follows the picture's centre: 40 of the 160 pixels the picture is wide,
+        // which is an eighth of the surface.
+        video.Transform = VideoTransform.Identity with { Zoom = 0.5, PanX = 40.0 };
         Assert.That(video.SubtitleFrame.Left, Is.EqualTo(0.375).Within(0.001), "the words move with the picture");
 
         // Panned off the surface, the picture the viewer ends up with is only the part still on it â€” 45 of the 90 pixels â€”
         // and the box is that tall, at the picture's shape: 80 pixels wide.
-        video.Transform = VideoTransform.Identity with { Zoom = 0.5, PanY = 1.0 };
+        video.Transform = VideoTransform.Identity with { Zoom = 0.5, PanY = 120.0 };
         SubtitleFrame cropped = video.SubtitleFrame;
         using (Assert.EnterMultipleScope())
         {

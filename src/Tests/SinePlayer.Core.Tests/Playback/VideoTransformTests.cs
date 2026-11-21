@@ -242,17 +242,17 @@ public class VideoTransformTests
     }
 
     [Test]
-    public void PansByAFractionOfTheSurface()
+    public void PansByDeviceIndependentPixels()
     {
-        VideoTransform panned = VideoTransform.Identity with { PanX = 1.0, PanY = -1.0 };
+        VideoTransform panned = VideoTransform.Identity with { PanX = 100.0, PanY = -50.0 };
 
         (double x, double y, _, _) = Box(panned, 1920, 1080, 1600, 1200);
         (double centreX, double centreY, _, _) = Box(VideoTransform.Identity, 1920, 1080, 1600, 1200);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(x, Is.EqualTo(centreX + 800).Within(0.01), "one whole step is half a surface to the right");
-            Assert.That(y, Is.EqualTo(centreY - 600).Within(0.01), "and half a surface up");
+            Assert.That(x, Is.EqualTo(centreX + 100).Within(0.01), "a hundred pixels to the right");
+            Assert.That(y, Is.EqualTo(centreY - 50).Within(0.01), "and fifty up");
         }
     }
 
@@ -275,7 +275,7 @@ public class VideoTransformTests
             Assert.That((VideoTransform.Identity with { Orientation = new VideoOrientation(1, false) }).IsIdentity, Is.False);
             Assert.That((VideoTransform.Identity with { ResizeMode = VideoResizeMode.Fill }).IsIdentity, Is.False);
             Assert.That((VideoTransform.Identity with { Zoom = 1.5 }).IsIdentity, Is.False);
-            Assert.That((VideoTransform.Identity with { PanY = 0.25 }).IsIdentity, Is.False);
+            Assert.That((VideoTransform.Identity with { PanY = 25.0 }).IsIdentity, Is.False);
         }
     }
 

@@ -22,18 +22,26 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
     public int RotationDegrees { get; set; } = 0;
     public bool FlipHorizontal { get; set; }
     public bool FlipVertical { get; set; }
+    public double Zoom { get; set; } = 1.0;
+    public double PanX { get; set; }
+    public double PanY { get; set; }
 
     public VideoTransform ToTransform()
     {
         int quarterTurns = (int)Math.Round(RotationDegrees / 90.0);
+        double zoom = double.IsFinite(Zoom) && Zoom > 0.0 ? Zoom : 1.0;
+        double panX = double.IsFinite(PanX) ? PanX : 0.0;
+        double panY = double.IsFinite(PanY) ? PanY : 0.0;
 
-        return new VideoTransform(
-            VideoOrientation.FromDegrees(quarterTurns * 90, FlipHorizontal, FlipVertical),
-            ResizeMode,
-            1.0,
-            0.0,
-            0.0,
-            ScalingMode);
+        return new VideoTransform
+        {
+            Orientation = VideoOrientation.FromDegrees(quarterTurns * 90, FlipHorizontal, FlipVertical),
+            ResizeMode = ResizeMode,
+            Zoom = zoom,
+            PanX = panX,
+            PanY = panY,
+            Scaling = ScalingMode,
+        };
     }
 
     protected override Dictionary<string, VideoSettingsModel> LoadPresets()
@@ -63,6 +71,9 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
         RotationDegrees = ParseRotationDegrees(model.RotationDegrees, RotationDegrees);
         FlipHorizontal = model.FlipHorizontal ?? FlipHorizontal;
         FlipVertical = model.FlipVertical ?? FlipVertical;
+        Zoom = model.Zoom ?? Zoom;
+        PanX = model.PanX ?? PanX;
+        PanY = model.PanY ?? PanY;
     }
 
     protected override JsonModel ToJsonModel()
@@ -79,6 +90,9 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
             RotationDegrees = RotationDegrees,
             FlipHorizontal = FlipHorizontal,
             FlipVertical = FlipVertical,
+            Zoom = Zoom,
+            PanX = PanX,
+            PanY = PanY,
         };
     }
 
@@ -138,5 +152,14 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
 
         [JsonPropertyName("FlipVertical")]
         public bool? FlipVertical { get; set; }
+
+        [JsonPropertyName("Zoom")]
+        public double? Zoom { get; set; }
+
+        [JsonPropertyName("PanX")]
+        public double? PanX { get; set; }
+
+        [JsonPropertyName("PanY")]
+        public double? PanY { get; set; }
     }
 }

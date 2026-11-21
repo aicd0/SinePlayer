@@ -1431,4 +1431,7 @@ $info</value>
   <data name="Yes" xml:space="preserve">
     <value>예</value>
   </data>
+  <data name="Zoom" xml:space="preserve">
+    <value>확대/축소</value>
+  </data>
 </root>

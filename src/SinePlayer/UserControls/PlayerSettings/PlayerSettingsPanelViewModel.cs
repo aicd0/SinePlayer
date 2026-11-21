@@ -59,28 +59,6 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
-    private string _generalSpeedLabel = string.Empty;
-    public string GeneralSpeedLabel
-    {
-        get => _generalSpeedLabel;
-        set
-        {
-            _generalSpeedLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GeneralSpeedLabel)));
-        }
-    }
-
-    private string _videoSyncLabel = string.Empty;
-    public string VideoSyncLabel
-    {
-        get => _videoSyncLabel;
-        set
-        {
-            _videoSyncLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VideoSyncLabel)));
-        }
-    }
-
     private string _videoDecoderLabel = string.Empty;
     public string VideoDecoderLabel
     {
@@ -180,17 +158,6 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
-    private string _audioSyncLabel = string.Empty;
-    public string AudioSyncLabel
-    {
-        get => _audioSyncLabel;
-        set
-        {
-            _audioSyncLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AudioSyncLabel)));
-        }
-    }
-
     private string _audioDecoderLabel = string.Empty;
     public string AudioDecoderLabel
     {
@@ -253,28 +220,6 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         {
             _subtitleRendererLabel = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleRendererLabel)));
-        }
-    }
-
-    private string _subtitleSyncLabel = string.Empty;
-    public string SubtitleSyncLabel
-    {
-        get => _subtitleSyncLabel;
-        set
-        {
-            _subtitleSyncLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleSyncLabel)));
-        }
-    }
-
-    private string _subtitleOrderLabel = string.Empty;
-    public string SubtitleOrderLabel
-    {
-        get => _subtitleOrderLabel;
-        set
-        {
-            _subtitleOrderLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleOrderLabel)));
         }
     }
 
@@ -355,17 +300,6 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         }
     }
 
-    private string _subtitleOutlineWidthLabel = string.Empty;
-    public string SubtitleOutlineWidthLabel
-    {
-        get => _subtitleOutlineWidthLabel;
-        set
-        {
-            _subtitleOutlineWidthLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleOutlineWidthLabel)));
-        }
-    }
-
     private string _subtitleOutlineColorLabel = string.Empty;
     public string SubtitleOutlineColorLabel
     {
@@ -374,17 +308,6 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         {
             _subtitleOutlineColorLabel = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleOutlineColorLabel)));
-        }
-    }
-
-    private string _subtitleShadowDistanceLabel = string.Empty;
-    public string SubtitleShadowDistanceLabel
-    {
-        get => _subtitleShadowDistanceLabel;
-        set
-        {
-            _subtitleShadowDistanceLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleShadowDistanceLabel)));
         }
     }
 
@@ -407,39 +330,6 @@ internal partial class PlayerSettingsPanelViewModel : INotifyPropertyChanged
         {
             _subtitleShadowLabel = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleShadowLabel)));
-        }
-    }
-
-    private string _subtitleOpacityLabel = string.Empty;
-    public string SubtitleOpacityLabel
-    {
-        get => _subtitleOpacityLabel;
-        set
-        {
-            _subtitleOpacityLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleOpacityLabel)));
-        }
-    }
-
-    private string _subtitlePanXLabel = string.Empty;
-    public string SubtitlePanXLabel
-    {
-        get => _subtitlePanXLabel;
-        set
-        {
-            _subtitlePanXLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitlePanXLabel)));
-        }
-    }
-
-    private string _subtitlePanYLabel = string.Empty;
-    public string SubtitlePanYLabel
-    {
-        get => _subtitlePanYLabel;
-        set
-        {
-            _subtitlePanYLabel = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitlePanYLabel)));
         }
     }
 
