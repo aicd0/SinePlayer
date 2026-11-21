@@ -56,7 +56,6 @@ internal sealed partial class PlayerPage : BasePage
 
     private const long SEEK_STEP_MS = 5000;
     private const int VOLUME_STEP = 5;
-    private const int SINGLE_TAP_DELAY_MS = 100;
     private const int HIDE_OVERLAY_DELAY_MS = 0;
     private const int HIDE_CURSOR_DELAY_MS = 3000;
 
@@ -70,8 +69,11 @@ internal sealed partial class PlayerPage : BasePage
     public PlayerPage()
     {
         InitializeComponent();
-        _gestureRecognizer.Tapped += GestureRecognizer_Tapped;
+        _dragGesture.SingleTapped += DragGesture_SingleTapped;
+        _dragGesture.DoubleTapped += DragGesture_DoubleTapped;
         _dragGesture.EffectChanged += DragGesture_EffectChanged;
+        _dragGesture.ZoomPanPreviewed += DragGesture_ZoomPanPreviewed;
+        _dragGesture.ZoomPanRequested += DragGesture_ZoomPanRequested;
         _dragGesture.VolumeRequested += DragGesture_VolumeRequested;
         _dragGesture.BrightnessRequested += DragGesture_BrightnessRequested;
         _dragGesture.SeekPreviewed += DragGesture_SeekPreviewed;
@@ -744,12 +746,10 @@ internal sealed partial class PlayerPage : BasePage
 
     #region Gesture
 
-    private readonly PlayerGestureRecognizer _gestureRecognizer = new();
     private readonly PlayerGestureController _dragGesture = new();
     private bool _isReleasingGestureCapture = false;
     private bool _isSpeedHold = false;
-    private bool _tapPending = false;
-    private bool _tapCancelled = false;
+    private bool _isZooming = false;
 
     private void PlayerPage_AnyPointerPressed(object sender, PointerRoutedEventArgs e)
     {
@@ -806,30 +806,36 @@ internal sealed partial class PlayerPage : BasePage
     {
         FocusPlayer();
         ((UIElement)sender).CapturePointer(e.Pointer);
-        _gestureRecognizer.ProcessDownEvent(e.GetCurrentPoint(VideoHost));
 
         PointerPoint gesturePoint = e.GetCurrentPoint(VideoGrid);
         if (e.Pointer.PointerDeviceType != PointerDeviceType.Mouse || gesturePoint.Properties.IsLeftButtonPressed)
         {
+            IVideoChain? videoChain = _view?.VideoChain;
+            VideoTransform transform = videoChain?.Transform ?? VideoTransform.Identity;
+
             _dragGesture.Begin(
-                e.Pointer.PointerId,
-                gesturePoint.Position,
-                new PlayerGestureController.Context(
-                    VideoGrid.ActualWidth,
-                    VideoGrid.ActualHeight,
-                    ViewModel.VolumeLiveData.Value,
-                    GetGestureStartPositionMs(),
-                    ViewModel.DurationMs,
-                    DisplayBrightnessController.Shared.Level,
-                    GetGesturePlaybackRate()),
-                e.Pointer.PointerDeviceType);
+                gesturePoint,
+                new PlayerGestureController.Context
+                {
+                    Width = VideoGrid.ActualWidth,
+                    Height = VideoGrid.ActualHeight,
+                    Volume = ViewModel.VolumeLiveData.Value,
+                    PositionMs = GetGestureStartPositionMs(),
+                    DurationMs = ViewModel.DurationMs,
+                    Brightness = DisplayBrightnessController.Shared.Level,
+                    PlaybackRate = GetGesturePlaybackRate(),
+                    HasVideoSurface = videoChain?.SelectedStream is not null,
+                    RasterizationScale = videoChain?.Target?.RasterizationScale ?? 1.0,
+                    Zoom = transform.Zoom,
+                    PanX = transform.PanX,
+                    PanY = transform.PanY,
+                });
         }
     }
 
     private void VideoGrid_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        _gestureRecognizer.ProcessMoveEvents(e.GetIntermediatePoints(VideoHost));
-        _dragGesture.Move(e.Pointer.PointerId, e.GetCurrentPoint(VideoGrid).Position);
+        _dragGesture.Move(e.GetIntermediatePoints(VideoGrid));
 
         // A move reported at the position the pointer already had is not the user moving it: a frame presented on the
         // surface underneath sends one too. Restarting the wait for those is what makes the cursor hide late, so only a
@@ -849,8 +855,7 @@ internal sealed partial class PlayerPage : BasePage
         _isReleasingGestureCapture = true;
         ((UIElement)sender).ReleasePointerCapture(e.Pointer);
         _isReleasingGestureCapture = false;
-        _gestureRecognizer.ProcessUpEvent(e.GetCurrentPoint(VideoHost));
-        _dragGesture.Complete(e.Pointer.PointerId);
+        _dragGesture.Complete(e.GetCurrentPoint(VideoGrid));
     }
 
     private void VideoGrid_PointerCanceled(object sender, PointerRoutedEventArgs e)
@@ -858,8 +863,7 @@ internal sealed partial class PlayerPage : BasePage
         _isReleasingGestureCapture = true;
         ((UIElement)sender).ReleasePointerCapture(e.Pointer);
         _isReleasingGestureCapture = false;
-        _gestureRecognizer.ProcessUpEvent(e.GetCurrentPoint(VideoHost));
-        _dragGesture.Cancel(e.Pointer.PointerId);
+        _dragGesture.Cancel(e.GetCurrentPoint(VideoGrid));
     }
 
     private void VideoGrid_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
@@ -869,49 +873,26 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
-        _dragGesture.Cancel(e.Pointer.PointerId);
+        _dragGesture.Cancel(e.GetCurrentPoint(VideoGrid));
     }
 
-    private void GestureRecognizer_Tapped(GestureRecognizer sender, TappedEventArgs e)
+    private void DragGesture_SingleTapped()
     {
-        // Releasing a hold that sped playback up is not a click on the picture.
-        if (_isSpeedHold)
+        if (IsStarted)
         {
-            return;
+            ToggleOverlayHold();
         }
+    }
 
-        if (e.TapCount == 1)
-        {
-            if (_tapPending)
-            {
-                return;
-            }
-
-            _tapPending = true;
-            _tapCancelled = false;
-            CoroutineUtils.Run(async () =>
-            {
-                await Task.Delay(SINGLE_TAP_DELAY_MS);
-
-                _tapPending = false;
-                if (_tapCancelled || !IsStarted)
-                {
-                    return;
-                }
-
-                ToggleOverlayHold();
-            });
-        }
-        else if (e.TapCount == 2)
-        {
-            _tapCancelled = true;
-            TogglePlayPause();
-        }
+    private void DragGesture_DoubleTapped()
+    {
+        TogglePlayPause();
     }
 
     private void DragGesture_EffectChanged(PlayerGestureController.Effect effect)
     {
         _isSpeedHold = effect == PlayerGestureController.Effect.Speed;
+        _isZooming = effect == PlayerGestureController.Effect.Zoom;
 
         switch (effect)
         {
@@ -968,6 +949,30 @@ internal sealed partial class PlayerPage : BasePage
         {
             GestureHint.ShowSpeed(rate);
         }
+    }
+
+    private void DragGesture_ZoomPanPreviewed(PlayerGestureController.ZoomPanRequest request)
+    {
+        PlayerView? view = _view;
+        if (view?.VideoChain is { } chain)
+        {
+            chain.Transform = chain.Transform with { Zoom = request.Zoom, PanX = request.PanX, PanY = request.PanY };
+        }
+
+        if (_isZooming)
+        {
+            GestureHint.ShowZoom(request.Zoom);
+        }
+    }
+
+    private void DragGesture_ZoomPanRequested(PlayerGestureController.ZoomPanRequest request)
+    {
+        _navigationBar?.PlayerSettingsPanel.ApplyVideo(settings =>
+        {
+            settings.Zoom = request.Zoom;
+            settings.PanX = request.PanX;
+            settings.PanY = request.PanY;
+        });
     }
 
     private long GetGestureStartPositionMs()
