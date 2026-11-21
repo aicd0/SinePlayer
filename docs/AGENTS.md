@@ -11,6 +11,8 @@
 - Do not run the full test suite unless explicitly asked. Building x64 is the default verification.
 - No redundant API shapes: if a property is settable, do not also accept it as an `Add*(…)` parameter, and do not add a
   method that only forwards one argument. One way to say a thing.
+- Never use the null-forgiving operator (`!`): narrow with a null check or a pattern (`is not { } value`) so the compiler
+  can see what is not null, and restructure the code when neither reads well.
 - Anything a second thread reads or writes needs a synchronization mechanism chosen from what the project already uses
   (`AtomicCell<T>` for a value replaced as a whole, `Interlocked` for a counter, `volatile` for a flag), and a comment
   when the reason is not obvious. "It is only a reference assignment" is not a mechanism.
