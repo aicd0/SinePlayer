@@ -262,6 +262,18 @@
                                     SmallChange="0.01"
                                     ValueChanged="VideoZoomNumberBox_ValueChanged" />
                                 <settings:NumberBoxSettingView
+                                    x:Name="VideoHorizontalStretchNumberBox"
+                                    Label="{x:Bind StringResource.HorizontalStretch}"
+                                    LargeChange="100"
+                                    SmallChange="10"
+                                    ValueChanged="VideoHorizontalStretchNumberBox_ValueChanged" />
+                                <settings:NumberBoxSettingView
+                                    x:Name="VideoVerticalStretchNumberBox"
+                                    Label="{x:Bind StringResource.VerticalStretch}"
+                                    LargeChange="100"
+                                    SmallChange="10"
+                                    ValueChanged="VideoVerticalStretchNumberBox_ValueChanged" />
+                                <settings:NumberBoxSettingView
                                     x:Name="VideoPanXNumberBox"
                                     Label="{x:Bind StringResource.PanX}"
                                     LargeChange="50"

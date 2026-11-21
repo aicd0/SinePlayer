@@ -81,18 +81,24 @@ public readonly record struct VideoTransform
     }
 
     public VideoOrientation Orientation { get; init; }
-
     public VideoResizeMode ResizeMode { get; init; }
-
+    public double TargetAspectRatio { get; init; }
     public double Zoom { get; init; } = 1.0;
-
+    public double HorizontalStretch { get; init; }
+    public double VerticalStretch { get; init; }
     public double PanX { get; init; }
-
     public double PanY { get; init; }
-
     public VideoScalingMode Scaling { get; init; } = VideoScalingMode.Bilinear;
 
-    public bool IsIdentity => Orientation.IsIdentity && ResizeMode == VideoResizeMode.Fit && Zoom == 1.0 && PanX == 0.0 && PanY == 0.0;
+    public bool IsIdentity =>
+        Orientation.IsIdentity &&
+        ResizeMode == VideoResizeMode.Fit &&
+        Zoom == 1.0 &&
+        HorizontalStretch == 0.0 &&
+        VerticalStretch == 0.0 &&
+        PanX == 0.0 &&
+        PanY == 0.0 &&
+        TargetAspectRatio == 0.0;
 
     /// <summary>
     /// The matrix that draws the picture's own square onto the surface: the picture's coordinates are 0 to 1 along each of
@@ -137,7 +143,12 @@ public readonly record struct VideoTransform
     {
         (double pictureWidth, double pictureHeight) = GetPictureSize(frameWidth, frameHeight);
 
-        double zoom = Zoom > 0 && double.IsFinite(Zoom) ? Zoom : 1.0;
+        double aspectRatio = TargetAspectRatio > 0 && double.IsFinite(TargetAspectRatio) ? TargetAspectRatio : 0.0;
+        if (aspectRatio > 0)
+        {
+            pictureHeight = pictureWidth / aspectRatio;
+        }
+
         double scaleX = surfaceWidth / pictureWidth;
         double scaleY = surfaceHeight / pictureHeight;
 
@@ -149,8 +160,11 @@ public readonly record struct VideoTransform
             _ => (pictureWidth * Math.Min(scaleX, scaleY), pictureHeight * Math.Min(scaleX, scaleY)),
         };
 
-        width *= zoom;
-        height *= zoom;
+        double zoom = Zoom > 0 && double.IsFinite(Zoom) ? Zoom : 1.0;
+        double offsetX = double.IsFinite(HorizontalStretch) ? HorizontalStretch : 0.0;
+        double offsetY = double.IsFinite(VerticalStretch) ? VerticalStretch : 0.0;
+        width = Math.Max((width * zoom) + offsetX, 1.0);
+        height = Math.Max((height * zoom) + offsetY, 1.0);
 
         // The square is the picture before it is turned, so its own shape is the turned picture's the other way round.
         bool swapsAxes = Orientation.SwapsAxes;

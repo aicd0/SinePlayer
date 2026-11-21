@@ -178,6 +178,34 @@ public class VideoTransformTests
     }
 
     [Test]
+    public void StretchesThePictureToTheChosenShapeBeforeTheModeSizesIt()
+    {
+        // A 16:9 picture given a 2:1 shape first: Fit then keeps the widened shape whole, with bars above and below.
+        VideoTransform fitted = VideoTransform.Identity with { TargetAspectRatio = 2.0 };
+        (double x, double y, double width, double height) = Box(fitted, 1920, 1080, 1600, 1200);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(width, Is.EqualTo(1600).Within(0.01), "the width is what limits it");
+            Assert.That(height, Is.EqualTo(800).Within(0.01), "and the widened shape is half as tall as it is wide");
+            Assert.That(x, Is.EqualTo(0).Within(0.01));
+            Assert.That(y, Is.EqualTo(200).Within(0.01));
+        }
+
+        // Fill crops that same widened shape to the surface instead, so it runs past the sides.
+        VideoTransform filled = fitted with { ResizeMode = VideoResizeMode.Fill };
+        (x, y, width, height) = Box(filled, 1920, 1080, 1600, 1200);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(height, Is.EqualTo(1200).Within(0.01), "the height is what covers it");
+            Assert.That(width, Is.EqualTo(2400).Within(0.01));
+            Assert.That(x, Is.EqualTo(-400).Within(0.01), "and is cropped evenly on both sides");
+            Assert.That(y, Is.EqualTo(0).Within(0.01));
+        }
+    }
+
+    [Test]
     public void KeepsThePictureAtItsOwnSizeAndCropsWhatDoesNotFit()
     {
         VideoTransform original = VideoTransform.Identity with { ResizeMode = VideoResizeMode.OriginalSize };

@@ -696,6 +696,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="Horizontal" xml:space="preserve">
     <value>水平</value>
   </data>
+  <data name="HorizontalStretch" xml:space="preserve">
+    <value>水平方向の引き伸ばし</value>
+  </data>
   <data name="Image" xml:space="preserve">
     <value>画像</value>
   </data>
@@ -1382,6 +1385,9 @@ $info</value>
   </data>
   <data name="Vertical" xml:space="preserve">
     <value>垂直</value>
+  </data>
+  <data name="VerticalStretch" xml:space="preserve">
+    <value>垂直方向の引き伸ばし</value>
   </data>
   <data name="Video" xml:space="preserve">
     <value>ビデオ</value>

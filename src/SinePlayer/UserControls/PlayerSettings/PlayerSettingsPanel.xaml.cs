@@ -716,7 +716,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
-                bool modified = settings.Video.ResizeMode != presetSettings.Video.ResizeMode;
+                bool modified = settings.Video.ResizeMode != presetSettings.Video.ResizeMode ||
+                    settings.Video.AspectRatio != presetSettings.Video.AspectRatio;
                 tabModified = tabModified || modified;
                 UpdateVideoStretchMode(settings);
                 ViewModel.VideoStretchModeLabel = GetLabel(StringResource.Scaling, modified);
@@ -740,6 +741,18 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 bool modified = settings.Video.Zoom != presetSettings.Video.Zoom;
                 tabModified = tabModified || modified;
                 UpdateVideoZoom(settings, presetSettings);
+            }
+
+            {
+                bool modified = settings.Video.HorizontalStretch != presetSettings.Video.HorizontalStretch;
+                tabModified = tabModified || modified;
+                UpdateVideoHorizontalStretch(settings, presetSettings);
+            }
+
+            {
+                bool modified = settings.Video.VerticalStretch != presetSettings.Video.VerticalStretch;
+                tabModified = tabModified || modified;
+                UpdateVideoVerticalStretch(settings, presetSettings);
             }
 
             {
@@ -1103,17 +1116,8 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void UpdateVideoStretchMode(PlayerSettingsModel settings)
     {
-        List<PlaybackComponentOption> options = PlayerMenuCreator.GetStretchModeOptions();
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Video.ResizeMode.ToString());
-        VideoStretchModeDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
-        {
-            VideoResizeMode mode = Enum.Parse<VideoResizeMode>(key);
-            if (settings.Video.ResizeMode != mode)
-            {
-                ApplyVideo(target => target.ResizeMode = mode);
-            }
-        });
-        VideoStretchModeDropDownButton.Content = choice.Label;
+        VideoStretchModeDropDownButton.Flyout = CreateMenu(PlayerMenuCreator.CreateStretchModeItems(settings.Video, ApplyVideo));
+        VideoStretchModeDropDownButton.Content = PlayerMenuCreator.GetStretchModeLabel(settings.Video.ResizeMode, settings.Video.AspectRatio);
     }
 
     private void UpdateVideoInterpolation(PlayerSettingsModel settings)
@@ -1180,6 +1184,80 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (Math.Abs(VideoZoomNumberBox.Value - value) > 0.001)
         {
             VideoZoomNumberBox.Value = value;
+        }
+    }
+
+    private void VideoHorizontalStretchNumberBox_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = VideoHorizontalStretchNumberBox.Value;
+        if (double.IsNaN(value))
+        {
+            value = 0.0;
+        }
+
+        value = Math.Round(Math.Clamp(value, VideoHorizontalStretchNumberBox.Minimum, VideoHorizontalStretchNumberBox.Maximum));
+        if (value != VideoHorizontalStretchNumberBox.Value)
+        {
+            VideoHorizontalStretchNumberBox.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Video.HorizontalStretch - value) > 0.001)
+        {
+            ApplyVideo(settings => settings.HorizontalStretch = value);
+        }
+    }
+
+    private void UpdateVideoHorizontalStretch(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
+    {
+        VideoHorizontalStretchNumberBox.RestoreValue = presetSettings.Video.HorizontalStretch;
+        VideoHorizontalStretchNumberBox.ResetValue = _defaultSettings.Video.HorizontalStretch;
+
+        double value = settings.Video.HorizontalStretch;
+        if (Math.Abs(VideoHorizontalStretchNumberBox.Value - value) > 0.001)
+        {
+            VideoHorizontalStretchNumberBox.Value = value;
+        }
+    }
+
+    private void VideoVerticalStretchNumberBox_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = VideoVerticalStretchNumberBox.Value;
+        if (double.IsNaN(value))
+        {
+            value = 0.0;
+        }
+
+        value = Math.Round(Math.Clamp(value, VideoVerticalStretchNumberBox.Minimum, VideoVerticalStretchNumberBox.Maximum));
+        if (value != VideoVerticalStretchNumberBox.Value)
+        {
+            VideoVerticalStretchNumberBox.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Video.VerticalStretch - value) > 0.001)
+        {
+            ApplyVideo(settings => settings.VerticalStretch = value);
+        }
+    }
+
+    private void UpdateVideoVerticalStretch(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
+    {
+        VideoVerticalStretchNumberBox.RestoreValue = presetSettings.Video.VerticalStretch;
+        VideoVerticalStretchNumberBox.ResetValue = _defaultSettings.Video.VerticalStretch;
+
+        double value = settings.Video.VerticalStretch;
+        if (Math.Abs(VideoVerticalStretchNumberBox.Value - value) > 0.001)
+        {
+            VideoVerticalStretchNumberBox.Value = value;
         }
     }
 
@@ -2491,8 +2569,13 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private static MenuFlyout CreateChoiceMenu(IReadOnlyList<PlaybackComponentOption> options, string? selectedKey, Action<string> select)
     {
+        return CreateMenu(PlayerMenuCreator.CreateChoiceItems(options, selectedKey, select));
+    }
+
+    private static MenuFlyout CreateMenu(IEnumerable<BaseMenuFlyoutItemModel> items)
+    {
         var flyout = new MenuFlyout();
-        foreach (BaseMenuFlyoutItemModel item in PlayerMenuCreator.CreateChoiceItems(options, selectedKey, select))
+        foreach (BaseMenuFlyoutItemModel item in items)
         {
             flyout.Items.Add(item.CreateMenuFlyoutItem());
         }
