@@ -16,6 +16,7 @@ internal sealed partial class PlayerGestureHint : BaseUserControl
     private const string BrightnessGlyph = "\uE706";
     private const string MutedGlyph = "\uE74F";
     private const string SpeedGlyph = "\uEB9D";
+    private const string ZoomGlyph = "\uE71E";
 
     public PlayerGestureHint()
     {
@@ -56,6 +57,14 @@ internal sealed partial class PlayerGestureHint : BaseUserControl
         EffectIcon.Glyph = SpeedGlyph;
         EffectIcon.Visibility = Visibility.Visible;
         EffectText.Text = $"{rate.ToString("0.0", CultureInfo.InvariantCulture)}x";
+        Visibility = Visibility.Visible;
+    }
+
+    public void ShowZoom(double zoom)
+    {
+        EffectIcon.Glyph = ZoomGlyph;
+        EffectIcon.Visibility = Visibility.Visible;
+        EffectText.Text = $"{zoom.ToString("0.##", CultureInfo.InvariantCulture)}x";
         Visibility = Visibility.Visible;
     }
 

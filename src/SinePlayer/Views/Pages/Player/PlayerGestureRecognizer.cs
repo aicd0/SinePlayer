@@ -19,13 +19,27 @@ internal class PlayerGestureRecognizer
 
     public PlayerGestureRecognizer()
     {
-        _gestureRecognizer.GestureSettings = GestureSettings.Tap | GestureSettings.DoubleTap;
+        _gestureRecognizer.GestureSettings =
+            GestureSettings.Tap |
+            GestureSettings.DoubleTap |
+            GestureSettings.ManipulationScale |
+            GestureSettings.ManipulationTranslateX |
+            GestureSettings.ManipulationTranslateY;
         _gestureRecognizer.Tapped += GestureRecognizer_Tapped;
+        _gestureRecognizer.ManipulationStarted += GestureRecognizer_ManipulationStarted;
+        _gestureRecognizer.ManipulationUpdated += GestureRecognizer_ManipulationUpdated;
+        _gestureRecognizer.ManipulationCompleted += GestureRecognizer_ManipulationCompleted;
     }
 
     public delegate void TappedHandler(GestureRecognizer sender, TappedEventArgs e);
+    public delegate void ManipulationStartedHandler(GestureRecognizer sender, ManipulationStartedEventArgs e);
+    public delegate void ManipulationUpdatedHandler(GestureRecognizer sender, ManipulationUpdatedEventArgs e);
+    public delegate void ManipulationCompletedHandler(GestureRecognizer sender, ManipulationCompletedEventArgs e);
 
     public event TappedHandler? Tapped;
+    public event ManipulationStartedHandler? ManipulationStarted;
+    public event ManipulationUpdatedHandler? ManipulationUpdated;
+    public event ManipulationCompletedHandler? ManipulationCompleted;
 
     public void ProcessDownEvent(PointerPoint value)
     {
@@ -79,6 +93,22 @@ internal class PlayerGestureRecognizer
         }
     }
 
+    public void CompleteGesture()
+    {
+        try
+        {
+            _gestureRecognizer.CompleteGesture();
+        }
+        catch (ArgumentException ex)
+        {
+            Logger.E(TAG, nameof(CompleteGesture), ex);
+        }
+        catch (Exception ex)
+        {
+            Logger.F(TAG, nameof(CompleteGesture), ex);
+        }
+    }
+
     private void GestureRecognizer_Tapped(GestureRecognizer sender, TappedEventArgs args)
     {
         try
@@ -88,6 +118,42 @@ internal class PlayerGestureRecognizer
         catch (Exception ex)
         {
             Logger.F(TAG, nameof(GestureRecognizer_Tapped), ex);
+        }
+    }
+
+    private void GestureRecognizer_ManipulationStarted(GestureRecognizer sender, ManipulationStartedEventArgs args)
+    {
+        try
+        {
+            ManipulationStarted?.Invoke(sender, args);
+        }
+        catch (Exception ex)
+        {
+            Logger.F(TAG, nameof(GestureRecognizer_ManipulationStarted), ex);
+        }
+    }
+
+    private void GestureRecognizer_ManipulationUpdated(GestureRecognizer sender, ManipulationUpdatedEventArgs args)
+    {
+        try
+        {
+            ManipulationUpdated?.Invoke(sender, args);
+        }
+        catch (Exception ex)
+        {
+            Logger.F(TAG, nameof(GestureRecognizer_ManipulationUpdated), ex);
+        }
+    }
+
+    private void GestureRecognizer_ManipulationCompleted(GestureRecognizer sender, ManipulationCompletedEventArgs args)
+    {
+        try
+        {
+            ManipulationCompleted?.Invoke(sender, args);
+        }
+        catch (Exception ex)
+        {
+            Logger.F(TAG, nameof(GestureRecognizer_ManipulationCompleted), ex);
         }
     }
 }

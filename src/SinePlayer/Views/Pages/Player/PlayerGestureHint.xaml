@@ -28,7 +28,7 @@
             <TextBlock
                 x:Name="EffectText"
                 VerticalAlignment="Center"
-                FontSize="22"
+                FontSize="24"
                 FontWeight="SemiBold"
                 Foreground="White" />
         </StackPanel>
