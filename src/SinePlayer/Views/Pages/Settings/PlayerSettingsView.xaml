@@ -90,6 +90,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock
@@ -238,6 +239,31 @@
                     SpinButtonPlacementMode="Inline"
                     ValueChanged="ZoomOutNumberBox_ValueChanged"
                     Value="{x:Bind ViewModel.ZoomOutStep, Mode=TwoWay}" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="6"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.FastForward}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="6"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="FastForwardNumberBox"
+                    MinWidth="120"
+                    LargeChange="0.5"
+                    Maximum="8"
+                    Minimum="1"
+                    SmallChange="0.1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="FastForwardNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.FastForwardSpeed, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="x" />
             </StackPanel>
         </Grid>
     </StackPanel>

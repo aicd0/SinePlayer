@@ -561,6 +561,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="ExpressionValid" xml:space="preserve">
     <value>SQL-запрос: $query</value>
   </data>
+  <data name="FastForward" xml:space="preserve">
+    <value>Скорость перемотки</value>
+  </data>
   <data name="Favorite" xml:space="preserve">
     <value>В избранное</value>
   </data>

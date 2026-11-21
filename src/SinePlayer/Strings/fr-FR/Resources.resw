@@ -561,6 +561,9 @@ L'évaluation s'effectuera dans l'ordre suivant :
   <data name="ExpressionValid" xml:space="preserve">
     <value>Requête SQL : $query</value>
   </data>
+  <data name="FastForward" xml:space="preserve">
+    <value>Avance rapide</value>
+  </data>
   <data name="Favorite" xml:space="preserve">
     <value>Collecter</value>
   </data>

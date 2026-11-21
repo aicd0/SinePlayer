@@ -561,6 +561,9 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="ExpressionValid" xml:space="preserve">
     <value>SQL查询语句：$query</value>
   </data>
+  <data name="FastForward" xml:space="preserve">
+    <value>快进</value>
+  </data>
   <data name="Favorite" xml:space="preserve">
     <value>收藏</value>
   </data>

@@ -197,6 +197,7 @@ internal sealed partial class PlayerPage : BasePage
         TransportBar.PlayQueueRequested += OpenPlayQueuePane;
         TransportBar.RepeatRequested += ViewModel.CycleRepeatMode;
         TransportBar.ShuffleRequested += ViewModel.ToggleShuffle;
+        TransportBar.MoreRequested += TransportBar_MoreRequested;
         TransportBar.SeekRequested += SeekTo;
         TransportBar.VolumeChanged += SetVolume;
         TransportBar.MuteChanged += SetMuted;
@@ -364,41 +365,20 @@ internal sealed partial class PlayerPage : BasePage
             return;
         }
 
+        // A hold on the picture is what speeds the playback up, so touch no longer opens the menu; a right click does.
+        if (GetMainWindowAbility().LastPointerDeviceType != PointerDeviceType.Mouse)
+        {
+            return;
+        }
+
         args.Handled = true;
 
         CoroutineUtils.Run(async () =>
         {
-            PlayerSettingsPanel? settingsPanel = _navigationBar?.PlayerSettingsPanel;
-            MediaModel? media = ViewModel.Media;
-            PlayerSession? session = _session;
-            if (settingsPanel is null || media is null || session is null)
+            MenuFlyout? flyout = await CreateVideoHostMenu();
+            if (flyout is null)
             {
                 return;
-            }
-
-            PlayerMenuContext context = new()
-            {
-                WindowId = WindowId,
-                ActionHandler = PageActionHandler,
-                Media = media,
-                Settings = settingsPanel.Settings,
-                UpdateVideoSettings = settingsPanel.ApplyVideo,
-                UpdateAudioSettings = settingsPanel.ApplyAudio,
-                UpdateSubtitleSettings = settingsPanel.ApplySubtitle,
-                PlayQueue = session.PlayQueue.ToBuilder(),
-                Playback = ViewModel.Playback.ToBuilder(),
-                Session = session,
-                View = _view,
-                Url = GetMainPageAbility().Url,
-                PromptInfo = PromptTemporary,
-            };
-
-            List<BaseMenuFlyoutItemModel> items = await PlayerMenuCreator.CreateVideoHostMenuItems(context);
-
-            MenuFlyout flyout = new();
-            foreach (BaseMenuFlyoutItemModel item in items)
-            {
-                flyout.Items.Add(item.CreateMenuFlyoutItem());
             }
 
             if (args.TryGetPosition(fe, out Windows.Foundation.Point point))
@@ -409,6 +389,21 @@ internal sealed partial class PlayerPage : BasePage
             {
                 flyout.ShowAt(fe);
             }
+        });
+    }
+
+    private void TransportBar_MoreRequested(FrameworkElement anchor)
+    {
+        CoroutineUtils.Run(async () =>
+        {
+            MenuFlyout? flyout = await CreateVideoHostMenu();
+            if (flyout is null)
+            {
+                return;
+            }
+
+            flyout.Placement = FlyoutPlacementMode.TopEdgeAlignedLeft;
+            flyout.ShowAt(anchor);
         });
     }
 
@@ -543,11 +538,11 @@ internal sealed partial class PlayerPage : BasePage
     private bool _viewDisposed;
     private SubtitleInsets _subtitleInsets = SubtitleInsets.None;
     private MediaEngineState _lastPlaybackState = MediaEngineState.None;
+    private bool _suppressNextResumePrompt;
+    private bool _suppressNextPathPrompt = true;
 
     private void Session_MediaChanged(MediaModel? media, OperationResult opened)
     {
-        _lastPlaybackState = MediaEngineState.None;
-
         Enqueue(async () =>
         {
             PlayerSession? session = _session;
@@ -575,6 +570,15 @@ internal sealed partial class PlayerPage : BasePage
             {
                 EmitError(opened.Message);
                 return;
+            }
+
+            if (_suppressNextPathPrompt)
+            {
+                _suppressNextPathPrompt = false;
+            }
+            else
+            {
+                PromptTemporary(media.Location);
             }
 
             await ApplyPlayerSettings();
@@ -633,6 +637,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (IsResumed)
         {
+            _suppressNextResumePrompt = true;
             session.Play();
         }
         else
@@ -746,10 +751,18 @@ internal sealed partial class PlayerPage : BasePage
         }
         else if (state == MediaEngineState.Playing && lastState == MediaEngineState.Paused)
         {
-            PromptTemporary(StringResourceProvider.Instance.PlaybackResumed);
+            if (_suppressNextResumePrompt)
+            {
+                _suppressNextResumePrompt = false;
+            }
+            else
+            {
+                PromptTemporary(StringResourceProvider.Instance.PlaybackResumed);
+            }
         }
         else if (state == MediaEngineState.Paused && lastState == MediaEngineState.Playing)
         {
+            _suppressNextResumePrompt = false;
             PromptTemporary(StringResourceProvider.Instance.PlaybackPaused);
         }
 
@@ -1250,6 +1263,8 @@ internal sealed partial class PlayerPage : BasePage
 
     private void TogglePlayPause()
     {
+        _suppressNextResumePrompt = false;
+
         Enqueue(() =>
         {
             if (_session is not { } session)
@@ -1726,6 +1741,44 @@ internal sealed partial class PlayerPage : BasePage
         AddKeyboardAccelerators(KeyboardShortcutActions.VolumeUp, (_, _) => AdjustVolume(GetVolumeStep(AppSettingsModel.VolumeUpPercent)));
         AddKeyboardAccelerators(KeyboardShortcutActions.OpenNextItem, (_, _) => ViewModel.Next());
         AddKeyboardAccelerators(KeyboardShortcutActions.OpenPreviousItem, (_, _) => ViewModel.Previous());
+    }
+
+    private async Task<MenuFlyout?> CreateVideoHostMenu()
+    {
+        PlayerSettingsPanel? settingsPanel = _navigationBar?.PlayerSettingsPanel;
+        MediaModel? media = ViewModel.Media;
+        PlayerSession? session = _session;
+        if (settingsPanel is null || media is null || session is null)
+        {
+            return null;
+        }
+
+        PlayerMenuContext context = new()
+        {
+            WindowId = WindowId,
+            ActionHandler = PageActionHandler,
+            Media = media,
+            Settings = settingsPanel.Settings,
+            UpdateVideoSettings = settingsPanel.ApplyVideo,
+            UpdateAudioSettings = settingsPanel.ApplyAudio,
+            UpdateSubtitleSettings = settingsPanel.ApplySubtitle,
+            PlayQueue = session.PlayQueue.ToBuilder(),
+            Playback = ViewModel.Playback.ToBuilder(),
+            Session = session,
+            View = _view,
+            Url = GetMainPageAbility().Url,
+            PromptInfo = PromptTemporary,
+        };
+
+        List<BaseMenuFlyoutItemModel> items = await PlayerMenuCreator.CreateVideoHostMenuItems(context);
+
+        MenuFlyout flyout = new();
+        foreach (BaseMenuFlyoutItemModel item in items)
+        {
+            flyout.Items.Add(item.CreateMenuFlyoutItem());
+        }
+
+        return flyout;
     }
 
     #endregion

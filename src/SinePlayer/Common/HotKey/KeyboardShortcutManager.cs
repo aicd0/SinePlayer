@@ -18,12 +18,9 @@ namespace SinePlayer.Common.HotKey;
 
 internal static class KeyboardShortcutManager
 {
-    private const long TRIGGER_COOLDOWN = 200;
-
     private static readonly MutableLiveData<bool> sShortcutsChangedLiveData = new();
     public static ILiveData<bool> ShortcutsChangedLiveData => sShortcutsChangedLiveData;
 
-    private static readonly Dictionary<string, long> sLastTriggerTime = [];
     private static List<KeyboardShortcutModel>? sCachedShortcuts;
 
     static KeyboardShortcutManager()
@@ -128,10 +125,7 @@ internal static class KeyboardShortcutManager
             accelerator.Invoked += (sender, args) =>
             {
                 args.Handled = true;
-                if (IsTriggerAllowed(shortcut))
-                {
-                    handler(sender, args);
-                }
+                handler(sender, args);
             };
             accelerators.Add(accelerator);
         }
@@ -179,23 +173,6 @@ internal static class KeyboardShortcutManager
     private static List<KeyboardShortcutModel> GetCachedShortcuts()
     {
         return sCachedShortcuts ??= AppSettingsModel.KeyboardShortcuts;
-    }
-
-    private static bool IsTriggerAllowed(KeyboardShortcutModel shortcut)
-    {
-        string triggerKey = $"{shortcut.Action}:{shortcut.Key}:{shortcut.Modifiers}";
-        long now = Environment.TickCount64;
-        if (sLastTriggerTime.TryGetValue(triggerKey, out long lastTime))
-        {
-            long elapsedMilliseconds = now - lastTime;
-            if (elapsedMilliseconds < TRIGGER_COOLDOWN)
-            {
-                return false;
-            }
-        }
-
-        sLastTriggerTime[triggerKey] = now;
-        return true;
     }
 
     private static string GetScope(string action)

@@ -135,6 +135,7 @@ public class StringResourceProvider
     public string ExpressionOr => GetResourceString("ExpressionOr");
     public string ExpressionReference => GetResourceString("ExpressionReference");
     public string ExpressionValid => GetResourceString("ExpressionValid");
+    public string FastForward => GetResourceString("FastForward");
     public string Favorite => GetResourceString("Favorite");
     public string Favorites => GetResourceString("Favorites");
     public string Feedback => GetResourceString("Feedback");

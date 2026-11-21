@@ -57,7 +57,7 @@ internal sealed partial class PlayerGestureHint : BaseUserControl
     {
         EffectIcon.Glyph = SpeedGlyph;
         EffectIcon.Visibility = Visibility.Visible;
-        EffectText.Text = $"{rate.ToString("0.0", CultureInfo.InvariantCulture)}x";
+        EffectText.Text = $"{rate.ToString("0.0#", CultureInfo.InvariantCulture)}x";
         Visibility = Visibility.Visible;
     }
 

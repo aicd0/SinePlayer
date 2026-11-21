@@ -35,6 +35,9 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
     public delegate void ShuffleRequestedEventHandler();
     public event ShuffleRequestedEventHandler? ShuffleRequested;
 
+    public delegate void MoreRequestedEventHandler(FrameworkElement anchor);
+    public event MoreRequestedEventHandler? MoreRequested;
+
     public delegate void SeekRequestedEventHandler(long positionMs);
     public event SeekRequestedEventHandler? SeekRequested;
 
@@ -231,6 +234,11 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
     private void OnShuffleClick(object sender, RoutedEventArgs e)
     {
         ShuffleRequested?.Invoke();
+    }
+
+    private void OnMoreClick(object sender, RoutedEventArgs e)
+    {
+        MoreRequested?.Invoke(MoreButton);
     }
 
     private void OnMuteClick(object sender, RoutedEventArgs e)

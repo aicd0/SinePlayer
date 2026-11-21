@@ -561,6 +561,9 @@ The expression will be evaluated in the following order:
   <data name="ExpressionValid" xml:space="preserve">
     <value>SQL query: $query</value>
   </data>
+  <data name="FastForward" xml:space="preserve">
+    <value>Fast forward</value>
+  </data>
   <data name="Favorite" xml:space="preserve">
     <value>Favorite</value>
   </data>
