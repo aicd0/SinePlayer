@@ -288,6 +288,14 @@ class StringUtils
         return defaultValue;
     }
 
+    public static string FormatTime(long milliseconds)
+    {
+        var time = TimeSpan.FromMilliseconds(Math.Max(milliseconds, 0));
+        return time.TotalHours >= 1.0
+            ? time.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
+            : time.ToString(@"m\:ss", CultureInfo.InvariantCulture);
+    }
+
     public static bool TryNormalizeWebUrl(string url, out Uri? result)
     {
         result = null;

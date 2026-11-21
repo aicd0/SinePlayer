@@ -1006,6 +1006,12 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="PlaybackInformation" xml:space="preserve">
     <value>再生情報</value>
   </data>
+  <data name="PlaybackPaused" xml:space="preserve">
+    <value>再生を一時停止しました</value>
+  </data>
+  <data name="PlaybackResumed" xml:space="preserve">
+    <value>再生を再開しました</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>プレーヤーの全般設定</value>
   </data>

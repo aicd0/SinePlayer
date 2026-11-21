@@ -269,6 +269,8 @@ public class StringResourceProvider
     public string PlayQueueEmpty => GetResourceString("PlayQueueEmpty");
     public string Playback => GetResourceString("Playback");
     public string PlaybackInformation => GetResourceString("PlaybackInformation");
+    public string PlaybackPaused => GetResourceString("PlaybackPaused");
+    public string PlaybackResumed => GetResourceString("PlaybackResumed");
     public string PlayerSettings => GetResourceString("PlayerSettings");
     public string PlayerStatusError => GetResourceString("PlayerStatusError");
     public string PluginSettingsDescription => GetResourceString("PluginSettingsDescription");

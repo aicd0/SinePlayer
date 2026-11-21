@@ -1006,6 +1006,12 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="PlaybackInformation" xml:space="preserve">
     <value>Playback information</value>
   </data>
+  <data name="PlaybackPaused" xml:space="preserve">
+    <value>Playback paused</value>
+  </data>
+  <data name="PlaybackResumed" xml:space="preserve">
+    <value>Playback resumed</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Global player configurations</value>
   </data>

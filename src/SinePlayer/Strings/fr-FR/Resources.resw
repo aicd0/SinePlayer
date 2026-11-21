@@ -1006,6 +1006,12 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="PlaybackInformation" xml:space="preserve">
     <value>Informations de lecture</value>
   </data>
+  <data name="PlaybackPaused" xml:space="preserve">
+    <value>Lecture en pause</value>
+  </data>
+  <data name="PlaybackResumed" xml:space="preserve">
+    <value>Lecture reprise</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Paramètres généraux du lecteur</value>
   </data>

@@ -20,6 +20,7 @@ using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Constants;
 using SinePlayer.Common.HotKey;
+using SinePlayer.Common.Localization;
 using SinePlayer.Common.Misc;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Common.Plugins;
@@ -54,8 +55,6 @@ internal sealed partial class PlayerPage : BasePage
 {
     #region Constructor
 
-    private const long SEEK_STEP_MS = 5000;
-    private const int VOLUME_STEP = 5;
     private const int HIDE_OVERLAY_DELAY_MS = 0;
     private const int HIDE_CURSOR_DELAY_MS = 3000;
 
@@ -542,9 +541,12 @@ internal sealed partial class PlayerPage : BasePage
     private PlayerView? _view;
     private bool _viewDisposed;
     private SubtitleInsets _subtitleInsets = SubtitleInsets.None;
+    private MediaEngineState _lastPlaybackState = MediaEngineState.None;
 
     private void Session_MediaChanged(MediaModel? media, OperationResult opened)
     {
+        _lastPlaybackState = MediaEngineState.None;
+
         Enqueue(async () =>
         {
             PlayerSession? session = _session;
@@ -731,12 +733,23 @@ internal sealed partial class PlayerPage : BasePage
 
     private void ShowState(MediaEngineState state, string? message)
     {
+        MediaEngineState lastState = _lastPlaybackState;
+        _lastPlaybackState = state;
+
         ViewModel.IsPlayingLiveData.Emit(state == MediaEngineState.Playing);
         ViewModel.IsPlaying = state == MediaEngineState.Playing;
 
         if (state == MediaEngineState.Error)
         {
             EmitError(message ?? "Unknown error");
+        }
+        else if (state == MediaEngineState.Playing && lastState == MediaEngineState.Paused)
+        {
+            PromptTemporary(StringResourceProvider.Instance.PlaybackResumed);
+        }
+        else if (state == MediaEngineState.Paused && lastState == MediaEngineState.Playing)
+        {
+            PromptTemporary(StringResourceProvider.Instance.PlaybackPaused);
         }
 
         UpdateKeepScreenOn();
@@ -1228,6 +1241,11 @@ internal sealed partial class PlayerPage : BasePage
 
     private void SeekBy(long deltaMs)
     {
+        if (deltaMs == 0)
+        {
+            return;
+        }
+
         Enqueue(() =>
         {
             if (_session is not { } session)
@@ -1239,7 +1257,18 @@ internal sealed partial class PlayerPage : BasePage
             SeekMode mode = AppSettingsModel.PreciseSeeking
                 ? SeekMode.Precise
                 : deltaMs > 0 ? SeekMode.NextKeyframe : SeekMode.PreviousKeyframe;
-            SeekTo(Math.Max(positionMs + deltaMs, 0), mode);
+
+            long durationMs = ViewModel.DurationMs;
+            long targetMs = durationMs > 0
+                ? Math.Clamp(positionMs + deltaMs, 0, durationMs)
+                : Math.Max(positionMs + deltaMs, 0);
+
+            SeekTo(targetMs, mode);
+
+            string action = deltaMs > 0
+                ? StringResourceProvider.Instance.SeekForward
+                : StringResourceProvider.Instance.SeekBackward;
+            PromptTemporary(StringResourceProvider.Instance.WithColon(action) + StringUtils.FormatTime(targetMs));
         });
     }
 
@@ -1263,7 +1292,17 @@ internal sealed partial class PlayerPage : BasePage
 
     private void AdjustVolume(int delta)
     {
+        if (delta == 0)
+        {
+            return;
+        }
+
         SetVolume(ViewModel.VolumeLiveData.Value + delta);
+
+        string action = delta > 0
+            ? StringResourceProvider.Instance.VolumeUp
+            : StringResourceProvider.Instance.VolumeDown;
+        PromptTemporary(StringResourceProvider.Instance.WithColon(action) + $"{ViewModel.VolumeLiveData.Value}%");
     }
 
     private void SetMuted(bool isMuted)
@@ -1625,10 +1664,10 @@ internal sealed partial class PlayerPage : BasePage
         KeyboardAccelerators.Clear();
 
         AddKeyboardAccelerators(KeyboardShortcutActions.PlayPause, (_, _) => TogglePlayPause());
-        AddKeyboardAccelerators(KeyboardShortcutActions.SeekBackward, (_, _) => SeekBy(-SEEK_STEP_MS));
-        AddKeyboardAccelerators(KeyboardShortcutActions.SeekForward, (_, _) => SeekBy(SEEK_STEP_MS));
-        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeDown, (_, _) => AdjustVolume(-VOLUME_STEP));
-        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeUp, (_, _) => AdjustVolume(VOLUME_STEP));
+        AddKeyboardAccelerators(KeyboardShortcutActions.SeekBackward, (_, _) => SeekBy(-GetSeekStepMs(AppSettingsModel.SeekBackwardSeconds)));
+        AddKeyboardAccelerators(KeyboardShortcutActions.SeekForward, (_, _) => SeekBy(GetSeekStepMs(AppSettingsModel.SeekForwardSeconds)));
+        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeDown, (_, _) => AdjustVolume(-GetVolumeStep(AppSettingsModel.VolumeDownPercent)));
+        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeUp, (_, _) => AdjustVolume(GetVolumeStep(AppSettingsModel.VolumeUpPercent)));
         AddKeyboardAccelerators(KeyboardShortcutActions.OpenNextItem, (_, _) => ViewModel.Next());
         AddKeyboardAccelerators(KeyboardShortcutActions.OpenPreviousItem, (_, _) => ViewModel.Previous());
     }
@@ -1636,6 +1675,16 @@ internal sealed partial class PlayerPage : BasePage
     #endregion
 
     #region Utilities
+
+    private static long GetSeekStepMs(double seconds)
+    {
+        return double.IsFinite(seconds) && seconds > 0.0 ? (long)Math.Round(seconds * 1000.0) : 0;
+    }
+
+    private static int GetVolumeStep(double percent)
+    {
+        return double.IsFinite(percent) && percent > 0.0 ? (int)Math.Round(percent) : 0;
+    }
 
     private void Enqueue(Action action)
     {

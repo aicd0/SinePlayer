@@ -1004,6 +1004,12 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="PlaybackInformation" xml:space="preserve">
     <value>播放資訊</value>
   </data>
+  <data name="PlaybackPaused" xml:space="preserve">
+    <value>播放已暫停</value>
+  </data>
+  <data name="PlaybackResumed" xml:space="preserve">
+    <value>播放已恢復</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>播放器全域設定</value>
   </data>

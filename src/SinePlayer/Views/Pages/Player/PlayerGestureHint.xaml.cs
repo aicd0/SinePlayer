@@ -7,6 +7,7 @@ using System.Globalization;
 using Microsoft.UI.Xaml;
 
 using SinePlayer.Common.BaseUI;
+using SinePlayer.Common.Utils;
 
 namespace SinePlayer.Views.Pages.Player;
 
@@ -48,7 +49,7 @@ internal sealed partial class PlayerGestureHint : BaseUserControl
     public void ShowSeek(long positionMs, long offsetMs)
     {
         EffectIcon.Visibility = Visibility.Collapsed;
-        EffectText.Text = $"{FormatTime(positionMs)} ({FormatOffset(offsetMs)})";
+        EffectText.Text = $"{StringUtils.FormatTime(positionMs)} ({FormatOffset(offsetMs)})";
         Visibility = Visibility.Visible;
     }
 
@@ -71,14 +72,6 @@ internal sealed partial class PlayerGestureHint : BaseUserControl
     public void Hide()
     {
         Visibility = Visibility.Collapsed;
-    }
-
-    private static string FormatTime(long milliseconds)
-    {
-        var time = TimeSpan.FromMilliseconds(Math.Max(milliseconds, 0));
-        return time.TotalHours >= 1.0
-            ? time.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
-            : time.ToString(@"m\:ss", CultureInfo.InvariantCulture);
     }
 
     private static string FormatOffset(long offsetMs)

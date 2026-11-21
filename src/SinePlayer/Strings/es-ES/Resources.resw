@@ -1006,6 +1006,12 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="PlaybackInformation" xml:space="preserve">
     <value>Información de reproducción</value>
   </data>
+  <data name="PlaybackPaused" xml:space="preserve">
+    <value>Reproducción en pausa</value>
+  </data>
+  <data name="PlaybackResumed" xml:space="preserve">
+    <value>Reproducción reanudada</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Configuración global del reproductor</value>
   </data>

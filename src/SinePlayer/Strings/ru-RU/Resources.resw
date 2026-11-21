@@ -1006,6 +1006,12 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="PlaybackInformation" xml:space="preserve">
     <value>Информация о воспроизведении</value>
   </data>
+  <data name="PlaybackPaused" xml:space="preserve">
+    <value>Воспроизведение приостановлено</value>
+  </data>
+  <data name="PlaybackResumed" xml:space="preserve">
+    <value>Воспроизведение возобновлено</value>
+  </data>
   <data name="PlayerExpander.Detail" xml:space="preserve">
     <value>Общие настройки проигрывателя</value>
   </data>
