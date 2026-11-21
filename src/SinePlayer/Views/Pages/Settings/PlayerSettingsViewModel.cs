@@ -168,6 +168,28 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private double _zoomInStep = AppSettingsModel.ZoomInStep;
+    public double ZoomInStep
+    {
+        get => _zoomInStep;
+        set
+        {
+            _zoomInStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ZoomInStep)));
+        }
+    }
+
+    private double _zoomOutStep = AppSettingsModel.ZoomOutStep;
+    public double ZoomOutStep
+    {
+        get => _zoomOutStep;
+        set
+        {
+            _zoomOutStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ZoomOutStep)));
+        }
+    }
+
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
@@ -195,6 +217,8 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             SeekBackwardSeconds = AppSettingsModel.SeekBackwardSeconds;
             VolumeUpPercent = AppSettingsModel.VolumeUpPercent;
             VolumeDownPercent = AppSettingsModel.VolumeDownPercent;
+            ZoomInStep = AppSettingsModel.ZoomInStep;
+            ZoomOutStep = AppSettingsModel.ZoomOutStep;
         });
     }
 

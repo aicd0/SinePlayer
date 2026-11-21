@@ -24,7 +24,8 @@
             PointerExited="VideoGrid_PointerExited"
             PointerMoved="VideoGrid_PointerMoved"
             PointerPressed="VideoGrid_PointerPressed"
-            PointerReleased="VideoGrid_PointerReleased">
+            PointerReleased="VideoGrid_PointerReleased"
+            PointerWheelChanged="VideoGrid_PointerWheelChanged">
             <Grid x:Name="VideoHost" IsHitTestVisible="False" />
             <Grid x:Name="SubtitleHost" IsHitTestVisible="False" />
         </Grid>

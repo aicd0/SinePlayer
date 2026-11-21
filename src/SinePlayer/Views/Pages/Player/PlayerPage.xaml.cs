@@ -48,6 +48,7 @@ using SinePlayer.Views.Pages.Sidebar.MediaInfo;
 
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
+using Windows.UI.Core;
 
 namespace SinePlayer.Views.Pages.Player;
 
@@ -889,6 +890,34 @@ internal sealed partial class PlayerPage : BasePage
         _dragGesture.Cancel(e.GetCurrentPoint(VideoGrid));
     }
 
+    private void VideoGrid_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        int wheelDelta = e.GetCurrentPoint(VideoGrid).Properties.MouseWheelDelta;
+        if (wheelDelta == 0)
+        {
+            return;
+        }
+
+        e.Handled = true;
+
+        if (IsControlKeyDown())
+        {
+            double delta = GetZoomStep(wheelDelta > 0 ? AppSettingsModel.ZoomInStep : AppSettingsModel.ZoomOutStep);
+            if (delta > 0.0)
+            {
+                ZoomBy(wheelDelta > 0 ? delta : -delta);
+            }
+
+            return;
+        }
+
+        int volumeStep = GetVolumeStep(wheelDelta > 0 ? AppSettingsModel.VolumeUpPercent : AppSettingsModel.VolumeDownPercent);
+        if (volumeStep > 0)
+        {
+            AdjustVolume(wheelDelta > 0 ? volumeStep : -volumeStep);
+        }
+    }
+
     private void DragGesture_SingleTapped()
     {
         if (IsStarted)
@@ -1311,6 +1340,33 @@ internal sealed partial class PlayerPage : BasePage
         Enqueue(() => _session?.SetMuted(isMuted));
     }
 
+    private void ZoomBy(double delta)
+    {
+        PlayerView? view = _view;
+        if (view?.VideoChain is not { SelectedStream: not null } chain)
+        {
+            return;
+        }
+
+        double current = chain.Transform.Zoom;
+        if (!double.IsFinite(current) || current <= 0.0)
+        {
+            current = 1.0;
+        }
+
+        double zoom = Math.Round(Math.Clamp(current + delta, VideoSettingsModel.MinimumZoom, VideoSettingsModel.MaximumZoom), 2);
+        if (zoom != chain.Transform.Zoom)
+        {
+            chain.Transform = chain.Transform with { Zoom = zoom };
+            _navigationBar?.PlayerSettingsPanel.ApplyVideo(settings => settings.Zoom = zoom);
+        }
+
+        string action = delta > 0.0
+            ? StringResourceProvider.Instance.ZoomIn
+            : StringResourceProvider.Instance.ZoomOut;
+        PromptTemporary(StringResourceProvider.Instance.WithColon(action) + $"{Math.Round(zoom * 100.0)}%");
+    }
+
     private async Task ApplyPlayerSettings()
     {
         PlayerSession? session = _session;
@@ -1686,6 +1742,11 @@ internal sealed partial class PlayerPage : BasePage
         return double.IsFinite(percent) && percent > 0.0 ? (int)Math.Round(percent) : 0;
     }
 
+    private static double GetZoomStep(double zoom)
+    {
+        return double.IsFinite(zoom) && zoom > 0.0 ? zoom : 0.0;
+    }
+
     private void Enqueue(Action action)
     {
         Enqueue(() =>
@@ -1716,6 +1777,12 @@ internal sealed partial class PlayerPage : BasePage
     private IMainWindowAbility GetMainWindowAbility()
     {
         return GetAbility<IMainWindowAbility>()!;
+    }
+
+    private static bool IsControlKeyDown()
+    {
+        CoreVirtualKeyStates state = InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+        return (state & CoreVirtualKeyStates.Down) == CoreVirtualKeyStates.Down;
     }
 
     private static long GetTick()
