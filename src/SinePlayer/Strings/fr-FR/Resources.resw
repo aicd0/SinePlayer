@@ -976,6 +976,21 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="Pan" xml:space="preserve">
     <value>Panoramique</value>
   </data>
+  <data name="PanDown" xml:space="preserve">
+    <value>Déplacer vers le bas</value>
+  </data>
+  <data name="PanLeft" xml:space="preserve">
+    <value>Déplacer vers la gauche</value>
+  </data>
+  <data name="PanPosition" xml:space="preserve">
+    <value>Déplacement</value>
+  </data>
+  <data name="PanRight" xml:space="preserve">
+    <value>Déplacer vers la droite</value>
+  </data>
+  <data name="PanUp" xml:space="preserve">
+    <value>Déplacer vers le haut</value>
+  </data>
   <data name="PanX" xml:space="preserve">
     <value>Décalage X</value>
   </data>

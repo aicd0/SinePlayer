@@ -47,6 +47,8 @@ internal sealed class PlayerMenuContext
 
     public required Action<bool> AdjustSubtitleFontSize { get; init; }
 
+    public required Action<string> AdjustPan { get; init; }
+
     public PlayQueueModel.Builder? PlayQueue { get; init; }
 
     public PlaybackModel.Builder? Playback { get; init; }

@@ -976,6 +976,21 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="Pan" xml:space="preserve">
     <value>Balance</value>
   </data>
+  <data name="PanDown" xml:space="preserve">
+    <value>Desplazar hacia abajo</value>
+  </data>
+  <data name="PanLeft" xml:space="preserve">
+    <value>Desplazar hacia la izquierda</value>
+  </data>
+  <data name="PanPosition" xml:space="preserve">
+    <value>Desplazamiento</value>
+  </data>
+  <data name="PanRight" xml:space="preserve">
+    <value>Desplazar hacia la derecha</value>
+  </data>
+  <data name="PanUp" xml:space="preserve">
+    <value>Desplazar hacia arriba</value>
+  </data>
   <data name="PanX" xml:space="preserve">
     <value>Desplazamiento X</value>
   </data>

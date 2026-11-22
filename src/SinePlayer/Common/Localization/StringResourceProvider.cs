@@ -259,6 +259,11 @@ public class StringResourceProvider
     public string Output => GetResourceString("Output");
     public string OverwriteExistingEntries => GetResourceString("OverwriteExistingEntries");
     public string Pan => GetResourceString("Pan");
+    public string PanDown => GetResourceString("PanDown");
+    public string PanLeft => GetResourceString("PanLeft");
+    public string PanPosition => GetResourceString("PanPosition");
+    public string PanRight => GetResourceString("PanRight");
+    public string PanUp => GetResourceString("PanUp");
     public string PanX => GetResourceString("PanX");
     public string PanY => GetResourceString("PanY");
     public string Pause => GetResourceString("Pause");

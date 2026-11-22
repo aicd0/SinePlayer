@@ -376,6 +376,32 @@ internal static class AppSettingsModel
         }
     }
 
+    public static double VideoPanStep
+    {
+        get
+        {
+            return _db.Read(model => model.VideoPanStep ?? 5.0);
+        }
+        set
+        {
+            _db.Write(model => model.VideoPanStep = value);
+            _db.Save();
+        }
+    }
+
+    public static double SubtitlePanStep
+    {
+        get
+        {
+            return _db.Read(model => model.SubtitlePanStep ?? 5.0);
+        }
+        set
+        {
+            _db.Write(model => model.SubtitlePanStep = value);
+            _db.Save();
+        }
+    }
+
     public static CloseLastTabBehaviorEnum CloseLastTabBehavior
     {
         get
@@ -1281,6 +1307,12 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("DecreaseSubtitleFontSizeStep")]
         public double? DecreaseSubtitleFontSizeStep { get; set; }
+
+        [JsonPropertyName("VideoPanStep")]
+        public double? VideoPanStep { get; set; }
+
+        [JsonPropertyName("SubtitlePanStep")]
+        public double? SubtitlePanStep { get; set; }
 
         [JsonPropertyName("PromptBeforeRemovingMedia")]
         public bool? PromptBeforeRemovingMedia { get; set; }

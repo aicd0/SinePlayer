@@ -240,6 +240,24 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
+    private void VideoPanStepNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.VideoPanStep);
+        if (AppSettingsModel.VideoPanStep != value)
+        {
+            AppSettingsModel.VideoPanStep = value;
+        }
+    }
+
+    private void SubtitlePanStepNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.SubtitlePanStep);
+        if (AppSettingsModel.SubtitlePanStep != value)
+        {
+            AppSettingsModel.SubtitlePanStep = value;
+        }
+    }
+
     private static double ReadStep(NumberBox box, double fallback, int decimals = 0)
     {
         if (double.IsNaN(box.Value))

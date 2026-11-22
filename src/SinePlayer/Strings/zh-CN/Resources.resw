@@ -976,6 +976,21 @@ NOT                  - 逻辑非。例如：NOT %tag = "SomeTag"
   <data name="Pan" xml:space="preserve">
     <value>声像</value>
   </data>
+  <data name="PanDown" xml:space="preserve">
+    <value>下移</value>
+  </data>
+  <data name="PanLeft" xml:space="preserve">
+    <value>左移</value>
+  </data>
+  <data name="PanPosition" xml:space="preserve">
+    <value>平移</value>
+  </data>
+  <data name="PanRight" xml:space="preserve">
+    <value>右移</value>
+  </data>
+  <data name="PanUp" xml:space="preserve">
+    <value>上移</value>
+  </data>
   <data name="PanX" xml:space="preserve">
     <value>水平平移</value>
   </data>

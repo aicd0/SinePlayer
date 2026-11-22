@@ -23,6 +23,14 @@ internal static class KeyboardShortcutActions
     public const string OpenDevTools = "OpenDevTools";
     public const string OpenNextItem = "OpenNextItem";
     public const string OpenPreviousItem = "OpenPreviousItem";
+    public const string PanSubtitleDown = "PanSubtitleDown";
+    public const string PanSubtitleLeft = "PanSubtitleLeft";
+    public const string PanSubtitleRight = "PanSubtitleRight";
+    public const string PanSubtitleUp = "PanSubtitleUp";
+    public const string PanVideoDown = "PanVideoDown";
+    public const string PanVideoLeft = "PanVideoLeft";
+    public const string PanVideoRight = "PanVideoRight";
+    public const string PanVideoUp = "PanVideoUp";
     public const string PlayPause = "PlayPause";
     public const string SeekBackward = "SeekBackward";
     public const string SeekForward = "SeekForward";
@@ -39,7 +47,8 @@ internal static class KeyboardShortcutActions
     public const string ZoomOut = "ZoomOut";
 
     public const string RootScope = "";
-    public const string PlayerScope = "/Player";
+    private const string PathSeparator = " / ";
+    private const string PlayerScope = "/Player";
 
     private static readonly List<KeyboardShortcutActionEntry> sAll =
     [
@@ -61,12 +70,20 @@ internal static class KeyboardShortcutActions
         new() { Id = SyncVideoBackward, Name = StringResourceProvider.Instance.SyncBackward, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
         new() { Id = ZoomIn, Name = StringResourceProvider.Instance.ZoomIn, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
         new() { Id = ZoomOut, Name = StringResourceProvider.Instance.ZoomOut, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
+        new() { Id = PanVideoUp, Name = StringResourceProvider.Instance.PanUp, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
+        new() { Id = PanVideoDown, Name = StringResourceProvider.Instance.PanDown, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
+        new() { Id = PanVideoLeft, Name = StringResourceProvider.Instance.PanLeft, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
+        new() { Id = PanVideoRight, Name = StringResourceProvider.Instance.PanRight, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
         new() { Id = SyncAudioForward, Name = StringResourceProvider.Instance.SyncForward, CategoryPath = [StringResourceProvider.Instance.Audio], Scope = PlayerScope },
         new() { Id = SyncAudioBackward, Name = StringResourceProvider.Instance.SyncBackward, CategoryPath = [StringResourceProvider.Instance.Audio], Scope = PlayerScope },
         new() { Id = SyncSubtitleForward, Name = StringResourceProvider.Instance.SyncForward, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
         new() { Id = SyncSubtitleBackward, Name = StringResourceProvider.Instance.SyncBackward, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
         new() { Id = IncreaseSubtitleFontSize, Name = StringResourceProvider.Instance.IncreaseFontSize, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
         new() { Id = DecreaseSubtitleFontSize, Name = StringResourceProvider.Instance.DecreaseFontSize, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
+        new() { Id = PanSubtitleUp, Name = StringResourceProvider.Instance.PanUp, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
+        new() { Id = PanSubtitleDown, Name = StringResourceProvider.Instance.PanDown, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
+        new() { Id = PanSubtitleLeft, Name = StringResourceProvider.Instance.PanLeft, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
+        new() { Id = PanSubtitleRight, Name = StringResourceProvider.Instance.PanRight, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
         new() { Id = ExitFullscreen, Name = StringResourceProvider.Instance.ExitFullscreen, IsInternal = true },
         new() { Id = OpenDevTools, Name = "Open dev tools", IsInternal = true },
     ];
@@ -129,6 +146,11 @@ internal static class KeyboardShortcutActions
         return Get(action)?.FullName ?? action;
     }
 
+    public static string JoinPath(params string[] parts)
+    {
+        return string.Join(PathSeparator, parts);
+    }
+
     public static KeyboardShortcutActionGroup BuildTree(IEnumerable<KeyboardShortcutActionEntry> entries)
     {
         KeyboardShortcutActionGroup root = new();
@@ -169,9 +191,7 @@ internal sealed class KeyboardShortcutActionEntry
 
     public bool IsInternal { get; init; }
 
-    public string CategoryText => string.Join(" / ", CategoryPath);
-
-    public string FullName => CategoryPath.Length == 0 ? Name : $"{CategoryText} / {Name}";
+    public string FullName => CategoryPath.Length == 0 ? Name : KeyboardShortcutActions.JoinPath([.. CategoryPath, Name]);
 }
 
 internal sealed class KeyboardShortcutActionGroup

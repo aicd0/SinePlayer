@@ -59,6 +59,7 @@ internal sealed partial class PlayerPage : BasePage
     private const int HIDE_OVERLAY_DELAY_MS = 0;
     private const int HIDE_CURSOR_DELAY_MS = 3000;
     private const double DefaultFontSize = 32.0;
+    private const double MaximumPan = 2000.0;
 
     // Can only be accessed on UI thread
     public static IReadOnlyList<Tuple<int, string>> ActiveTabs { get; private set; } = [];
@@ -1457,6 +1458,73 @@ internal sealed partial class PlayerPage : BasePage
         PromptTemporary(StringResourceProvider.Instance.WithColon(KeyboardShortcutActions.GetFullName(actionId)) + $"{size:0.#}");
     }
 
+    private void AdjustPan(string action)
+    {
+        PlayerSettingsPanel? settingsPanel = _navigationBar?.PlayerSettingsPanel;
+        if (settingsPanel is null)
+        {
+            return;
+        }
+
+        (MediaStreamKind Kind, bool Horizontal, bool Positive)? pan = action switch
+        {
+            KeyboardShortcutActions.PanVideoUp => (MediaStreamKind.Video, false, false),
+            KeyboardShortcutActions.PanVideoDown => (MediaStreamKind.Video, false, true),
+            KeyboardShortcutActions.PanVideoLeft => (MediaStreamKind.Video, true, false),
+            KeyboardShortcutActions.PanVideoRight => (MediaStreamKind.Video, true, true),
+            KeyboardShortcutActions.PanSubtitleUp => (MediaStreamKind.Subtitle, false, false),
+            KeyboardShortcutActions.PanSubtitleDown => (MediaStreamKind.Subtitle, false, true),
+            KeyboardShortcutActions.PanSubtitleLeft => (MediaStreamKind.Subtitle, true, false),
+            KeyboardShortcutActions.PanSubtitleRight => (MediaStreamKind.Subtitle, true, true),
+            _ => null,
+        };
+        if (pan is not { } direction)
+        {
+            return;
+        }
+
+        double step = direction.Kind == MediaStreamKind.Video ? AppSettingsModel.VideoPanStep : AppSettingsModel.SubtitlePanStep;
+        if (!double.IsFinite(step) || step <= 0.0)
+        {
+            return;
+        }
+
+        double delta = direction.Positive ? step : -step;
+        PlayerSettingsModel settings = settingsPanel.Settings;
+        double offset;
+        switch (direction.Kind)
+        {
+            case MediaStreamKind.Video when direction.Horizontal:
+                offset = PanValueOf(settings.Video.PanX, delta);
+                settingsPanel.ApplyVideo(target => target.PanX = offset);
+                break;
+            case MediaStreamKind.Video:
+                offset = PanValueOf(settings.Video.PanY, delta);
+                settingsPanel.ApplyVideo(target => target.PanY = offset);
+                break;
+            case MediaStreamKind.Subtitle when direction.Horizontal:
+                offset = PanValueOf(settings.Subtitle.PanX, delta);
+                settingsPanel.ApplySubtitle(target => target.PanX = (int)offset);
+                break;
+            default:
+                offset = PanValueOf(settings.Subtitle.PanY, delta);
+                settingsPanel.ApplySubtitle(target => target.PanY = (int)offset);
+                break;
+        }
+
+        PromptTemporary(StringResourceProvider.Instance.WithColon(KeyboardShortcutActions.GetFullName(action)) + $"{offset:0.##}");
+    }
+
+    private static double PanValueOf(double current, double delta)
+    {
+        return Math.Round(Math.Clamp(current + delta, -MaximumPan, MaximumPan), 2);
+    }
+
+    private static int PanValueOf(int current, double delta)
+    {
+        return (int)Math.Round(Math.Clamp(current + delta, -MaximumPan, MaximumPan));
+    }
+
     private async Task ApplyPlayerSettings()
     {
         PlayerSession? session = _session;
@@ -1807,6 +1875,16 @@ internal sealed partial class PlayerPage : BasePage
             case KeyboardShortcutActions.IncreaseSubtitleFontSize:
                 AdjustSubtitleFontSize(increase: true);
                 return true;
+            case KeyboardShortcutActions.PanVideoUp:
+            case KeyboardShortcutActions.PanVideoDown:
+            case KeyboardShortcutActions.PanVideoLeft:
+            case KeyboardShortcutActions.PanVideoRight:
+            case KeyboardShortcutActions.PanSubtitleUp:
+            case KeyboardShortcutActions.PanSubtitleDown:
+            case KeyboardShortcutActions.PanSubtitleLeft:
+            case KeyboardShortcutActions.PanSubtitleRight:
+                AdjustPan(action);
+                return true;
             case KeyboardShortcutActions.PlayPause:
                 TogglePlayPause();
                 return true;
@@ -1879,6 +1957,7 @@ internal sealed partial class PlayerPage : BasePage
             AdjustSync = SyncBy,
             AdjustZoom = AdjustZoom,
             AdjustSubtitleFontSize = AdjustSubtitleFontSize,
+            AdjustPan = AdjustPan,
             PlayQueue = session.PlayQueue.ToBuilder(),
             Playback = ViewModel.Playback.ToBuilder(),
             Session = session,

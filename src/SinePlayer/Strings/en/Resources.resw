@@ -976,6 +976,21 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="Pan" xml:space="preserve">
     <value>Pan</value>
   </data>
+  <data name="PanDown" xml:space="preserve">
+    <value>Pan down</value>
+  </data>
+  <data name="PanLeft" xml:space="preserve">
+    <value>Pan left</value>
+  </data>
+  <data name="PanPosition" xml:space="preserve">
+    <value>Pan</value>
+  </data>
+  <data name="PanRight" xml:space="preserve">
+    <value>Pan right</value>
+  </data>
+  <data name="PanUp" xml:space="preserve">
+    <value>Pan up</value>
+  </data>
   <data name="PanX" xml:space="preserve">
     <value>Pan X</value>
   </data>

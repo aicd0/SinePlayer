@@ -976,6 +976,21 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="Pan" xml:space="preserve">
     <value>Panorama</value>
   </data>
+  <data name="PanDown" xml:space="preserve">
+    <value>Nach unten verschieben</value>
+  </data>
+  <data name="PanLeft" xml:space="preserve">
+    <value>Nach links verschieben</value>
+  </data>
+  <data name="PanPosition" xml:space="preserve">
+    <value>Verschieben</value>
+  </data>
+  <data name="PanRight" xml:space="preserve">
+    <value>Nach rechts verschieben</value>
+  </data>
+  <data name="PanUp" xml:space="preserve">
+    <value>Nach oben verschieben</value>
+  </data>
   <data name="PanX" xml:space="preserve">
     <value>X-Verschiebung</value>
   </data>
