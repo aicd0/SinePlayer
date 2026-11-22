@@ -44,10 +44,11 @@
             VerticalAlignment="Center" />
         <Border
             x:Name="PromptBox"
-            Padding="4,2,4,4"
+            Padding="8,3,8,6"
             HorizontalAlignment="Left"
             VerticalAlignment="Top"
-            Background="#A6000000"
+            Background="#80000000"
+            CornerRadius="4"
             IsHitTestVisible="False"
             Visibility="Collapsed">
             <TextBlock

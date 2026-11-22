@@ -914,12 +914,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (IsControlKeyDown())
         {
-            double delta = GetZoomStep(wheelDelta > 0 ? AppSettingsModel.ZoomInStep : AppSettingsModel.ZoomOutStep);
-            if (delta > 0.0)
-            {
-                ZoomBy(wheelDelta > 0 ? delta : -delta);
-            }
-
+            AdjustZoom(wheelDelta > 0);
             return;
         }
 
@@ -1354,10 +1349,16 @@ internal sealed partial class PlayerPage : BasePage
         Enqueue(() => _session?.SetMuted(isMuted));
     }
 
-    private void ZoomBy(double delta)
+    private void AdjustZoom(bool zoomIn)
     {
         PlayerView? view = _view;
         if (view?.VideoChain is not { SelectedStream: not null } chain)
+        {
+            return;
+        }
+
+        double step = GetZoomStep(zoomIn ? AppSettingsModel.ZoomInStep : AppSettingsModel.ZoomOutStep);
+        if (step <= 0.0)
         {
             return;
         }
@@ -1368,14 +1369,14 @@ internal sealed partial class PlayerPage : BasePage
             current = 1.0;
         }
 
-        double zoom = Math.Round(Math.Clamp(current + delta, VideoSettingsModel.MinimumZoom, VideoSettingsModel.MaximumZoom), 2);
+        double zoom = Math.Round(Math.Clamp(current + (zoomIn ? step : -step), VideoSettingsModel.MinimumZoom, VideoSettingsModel.MaximumZoom), 2);
         if (zoom != chain.Transform.Zoom)
         {
             chain.Transform = chain.Transform with { Zoom = zoom };
             _navigationBar?.PlayerSettingsPanel.ApplyVideo(settings => settings.Zoom = zoom);
         }
 
-        string action = delta > 0.0
+        string action = zoomIn
             ? StringResourceProvider.Instance.ZoomIn
             : StringResourceProvider.Instance.ZoomOut;
         PromptTemporary(StringResourceProvider.Instance.WithColon(action) + $"{Math.Round(zoom * 100.0)}%");
@@ -1803,6 +1804,12 @@ internal sealed partial class PlayerPage : BasePage
             case KeyboardShortcutActions.VolumeUp:
                 AdjustVolume(GetVolumeStep(AppSettingsModel.VolumeUpPercent));
                 return true;
+            case KeyboardShortcutActions.ZoomIn:
+                AdjustZoom(zoomIn: true);
+                return true;
+            case KeyboardShortcutActions.ZoomOut:
+                AdjustZoom(zoomIn: false);
+                return true;
             case KeyboardShortcutActions.OpenNextItem:
                 ViewModel.Next();
                 return true;
@@ -1834,6 +1841,7 @@ internal sealed partial class PlayerPage : BasePage
             UpdateAudioSettings = settingsPanel.ApplyAudio,
             UpdateSubtitleSettings = settingsPanel.ApplySubtitle,
             AdjustSync = SyncBy,
+            AdjustZoom = AdjustZoom,
             PlayQueue = session.PlayQueue.ToBuilder(),
             Playback = ViewModel.Playback.ToBuilder(),
             Session = session,

@@ -11,6 +11,7 @@ using Microsoft.UI.Xaml.Controls;
 
 using SinePlayer.Common.Actions;
 using SinePlayer.Common.Actions.Providers;
+using SinePlayer.Common.HotKey;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Playback.Abstractions;
@@ -265,6 +266,25 @@ internal static class PlayerMenuCreator
                         applyChange(target => target.RotationDegrees = degrees);
                     }
                 }),
+            },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Zoom,
+                Items = new List<BaseMenuFlyoutItemModel>
+                {
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.ZoomIn,
+                        ShortcutAction = KeyboardShortcutActions.ZoomIn,
+                        Click = () => context.AdjustZoom(true),
+                    },
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.ZoomOut,
+                        ShortcutAction = KeyboardShortcutActions.ZoomOut,
+                        Click = () => context.AdjustZoom(false),
+                    },
+                },
             },
             new ToggleMenuFlyoutItemModel()
             {
@@ -559,16 +579,25 @@ internal static class PlayerMenuCreator
 
     private static List<BaseMenuFlyoutItemModel> CreateSyncMenuItems(PlayerMenuContext context, MediaStreamKind kind)
     {
+        (string forward, string backward) = kind switch
+        {
+            MediaStreamKind.Video => (KeyboardShortcutActions.SyncVideoForward, KeyboardShortcutActions.SyncVideoBackward),
+            MediaStreamKind.Audio => (KeyboardShortcutActions.SyncAudioForward, KeyboardShortcutActions.SyncAudioBackward),
+            _ => (KeyboardShortcutActions.SyncSubtitleForward, KeyboardShortcutActions.SyncSubtitleBackward),
+        };
+
         return
         [
             new SimpleMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.SyncForward,
+                ShortcutAction = forward,
                 Click = () => context.AdjustSync(kind, true),
             },
             new SimpleMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.SyncBackward,
+                ShortcutAction = backward,
                 Click = () => context.AdjustSync(kind, false),
             },
         ];
