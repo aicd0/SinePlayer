@@ -43,6 +43,8 @@ internal sealed class PlayerMenuContext
 
     public required Action<MediaStreamKind, bool> AdjustSync { get; init; }
 
+    public required Action<bool> AdjustZoom { get; init; }
+
     public PlayQueueModel.Builder? PlayQueue { get; init; }
 
     public PlaybackModel.Builder? Playback { get; init; }

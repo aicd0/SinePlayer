@@ -33,6 +33,8 @@ internal static class KeyboardShortcutActions
     public const string ToggleFullscreen = "ToggleFullscreen";
     public const string VolumeDown = "VolumeDown";
     public const string VolumeUp = "VolumeUp";
+    public const string ZoomIn = "ZoomIn";
+    public const string ZoomOut = "ZoomOut";
 
     public const string RootScope = "";
     public const string PlayerScope = "/Player";
@@ -61,6 +63,8 @@ internal static class KeyboardShortcutActions
         new() { Id = ToggleFullscreen, Name = StringResourceProvider.Instance.ToggleFullscreen },
         new() { Id = VolumeDown, Name = StringResourceProvider.Instance.VolumeDown, Scope = PlayerScope },
         new() { Id = VolumeUp, Name = StringResourceProvider.Instance.VolumeUp, Scope = PlayerScope },
+        new() { Id = ZoomIn, Name = StringResourceProvider.Instance.ZoomIn, Scope = PlayerScope },
+        new() { Id = ZoomOut, Name = StringResourceProvider.Instance.ZoomOut, Scope = PlayerScope },
     ];
 
     private static readonly KeyboardShortcutModel[] sDefaultShortcuts =
