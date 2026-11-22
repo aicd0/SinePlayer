@@ -155,17 +155,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         }
     }
 
-    private string? _backgroundImageUri = null;
-    public string? BackgroundImageUri
-    {
-        get => _backgroundImageUri;
-        set
-        {
-            _backgroundImageUri = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BackgroundImageUri)));
-        }
-    }
-
     private bool _isAudio = false;
     public bool IsAudio
     {
@@ -204,7 +193,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
     {
         _media = null;
         _durationMs = 0;
-        BackgroundImageUri = null;
         IsAudio = false;
 
         if (media is null)
@@ -215,7 +203,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
 
         _media = media;
         IsAudio = media.Type == MediaType.Audio;
-        UpdateMediaMetadata();
         UpdateFavoriteStatusInternal(media);
     }
 
@@ -335,17 +322,6 @@ internal partial class PlayerPageViewModel : INotifyPropertyChanged
         {
             UpdateFavoriteStatusInternal(media);
         }
-    }
-
-    public void UpdateMediaMetadata()
-    {
-        MediaModel? media = _media;
-        if (media is null)
-        {
-            return;
-        }
-
-        BackgroundImageUri = media.GetExt(MediaExt.BACKGROUND_IMAGE);
     }
 
     #endregion

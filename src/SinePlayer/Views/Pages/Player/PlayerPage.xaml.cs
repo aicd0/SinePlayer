@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.UI.Dispatching;
@@ -221,17 +220,6 @@ internal sealed partial class PlayerPage : BasePage
     private void ObserveData()
     {
         GlobalEvent.Instance.FavoriteUpdated.Observe(this, _ => ViewModel.UpdateFavoriteStatus());
-
-        GlobalEvent.Instance.MediaUpdated.Observe(this, ids =>
-        {
-            MediaModel? media = ViewModel.Media;
-            if (media is null || !ids.Contains(media.Id))
-            {
-                return;
-            }
-
-            ViewModel.UpdateMediaMetadata();
-        });
 
         AppSettingsModel.KeepScreenOnBehaviorChangedLiveData.Observe(this, _ => UpdateKeepScreenOn());
 
