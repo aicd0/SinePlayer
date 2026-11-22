@@ -1585,7 +1585,7 @@ internal sealed partial class PlayerPage : BasePage
 
         UpdatePromptMargin();
         PromptText.Text = message;
-        PromptText.Visibility = Visibility.Visible;
+        PromptBox.Visibility = Visibility.Visible;
 
         if (!autoHide)
         {
@@ -1604,7 +1604,7 @@ internal sealed partial class PlayerPage : BasePage
     {
         StopPromptTimer();
 
-        PromptText.Visibility = Visibility.Collapsed;
+        PromptBox.Visibility = Visibility.Collapsed;
         PromptText.Text = string.Empty;
     }
 
@@ -1623,8 +1623,8 @@ internal sealed partial class PlayerPage : BasePage
 
     private void UpdatePromptMargin()
     {
-        double top = 12.0 + (_isOverlayVisible ? _topOverlayHeight : 0.0);
-        PromptText.Margin = new Thickness(16.0, top, 16.0, 0);
+        double top = 8.0 + (_isOverlayVisible ? _topOverlayHeight : 0.0);
+        PromptBox.Margin = new Thickness(8.0, top, 8.0, 0);
     }
 
     private void UpdateSubtitlePresentation()

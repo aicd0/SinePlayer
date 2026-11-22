@@ -7,7 +7,6 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:player="using:SinePlayer.Views.Pages.Player"
-    xmlns:text="using:SinePlayer.UserControls.Text"
     IsTabStop="True"
     UseSystemFocusVisuals="False"
     mc:Ignorable="d">
@@ -43,17 +42,21 @@
             x:Name="GestureHint"
             HorizontalAlignment="Center"
             VerticalAlignment="Center" />
-        <text:OutlineTextBlock
-            x:Name="PromptText"
+        <Border
+            x:Name="PromptBox"
+            Padding="4,2,4,4"
             HorizontalAlignment="Left"
             VerticalAlignment="Top"
-            FontSize="16"
-            FontWeight="Bold"
-            Foreground="#496CE5"
+            Background="#A6000000"
             IsHitTestVisible="False"
-            OutlineWidth="1"
-            TextWrapping="Wrap"
-            Visibility="Collapsed" />
+            Visibility="Collapsed">
+            <TextBlock
+                x:Name="PromptText"
+                FontSize="16"
+                FontWeight="Bold"
+                Foreground="#FFFFFF"
+                TextWrapping="Wrap" />
+        </Border>
     </Grid>
 
 </base:BasePage>
