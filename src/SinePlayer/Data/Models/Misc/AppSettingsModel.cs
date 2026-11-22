@@ -350,6 +350,32 @@ internal static class AppSettingsModel
         }
     }
 
+    public static double IncreaseSubtitleFontSizeStep
+    {
+        get
+        {
+            return _db.Read(model => model.IncreaseSubtitleFontSizeStep ?? 2.0);
+        }
+        set
+        {
+            _db.Write(model => model.IncreaseSubtitleFontSizeStep = value);
+            _db.Save();
+        }
+    }
+
+    public static double DecreaseSubtitleFontSizeStep
+    {
+        get
+        {
+            return _db.Read(model => model.DecreaseSubtitleFontSizeStep ?? 2.0);
+        }
+        set
+        {
+            _db.Write(model => model.DecreaseSubtitleFontSizeStep = value);
+            _db.Save();
+        }
+    }
+
     public static CloseLastTabBehaviorEnum CloseLastTabBehavior
     {
         get
@@ -1249,6 +1275,12 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("SyncSubtitleBackwardStep")]
         public double? SyncSubtitleBackwardStep { get; set; }
+
+        [JsonPropertyName("IncreaseSubtitleFontSizeStep")]
+        public double? IncreaseSubtitleFontSizeStep { get; set; }
+
+        [JsonPropertyName("DecreaseSubtitleFontSizeStep")]
+        public double? DecreaseSubtitleFontSizeStep { get; set; }
 
         [JsonPropertyName("PromptBeforeRemovingMedia")]
         public bool? PromptBeforeRemovingMedia { get; set; }

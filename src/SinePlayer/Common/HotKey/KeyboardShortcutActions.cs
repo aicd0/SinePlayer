@@ -14,8 +14,10 @@ internal static class KeyboardShortcutActions
     public const string AddNewTab = "AddNewTab";
     public const string AddNewWindow = "AddNewWindow";
     public const string CloseTab = "CloseTab";
+    public const string DecreaseSubtitleFontSize = "DecreaseSubtitleFontSize";
     public const string ExitApp = "ExitApp";
     public const string ExitFullscreen = "ExitFullscreen";
+    public const string IncreaseSubtitleFontSize = "IncreaseSubtitleFontSize";
     public const string JumpToNextTab = "JumpToNextTab";
     public const string JumpToPreviousTab = "JumpToPreviousTab";
     public const string OpenDevTools = "OpenDevTools";
@@ -45,26 +47,28 @@ internal static class KeyboardShortcutActions
         new() { Id = AddNewWindow, Name = StringResourceProvider.Instance.NewWindow },
         new() { Id = CloseTab, Name = StringResourceProvider.Instance.CloseTab },
         new() { Id = ExitApp, Name = StringResourceProvider.Instance.Exit },
-        new() { Id = ExitFullscreen, Name = StringResourceProvider.Instance.ExitFullscreen, IsInternal = true },
         new() { Id = JumpToNextTab, Name = StringResourceProvider.Instance.JumpToNextTab },
         new() { Id = JumpToPreviousTab, Name = StringResourceProvider.Instance.JumpToPreviousTab },
-        new() { Id = OpenDevTools, Name = "Open dev tools", IsInternal = true },
         new() { Id = OpenNextItem, Name = StringResourceProvider.Instance.OpenNextItem, Scope = PlayerScope },
         new() { Id = OpenPreviousItem, Name = StringResourceProvider.Instance.OpenPreviousItem, Scope = PlayerScope },
         new() { Id = PlayPause, Name = StringResourceProvider.Instance.PlayPause, Scope = PlayerScope },
         new() { Id = SeekBackward, Name = StringResourceProvider.Instance.SeekBackward, Scope = PlayerScope },
         new() { Id = SeekForward, Name = StringResourceProvider.Instance.SeekForward, Scope = PlayerScope },
-        new() { Id = SyncAudioBackward, Name = StringResourceProvider.Instance.SyncAudioBackward, Scope = PlayerScope },
-        new() { Id = SyncAudioForward, Name = StringResourceProvider.Instance.SyncAudioForward, Scope = PlayerScope },
-        new() { Id = SyncSubtitleBackward, Name = StringResourceProvider.Instance.SyncSubtitleBackward, Scope = PlayerScope },
-        new() { Id = SyncSubtitleForward, Name = StringResourceProvider.Instance.SyncSubtitleForward, Scope = PlayerScope },
-        new() { Id = SyncVideoBackward, Name = StringResourceProvider.Instance.SyncVideoBackward, Scope = PlayerScope },
-        new() { Id = SyncVideoForward, Name = StringResourceProvider.Instance.SyncVideoForward, Scope = PlayerScope },
         new() { Id = ToggleFullscreen, Name = StringResourceProvider.Instance.ToggleFullscreen },
         new() { Id = VolumeDown, Name = StringResourceProvider.Instance.VolumeDown, Scope = PlayerScope },
         new() { Id = VolumeUp, Name = StringResourceProvider.Instance.VolumeUp, Scope = PlayerScope },
-        new() { Id = ZoomIn, Name = StringResourceProvider.Instance.ZoomIn, Scope = PlayerScope },
-        new() { Id = ZoomOut, Name = StringResourceProvider.Instance.ZoomOut, Scope = PlayerScope },
+        new() { Id = SyncVideoForward, Name = StringResourceProvider.Instance.SyncForward, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
+        new() { Id = SyncVideoBackward, Name = StringResourceProvider.Instance.SyncBackward, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
+        new() { Id = ZoomIn, Name = StringResourceProvider.Instance.ZoomIn, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
+        new() { Id = ZoomOut, Name = StringResourceProvider.Instance.ZoomOut, CategoryPath = [StringResourceProvider.Instance.Video], Scope = PlayerScope },
+        new() { Id = SyncAudioForward, Name = StringResourceProvider.Instance.SyncForward, CategoryPath = [StringResourceProvider.Instance.Audio], Scope = PlayerScope },
+        new() { Id = SyncAudioBackward, Name = StringResourceProvider.Instance.SyncBackward, CategoryPath = [StringResourceProvider.Instance.Audio], Scope = PlayerScope },
+        new() { Id = SyncSubtitleForward, Name = StringResourceProvider.Instance.SyncForward, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
+        new() { Id = SyncSubtitleBackward, Name = StringResourceProvider.Instance.SyncBackward, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
+        new() { Id = IncreaseSubtitleFontSize, Name = StringResourceProvider.Instance.IncreaseFontSize, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
+        new() { Id = DecreaseSubtitleFontSize, Name = StringResourceProvider.Instance.DecreaseFontSize, CategoryPath = [StringResourceProvider.Instance.Subtitle], Scope = PlayerScope },
+        new() { Id = ExitFullscreen, Name = StringResourceProvider.Instance.ExitFullscreen, IsInternal = true },
+        new() { Id = OpenDevTools, Name = "Open dev tools", IsInternal = true },
     ];
 
     private static readonly KeyboardShortcutModel[] sDefaultShortcuts =
@@ -120,6 +124,28 @@ internal static class KeyboardShortcutActions
         return null;
     }
 
+    public static string GetFullName(string action)
+    {
+        return Get(action)?.FullName ?? action;
+    }
+
+    public static KeyboardShortcutActionGroup BuildTree(IEnumerable<KeyboardShortcutActionEntry> entries)
+    {
+        KeyboardShortcutActionGroup root = new();
+        foreach (KeyboardShortcutActionEntry entry in entries)
+        {
+            KeyboardShortcutActionGroup group = root;
+            foreach (string category in entry.CategoryPath)
+            {
+                group = group.GetOrAddGroup(category);
+            }
+
+            group.Entries.Add(entry);
+        }
+
+        return root;
+    }
+
     private static KeyboardShortcutModel CreateShortcut(string action, VirtualKey key, VirtualKeyModifiers modifiers = VirtualKeyModifiers.None)
     {
         return new KeyboardShortcutModel
@@ -137,7 +163,37 @@ internal sealed class KeyboardShortcutActionEntry
 
     public required string Name { get; init; }
 
+    public string[] CategoryPath { get; init; } = [];
+
     public string Scope { get; init; } = KeyboardShortcutActions.RootScope;
 
     public bool IsInternal { get; init; }
+
+    public string CategoryText => string.Join(" / ", CategoryPath);
+
+    public string FullName => CategoryPath.Length == 0 ? Name : $"{CategoryText} / {Name}";
+}
+
+internal sealed class KeyboardShortcutActionGroup
+{
+    public string Name { get; init; } = string.Empty;
+
+    public List<KeyboardShortcutActionGroup> Groups { get; } = [];
+
+    public List<KeyboardShortcutActionEntry> Entries { get; } = [];
+
+    public KeyboardShortcutActionGroup GetOrAddGroup(string name)
+    {
+        foreach (KeyboardShortcutActionGroup group in Groups)
+        {
+            if (group.Name == name)
+            {
+                return group;
+            }
+        }
+
+        KeyboardShortcutActionGroup created = new() { Name = name };
+        Groups.Add(created);
+        return created;
+    }
 }

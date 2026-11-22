@@ -58,6 +58,7 @@ internal sealed partial class PlayerPage : BasePage
 
     private const int HIDE_OVERLAY_DELAY_MS = 0;
     private const int HIDE_CURSOR_DELAY_MS = 3000;
+    private const double DefaultFontSize = 32.0;
 
     // Can only be accessed on UI thread
     public static IReadOnlyList<Tuple<int, string>> ActiveTabs { get; private set; } = [];
@@ -1392,39 +1393,68 @@ internal sealed partial class PlayerPage : BasePage
 
         PlayerSettingsModel settings = settingsPanel.Settings;
         double value;
-        string action;
+        string actionId;
         switch (kind)
         {
             case MediaStreamKind.Video:
                 settingsPanel.ApplyVideo(target => target.Sync = SyncValueOf(target.Sync, forward, AppSettingsModel.SyncVideoForwardStep, AppSettingsModel.SyncVideoBackwardStep));
                 value = settings.Video.Sync;
-                action = forward
-                    ? StringResource.SyncVideoForward
-                    : StringResource.SyncVideoBackward;
+                actionId = forward
+                    ? KeyboardShortcutActions.SyncVideoForward
+                    : KeyboardShortcutActions.SyncVideoBackward;
                 break;
             case MediaStreamKind.Audio:
                 settingsPanel.ApplyAudio(target => target.Sync = SyncValueOf(target.Sync, forward, AppSettingsModel.SyncAudioForwardStep, AppSettingsModel.SyncAudioBackwardStep));
                 value = settings.Audio.Sync;
-                action = forward
-                    ? StringResource.SyncAudioForward
-                    : StringResource.SyncAudioBackward;
+                actionId = forward
+                    ? KeyboardShortcutActions.SyncAudioForward
+                    : KeyboardShortcutActions.SyncAudioBackward;
                 break;
             default:
                 settingsPanel.ApplySubtitle(target => target.Sync = SyncValueOf(target.Sync, forward, AppSettingsModel.SyncSubtitleForwardStep, AppSettingsModel.SyncSubtitleBackwardStep));
                 value = settings.Subtitle.Sync;
-                action = forward
-                    ? StringResource.SyncSubtitleForward
-                    : StringResource.SyncSubtitleBackward;
+                actionId = forward
+                    ? KeyboardShortcutActions.SyncSubtitleForward
+                    : KeyboardShortcutActions.SyncSubtitleBackward;
                 break;
         }
 
-        PromptTemporary(StringResourceProvider.Instance.WithColon(action) + $"{value:+0.0;-0.0;0.0}s");
+        PromptTemporary(StringResourceProvider.Instance.WithColon(KeyboardShortcutActions.GetFullName(actionId)) + $"{value:+0.0;-0.0;0.0}s");
     }
 
     private static double SyncValueOf(double current, bool forward, double forwardStep, double backwardStep)
     {
         double step = forward ? forwardStep : backwardStep;
         return Math.Round(Math.Clamp(current + (forward ? step : -step), -PlayerSession.MaximumSyncSeconds, PlayerSession.MaximumSyncSeconds), 1);
+    }
+
+    private void AdjustSubtitleFontSize(bool increase)
+    {
+        PlayerSettingsPanel? settingsPanel = _navigationBar?.PlayerSettingsPanel;
+        if (settingsPanel is null)
+        {
+            return;
+        }
+
+        double step = increase ? AppSettingsModel.IncreaseSubtitleFontSizeStep : AppSettingsModel.DecreaseSubtitleFontSizeStep;
+        if (!double.IsFinite(step) || step <= 0.0)
+        {
+            return;
+        }
+
+        double current = settingsPanel.Settings.Subtitle.Size;
+        if (current <= 0.0)
+        {
+            current = DefaultFontSize;
+        }
+
+        double size = Math.Round(Math.Clamp(current + (increase ? step : -step), PlayerSession.MinimumSubtitleFontSize, PlayerSession.MaximumSubtitleFontSize), 1);
+        settingsPanel.ApplySubtitle(settings => settings.Size = size);
+
+        string actionId = increase
+            ? KeyboardShortcutActions.IncreaseSubtitleFontSize
+            : KeyboardShortcutActions.DecreaseSubtitleFontSize;
+        PromptTemporary(StringResourceProvider.Instance.WithColon(KeyboardShortcutActions.GetFullName(actionId)) + $"{size:0.#}");
     }
 
     private async Task ApplyPlayerSettings()
@@ -1771,6 +1801,12 @@ internal sealed partial class PlayerPage : BasePage
     {
         switch (action)
         {
+            case KeyboardShortcutActions.DecreaseSubtitleFontSize:
+                AdjustSubtitleFontSize(increase: false);
+                return true;
+            case KeyboardShortcutActions.IncreaseSubtitleFontSize:
+                AdjustSubtitleFontSize(increase: true);
+                return true;
             case KeyboardShortcutActions.PlayPause:
                 TogglePlayPause();
                 return true;
@@ -1842,6 +1878,7 @@ internal sealed partial class PlayerPage : BasePage
             UpdateSubtitleSettings = settingsPanel.ApplySubtitle,
             AdjustSync = SyncBy,
             AdjustZoom = AdjustZoom,
+            AdjustSubtitleFontSize = AdjustSubtitleFontSize,
             PlayQueue = session.PlayQueue.ToBuilder(),
             Playback = ViewModel.Playback.ToBuilder(),
             Session = session,

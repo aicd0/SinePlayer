@@ -94,6 +94,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock
@@ -270,7 +271,7 @@
                 Grid.Row="4"
                 Grid.Column="0"
                 VerticalAlignment="Center"
-                Text="{x:Bind StringResource.SyncVideoForward}"
+                Text="{x:Bind ViewModel.SyncVideoForwardLabel}"
                 TextWrapping="Wrap" />
             <StackPanel
                 Grid.Row="4"
@@ -294,7 +295,7 @@
                 Grid.Row="4"
                 Grid.Column="4"
                 VerticalAlignment="Center"
-                Text="{x:Bind StringResource.SyncVideoBackward}"
+                Text="{x:Bind ViewModel.SyncVideoBackwardLabel}"
                 TextWrapping="Wrap" />
             <StackPanel
                 Grid.Row="4"
@@ -319,7 +320,7 @@
                 Grid.Row="5"
                 Grid.Column="0"
                 VerticalAlignment="Center"
-                Text="{x:Bind StringResource.SyncAudioForward}"
+                Text="{x:Bind ViewModel.SyncAudioForwardLabel}"
                 TextWrapping="Wrap" />
             <StackPanel
                 Grid.Row="5"
@@ -343,7 +344,7 @@
                 Grid.Row="5"
                 Grid.Column="4"
                 VerticalAlignment="Center"
-                Text="{x:Bind StringResource.SyncAudioBackward}"
+                Text="{x:Bind ViewModel.SyncAudioBackwardLabel}"
                 TextWrapping="Wrap" />
             <StackPanel
                 Grid.Row="5"
@@ -368,7 +369,7 @@
                 Grid.Row="6"
                 Grid.Column="0"
                 VerticalAlignment="Center"
-                Text="{x:Bind StringResource.SyncSubtitleForward}"
+                Text="{x:Bind ViewModel.SyncSubtitleForwardLabel}"
                 TextWrapping="Wrap" />
             <StackPanel
                 Grid.Row="6"
@@ -392,7 +393,7 @@
                 Grid.Row="6"
                 Grid.Column="4"
                 VerticalAlignment="Center"
-                Text="{x:Bind StringResource.SyncSubtitleBackward}"
+                Text="{x:Bind ViewModel.SyncSubtitleBackwardLabel}"
                 TextWrapping="Wrap" />
             <StackPanel
                 Grid.Row="6"
@@ -411,6 +412,53 @@
                     ValueChanged="SyncSubtitleBackwardNumberBox_ValueChanged"
                     Value="{x:Bind ViewModel.SyncSubtitleBackwardStep, Mode=TwoWay}" />
                 <TextBlock VerticalAlignment="Center" Text="s" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="7"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind ViewModel.IncreaseFontSizeLabel}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="7"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="IncreaseFontSizeNumberBox"
+                    MinWidth="120"
+                    LargeChange="10"
+                    Maximum="100"
+                    Minimum="1"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="IncreaseSubtitleFontSizeNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.IncreaseSubtitleFontSizeStep, Mode=TwoWay}" />
+            </StackPanel>
+            <TextBlock
+                Grid.Row="7"
+                Grid.Column="4"
+                VerticalAlignment="Center"
+                Text="{x:Bind ViewModel.DecreaseFontSizeLabel}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="7"
+                Grid.Column="6"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="DecreaseFontSizeNumberBox"
+                    MinWidth="120"
+                    LargeChange="10"
+                    Maximum="100"
+                    Minimum="1"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="DecreaseSubtitleFontSizeNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.DecreaseSubtitleFontSizeStep, Mode=TwoWay}" />
             </StackPanel>
         </Grid>
     </StackPanel>

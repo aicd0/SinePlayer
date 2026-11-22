@@ -390,6 +390,9 @@
   <data name="Decoder" xml:space="preserve">
     <value>デコーダー</value>
   </data>
+  <data name="DecreaseFontSize" xml:space="preserve">
+    <value>フォントサイズを小さくする</value>
+  </data>
   <data name="Default" xml:space="preserve">
     <value>デフォルト</value>
   </data>
@@ -728,6 +731,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>非表示の項目を含める</value>
+  </data>
+  <data name="IncreaseFontSize" xml:space="preserve">
+    <value>フォントサイズを大きくする</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>プラグインをインストール</value>

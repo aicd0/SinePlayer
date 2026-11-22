@@ -390,6 +390,9 @@
   <data name="Decoder" xml:space="preserve">
     <value>Decoder</value>
   </data>
+  <data name="DecreaseFontSize" xml:space="preserve">
+    <value>Decrease font size</value>
+  </data>
   <data name="Default" xml:space="preserve">
     <value>Default</value>
   </data>
@@ -728,6 +731,9 @@ The expression will be evaluated in the following order:
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>Include hidden items</value>
+  </data>
+  <data name="IncreaseFontSize" xml:space="preserve">
+    <value>Increase font size</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>Install plugin</value>

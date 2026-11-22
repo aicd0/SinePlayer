@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 
+using SinePlayer.Common.HotKey;
 using SinePlayer.Common.Localization;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Misc;
@@ -267,6 +268,37 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private double _increaseSubtitleFontSizeStep = AppSettingsModel.IncreaseSubtitleFontSizeStep;
+    public double IncreaseSubtitleFontSizeStep
+    {
+        get => _increaseSubtitleFontSizeStep;
+        set
+        {
+            _increaseSubtitleFontSizeStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IncreaseSubtitleFontSizeStep)));
+        }
+    }
+
+    private double _decreaseSubtitleFontSizeStep = AppSettingsModel.DecreaseSubtitleFontSizeStep;
+    public double DecreaseSubtitleFontSizeStep
+    {
+        get => _decreaseSubtitleFontSizeStep;
+        set
+        {
+            _decreaseSubtitleFontSizeStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DecreaseSubtitleFontSizeStep)));
+        }
+    }
+
+    public string SyncVideoForwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncVideoForward);
+    public string SyncVideoBackwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncVideoBackward);
+    public string SyncAudioForwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncAudioForward);
+    public string SyncAudioBackwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncAudioBackward);
+    public string SyncSubtitleForwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncSubtitleForward);
+    public string SyncSubtitleBackwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncSubtitleBackward);
+    public string IncreaseFontSizeLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.IncreaseSubtitleFontSize);
+    public string DecreaseFontSizeLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.DecreaseSubtitleFontSize);
+
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
@@ -303,6 +335,8 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             SyncAudioBackwardStep = AppSettingsModel.SyncAudioBackwardStep;
             SyncSubtitleForwardStep = AppSettingsModel.SyncSubtitleForwardStep;
             SyncSubtitleBackwardStep = AppSettingsModel.SyncSubtitleBackwardStep;
+            IncreaseSubtitleFontSizeStep = AppSettingsModel.IncreaseSubtitleFontSizeStep;
+            DecreaseSubtitleFontSizeStep = AppSettingsModel.DecreaseSubtitleFontSizeStep;
         });
     }
 
