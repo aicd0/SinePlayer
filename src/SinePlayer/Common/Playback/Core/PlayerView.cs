@@ -37,6 +37,8 @@ internal sealed partial class PlayerView(PlayerSession session) : IDisposable
 
     public PlaybackInfoHandle PlaybackInfo => _playbackInfo;
 
+    public bool IsForeground { get; set; }
+
     public IVideoChain? VideoChain => _videoChain;
 
     public IReadOnlyList<ISubtitleChain> SubtitleChains => (List<ISubtitleChain>)[.. _subtitleChains];
