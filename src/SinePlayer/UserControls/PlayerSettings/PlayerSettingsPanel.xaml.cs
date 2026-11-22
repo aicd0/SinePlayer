@@ -46,9 +46,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private const string EmptyValues = "{}";
 
-    private const double MinimumSubtitleFontSize = 4.0;
-    private const double MaximumSubtitleFontSize = 200.0;
-    private const int DefaultSubtitleFontWeight = 400;
     private const int MaximumMixLevel = 200;
 
     private static readonly double[] SubtitleFontSizePresets = [16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 48.0, 56.0, 64.0, 72.0];
@@ -1857,7 +1854,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
 
     private void ApplySubtitleFontSize(double size)
     {
-        double value = size <= 0.0 ? 0.0 : Math.Clamp(size, MinimumSubtitleFontSize, MaximumSubtitleFontSize);
+        double value = size <= 0.0 ? 0.0 : Math.Clamp(size, PlayerSession.MinimumSubtitleFontSize, PlayerSession.MaximumSubtitleFontSize);
         if (_mediaSettings.Subtitle.Size != value)
         {
             ApplySubtitle(settings => settings.Size = value);
@@ -1962,7 +1959,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
         }
 
-        int value = settings.Subtitle.Weight > 0 ? settings.Subtitle.Weight : DefaultSubtitleFontWeight;
+        int value = settings.Subtitle.Weight > 0 ? settings.Subtitle.Weight : PlayerSession.DefaultSubtitleFontWeight;
         int index = -1;
         int insertAt = SubtitleFontWeightComboBox.Items.Count;
         for (int i = 0; i < SubtitleFontWeightComboBox.Items.Count; i++)
@@ -2591,7 +2588,7 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private string FormatSubtitleFontWeight(int weight)
     {
         string number = weight.ToString(CultureInfo.CurrentCulture);
-        return weight == DefaultSubtitleFontWeight ? $"{number} ({StringResource.Default})" : number;
+        return weight == PlayerSession.DefaultSubtitleFontWeight ? $"{number} ({StringResource.Default})" : number;
     }
 
     private string FormatSubtitleFontStyle(FontStyle style)

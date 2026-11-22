@@ -390,6 +390,9 @@
   <data name="Decoder" xml:space="preserve">
     <value>Декодер</value>
   </data>
+  <data name="DecreaseFontSize" xml:space="preserve">
+    <value>Уменьшить размер шрифта</value>
+  </data>
   <data name="Default" xml:space="preserve">
     <value>По умолчанию</value>
   </data>
@@ -728,6 +731,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>Включить скрытые элементы</value>
+  </data>
+  <data name="IncreaseFontSize" xml:space="preserve">
+    <value>Увеличить размер шрифта</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>Установить плагин</value>

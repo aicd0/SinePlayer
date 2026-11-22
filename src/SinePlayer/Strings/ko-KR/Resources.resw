@@ -390,6 +390,9 @@
   <data name="Decoder" xml:space="preserve">
     <value>디코더</value>
   </data>
+  <data name="DecreaseFontSize" xml:space="preserve">
+    <value>글꼴 크기 줄이기</value>
+  </data>
   <data name="Default" xml:space="preserve">
     <value>기본</value>
   </data>
@@ -728,6 +731,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>숨겨진 항목 포함</value>
+  </data>
+  <data name="IncreaseFontSize" xml:space="preserve">
+    <value>글꼴 크기 키우기</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>플러그인 설치</value>

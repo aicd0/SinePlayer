@@ -390,6 +390,9 @@
   <data name="Decoder" xml:space="preserve">
     <value>Decodificador</value>
   </data>
+  <data name="DecreaseFontSize" xml:space="preserve">
+    <value>Reducir el tamaño de fuente</value>
+  </data>
   <data name="Default" xml:space="preserve">
     <value>Por defecto</value>
   </data>
@@ -728,6 +731,9 @@ La evaluación se realizará en el siguiente orden:
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>Incluir elementos ocultos</value>
+  </data>
+  <data name="IncreaseFontSize" xml:space="preserve">
+    <value>Aumentar el tamaño de fuente</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>Instalar complemento</value>

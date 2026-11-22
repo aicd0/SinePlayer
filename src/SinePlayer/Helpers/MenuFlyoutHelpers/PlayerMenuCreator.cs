@@ -17,8 +17,12 @@ using SinePlayer.Common.Playback.Core;
 using SinePlayer.Core.Playback.Abstractions;
 using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
+using SinePlayer.Core.Playback.Backends.Win2D;
+using SinePlayer.Core.Playback.Hosting;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Helpers.Misc;
+
+using Windows.UI.Text;
 
 namespace SinePlayer.Helpers.MenuFlyoutHelpers;
 
@@ -314,6 +318,37 @@ internal static class PlayerMenuCreator
         ];
     }
 
+    private static List<BaseMenuFlyoutItemModel> CreateVideoTrackItems(PlayerMenuContext context)
+    {
+        IReadOnlyList<MediaStreamInfo>? streams = context.Tracks(MediaStreamKind.Video);
+        if (streams is null || streams.Count == 0)
+        {
+            return [new SimpleMenuFlyoutItemModel() { Text = StringResourceProvider.Instance.None, IsEnabled = false }];
+        }
+
+        List<BaseMenuFlyoutItemModel> items = [];
+        foreach (MediaStreamInfo stream in streams)
+        {
+            MediaStreamInfo choice = stream;
+            items.Add(new ToggleMenuFlyoutItemModel()
+            {
+                Text = MediaStreamLabel.Describe(choice, context.SourceOf(choice)),
+                IsChecked = context.IsTrackPlaying(choice),
+                Click = () => context.SelectTrack(MediaStreamKind.Video, choice),
+            });
+        }
+
+        items.Add(new SeparatorMenuFlyoutItemModel());
+        items.Add(new ToggleMenuFlyoutItemModel()
+        {
+            Text = StringResourceProvider.Instance.Off,
+            IsChecked = !streams.Any(context.IsTrackPlaying),
+            Click = () => context.SelectTrack(MediaStreamKind.Video, null),
+        });
+
+        return items;
+    }
+
     private static List<BaseMenuFlyoutItemModel> CreateAudioMenuItems(PlayerMenuContext context)
     {
         PlayerSettingsModel settings = context.Settings;
@@ -360,87 +395,20 @@ internal static class PlayerMenuCreator
                     }
                 }),
             },
-        ];
-    }
-
-    private static List<BaseMenuFlyoutItemModel> CreateSubtitleMenuItems(PlayerMenuContext context)
-    {
-        PlayerSettingsModel settings = context.Settings;
-        Action<Action<SubtitleSettingsModel>> applyChange = context.UpdateSubtitleSettings;
-
-        List<PlaybackComponentOption> decoderOptions = [.. PlaybackComponents.GetSubtitleDecoderOptions()];
-        PlaybackComponentOption decoder = EnsureChoice(decoderOptions, settings.Subtitle.Decoder);
-
-        List<PlaybackComponentOption> rendererOptions = [.. PlaybackComponents.GetSubtitleRendererOptions()];
-        PlaybackComponentOption renderer = EnsureChoice(rendererOptions, settings.Subtitle.Renderer);
-
-        return
-        [
-            new SubItemMenuFlyoutItemModel()
-            {
-                Text = StringResourceProvider.Instance.SelectSubtitleTrack,
-                Items = CreateSubtitleTrackItems(context),
-            },
-            new SubItemMenuFlyoutItemModel()
-            {
-                Text = StringResourceProvider.Instance.Sync,
-                Items = CreateSyncMenuItems(context, MediaStreamKind.Subtitle),
-            },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
             {
-                Text = StringResourceProvider.Instance.Decoder,
-                Items = CreateChoiceItems(decoderOptions, decoder.Key, key =>
+                Text = StringResourceProvider.Instance.StretchMethod,
+                Items = CreateChoiceItems(GetAudioStretchMethodOptions(), settings.Audio.StretchMethod.ToString(), key =>
                 {
-                    if (settings.Subtitle.Decoder != key)
+                    AudioSpeedAlgorithm method = Enum.Parse<AudioSpeedAlgorithm>(key);
+                    if (settings.Audio.StretchMethod != method)
                     {
-                        applyChange(target => target.Decoder = key);
-                    }
-                }),
-            },
-            new SubItemMenuFlyoutItemModel()
-            {
-                Text = StringResourceProvider.Instance.Renderer,
-                Items = CreateChoiceItems(rendererOptions, renderer.Key, key =>
-                {
-                    if (settings.Subtitle.Renderer != key)
-                    {
-                        applyChange(target => target.Renderer = key);
+                        applyChange(target => target.StretchMethod = method);
                     }
                 }),
             },
         ];
-    }
-
-    private static List<BaseMenuFlyoutItemModel> CreateVideoTrackItems(PlayerMenuContext context)
-    {
-        IReadOnlyList<MediaStreamInfo>? streams = context.Tracks(MediaStreamKind.Video);
-        if (streams is null || streams.Count == 0)
-        {
-            return [new SimpleMenuFlyoutItemModel() { Text = StringResourceProvider.Instance.None, IsEnabled = false }];
-        }
-
-        List<BaseMenuFlyoutItemModel> items = [];
-        foreach (MediaStreamInfo stream in streams)
-        {
-            MediaStreamInfo choice = stream;
-            items.Add(new ToggleMenuFlyoutItemModel()
-            {
-                Text = MediaStreamLabel.Describe(choice, context.SourceOf(choice)),
-                IsChecked = context.IsTrackPlaying(choice),
-                Click = () => context.SelectTrack(MediaStreamKind.Video, choice),
-            });
-        }
-
-        items.Add(new SeparatorMenuFlyoutItemModel());
-        items.Add(new ToggleMenuFlyoutItemModel()
-        {
-            Text = StringResourceProvider.Instance.Off,
-            IsChecked = !streams.Any(context.IsTrackPlaying),
-            Click = () => context.SelectTrack(MediaStreamKind.Video, null),
-        });
-
-        return items;
     }
 
     private static List<BaseMenuFlyoutItemModel> CreateAudioTrackItems(PlayerMenuContext context)
@@ -504,6 +472,131 @@ internal static class PlayerMenuCreator
         });
 
         return items;
+    }
+
+    private static List<PlaybackComponentOption> GetAudioStretchMethodOptions()
+    {
+        return
+        [
+            new(nameof(AudioSpeedAlgorithm.None), StringResourceProvider.Instance.None),
+            new(nameof(AudioSpeedAlgorithm.WSOLA), nameof(AudioSpeedAlgorithm.WSOLA)),
+        ];
+    }
+
+    private static List<BaseMenuFlyoutItemModel> CreateSubtitleMenuItems(PlayerMenuContext context)
+    {
+        PlayerSettingsModel settings = context.Settings;
+        Action<Action<SubtitleSettingsModel>> applyChange = context.UpdateSubtitleSettings;
+
+        List<PlaybackComponentOption> decoderOptions = [.. PlaybackComponents.GetSubtitleDecoderOptions()];
+        PlaybackComponentOption decoder = EnsureChoice(decoderOptions, settings.Subtitle.Decoder);
+
+        List<PlaybackComponentOption> rendererOptions = [.. PlaybackComponents.GetSubtitleRendererOptions()];
+        PlaybackComponentOption renderer = EnsureChoice(rendererOptions, settings.Subtitle.Renderer);
+
+        return
+        [
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.SelectSubtitleTrack,
+                Items = CreateSubtitleTrackItems(context),
+            },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Sync,
+                Items = CreateSyncMenuItems(context, MediaStreamKind.Subtitle),
+            },
+            new SeparatorMenuFlyoutItemModel(),
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Decoder,
+                Items = CreateChoiceItems(decoderOptions, decoder.Key, key =>
+                {
+                    if (settings.Subtitle.Decoder != key)
+                    {
+                        applyChange(target => target.Decoder = key);
+                    }
+                }),
+            },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Renderer,
+                Items = CreateChoiceItems(rendererOptions, renderer.Key, key =>
+                {
+                    if (settings.Subtitle.Renderer != key)
+                    {
+                        applyChange(target => target.Renderer = key);
+                    }
+                }),
+            },
+            new SeparatorMenuFlyoutItemModel(),
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.FontFamily,
+                Items = CreateChoiceItems(GetSubtitleFontFamilyOptions(), settings.Subtitle.Family, key =>
+                {
+                    if (!string.Equals(settings.Subtitle.Family, key, StringComparison.Ordinal))
+                    {
+                        applyChange(target => target.Family = key);
+                    }
+                }),
+            },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.FontSize,
+                Items = new List<BaseMenuFlyoutItemModel>
+                {
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.IncreaseFontSize,
+                        ShortcutAction = KeyboardShortcutActions.IncreaseSubtitleFontSize,
+                        Click = () => context.AdjustSubtitleFontSize(true),
+                    },
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.DecreaseFontSize,
+                        ShortcutAction = KeyboardShortcutActions.DecreaseSubtitleFontSize,
+                        Click = () => context.AdjustSubtitleFontSize(false),
+                    },
+                },
+            },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.FontStyle,
+                Items = CreateChoiceItems(GetSubtitleFontStyleOptions(), settings.Subtitle.ToFontStyle().ToString(), key =>
+                {
+                    FontStyle style = Enum.Parse<FontStyle>(key);
+                    if (settings.Subtitle.ToFontStyle() != style)
+                    {
+                        applyChange(target => target.Style = style.ToString());
+                    }
+                }),
+            },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.FontWeight,
+                Items = CreateChoiceItems(GetSubtitleFontWeightOptions(settings.Subtitle.Family), GetSubtitleFontWeightKey(settings.Subtitle.Weight), key =>
+                {
+                    int weight = int.Parse(key, CultureInfo.InvariantCulture);
+                    if (settings.Subtitle.Weight != weight)
+                    {
+                        applyChange(target => target.Weight = weight);
+                    }
+                }),
+            },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Alignment,
+                Items = CreateChoiceItems(GetSubtitleAlignmentOptions(), settings.Subtitle.TextAlignment?.ToString() ?? string.Empty, key =>
+                {
+                    SubtitleTextAlignment? alignment = key.Length == 0 ? null : Enum.Parse<SubtitleTextAlignment>(key);
+                    if (settings.Subtitle.TextAlignment != alignment)
+                    {
+                        applyChange(target => target.TextAlignment = alignment);
+                    }
+                }),
+            },
+        ];
     }
 
     private static List<BaseMenuFlyoutItemModel> CreateSubtitleTrackItems(PlayerMenuContext context)
@@ -575,6 +668,69 @@ internal static class PlayerMenuCreator
         });
 
         return items;
+    }
+
+    private static List<PlaybackComponentOption> GetSubtitleFontFamilyOptions()
+    {
+        List<PlaybackComponentOption> options = [new(string.Empty, StringResourceProvider.Instance.Default)];
+        foreach (string family in SubtitleFonts.GetFamilies())
+        {
+            options.Add(new(family, family));
+        }
+
+        return options;
+    }
+
+    private static List<PlaybackComponentOption> GetSubtitleFontStyleOptions()
+    {
+        List<PlaybackComponentOption> options = [];
+        foreach (FontStyle style in Enum.GetValues<FontStyle>())
+        {
+            string label = style switch
+            {
+                FontStyle.Oblique => StringResourceProvider.Instance.FontStyleOblique,
+                FontStyle.Italic => StringResourceProvider.Instance.FontStyleItalic,
+                _ => StringResourceProvider.Instance.FontStyleNormal,
+            };
+            options.Add(new(style.ToString(), label));
+        }
+
+        return options;
+    }
+
+    private static List<PlaybackComponentOption> GetSubtitleFontWeightOptions(string family)
+    {
+        List<PlaybackComponentOption> options = [];
+        foreach (int weight in SubtitleFonts.GetWeights(family))
+        {
+            string number = weight.ToString(CultureInfo.CurrentCulture);
+            string label = weight == PlayerSession.DefaultSubtitleFontWeight ? $"{number} ({StringResourceProvider.Instance.Default})" : number;
+            options.Add(new(weight.ToString(CultureInfo.InvariantCulture), label));
+        }
+
+        return options;
+    }
+
+    private static List<PlaybackComponentOption> GetSubtitleAlignmentOptions()
+    {
+        return
+        [
+            new(string.Empty, StringResourceProvider.Instance.Default),
+            new(nameof(SubtitleTextAlignment.BottomLeft), StringResourceProvider.Instance.AlignmentBottomLeft),
+            new(nameof(SubtitleTextAlignment.BottomCenter), StringResourceProvider.Instance.AlignmentBottomCenter),
+            new(nameof(SubtitleTextAlignment.BottomRight), StringResourceProvider.Instance.AlignmentBottomRight),
+            new(nameof(SubtitleTextAlignment.MiddleLeft), StringResourceProvider.Instance.AlignmentMiddleLeft),
+            new(nameof(SubtitleTextAlignment.MiddleCenter), StringResourceProvider.Instance.AlignmentMiddleCenter),
+            new(nameof(SubtitleTextAlignment.MiddleRight), StringResourceProvider.Instance.AlignmentMiddleRight),
+            new(nameof(SubtitleTextAlignment.TopLeft), StringResourceProvider.Instance.AlignmentTopLeft),
+            new(nameof(SubtitleTextAlignment.TopCenter), StringResourceProvider.Instance.AlignmentTopCenter),
+            new(nameof(SubtitleTextAlignment.TopRight), StringResourceProvider.Instance.AlignmentTopRight),
+        ];
+    }
+
+    private static string GetSubtitleFontWeightKey(int weight)
+    {
+        return (weight > 0 ? weight : PlayerSession.DefaultSubtitleFontWeight).ToString(CultureInfo.InvariantCulture);
     }
 
     private static List<BaseMenuFlyoutItemModel> CreateSyncMenuItems(PlayerMenuContext context, MediaStreamKind kind)

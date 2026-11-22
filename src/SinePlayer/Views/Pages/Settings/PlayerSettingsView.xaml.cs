@@ -222,6 +222,24 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
+    private void IncreaseSubtitleFontSizeNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.IncreaseSubtitleFontSizeStep);
+        if (AppSettingsModel.IncreaseSubtitleFontSizeStep != value)
+        {
+            AppSettingsModel.IncreaseSubtitleFontSizeStep = value;
+        }
+    }
+
+    private void DecreaseSubtitleFontSizeNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.DecreaseSubtitleFontSizeStep);
+        if (AppSettingsModel.DecreaseSubtitleFontSizeStep != value)
+        {
+            AppSettingsModel.DecreaseSubtitleFontSizeStep = value;
+        }
+    }
+
     private static double ReadStep(NumberBox box, double fallback, int decimals = 0)
     {
         if (double.IsNaN(box.Value))

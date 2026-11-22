@@ -390,6 +390,9 @@
   <data name="Decoder" xml:space="preserve">
     <value>Decoder</value>
   </data>
+  <data name="DecreaseFontSize" xml:space="preserve">
+    <value>Schriftgröße verkleinern</value>
+  </data>
   <data name="Default" xml:space="preserve">
     <value>Standard</value>
   </data>
@@ -728,6 +731,9 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>Versteckte Elemente einschließen</value>
+  </data>
+  <data name="IncreaseFontSize" xml:space="preserve">
+    <value>Schriftgröße vergrößern</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>Plugin installieren</value>

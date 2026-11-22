@@ -95,6 +95,7 @@ public class StringResourceProvider
     public string DebugModeWarning => GetResourceString("DebugModeWarning");
     public string DecodeMode => GetResourceString("DecodeMode");
     public string Decoder => GetResourceString("Decoder");
+    public string DecreaseFontSize => GetResourceString("DecreaseFontSize");
     public string Default => GetResourceString("Default");
     public string DefaultTags => GetResourceString("DefaultTags");
     public string Delete => GetResourceString("Delete");
@@ -190,6 +191,7 @@ public class StringResourceProvider
     public string ImageSaturation => GetResourceString("ImageSaturation");
     public string Images => GetResourceString("Images");
     public string IncludeHiddenItems => GetResourceString("IncludeHiddenItems");
+    public string IncreaseFontSize => GetResourceString("IncreaseFontSize");
     public string InstallPlugin => GetResourceString("InstallPlugin");
     public string InstallPluginWarning => GetResourceString("InstallPluginWarning");
     public string InvertImage => GetResourceString("InvertImage");
@@ -412,21 +414,9 @@ public class StringResourceProvider
 
     private StringResourceProvider() { }
 
-    public string SyncAudioBackward => WithParentheses(SyncBackward, Audio);
-    public string SyncAudioForward => WithParentheses(SyncForward, Audio);
-    public string SyncSubtitleBackward => WithParentheses(SyncBackward, Subtitle);
-    public string SyncSubtitleForward => WithParentheses(SyncForward, Subtitle);
-    public string SyncVideoBackward => WithParentheses(SyncBackward, Video);
-    public string SyncVideoForward => WithParentheses(SyncForward, Video);
-
     public string WithColon(string text)
     {
         return TextWithColon.Replace("$text", text);
-    }
-
-    public string WithParentheses(string text, string detail)
-    {
-        return TextWithParentheses.Replace("$text", text).Replace("$detail", detail);
     }
 
     private static string GetResourceString(string resource)

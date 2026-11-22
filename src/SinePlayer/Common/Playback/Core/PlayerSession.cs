@@ -79,6 +79,9 @@ internal sealed partial class PlayerSession : IDisposable
     public const double MinimumPlaybackRate = 0.1;
     public const double MaximumPlaybackRate = 8.0;
     public const double MaximumSyncSeconds = 3600.0;
+    public const double MinimumSubtitleFontSize = 4.0;
+    public const double MaximumSubtitleFontSize = 200.0;
+    public const int DefaultSubtitleFontWeight = 400;
 
     public static string NewId()
     {

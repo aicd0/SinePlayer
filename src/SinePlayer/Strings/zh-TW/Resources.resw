@@ -390,6 +390,9 @@
   <data name="Decoder" xml:space="preserve">
     <value>解碼器</value>
   </data>
+  <data name="DecreaseFontSize" xml:space="preserve">
+    <value>減小字型大小</value>
+  </data>
   <data name="Default" xml:space="preserve">
     <value>預設</value>
   </data>
@@ -726,6 +729,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>包含隱藏項目</value>
+  </data>
+  <data name="IncreaseFontSize" xml:space="preserve">
+    <value>增大字型大小</value>
   </data>
   <data name="InstallPlugin" xml:space="preserve">
     <value>安裝外掛程式</value>
