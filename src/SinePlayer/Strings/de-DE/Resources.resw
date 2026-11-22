@@ -561,9 +561,6 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>Ausdruck</value>
   </data>
-  <data name="ExpressionValid" xml:space="preserve">
-    <value>SQL-Abfrage: $query</value>
-  </data>
   <data name="FastForward" xml:space="preserve">
     <value>Vorspulgeschwindigkeit</value>
   </data>

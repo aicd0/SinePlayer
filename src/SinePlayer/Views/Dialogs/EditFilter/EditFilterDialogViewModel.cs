@@ -10,6 +10,7 @@ using SinePlayer.Common.Expression;
 using SinePlayer.Common.Expression.Filter;
 using SinePlayer.Common.Expression.Filter.Sql;
 using SinePlayer.Common.Localization;
+using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Core.Database.SqlHelpers;
@@ -335,7 +336,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         command.AppendCondition(condition);
 
         _isExpressionValid = true;
-        string hintMessage = StringResourceProvider.Instance.ExpressionValid.Replace("$query", command.ToString());
+        string hintMessage = DebugUtils.DeveloperMode ? $"SQL query: {command}" : string.Empty;
         ParseResultLiveData.Emit(hintMessage);
         UpdateButtonStates();
     }
