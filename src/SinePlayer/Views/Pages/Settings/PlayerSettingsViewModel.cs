@@ -201,6 +201,72 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private double _syncVideoForwardStep = AppSettingsModel.SyncVideoForwardStep;
+    public double SyncVideoForwardStep
+    {
+        get => _syncVideoForwardStep;
+        set
+        {
+            _syncVideoForwardStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SyncVideoForwardStep)));
+        }
+    }
+
+    private double _syncVideoBackwardStep = AppSettingsModel.SyncVideoBackwardStep;
+    public double SyncVideoBackwardStep
+    {
+        get => _syncVideoBackwardStep;
+        set
+        {
+            _syncVideoBackwardStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SyncVideoBackwardStep)));
+        }
+    }
+
+    private double _syncAudioForwardStep = AppSettingsModel.SyncAudioForwardStep;
+    public double SyncAudioForwardStep
+    {
+        get => _syncAudioForwardStep;
+        set
+        {
+            _syncAudioForwardStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SyncAudioForwardStep)));
+        }
+    }
+
+    private double _syncAudioBackwardStep = AppSettingsModel.SyncAudioBackwardStep;
+    public double SyncAudioBackwardStep
+    {
+        get => _syncAudioBackwardStep;
+        set
+        {
+            _syncAudioBackwardStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SyncAudioBackwardStep)));
+        }
+    }
+
+    private double _syncSubtitleForwardStep = AppSettingsModel.SyncSubtitleForwardStep;
+    public double SyncSubtitleForwardStep
+    {
+        get => _syncSubtitleForwardStep;
+        set
+        {
+            _syncSubtitleForwardStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SyncSubtitleForwardStep)));
+        }
+    }
+
+    private double _syncSubtitleBackwardStep = AppSettingsModel.SyncSubtitleBackwardStep;
+    public double SyncSubtitleBackwardStep
+    {
+        get => _syncSubtitleBackwardStep;
+        set
+        {
+            _syncSubtitleBackwardStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SyncSubtitleBackwardStep)));
+        }
+    }
+
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
@@ -231,6 +297,12 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             ZoomInStep = AppSettingsModel.ZoomInStep;
             ZoomOutStep = AppSettingsModel.ZoomOutStep;
             FastForwardSpeed = AppSettingsModel.FastForwardSpeed;
+            SyncVideoForwardStep = AppSettingsModel.SyncVideoForwardStep;
+            SyncVideoBackwardStep = AppSettingsModel.SyncVideoBackwardStep;
+            SyncAudioForwardStep = AppSettingsModel.SyncAudioForwardStep;
+            SyncAudioBackwardStep = AppSettingsModel.SyncAudioBackwardStep;
+            SyncSubtitleForwardStep = AppSettingsModel.SyncSubtitleForwardStep;
+            SyncSubtitleBackwardStep = AppSettingsModel.SyncSubtitleBackwardStep;
         });
     }
 

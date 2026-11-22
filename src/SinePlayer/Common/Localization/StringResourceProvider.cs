@@ -360,10 +360,13 @@ public class StringResourceProvider
     public string SubtitleTypeBitmap => GetResourceString("SubtitleTypeBitmap");
     public string SubtitleTypeText => GetResourceString("SubtitleTypeText");
     public string Sync => GetResourceString("Sync");
+    public string SyncBackward => GetResourceString("SyncBackward");
+    public string SyncForward => GetResourceString("SyncForward");
     public string Tag => GetResourceString("Tag");
     public string TagLinkTip => GetResourceString("TagLinkTip");
     public string Tags => GetResourceString("Tags");
     public string TextWithColon => GetResourceString("TextWithColon");
+    public string TextWithParentheses => GetResourceString("TextWithParentheses");
     public string Tip => GetResourceString("Tip");
     public string Title => GetResourceString("Title");
     public string Title1 => GetResourceString("Title1");
@@ -409,9 +412,21 @@ public class StringResourceProvider
 
     private StringResourceProvider() { }
 
+    public string SyncAudioBackward => WithParentheses(SyncBackward, Audio);
+    public string SyncAudioForward => WithParentheses(SyncForward, Audio);
+    public string SyncSubtitleBackward => WithParentheses(SyncBackward, Subtitle);
+    public string SyncSubtitleForward => WithParentheses(SyncForward, Subtitle);
+    public string SyncVideoBackward => WithParentheses(SyncBackward, Video);
+    public string SyncVideoForward => WithParentheses(SyncForward, Video);
+
     public string WithColon(string text)
     {
         return TextWithColon.Replace("$text", text);
+    }
+
+    public string WithParentheses(string text, string detail)
+    {
+        return TextWithParentheses.Replace("$text", text).Replace("$detail", detail);
     }
 
     private static string GetResourceString(string resource)

@@ -1,7 +1,10 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System;
 using System.Text;
+
+using SinePlayer.Core.Common.Native;
 
 using Windows.System;
 
@@ -75,7 +78,7 @@ internal sealed class KeyboardShortcutModel
             VirtualKey.Space => "Space",
             VirtualKey.Escape => "Esc",
             VirtualKey.Back => "Backspace",
-            _ => key.ToString(),
+            _ => Enum.IsDefined(key) ? key.ToString() : KeyboardKeyNames.GetName((uint)key) ?? key.ToString(),
         };
     }
 }

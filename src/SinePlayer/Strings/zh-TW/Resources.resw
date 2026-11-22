@@ -1171,7 +1171,7 @@ $plugins</value>
     <value>儲存檢視設定</value>
   </data>
   <data name="Scaling" xml:space="preserve">
-    <value>縮放</value>
+    <value>縮放模式</value>
   </data>
   <data name="ScanOnLaunch" xml:space="preserve">
     <value>啟動時掃描</value>
@@ -1296,6 +1296,12 @@ $plugins</value>
   <data name="Sync" xml:space="preserve">
     <value>同步</value>
   </data>
+  <data name="SyncBackward" xml:space="preserve">
+    <value>向後同步</value>
+  </data>
+  <data name="SyncForward" xml:space="preserve">
+    <value>向前同步</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>標籤</value>
   </data>
@@ -1315,6 +1321,9 @@ $plugins</value>
   </data>
   <data name="TextWithColon" xml:space="preserve">
     <value>$text：</value>
+  </data>
+  <data name="TextWithParentheses" xml:space="preserve">
+    <value>$text（$detail）</value>
   </data>
   <data name="ThemeDark.Content" xml:space="preserve">
     <value>深色</value>

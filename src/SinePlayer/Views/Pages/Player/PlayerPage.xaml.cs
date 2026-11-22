@@ -124,7 +124,6 @@ internal sealed partial class PlayerPage : BasePage
             _view = view;
             ViewModel.Initialize(PageActionHandler, session.Playback);
             ObserveData();
-            UpdateKeyboardAccelerators();
 
             VideoHost.Children.Clear();
             VideoHost.Children.Add(view.VideoPanel);
@@ -152,11 +151,13 @@ internal sealed partial class PlayerPage : BasePage
         UpdatePageState();
         SyncCurrentMedia();
         FocusPlayer();
+        GetMainPageAbility().RegisterShortcutActionHandler(InvokeShortcutAction);
     }
 
     protected override void OnPause()
     {
         base.OnPause();
+        GetMainPageAbility().UnregisterShortcutActionHandler(InvokeShortcutAction);
         UpdatePageState();
         ShowCursor();
     }
@@ -228,8 +229,6 @@ internal sealed partial class PlayerPage : BasePage
 
             ViewModel.UpdateMediaMetadata();
         });
-
-        KeyboardShortcutManager.ShortcutsChangedLiveData.Observe(this, _ => UpdateKeyboardAccelerators());
 
         AppSettingsModel.KeepScreenOnBehaviorChangedLiveData.Observe(this, _ => UpdateKeepScreenOn());
 
@@ -1382,6 +1381,51 @@ internal sealed partial class PlayerPage : BasePage
         PromptTemporary(StringResourceProvider.Instance.WithColon(action) + $"{Math.Round(zoom * 100.0)}%");
     }
 
+    private void SyncBy(MediaStreamKind kind, bool forward)
+    {
+        PlayerSettingsPanel? settingsPanel = _navigationBar?.PlayerSettingsPanel;
+        if (settingsPanel is null)
+        {
+            return;
+        }
+
+        PlayerSettingsModel settings = settingsPanel.Settings;
+        double value;
+        string action;
+        switch (kind)
+        {
+            case MediaStreamKind.Video:
+                settingsPanel.ApplyVideo(target => target.Sync = SyncValueOf(target.Sync, forward, AppSettingsModel.SyncVideoForwardStep, AppSettingsModel.SyncVideoBackwardStep));
+                value = settings.Video.Sync;
+                action = forward
+                    ? StringResource.SyncVideoForward
+                    : StringResource.SyncVideoBackward;
+                break;
+            case MediaStreamKind.Audio:
+                settingsPanel.ApplyAudio(target => target.Sync = SyncValueOf(target.Sync, forward, AppSettingsModel.SyncAudioForwardStep, AppSettingsModel.SyncAudioBackwardStep));
+                value = settings.Audio.Sync;
+                action = forward
+                    ? StringResource.SyncAudioForward
+                    : StringResource.SyncAudioBackward;
+                break;
+            default:
+                settingsPanel.ApplySubtitle(target => target.Sync = SyncValueOf(target.Sync, forward, AppSettingsModel.SyncSubtitleForwardStep, AppSettingsModel.SyncSubtitleBackwardStep));
+                value = settings.Subtitle.Sync;
+                action = forward
+                    ? StringResource.SyncSubtitleForward
+                    : StringResource.SyncSubtitleBackward;
+                break;
+        }
+
+        PromptTemporary(StringResourceProvider.Instance.WithColon(action) + $"{value:+0.0;-0.0;0.0}s");
+    }
+
+    private static double SyncValueOf(double current, bool forward, double forwardStep, double backwardStep)
+    {
+        double step = forward ? forwardStep : backwardStep;
+        return Math.Round(Math.Clamp(current + (forward ? step : -step), -PlayerSession.MaximumSyncSeconds, PlayerSession.MaximumSyncSeconds), 1);
+    }
+
     private async Task ApplyPlayerSettings()
     {
         PlayerSession? session = _session;
@@ -1722,25 +1766,52 @@ internal sealed partial class PlayerPage : BasePage
         }
     }
 
-    private void UpdateKeyboardAccelerators()
+    private bool InvokeShortcutAction(string action)
     {
-        void AddKeyboardAccelerators(string action, Windows.Foundation.TypedEventHandler<KeyboardAccelerator, KeyboardAcceleratorInvokedEventArgs> handler)
+        switch (action)
         {
-            foreach (KeyboardAccelerator accelerator in KeyboardShortcutManager.CreateAccelerators(action, handler))
-            {
-                KeyboardAccelerators.Add(accelerator);
-            }
+            case KeyboardShortcutActions.PlayPause:
+                TogglePlayPause();
+                return true;
+            case KeyboardShortcutActions.SeekBackward:
+                SeekBy(-GetSeekStepMs(AppSettingsModel.SeekBackwardSeconds));
+                return true;
+            case KeyboardShortcutActions.SeekForward:
+                SeekBy(GetSeekStepMs(AppSettingsModel.SeekForwardSeconds));
+                return true;
+            case KeyboardShortcutActions.SyncVideoBackward:
+                SyncBy(MediaStreamKind.Video, forward: false);
+                return true;
+            case KeyboardShortcutActions.SyncVideoForward:
+                SyncBy(MediaStreamKind.Video, forward: true);
+                return true;
+            case KeyboardShortcutActions.SyncAudioBackward:
+                SyncBy(MediaStreamKind.Audio, forward: false);
+                return true;
+            case KeyboardShortcutActions.SyncAudioForward:
+                SyncBy(MediaStreamKind.Audio, forward: true);
+                return true;
+            case KeyboardShortcutActions.SyncSubtitleBackward:
+                SyncBy(MediaStreamKind.Subtitle, forward: false);
+                return true;
+            case KeyboardShortcutActions.SyncSubtitleForward:
+                SyncBy(MediaStreamKind.Subtitle, forward: true);
+                return true;
+            case KeyboardShortcutActions.VolumeDown:
+                AdjustVolume(-GetVolumeStep(AppSettingsModel.VolumeDownPercent));
+                return true;
+            case KeyboardShortcutActions.VolumeUp:
+                AdjustVolume(GetVolumeStep(AppSettingsModel.VolumeUpPercent));
+                return true;
+            case KeyboardShortcutActions.OpenNextItem:
+                ViewModel.Next();
+                return true;
+            case KeyboardShortcutActions.OpenPreviousItem:
+                ViewModel.Previous();
+                return true;
+            default:
+                return false;
         }
-
-        KeyboardAccelerators.Clear();
-
-        AddKeyboardAccelerators(KeyboardShortcutActions.PlayPause, (_, _) => TogglePlayPause());
-        AddKeyboardAccelerators(KeyboardShortcutActions.SeekBackward, (_, _) => SeekBy(-GetSeekStepMs(AppSettingsModel.SeekBackwardSeconds)));
-        AddKeyboardAccelerators(KeyboardShortcutActions.SeekForward, (_, _) => SeekBy(GetSeekStepMs(AppSettingsModel.SeekForwardSeconds)));
-        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeDown, (_, _) => AdjustVolume(-GetVolumeStep(AppSettingsModel.VolumeDownPercent)));
-        AddKeyboardAccelerators(KeyboardShortcutActions.VolumeUp, (_, _) => AdjustVolume(GetVolumeStep(AppSettingsModel.VolumeUpPercent)));
-        AddKeyboardAccelerators(KeyboardShortcutActions.OpenNextItem, (_, _) => ViewModel.Next());
-        AddKeyboardAccelerators(KeyboardShortcutActions.OpenPreviousItem, (_, _) => ViewModel.Previous());
     }
 
     private async Task<MenuFlyout?> CreateVideoHostMenu()
@@ -1762,6 +1833,7 @@ internal sealed partial class PlayerPage : BasePage
             UpdateVideoSettings = settingsPanel.ApplyVideo,
             UpdateAudioSettings = settingsPanel.ApplyAudio,
             UpdateSubtitleSettings = settingsPanel.ApplySubtitle,
+            AdjustSync = SyncBy,
             PlayQueue = session.PlayQueue.ToBuilder(),
             Playback = ViewModel.Playback.ToBuilder(),
             Session = session,

@@ -1298,6 +1298,12 @@ $plugins</value>
   <data name="Sync" xml:space="preserve">
     <value>Sincronización</value>
   </data>
+  <data name="SyncBackward" xml:space="preserve">
+    <value>Retroceder la sincronización</value>
+  </data>
+  <data name="SyncForward" xml:space="preserve">
+    <value>Avanzar la sincronización</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Etiqueta</value>
   </data>
@@ -1317,6 +1323,9 @@ Categoría 2: Etiqueta 4, Etiqueta 5</value>
   </data>
   <data name="TextWithColon" xml:space="preserve">
     <value>$text: </value>
+  </data>
+  <data name="TextWithParentheses" xml:space="preserve">
+    <value>$text ($detail)</value>
   </data>
   <data name="ThemeDark.Content" xml:space="preserve">
     <value>Oscuro</value>

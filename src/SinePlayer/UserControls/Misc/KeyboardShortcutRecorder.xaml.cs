@@ -1,7 +1,6 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 
@@ -10,7 +9,6 @@ using SinePlayer.Common.HotKey;
 using SinePlayer.Common.Localization;
 
 using Windows.System;
-using Windows.UI.Core;
 
 namespace SinePlayer.UserControls.Misc;
 
@@ -53,7 +51,7 @@ internal sealed partial class KeyboardShortcutRecorder : BaseUserControl
             KeyboardShortcutModel model = new()
             {
                 Key = key,
-                Modifiers = GetCurrentModifiers(),
+                Modifiers = KeyboardShortcutManager.GetCurrentModifiers(),
             };
             Shortcut = model;
             ShortcutChanged?.Invoke(this, model);
@@ -80,7 +78,7 @@ internal sealed partial class KeyboardShortcutRecorder : BaseUserControl
             return;
         }
 
-        VirtualKeyModifiers modifiers = GetCurrentModifiers();
+        VirtualKeyModifiers modifiers = KeyboardShortcutManager.GetCurrentModifiers();
         PlaceholderTextBlock.Text = modifiers == VirtualKeyModifiers.None
             ? StringResourceProvider.Instance.PressKeyCombination
             : KeyboardShortcutModel.FormatModifiers(modifiers);
@@ -105,38 +103,5 @@ internal sealed partial class KeyboardShortcutRecorder : BaseUserControl
             VirtualKey.RightWindows => true,
             _ => false,
         };
-    }
-
-    private static VirtualKeyModifiers GetCurrentModifiers()
-    {
-        VirtualKeyModifiers modifiers = VirtualKeyModifiers.None;
-
-        if (IsKeyDown(VirtualKey.Control))
-        {
-            modifiers |= VirtualKeyModifiers.Control;
-        }
-
-        if (IsKeyDown(VirtualKey.Shift))
-        {
-            modifiers |= VirtualKeyModifiers.Shift;
-        }
-
-        if (IsKeyDown(VirtualKey.Menu))
-        {
-            modifiers |= VirtualKeyModifiers.Menu;
-        }
-
-        if (IsKeyDown(VirtualKey.LeftWindows) || IsKeyDown(VirtualKey.RightWindows))
-        {
-            modifiers |= VirtualKeyModifiers.Windows;
-        }
-
-        return modifiers;
-    }
-
-    private static bool IsKeyDown(VirtualKey key)
-    {
-        CoreVirtualKeyStates state = InputKeyboardSource.GetKeyStateForCurrentThread(key);
-        return state.HasFlag(CoreVirtualKeyStates.Down);
     }
 }

@@ -49,6 +49,7 @@ FindNextFile
 GetActiveWindow
 GetCursorPos
 GetDpiForWindow
+GetKeyNameText
 GetMonitorBrightness
 GetMonitorInfo
 GetNumberOfPhysicalMonitorsFromHMONITOR
@@ -85,6 +86,7 @@ IPropertyStore
 LocalFree
 MC_CAPS_BRIGHTNESS
 MONITORINFOEXW
+MapVirtualKey
 MessageBox
 MonitorFromPoint
 MonitorFromRect
