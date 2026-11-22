@@ -95,6 +95,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock
@@ -459,6 +460,53 @@
                     SpinButtonPlacementMode="Inline"
                     ValueChanged="DecreaseSubtitleFontSizeNumberBox_ValueChanged"
                     Value="{x:Bind ViewModel.DecreaseSubtitleFontSizeStep, Mode=TwoWay}" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="8"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind ViewModel.VideoPanLabel}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="8"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="VideoPanStepNumberBox"
+                    MinWidth="120"
+                    LargeChange="10"
+                    Maximum="1000"
+                    Minimum="1"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="VideoPanStepNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.VideoPanStep, Mode=TwoWay}" />
+            </StackPanel>
+            <TextBlock
+                Grid.Row="8"
+                Grid.Column="4"
+                VerticalAlignment="Center"
+                Text="{x:Bind ViewModel.SubtitlePanLabel}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="8"
+                Grid.Column="6"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="SubtitlePanStepNumberBox"
+                    MinWidth="120"
+                    LargeChange="10"
+                    Maximum="1000"
+                    Minimum="1"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="SubtitlePanStepNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.SubtitlePanStep, Mode=TwoWay}" />
             </StackPanel>
         </Grid>
     </StackPanel>

@@ -976,6 +976,21 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="Pan" xml:space="preserve">
     <value>Панорама</value>
   </data>
+  <data name="PanDown" xml:space="preserve">
+    <value>Сдвинуть вниз</value>
+  </data>
+  <data name="PanLeft" xml:space="preserve">
+    <value>Сдвинуть влево</value>
+  </data>
+  <data name="PanPosition" xml:space="preserve">
+    <value>Сдвиг</value>
+  </data>
+  <data name="PanRight" xml:space="preserve">
+    <value>Сдвинуть вправо</value>
+  </data>
+  <data name="PanUp" xml:space="preserve">
+    <value>Сдвинуть вверх</value>
+  </data>
   <data name="PanX" xml:space="preserve">
     <value>Сдвиг X</value>
   </data>

@@ -290,6 +290,37 @@ internal static class PlayerMenuCreator
                     },
                 },
             },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.PanPosition,
+                Items = new List<BaseMenuFlyoutItemModel>
+                {
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.PanUp,
+                        ShortcutAction = KeyboardShortcutActions.PanVideoUp,
+                        Click = () => context.AdjustPan(KeyboardShortcutActions.PanVideoUp),
+                    },
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.PanDown,
+                        ShortcutAction = KeyboardShortcutActions.PanVideoDown,
+                        Click = () => context.AdjustPan(KeyboardShortcutActions.PanVideoDown),
+                    },
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.PanLeft,
+                        ShortcutAction = KeyboardShortcutActions.PanVideoLeft,
+                        Click = () => context.AdjustPan(KeyboardShortcutActions.PanVideoLeft),
+                    },
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.PanRight,
+                        ShortcutAction = KeyboardShortcutActions.PanVideoRight,
+                        Click = () => context.AdjustPan(KeyboardShortcutActions.PanVideoRight),
+                    },
+                },
+            },
             new ToggleMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.FlipVertically,
@@ -595,6 +626,44 @@ internal static class PlayerMenuCreator
                         applyChange(target => target.TextAlignment = alignment);
                     }
                 }),
+            },
+            new ToggleMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Shadow,
+                IsChecked = settings.Subtitle.ShadowEnabled,
+                Click = () => applyChange(target => target.ShadowEnabled = !settings.Subtitle.ShadowEnabled),
+            },
+            new SeparatorMenuFlyoutItemModel(),
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.PanPosition,
+                Items = new List<BaseMenuFlyoutItemModel>
+                {
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.PanUp,
+                        ShortcutAction = KeyboardShortcutActions.PanSubtitleUp,
+                        Click = () => context.AdjustPan(KeyboardShortcutActions.PanSubtitleUp),
+                    },
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.PanDown,
+                        ShortcutAction = KeyboardShortcutActions.PanSubtitleDown,
+                        Click = () => context.AdjustPan(KeyboardShortcutActions.PanSubtitleDown),
+                    },
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.PanLeft,
+                        ShortcutAction = KeyboardShortcutActions.PanSubtitleLeft,
+                        Click = () => context.AdjustPan(KeyboardShortcutActions.PanSubtitleLeft),
+                    },
+                    new SimpleMenuFlyoutItemModel()
+                    {
+                        Text = StringResourceProvider.Instance.PanRight,
+                        ShortcutAction = KeyboardShortcutActions.PanSubtitleRight,
+                        Click = () => context.AdjustPan(KeyboardShortcutActions.PanSubtitleRight),
+                    },
+                },
             },
         ];
     }

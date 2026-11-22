@@ -290,6 +290,28 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private double _videoPanStep = AppSettingsModel.VideoPanStep;
+    public double VideoPanStep
+    {
+        get => _videoPanStep;
+        set
+        {
+            _videoPanStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VideoPanStep)));
+        }
+    }
+
+    private double _subtitlePanStep = AppSettingsModel.SubtitlePanStep;
+    public double SubtitlePanStep
+    {
+        get => _subtitlePanStep;
+        set
+        {
+            _subtitlePanStep = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitlePanStep)));
+        }
+    }
+
     public string SyncVideoForwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncVideoForward);
     public string SyncVideoBackwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncVideoBackward);
     public string SyncAudioForwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncAudioForward);
@@ -298,6 +320,8 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
     public string SyncSubtitleBackwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncSubtitleBackward);
     public string IncreaseFontSizeLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.IncreaseSubtitleFontSize);
     public string DecreaseFontSizeLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.DecreaseSubtitleFontSize);
+    public string VideoPanLabel => KeyboardShortcutActions.JoinPath(StringResourceProvider.Instance.Video, StringResourceProvider.Instance.PanPosition);
+    public string SubtitlePanLabel => KeyboardShortcutActions.JoinPath(StringResourceProvider.Instance.Subtitle, StringResourceProvider.Instance.PanPosition);
 
     public void Initialize(SettingsSharedViewModel shared)
     {
@@ -337,6 +361,8 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             SyncSubtitleBackwardStep = AppSettingsModel.SyncSubtitleBackwardStep;
             IncreaseSubtitleFontSizeStep = AppSettingsModel.IncreaseSubtitleFontSizeStep;
             DecreaseSubtitleFontSizeStep = AppSettingsModel.DecreaseSubtitleFontSizeStep;
+            VideoPanStep = AppSettingsModel.VideoPanStep;
+            SubtitlePanStep = AppSettingsModel.SubtitlePanStep;
         });
     }
 
