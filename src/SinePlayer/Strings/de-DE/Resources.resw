@@ -1298,6 +1298,12 @@ Im abgesicherten Modus starten?</value>
   <data name="Sync" xml:space="preserve">
     <value>Synchronisierung</value>
   </data>
+  <data name="SyncBackward" xml:space="preserve">
+    <value>Nach hinten synchronisieren</value>
+  </data>
+  <data name="SyncForward" xml:space="preserve">
+    <value>Nach vorn synchronisieren</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Etikett</value>
   </data>
@@ -1317,6 +1323,9 @@ Kategorie 2: Tag 4, Tag 5</value>
   </data>
   <data name="TextWithColon" xml:space="preserve">
     <value>$text: </value>
+  </data>
+  <data name="TextWithParentheses" xml:space="preserve">
+    <value>$text ($detail)</value>
   </data>
   <data name="ThemeDark.Content" xml:space="preserve">
     <value>Dunkel</value>

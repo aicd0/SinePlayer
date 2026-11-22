@@ -76,12 +76,15 @@
             Margin="0,16"
             Fill="{ThemeResource AppSeperator1}" />
 
-        <Grid RowSpacing="8">
+        <Grid HorizontalAlignment="Left" RowSpacing="8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="12" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="32" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -117,16 +120,15 @@
                     Value="{x:Bind ViewModel.SeekForwardSeconds, Mode=TwoWay}" />
                 <TextBlock VerticalAlignment="Center" Text="s" />
             </StackPanel>
-
             <TextBlock
-                Grid.Row="1"
-                Grid.Column="0"
+                Grid.Row="0"
+                Grid.Column="4"
                 VerticalAlignment="Center"
                 Text="{x:Bind StringResource.SeekBackward}"
                 TextWrapping="Wrap" />
             <StackPanel
-                Grid.Row="1"
-                Grid.Column="2"
+                Grid.Row="0"
+                Grid.Column="6"
                 VerticalAlignment="Center"
                 Orientation="Horizontal"
                 Spacing="6">
@@ -144,13 +146,13 @@
             </StackPanel>
 
             <TextBlock
-                Grid.Row="2"
+                Grid.Row="1"
                 Grid.Column="0"
                 VerticalAlignment="Center"
                 Text="{x:Bind StringResource.VolumeUp}"
                 TextWrapping="Wrap" />
             <StackPanel
-                Grid.Row="2"
+                Grid.Row="1"
                 Grid.Column="2"
                 VerticalAlignment="Center"
                 Orientation="Horizontal"
@@ -167,16 +169,15 @@
                     Value="{x:Bind ViewModel.VolumeUpPercent, Mode=TwoWay}" />
                 <TextBlock VerticalAlignment="Center" Text="%" />
             </StackPanel>
-
             <TextBlock
-                Grid.Row="3"
-                Grid.Column="0"
+                Grid.Row="1"
+                Grid.Column="4"
                 VerticalAlignment="Center"
                 Text="{x:Bind StringResource.VolumeDown}"
                 TextWrapping="Wrap" />
             <StackPanel
-                Grid.Row="3"
-                Grid.Column="2"
+                Grid.Row="1"
+                Grid.Column="6"
                 VerticalAlignment="Center"
                 Orientation="Horizontal"
                 Spacing="6">
@@ -194,13 +195,13 @@
             </StackPanel>
 
             <TextBlock
-                Grid.Row="4"
+                Grid.Row="2"
                 Grid.Column="0"
                 VerticalAlignment="Center"
                 Text="{x:Bind StringResource.ZoomIn}"
                 TextWrapping="Wrap" />
             <StackPanel
-                Grid.Row="4"
+                Grid.Row="2"
                 Grid.Column="2"
                 VerticalAlignment="Center"
                 Orientation="Horizontal"
@@ -216,16 +217,15 @@
                     ValueChanged="ZoomInNumberBox_ValueChanged"
                     Value="{x:Bind ViewModel.ZoomInStep, Mode=TwoWay}" />
             </StackPanel>
-
             <TextBlock
-                Grid.Row="5"
-                Grid.Column="0"
+                Grid.Row="2"
+                Grid.Column="4"
                 VerticalAlignment="Center"
                 Text="{x:Bind StringResource.ZoomOut}"
                 TextWrapping="Wrap" />
             <StackPanel
-                Grid.Row="5"
-                Grid.Column="2"
+                Grid.Row="2"
+                Grid.Column="6"
                 VerticalAlignment="Center"
                 Orientation="Horizontal"
                 Spacing="6">
@@ -242,13 +242,13 @@
             </StackPanel>
 
             <TextBlock
-                Grid.Row="6"
+                Grid.Row="3"
                 Grid.Column="0"
                 VerticalAlignment="Center"
                 Text="{x:Bind StringResource.FastForward}"
                 TextWrapping="Wrap" />
             <StackPanel
-                Grid.Row="6"
+                Grid.Row="3"
                 Grid.Column="2"
                 VerticalAlignment="Center"
                 Orientation="Horizontal"
@@ -264,6 +264,153 @@
                     ValueChanged="FastForwardNumberBox_ValueChanged"
                     Value="{x:Bind ViewModel.FastForwardSpeed, Mode=TwoWay}" />
                 <TextBlock VerticalAlignment="Center" Text="x" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="4"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.SyncVideoForward}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="4"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="SyncVideoForwardNumberBox"
+                    MinWidth="120"
+                    LargeChange="1"
+                    Maximum="10"
+                    Minimum="0.1"
+                    SmallChange="0.1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="SyncVideoForwardNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.SyncVideoForwardStep, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="s" />
+            </StackPanel>
+            <TextBlock
+                Grid.Row="4"
+                Grid.Column="4"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.SyncVideoBackward}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="4"
+                Grid.Column="6"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="SyncVideoBackwardNumberBox"
+                    MinWidth="120"
+                    LargeChange="1"
+                    Maximum="10"
+                    Minimum="0.1"
+                    SmallChange="0.1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="SyncVideoBackwardNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.SyncVideoBackwardStep, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="s" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="5"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.SyncAudioForward}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="5"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="SyncAudioForwardNumberBox"
+                    MinWidth="120"
+                    LargeChange="1"
+                    Maximum="10"
+                    Minimum="0.1"
+                    SmallChange="0.1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="SyncAudioForwardNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.SyncAudioForwardStep, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="s" />
+            </StackPanel>
+            <TextBlock
+                Grid.Row="5"
+                Grid.Column="4"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.SyncAudioBackward}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="5"
+                Grid.Column="6"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="SyncAudioBackwardNumberBox"
+                    MinWidth="120"
+                    LargeChange="1"
+                    Maximum="10"
+                    Minimum="0.1"
+                    SmallChange="0.1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="SyncAudioBackwardNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.SyncAudioBackwardStep, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="s" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="6"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.SyncSubtitleForward}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="6"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="SyncSubtitleForwardNumberBox"
+                    MinWidth="120"
+                    LargeChange="1"
+                    Maximum="10"
+                    Minimum="0.1"
+                    SmallChange="0.1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="SyncSubtitleForwardNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.SyncSubtitleForwardStep, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="s" />
+            </StackPanel>
+            <TextBlock
+                Grid.Row="6"
+                Grid.Column="4"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.SyncSubtitleBackward}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="6"
+                Grid.Column="6"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="SyncSubtitleBackwardNumberBox"
+                    MinWidth="120"
+                    LargeChange="1"
+                    Maximum="10"
+                    Minimum="0.1"
+                    SmallChange="0.1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="SyncSubtitleBackwardNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.SyncSubtitleBackwardStep, Mode=TwoWay}" />
+                <TextBlock VerticalAlignment="Center" Text="s" />
             </StackPanel>
         </Grid>
     </StackPanel>

@@ -272,6 +272,84 @@ internal static class AppSettingsModel
         }
     }
 
+    public static double SyncVideoForwardStep
+    {
+        get
+        {
+            return _db.Read(model => model.SyncVideoForwardStep ?? 0.1);
+        }
+        set
+        {
+            _db.Write(model => model.SyncVideoForwardStep = value);
+            _db.Save();
+        }
+    }
+
+    public static double SyncVideoBackwardStep
+    {
+        get
+        {
+            return _db.Read(model => model.SyncVideoBackwardStep ?? 0.1);
+        }
+        set
+        {
+            _db.Write(model => model.SyncVideoBackwardStep = value);
+            _db.Save();
+        }
+    }
+
+    public static double SyncAudioForwardStep
+    {
+        get
+        {
+            return _db.Read(model => model.SyncAudioForwardStep ?? 0.1);
+        }
+        set
+        {
+            _db.Write(model => model.SyncAudioForwardStep = value);
+            _db.Save();
+        }
+    }
+
+    public static double SyncAudioBackwardStep
+    {
+        get
+        {
+            return _db.Read(model => model.SyncAudioBackwardStep ?? 0.1);
+        }
+        set
+        {
+            _db.Write(model => model.SyncAudioBackwardStep = value);
+            _db.Save();
+        }
+    }
+
+    public static double SyncSubtitleForwardStep
+    {
+        get
+        {
+            return _db.Read(model => model.SyncSubtitleForwardStep ?? 0.1);
+        }
+        set
+        {
+            _db.Write(model => model.SyncSubtitleForwardStep = value);
+            _db.Save();
+        }
+    }
+
+    public static double SyncSubtitleBackwardStep
+    {
+        get
+        {
+            return _db.Read(model => model.SyncSubtitleBackwardStep ?? 0.1);
+        }
+        set
+        {
+            _db.Write(model => model.SyncSubtitleBackwardStep = value);
+            _db.Save();
+        }
+    }
+
     public static CloseLastTabBehaviorEnum CloseLastTabBehavior
     {
         get
@@ -1153,6 +1231,24 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("FastForwardSpeed")]
         public double? FastForwardSpeed { get; set; }
+
+        [JsonPropertyName("SyncVideoForwardStep")]
+        public double? SyncVideoForwardStep { get; set; }
+
+        [JsonPropertyName("SyncVideoBackwardStep")]
+        public double? SyncVideoBackwardStep { get; set; }
+
+        [JsonPropertyName("SyncAudioForwardStep")]
+        public double? SyncAudioForwardStep { get; set; }
+
+        [JsonPropertyName("SyncAudioBackwardStep")]
+        public double? SyncAudioBackwardStep { get; set; }
+
+        [JsonPropertyName("SyncSubtitleForwardStep")]
+        public double? SyncSubtitleForwardStep { get; set; }
+
+        [JsonPropertyName("SyncSubtitleBackwardStep")]
+        public double? SyncSubtitleBackwardStep { get; set; }
 
         [JsonPropertyName("PromptBeforeRemovingMedia")]
         public bool? PromptBeforeRemovingMedia { get; set; }

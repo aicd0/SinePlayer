@@ -1298,6 +1298,12 @@ Start in Safe Mode?</value>
   <data name="Sync" xml:space="preserve">
     <value>Sync</value>
   </data>
+  <data name="SyncBackward" xml:space="preserve">
+    <value>Sync backward</value>
+  </data>
+  <data name="SyncForward" xml:space="preserve">
+    <value>Sync forward</value>
+  </data>
   <data name="Tag" xml:space="preserve">
     <value>Tag</value>
   </data>
@@ -1317,6 +1323,9 @@ Category2: Tag4, Tag5</value>
   </data>
   <data name="TextWithColon" xml:space="preserve">
     <value>$text: </value>
+  </data>
+  <data name="TextWithParentheses" xml:space="preserve">
+    <value>$text ($detail)</value>
   </data>
   <data name="ThemeDark.Content" xml:space="preserve">
     <value>Dark</value>

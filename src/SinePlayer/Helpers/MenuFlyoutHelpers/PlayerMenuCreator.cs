@@ -208,6 +208,11 @@ internal static class PlayerMenuCreator
                 Text = StringResourceProvider.Instance.SelectVideoTrack,
                 Items = CreateVideoTrackItems(context),
             },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Sync,
+                Items = CreateSyncMenuItems(context, MediaStreamKind.Video),
+            },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
             {
@@ -307,6 +312,11 @@ internal static class PlayerMenuCreator
                 Text = StringResourceProvider.Instance.SelectAudioTrack,
                 Items = CreateAudioTrackItems(context),
             },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Sync,
+                Items = CreateSyncMenuItems(context, MediaStreamKind.Audio),
+            },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
             {
@@ -350,6 +360,11 @@ internal static class PlayerMenuCreator
             {
                 Text = StringResourceProvider.Instance.SelectSubtitleTrack,
                 Items = CreateSubtitleTrackItems(context),
+            },
+            new SubItemMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.Sync,
+                Items = CreateSyncMenuItems(context, MediaStreamKind.Subtitle),
             },
             new SeparatorMenuFlyoutItemModel(),
             new SubItemMenuFlyoutItemModel()
@@ -540,6 +555,23 @@ internal static class PlayerMenuCreator
         });
 
         return items;
+    }
+
+    private static List<BaseMenuFlyoutItemModel> CreateSyncMenuItems(PlayerMenuContext context, MediaStreamKind kind)
+    {
+        return
+        [
+            new SimpleMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.SyncForward,
+                Click = () => context.AdjustSync(kind, true),
+            },
+            new SimpleMenuFlyoutItemModel()
+            {
+                Text = StringResourceProvider.Instance.SyncBackward,
+                Click = () => context.AdjustSync(kind, false),
+            },
+        ];
     }
 
     private static SubItemMenuFlyoutItemModel CreateStretchModeSubItem(string text, VideoResizeMode resizeMode, VideoSettingsModel settings, Action<VideoResizeMode, double> select)

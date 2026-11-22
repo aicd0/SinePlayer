@@ -168,6 +168,60 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
+    private void SyncVideoForwardNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.SyncVideoForwardStep, decimals: 1);
+        if (AppSettingsModel.SyncVideoForwardStep != value)
+        {
+            AppSettingsModel.SyncVideoForwardStep = value;
+        }
+    }
+
+    private void SyncVideoBackwardNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.SyncVideoBackwardStep, decimals: 1);
+        if (AppSettingsModel.SyncVideoBackwardStep != value)
+        {
+            AppSettingsModel.SyncVideoBackwardStep = value;
+        }
+    }
+
+    private void SyncAudioForwardNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.SyncAudioForwardStep, decimals: 1);
+        if (AppSettingsModel.SyncAudioForwardStep != value)
+        {
+            AppSettingsModel.SyncAudioForwardStep = value;
+        }
+    }
+
+    private void SyncAudioBackwardNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.SyncAudioBackwardStep, decimals: 1);
+        if (AppSettingsModel.SyncAudioBackwardStep != value)
+        {
+            AppSettingsModel.SyncAudioBackwardStep = value;
+        }
+    }
+
+    private void SyncSubtitleForwardNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.SyncSubtitleForwardStep, decimals: 1);
+        if (AppSettingsModel.SyncSubtitleForwardStep != value)
+        {
+            AppSettingsModel.SyncSubtitleForwardStep = value;
+        }
+    }
+
+    private void SyncSubtitleBackwardNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        double value = ReadStep(sender, AppSettingsModel.SyncSubtitleBackwardStep, decimals: 1);
+        if (AppSettingsModel.SyncSubtitleBackwardStep != value)
+        {
+            AppSettingsModel.SyncSubtitleBackwardStep = value;
+        }
+    }
+
     private static double ReadStep(NumberBox box, double fallback, int decimals = 0)
     {
         if (double.IsNaN(box.Value))

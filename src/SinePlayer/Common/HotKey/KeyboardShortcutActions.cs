@@ -24,6 +24,12 @@ internal static class KeyboardShortcutActions
     public const string PlayPause = "PlayPause";
     public const string SeekBackward = "SeekBackward";
     public const string SeekForward = "SeekForward";
+    public const string SyncAudioBackward = "SyncAudioBackward";
+    public const string SyncAudioForward = "SyncAudioForward";
+    public const string SyncSubtitleBackward = "SyncSubtitleBackward";
+    public const string SyncSubtitleForward = "SyncSubtitleForward";
+    public const string SyncVideoBackward = "SyncVideoBackward";
+    public const string SyncVideoForward = "SyncVideoForward";
     public const string ToggleFullscreen = "ToggleFullscreen";
     public const string VolumeDown = "VolumeDown";
     public const string VolumeUp = "VolumeUp";
@@ -46,6 +52,12 @@ internal static class KeyboardShortcutActions
         new() { Id = PlayPause, Name = StringResourceProvider.Instance.PlayPause, Scope = PlayerScope },
         new() { Id = SeekBackward, Name = StringResourceProvider.Instance.SeekBackward, Scope = PlayerScope },
         new() { Id = SeekForward, Name = StringResourceProvider.Instance.SeekForward, Scope = PlayerScope },
+        new() { Id = SyncAudioBackward, Name = StringResourceProvider.Instance.SyncAudioBackward, Scope = PlayerScope },
+        new() { Id = SyncAudioForward, Name = StringResourceProvider.Instance.SyncAudioForward, Scope = PlayerScope },
+        new() { Id = SyncSubtitleBackward, Name = StringResourceProvider.Instance.SyncSubtitleBackward, Scope = PlayerScope },
+        new() { Id = SyncSubtitleForward, Name = StringResourceProvider.Instance.SyncSubtitleForward, Scope = PlayerScope },
+        new() { Id = SyncVideoBackward, Name = StringResourceProvider.Instance.SyncVideoBackward, Scope = PlayerScope },
+        new() { Id = SyncVideoForward, Name = StringResourceProvider.Instance.SyncVideoForward, Scope = PlayerScope },
         new() { Id = ToggleFullscreen, Name = StringResourceProvider.Instance.ToggleFullscreen },
         new() { Id = VolumeDown, Name = StringResourceProvider.Instance.VolumeDown, Scope = PlayerScope },
         new() { Id = VolumeUp, Name = StringResourceProvider.Instance.VolumeUp, Scope = PlayerScope },
