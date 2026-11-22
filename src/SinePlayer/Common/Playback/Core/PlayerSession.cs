@@ -122,10 +122,6 @@ internal sealed partial class PlayerSession : IDisposable
 
     public IReadOnlyList<IAudioChain> AudioChains => (List<IAudioChain>)[.. _audioChains.Select(entry => entry.Chain)];
 
-    /// <summary>
-    /// Which set of levels the audio chain is mixing with, or null before anything has been configured. The filter
-    /// decides it from the stream and the device, so this is the decision itself rather than a second guess at it.
-    /// </summary>
     public RemixLevelSet? ActiveMixLevelSet => _audioChains.Count == 0 ? null : _audioChains[0].Remix.ActiveLevelSet;
 
     public TimeSpan Position => _pipeline?.Position ?? TimeSpan.Zero;
@@ -568,6 +564,29 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         pipeline.Play();
+    }
+
+    public void PauseWhenNoViewIsShown()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        foreach (PlayerView view in _views)
+        {
+            if (view.IsForeground)
+            {
+                return;
+            }
+        }
+
+        if (_pipeline?.State == MediaEngineState.Paused)
+        {
+            return;
+        }
+
+        Pause();
     }
 
     public void Pause()

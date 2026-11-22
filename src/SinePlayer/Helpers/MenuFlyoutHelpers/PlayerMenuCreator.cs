@@ -71,7 +71,6 @@ internal static class PlayerMenuCreator
                 Icon = new FontIconSource() { Glyph = MediaGlyphHelper.SubtitleGlyph },
                 Items = CreateSubtitleMenuItems(context),
             },
-            new SeparatorMenuFlyoutItemModel(),
             new SimpleMenuFlyoutItemModel()
             {
                 Text = StringResourceProvider.Instance.NewWindow,

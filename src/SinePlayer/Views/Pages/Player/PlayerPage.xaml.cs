@@ -123,6 +123,7 @@ internal sealed partial class PlayerPage : BasePage
             }
 
             PlayerView view = await session.CreateView();
+            view.IsForeground = IsResumed;
             _view = view;
             ViewModel.Initialize(PageActionHandler, session.Playback);
             ObserveData();
@@ -1746,6 +1747,8 @@ internal sealed partial class PlayerPage : BasePage
     {
         UpdateKeepScreenOn();
 
+        _view?.IsForeground = IsResumed;
+
         if (IsResumed)
         {
             if (_playbackPendingOnActivate)
@@ -1758,7 +1761,7 @@ internal sealed partial class PlayerPage : BasePage
         {
             if (AppSettingsModel.PauseOnLeaveTab && !ViewModel.IsAudio)
             {
-                Enqueue(() => _session?.Pause());
+                Enqueue(() => _session?.PauseWhenNoViewIsShown());
             }
         }
     }

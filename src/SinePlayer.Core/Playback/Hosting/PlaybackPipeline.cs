@@ -10,6 +10,7 @@ using SinePlayer.Core.Playback.Abstractions.Registry;
 using SinePlayer.Core.Playback.Abstractions.Render;
 using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Engine;
+using SinePlayer.Core.Playback.Timing;
 using SinePlayer.Core.Playback.Utils;
 
 namespace SinePlayer.Core.Playback.Hosting;
@@ -42,6 +43,7 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
     public PlaybackPipeline()
     {
         _events = new PipelineEvents(WakeAll);
+        _events.StateChanged += OnStateChanged;
         _timeline = new PipelineTimeline(NotifyClockMoved, () => IsStarved);
         _reader = new MediaReader(_timeline, _events, ChooseSeekLanding);
         _wakeTargets = [_reader];
@@ -882,6 +884,18 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
     #endregion
 
     #region Misc
+
+    private static void OnStateChanged(MediaEngineState state, string? error)
+    {
+        if (state == MediaEngineState.Playing)
+        {
+            TimerResolution.Hold();
+        }
+        else
+        {
+            TimerResolution.Release();
+        }
+    }
 
     private void RegisterFeed(IChainFeed feed)
     {
