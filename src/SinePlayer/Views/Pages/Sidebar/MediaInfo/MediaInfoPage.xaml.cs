@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -54,13 +53,12 @@ internal sealed partial class MediaInfoPage : BasePage
     {
         GlobalEvent.Instance.MediaUpdated.Observe(this, ids =>
         {
-            MediaModel? media = ViewModel.Media;
-            if (media is null || !ids.Contains(media.Id))
-            {
-                return;
-            }
+            ViewModel.OnMediaUpdated(ids);
+        });
 
-            ViewModel.Reload();
+        GlobalEvent.Instance.CollectionUpdated.Observe(this, _ =>
+        {
+            ViewModel.RefreshTargets();
         });
 
         GlobalEvent.Instance.FavoriteUpdated.Observe(this, _ =>
@@ -95,6 +93,16 @@ internal sealed partial class MediaInfoPage : BasePage
             FillRichTextInlines(TbMediaDescription.Inlines, description);
             TbMediaDescription.Visibility = TbMediaDescription.Inlines.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         });
+    }
+
+    private void OnTargetSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ComboBox comboBox)
+        {
+            return;
+        }
+
+        ViewModel.SetSelectedTargetIndex(comboBox.SelectedIndex);
     }
 
     private void SetCompletionStateButton_Click(object sender, RoutedEventArgs e)
