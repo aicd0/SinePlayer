@@ -711,6 +711,9 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   <data name="ImageContrast" xml:space="preserve">
     <value>Kontrast</value>
   </data>
+  <data name="ImageHue" xml:space="preserve">
+    <value>Farbton</value>
+  </data>
   <data name="ImageInterpolation" xml:space="preserve">
     <value>Bildinterpolation</value>
   </data>

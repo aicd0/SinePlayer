@@ -1,4 +1,4 @@
-// Copyright (c) aicd0. All rights reserved.
+﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System.Runtime.InteropServices;
@@ -636,7 +636,7 @@ public class FFmpegVideoDecoderTests
     {
         renderer.SetOutput(target.View, target.Width, target.Height);
 
-        OperationResult result = renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         return target.ReadPixels(device);

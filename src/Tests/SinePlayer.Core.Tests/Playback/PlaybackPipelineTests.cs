@@ -1161,12 +1161,12 @@ public partial class PlaybackPipelineTests
             return OperationResult.Success();
         }
 
-        public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
+        public OperationResult Render(RawVideoFrame frame, VideoTransform transform, VideoAdjustments adjustments)
         {
             return OperationResult.Success();
         }
 
-        public OperationResult RefreshSurface(VideoTransform transform)
+        public OperationResult RefreshSurface(VideoTransform transform, VideoAdjustments adjustments)
         {
             return OperationResult.Success();
         }
@@ -1851,7 +1851,7 @@ public partial class PlaybackPipelineTests
             return OperationResult.Success();
         }
 
-        public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
+        public OperationResult Render(RawVideoFrame frame, VideoTransform transform, VideoAdjustments adjustments)
         {
             if (RenderFailure is string failure)
             {
@@ -1864,6 +1864,7 @@ public partial class PlaybackPipelineTests
             }
 
             LastRenderedTransform = transform;
+            LastRenderedAdjustments = adjustments;
             RenderedFrames++;
             lock (_renderedWidths)
             {
@@ -1883,6 +1884,12 @@ public partial class PlaybackPipelineTests
         /// <summary>Where the last redraw was told to go, for a transform that changes while nothing is presented.</summary>
         public VideoTransform LastRefreshedTransform { get; private set; } = VideoTransform.Identity;
 
+        /// <summary>How the last frame was adjusted, which is how a test reads the colour the pipeline held.</summary>
+        public VideoAdjustments LastRenderedAdjustments { get; private set; } = VideoAdjustments.Neutral;
+
+        /// <summary>How the last redraw was adjusted, for a colour that changes while nothing is presented.</summary>
+        public VideoAdjustments LastRefreshedAdjustments { get; private set; } = VideoAdjustments.Neutral;
+
         /// <summary>
         /// Counts the times the pipeline offered the renderer a surface change while nothing was being
         /// presented; the stand-in does not keep a surface of its own, so taking it up is nothing.
@@ -1892,10 +1899,11 @@ public partial class PlaybackPipelineTests
         /// <summary>How many times the pipeline let this renderer go, which is what a swap has to do to the one it replaces.</summary>
         public int DisposeCount { get; private set; }
 
-        public OperationResult RefreshSurface(VideoTransform transform)
+        public OperationResult RefreshSurface(VideoTransform transform, VideoAdjustments adjustments)
         {
             RefreshedSurfaces++;
             LastRefreshedTransform = transform;
+            LastRefreshedAdjustments = adjustments;
 
             // Run on the thread that is presenting, at the one moment a test can be sure it is between reading the
             // position and taking a frame: a seek asked for here lands before this thread looks at the queue.

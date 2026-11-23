@@ -1,4 +1,4 @@
-// Copyright (c) aicd0. All rights reserved.
+﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using SinePlayer.Core.Common.ErrorHandling;
@@ -15,7 +15,7 @@ internal sealed partial class D3D11VideoShaders : IDisposable
 {
     private const string ShaderSource = """
 // ==============================================================================================================================
-// SinePlayer's video shaders: one source, one programme per (layout, transform) pair.
+// Video shaders: one source, one programme per (layout, transform) pair.
 //
 // A picture arrives as planes the renderer uploaded, or as slices of the decoder's own texture. A container expects one of
 // exactly two things: gamma-encoded BT.709 relative to its white, or PQ in BT.2020, which is absolute light. The programme
@@ -31,7 +31,7 @@ internal sealed partial class D3D11VideoShaders : IDisposable
 // ==============================================================================================================================
 
 // ==============================================================================================================================
-// 1. Frame geometry
+// Frame geometry
 //
 // One unit quad, placed by the transform the renderer supplies. No vertex buffer is involved, and the picture is drawn
 // exactly where the transform puts it rather than into a viewport shaped like it — which is what makes fitting, turning and
@@ -87,7 +87,7 @@ float2 ChromaCoordinate(float2 texCoord)
 }
 
 // ==============================================================================================================================
-// 2. Frame inputs
+// Frame inputs
 //
 // Three textures for a frame in memory — one plane each, two of them unused by a semi-planar layout — and two arrays for a
 // hardware frame, whose planes are slices of the decoder's own texture.
@@ -103,7 +103,7 @@ Texture2DArray SecondPlaneArray : register(t4);
 SamplerState VideoSampler : register(s0);
 
 // ==============================================================================================================================
-// 3. Samples to colour
+// Samples to colour
 //
 // Both matrices expect limited-range samples: black at 16/255 and white at 235/255 of the scale, which is how the picture
 // was mastered. Ten-bit samples need one correction before they are used. A software decoder stores the code right-aligned
@@ -135,7 +135,7 @@ float3 ConvertBt2020ToRgb(float y, float2 chroma)
 }
 
 // ==============================================================================================================================
-// 4. Light
+// Light
 //
 // A PQ or HLG sample is not a code value, it is a light level, and the colours are relative to a wider gamut than an SDR
 // display has. Getting from one to the other is four steps — undo the transfer, bring the gamut in, compress what the display
@@ -242,7 +242,7 @@ float3 EncodeDisplay(float3 linearColour)
 }
 
 // ==============================================================================================================================
-// 5. The four conversions the programmes call
+// The four conversions the programmes call
 //
 // Each takes the picture as R'G'B' in its own encoding and returns exactly what a container holds, so a programme below is
 // only a plane read and one of these.
@@ -274,7 +274,31 @@ float3 ConvertHlgToPq(float3 rgb)
 }
 
 // ==============================================================================================================================
-// 6. An SDR container: standard dynamic range in, standard dynamic range out
+// The picture's colour
+//
+// The four controls a viewer has over the picture itself, applied to the colour the programme has just produced: one set of
+// numbers for every layout and every conversion, and the same numbers for a frame in memory and one a decoder wrote on the
+// GPU. Saturation and hue are already one matrix by the time they arrive, so the pixel stage only multiplies.
+// ==============================================================================================================================
+
+cbuffer ColourAdjustments : register(b1)
+{
+    float4 ColourRow0;
+    float4 ColourRow1;
+    float4 ColourRow2;
+    float4 ColourUnused;
+};
+
+// Contrast pushes the picture away from mid grey, brightness lifts what that left, and the matrix then turns the result into
+// the colour the viewer asked for. The matrix keeps luma, so a grey stays the grey it was.
+float3 AdjustColour(float3 rgb)
+{
+    float3 placed = ((rgb - 0.5) * ColourRow0.w) + (0.5 + ColourRow1.w);
+    return saturate(float3(dot(ColourRow0.xyz, placed), dot(ColourRow1.xyz, placed), dot(ColourRow2.xyz, placed)));
+}
+
+// ==============================================================================================================================
+// An SDR container: standard dynamic range in, standard dynamic range out
 //
 // Eight-bit gamma-encoded BT.709 relative to the display's white, which is what the samples already are. The picture is read,
 // turned into RGB with the matrix of the standard it was graded against, and written.
@@ -282,14 +306,15 @@ float3 ConvertHlgToPq(float3 rgb)
 
 float4 PSMainPacked(VSOutput input) : SV_TARGET
 {
-    return FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord));
+    float4 sample = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord));
+    return float4(AdjustColour(sample.rgb), sample.a);
 }
 
 float4 PSMainSemiPlanar(VSOutput input) : SV_TARGET
 {
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
     float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
-    return float4(ConvertYuvToRgb(luma, chroma), 1.0);
+    return float4(AdjustColour(ConvertYuvToRgb(luma, chroma)), 1.0);
 }
 
 float4 PSMainPlanar(VSOutput input) : SV_TARGET
@@ -297,7 +322,7 @@ float4 PSMainPlanar(VSOutput input) : SV_TARGET
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
     float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r;
     float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r;
-    return float4(ConvertYuvToRgb(luma, float2(cb, cr)), 1.0);
+    return float4(AdjustColour(ConvertYuvToRgb(luma, float2(cb, cr))), 1.0);
 }
 
 float4 PSMainPlanarTenBit(VSOutput input) : SV_TARGET
@@ -305,18 +330,18 @@ float4 PSMainPlanarTenBit(VSOutput input) : SV_TARGET
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
     float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
-    return float4(ConvertYuvToRgb(luma, float2(cb, cr)), 1.0);
+    return float4(AdjustColour(ConvertYuvToRgb(luma, float2(cb, cr))), 1.0);
 }
 
 float4 PSMainSemiPlanarArray(VSOutput input) : SV_TARGET
 {
     float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
     float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
-    return float4(ConvertYuvToRgb(luma, chroma), 1.0);
+    return float4(AdjustColour(ConvertYuvToRgb(luma, chroma)), 1.0);
 }
 
 // ==============================================================================================================================
-// 7. An SDR container fed by high dynamic range content: tone mapped
+// An SDR container fed by high dynamic range content: tone mapped
 //
 // The samples are light levels and the colours are relative to a wider gamut, so the transfer is undone, the gamut is brought
 // in, what lies above reference white is compressed rather than clipped, and the result is re-encoded. The picture looks as
@@ -327,7 +352,7 @@ float4 PSMainSemiPlanarPqToSdr(VSOutput input) : SV_TARGET
 {
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
     float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
-    return float4(ConvertPqToDisplay(ConvertBt2020ToRgb(luma, chroma)), 1.0);
+    return float4(AdjustColour(ConvertPqToDisplay(ConvertBt2020ToRgb(luma, chroma))), 1.0);
 }
 
 float4 PSMainPlanarTenBitPqToSdr(VSOutput input) : SV_TARGET
@@ -335,21 +360,21 @@ float4 PSMainPlanarTenBitPqToSdr(VSOutput input) : SV_TARGET
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
     float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
-    return float4(ConvertPqToDisplay(ConvertBt2020ToRgb(luma, float2(cb, cr))), 1.0);
+    return float4(AdjustColour(ConvertPqToDisplay(ConvertBt2020ToRgb(luma, float2(cb, cr)))), 1.0);
 }
 
 float4 PSMainSemiPlanarArrayPqToSdr(VSOutput input) : SV_TARGET
 {
     float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
     float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
-    return float4(ConvertPqToDisplay(ConvertBt2020ToRgb(luma, chroma)), 1.0);
+    return float4(AdjustColour(ConvertPqToDisplay(ConvertBt2020ToRgb(luma, chroma))), 1.0);
 }
 
 float4 PSMainSemiPlanarHlgToSdr(VSOutput input) : SV_TARGET
 {
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
     float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
-    return float4(ConvertHlgToDisplay(ConvertBt2020ToRgb(luma, chroma)), 1.0);
+    return float4(AdjustColour(ConvertHlgToDisplay(ConvertBt2020ToRgb(luma, chroma))), 1.0);
 }
 
 float4 PSMainPlanarTenBitHlgToSdr(VSOutput input) : SV_TARGET
@@ -357,18 +382,18 @@ float4 PSMainPlanarTenBitHlgToSdr(VSOutput input) : SV_TARGET
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
     float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
-    return float4(ConvertHlgToDisplay(ConvertBt2020ToRgb(luma, float2(cb, cr))), 1.0);
+    return float4(AdjustColour(ConvertHlgToDisplay(ConvertBt2020ToRgb(luma, float2(cb, cr)))), 1.0);
 }
 
 float4 PSMainSemiPlanarArrayHlgToSdr(VSOutput input) : SV_TARGET
 {
     float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
     float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
-    return float4(ConvertHlgToDisplay(ConvertBt2020ToRgb(luma, chroma)), 1.0);
+    return float4(AdjustColour(ConvertHlgToDisplay(ConvertBt2020ToRgb(luma, chroma))), 1.0);
 }
 
 // ==============================================================================================================================
-// 8. An HDR container: high dynamic range in, high dynamic range out
+// An HDR container: high dynamic range in, high dynamic range out
 //
 // Ten-bit PQ in BT.2020, which is exactly what a PQ frame holds, so nothing is compressed: every value within the panel's
 // reach arrives at the light level the grade names, and only the limited range is expanded. This is the programme that exists
@@ -379,7 +404,7 @@ float4 PSMainSemiPlanarPqPassthrough(VSOutput input) : SV_TARGET
 {
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
     float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
-    return float4(ConvertBt2020ToRgb(luma, chroma), 1.0);
+    return float4(AdjustColour(ConvertBt2020ToRgb(luma, chroma)), 1.0);
 }
 
 float4 PSMainPlanarTenBitPqPassthrough(VSOutput input) : SV_TARGET
@@ -387,18 +412,18 @@ float4 PSMainPlanarTenBitPqPassthrough(VSOutput input) : SV_TARGET
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
     float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
-    return float4(ConvertBt2020ToRgb(luma, float2(cb, cr)), 1.0);
+    return float4(AdjustColour(ConvertBt2020ToRgb(luma, float2(cb, cr))), 1.0);
 }
 
 float4 PSMainSemiPlanarArrayPqPassthrough(VSOutput input) : SV_TARGET
 {
     float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
     float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
-    return float4(ConvertBt2020ToRgb(luma, chroma), 1.0);
+    return float4(AdjustColour(ConvertBt2020ToRgb(luma, chroma)), 1.0);
 }
 
 // ==============================================================================================================================
-// 9. An HDR container fed by HLG content
+// An HDR container fed by HLG content
 //
 // HLG is a scene-referred signal measured against a nominal thousand nit white; a PQ container wants absolute light, so the
 // one is resolved into the other. No range is compressed — HLG's peak is the scale it is already on.
@@ -408,7 +433,7 @@ float4 PSMainSemiPlanarHlgToPq(VSOutput input) : SV_TARGET
 {
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
     float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
-    return float4(ConvertHlgToPq(ConvertBt2020ToRgb(luma, chroma)), 1.0);
+    return float4(AdjustColour(ConvertHlgToPq(ConvertBt2020ToRgb(luma, chroma))), 1.0);
 }
 
 float4 PSMainPlanarTenBitHlgToPq(VSOutput input) : SV_TARGET
@@ -416,18 +441,18 @@ float4 PSMainPlanarTenBitHlgToPq(VSOutput input) : SV_TARGET
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
     float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
-    return float4(ConvertHlgToPq(ConvertBt2020ToRgb(luma, float2(cb, cr))), 1.0);
+    return float4(AdjustColour(ConvertHlgToPq(ConvertBt2020ToRgb(luma, float2(cb, cr)))), 1.0);
 }
 
 float4 PSMainSemiPlanarArrayHlgToPq(VSOutput input) : SV_TARGET
 {
     float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
     float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
-    return float4(ConvertHlgToPq(ConvertBt2020ToRgb(luma, chroma)), 1.0);
+    return float4(AdjustColour(ConvertHlgToPq(ConvertBt2020ToRgb(luma, chroma))), 1.0);
 }
 
 // ==============================================================================================================================
-// 10. An HDR container fed by standard dynamic range content
+// An HDR container fed by standard dynamic range content
 //
 // An HDR container carries an SDR picture faithfully as long as its white is placed where a grade's white belongs, so this is
 // a lift rather than a conversion: gamma undone, white put at 203 nits, and that light encoded as PQ. Skipping it would put
@@ -436,14 +461,14 @@ float4 PSMainSemiPlanarArrayHlgToPq(VSOutput input) : SV_TARGET
 
 float4 PSMainPackedSdrToPq(VSOutput input) : SV_TARGET
 {
-    return float4(ConvertSdrToPq(FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).rgb), 1.0);
+    return float4(AdjustColour(ConvertSdrToPq(FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).rgb)), 1.0);
 }
 
 float4 PSMainSemiPlanarSdrToPq(VSOutput input) : SV_TARGET
 {
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
     float2 chroma = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).rg;
-    return float4(ConvertSdrToPq(ConvertYuvToRgb(luma, chroma)), 1.0);
+    return float4(AdjustColour(ConvertSdrToPq(ConvertYuvToRgb(luma, chroma))), 1.0);
 }
 
 float4 PSMainPlanarSdrToPq(VSOutput input) : SV_TARGET
@@ -451,7 +476,7 @@ float4 PSMainPlanarSdrToPq(VSOutput input) : SV_TARGET
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r;
     float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r;
     float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r;
-    return float4(ConvertSdrToPq(ConvertYuvToRgb(luma, float2(cb, cr))), 1.0);
+    return float4(AdjustColour(ConvertSdrToPq(ConvertYuvToRgb(luma, float2(cb, cr)))), 1.0);
 }
 
 float4 PSMainPlanarTenBitSdrToPq(VSOutput input) : SV_TARGET
@@ -459,14 +484,14 @@ float4 PSMainPlanarTenBitSdrToPq(VSOutput input) : SV_TARGET
     float luma = FirstTexture.Sample(VideoSampler, PictureCoordinate(input.TexCoord)).r * 64.0;
     float cb = SecondTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
     float cr = ThirdTexture.Sample(VideoSampler, ChromaCoordinate(input.TexCoord)).r * 64.0;
-    return float4(ConvertSdrToPq(ConvertYuvToRgb(luma, float2(cb, cr))), 1.0);
+    return float4(AdjustColour(ConvertSdrToPq(ConvertYuvToRgb(luma, float2(cb, cr)))), 1.0);
 }
 
 float4 PSMainSemiPlanarArraySdrToPq(VSOutput input) : SV_TARGET
 {
     float luma = FirstPlaneArray.Sample(VideoSampler, float3(PictureCoordinate(input.TexCoord), 0.0)).r;
     float2 chroma = SecondPlaneArray.Sample(VideoSampler, float3(ChromaCoordinate(input.TexCoord), 0.0)).rg;
-    return float4(ConvertSdrToPq(ConvertYuvToRgb(luma, chroma)), 1.0);
+    return float4(AdjustColour(ConvertSdrToPq(ConvertYuvToRgb(luma, chroma))), 1.0);
 }
 """;
 

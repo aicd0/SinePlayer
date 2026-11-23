@@ -33,6 +33,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
     private readonly PipelineEvents _events;
 
     private readonly AtomicCell<VideoTransform> _transform = new(VideoTransform.Identity);
+    private readonly AtomicCell<VideoAdjustments> _adjustments = new(VideoAdjustments.Neutral);
     private IVideoRenderTarget? _target;
     private volatile bool _starved;
 
@@ -150,6 +151,21 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
             _transform.Write(_ => value);
             RenderNode.Wake();
             _host.PictureLayoutChanged(this);
+        }
+    }
+
+    public VideoAdjustments Adjustments
+    {
+        get => _adjustments.Read();
+        set
+        {
+            if (_adjustments.Read() == value)
+            {
+                return;
+            }
+
+            _adjustments.Write(_ => value);
+            RenderNode.Wake();
         }
     }
 
@@ -599,13 +615,14 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
 
             bool playing = _events.CheckState(out MediaEngineState state, MediaEngineState.Playing);
             VideoTransform transform = GetStreamTransform((VideoStreamInfo?)Renderer.CurrentStream);
+            VideoAdjustments adjustments = _adjustments.Read();
 
             if (deviceAvailable && videoRenderer is not null && state is MediaEngineState.Paused or MediaEngineState.Ended)
             {
                 OperationResult refreshed;
                 try
                 {
-                    refreshed = videoRenderer.RefreshSurface(transform);
+                    refreshed = videoRenderer.RefreshSurface(transform, adjustments);
                 }
                 catch (Exception ex)
                 {
@@ -746,7 +763,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
                         continue;
                     }
 
-                    OperationResult shown = RenderFrame(videoRenderer, frame, timestamp, transform);
+                    OperationResult shown = RenderFrame(videoRenderer, frame, timestamp, transform, adjustments);
                     if (!shown.IsSuccessful)
                     {
                         _events.PostWarning(shown.Message, this);
@@ -844,13 +861,13 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
         return FrameQueue.Count < FrameQueueCapacity;
     }
 
-    private OperationResult RenderFrame(IVideoRenderer renderer, RawVideoFrame frame, TimeSpan timestamp, VideoTransform transform)
+    private OperationResult RenderFrame(IVideoRenderer renderer, RawVideoFrame frame, TimeSpan timestamp, VideoTransform transform, VideoAdjustments adjustments)
     {
         long startTicks = Stopwatch.GetTimestamp();
         OperationResult rendered;
         try
         {
-            rendered = renderer.Render(frame, transform);
+            rendered = renderer.Render(frame, transform, adjustments);
         }
         catch (Exception ex)
         {

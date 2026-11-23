@@ -36,14 +36,14 @@ internal sealed partial class NullVideoRenderer : IVideoRenderer
         return true;
     }
 
-    public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
+    public OperationResult Render(RawVideoFrame frame, VideoTransform transform, VideoAdjustments adjustments)
     {
         ArgumentNullException.ThrowIfNull(frame);
         Interlocked.Increment(ref _renderedFrameCount);
         return OperationResult.Success();
     }
 
-    public OperationResult RefreshSurface(VideoTransform transform)
+    public OperationResult RefreshSurface(VideoTransform transform, VideoAdjustments adjustments)
     {
         return OperationResult.Success();
     }

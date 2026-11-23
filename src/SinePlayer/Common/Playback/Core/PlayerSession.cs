@@ -804,6 +804,9 @@ internal sealed partial class PlayerSession : IDisposable
 
     #region Settings
 
+    private const int MinimumPictureAdjustment = -100;
+    private const int MaximumPictureAdjustment = 100;
+    private const int MaximumHue = 180;
     private const int MinimumMixLevel = 0;
     private const int MaximumMixLevel = 200;
     private const int MinimumPan = -100;
@@ -857,6 +860,13 @@ internal sealed partial class PlayerSession : IDisposable
         PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Video, stream);
         settings.ToComponents().ApplyVideo(chain);
         chain.Transform = settings.Video.ToTransform();
+        chain.Adjustments = new VideoAdjustments
+        {
+            Brightness = Math.Clamp(settings.Video.Brightness, MinimumPictureAdjustment, MaximumPictureAdjustment) / 100.0f,
+            Contrast = Math.Clamp(settings.Video.Contrast, MinimumPictureAdjustment, MaximumPictureAdjustment) / 100.0f,
+            Saturation = Math.Clamp(settings.Video.Saturation, MinimumPictureAdjustment, MaximumPictureAdjustment) / 100.0f,
+            Hue = Math.Clamp(settings.Video.Hue, -MaximumHue, MaximumHue),
+        };
         chain.Offset = OffsetOf(settings.Video.Sync);
     }
 

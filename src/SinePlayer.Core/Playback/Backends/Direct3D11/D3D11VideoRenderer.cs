@@ -56,6 +56,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
     private readonly D3D11Device _device;
     private readonly D3D11VideoShaders _shaders;
     private readonly ID3D11Buffer _frameTransform;
+    private readonly ID3D11Buffer _colourAdjustments;
 
     private ID3D11RenderTargetView? _outputView;
     private int _outputWidth;
@@ -78,6 +79,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         _shaders = shaders;
         _surfacePreference = surfacePreference;
         _frameTransform = D3D11Interop.CreateConstantBuffer(device.Device);
+        _colourAdjustments = D3D11Interop.CreateConstantBuffer(device.Device);
         _name = Describe(kind: null);
     }
 
@@ -121,6 +123,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
 
             ReleaseFrameTextures();
             D3D11Interop.Release(_frameTransform);
+            D3D11Interop.Release(_colourAdjustments);
             _shaders.Dispose();
 
             _device.Dispose();
@@ -180,7 +183,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         return surface is null || surface.TryAcquireFrameSlot();
     }
 
-    public OperationResult Render(RawVideoFrame frame, VideoTransform transform)
+    public OperationResult Render(RawVideoFrame frame, VideoTransform transform, VideoAdjustments adjustments)
     {
         ArgumentNullException.ThrowIfNull(frame);
 
@@ -218,7 +221,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                     return OperationResult.Failure(resolvedShader);
                 }
 
-                return Draw(resolvedShader.Result, _gpuViews, GpuTextureSlot, _gpuTexCoords, _gpuTexCoordMax, _gpuChromaTexCoordMax, transform);
+                return Draw(resolvedShader.Result, _gpuViews, GpuTextureSlot, _gpuTexCoords, _gpuTexCoordMax, _gpuChromaTexCoordMax, transform, adjustments);
             }
             else
             {
@@ -239,12 +242,12 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                     return upload;
                 }
 
-                return Draw(resolvedShader.Result, _planeViews, 0, (1.0f, 1.0f), (1.0f, 1.0f), (1.0f, 1.0f), transform);
+                return Draw(resolvedShader.Result, _planeViews, 0, (1.0f, 1.0f), (1.0f, 1.0f), (1.0f, 1.0f), transform, adjustments);
             }
         }
     }
 
-    public OperationResult RefreshSurface(VideoTransform transform)
+    public OperationResult RefreshSurface(VideoTransform transform, VideoAdjustments adjustments)
     {
         if (_disposed)
         {
@@ -264,7 +267,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
                 return OperationResult.Success();
             }
 
-            return Draw(_lastPixelShader, _lastViews, _lastSlot, _lastTexCoords, _lastTexCoordMax, _lastChromaTexCoordMax, transform);
+            return Draw(_lastPixelShader, _lastViews, _lastSlot, _lastTexCoords, _lastTexCoordMax, _lastChromaTexCoordMax, transform, adjustments);
         }
     }
 
@@ -638,7 +641,7 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         }
     }
 
-    private OperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, (float X, float Y) texCoords, (float X, float Y) texCoordMax, (float X, float Y) chromaTexCoordMax, VideoTransform transform)
+    private OperationResult Draw(ID3D11PixelShader pixelShader, ID3D11ShaderResourceView[] views, uint textureSlot, (float X, float Y) texCoords, (float X, float Y) texCoordMax, (float X, float Y) chromaTexCoordMax, VideoTransform transform, VideoAdjustments adjustments)
     {
         ID3D11DeviceContext context = _device.Context;
         context.OMSetRenderTargets(1, [_outputView], null);
@@ -661,6 +664,10 @@ internal sealed partial class D3D11VideoRenderer : IVideoRenderer, ID3D11GpuDevi
         Matrix3x2 placement = transform.GetPictureToSurfaceMatrix(_frameWidth, _frameHeight, _outputWidth, _outputHeight);
         D3D11Interop.SetFrameTransform(context, _frameTransform, texCoords, texCoordMax, chromaTexCoordMax, placement);
         D3D11Interop.SetFrameConstantBuffer(context, 0, _frameTransform);
+
+        // The colour controls are the pixel stage's alone, in the slot beside the transform the vertex stage shares.
+        D3D11Interop.SetColourAdjustments(context, _colourAdjustments, adjustments);
+        D3D11Interop.SetPixelConstantBuffer(context, 1, _colourAdjustments);
 
         D3D11Interop.SetTextures(context, textureSlot, views, _shaders.GetSampler(transform.Scaling));
 

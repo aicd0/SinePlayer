@@ -17,9 +17,9 @@ public interface IVideoRenderer : IDisposable
 
     bool TryAcquireFrameSlot();
 
-    OperationResult Render(RawVideoFrame frame, VideoTransform transform);
+    OperationResult Render(RawVideoFrame frame, VideoTransform transform, VideoAdjustments adjustments);
 
-    OperationResult RefreshSurface(VideoTransform transform);
+    OperationResult RefreshSurface(VideoTransform transform, VideoAdjustments adjustments);
 
     OperationResult ClearSurface();
 }

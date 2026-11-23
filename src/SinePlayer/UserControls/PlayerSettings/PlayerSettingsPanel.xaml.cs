@@ -721,13 +721,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
-                bool modified = settings.Video.ScalingMode != presetSettings.Video.ScalingMode;
-                tabModified = tabModified || modified;
-                UpdateVideoInterpolation(settings);
-                ViewModel.VideoInterpolationLabel = GetLabel(StringResource.ImageInterpolation, modified);
-            }
-
-            {
                 bool modified = settings.Video.RotationDegrees != presetSettings.Video.RotationDegrees;
                 tabModified = tabModified || modified;
                 UpdateVideoRotation(settings);
@@ -776,6 +769,37 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 tabModified = tabModified || modified;
                 UpdateVideoFlipVertical(settings);
                 ViewModel.VideoFlipVerticalLabel = GetLabel(StringResource.FlipVertically, modified);
+            }
+
+            {
+                bool modified = settings.Video.ScalingMode != presetSettings.Video.ScalingMode;
+                tabModified = tabModified || modified;
+                UpdateVideoInterpolation(settings);
+                ViewModel.VideoInterpolationLabel = GetLabel(StringResource.ImageInterpolation, modified);
+            }
+
+            {
+                bool modified = settings.Video.Brightness != presetSettings.Video.Brightness;
+                tabModified = tabModified || modified;
+                UpdateVideoBrightness(settings, presetSettings);
+            }
+
+            {
+                bool modified = settings.Video.Contrast != presetSettings.Video.Contrast;
+                tabModified = tabModified || modified;
+                UpdateVideoContrast(settings, presetSettings);
+            }
+
+            {
+                bool modified = settings.Video.Saturation != presetSettings.Video.Saturation;
+                tabModified = tabModified || modified;
+                UpdateVideoSaturation(settings, presetSettings);
+            }
+
+            {
+                bool modified = settings.Video.Hue != presetSettings.Video.Hue;
+                tabModified = tabModified || modified;
+                UpdateVideoHue(settings, presetSettings);
             }
 
             _videoCategory.IsModified = tabModified;
@@ -1117,21 +1141,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         VideoStretchModeDropDownButton.Content = PlayerMenuCreator.GetStretchModeLabel(settings.Video.ResizeMode, settings.Video.AspectRatio);
     }
 
-    private void UpdateVideoInterpolation(PlayerSettingsModel settings)
-    {
-        List<PlaybackComponentOption> options = PlayerMenuCreator.GetScalingModeOptions();
-        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Video.ScalingMode.ToString());
-        VideoInterpolationDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
-        {
-            VideoScalingMode mode = Enum.Parse<VideoScalingMode>(key);
-            if (settings.Video.ScalingMode != mode)
-            {
-                ApplyVideo(target => target.ScalingMode = mode);
-            }
-        });
-        VideoInterpolationDropDownButton.Content = choice.Label;
-    }
-
     private void UpdateVideoRotation(PlayerSettingsModel settings)
     {
         List<PlaybackComponentOption> options = PlayerMenuCreator.GetRotationOptions();
@@ -1368,6 +1377,125 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
     private void UpdateVideoFlipVertical(PlayerSettingsModel settings)
     {
         VideoFlipVerticalToggleSwitch.IsOn = settings.Video.FlipVertical;
+    }
+
+    private void UpdateVideoInterpolation(PlayerSettingsModel settings)
+    {
+        List<PlaybackComponentOption> options = PlayerMenuCreator.GetScalingModeOptions();
+        PlaybackComponentOption choice = PlayerMenuCreator.EnsureChoice(options, settings.Video.ScalingMode.ToString());
+        VideoInterpolationDropDownButton.Flyout = CreateChoiceMenu(options, choice.Key, key =>
+        {
+            VideoScalingMode mode = Enum.Parse<VideoScalingMode>(key);
+            if (settings.Video.ScalingMode != mode)
+            {
+                ApplyVideo(target => target.ScalingMode = mode);
+            }
+        });
+        VideoInterpolationDropDownButton.Content = choice.Label;
+    }
+
+    private void VideoBrightnessSlider_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        int value = (int)Math.Round(VideoBrightnessSlider.Value);
+        if (_mediaSettings.Video.Brightness != value)
+        {
+            ApplyVideo(settings => settings.Brightness = value);
+        }
+    }
+
+    private void UpdateVideoBrightness(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
+    {
+        VideoBrightnessSlider.RestoreValue = presetSettings.Video.Brightness;
+        VideoBrightnessSlider.ResetValue = _defaultSettings.Video.Brightness;
+
+        double value = settings.Video.Brightness;
+        if (Math.Abs(VideoBrightnessSlider.Value - value) > 0.5)
+        {
+            VideoBrightnessSlider.Value = value;
+        }
+    }
+
+    private void VideoContrastSlider_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        int value = (int)Math.Round(VideoContrastSlider.Value);
+        if (_mediaSettings.Video.Contrast != value)
+        {
+            ApplyVideo(settings => settings.Contrast = value);
+        }
+    }
+
+    private void UpdateVideoContrast(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
+    {
+        VideoContrastSlider.RestoreValue = presetSettings.Video.Contrast;
+        VideoContrastSlider.ResetValue = _defaultSettings.Video.Contrast;
+
+        double value = settings.Video.Contrast;
+        if (Math.Abs(VideoContrastSlider.Value - value) > 0.5)
+        {
+            VideoContrastSlider.Value = value;
+        }
+    }
+
+    private void VideoSaturationSlider_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        int value = (int)Math.Round(VideoSaturationSlider.Value);
+        if (_mediaSettings.Video.Saturation != value)
+        {
+            ApplyVideo(settings => settings.Saturation = value);
+        }
+    }
+
+    private void UpdateVideoSaturation(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
+    {
+        VideoSaturationSlider.RestoreValue = presetSettings.Video.Saturation;
+        VideoSaturationSlider.ResetValue = _defaultSettings.Video.Saturation;
+
+        double value = settings.Video.Saturation;
+        if (Math.Abs(VideoSaturationSlider.Value - value) > 0.5)
+        {
+            VideoSaturationSlider.Value = value;
+        }
+    }
+
+    private void VideoHueSlider_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        int value = (int)Math.Round(VideoHueSlider.Value);
+        if (_mediaSettings.Video.Hue != value)
+        {
+            ApplyVideo(settings => settings.Hue = value);
+        }
+    }
+
+    private void UpdateVideoHue(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
+    {
+        VideoHueSlider.RestoreValue = presetSettings.Video.Hue;
+        VideoHueSlider.ResetValue = _defaultSettings.Video.Hue;
+
+        double value = settings.Video.Hue;
+        if (Math.Abs(VideoHueSlider.Value - value) > 0.5)
+        {
+            VideoHueSlider.Value = value;
+        }
     }
 
     private void AudioSyncNumberBox_ValueChanged(object? sender, EventArgs e)
