@@ -919,6 +919,66 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>
+    /// A bitmap cue is scaled by the picture, not by the surface: its fractions are read in a box of the picture's shape,
+    /// fitted into the surface and sitting on its bottom edge. Read in the surface's box instead, the same cue in a window
+    /// of another shape than the picture is scaled one axis at a time, which is what stretching is.
+    /// </summary>
+    [Test]
+    public void FitsABitmapCueToThePictureAndSitsItOnTheSurfacesBottom()
+    {
+        CanvasRenderTarget? target = null;
+        try
+        {
+            CanvasDevice device;
+            try
+            {
+                device = EnsureDetachedDevice();
+            }
+            catch (Exception exception)
+            {
+                Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+                return;
+            }
+
+            const int width = 400;
+            const int height = 400;
+            target = new CanvasRenderTarget(device, width, height, 96.0f);
+
+            // A 16:9 picture in a square surface: 400 × 225, centred. Only its shape is read, and the box of that shape
+            // fitted into this surface is 400 × 225 on the bottom edge, 175 rows down.
+            SubtitlePresentation presentation = SubtitlePresentation.Identity with
+            {
+                Frame = new SubtitleFrame(0.0, 0.21875, 1.0, 0.5625),
+            };
+
+            // The middle half of the picture's bottom half, whichever box that is read in.
+            using SubtitleCue cue = BitmapCue(left: 0.25, top: 0.5, imageWidth: 0.5, imageHeight: 0.5);
+
+            using (CanvasDrawingSession session = target.CreateDrawingSession())
+            {
+                session.Clear(default(Color));
+                Win2DSubtitleLayer.DrawCues(session, device, (List<SubtitleCue>)[cue], presentation, width, height);
+            }
+
+            (int left, int top, int right, int bottom) = InkBounds(target.GetPixelBytes(), width, height);
+            int cueWidth = right - left + 1;
+            int cueHeight = bottom - top + 1;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(cueWidth, Is.EqualTo(200).Within(3), "the cue is half the picture's width");
+                Assert.That(cueHeight, Is.EqualTo(113).Within(3), "and half its height, not half the surface's");
+                Assert.That(bottom, Is.EqualTo(height - 1).Within(2), "the box the cue is read in sits on the bottom edge");
+                Assert.That(top, Is.EqualTo(288).Within(3), "so the cue at the picture's bottom starts there");
+            }
+        }
+        finally
+        {
+            target?.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Two events can be up at the same time — the Matrix's title arrives as one SRT event per character — and they share an
     /// alignment band, so each has to make room for the one before it rather than being drawn on the same spot.
     /// </summary>
