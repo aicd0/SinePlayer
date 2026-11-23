@@ -1,10 +1,12 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System;
+
 using Windows.Win32;
 using Windows.Win32.UI.Input.KeyboardAndMouse;
 
-namespace SinePlayer.Core.Common.Native;
+namespace SinePlayer.Common.HotKey;
 
 public static class KeyboardKeyNames
 {
