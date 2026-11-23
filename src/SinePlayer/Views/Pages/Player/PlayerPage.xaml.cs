@@ -1124,6 +1124,13 @@ internal sealed partial class PlayerPage : BasePage
         if (_isOverlayHold)
         {
             ShowOverlay();
+
+            PointerDeviceType pointerDeviceType = GetMainWindowAbility().LastPointerDeviceType;
+            if (pointerDeviceType != PointerDeviceType.Mouse)
+            {
+                _isOverlayHold = false;
+                HideOverlay(delay: 3000);
+            }
         }
         else
         {
@@ -1309,6 +1316,7 @@ internal sealed partial class PlayerPage : BasePage
 
     private void SeekTo(long positionMs, SeekMode mode)
     {
+        UnholdOverlay();
         Enqueue(() => _session?.Seek(TimeSpan.FromMilliseconds(positionMs), mode));
     }
 
