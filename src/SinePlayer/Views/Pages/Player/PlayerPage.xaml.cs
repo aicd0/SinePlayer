@@ -79,7 +79,6 @@ internal sealed partial class PlayerPage : BasePage
         _dragGesture.SeekPreviewed += DragGesture_SeekPreviewed;
         _dragGesture.SeekRequested += DragGesture_SeekRequested;
         _dragGesture.SpeedRequested += DragGesture_SpeedRequested;
-        AddHandler(PointerPressedEvent, new PointerEventHandler(PlayerPage_AnyPointerPressed), handledEventsToo: true);
     }
 
     #endregion
@@ -265,6 +264,8 @@ internal sealed partial class PlayerPage : BasePage
             TransportBar.IsHitTestVisible = autoToggleOverlaysOnCursor || opacity >= 0.5;
             GetMainPageAbility().SetHiddenOverlayHitTestVisibility(autoToggleOverlaysOnCursor);
         });
+
+        GetMainWindowAbility().RegisterAnyPointerPressedHandler(this, MainWindow_AnyPointerPressed);
 
         GetMainWindowAbility().RegisterFullscreenChangedHandler(this, isFullscreen =>
         {
@@ -692,7 +693,7 @@ internal sealed partial class PlayerPage : BasePage
 
         if (state == MediaEngineState.Playing)
         {
-            UnholdOverlay();
+            PostUnholdOverlay();
         }
     }
 
@@ -767,9 +768,9 @@ internal sealed partial class PlayerPage : BasePage
     private bool _isSpeedHold = false;
     private bool _isZooming = false;
 
-    private void PlayerPage_AnyPointerPressed(object sender, PointerRoutedEventArgs e)
+    private void MainWindow_AnyPointerPressed(PointerDeviceType deviceType, object? originalSource)
     {
-        if (e.Pointer.PointerDeviceType == PointerDeviceType.Mouse)
+        if (deviceType == PointerDeviceType.Mouse)
         {
             return;
         }
@@ -787,7 +788,12 @@ internal sealed partial class PlayerPage : BasePage
             return false;
         }
 
-        _isPointerInsideOverlay = !IsElementInsideVideo(e.OriginalSource);
+        bool pointerInsideOverlay = !IsElementInsideVideo(originalSource);
+        _isPointerInsideOverlay = pointerInsideOverlay;
+        if (pointerInsideOverlay)
+        {
+            ShowOverlay();
+        }
     }
 
     private void VideoGrid_PointerEntered(object sender, PointerRoutedEventArgs e)
@@ -1139,19 +1145,23 @@ internal sealed partial class PlayerPage : BasePage
         }
     }
 
-    private void UnholdOverlay()
+    private void PostUnholdOverlay()
     {
-        _isOverlayHold = false;
+        // This request has to be posted, otherwise a later MainWindow_AnyPointerPressed will have it undone.
+        CoroutineUtils.PostInMainThread(() =>
+        {
+            _isOverlayHold = false;
 
-        PointerDeviceType pointerDeviceType = GetMainWindowAbility().LastPointerDeviceType;
-        if (pointerDeviceType == PointerDeviceType.Mouse || !_isPointerInsideOverlay)
-        {
-            HideOverlay();
-        }
-        else
-        {
-            HideOverlay(delay: 3000, ignorePointerPosition: true);
-        }
+            PointerDeviceType pointerDeviceType = GetMainWindowAbility().LastPointerDeviceType;
+            if (pointerDeviceType == PointerDeviceType.Mouse || !_isPointerInsideOverlay)
+            {
+                HideOverlay();
+            }
+            else
+            {
+                HideOverlay(delay: 3000, ignorePointerPosition: true);
+            }
+        });
     }
 
     private void ShowOverlay()
@@ -1317,7 +1327,7 @@ internal sealed partial class PlayerPage : BasePage
 
     private void SeekTo(long positionMs, SeekMode mode)
     {
-        UnholdOverlay();
+        PostUnholdOverlay();
         Enqueue(() => _session?.Seek(TimeSpan.FromMilliseconds(positionMs), mode));
     }
 
