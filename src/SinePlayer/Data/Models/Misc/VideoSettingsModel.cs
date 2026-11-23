@@ -31,6 +31,10 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
     public double AspectRatio { get; set; }
     public double PanX { get; set; }
     public double PanY { get; set; }
+    public int Brightness { get; set; }
+    public int Contrast { get; set; }
+    public int Saturation { get; set; }
+    public int Hue { get; set; }
 
     public VideoTransform ToTransform()
     {
@@ -88,6 +92,10 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
         VerticalStretch = model.VerticalStretch ?? VerticalStretch;
         PanX = model.PanX ?? PanX;
         PanY = model.PanY ?? PanY;
+        Brightness = model.Brightness ?? Brightness;
+        Contrast = model.Contrast ?? Contrast;
+        Saturation = model.Saturation ?? Saturation;
+        Hue = model.Hue ?? Hue;
 
         if (model.AspectRatio is { } aspectRatio && double.IsFinite(aspectRatio))
         {
@@ -115,6 +123,10 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
             AspectRatio = AspectRatio,
             PanX = PanX,
             PanY = PanY,
+            Brightness = Brightness,
+            Contrast = Contrast,
+            Saturation = Saturation,
+            Hue = Hue,
         };
     }
 
@@ -192,5 +204,17 @@ internal sealed class VideoSettingsModel : PresetSettingsModel<VideoSettingsMode
 
         [JsonPropertyName("PanY")]
         public double? PanY { get; set; }
+
+        [JsonPropertyName("Brightness")]
+        public int? Brightness { get; set; }
+
+        [JsonPropertyName("Contrast")]
+        public int? Contrast { get; set; }
+
+        [JsonPropertyName("Saturation")]
+        public int? Saturation { get; set; }
+
+        [JsonPropertyName("Hue")]
+        public int? Hue { get; set; }
     }
 }

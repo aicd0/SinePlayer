@@ -711,6 +711,9 @@ The expression will be evaluated in the following order:
   <data name="ImageContrast" xml:space="preserve">
     <value>Contrast</value>
   </data>
+  <data name="ImageHue" xml:space="preserve">
+    <value>Hue</value>
+  </data>
   <data name="ImageInterpolation" xml:space="preserve">
     <value>Image interpolation</value>
   </data>

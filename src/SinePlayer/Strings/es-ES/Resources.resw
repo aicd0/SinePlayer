@@ -711,6 +711,9 @@ La evaluación se realizará en el siguiente orden:
   <data name="ImageContrast" xml:space="preserve">
     <value>Contraste</value>
   </data>
+  <data name="ImageHue" xml:space="preserve">
+    <value>Tono</value>
+  </data>
   <data name="ImageInterpolation" xml:space="preserve">
     <value>Interpolación de imagen</value>
   </data>

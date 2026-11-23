@@ -292,6 +292,42 @@ public partial class PlaybackPipelineTests
     }
 
     /// <summary>
+    /// The colour controls travel with every frame the way the transform does, and a picture that is not presenting is
+    /// drawn again when they change: the host sets them once and both paths see the same values.
+    /// </summary>
+    [Test]
+    public void RendersEveryFrameThroughTheAdjustmentsTheHostSet()
+    {
+        string path = RawAudioVideoFixtureFile.Create();
+        try
+        {
+            FakeVideoRenderer videoRenderer = new();
+            using PlaybackPipeline pipeline = CreatePipeline(videoRenderer, new FakeAudioRenderer());
+
+            Assert.That(Open(pipeline, path).IsSuccessful, Is.True);
+            WaitFor(() => videoRenderer.RenderedFrames > 0, "the paused picture to be drawn once");
+            Assert.That(videoRenderer.LastRenderedAdjustments, Is.EqualTo(VideoAdjustments.Neutral), "nothing is adjusted until the host says so");
+
+            var adjustments = new VideoAdjustments { Brightness = 0.25f, Contrast = -0.5f, Saturation = 0.5f, Hue = 90.0f };
+            pipeline.VideoChains[0].Adjustments = adjustments;
+
+            WaitFor(() => videoRenderer.LastRefreshedAdjustments == adjustments, "the adjusted picture is offered to the renderer");
+
+            long drawn = videoRenderer.RenderedFrames;
+            pipeline.Play();
+
+            WaitForPresentedFrames(pipeline, 2);
+            WaitFor(() => videoRenderer.RenderedFrames > drawn, "the playing picture to be drawn");
+
+            Assert.That(videoRenderer.LastRenderedAdjustments, Is.EqualTo(adjustments));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
     /// A thread with nothing to do waits rather than polls, so the host's word is what has to reach it: each
     /// surface change arriving while paused has to be taken up as it arrives, not at the next time the
     /// sleeping thread happens to look. The test counts the offers while several changes arrive in quick

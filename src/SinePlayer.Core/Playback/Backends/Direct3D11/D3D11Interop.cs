@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Playback.Abstractions.Render;
 
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -63,8 +64,8 @@ internal static class D3D11Interop
     }
 
     /// <summary>
-    /// A constant buffer holding one transform. Small and updated per frame, which is what a default-usage
-    /// buffer is for — four vectors for the shader's own use plus the two rows that place the picture.
+    /// A constant buffer holding one frame's constants. Small and updated per frame, which is what a default-usage
+    /// buffer is for — four vectors each: one buffer for where the picture is placed, one for how its colour is adjusted.
     /// </summary>
     internal static ID3D11Buffer CreateConstantBuffer(ID3D11Device device)
     {
@@ -116,6 +117,72 @@ internal static class D3D11Interop
     {
         context.VSSetConstantBuffers(slot, 1, [buffer]);
         context.PSSetConstantBuffers(slot, 1, [buffer]);
+    }
+
+    /// <summary>Binds a buffer the pixel stage alone reads, beside the frame's own at the next slot.</summary>
+    internal static void SetPixelConstantBuffer(ID3D11DeviceContext context, uint slot, ID3D11Buffer buffer)
+    {
+        context.PSSetConstantBuffers(slot, 1, [buffer]);
+    }
+
+    /// <summary>
+    /// Writes the four colour controls into the constants a programme reads: contrast and brightness as the scalars
+    /// that move the picture as a whole, and saturation and hue as one matrix that moves the colour without moving the
+    /// luma. The matrix is computed here so the pixel stage only multiplies, and so one set of numbers serves every
+    /// layout and every conversion.
+    /// </summary>
+    internal static unsafe void SetColourAdjustments(ID3D11DeviceContext context, ID3D11Buffer buffer, VideoAdjustments adjustments)
+    {
+        const float lumaRed = 0.2126f;
+        const float lumaGreen = 0.7152f;
+        const float lumaBlue = 0.0722f;
+
+        // Saturation: luma stays and everything around it is scaled, which is the matrix that turns colour off and on
+        // without changing how bright the picture is.
+        float saturation = 1.0f + adjustments.Saturation;
+        float s00 = lumaRed + (saturation * (1.0f - lumaRed));
+        float s01 = lumaGreen - (saturation * lumaGreen);
+        float s02 = lumaBlue - (saturation * lumaBlue);
+        float s10 = lumaRed - (saturation * lumaRed);
+        float s11 = lumaGreen + (saturation * (1.0f - lumaGreen));
+        float s12 = lumaBlue - (saturation * lumaBlue);
+        float s20 = lumaRed - (saturation * lumaRed);
+        float s21 = lumaGreen - (saturation * lumaGreen);
+        float s22 = lumaBlue + (saturation * (1.0f - lumaBlue));
+
+        // Hue: a rotation about the grey axis, which is the only axis a colour has that a rotation leaves alone.
+        float radians = adjustments.Hue * (MathF.PI / 180.0f);
+        float cos = MathF.Cos(radians);
+        float sin = MathF.Sin(radians);
+        float h00 = 0.213f + (cos * 0.787f) - (sin * 0.213f);
+        float h01 = 0.715f - (cos * 0.715f) - (sin * 0.715f);
+        float h02 = 0.072f - (cos * 0.072f) + (sin * 0.928f);
+        float h10 = 0.213f - (cos * 0.213f) + (sin * 0.143f);
+        float h11 = 0.715f + (cos * 0.285f) + (sin * 0.140f);
+        float h12 = 0.072f - (cos * 0.072f) - (sin * 0.283f);
+        float h20 = 0.213f - (cos * 0.213f) - (sin * 0.787f);
+        float h21 = 0.715f - (cos * 0.715f) + (sin * 0.715f);
+        float h22 = 0.072f + (cos * 0.928f) + (sin * 0.072f);
+
+        float* values = stackalloc float[16];
+        values[0] = (h00 * s00) + (h01 * s10) + (h02 * s20);
+        values[1] = (h00 * s01) + (h01 * s11) + (h02 * s21);
+        values[2] = (h00 * s02) + (h01 * s12) + (h02 * s22);
+        values[3] = 1.0f + adjustments.Contrast;
+        values[4] = (h10 * s00) + (h11 * s10) + (h12 * s20);
+        values[5] = (h10 * s01) + (h11 * s11) + (h12 * s21);
+        values[6] = (h10 * s02) + (h11 * s12) + (h12 * s22);
+        values[7] = adjustments.Brightness;
+        values[8] = (h20 * s00) + (h21 * s10) + (h22 * s20);
+        values[9] = (h20 * s01) + (h21 * s11) + (h22 * s21);
+        values[10] = (h20 * s02) + (h21 * s12) + (h22 * s22);
+        values[11] = 0.0f;
+        values[12] = 0.0f;
+        values[13] = 0.0f;
+        values[14] = 0.0f;
+        values[15] = 0.0f;
+
+        Graphics_Direct3D11_ID3D11DeviceContext_Extensions.UpdateSubresource(context, buffer, 0, null, values, 0, 0);
     }
 
     /// <summary>

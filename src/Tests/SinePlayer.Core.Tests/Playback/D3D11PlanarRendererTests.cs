@@ -1,4 +1,4 @@
-// Copyright (c) aicd0. All rights reserved.
+﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System.Runtime.InteropServices;
@@ -189,6 +189,78 @@ public class D3D11PlanarRendererTests
         AssertPixel(Render(PixelFormat.Bgra8, bgra), 0, 0, 0, 255);
     }
 
+    /// <summary>
+    /// The colour controls work on what the programme produced, so brightness lifts black rather than leaving it
+    /// black: half the range is added after the contrast, which is unchanged here.
+    /// </summary>
+    [Test]
+    public void LiftsBlackWithBrightness()
+    {
+        // Y = 16, U = V = 128 is black in BT.601 limited range.
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [0x10]),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x80, 0x80]));
+
+        byte[] pixels = Render(PixelFormat.Nv12, buffer, new VideoAdjustments { Brightness = 0.5f });
+
+        AssertPixel(pixels, 0, 128, 128, 128);
+    }
+
+    /// <summary>Squeezing the contrast to nothing leaves every sample at the middle the picture is compressed to.</summary>
+    [Test]
+    public void FlattensThePictureWithNoContrast()
+    {
+        // Y = 81, U = 90, V = 240 is pure red in BT.601 limited range.
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [0x51]),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x5A, 0xF0]));
+
+        byte[] pixels = Render(PixelFormat.Nv12, buffer, new VideoAdjustments { Contrast = -1.0f });
+
+        AssertPixel(pixels, 0, 128, 128, 128);
+    }
+
+    /// <summary>
+    /// Turning the colour off leaves the luma, which is what makes a grey stay the grey it was: red's share of the
+    /// encoded brightness is 0.2126, not the whole of it.
+    /// </summary>
+    [Test]
+    public void KeepsOnlyLumaWithNoSaturation()
+    {
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [0x51]),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x5A, 0xF0]));
+
+        byte[] pixels = Render(PixelFormat.Nv12, buffer, new VideoAdjustments { Saturation = -1.0f });
+
+        AssertPixel(pixels, 0, 54, 54, 54);
+    }
+
+    /// <summary>A third of a turn takes red to green around the grey axis, which stays where it is.</summary>
+    [Test]
+    public void RotatesHueAroundTheGreyAxis()
+    {
+        using PlanarFrameBuffer buffer = new(
+            (Width, Height, 1, (_, _) => [0x51]),
+            ((Width + 1) / 2, (Height + 1) / 2, 2, (_, _) => [0x5A, 0xF0]));
+
+        byte[] pixels = Render(PixelFormat.Nv12, buffer, new VideoAdjustments { Hue = 120.0f });
+
+        AssertPixel(pixels, 0, 0, 113, 0);
+    }
+
+    /// <summary>A packed frame goes through the same controls as the planes do.</summary>
+    [Test]
+    public void AdjustsAPackedFrame()
+    {
+        // Red, green, blue, opaque, in the byte order the layout names.
+        using PlanarFrameBuffer red = new((Width, Height, 4, (_, _) => [0xFF, 0x00, 0x00, 0xFF]));
+
+        byte[] pixels = Render(PixelFormat.Rgba8, red, new VideoAdjustments { Saturation = -1.0f });
+
+        AssertPixel(pixels, 0, 54, 54, 54);
+    }
+
     [Test]
     public void RejectsLayoutWithMissingPlanes()
     {
@@ -199,7 +271,7 @@ public class D3D11PlanarRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
         _renderer.SetOutput(target.View, Width, Height);
 
-        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
 
         Assert.That(result.IsSuccessful, Is.False);
     }
@@ -223,7 +295,7 @@ public class D3D11PlanarRendererTests
         Monitor.Enter(deviceLock);
         try
         {
-            draw = Task.Run(() => _renderer.Render(frame, VideoTransform.Identity));
+            draw = Task.Run(() => _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral));
             blocked = !draw.Wait(TimeSpan.FromMilliseconds(250));
         }
         finally
@@ -298,7 +370,7 @@ public class D3D11PlanarRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
         _renderer.SetOutput(target.View, Width, Height);
 
-        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
 
         using (Assert.EnterMultipleScope())
         {
@@ -323,7 +395,7 @@ public class D3D11PlanarRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
         _renderer.SetOutput(target.View, Width, Height);
 
-        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
 
         Assert.That(result.IsSuccessful, Is.True, result.Message);
     }
@@ -343,7 +415,7 @@ public class D3D11PlanarRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
         _renderer.SetOutput(target.View, Width, Height);
 
-        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
 
         using (Assert.EnterMultipleScope())
         {
@@ -514,7 +586,7 @@ public class D3D11PlanarRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height, DXGI_FORMAT.DXGI_FORMAT_R10G10B10A2_UNORM);
 
         _renderer.SetOutput(target.View, Width, Height);
-        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         byte[] pixels = target.ReadPixels(_device, DXGI_FORMAT.DXGI_FORMAT_R10G10B10A2_UNORM);
@@ -550,16 +622,26 @@ public class D3D11PlanarRendererTests
 
     private byte[] Render(PixelFormat format, PlanarFrameBuffer buffer)
     {
-        return Render(format, buffer, ColourInfo.Unknown);
+        return Render(format, buffer, ColourInfo.Unknown, VideoAdjustments.Neutral);
+    }
+
+    private byte[] Render(PixelFormat format, PlanarFrameBuffer buffer, VideoAdjustments adjustments)
+    {
+        return Render(format, buffer, ColourInfo.Unknown, adjustments);
     }
 
     private byte[] Render(PixelFormat format, PlanarFrameBuffer buffer, ColourInfo colour)
+    {
+        return Render(format, buffer, colour, VideoAdjustments.Neutral);
+    }
+
+    private byte[] Render(PixelFormat format, PlanarFrameBuffer buffer, ColourInfo colour, VideoAdjustments adjustments)
     {
         using RawVideoFrame frame = CreateFrame(format, buffer, colour);
         using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
 
         _renderer.SetOutput(target.View, Width, Height);
-        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity, adjustments);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         return target.ReadPixels(_device);
@@ -638,7 +720,7 @@ public class D3D11PlanarRendererTests
             {
                 using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
                 _renderer.SetOutput(target.View, width, height);
-                OperationResult rendered = _renderer.Render(frame, new VideoTransform { Orientation = VideoOrientation.Identity, ResizeMode = VideoResizeMode.Stretch });
+                OperationResult rendered = _renderer.Render(frame, new VideoTransform { Orientation = VideoOrientation.Identity, ResizeMode = VideoResizeMode.Stretch }, VideoAdjustments.Neutral);
                 Assert.That(rendered.IsSuccessful, Is.True, rendered.Message);
 
                 byte[] pixels = target.ReadPixels(_device);
@@ -695,6 +777,69 @@ public class D3D11PlanarRendererTests
     }
 
     /// <summary>
+    /// A hardware frame is adjusted where it is: the colour controls read the slices the decoder wrote, so no readback
+    /// stands between the picture and the filter.
+    /// </summary>
+    [Test]
+    public void AdjustsAHardwareFrame()
+    {
+        // The picture is black in limited range — luma 16, neutral chroma — with the padding a decoder leaves alone.
+        byte[] data = new byte[Width * Height + Width * (Height / 2)];
+        data.AsSpan(0, Width * Height).Fill(16);
+        data.AsSpan(Width * Height).Fill(128);
+
+        D3D11_TEXTURE2D_DESC description = new()
+        {
+            Width = Width,
+            Height = Height,
+            MipLevels = 1,
+            ArraySize = 2,
+            Format = DXGI_FORMAT.DXGI_FORMAT_NV12,
+            SampleDesc = new DXGI_SAMPLE_DESC { Count = 1 },
+            Usage = D3D11_USAGE.D3D11_USAGE_DEFAULT,
+            BindFlags = D3D11_BIND_FLAG.D3D11_BIND_SHADER_RESOURCE,
+        };
+
+        ID3D11Texture2D texture = D3D11Interop.CreateTexture2D(_device.Device, description);
+        nint native = Marshal.GetIUnknownForObject(texture);
+        try
+        {
+            unsafe
+            {
+                fixed (byte* source = data)
+                {
+                    Graphics_Direct3D11_ID3D11DeviceContext_Extensions.UpdateSubresource(_device.Context, texture, 1, null, source, (uint)Width, 0);
+                }
+            }
+
+            using FakeGpuBuffer buffer = new(native);
+            using RawVideoFrame frame = new()
+            {
+                Timestamp = TimeSpan.Zero,
+                Duration = TimeSpan.FromMilliseconds(40),
+                Width = Width,
+                Height = Height,
+                Format = PixelFormat.Nv12,
+                Buffer = buffer,
+                IsHardwareBacked = true,
+            };
+
+            using var target = D3D11RenderTarget.CreateOffscreen(_device, Width, Height);
+            _renderer.SetOutput(target.View, Width, Height);
+
+            OperationResult result = _renderer.Render(frame, VideoTransform.Identity, new VideoAdjustments { Brightness = 0.5f });
+            Assert.That(result.IsSuccessful, Is.True, result.Message);
+
+            AssertPixel(target.ReadPixels(_device), 0, 128, 128, 128);
+        }
+        finally
+        {
+            Marshal.Release(native);
+            D3D11Interop.Release(texture);
+        }
+    }
+
+    /// <summary>
     /// A hardware frame the decoder will not keep alive is refused rather than drawn. The views name a slice of the
     /// decoder's own texture; without a retention the decoder is free to refill that slice while it is sampled, and a
     /// torn picture says nothing about why it happened. The frame already on the surface is left alone.
@@ -709,12 +854,12 @@ public class D3D11PlanarRendererTests
         using FakeGpuBuffer drawable = new(texture.Native);
         using (RawVideoFrame first = CreateGpuFrame(drawable))
         {
-            Assert.That(_renderer.Render(first, VideoTransform.Identity).IsSuccessful, Is.True, "the frame that can be kept alive draws");
+            Assert.That(_renderer.Render(first, VideoTransform.Identity, VideoAdjustments.Neutral).IsSuccessful, Is.True, "the frame that can be kept alive draws");
         }
 
         using FakeGpuBuffer unretainable = new(texture.Native) { CanRetain = false };
         using RawVideoFrame second = CreateGpuFrame(unretainable, width: Width + 2);
-        OperationResult result = _renderer.Render(second, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(second, VideoTransform.Identity, VideoAdjustments.Neutral);
 
         using (Assert.EnterMultipleScope())
         {

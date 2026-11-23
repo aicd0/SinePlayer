@@ -1,4 +1,4 @@
-// Copyright (c) aicd0. All rights reserved.
+﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System.Runtime.InteropServices;
@@ -56,7 +56,7 @@ public class D3D11VideoRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
 
         _renderer.SetOutput(target.View, width, height);
-        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         byte[] pixels = target.ReadPixels(_device);
@@ -169,7 +169,7 @@ public class D3D11VideoRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
 
         _renderer.SetOutput(target.View, width, height);
-        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         byte[] pixels = target.ReadPixels(_device);
@@ -204,7 +204,7 @@ public class D3D11VideoRendererTests
         _renderer.SetOutput(target.View, height, width);
 
         VideoTransform turned = VideoTransform.Identity with { Orientation = new VideoOrientation(1, false) };
-        OperationResult result = _renderer.Render(frame, turned);
+        OperationResult result = _renderer.Render(frame, turned, VideoAdjustments.Neutral);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         byte[] pixels = target.ReadPixels(_device);
@@ -233,7 +233,7 @@ public class D3D11VideoRendererTests
         _renderer.SetOutput(target.View, width, height);
 
         VideoTransform mirrored = VideoTransform.Identity with { Orientation = new VideoOrientation(0, true) };
-        OperationResult result = _renderer.Render(frame, mirrored);
+        OperationResult result = _renderer.Render(frame, mirrored, VideoAdjustments.Neutral);
         Assert.That(result.IsSuccessful, Is.True, result.Message);
 
         byte[] pixels = target.ReadPixels(_device);
@@ -263,7 +263,7 @@ public class D3D11VideoRendererTests
         using (var wide = D3D11RenderTarget.CreateOffscreen(_device, 4, 2))
         {
             _renderer.SetOutput(wide.View, 4, 2);
-            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral).IsSuccessful, Is.True);
 
             byte[] pixels = wide.ReadPixels(_device);
             using (Assert.EnterMultipleScope())
@@ -278,7 +278,7 @@ public class D3D11VideoRendererTests
         using (var tall = D3D11RenderTarget.CreateOffscreen(_device, 2, 4))
         {
             _renderer.SetOutput(tall.View, 2, 4);
-            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral).IsSuccessful, Is.True);
 
             byte[] pixels = tall.ReadPixels(_device);
             using (Assert.EnterMultipleScope())
@@ -301,12 +301,12 @@ public class D3D11VideoRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
 
         _renderer.SetOutput(target.View, width, height);
-        Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+        Assert.That(_renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral).IsSuccessful, Is.True);
         Assert.That(target.ReadPixels(_device)[0], Is.EqualTo(0x10), "the picture starts unmirrored");
 
         // No new frame arrives: the redraw is what turns the picture that is already there.
         VideoTransform mirrored = VideoTransform.Identity with { Orientation = new VideoOrientation(0, true) };
-        OperationResult refreshed = _renderer.RefreshSurface(mirrored);
+        OperationResult refreshed = _renderer.RefreshSurface(mirrored, VideoAdjustments.Neutral);
         Assert.That(refreshed.IsSuccessful, Is.True, refreshed.Message);
         Assert.That(target.ReadPixels(_device)[0], Is.EqualTo(0x40), "the same picture is drawn the other way round");
     }
@@ -328,7 +328,7 @@ public class D3D11VideoRendererTests
         using var target = D3D11RenderTarget.CreateOffscreen(_device, width, height);
 
         _renderer.SetOutput(target.View, width, height);
-        Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+        Assert.That(_renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral).IsSuccessful, Is.True);
         Assert.That(target.ReadPixels(_device)[2], Is.EqualTo(red), "the picture is on the surface");
 
         OperationResult cleared = _renderer.ClearSurface();
@@ -336,7 +336,7 @@ public class D3D11VideoRendererTests
         Assert.That(BlackChannels(target), Has.All.Zero, "the surface is empty");
 
         // The frame the redraw would draw is gone with it: a refresh after the clear has nothing to show.
-        OperationResult refreshed = _renderer.RefreshSurface(VideoTransform.Identity);
+        OperationResult refreshed = _renderer.RefreshSurface(VideoTransform.Identity, VideoAdjustments.Neutral);
         Assert.That(refreshed.IsSuccessful, Is.True, refreshed.Message);
         Assert.That(BlackChannels(target), Has.All.Zero, "what was cleared does not come back on a redraw");
     }
@@ -387,7 +387,7 @@ public class D3D11VideoRendererTests
 
         using FrameBuffer buffer = new(8, 4, (_, _) => (0x11, 0x22, 0x33, 0xFF));
         using RawVideoFrame frame = CreateFrame(8, 4, buffer);
-        OperationResult renderResult = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult renderResult = _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
         Assert.That(renderResult.IsSuccessful, Is.True, renderResult.Message);
 
         byte[] pixels = ownedSwapChain.ReadPixels();
@@ -442,7 +442,7 @@ public class D3D11VideoRendererTests
         };
 
         _renderer.SetOutput(null, 0, 0);
-        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
 
         Assert.That(result.IsSuccessful, Is.False);
     }
@@ -478,7 +478,7 @@ public class D3D11VideoRendererTests
         using (FrameBuffer buffer = new(200, 100, (_, _) => (0x10, 0x20, 0x30, 0xFF)))
         using (RawVideoFrame frame = CreateFrame(200, 100, buffer))
         {
-            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral).IsSuccessful, Is.True);
         }
 
         Assert.That(_renderer.TryGetCompositionTransform(out double before, out double _), Is.True);
@@ -493,7 +493,7 @@ public class D3D11VideoRendererTests
         using (FrameBuffer buffer = new(200, 100, (_, _) => (0x10, 0x20, 0x30, 0xFF)))
         using (RawVideoFrame frame = CreateFrame(200, 100, buffer))
         {
-            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral).IsSuccessful, Is.True);
         }
 
         using (Assert.EnterMultipleScope())
@@ -516,7 +516,7 @@ public class D3D11VideoRendererTests
         using (FrameBuffer buffer = new(100, 50, (_, _) => (0x11, 0x22, 0x33, 0xFF)))
         using (RawVideoFrame frame = CreateFrame(100, 50, buffer))
         {
-            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral).IsSuccessful, Is.True);
         }
 
         // Playback is paused, so nothing is presented: only the host's report of a new surface arrives.
@@ -525,7 +525,7 @@ public class D3D11VideoRendererTests
         target.RasterizationScale = 2.0;
         target.RaiseSizeChanged();
 
-        OperationResult refreshed = _renderer.RefreshSurface(VideoTransform.Identity);
+        OperationResult refreshed = _renderer.RefreshSurface(VideoTransform.Identity, VideoAdjustments.Neutral);
 
         using (Assert.EnterMultipleScope())
         {
@@ -554,13 +554,13 @@ public class D3D11VideoRendererTests
         using (FrameBuffer buffer = new(width, height, (_, _) => (blue, green, red, 0xFF)))
         using (RawVideoFrame frame = CreateFrame(width, height, buffer))
         {
-            Assert.That(_renderer.Render(frame, VideoTransform.Identity).IsSuccessful, Is.True);
+            Assert.That(_renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral).IsSuccessful, Is.True);
         }
 
         _device.Context.ClearRenderTargetView(target.View, [0.0f, 0.0f, 0.0f, 1.0f]);
         Assert.That(target.ReadPixels(_device)[0], Is.Zero, "the surface is emptied first, so what follows is drawn rather than left behind");
 
-        Assert.That(_renderer.RefreshSurface(VideoTransform.Identity).IsSuccessful, Is.True);
+        Assert.That(_renderer.RefreshSurface(VideoTransform.Identity, VideoAdjustments.Neutral).IsSuccessful, Is.True);
 
         byte[] pixels = target.ReadPixels(_device);
         using (Assert.EnterMultipleScope())
@@ -584,7 +584,7 @@ public class D3D11VideoRendererTests
         target.SurfaceHeight = 16;
         target.RaiseSizeChanged();
 
-        OperationResult refreshed = _renderer.RefreshSurface(VideoTransform.Identity);
+        OperationResult refreshed = _renderer.RefreshSurface(VideoTransform.Identity, VideoAdjustments.Neutral);
 
         using (Assert.EnterMultipleScope())
         {
@@ -626,7 +626,7 @@ public class D3D11VideoRendererTests
         using RawVideoFrame frame = CreateFrame(4, 4, buffer);
 
         _renderer.SetOutput(null, 0, 0);
-        OperationResult result = _renderer.Render(frame, VideoTransform.Identity);
+        OperationResult result = _renderer.Render(frame, VideoTransform.Identity, VideoAdjustments.Neutral);
 
         Assert.That(result.IsSuccessful, Is.False);
     }

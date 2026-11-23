@@ -711,6 +711,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="ImageContrast" xml:space="preserve">
     <value>コントラスト</value>
   </data>
+  <data name="ImageHue" xml:space="preserve">
+    <value>色相</value>
+  </data>
   <data name="ImageInterpolation" xml:space="preserve">
     <value>画像補間</value>
   </data>

@@ -16,6 +16,8 @@ public interface IVideoChain : IPlaybackChain<VideoStreamInfo>, IPictureFrameSou
 
     VideoTransform Transform { get; set; }
 
+    VideoAdjustments Adjustments { get; set; }
+
     ISynchronizer Synchronizer { get; set; }
 
     long PresentedFrameCount { get; }

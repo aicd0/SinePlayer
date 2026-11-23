@@ -711,6 +711,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="ImageContrast" xml:space="preserve">
     <value>Контраст</value>
   </data>
+  <data name="ImageHue" xml:space="preserve">
+    <value>Оттенок</value>
+  </data>
   <data name="ImageInterpolation" xml:space="preserve">
     <value>Интерполяция изображения</value>
   </data>

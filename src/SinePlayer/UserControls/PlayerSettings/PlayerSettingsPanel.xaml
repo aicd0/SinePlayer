@@ -357,6 +357,40 @@
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Effects}" SectionKey="Effects">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <settings:SliderSettingView
+                                    x:Name="VideoBrightnessSlider"
+                                    Label="{x:Bind StringResource.ImageBrightness}"
+                                    Maximum="100"
+                                    Minimum="-100"
+                                    StepFrequency="1"
+                                    ValueChanged="VideoBrightnessSlider_ValueChanged" />
+                                <settings:SliderSettingView
+                                    x:Name="VideoContrastSlider"
+                                    Label="{x:Bind StringResource.ImageContrast}"
+                                    Maximum="100"
+                                    Minimum="-100"
+                                    StepFrequency="1"
+                                    ValueChanged="VideoContrastSlider_ValueChanged" />
+                                <settings:SliderSettingView
+                                    x:Name="VideoSaturationSlider"
+                                    Label="{x:Bind StringResource.ImageSaturation}"
+                                    Maximum="100"
+                                    Minimum="-100"
+                                    StepFrequency="1"
+                                    ValueChanged="VideoSaturationSlider_ValueChanged" />
+                                <settings:SliderSettingView
+                                    x:Name="VideoHueSlider"
+                                    Label="{x:Bind StringResource.ImageHue}"
+                                    Maximum="180"
+                                    Minimum="-180"
+                                    StepFrequency="1"
+                                    ValueChanged="VideoHueSlider_ValueChanged" />
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
                 </StackPanel>
 
                 <StackPanel
