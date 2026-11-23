@@ -3,6 +3,7 @@
 
 using SinePlayer.Core.Common.AppEnvironment;
 using SinePlayer.Core.Common.ErrorHandling;
+using SinePlayer.Core.Common.Storage;
 using SinePlayer.Core.Playback.Backends.FFmpeg.Interop;
 
 namespace SinePlayer.Core.Playback.Backends.FFmpeg;
@@ -26,9 +27,6 @@ public static class FFmpegRuntime
 
     private static bool sInitialized;
     private static string? sVersion;
-
-    /// <summary>Directory the libraries were loaded from, or null before initialisation.</summary>
-    public static string? LibraryDirectory => NativeLibraryLoader.FfmpegDirectory;
 
     /// <summary>Version string reported by FFmpeg itself, or null before initialisation.</summary>
     public static string? Version => sVersion;
@@ -68,7 +66,7 @@ public static class FFmpegRuntime
         if (avUtilMajor != ExpectedAvUtilMajor || avCodecMajor != ExpectedAvCodecMajor || avFormatMajor != ExpectedAvFormatMajor)
         {
             throw new InvalidOperationException(
-                $"FFmpeg native libraries in '{LibraryDirectory}' do not match the interop layer. " +
+                $"FFmpeg native libraries in '{StorageLocation.NativeLibraryFolderPath}' do not match the interop layer. " +
                 $"Expected libavutil {ExpectedAvUtilMajor}, libavcodec {ExpectedAvCodecMajor}, libavformat {ExpectedAvFormatMajor}; " +
                 $"found libavutil {avUtilMajor}, libavcodec {avCodecMajor}, libavformat {avFormatMajor}.");
         }
