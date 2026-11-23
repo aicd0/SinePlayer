@@ -9,47 +9,13 @@ using SinePlayer.Core.Common.Storage;
 
 namespace SinePlayer.Core.Common.AppEnvironment;
 
-/// <summary>
-/// The native libraries this build ships that have to be brought into the process by hand, one named set at a time, on
-/// first use.
-/// <para>
-/// The order of each set is the whole point: a library loaded by full path does not have its own directory searched for
-/// what it imports, so everything it depends on has to be in the process before it is. Each set is therefore written
-/// dependencies first, the library whose exports are used last. Once they are in the process, imports find them by name,
-/// and a set whose imports are named after files needs nothing more; FFmpeg's are not, which is why its set also installs
-/// the import resolver that turns a declared name back into the file it lives in.
-/// </para>
-/// <para>
-/// Every ask after the first is answered from what the first one found, including a failure: retrying a file that is not
-/// there on every redraw would only repeat the answer.
-/// </para>
-/// </summary>
 internal static class NativeLibraryLoader
 {
-    /// <summary>
-    /// libass and everything it imports. The C runtime leads because these are MSVC-built binaries, unlike the FFmpeg ones,
-    /// which need none of it.
-    /// </summary>
     private static readonly NativeLibrarySet sLibass = new(
         "libass",
         installsResolver: false,
-        "vcruntime140.dll",
-        "vcruntime140_1.dll",
-        "z.dll",
-        "bz2.dll",
-        "libpng16.dll",
-        "brotlicommon.dll",
-        "brotlidec.dll",
-        "freetype.dll",
-        "fribidi-0.dll",
-        "harfbuzz.dll",
-        "ass-9.dll");
+        LibassFiles());
 
-    /// <summary>
-    /// FFmpeg, in the order libavcodec and libavformat need it. The names carry their major version, which is how FFmpeg
-    /// names its libraries on Windows and why an import declared without it has to be resolved: see
-    /// <see cref="NativeLibrarySet.InstallsResolver"/>.
-    /// </summary>
     private static readonly NativeLibrarySet sFfmpeg = new(
         "FFmpeg",
         installsResolver: true,
@@ -59,37 +25,36 @@ internal static class NativeLibraryLoader
         "avcodec-63.dll",
         "avformat-63.dll");
 
-    /// <summary>Whether libass and everything it imports are in the process.</summary>
-    internal static bool IsLibassLoaded => sLibass.IsLoaded;
-
-    /// <summary>Whether FFmpeg and everything it imports are in the process.</summary>
-    internal static bool IsFfmpegLoaded => sFfmpeg.IsLoaded;
-
-    /// <summary>Where FFmpeg was loaded from, or null before it was.</summary>
-    internal static string? FfmpegDirectory => sFfmpeg.LoadedFrom;
-
-    /// <summary>Where libass was loaded from, or null before it was.</summary>
-    internal static string? LibassDirectory => sLibass.LoadedFrom;
-
-    /// <summary>Brings libass, and everything it imports, into the process. Cheap after the first call.</summary>
     internal static OperationResult EnsureLibass()
     {
         return sLibass.EnsureLoaded();
     }
 
-    /// <summary>
-    /// Brings FFmpeg, and everything it imports, into the process, and makes the imports declared in the interop layer
-    /// resolve to these files. Cheap after the first call.
-    /// </summary>
     internal static OperationResult EnsureFfmpeg()
     {
         return sFfmpeg.EnsureLoaded();
     }
 
-    /// <summary>
-    /// One named set of libraries, with its own state: two sets fail independently, and one being present says nothing
-    /// about the other.
-    /// </summary>
+    private static string[] LibassFiles()
+    {
+        string[] runtime = RuntimeInformation.ProcessArchitecture == Architecture.X64
+            ? ["vcruntime140.dll", "vcruntime140_1.dll"]
+            : ["vcruntime140.dll"];
+        return
+        [
+            .. runtime,
+            "z.dll",
+            "bz2.dll",
+            "libpng16.dll",
+            "brotlicommon.dll",
+            "brotlidec.dll",
+            "freetype.dll",
+            "fribidi-0.dll",
+            "harfbuzz.dll",
+            "ass-9.dll",
+        ];
+    }
+
     private sealed class NativeLibrarySet
     {
         private static bool sResolverInstalled;
@@ -151,17 +116,17 @@ internal static class NativeLibraryLoader
                     return OperationResult.Failure(_failure);
                 }
 
-                try
+                foreach (string fileName in _fileNames)
                 {
-                    foreach (string fileName in _fileNames)
+                    try
                     {
                         NativeLibrary.Load(Path.Combine(directory, fileName));
                     }
-                }
-                catch (Exception exception)
-                {
-                    _failure = $"Unable to load the {_name} native libraries from '{directory}': {exception.Message}";
-                    return OperationResult.Failure(_failure);
+                    catch (Exception exception)
+                    {
+                        _failure = $"Unable to load '{fileName}' for the {_name} native libraries from '{directory}': {exception.Message}";
+                        return OperationResult.Failure(_failure);
+                    }
                 }
 
                 Volatile.Write(ref _loadedFrom, directory);

@@ -3,6 +3,7 @@
 
 using System.Runtime.InteropServices;
 
+using SinePlayer.Core.Common.Storage;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 
 namespace SinePlayer.Core.Tests.Playback;
@@ -23,15 +24,14 @@ public class FFmpegRuntimeTests
     {
         FFmpegRuntime.EnsureInitialized();
 
-        string? directory = FFmpegRuntime.LibraryDirectory;
-        Assert.That(directory, Is.Not.Null, "the runtime has to say where it loaded from");
+        string directory = StorageLocation.NativeLibraryFolderPath;
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(FFmpegRuntime.Version, Is.Not.Null.And.Not.Empty, "and what version it loaded");
             foreach (string name in sLoadedLibraries)
             {
-                Assert.That(File.Exists(Path.Combine(directory!, name)), Is.True, $"{name} is missing from '{directory}', which is where this process loaded from");
+                Assert.That(File.Exists(Path.Combine(directory, name)), Is.True, $"{name} is missing from '{directory}', which is where this process loads from");
             }
         }
     }
@@ -46,7 +46,7 @@ public class FFmpegRuntimeTests
     {
         FFmpegRuntime.EnsureInitialized();
 
-        string directory = FFmpegRuntime.LibraryDirectory!;
+        string directory = StorageLocation.NativeLibraryFolderPath;
         ushort expected = RuntimeInformation.ProcessArchitecture switch
         {
             Architecture.X64 => 0x8664,
