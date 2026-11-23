@@ -4,8 +4,6 @@
 using System;
 using System.Text;
 
-using SinePlayer.Core.Common.Native;
-
 using Windows.System;
 
 namespace SinePlayer.Common.HotKey;

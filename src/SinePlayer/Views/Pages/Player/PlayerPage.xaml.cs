@@ -55,7 +55,6 @@ internal sealed partial class PlayerPage : BasePage
 {
     #region Constructor
 
-    private const int HIDE_OVERLAY_DELAY_MS = 0;
     private const int HIDE_CURSOR_DELAY_MS = 3000;
     private const double DefaultFontSize = 32.0;
     private const double MaximumPan = 2000.0;
@@ -1068,6 +1067,8 @@ internal sealed partial class PlayerPage : BasePage
     #endregion
 
     #region Overlay
+
+    private const int HIDE_OVERLAY_DELAY_MS = 0;
 
     private bool _isPointerInsideOverlay = false;
     private bool _isMouseInsideRootElement = true;

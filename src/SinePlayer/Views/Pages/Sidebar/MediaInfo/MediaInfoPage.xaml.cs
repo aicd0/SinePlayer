@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -51,10 +50,7 @@ internal sealed partial class MediaInfoPage : BasePage
 
     private void ObserveData()
     {
-        GlobalEvent.Instance.MediaUpdated.Observe(this, ids =>
-        {
-            ViewModel.OnMediaUpdated(ids);
-        });
+        GlobalEvent.Instance.MediaUpdated.Observe(this, ViewModel.OnMediaUpdated);
 
         GlobalEvent.Instance.CollectionUpdated.Observe(this, _ =>
         {
@@ -183,26 +179,13 @@ internal sealed partial class MediaInfoPage : BasePage
     {
         CoroutineUtils.Run(async () =>
         {
-            OperationResult result = await OnDirectoryTappedInternal();
-            result.ShowErrorMessage(PageActionHandler);
+            MediaModel? media = ViewModel.Media;
+            OperationResult err = media is null
+                ? OperationResultExt.Failure(nameof(OnDirectoryTapped), "Media is null.")
+                : await media.ShowInFileExplorer();
+
+            err.ShowErrorMessage(PageActionHandler);
         });
-    }
-
-    private async Task<OperationResult> OnDirectoryTappedInternal()
-    {
-        MediaModel? media = ViewModel.Media;
-        if (media is null)
-        {
-            return OperationResultExt.Failure(nameof(OnDirectoryTapped), "Media is null.");
-        }
-
-        OperationResult innerErr = await media.ShowInFileExplorer();
-        if (!innerErr.IsSuccessful)
-        {
-            return OperationResultExt.Failure(innerErr);
-        }
-
-        return OperationResultExt.Success();
     }
 
     private void OnEditInfoClick(object sender, RoutedEventArgs e)
