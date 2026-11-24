@@ -311,14 +311,14 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
 
             // What the safe region costs is only what it takes to be inside it, and the band grows from where the cue ended
             // up rather than from where it would have gone, so cues of one band stay apart when the chrome moves them.
-            Vector2 kept = KeepInsideArea(origin, layout, safe);
+            Vector2 kept = KeepInsideArea(origin, layout.LayoutBounds.Width, layout.LayoutBounds.Height, safe);
             float moved = kept.Y - origin.Y;
             taken[row] += (row == 2 ? moved : -moved) + (float)layout.LayoutBounds.Height + gap;
 
             // The placement a chain asks for is that chain's own and moves nothing else: it is applied once the room this
             // cue takes has been counted, so panning one chain's words — including the part of the pan the edge cuts short —
             // leaves the words another chain stacks in the same band exactly where they were.
-            origin = KeepInsideArea(kept + new Vector2((float)(presentation.OffsetX * scale), (float)(presentation.OffsetY * scale)), layout, safe);
+            origin = KeepInsideArea(kept + new Vector2((float)(presentation.OffsetX * scale), (float)(presentation.OffsetY * scale)), layout.LayoutBounds.Width, layout.LayoutBounds.Height, safe);
 
             CanvasGeometry? outline = presentation.OutlineWidth > 0.0 ? outlines.Get(device, body, format, blockWidth, height) : null;
 
@@ -386,12 +386,9 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         double scaledWidth = image.Width * output.Width;
         double scaledHeight = image.Height * output.Height;
 
-        double maxX = Math.Max(safe.Left, safe.Left + safe.Width - scaledWidth);
-        double maxY = Math.Max(safe.Top, safe.Top + safe.Height - scaledHeight);
-        x = Math.Clamp(x, safe.Left, maxX);
-        y = Math.Clamp(y, safe.Top, maxY);
+        Vector2 kept = KeepInsideArea(new Vector2((float)x, (float)y), scaledWidth, scaledHeight, safe);
 
-        session.DrawImage(bitmap, new Rect(x, y, scaledWidth, scaledHeight));
+        session.DrawImage(bitmap, new Rect(kept.X, kept.Y, scaledWidth, scaledHeight));
     }
 
     #endregion
@@ -547,11 +544,18 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         return new Vector2(x, y);
     }
 
-    private static Vector2 KeepInsideArea(Vector2 origin, CanvasTextLayout layout, SubtitleArea safe)
+    /// <summary>
+    /// Where a cue of the given size goes inside the safe region: moved no further than it takes to be within it, and
+    /// centred across it when it is too wide to be made to fit. Pinning a cue that cannot fit against the left edge would
+    /// put the whole of its overflow on the right, which draws a centred line as a left-aligned one.
+    /// </summary>
+    private static Vector2 KeepInsideArea(Vector2 origin, double width, double height, SubtitleArea safe)
     {
-        double maxX = Math.Max(safe.Left, safe.Left + safe.Width - layout.LayoutBounds.Width);
-        double maxY = Math.Max(safe.Top, safe.Top + safe.Height - layout.LayoutBounds.Height);
-        return new Vector2((float)Math.Clamp(origin.X, (double)safe.Left, maxX), (float)Math.Clamp(origin.Y, (double)safe.Top, maxY));
+        double x = width > safe.Width
+            ? safe.Left + ((safe.Width - width) / 2.0)
+            : Math.Clamp(origin.X, (double)safe.Left, Math.Max(safe.Left, safe.Left + safe.Width - width));
+        double maxY = Math.Max(safe.Top, safe.Top + safe.Height - height);
+        return new Vector2((float)x, (float)Math.Clamp(origin.Y, (double)safe.Top, maxY));
     }
 
     #endregion

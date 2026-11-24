@@ -979,6 +979,59 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>
+    /// A bitmap cue too wide for the safe region is centred on it too: pinning it against the left edge would put the
+    /// whole of the cue under the chrome on the right, and it is the same clamp the words are placed with.
+    /// </summary>
+    [Test]
+    public void CentresABitmapCueTooWideForTheSafeRegionInsteadOfPinningItToItsLeftEdge()
+    {
+        CanvasRenderTarget? target = null;
+        try
+        {
+            CanvasDevice device;
+            try
+            {
+                device = EnsureDetachedDevice();
+            }
+            catch (Exception exception)
+            {
+                Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+                return;
+            }
+
+            const int width = 400;
+            const int height = 300;
+            target = new CanvasRenderTarget(device, width, height, 96.0f);
+
+            // Half the surface's width, starting a quarter of the way across, and chrome down both sides that leaves only
+            // a quarter of the width between them.
+            using SubtitleCue cue = BitmapCue(left: 0.25, top: 0.5, imageWidth: 0.5, imageHeight: 0.25);
+            SubtitlePresentation presentation = SubtitlePresentation.Identity with
+            {
+                Insets = new SubtitleInsets(150.0, 0.0, 150.0, 0.0),
+            };
+
+            using (CanvasDrawingSession session = target.CreateDrawingSession())
+            {
+                session.Clear(default(Color));
+                Win2DSubtitleLayer.DrawCues(session, device, (List<SubtitleCue>)[cue], presentation, width, height);
+            }
+
+            (int left, int _, int right, int _) = InkBounds(target.GetPixelBytes(), width, height);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(left, Is.EqualTo(100).Within(2), "the cue keeps the place its fractions name, centred on the region");
+                Assert.That(right, Is.EqualTo(299).Within(2), "and reaches past both of its edges");
+            }
+        }
+        finally
+        {
+            target?.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Two events can be up at the same time — the Matrix's title arrives as one SRT event per character — and they share an
     /// alignment band, so each has to make room for the one before it rather than being drawn on the same spot.
     /// </summary>
@@ -1498,6 +1551,50 @@ public class Win2DSubtitleRendererTests
             Assert.That(shortBottom - tallBottom, Is.EqualTo(60.0).Within(2.0),
                 "so a bar twice as tall costs exactly its extra height");
             Assert.That(bareBottom - bareTop, Is.EqualTo(shortBottom - shortTop), "and they are the same size they were");
+        }
+    }
+
+    /// <summary>
+    /// A cue too wide for the safe region cannot be kept inside it, so the room is shared between its two sides: the words
+    /// stay centred on the region the chrome leaves rather than pinned against its left edge. The clamp gave a run wider
+    /// than the region no room to move at all, and the left edge it fell back on drew a centred line as a left-aligned one.
+    /// </summary>
+    [Test]
+    public void CentresACueTooWideForTheSafeRegionInsteadOfPinningItToItsLeftEdge()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 300;
+
+        byte[] bare = RenderInk(device, width, height, AtFixedSize(48.0));
+        (int bareLeft, int bareTop, int bareRight, int bareBottom) = InkBounds(bare, width, height);
+        int cueWidth = bareRight - bareLeft + 1;
+        Assert.That(bareRight, Is.LessThan(width), "the cue is drawn whole inside the surface for this to say anything");
+
+        // Chrome down both sides, leaving less room than the words take up.
+        double strip = ((width - cueWidth) / 2.0) + 40.0;
+        byte[] squeezed = RenderInk(device, width, height, AtFixedSize(48.0) with
+        {
+            Insets = new SubtitleInsets(strip, 0.0, strip, 0.0),
+        });
+        (int squeezedLeft, int squeezedTop, int squeezedRight, int squeezedBottom) = InkBounds(squeezed, width, height);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(squeezedLeft, Is.LessThan((int)strip), "the words reach into the chrome on their left, not only on their right");
+            Assert.That(squeezedLeft, Is.EqualTo(bareLeft).Within(2), "so they stay where they were, centred on the region");
+            Assert.That(squeezedRight, Is.EqualTo(bareRight).Within(2));
+            Assert.That(squeezedBottom - squeezedTop, Is.EqualTo(bareBottom - bareTop).Within(2), "and they are not resized");
         }
     }
 
