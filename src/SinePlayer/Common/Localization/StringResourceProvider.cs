@@ -161,6 +161,7 @@ public class StringResourceProvider
     public string FontStyleNormal => GetResourceString("FontStyleNormal");
     public string FontStyleOblique => GetResourceString("FontStyleOblique");
     public string FontWeight => GetResourceString("FontWeight");
+    public string FrameBufferCapacity => GetResourceString("FrameBufferCapacity");
     public string FrameRate => GetResourceString("FrameRate");
     public string FunctionAverage => GetResourceString("FunctionAverage");
     public string FunctionItemCount => GetResourceString("FunctionItemCount");
@@ -298,6 +299,7 @@ public class StringResourceProvider
     public string PromptBeforeRemovingItems => GetResourceString("PromptBeforeRemovingItems");
     public string Random => GetResourceString("Random");
     public string Rating => GetResourceString("Rating");
+    public string ReadAheadBuffer => GetResourceString("ReadAheadBuffer");
     public string Refresh => GetResourceString("Refresh");
     public string RefreshRandomSeed => GetResourceString("RefreshRandomSeed");
     public string Remove => GetResourceString("Remove");

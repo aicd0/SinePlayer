@@ -22,6 +22,8 @@ internal static class AppSettingsModel
 {
     private const string TAG = nameof(AppSettingsModel);
     private const long DEFAULT_IMAGE_MEMORY_CACHE_CAPACITY = 128L * 1024 * 1024;
+    private const int DEFAULT_FRAME_QUEUE_CAPACITY = 8;
+    private const int DEFAULT_READ_AHEAD_MILLISECONDS = 8000;
 
     private static readonly JsonDatabase _db = new();
 
@@ -178,6 +180,32 @@ internal static class AppSettingsModel
         set
         {
             _db.Write(model => model.PreciseSeeking = value);
+            _db.Save();
+        }
+    }
+
+    public static int FrameQueueCapacity
+    {
+        get
+        {
+            return _db.Read(model => model.FrameQueueCapacity ?? DEFAULT_FRAME_QUEUE_CAPACITY);
+        }
+        set
+        {
+            _db.Write(model => model.FrameQueueCapacity = value);
+            _db.Save();
+        }
+    }
+
+    public static int ReadAhead
+    {
+        get
+        {
+            return _db.Read(model => model.ReadAhead ?? DEFAULT_READ_AHEAD_MILLISECONDS);
+        }
+        set
+        {
+            _db.Write(model => model.ReadAhead = value);
             _db.Save();
         }
     }
@@ -1279,6 +1307,12 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("PreciseSeeking")]
         public bool? PreciseSeeking { get; set; }
+
+        [JsonPropertyName("FrameQueueCapacity")]
+        public int? FrameQueueCapacity { get; set; }
+
+        [JsonPropertyName("ReadAhead")]
+        public int? ReadAhead { get; set; }
 
         [JsonPropertyName("SeekForwardSeconds")]
         public double? SeekForwardSeconds { get; set; }

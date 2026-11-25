@@ -639,6 +639,9 @@ The expression will be evaluated in the following order:
   <data name="FontWeight" xml:space="preserve">
     <value>Font weight</value>
   </data>
+  <data name="FrameBufferCapacity" xml:space="preserve">
+    <value>Frame buffer capacity</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Frame rate</value>
   </data>
@@ -1098,6 +1101,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="Rating" xml:space="preserve">
     <value>Rating</value>
+  </data>
+  <data name="ReadAheadBuffer" xml:space="preserve">
+    <value>Read-ahead buffer</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>Refresh</value>

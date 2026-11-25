@@ -20,13 +20,12 @@ namespace SinePlayer.Core.Playback.Engine;
 
 internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
 {
-    private const int FrameQueueCapacity = 8;
+    private const int DefaultFrameQueueCapacity = 8;
+    private const int DecoderBufferedFrameMargin = 4;
     private const int VideoStarvationMilliseconds = 200;
     private const int VideoStarvationResumeMilliseconds = 100;
     private const int VideoIdleTimeoutMilliseconds = 50;
     private const int FallbackFrameMilliseconds = 40;
-
-    public const int DecoderBufferedFrames = FrameQueueCapacity + 4;
 
     private readonly IChainHost _host;
     private readonly PipelineTimeline _timeline;
@@ -34,6 +33,7 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
 
     private readonly AtomicCell<VideoTransform> _transform = new(VideoTransform.Identity);
     private readonly AtomicCell<VideoAdjustments> _adjustments = new(VideoAdjustments.Neutral);
+    private readonly AtomicCell<int> _frameQueueCapacity = new(DefaultFrameQueueCapacity);
     private IVideoRenderTarget? _target;
     private volatile bool _starved;
 
@@ -84,6 +84,24 @@ internal sealed class VideoChain : IVideoChain, IChainFeed, IPipelineWakeTarget
     }
 
     public VideoComponentResolver Components { get; } = new();
+
+    public int FrameQueueCapacity
+    {
+        get => _frameQueueCapacity.Read();
+        set
+        {
+            int capacity = Math.Max(1, value);
+            if (_frameQueueCapacity.Read() == capacity)
+            {
+                return;
+            }
+
+            _frameQueueCapacity.Write(_ => capacity);
+            WakeDecode();
+        }
+    }
+
+    private int DecoderBufferedFrames => FrameQueueCapacity + DecoderBufferedFrameMargin;
 
     public long PresentedFrameCount => Interlocked.Read(ref _presentedFrameCount);
 

@@ -639,6 +639,9 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   <data name="FontWeight" xml:space="preserve">
     <value>Schriftstärke</value>
   </data>
+  <data name="FrameBufferCapacity" xml:space="preserve">
+    <value>Frame-Puffer-Kapazität</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Bildrate</value>
   </data>
@@ -1098,6 +1101,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   </data>
   <data name="Rating" xml:space="preserve">
     <value>Punktzahl</value>
+  </data>
+  <data name="ReadAheadBuffer" xml:space="preserve">
+    <value>Vorauslese-Puffer</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>Aktualisieren</value>

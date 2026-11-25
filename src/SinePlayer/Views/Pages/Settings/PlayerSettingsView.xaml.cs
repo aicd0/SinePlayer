@@ -258,6 +258,21 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
+    private void ReadAheadNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        int value = (int)ReadStep(sender, ViewModel.ReadAheadSeconds);
+        ViewModel.SetReadAheadSeconds(value);
+    }
+
+    private void FrameQueueCapacityNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        int value = (int)ReadStep(sender, AppSettingsModel.FrameQueueCapacity);
+        if (AppSettingsModel.FrameQueueCapacity != value)
+        {
+            AppSettingsModel.FrameQueueCapacity = value;
+        }
+    }
+
     private static double ReadStep(NumberBox box, double fallback, int decimals = 0)
     {
         if (double.IsNaN(box.Value))

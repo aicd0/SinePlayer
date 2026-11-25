@@ -73,6 +73,12 @@ public sealed partial class PlaybackPipeline : IDisposable, IChainHost
 
     public ISourceProviderFactory? SourceFactory { get; set; }
 
+    public TimeSpan ReadAhead
+    {
+        get => _reader.ReadAheadMin;
+        set => _reader.ReadAheadMin = value;
+    }
+
     public MediaEngineState State => _events.State;
 
     public string? Error => _events.Error;

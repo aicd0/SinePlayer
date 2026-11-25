@@ -639,6 +639,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="FontWeight" xml:space="preserve">
     <value>フォントの太さ</value>
   </data>
+  <data name="FrameBufferCapacity" xml:space="preserve">
+    <value>フレームバッファ容量</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>フレームレート</value>
   </data>
@@ -1098,6 +1101,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="Rating" xml:space="preserve">
     <value>スコア</value>
+  </data>
+  <data name="ReadAheadBuffer" xml:space="preserve">
+    <value>先読みバッファ</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>リフレッシュ</value>

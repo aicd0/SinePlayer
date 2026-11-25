@@ -113,6 +113,7 @@
                 <NumberBox
                     x:Name="SeekForwardNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="10"
                     Maximum="600"
                     Minimum="1"
@@ -137,6 +138,7 @@
                 <NumberBox
                     x:Name="SeekBackwardNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="10"
                     Maximum="600"
                     Minimum="1"
@@ -162,6 +164,7 @@
                 <NumberBox
                     x:Name="VolumeUpNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="5"
                     Maximum="50"
                     Minimum="1"
@@ -186,6 +189,7 @@
                 <NumberBox
                     x:Name="VolumeDownNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="5"
                     Maximum="50"
                     Minimum="1"
@@ -211,6 +215,7 @@
                 <NumberBox
                     x:Name="ZoomInNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="0.1"
                     Maximum="1"
                     Minimum="0.01"
@@ -234,6 +239,7 @@
                 <NumberBox
                     x:Name="ZoomOutNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="0.1"
                     Maximum="1"
                     Minimum="0.01"
@@ -258,6 +264,7 @@
                 <NumberBox
                     x:Name="FastForwardNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="0.5"
                     Maximum="8"
                     Minimum="1"
@@ -283,6 +290,7 @@
                 <NumberBox
                     x:Name="SyncVideoForwardNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="1"
                     Maximum="10"
                     Minimum="0.1"
@@ -332,6 +340,7 @@
                 <NumberBox
                     x:Name="SyncAudioForwardNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="1"
                     Maximum="10"
                     Minimum="0.1"
@@ -356,6 +365,7 @@
                 <NumberBox
                     x:Name="SyncAudioBackwardNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="1"
                     Maximum="10"
                     Minimum="0.1"
@@ -381,6 +391,7 @@
                 <NumberBox
                     x:Name="SyncSubtitleForwardNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="1"
                     Maximum="10"
                     Minimum="0.1"
@@ -405,6 +416,7 @@
                 <NumberBox
                     x:Name="SyncSubtitleBackwardNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="1"
                     Maximum="10"
                     Minimum="0.1"
@@ -430,6 +442,7 @@
                 <NumberBox
                     x:Name="IncreaseFontSizeNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="10"
                     Maximum="100"
                     Minimum="1"
@@ -453,6 +466,7 @@
                 <NumberBox
                     x:Name="DecreaseFontSizeNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="10"
                     Maximum="100"
                     Minimum="1"
@@ -477,6 +491,7 @@
                 <NumberBox
                     x:Name="VideoPanStepNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="10"
                     Maximum="1000"
                     Minimum="1"
@@ -500,6 +515,7 @@
                 <NumberBox
                     x:Name="SubtitlePanStepNumberBox"
                     MinWidth="120"
+                    HorizontalAlignment="Left"
                     LargeChange="10"
                     Maximum="1000"
                     Minimum="1"
@@ -508,6 +524,69 @@
                     ValueChanged="SubtitlePanStepNumberBox_ValueChanged"
                     Value="{x:Bind ViewModel.SubtitlePanStep, Mode=TwoWay}" />
             </StackPanel>
+        </Grid>
+
+        <Rectangle
+            Height="1"
+            Margin="0,16"
+            Fill="{ThemeResource AppSeperator1}" />
+
+        <Grid HorizontalAlignment="Left" RowSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                Grid.Row="0"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.ReadAheadBuffer}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="0"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="ReadAheadNumberBox"
+                    MinWidth="120"
+                    HorizontalAlignment="Left"
+                    LargeChange="5"
+                    Maximum="30"
+                    Minimum="1"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="ReadAheadNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.ReadAheadSeconds, Mode=OneWay}" />
+                <TextBlock VerticalAlignment="Center" Text="s" />
+            </StackPanel>
+
+            <TextBlock
+                Grid.Row="1"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.FrameBufferCapacity}"
+                TextWrapping="Wrap" />
+            <NumberBox
+                x:Name="FrameQueueCapacityNumberBox"
+                Grid.Row="1"
+                Grid.Column="2"
+                MinWidth="120"
+                HorizontalAlignment="Left"
+                LargeChange="4"
+                Maximum="16"
+                Minimum="4"
+                SmallChange="1"
+                SpinButtonPlacementMode="Inline"
+                ValueChanged="FrameQueueCapacityNumberBox_ValueChanged"
+                Value="{x:Bind ViewModel.FrameQueueCapacity, Mode=OneWay}" />
         </Grid>
     </StackPanel>
 
