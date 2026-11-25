@@ -1049,6 +1049,15 @@
   <data name="PromptBeforeRemovingItems" xml:space="preserve">
     <value>移除項目前先確認</value>
   </data>
+  <data name="PropertyUnitMonth" xml:space="preserve">
+    <value>月</value>
+  </data>
+  <data name="PropertyUnitQuarter" xml:space="preserve">
+    <value>季度</value>
+  </data>
+  <data name="PropertyUnitYear" xml:space="preserve">
+    <value>年</value>
+  </data>
   <data name="Random" xml:space="preserve">
     <value>隨機播放</value>
   </data>

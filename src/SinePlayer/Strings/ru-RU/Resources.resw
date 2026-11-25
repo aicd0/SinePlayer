@@ -1051,6 +1051,15 @@ $files</value>
   <data name="PromptBeforeRemovingItems" xml:space="preserve">
     <value>Запрашивать подтверждение перед удалением элементов</value>
   </data>
+  <data name="PropertyUnitMonth" xml:space="preserve">
+    <value>месяц</value>
+  </data>
+  <data name="PropertyUnitQuarter" xml:space="preserve">
+    <value>квартал</value>
+  </data>
+  <data name="PropertyUnitYear" xml:space="preserve">
+    <value>год</value>
+  </data>
   <data name="Random" xml:space="preserve">
     <value>В случайном порядке</value>
   </data>

@@ -10,6 +10,7 @@ using System.Text.Json.Serialization;
 using SinePlayer.Common.Localization;
 using SinePlayer.Common.Misc;
 using SinePlayer.Core.Database.JSON;
+using SinePlayer.Data.Models.MediaProperty;
 
 namespace SinePlayer.Data.Models.Misc;
 
@@ -167,17 +168,17 @@ class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
             {
                 Name = model.Name ?? string.Empty,
                 Modified = model.Modified ?? false,
-                SortBy = MediaPropertyModel.FromJson(model.SortBy) ?? defaultModel.SortBy,
+                SortBy = MediaPropertyModel.FromSortJson(model.SortBy) ?? defaultModel.SortBy,
                 MediaOrderMethod = string.IsNullOrEmpty(model.MediaOrderMethod) ?
                     defaultModel.MediaOrderMethod :
                     StringToOrderMethod(model.MediaOrderMethod),
-                GroupBy = MediaPropertyModel.FromJson(model.GroupBy),
+                GroupBy = MediaPropertyModel.FromGroupJson(model.GroupBy),
                 GroupOrderMethod = string.IsNullOrEmpty(model.GroupOrderMethod) ?
                     defaultModel.GroupOrderMethod :
                     StringToOrderMethod(model.GroupOrderMethod),
                 GroupSortingFunction = string.IsNullOrEmpty(model.GroupSortingFunction) ?
                     defaultModel.GroupSortingFunction : StringToFunctionType(model.GroupSortingFunction),
-                GroupSortingProperty = MediaPropertyModel.FromJson(model.GroupSortingProperty),
+                GroupSortingProperty = MediaPropertyModel.FromSortJson(model.GroupSortingProperty),
                 CollapsedGroups = (model.CollapsedGroups ?? []).Where(x => !string.IsNullOrEmpty(x)).Select(x => x!).ToFrozenSet(),
                 ViewType = string.IsNullOrEmpty(model.ViewType) ?
                     defaultModel.ViewType : StringToViewType(model.ViewType),
