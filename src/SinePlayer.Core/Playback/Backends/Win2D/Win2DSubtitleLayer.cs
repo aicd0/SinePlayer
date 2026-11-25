@@ -249,7 +249,6 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         float margin = height * MarginFraction;
         float gap = fontSize * StackGapFraction;
         SubtitleArea safe = SafeAreaOf(presentation, scale, width, height);
-        SubtitleArea output = OutputAreaOf(presentation, width, height);
 
         // How much of each band is taken, by the alignment's row: bottom, middle, top. Several events can be up at once —
         // the same speaker's two lines, or a sign beside dialogue — and they share a band far more often than not. Each is
@@ -275,7 +274,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         {
             if (cue.Image is { } image)
             {
-                DrawImage(session, device, image, presentation, output, safe, scale);
+                DrawImage(session, device, image, presentation, safe, scale, width, height);
                 continue;
             }
 
@@ -361,7 +360,7 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
 
     #region Bitmap
 
-    private static void DrawImage(CanvasDrawingSession session, CanvasDevice device, SubtitleImage image, SubtitlePresentation presentation, SubtitleArea output, SubtitleArea safe, double scale)
+    private static void DrawImage(CanvasDrawingSession session, CanvasDevice device, SubtitleImage image, SubtitlePresentation presentation, SubtitleArea safe, double scale, int width, int height)
     {
         ISubtitleImageBuffer buffer = image.Buffer;
         if (buffer.Width <= 0 || buffer.Height <= 0)
@@ -381,14 +380,40 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             96.0f,
             CanvasAlphaMode.Premultiplied);
 
+        SubtitleArea output = OutputAreaOf(image, presentation, width, height);
         double x = output.Left + (image.Left * output.Width) + (presentation.OffsetX * scale);
         double y = output.Top + (image.Top * output.Height) + (presentation.OffsetY * scale);
         double scaledWidth = image.Width * output.Width;
         double scaledHeight = image.Height * output.Height;
 
         Vector2 kept = KeepInsideArea(new Vector2((float)x, (float)y), scaledWidth, scaledHeight, safe);
-
         session.DrawImage(bitmap, new Rect(kept.X, kept.Y, scaledWidth, scaledHeight));
+    }
+
+    private static SubtitleArea OutputAreaOf(SubtitleImage image, SubtitlePresentation presentation, int width, int height)
+    {
+        double canvasWidth = image.CanvasWidth;
+        double canvasHeight = image.CanvasHeight;
+        if (!(canvasWidth > 0.0) || !(canvasHeight > 0.0))
+        {
+            SubtitleFrame frame = presentation.Frame;
+            canvasWidth = frame.Width * width;
+            canvasHeight = frame.Height * height;
+        }
+
+        if (!(canvasWidth > 0.0) || !(canvasHeight > 0.0) || !double.IsFinite(canvasWidth) || !double.IsFinite(canvasHeight))
+        {
+            return new SubtitleArea(0.0f, 0.0f, width, height);
+        }
+
+        double scale = Math.Min(width / canvasWidth, height / canvasHeight);
+        double outputWidth = Math.Min(canvasWidth * scale, width);
+        double outputHeight = Math.Min(canvasHeight * scale, height);
+        return new SubtitleArea(
+            (float)((width - outputWidth) / 2.0),
+            (float)(height - outputHeight),
+            (float)outputWidth,
+            (float)outputHeight);
     }
 
     #endregion
@@ -476,33 +501,6 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         return new SubtitleArea(left, top, Math.Max(1.0f, width - left - right), Math.Max(1.0f, height - top - bottom));
     }
 
-    /// <summary>
-    /// The box a bitmap cue's own coordinates are read in: the picture's shape, fitted into the surface and sat on the
-    /// surface's bottom edge. The cue is authored against the picture, so reading its fractions in the surface's box
-    /// instead would scale it one axis at a time whenever the window has another shape than the picture, which is what
-    /// stretching looks like. The frame of a picture that is not bound is empty, and then the surface is the only box
-    /// there is.
-    /// </summary>
-    private static SubtitleArea OutputAreaOf(SubtitlePresentation presentation, int width, int height)
-    {
-        SubtitleFrame frame = presentation.Frame;
-        double pictureWidth = frame.Width * width;
-        double pictureHeight = frame.Height * height;
-        if (!(pictureWidth > 0.0) || !(pictureHeight > 0.0) || !double.IsFinite(pictureWidth) || !double.IsFinite(pictureHeight))
-        {
-            return new SubtitleArea(0.0f, 0.0f, width, height);
-        }
-
-        double scale = Math.Min(width / pictureWidth, height / pictureHeight);
-        double outputWidth = Math.Min(pictureWidth * scale, width);
-        double outputHeight = Math.Min(pictureHeight * scale, height);
-        return new SubtitleArea(
-            (float)((width - outputWidth) / 2.0),
-            (float)(height - outputHeight),
-            (float)outputWidth,
-            (float)outputHeight);
-    }
-
     private static int RowOf(int alignment)
     {
         return (Math.Clamp(alignment, 1, 9) - 1) / 3;
@@ -522,8 +520,6 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         using CanvasTextLayout measured = new(device, body, format, width, height);
         return Math.Max(1.0f, (float)measured.LayoutBounds.Width);
     }
-
-    private readonly record struct SubtitleArea(float Left, float Top, float Width, float Height);
 
     private static Vector2 Anchor(CanvasTextLayout layout, int row, int column, int width, int height, float margin)
     {
@@ -557,6 +553,8 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
         double maxY = Math.Max(safe.Top, safe.Top + safe.Height - height);
         return new Vector2((float)x, (float)Math.Clamp(origin.Y, (double)safe.Top, maxY));
     }
+
+    private readonly record struct SubtitleArea(float Left, float Top, float Width, float Height);
 
     #endregion
 }

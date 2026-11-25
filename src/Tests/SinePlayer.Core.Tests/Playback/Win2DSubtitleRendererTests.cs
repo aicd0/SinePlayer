@@ -919,9 +919,10 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>
-    /// A bitmap cue is scaled by the picture, not by the surface: its fractions are read in a box of the picture's shape,
-    /// fitted into the surface and sitting on its bottom edge. Read in the surface's box instead, the same cue in a window
-    /// of another shape than the picture is scaled one axis at a time, which is what stretching is.
+    /// A decoder that does not name its canvas leaves the picture as the only box there is, and the cue is scaled by that
+    /// box rather than by the surface: its fractions are read in a box of the picture's shape, fitted into the surface and
+    /// sitting on its bottom edge. Read in the surface's box instead, the same cue in a window of another shape than the
+    /// picture is scaled one axis at a time, which is what stretching is.
     /// </summary>
     [Test]
     public void FitsABitmapCueToThePictureAndSitsItOnTheSurfacesBottom()
@@ -1023,6 +1024,63 @@ public class Win2DSubtitleRendererTests
             {
                 Assert.That(left, Is.EqualTo(100).Within(2), "the cue keeps the place its fractions name, centred on the region");
                 Assert.That(right, Is.EqualTo(299).Within(2), "and reaches past both of its edges");
+            }
+        }
+        finally
+        {
+            target?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A bitmap cue's fractions are read in the canvas the decoder names, not in the picture it is shown over: a scope
+    /// picture cut out of a 16:9 disc keeps the 16:9 plane its words were drawn in, and reading them in the picture's box
+    /// would scale the cue one axis at a time — 1.34 times too wide for The Return of the King's disc. The canvas is
+    /// fitted into the surface and sat on its bottom edge, as the picture's own box is when no canvas is named.
+    /// </summary>
+    [Test]
+    public void ReadsABitmapCueInTheCanvasTheDecoderNamesRatherThanInThePicture()
+    {
+        CanvasRenderTarget? target = null;
+        try
+        {
+            CanvasDevice device;
+            try
+            {
+                device = EnsureDetachedDevice();
+            }
+            catch (Exception exception)
+            {
+                Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+                return;
+            }
+
+            const int width = 400;
+            const int height = 400;
+            target = new CanvasRenderTarget(device, width, height, 96.0f);
+
+            // A picture of 400 × 268 in the middle of the square, and the 1920 × 1080 plane its words were authored in.
+            SubtitlePresentation presentation = SubtitlePresentation.Identity with
+            {
+                Frame = new SubtitleFrame(0.0, 0.165, 1.0, 0.67),
+            };
+
+            // The middle half of the bottom half of the canvas: 200 × 112.5, on the surface's bottom edge.
+            using SubtitleCue cue = BitmapCue(left: 0.25, top: 0.5, imageWidth: 0.5, imageHeight: 0.5, canvasWidth: 1920, canvasHeight: 1080);
+
+            using (CanvasDrawingSession session = target.CreateDrawingSession())
+            {
+                session.Clear(default(Color));
+                Win2DSubtitleLayer.DrawCues(session, device, (List<SubtitleCue>)[cue], presentation, width, height);
+            }
+
+            (int left, int top, int right, int bottom) = InkBounds(target.GetPixelBytes(), width, height);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(right - left + 1, Is.EqualTo(200).Within(3), "the cue is half the canvas's width");
+                Assert.That(bottom - top + 1, Is.EqualTo(113).Within(3), "and half its height — not half the picture's, which would be 134");
+                Assert.That(bottom, Is.EqualTo(height - 1).Within(2), "the canvas sits on the surface's bottom edge");
             }
         }
         finally
@@ -1273,8 +1331,11 @@ public class Win2DSubtitleRendererTests
         Assert.That(shrunk.IsSuccessful, Is.True, shrunk.Message);
     }
 
-    /// <summary>A cue carrying a small opaque image, positioned and sized as fractions of the frame.</summary>
-    private static SubtitleCue BitmapCue(double left, double top, double imageWidth, double imageHeight)
+    /// <summary>
+    /// A cue carrying a small opaque image, positioned and sized as fractions of the canvas the decoder names — the
+    /// picture's own box when it names none, which is the fallback these most of the drawing here is checked against.
+    /// </summary>
+    private static SubtitleCue BitmapCue(double left, double top, double imageWidth, double imageHeight, int canvasWidth = 0, int canvasHeight = 0)
     {
         return new SubtitleCue
         {
@@ -1283,6 +1344,8 @@ public class Win2DSubtitleRendererTests
             Image = new SubtitleImage
             {
                 Buffer = FakeImage.Create(4, 2),
+                CanvasWidth = canvasWidth,
+                CanvasHeight = canvasHeight,
                 Left = left,
                 Top = top,
                 Width = imageWidth,
