@@ -723,6 +723,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="ImageInterpolationNearestNeighbor" xml:space="preserve">
     <value>最近傍</value>
   </data>
+  <data name="ImageMemoryCacheCapacity" xml:space="preserve">
+    <value>画像メモリキャッシュの容量</value>
+  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>彩度</value>
   </data>

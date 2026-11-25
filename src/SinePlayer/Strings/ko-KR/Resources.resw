@@ -723,6 +723,9 @@ NOT                  - 논리 부정(NOT). 예: NOT %tag = "SomeTag"
   <data name="ImageInterpolationNearestNeighbor" xml:space="preserve">
     <value>최근접</value>
   </data>
+  <data name="ImageMemoryCacheCapacity" xml:space="preserve">
+    <value>이미지 메모리 캐시 용량</value>
+  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>채도</value>
   </data>

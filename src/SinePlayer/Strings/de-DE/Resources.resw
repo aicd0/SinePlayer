@@ -723,6 +723,9 @@ Die Auswertung erfolgt in dieser Reihenfolge:
   <data name="ImageInterpolationNearestNeighbor" xml:space="preserve">
     <value>Nächster Nachbar</value>
   </data>
+  <data name="ImageMemoryCacheCapacity" xml:space="preserve">
+    <value>Arbeitsspeicher-Cachekapazität für Bilder</value>
+  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Sättigung</value>
   </data>

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 using SinePlayer.Common.Localization;
 using SinePlayer.Core.Common.Utils;
+using SinePlayer.Core.Imaging;
 using SinePlayer.Data.Models.Misc;
 
 namespace SinePlayer.Views.Pages.Settings;
@@ -14,6 +15,7 @@ namespace SinePlayer.Views.Pages.Settings;
 internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
 {
     private const string TAG = nameof(GeneralSettingsViewModel);
+    private const long MEGABYTE = 1024L * 1024L;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -105,6 +107,17 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private int _imageMemoryCacheCapacity = 0;
+    public int ImageMemoryCacheCapacity
+    {
+        get => _imageMemoryCacheCapacity;
+        set
+        {
+            _imageMemoryCacheCapacity = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ImageMemoryCacheCapacity)));
+        }
+    }
+
     public void Initialize(SettingsSharedViewModel shared)
     {
         Shared = shared;
@@ -116,7 +129,22 @@ internal partial class GeneralSettingsViewModel : INotifyPropertyChanged
         UpdateCloseLastTabBehavior();
         UpdateOpenItemDefaultBahevior();
         RestoreWindowState = AppSettingsModel.RestoreWindowState;
+        ImageMemoryCacheCapacity = (int)(AppSettingsModel.ImageMemoryCacheCapacity / MEGABYTE);
         CoroutineUtils.Run(UpdateHistory);
+    }
+
+    public void SetImageMemoryCacheCapacity(int megabytes)
+    {
+        if (megabytes == ImageMemoryCacheCapacity)
+        {
+            return;
+        }
+
+        ImageMemoryCacheCapacity = megabytes;
+
+        long bytes = megabytes * MEGABYTE;
+        AppSettingsModel.ImageMemoryCacheCapacity = bytes;
+        ImageLoader.SetMemoryCacheCapacity(bytes);
     }
 
     private void UpdateCloseLastTabBehavior()
