@@ -9,8 +9,11 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 
 using SinePlayer.Common.BaseUI;
+using SinePlayer.Common.Constants;
 using SinePlayer.Common.HotKey;
 using SinePlayer.Common.Utils;
+using SinePlayer.Core.Common.Utils;
+using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Playback;
 
 namespace SinePlayer.Views.Pages.Player;
@@ -54,8 +57,10 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
     public event FullscreenRequestedEventHandler? FullscreenRequested;
 
     private long _durationMs = 0;
+    private long _positionMs = 0;
     private bool _isMuted = false;
     private bool _isPinned = false;
+    private bool _isCountdown = false;
     private RepeatMode _repeatMode = RepeatMode.Off;
 
     private bool _isUpdatingVolumeSlider = false;
@@ -69,9 +74,11 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
     {
         InitializeComponent();
 
-        SeekSlider.AddHandler(PointerPressedEvent, new PointerEventHandler(OnSeekSliderPointerPressed), true);
-        SeekSlider.AddHandler(PointerReleasedEvent, new PointerEventHandler(OnSeekSliderPointerReleased), true);
-        SeekSlider.AddHandler(PointerCaptureLostEvent, new PointerEventHandler(OnSeekSliderPointerCaptureLost), true);
+        _isCountdown = AppDB.MainRegistry.CreateKey(RegistryNames.STATE).GetValueOrDefault(RegistryNames.StateKey.PLAYER_POSITION_COUNTDOWN, false);
+
+        SeekSlider.AddHandler(PointerPressedEvent, new PointerEventHandler(SeekSlider_PointerPressed), true);
+        SeekSlider.AddHandler(PointerReleasedEvent, new PointerEventHandler(SeekSlider_PointerReleased), true);
+        SeekSlider.AddHandler(PointerCaptureLostEvent, new PointerEventHandler(SeekSlider_PointerCaptureLost), true);
     }
 
     public void SetPlaying(bool isPlaying)
@@ -206,58 +213,58 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
         MuteIcon.Glyph = glyph;
     }
 
-    private void OnPreviousClick(object sender, RoutedEventArgs e)
+    private void PreviousButton_Click(object sender, RoutedEventArgs e)
     {
         PreviousRequested?.Invoke();
     }
 
-    private void OnPlayPauseClick(object sender, RoutedEventArgs e)
+    private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
     {
         PlayPauseRequested?.Invoke();
     }
 
-    private void OnNextClick(object sender, RoutedEventArgs e)
+    private void NextButton_Click(object sender, RoutedEventArgs e)
     {
         NextRequested?.Invoke();
     }
 
-    private void OnPlayQueueClick(object sender, RoutedEventArgs e)
+    private void PlayQueueButton_Click(object sender, RoutedEventArgs e)
     {
         PlayQueueRequested?.Invoke();
     }
 
-    private void OnRepeatClick(object sender, RoutedEventArgs e)
+    private void RepeatButton_Click(object sender, RoutedEventArgs e)
     {
         RepeatRequested?.Invoke();
     }
 
-    private void OnShuffleClick(object sender, RoutedEventArgs e)
+    private void ShuffleButton_Click(object sender, RoutedEventArgs e)
     {
         ShuffleRequested?.Invoke();
     }
 
-    private void OnMoreClick(object sender, RoutedEventArgs e)
+    private void MoreButton_Click(object sender, RoutedEventArgs e)
     {
         MoreRequested?.Invoke(MoreButton);
     }
 
-    private void OnMuteClick(object sender, RoutedEventArgs e)
+    private void MuteButton_Click(object sender, RoutedEventArgs e)
     {
         SetMuted(!_isMuted);
         MuteChanged?.Invoke(_isMuted);
     }
 
-    private void OnPinClick(object sender, RoutedEventArgs e)
+    private void PinButton_Click(object sender, RoutedEventArgs e)
     {
         PinRequested?.Invoke();
     }
 
-    private void OnFullscreenClick(object sender, RoutedEventArgs e)
+    private void FullscreenButton_Click(object sender, RoutedEventArgs e)
     {
         FullscreenRequested?.Invoke();
     }
 
-    private void OnSeekValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    private void SeekSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
         UpdatePositionText((long)Math.Round(e.NewValue * 1000.0));
         if (_isUpdatingSeekSlider || _isSeekDragging)
@@ -268,7 +275,7 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
         SeekRequested?.Invoke((long)Math.Round(e.NewValue * 1000.0));
     }
 
-    private void OnVolumeValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    private void VolumeSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
         if (_isUpdatingVolumeSlider)
         {
@@ -285,18 +292,18 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
         VolumeChanged?.Invoke(volume);
     }
 
-    private void OnSeekSliderPointerPressed(object sender, PointerRoutedEventArgs e)
+    private void SeekSlider_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         _seekValueAtPressMs = (long)Math.Round(SeekSlider.Value * 1000.0);
         _isSeekDragging = true;
     }
 
-    private void OnSeekSliderPointerReleased(object sender, PointerRoutedEventArgs e)
+    private void SeekSlider_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
         EndSeekDrag();
     }
 
-    private void OnSeekSliderPointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    private void SeekSlider_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
     {
         EndSeekDrag();
     }
@@ -317,8 +324,18 @@ internal sealed partial class PlayerTransportBar : BaseUserControl
         }
     }
 
+    private void PositionTextBlock_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        _isCountdown = !_isCountdown;
+        UpdatePositionText(_positionMs);
+        AppDB.MainRegistry.CreateKey(RegistryNames.STATE).Set(RegistryNames.StateKey.PLAYER_POSITION_COUNTDOWN, _isCountdown);
+    }
+
     private void UpdatePositionText(long positionMs)
     {
-        PositionTextBlock.Text = $"{StringUtils.FormatTime(positionMs)} / {StringUtils.FormatTime(_durationMs)}";
+        _positionMs = positionMs;
+
+        long displayPositionMs = _isCountdown ? _durationMs - Math.Clamp(positionMs, 0, Math.Max(_durationMs, 0)) : positionMs;
+        PositionTextBlock.Text = $"{StringUtils.FormatTime(displayPositionMs)} / {StringUtils.FormatTime(_durationMs)}";
     }
 }
