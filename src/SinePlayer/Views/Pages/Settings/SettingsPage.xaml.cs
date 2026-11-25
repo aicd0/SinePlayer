@@ -8,6 +8,7 @@ using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
+using Microsoft.UI.Xaml.Input;
 
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
@@ -105,6 +106,11 @@ internal sealed partial class SettingsPage : BasePage
     //
     // Events
     //
+
+    private void RootGrid_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        Focus(FocusState.Programmatic);
+    }
 
     private void OnSendFeedbackButtonClicked(object sender, RoutedEventArgs e)
     {
