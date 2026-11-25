@@ -266,6 +266,7 @@ public class StringResourceProvider
     public string PanUp => GetResourceString("PanUp");
     public string PanX => GetResourceString("PanX");
     public string PanY => GetResourceString("PanY");
+    public string Paste => GetResourceString("Paste");
     public string Pause => GetResourceString("Pause");
     public string PauseOnLeaveTab => GetResourceString("PauseOnLeaveTab");
     public string PictureLag => GetResourceString("PictureLag");

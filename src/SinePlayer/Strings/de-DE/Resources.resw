@@ -997,6 +997,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="PanY" xml:space="preserve">
     <value>Y-Verschiebung</value>
   </data>
+  <data name="Paste" xml:space="preserve">
+    <value>Einfügen</value>
+  </data>
   <data name="Pause" xml:space="preserve">
     <value>Pause</value>
   </data>

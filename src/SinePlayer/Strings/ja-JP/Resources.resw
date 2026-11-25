@@ -997,6 +997,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   <data name="PanY" xml:space="preserve">
     <value>Y 移動</value>
   </data>
+  <data name="Paste" xml:space="preserve">
+    <value>貼り付け</value>
+  </data>
   <data name="Pause" xml:space="preserve">
     <value>一時停止</value>
   </data>
