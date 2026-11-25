@@ -262,6 +262,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
             buttons.Add(new() { Tag = StringResourceProvider.Instance.Title1, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_TITLE1}") });
             buttons.Add(new() { Tag = StringResourceProvider.Instance.Title2, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_TITLE2}") });
             buttons.Add(new() { Tag = StringResourceProvider.Instance.Duration, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_DURATION}") });
+            buttons.Add(new() { Tag = StringResourceProvider.Instance.ReleaseDate, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_RELEASE_DATE}") });
             buttons.Add(new() { Tag = StringResourceProvider.Instance.Tag, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_TAG}") });
             buttons.Add(new() { Tag = StringResourceProvider.Instance.Hidden, OnClicked = () => OnClickButton($"%{MediaSQLProviderUtils.VAR_HIDDEN}") });
 

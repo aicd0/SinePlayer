@@ -9,7 +9,7 @@ internal static class DatabaseUpgradeManager
     {
         int version = DatabaseVersionModel.Version;
 
-        if (version == DatabaseVersionModel.VERSION)
+        if (version >= DatabaseVersionModel.VERSION)
         {
             return;
         }
@@ -25,6 +25,6 @@ internal static class DatabaseUpgradeManager
 
     public static void UpgradeDatabaseAfterInitialization()
     {
-        SqliteDB.UpgradeDatabase(DatabaseVersionModel.SqliteSchemeVersion);
+        SqliteDB.UpgradeDatabase();
     }
 }

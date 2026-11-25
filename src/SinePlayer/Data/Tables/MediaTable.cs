@@ -24,17 +24,12 @@ internal class MediaTable : ITable
     public static StringColumn ColumnDescription { get; } = new("description");
     public static Int32Column ColumnCompletionStatus { get; } = new("completion_status");
     public static Int64Column ColumnDurationMs { get; } = new("duration_ms");
+    public static StringColumn ColumnReleaseDate { get; } = new("release_date");
     public static StringColumn ColumnExt { get; } = new("ext");
 
     private MediaTable() { }
 
-    public SqlDatabase GetDatabase()
-    {
-        return SqliteDB.MediaDatabase;
-    }
+    public SqlDatabase Database => SqliteDB.MediaDatabase;
 
-    public string GetTableName()
-    {
-        return "media";
-    }
+    public string TableName => "media";
 }

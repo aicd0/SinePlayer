@@ -31,6 +31,7 @@ internal class MediaPropertyModel
     private const string PROP_TYPE_COMPLETION_STATUS = "CompletionState";
     private const string PROP_TYPE_LAST_VISIT_TIME = "LastVisitTime";
     private const string PROP_TYPE_DURATION = "Duration";
+    private const string PROP_TYPE_RELEASE_DATE = "ReleaseDate";
     private const string PROP_TYPE_PLUGIN_VIRTUAL_PROPERTY = "PluginVirtualProperty";
 
     private static readonly List<PropertyTypeEnum> _properties = [
@@ -40,6 +41,7 @@ internal class MediaPropertyModel
         PropertyTypeEnum.CompletionStatus,
         PropertyTypeEnum.LastVisitTime,
         PropertyTypeEnum.Duration,
+        PropertyTypeEnum.ReleaseDate,
     ];
 
     private PropertyTypeEnum Type { get; init; } = PropertyTypeEnum.Title;
@@ -70,6 +72,7 @@ internal class MediaPropertyModel
                 PropertyTypeEnum.CompletionStatus => StringResourceProvider.Instance.CompletionStatus,
                 PropertyTypeEnum.LastVisitTime => StringResourceProvider.Instance.LastVisitTime,
                 PropertyTypeEnum.Duration => StringResourceProvider.Instance.Duration,
+                PropertyTypeEnum.ReleaseDate => StringResourceProvider.Instance.ReleaseDate,
                 _ => string.Empty,
             };
         }
@@ -219,6 +222,7 @@ internal class MediaPropertyModel
             PropertyTypeEnum.CompletionStatus => CreateSorter(x => CompletionStateToComparable(x.CompletionStatus)),
             PropertyTypeEnum.LastVisitTime => CreateSorter(x => x.LastVisit.Ticks),
             PropertyTypeEnum.Duration => CreateSorter(x => x.DurationMs),
+            PropertyTypeEnum.ReleaseDate => CreateSorter(x => x.ReleaseDate),
             PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertySorter(),
             _ => CreateFallbackSorter(),
         };
@@ -335,6 +339,16 @@ internal class MediaPropertyModel
             return lastReadTime.ToString("D", EnvironmentProvider.Instance.GetCurrentAppLanguageInfo());
         }
 
+        string GetReleaseDateGroupName(MediaModel media)
+        {
+            if (media.ReleaseDate is not { } releaseDate)
+            {
+                return StringResourceProvider.Instance.Ungrouped;
+            }
+
+            return releaseDate.Year.ToString(EnvironmentProvider.Instance.GetCurrentAppLanguageInfo());
+        }
+
         IGroupSorter<MediaGroup, string> CreateSorter<T>(Func<MediaGroup, T> keySelector, Func<T, string>? keyInfoConverter = null, IComparer<T>? keyComparer = null)
         {
             return new BasicGroupSorter<MediaGroup, T>(orderMethod, keySelector, keyInfoConverter, keyComparer);
@@ -377,6 +391,7 @@ internal class MediaPropertyModel
                 PropertyTypeEnum.CompletionStatus => CreateSorter(x => GetCompletionStatusGroupSortingKey(x.Items[0])),
                 PropertyTypeEnum.LastVisitTime => CreateSorter(x => x.Items[0].LastVisit.Ticks),
                 PropertyTypeEnum.Duration => CreateSorter(x => x.Items[0].DurationMs),
+                PropertyTypeEnum.ReleaseDate => CreateSorter(x => x.Items[0].ReleaseDate?.Year ?? int.MinValue),
                 PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertySorter(),
                 _ => CreateFallbackSorter(),
             };
@@ -415,6 +430,7 @@ internal class MediaPropertyModel
             PropertyTypeEnum.CompletionStatus => CreateGrouper(x => (List<string>)[GetCompletionStatusGroupName(x)]),
             PropertyTypeEnum.LastVisitTime => CreateGrouper(x => (List<string>)[GetLastReadTimeGroupName(x)]),
             PropertyTypeEnum.Duration => CreateGrouper(x => (List<string>)[GetDurationGroupName(x)]),
+            PropertyTypeEnum.ReleaseDate => CreateGrouper(x => (List<string>)[GetReleaseDateGroupName(x)]),
             PropertyTypeEnum.PluginVirtualProperty => CreatePluginPropertyGrouper(),
             _ => CreateFallbackGrouper(),
         };
@@ -445,6 +461,7 @@ internal class MediaPropertyModel
                 PropertyTypeEnum.CompletionStatus => (int)media.CompletionStatus,
                 PropertyTypeEnum.LastVisitTime => media.LastVisit != DateTimeOffset.MinValue ? media.LastVisit.ToUnixTimeMilliseconds() : null,
                 PropertyTypeEnum.Duration => media.DurationMs > 0 ? media.DurationMs : null,
+                PropertyTypeEnum.ReleaseDate => media.ReleaseDate is { } releaseDate ? (releaseDate - DateTime.UnixEpoch).TotalMilliseconds : null,
                 PropertyTypeEnum.PluginVirtualProperty => sortingPropertyPluginSorter?.AsNumber(media),
                 _ => null,
             };
@@ -553,6 +570,7 @@ internal class MediaPropertyModel
             PropertyTypeEnum.CompletionStatus => PROP_TYPE_COMPLETION_STATUS,
             PropertyTypeEnum.LastVisitTime => PROP_TYPE_LAST_VISIT_TIME,
             PropertyTypeEnum.Duration => PROP_TYPE_DURATION,
+            PropertyTypeEnum.ReleaseDate => PROP_TYPE_RELEASE_DATE,
             PropertyTypeEnum.PluginVirtualProperty => PROP_TYPE_PLUGIN_VIRTUAL_PROPERTY,
             _ => PROP_TYPE_TITLE,
         };
@@ -574,6 +592,7 @@ internal class MediaPropertyModel
             PROP_TYPE_COMPLETION_STATUS => PropertyTypeEnum.CompletionStatus,
             PROP_TYPE_LAST_VISIT_TIME => PropertyTypeEnum.LastVisitTime,
             PROP_TYPE_DURATION => PropertyTypeEnum.Duration,
+            PROP_TYPE_RELEASE_DATE => PropertyTypeEnum.ReleaseDate,
             PROP_TYPE_PLUGIN_VIRTUAL_PROPERTY => PropertyTypeEnum.PluginVirtualProperty,
             _ => PropertyTypeEnum.Title,
         };
@@ -595,6 +614,7 @@ internal class MediaPropertyModel
         Title,
         LastVisitTime,
         Duration,
+        ReleaseDate,
         PluginVirtualProperty,
     }
 

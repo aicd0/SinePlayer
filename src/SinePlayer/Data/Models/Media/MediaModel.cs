@@ -1261,6 +1261,7 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     public string Description => _internalModel.Description;
     public CompletionStatusEnum CompletionStatus => _internalModel.CompletionStatus;
     public long DurationMs => _internalModel.DurationMs;
+    public DateTime? ReleaseDate => _internalModel.ReleaseDate;
     public IReadOnlyList<string> FolderViewPath => _internalModel.GetFolderViewPath();
     public Dictionary<string, HashSet<string>> TagsCopy => _internalModel.Tags.ToDictionary(p => p.Key, p => p.Value.Tags.ToHashSet());
 
@@ -1447,6 +1448,17 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
         DispatchUpdateEvent((List<long>)[Id]);
     }
 
+    public async Task SetReleaseDate(DateTime? releaseDate)
+    {
+        if (ReleaseDate == releaseDate)
+        {
+            return;
+        }
+
+        await _internalModel.SetReleaseDate(releaseDate);
+        DispatchUpdateEvent((List<long>)[Id]);
+    }
+
     //
     // Helpers
     //
@@ -1479,6 +1491,8 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     string SDK.Plugins.Media.IMediaModel.Description => Description;
 
     int SDK.Plugins.Media.IMediaModel.Rating => Rating;
+
+    DateTime? SDK.Plugins.Media.IMediaModel.ReleaseDate => ReleaseDate;
 
     IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory> SDK.Plugins.Media.IMediaModel.Tags => _internalModel.TagsForPlugin;
 
@@ -1527,6 +1541,11 @@ internal sealed partial class MediaModel : IEquatable<MediaModel>, SDK.Plugins.M
     Task SDK.Plugins.Media.IMediaModel.SetRating(int rating)
     {
         return SetRating(rating);
+    }
+
+    Task SDK.Plugins.Media.IMediaModel.SetReleaseDate(DateTime? releaseDate)
+    {
+        return SetReleaseDate(releaseDate);
     }
 
     Task SDK.Plugins.Media.IMediaModel.SetTags<T>(IEnumerable<KeyValuePair<string, T>> tags)

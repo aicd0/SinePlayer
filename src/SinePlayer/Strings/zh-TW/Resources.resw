@@ -511,51 +511,6 @@
   <data name="ExpressionOr" xml:space="preserve">
     <value>或</value>
   </data>
-  <data name="ExpressionReference" xml:space="preserve">
-    <value>運算式參考
-
-1. 變數
-
-%tag                 - 標籤。
-%title               - 標題 1 或標題 2。
-%title1              - 標題 1。
-%title2              - 標題 2。
-%rating              - 評分。例如，100 代表 5 顆星，-1 代表沒有評分。
-%completion_status   - 完成狀態。
-%progress            - 進度百分比。例如，50 代表 50%。
-%duration            - 總時長，單位為毫秒。
-
-2. 變數運算子
-
-=                    - 等於。例如：%title = "標題內容"
-&gt;                    - 大於。例如：%rating &gt; 3
-&gt;=                   - 大於或等於。
-&lt;                    - 小於。
-&lt;=                   - 小於或等於。
-... IN (...)         - 屬於指定集合。例如：
-                       %rating in (3, 4, 5) - 符合評分為 3、4 或 5 的項目。
-                       %tag.language in (A, B) - 符合 "language" 標籤類別中包含 "A" 或 "B" 的項目。
-                       (A, B) in %tag.artists - 符合 "artists" 標籤類別中同時包含 "A" 和 "B" 的項目。
-                       "apple" in %tag - 符合包含 "apple" 標籤的項目。
-
-3. 邏輯運算子
-
-AND                  - 邏輯 AND（且）。例如：%tag.artists = A AND %title = "標題內容"
-OR                   - 邏輯 OR（或）。例如：%title1 = "標題 1" OR %title2 = "標題 2"
-NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
-
-4. 括號
-
-預設情況下，運算子會由左至右依序計算。使用 (...) 可提高括號內運算式的優先順序。例如：
-
-    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
-
-計算順序如下：
-
-    1. NOT %tag.lang = langB  ==&gt;  結果1
-    2. %tag.language = langA OR 結果1  ==&gt;  結果2
-    3. %tag.artists = abc AND 結果2  ==&gt;  結果3</value>
-  </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>表達式</value>
   </data>
@@ -1108,6 +1063,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   </data>
   <data name="RefreshRandomSeed" xml:space="preserve">
     <value>刷新隨機種子</value>
+  </data>
+  <data name="ReleaseDate" xml:space="preserve">
+    <value>發行日期</value>
   </data>
   <data name="Remove" xml:space="preserve">
     <value>移除</value>

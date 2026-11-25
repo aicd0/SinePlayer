@@ -9,6 +9,7 @@ using System.Linq;
 
 using SinePlayer.Common.Actions;
 using SinePlayer.Common.Localization;
+using SinePlayer.Core.Common.AppEnvironment;
 using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
@@ -86,7 +87,17 @@ internal partial class MediaInfoPageViewModel : INotifyPropertyChanged
         {
             _mediaTitle2 = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MediaTitle2)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMediaTitle2Visible)));
+        }
+    }
+
+    private string _releaseDateText = string.Empty;
+    public string ReleaseDateText
+    {
+        get => _releaseDateText;
+        set
+        {
+            _releaseDateText = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ReleaseDateText)));
         }
     }
 
@@ -138,7 +149,6 @@ internal partial class MediaInfoPageViewModel : INotifyPropertyChanged
     public MediaModel? Media => _selectedMedia;
     public PlayQueueModel PlayQueue { get; set; } = PlayQueueModel.CreateEmpty();
     public PlaybackModel? Playback { get; set; }
-    public bool IsMediaTitle2Visible => MediaTitle2.Length > 0;
     public bool IsCoverImageVisible => !string.IsNullOrEmpty(CoverImageUri);
     public ObservableCollection<MediaModel> Targets { get; } = [];
     public ObservableCollection<TagCollectionViewModel> MediaTags { get; } = [];
@@ -343,6 +353,10 @@ internal partial class MediaInfoPageViewModel : INotifyPropertyChanged
             MediaTitle1 = media.Title1;
             MediaTitle2 = media.Title2;
         }
+
+        ReleaseDateText = media.ReleaseDate is { } releaseDate ?
+            releaseDate.ToString("d", EnvironmentProvider.Instance.GetCurrentAppLanguageInfo()) :
+            string.Empty;
 
         MediaDescriptionLiveData.Emit(media.Description);
 

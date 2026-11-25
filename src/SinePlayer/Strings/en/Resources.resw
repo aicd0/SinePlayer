@@ -513,51 +513,6 @@ Category:: Tag1, Tag2    - Overwrite "Category" with "Tag1" and "Tag2".</value>
   <data name="ExpressionOr" xml:space="preserve">
     <value>Or</value>
   </data>
-  <data name="ExpressionReference" xml:space="preserve">
-    <value>Expression Reference
-
-1. Variables
-
-%tag                 - Tags.
-%title               - Title 1 or Title 2.
-%title1              - Title 1.
-%title2              - Title 2.
-%rating              - Rating. For example, 100 represents 5 stars, and -1 means no rating.
-%completion_status   - Completion status.
-%progress            - Progress, as a percentage. For example, 50 represents 50%.
-%duration            - Total duration in milliseconds.
-
-2. Variable Operators
-
-=                    - Equal to. For example: %title = "Here's the title"
-&gt;                    - Greater than. For example: %rating &gt; 3
-&gt;=                   - Greater than or equal to.
-&lt;                    - Less than.
-&lt;=                   - Less than or equal to.
-... IN (...)         - Is contained in. For example:
-                       %rating in (3, 4, 5) - Matches items whose ratings are 3, 4, or 5.
-                       %tag.language in (A, B) - Matches items whose "language" tag category contains "A" or "B".
-                       (A, B) in %tag.artists - Matches items whose "artists" tag category contains both "A" and "B".
-                       "apple" in %tag - Matches items that contain the "apple" tag.
-
-3. Logical Operators
-
-AND                  - Logical AND. For example: %tag.artists = A AND %title = "Here's the title"
-OR                   - Logical OR. For example: %title1 = "Here's title 1" OR %title2 = "Here's title 2"
-NOT                  - Logical NOT. For example: NOT %tag = "SomeTag"
-
-4. Parentheses
-
-By default, operators are evaluated from left to right. Use (...) to give the enclosed expression higher precedence. For example:
-
-    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
-
-The expression will be evaluated in the following order:
-
-    1. NOT %tag.lang = langB  ==&gt;  Result1
-    2. %tag.language = langA OR Result1  ==&gt;  Result2
-    3. %tag.artists = abc AND Result2  ==&gt;  Result3</value>
-  </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>Expression</value>
   </data>
@@ -1110,6 +1065,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="RefreshRandomSeed" xml:space="preserve">
     <value>Refresh random seed</value>
+  </data>
+  <data name="ReleaseDate" xml:space="preserve">
+    <value>Release date</value>
   </data>
   <data name="Remove" xml:space="preserve">
     <value>Remove</value>

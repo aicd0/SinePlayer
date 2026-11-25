@@ -5,7 +5,7 @@ namespace SinePlayer.Core.Database.SqlHelpers;
 
 public interface ITable
 {
-    SqlDatabase GetDatabase();
+    SqlDatabase Database { get; }
 
-    string GetTableName();
+    string TableName { get; }
 }

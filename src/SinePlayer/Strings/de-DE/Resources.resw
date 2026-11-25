@@ -513,51 +513,6 @@ Kategorie:: Tag1, Tag2    - Überschreibe „Kategorie“ mit „Tag1“ und „
   <data name="ExpressionOr" xml:space="preserve">
     <value>Oder</value>
   </data>
-  <data name="ExpressionReference" xml:space="preserve">
-    <value>Referenz für Ausdrücke
-
-1. Variablen
-
-%tag                 - Tags.
-%title               - Titel 1 oder Titel 2.
-%title1              - Titel 1.
-%title2              - Titel 2.
-%rating              - Bewertung. Beispiel: 100 entspricht 5 Sternen, -1 bedeutet keine Bewertung.
-%completion_status   - Abschlussstatus.
-%progress            - Fortschritt in Prozent. Beispiel: 50 entspricht 50 %.
-%duration            - Gesamtdauer in Millisekunden.
-
-2. Variablenoperatoren
-
-=                    - Gleich. Beispiel: %title = "Hier steht der Titel"
-&gt;                    - Größer als. Beispiel: %rating &gt; 3
-&gt;=                   - Größer als oder gleich.
-&lt;                    - Kleiner als.
-&lt;=                   - Kleiner als oder gleich.
-... IN (...)         - Ist enthalten in. Beispiel:
-                       %rating in (3, 4, 5) - Entspricht Elementen mit den Bewertungen 3, 4 oder 5.
-                       %tag.language in (A, B) - Entspricht Elementen, deren Tag-Kategorie "language" "A" oder "B" enthält.
-                       (A, B) in %tag.artists - Entspricht Elementen, deren Tag-Kategorie "artists" sowohl "A" als auch "B" enthält.
-                       "apple" in %tag - Entspricht Elementen mit dem Tag "apple".
-
-3. Logische Operatoren
-
-AND                  - Logisches UND. Beispiel: %tag.artists = A AND %title = "Hier steht der Titel"
-OR                   - Logisches ODER. Beispiel: %title1 = "Hier steht Titel 1" OR %title2 = "Hier steht Titel 2"
-NOT                  - Logisches NICHT. Beispiel: NOT %tag = "SomeTag"
-
-4. Klammern
-
-Standardmäßig werden Operatoren von links nach rechts ausgewertet. Mit (...) können Sie die Priorität des eingeschlossenen Ausdrucks erhöhen. Beispiel:
-
-    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
-
-Die Auswertung erfolgt in dieser Reihenfolge:
-
-    1. NOT %tag.lang = langB  ==&gt;  Ergebnis1
-    2. %tag.language = langA OR Ergebnis1  ==&gt;  Ergebnis2
-    3. %tag.artists = abc AND Ergebnis2  ==&gt;  Ergebnis3</value>
-  </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>Ausdruck</value>
   </data>
@@ -1110,6 +1065,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   </data>
   <data name="RefreshRandomSeed" xml:space="preserve">
     <value>Zufallssamen aktualisieren</value>
+  </data>
+  <data name="ReleaseDate" xml:space="preserve">
+    <value>Veröffentlichungsdatum</value>
   </data>
   <data name="Remove" xml:space="preserve">
     <value>Entfernen</value>

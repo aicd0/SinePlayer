@@ -16,13 +16,7 @@ internal class MediaHistoryTable : ITable
 
     private MediaHistoryTable() { }
 
-    public SqlDatabase GetDatabase()
-    {
-        return SqliteDB.MiscDatabase;
-    }
+    public SqlDatabase Database => SqliteDB.MiscDatabase;
 
-    public string GetTableName()
-    {
-        return "media_history";
-    }
+    public string TableName => "media_history";
 }

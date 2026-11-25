@@ -19,6 +19,8 @@ public interface IMediaModel
 
     int Rating { get; }
 
+    DateTime? ReleaseDate { get; }
+
     IReadOnlyDictionary<string, IMediaTagCategory> Tags { get; }
 
     IReadOnlyDictionary<string, string> Links { get; }
@@ -34,6 +36,8 @@ public interface IMediaModel
     Task SetDescription(string description);
 
     Task SetRating(int rating);
+
+    Task SetReleaseDate(DateTime? releaseDate);
 
     Task SetTags<T>(IEnumerable<KeyValuePair<string, T>> tags) where T : IEnumerable<string>;
 

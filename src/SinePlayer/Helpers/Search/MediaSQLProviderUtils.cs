@@ -17,6 +17,7 @@ internal class MediaSQLProviderUtils
     public const string VAR_TITLE2 = "title2";
     public const string VAR_PROGRESS = "progress";
     public const string VAR_DURATION = "duration";
+    public const string VAR_RELEASE_DATE = "release_date";
     public const string VAR_HIDDEN = "hidden";
 
     public static ICondition CreateTagCondition(ICondition condition)

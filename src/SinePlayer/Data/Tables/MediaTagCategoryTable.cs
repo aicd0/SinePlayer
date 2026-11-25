@@ -16,13 +16,7 @@ internal class MediaTagCategoryTable : ITable
 
     private MediaTagCategoryTable() { }
 
-    public SqlDatabase GetDatabase()
-    {
-        return SqliteDB.MediaDatabase;
-    }
+    public SqlDatabase Database => SqliteDB.MediaDatabase;
 
-    public string GetTableName()
-    {
-        return "media_tag_category";
-    }
+    public string TableName => "media_tag_category";
 }

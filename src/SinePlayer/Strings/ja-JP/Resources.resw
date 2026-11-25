@@ -513,51 +513,6 @@ $files</value>
   <data name="ExpressionOr" xml:space="preserve">
     <value>または</value>
   </data>
-  <data name="ExpressionReference" xml:space="preserve">
-    <value>式のリファレンス
-
-1. 変数
-
-%tag                 - タグ。
-%title               - タイトル1またはタイトル2。
-%title1              - タイトル1。
-%title2              - タイトル2。
-%rating              - 評価。例：100は星5つ、-1は評価なしを表します。
-%completion_status   - 完了状態。
-%progress            - 進捗率。例：50は50%を表します。
-%duration            - 合計時間（ミリ秒）。
-
-2. 変数演算子
-
-=                    - 等しい。例：%title = "タイトル"
-&gt;                    - より大きい。例：%rating &gt; 3
-&gt;=                   - 以上。
-&lt;                    - より小さい。
-&lt;=                   - 以下。
-... IN (...)         - ～に含まれる。例：
-                       %rating in (3, 4, 5) - 評価が3、4、5の項目に一致します。
-                       %tag.language in (A, B) - "language"タグカテゴリに"A"または"B"が含まれる項目に一致します。
-                       (A, B) in %tag.artists - "artists"タグカテゴリに"A"と"B"の両方が含まれる項目に一致します。
-                       "apple" in %tag - "apple"タグを含む項目に一致します。
-
-3. 論理演算子
-
-AND                  - 論理積（AND）。例：%tag.artists = A AND %title = "タイトル"
-OR                   - 論理和（OR）。例：%title1 = "タイトル1" OR %title2 = "タイトル2"
-NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
-
-4. 括弧
-
-デフォルトでは、演算子は左から右の順に評価されます。(...)を使うと、括弧内の式が優先して評価されます。例：
-
-    %tag.artists = abc AND (%tag.language = langA OR NOT %tag.lang = langB)
-
-次の順序で評価されます。
-
-    1. NOT %tag.lang = langB  ==&gt;  結果1
-    2. %tag.language = langA OR 結果1  ==&gt;  結果2
-    3. %tag.artists = abc AND 結果2  ==&gt;  結果3</value>
-  </data>
   <data name="ExpressionTextBlock.Text" xml:space="preserve">
     <value>条件式</value>
   </data>
@@ -1110,6 +1065,9 @@ NOT                  - 否定（NOT）。例：NOT %tag = "SomeTag"
   </data>
   <data name="RefreshRandomSeed" xml:space="preserve">
     <value>乱数シードを更新</value>
+  </data>
+  <data name="ReleaseDate" xml:space="preserve">
+    <value>発売日</value>
   </data>
   <data name="Remove" xml:space="preserve">
     <value>除外</value>
