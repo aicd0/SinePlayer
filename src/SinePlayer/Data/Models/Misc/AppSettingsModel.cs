@@ -21,6 +21,7 @@ namespace SinePlayer.Data.Models.Misc;
 internal static class AppSettingsModel
 {
     private const string TAG = nameof(AppSettingsModel);
+    private const long DEFAULT_IMAGE_MEMORY_CACHE_CAPACITY = 128L * 1024 * 1024;
 
     private static readonly JsonDatabase _db = new();
 
@@ -761,6 +762,19 @@ internal static class AppSettingsModel
         }
     }
 
+    public static long ImageMemoryCacheCapacity
+    {
+        get
+        {
+            return _db.Read(model => model.ImageMemoryCacheCapacity ?? DEFAULT_IMAGE_MEMORY_CACHE_CAPACITY);
+        }
+        set
+        {
+            _db.Write(model => model.ImageMemoryCacheCapacity = value);
+            _db.Save();
+        }
+    }
+
     public static bool RatingPercentageEnabled
     {
         get
@@ -1217,6 +1231,9 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("KeyboardShortcuts")]
         public List<KeyboardShortcutJsonModel?>? KeyboardShortcuts { get; set; }
+
+        [JsonPropertyName("ImageMemoryCacheCapacity")]
+        public long? ImageMemoryCacheCapacity { get; set; }
 
         [JsonPropertyName("OpenItemDefaultBehavior")]
         public string? OpenItemDefaultBehavior { get; set; }

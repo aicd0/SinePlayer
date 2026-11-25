@@ -723,6 +723,9 @@ L'évaluation s'effectuera dans l'ordre suivant :
   <data name="ImageInterpolationNearestNeighbor" xml:space="preserve">
     <value>Plus proche voisin</value>
   </data>
+  <data name="ImageMemoryCacheCapacity" xml:space="preserve">
+    <value>Capacité du cache mémoire des images</value>
+  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Saturation</value>
   </data>

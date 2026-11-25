@@ -723,6 +723,9 @@ The expression will be evaluated in the following order:
   <data name="ImageInterpolationNearestNeighbor" xml:space="preserve">
     <value>Nearest-neighbor</value>
   </data>
+  <data name="ImageMemoryCacheCapacity" xml:space="preserve">
+    <value>Image memory cache capacity</value>
+  </data>
   <data name="ImageSaturation" xml:space="preserve">
     <value>Saturation</value>
   </data>

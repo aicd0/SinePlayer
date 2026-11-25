@@ -1,6 +1,7 @@
 // Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
+using System;
 using System.Collections.Generic;
 
 using Microsoft.UI.Xaml;
@@ -80,5 +81,22 @@ internal sealed partial class GeneralSettingsView : BaseUserControl
         {
             AppSettingsModel.RestoreWindowState = isChecked.Value;
         }
+    }
+
+    private void ImageMemoryCacheCapacityNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (double.IsNaN(args.NewValue))
+        {
+            return;
+        }
+
+        int value = Math.Clamp((int)args.NewValue, 0, 4096);
+        if (sender.Value != value)
+        {
+            sender.Value = value;
+            return;
+        }
+
+        ViewModel.SetImageMemoryCacheCapacity(value);
     }
 }
