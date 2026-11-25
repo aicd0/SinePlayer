@@ -997,6 +997,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="PanY" xml:space="preserve">
     <value>Desplazamiento Y</value>
   </data>
+  <data name="Paste" xml:space="preserve">
+    <value>Pegar</value>
+  </data>
   <data name="Pause" xml:space="preserve">
     <value>Pausa</value>
   </data>
