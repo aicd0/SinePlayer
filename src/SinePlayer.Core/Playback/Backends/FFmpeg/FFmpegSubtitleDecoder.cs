@@ -348,6 +348,8 @@ internal sealed partial class FFmpegSubtitleDecoder : ISubtitleDecoder
             return new SubtitleImage
             {
                 Buffer = buffer,
+                CanvasWidth = canvasWidth,
+                CanvasHeight = canvasHeight,
                 Left = (double)left / canvasWidth,
                 Top = (double)top / canvasHeight,
                 Width = (double)width / canvasWidth,

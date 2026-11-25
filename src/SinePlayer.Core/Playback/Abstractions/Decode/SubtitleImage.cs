@@ -7,6 +7,10 @@ public sealed partial class SubtitleImage : IDisposable
 {
     public required ISubtitleImageBuffer Buffer { get; init; }
 
+    public int CanvasWidth { get; init; }
+
+    public int CanvasHeight { get; init; }
+
     public required double Left { get; init; }
 
     public required double Top { get; init; }
