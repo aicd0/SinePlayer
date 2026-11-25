@@ -727,6 +727,7 @@ internal sealed partial class PlayerSession : IDisposable
         PlaybackPipeline pipeline = new()
         {
             SourceFactory = new FFmpegSourceProviderFactory(),
+            ReadAhead = TimeSpan.FromMilliseconds(AppSettingsModel.ReadAhead),
         };
 
         pipeline.StateChanged += Pipeline_StateChanged;
@@ -859,6 +860,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Video, stream);
         settings.ToComponents().ApplyVideo(chain);
+        chain.FrameQueueCapacity = AppSettingsModel.FrameQueueCapacity;
         chain.Transform = settings.Video.ToTransform();
         chain.Adjustments = new VideoAdjustments
         {

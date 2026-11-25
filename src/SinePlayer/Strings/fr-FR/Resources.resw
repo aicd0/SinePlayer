@@ -639,6 +639,9 @@ L'évaluation s'effectuera dans l'ordre suivant :
   <data name="FontWeight" xml:space="preserve">
     <value>Graisse de police</value>
   </data>
+  <data name="FrameBufferCapacity" xml:space="preserve">
+    <value>Capacité de mémoire tampon d’images</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Fréquence d’images</value>
   </data>
@@ -1098,6 +1101,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="Rating" xml:space="preserve">
     <value>score</value>
+  </data>
+  <data name="ReadAheadBuffer" xml:space="preserve">
+    <value>Mémoire tampon de lecture anticipée</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>Rafraîchir</value>

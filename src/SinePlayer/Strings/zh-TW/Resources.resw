@@ -637,6 +637,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   <data name="FontWeight" xml:space="preserve">
     <value>字型粗細</value>
   </data>
+  <data name="FrameBufferCapacity" xml:space="preserve">
+    <value>影格緩衝容量</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>影格率</value>
   </data>
@@ -1096,6 +1099,9 @@ NOT                  - 邏輯 NOT（非）。例如：NOT %tag = "SomeTag"
   </data>
   <data name="Rating" xml:space="preserve">
     <value>評分</value>
+  </data>
+  <data name="ReadAheadBuffer" xml:space="preserve">
+    <value>預讀緩衝</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>重新整理</value>

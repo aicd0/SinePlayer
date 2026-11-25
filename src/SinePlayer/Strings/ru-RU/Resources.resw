@@ -639,6 +639,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   <data name="FontWeight" xml:space="preserve">
     <value>Насыщенность шрифта</value>
   </data>
+  <data name="FrameBufferCapacity" xml:space="preserve">
+    <value>Объём буфера кадров</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Частота кадров</value>
   </data>
@@ -1098,6 +1101,9 @@ NOT                  - Логическое НЕ. Например: NOT %tag = "
   </data>
   <data name="Rating" xml:space="preserve">
     <value>Рейтинг</value>
+  </data>
+  <data name="ReadAheadBuffer" xml:space="preserve">
+    <value>Буфер упреждающего чтения</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>Обновить</value>

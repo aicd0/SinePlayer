@@ -13,6 +13,8 @@ namespace SinePlayer.Views.Pages.Settings;
 
 internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
 {
+    private const int MILLISECONDS_PER_SECOND = 1000;
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private SettingsSharedViewModel _shared = new();
@@ -125,7 +127,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _seekForwardSeconds = AppSettingsModel.SeekForwardSeconds;
+    private double _seekForwardSeconds;
     public double SeekForwardSeconds
     {
         get => _seekForwardSeconds;
@@ -136,7 +138,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _seekBackwardSeconds = AppSettingsModel.SeekBackwardSeconds;
+    private double _seekBackwardSeconds;
     public double SeekBackwardSeconds
     {
         get => _seekBackwardSeconds;
@@ -147,7 +149,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _volumeUpPercent = AppSettingsModel.VolumeUpPercent;
+    private double _volumeUpPercent;
     public double VolumeUpPercent
     {
         get => _volumeUpPercent;
@@ -158,7 +160,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _volumeDownPercent = AppSettingsModel.VolumeDownPercent;
+    private double _volumeDownPercent;
     public double VolumeDownPercent
     {
         get => _volumeDownPercent;
@@ -169,7 +171,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _zoomInStep = AppSettingsModel.ZoomInStep;
+    private double _zoomInStep;
     public double ZoomInStep
     {
         get => _zoomInStep;
@@ -180,7 +182,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _zoomOutStep = AppSettingsModel.ZoomOutStep;
+    private double _zoomOutStep;
     public double ZoomOutStep
     {
         get => _zoomOutStep;
@@ -191,7 +193,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _fastForwardSpeed = AppSettingsModel.FastForwardSpeed;
+    private double _fastForwardSpeed;
     public double FastForwardSpeed
     {
         get => _fastForwardSpeed;
@@ -202,7 +204,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _syncVideoForwardStep = AppSettingsModel.SyncVideoForwardStep;
+    private double _syncVideoForwardStep;
     public double SyncVideoForwardStep
     {
         get => _syncVideoForwardStep;
@@ -213,7 +215,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _syncVideoBackwardStep = AppSettingsModel.SyncVideoBackwardStep;
+    private double _syncVideoBackwardStep;
     public double SyncVideoBackwardStep
     {
         get => _syncVideoBackwardStep;
@@ -224,7 +226,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _syncAudioForwardStep = AppSettingsModel.SyncAudioForwardStep;
+    private double _syncAudioForwardStep;
     public double SyncAudioForwardStep
     {
         get => _syncAudioForwardStep;
@@ -235,7 +237,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _syncAudioBackwardStep = AppSettingsModel.SyncAudioBackwardStep;
+    private double _syncAudioBackwardStep;
     public double SyncAudioBackwardStep
     {
         get => _syncAudioBackwardStep;
@@ -246,7 +248,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _syncSubtitleForwardStep = AppSettingsModel.SyncSubtitleForwardStep;
+    private double _syncSubtitleForwardStep;
     public double SyncSubtitleForwardStep
     {
         get => _syncSubtitleForwardStep;
@@ -257,7 +259,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _syncSubtitleBackwardStep = AppSettingsModel.SyncSubtitleBackwardStep;
+    private double _syncSubtitleBackwardStep;
     public double SyncSubtitleBackwardStep
     {
         get => _syncSubtitleBackwardStep;
@@ -268,7 +270,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _increaseSubtitleFontSizeStep = AppSettingsModel.IncreaseSubtitleFontSizeStep;
+    private double _increaseSubtitleFontSizeStep;
     public double IncreaseSubtitleFontSizeStep
     {
         get => _increaseSubtitleFontSizeStep;
@@ -279,7 +281,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _decreaseSubtitleFontSizeStep = AppSettingsModel.DecreaseSubtitleFontSizeStep;
+    private double _decreaseSubtitleFontSizeStep;
     public double DecreaseSubtitleFontSizeStep
     {
         get => _decreaseSubtitleFontSizeStep;
@@ -290,7 +292,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _videoPanStep = AppSettingsModel.VideoPanStep;
+    private double _videoPanStep;
     public double VideoPanStep
     {
         get => _videoPanStep;
@@ -301,7 +303,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private double _subtitlePanStep = AppSettingsModel.SubtitlePanStep;
+    private double _subtitlePanStep;
     public double SubtitlePanStep
     {
         get => _subtitlePanStep;
@@ -309,6 +311,28 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         {
             _subtitlePanStep = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitlePanStep)));
+        }
+    }
+
+    private int _readAheadSeconds;
+    public int ReadAheadSeconds
+    {
+        get => _readAheadSeconds;
+        private set
+        {
+            _readAheadSeconds = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ReadAheadSeconds)));
+        }
+    }
+
+    private int _frameQueueCapacity;
+    public int FrameQueueCapacity
+    {
+        get => _frameQueueCapacity;
+        set
+        {
+            _frameQueueCapacity = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FrameQueueCapacity)));
         }
     }
 
@@ -327,6 +351,17 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
     {
         Shared = shared;
         Shared.UpdateStarted += Update;
+    }
+
+    public void SetReadAheadSeconds(int seconds)
+    {
+        if (seconds == ReadAheadSeconds)
+        {
+            return;
+        }
+
+        ReadAheadSeconds = seconds;
+        AppSettingsModel.ReadAhead = seconds * MILLISECONDS_PER_SECOND;
     }
 
     private void Update()
@@ -363,6 +398,8 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             DecreaseSubtitleFontSizeStep = AppSettingsModel.DecreaseSubtitleFontSizeStep;
             VideoPanStep = AppSettingsModel.VideoPanStep;
             SubtitlePanStep = AppSettingsModel.SubtitlePanStep;
+            ReadAheadSeconds = AppSettingsModel.ReadAhead / MILLISECONDS_PER_SECOND;
+            FrameQueueCapacity = AppSettingsModel.FrameQueueCapacity;
         });
     }
 

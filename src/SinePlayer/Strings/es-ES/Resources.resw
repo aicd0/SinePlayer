@@ -639,6 +639,9 @@ La evaluación se realizará en el siguiente orden:
   <data name="FontWeight" xml:space="preserve">
     <value>Grosor de la fuente</value>
   </data>
+  <data name="FrameBufferCapacity" xml:space="preserve">
+    <value>Capacidad del búfer de fotogramas</value>
+  </data>
   <data name="FrameRate" xml:space="preserve">
     <value>Frecuencia de fotogramas</value>
   </data>
@@ -1098,6 +1101,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="Rating" xml:space="preserve">
     <value>Puntaje</value>
+  </data>
+  <data name="ReadAheadBuffer" xml:space="preserve">
+    <value>Búfer de lectura anticipada</value>
   </data>
   <data name="Refresh" xml:space="preserve">
     <value>Refrescar</value>

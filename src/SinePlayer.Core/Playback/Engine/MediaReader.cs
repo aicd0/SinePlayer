@@ -15,17 +15,36 @@ internal sealed class MediaReader(
     Func<MediaSource, TimeSpan, SeekMode, int> chooseSeekLanding) : IPipelineWakeTarget
 {
     private const int BufferedWaitMilliseconds = 200;
+    private const int ReadAheadMarginMilliseconds = 2000;
 
-    private static readonly TimeSpan ReadAheadMin = TimeSpan.FromMilliseconds(8000);
-    private static readonly TimeSpan ReadAheadMax = TimeSpan.FromMilliseconds(10000);
-    private static readonly TimeSpan ReadAheadWake = TimeSpan.FromMilliseconds(4000);
+    private static readonly TimeSpan DefaultReadAheadMin = TimeSpan.FromMilliseconds(8000);
+    private static readonly TimeSpan MinimumReadAheadMin = TimeSpan.FromSeconds(1);
 
     private readonly PipelineNodeAsync _node = new();
+    private readonly AtomicCell<TimeSpan> _readAheadMin = new(DefaultReadAheadMin);
     private int _resyncRequested;
 
     private readonly AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> _videoSources = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
     private readonly AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> _audioSources = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
     private readonly AtomicCell<IReadOnlyDictionary<IChainFeed, ComponentSlot<MediaSource>>> _subtitleSources = new(new Dictionary<IChainFeed, ComponentSlot<MediaSource>>());
+
+    public TimeSpan ReadAheadMin
+    {
+        get => _readAheadMin.Read();
+        set => _readAheadMin.Write(_ => value < MinimumReadAheadMin ? MinimumReadAheadMin : value);
+    }
+
+    private TimeSpan ReadAheadMax => ReadAheadMin + TimeSpan.FromMilliseconds(ReadAheadMarginMilliseconds);
+
+    private TimeSpan ReadAheadWake
+    {
+        get
+        {
+            TimeSpan half = ReadAheadMin / 2;
+            TimeSpan margin = ReadAheadMin - TimeSpan.FromMilliseconds(ReadAheadMarginMilliseconds);
+            return half > margin ? half : margin;
+        }
+    }
 
     public void AddVideoSource(IChainFeed feed, ComponentSlot<MediaSource> slot)
     {

@@ -20,6 +20,8 @@ public interface IVideoChain : IPlaybackChain<VideoStreamInfo>, IPictureFrameSou
 
     ISynchronizer Synchronizer { get; set; }
 
+    int FrameQueueCapacity { get; set; }
+
     long PresentedFrameCount { get; }
 
     long DroppedFrameCount { get; }
