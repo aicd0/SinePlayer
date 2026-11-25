@@ -15,13 +15,7 @@ internal class MediaCollectionTable : ITable
 
     private MediaCollectionTable() { }
 
-    public SqlDatabase GetDatabase()
-    {
-        return SqliteDB.MediaDatabase;
-    }
+    public SqlDatabase Database => SqliteDB.MediaDatabase;
 
-    public string GetTableName()
-    {
-        return "media_collections";
-    }
+    public string TableName => "media_collections";
 }

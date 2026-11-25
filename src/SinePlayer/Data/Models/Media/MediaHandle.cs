@@ -6,6 +6,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -27,10 +28,16 @@ internal abstract partial class MediaHandle(MediaType type)
     //
 
     private const string TAG = nameof(MediaHandle);
+    private const string RELEASE_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
     //
     // Static Methods
     //
+
+    public static string FormatReleaseDate(DateTime? value)
+    {
+        return value is { } date ? date.ToString(RELEASE_DATE_FORMAT, CultureInfo.InvariantCulture) : string.Empty;
+    }
 
     public static ICondition CreateMediaCondition()
     {
@@ -160,6 +167,7 @@ internal abstract partial class MediaHandle(MediaType type)
             IReaderToken<string> descriptionToken = command.PutQueryString(MediaTable.ColumnDescription);
             IReaderToken<int> completionStatusToken = command.PutQueryInt32(MediaTable.ColumnCompletionStatus);
             IReaderToken<long> durationToken = command.PutQueryInt64(MediaTable.ColumnDurationMs);
+            IReaderToken<string> releaseDateToken = command.PutQueryString(MediaTable.ColumnReleaseDate);
             IReaderToken<string> extToken = command.PutQueryString(MediaTable.ColumnExt);
             using SelectCommand.IReader reader = command.Execute();
 
@@ -179,6 +187,7 @@ internal abstract partial class MediaHandle(MediaType type)
                 string description = descriptionToken.GetValue();
                 CompletionStatusEnum completionStatus = ParseCompletionStatus(completionStatusToken.GetValue());
                 long durationMs = durationToken.GetValue();
+                DateTime? releaseDate = ParseReleaseDate(releaseDateToken.GetValue());
                 string extJson = extToken.GetValue();
 
                 MediaHandle? media = FromType(type);
@@ -201,6 +210,7 @@ internal abstract partial class MediaHandle(MediaType type)
                 media._tags = new([]);
                 media.CompletionStatus = completionStatus;
                 media.DurationMs = durationMs;
+                media.ReleaseDate = releaseDate;
 
                 if (!string.IsNullOrEmpty(extJson))
                 {
@@ -327,6 +337,16 @@ internal abstract partial class MediaHandle(MediaType type)
         return CompletionStatusEnum.NotStarted;
     }
 
+    private static DateTime? ParseReleaseDate(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return null;
+        }
+
+        return DateTime.TryParseExact(text, RELEASE_DATE_FORMAT, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime value) ? value : null;
+    }
+
     //
     // Member variables
     //
@@ -354,6 +374,7 @@ internal abstract partial class MediaHandle(MediaType type)
     public IReadOnlyDictionary<string, MediaTagCategory> Tags => _tags;
     public IReadOnlyDictionary<string, SDK.Plugins.Media.IMediaTagCategory> TagsForPlugin => _tags;
     public long DurationMs { get; set; } = -1;
+    public DateTime? ReleaseDate { get; private set; }
 
     public virtual string FileSystemPath => Location;
 
@@ -586,6 +607,24 @@ internal abstract partial class MediaHandle(MediaType type)
         });
     }
 
+    public async Task SetReleaseDate(DateTime? releaseDate)
+    {
+        ReleaseDate = releaseDate;
+
+        await Enqueue(() =>
+        {
+            if (!IsPersistent)
+            {
+                return;
+            }
+
+            UpdateCommand.Create(MediaTable.Instance)
+                .AppendColumn(MediaTable.ColumnReleaseDate, GetColumnValue(MediaTable.ColumnReleaseDate))
+                .AppendCondition(MediaTable.ColumnId, Id)
+                .Execute();
+        });
+    }
+
     //
     // Abstract Methods
     //
@@ -611,8 +650,9 @@ internal abstract partial class MediaHandle(MediaType type)
             MediaTable.ColumnLastPositionMs,
             MediaTable.ColumnDescription,
             MediaTable.ColumnCompletionStatus,
-            MediaTable.ColumnExt,
             MediaTable.ColumnDurationMs,
+            MediaTable.ColumnReleaseDate,
+            MediaTable.ColumnExt,
         ];
     });
 
@@ -632,8 +672,9 @@ internal abstract partial class MediaHandle(MediaType type)
         evaluators[MediaTable.ColumnLastPositionMs.Name] = i => TypeAssert.AssertLong(i.LastPositionMs);
         evaluators[MediaTable.ColumnDescription.Name] = i => TypeAssert.AssertString(i.Description);
         evaluators[MediaTable.ColumnCompletionStatus.Name] = i => TypeAssert.AssertInt((int)i.CompletionStatus);
-        evaluators[MediaTable.ColumnExt.Name] = i => TypeAssert.AssertString(JsonSerializer.Serialize(i._ext));
         evaluators[MediaTable.ColumnDurationMs.Name] = i => TypeAssert.AssertLong(i.DurationMs);
+        evaluators[MediaTable.ColumnReleaseDate.Name] = i => TypeAssert.AssertString(FormatReleaseDate(i.ReleaseDate));
+        evaluators[MediaTable.ColumnExt.Name] = i => TypeAssert.AssertString(JsonSerializer.Serialize(i._ext));
         return evaluators;
     });
 

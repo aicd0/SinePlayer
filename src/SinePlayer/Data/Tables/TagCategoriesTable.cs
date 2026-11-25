@@ -15,13 +15,7 @@ internal class TagCategoriesTable : ITable
 
     private TagCategoriesTable() { }
 
-    public SqlDatabase GetDatabase()
-    {
-        return SqliteDB.TagsDatabase;
-    }
+    public SqlDatabase Database => SqliteDB.TagsDatabase;
 
-    public string GetTableName()
-    {
-        return "tag_categories";
-    }
+    public string TableName => "tag_categories";
 }

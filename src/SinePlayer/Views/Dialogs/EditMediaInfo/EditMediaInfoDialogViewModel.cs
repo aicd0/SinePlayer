@@ -145,6 +145,30 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
         }
     }
 
+    private bool _releaseDateChanged = false;
+    public bool ReleaseDateChanged
+    {
+        get => _releaseDateChanged;
+        set
+        {
+            _releaseDateChanged = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ReleaseDateLabel)));
+        }
+    }
+
+    public string ReleaseDateLabel => GetChangedLabel(StringResourceProvider.Instance.ReleaseDate, ReleaseDateChanged);
+
+    private DateTimeOffset? _releaseDate = null;
+    public DateTimeOffset? ReleaseDate
+    {
+        get => _releaseDate;
+        set
+        {
+            _releaseDate = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ReleaseDate)));
+        }
+    }
+
     private bool _isTagInfoBarOpen = false;
     public bool IsTagInfoBarOpen
     {
@@ -198,6 +222,8 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
         Rating = commonRating == "-1" ? string.Empty : commonRating;
         SetRatingPercentageEnabled(AppSettingsModel.RatingPercentageEnabled);
 
+        ReleaseDate = ExtractCommonValue(media => media.ReleaseDate is { } date ? new DateTimeOffset(date) : null, (DateTimeOffset?)null);
+
         InitializeTags(_tagIdMode);
         InitializeLinks();
         InitializeImages();
@@ -229,6 +255,9 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
                 _ratingChanged = false;
             }
         }
+
+        // Release date
+        DateTime? releaseDate = _releaseDate is { } releaseDateValue ? releaseDateValue.DateTime : null;
 
         // Tags
         List<KeyValuePair<TagWithId, List<TagWithId>>> newTags = ParseTagString(_tags, _tagIdMode);
@@ -290,6 +319,11 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
                 if (_ratingChanged)
                 {
                     tasks.Add(media.SetRating(rating));
+                }
+
+                if (_releaseDateChanged)
+                {
+                    tasks.Add(media.SetReleaseDate(releaseDate));
                 }
 
                 if (_tagsChanged)
@@ -460,6 +494,17 @@ internal partial class EditMediaInfoDialogViewModel : INotifyPropertyChanged
                 Rating = Math.Clamp(Math.Round(ratingFloat * 0.05F, 2, MidpointRounding.AwayFromZero), 0F, 5F).ToString("0.##");
             }
         }
+    }
+
+    public void SetReleaseDate(DateTimeOffset? releaseDate)
+    {
+        if (_releaseDate == releaseDate)
+        {
+            return;
+        }
+
+        ReleaseDate = releaseDate;
+        ReleaseDateChanged = true;
     }
 
     public void SetTags(string text)
