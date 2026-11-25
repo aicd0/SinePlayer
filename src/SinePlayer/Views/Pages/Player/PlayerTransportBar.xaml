@@ -37,7 +37,7 @@
                 IsThumbToolTipEnabled="False"
                 Maximum="1"
                 StepFrequency="1"
-                ValueChanged="OnSeekValueChanged" />
+                ValueChanged="SeekSlider_ValueChanged" />
             <Grid>
                 <StackPanel
                     HorizontalAlignment="Left"
@@ -47,7 +47,7 @@
                         x:Name="PreviousButton"
                         hotkey:ShortcutToolTip.Action="OpenPreviousItem"
                         hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Previous}"
-                        Click="OnPreviousClick"
+                        Click="PreviousButton_Click"
                         IsEnabled="False"
                         Style="{StaticResource PlaybackControlButtonStyle}">
                         <Button.Content>
@@ -57,7 +57,7 @@
                     <Button
                         x:Name="PlayPauseButton"
                         hotkey:ShortcutToolTip.Action="PlayPause"
-                        Click="OnPlayPauseClick"
+                        Click="PlayPauseButton_Click"
                         Style="{StaticResource PlaybackControlButtonStyle}">
                         <Button.Content>
                             <FontIcon x:Name="PlayPauseIcon" FontSize="14" />
@@ -76,7 +76,7 @@
                         x:Name="NextButton"
                         hotkey:ShortcutToolTip.Action="OpenNextItem"
                         hotkey:ShortcutToolTip.Text="{x:Bind StringResource.Next}"
-                        Click="OnNextClick"
+                        Click="NextButton_Click"
                         IsEnabled="False"
                         Style="{StaticResource PlaybackControlButtonStyle}">
                         <Button.Content>
@@ -85,7 +85,7 @@
                     </Button>
                     <Button
                         x:Name="PlayQueueButton"
-                        Click="OnPlayQueueClick"
+                        Click="PlayQueueButton_Click"
                         Style="{StaticResource PlaybackControlButtonStyle}"
                         ToolTipService.ToolTip="{x:Bind StringResource.PlayQueue}">
                         <Button.Content>
@@ -94,7 +94,7 @@
                     </Button>
                     <Button
                         x:Name="RepeatButton"
-                        Click="OnRepeatClick"
+                        Click="RepeatButton_Click"
                         Style="{StaticResource PlaybackControlButtonStyle}">
                         <Button.Content>
                             <FontIcon x:Name="RepeatIcon" FontSize="14" />
@@ -102,7 +102,7 @@
                     </Button>
                     <ToggleButton
                         x:Name="ShuffleButton"
-                        Click="OnShuffleClick"
+                        Click="ShuffleButton_Click"
                         Style="{StaticResource PlaybackControlToggleButtonStyle}"
                         ToolTipService.ToolTip="{x:Bind StringResource.Shuffle}">
                         <ToggleButton.Content>
@@ -114,7 +114,7 @@
                     </ToggleButton>
                     <Button
                         x:Name="MoreButton"
-                        Click="OnMoreClick"
+                        Click="MoreButton_Click"
                         Style="{StaticResource PlaybackControlButtonStyle}"
                         ToolTipService.ToolTip="{x:Bind StringResource.More}">
                         <Button.Content>
@@ -126,12 +126,17 @@
                     HorizontalAlignment="Right"
                     Orientation="Horizontal"
                     Spacing="4">
-                    <TextBlock
-                        x:Name="PositionTextBlock"
-                        Margin="0,0,12,2"
-                        VerticalAlignment="Center"
-                        FontSize="14"
-                        Text="0:00 / 0:00" />
+                    <Grid
+                        Margin="0,0,12,0"
+                        Background="Transparent"
+                        Tapped="PositionTextBlock_Tapped">
+                        <TextBlock
+                            x:Name="PositionTextBlock"
+                            Margin="0,0,0,2"
+                            VerticalAlignment="Center"
+                            FontSize="14"
+                            Text="0:00 / 0:00" />
+                    </Grid>
                     <Button
                         x:Name="VolumeButton"
                         Style="{StaticResource PlaybackControlButtonStyle}"
@@ -147,7 +152,7 @@
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button
                                         x:Name="MuteButton"
-                                        Click="OnMuteClick"
+                                        Click="MuteButton_Click"
                                         Style="{StaticResource PlaybackControlButtonStyle}">
                                         <Button.Content>
                                             <FontIcon
@@ -164,7 +169,7 @@
                                         IsTabStop="False"
                                         Maximum="100"
                                         StepFrequency="1"
-                                        ValueChanged="OnVolumeValueChanged"
+                                        ValueChanged="VolumeSlider_ValueChanged"
                                         Value="100" />
                                 </StackPanel>
                             </Flyout>
@@ -172,7 +177,7 @@
                     </Button>
                     <Button
                         x:Name="PinButton"
-                        Click="OnPinClick"
+                        Click="PinButton_Click"
                         Style="{StaticResource PlaybackControlButtonStyle}"
                         ToolTipService.ToolTip="{x:Bind StringResource.Pin}">
                         <Button.Content>
@@ -186,7 +191,7 @@
                         x:Name="FullscreenButton"
                         hotkey:ShortcutToolTip.Action="ToggleFullscreen"
                         hotkey:ShortcutToolTip.Text="{x:Bind StringResource.EnterFullscreen}"
-                        Click="OnFullscreenClick"
+                        Click="FullscreenButton_Click"
                         Style="{StaticResource PlaybackControlButtonStyle}">
                         <Button.Content>
                             <FontIcon
