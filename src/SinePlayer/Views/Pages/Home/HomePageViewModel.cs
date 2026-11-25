@@ -16,6 +16,7 @@ using SinePlayer.Core.Common.Lifecycle;
 using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Models.Media;
+using SinePlayer.Data.Models.MediaProperty;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
 using SinePlayer.Helpers.Misc;
@@ -573,14 +574,14 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
 
             if (groupBy is not null)
             {
-                List<MediaPropertyModel.GroupItem<MediaModel>> groups = groupBy.GroupMedia(mediaItems, x => x,
+                List<GroupItem<MediaModel>> groups = groupBy.GroupMedia(mediaItems, x => x,
                     filter.GroupOrderMethod,
                     filter.GroupSortingFunction,
                     filter.GroupSortingProperty,
                     filter.MergeSingleItemGroups);
                 var playQueue = new PlayQueueModel.Builder();
                 groupedMedia = [];
-                foreach (MediaPropertyModel.GroupItem<MediaModel> group in groups)
+                foreach (GroupItem<MediaModel> group in groups)
                 {
                     List<MediaModel> sorted = SortMediaByProerty(group.Items, sortBy, filter.MediaOrderMethod);
                     playQueue.AddMedia(sorted);
@@ -647,6 +648,8 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
     private List<BaseMenuFlyoutItemModel> CreateSortByMenuItems(List<MediaPropertyModel> properties,
         MediaPropertyModel? selectedProperty, MediaFilterModel.OrderMethodEnum selectedOrderMethod)
     {
+        properties = [.. properties.Where(x => x.CanSort)];
+
         List<BaseMenuFlyoutItemModel> items = [];
 
         items.AddRange(CreateSortByPropertyMenuItems(properties, selectedProperty, p =>
@@ -709,7 +712,7 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
             }
         });
 
-        items.AddRange(CreateSortByPropertyMenuItems(properties, selectedProperty, p =>
+        items.AddRange(CreateSortByPropertyMenuItems([.. properties.Where(x => x.CanGroup)], selectedProperty, p =>
         {
             SelectSortOrGroup(filter =>
             {
@@ -829,6 +832,8 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
         MediaFilterModel.FunctionTypeEnum sortingFunction, MediaPropertyModel? sortingProperty,
         Action<MediaFilterModel.FunctionTypeEnum, MediaPropertyModel?> clickHandler)
     {
+        properties = [.. properties.Where(x => x.CanAggregate)];
+
         string GetFunctionDisplayName(MediaFilterModel.FunctionTypeEnum function)
         {
             return function switch
@@ -900,62 +905,50 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
             value.Add(property);
         }
 
-        List<MediaPropertyModel>? plainProperties = null;
-        List<KeyValuePair<string, List<MediaPropertyModel>>> propertyGroupList = [];
-        foreach (KeyValuePair<string, List<MediaPropertyModel>> kvp in propertyGroupMap)
+        List<BaseMenuFlyoutItemModel> items = [];
+        HashSet<string> emittedGroups = [];
+        foreach (MediaPropertyModel property in properties)
         {
-            if (kvp.Key == string.Empty)
+            string groupName = property.DisplayGroupName;
+            if (groupName == string.Empty)
             {
-                plainProperties = kvp.Value;
+                items.Add(CreatePropertyItem(property, property.DisplayFullName));
                 continue;
             }
 
-            propertyGroupList.Add(kvp);
-            kvp.Value.Sort((a, b) => string.Compare(a.DisplayName, b.DisplayName));
-        }
-
-        List<Tuple<string, BaseMenuFlyoutItemModel>> items = [];
-        if (plainProperties is not null)
-        {
-            foreach (MediaPropertyModel p in plainProperties)
+            if (emittedGroups.Contains(groupName))
             {
-                items.Add(new(p.DisplayName, new ToggleMenuFlyoutItemModel()
-                {
-                    Text = p.DisplayName,
-                    IsChecked = p.Equals(selectedProperty),
-                    Click = () =>
-                    {
-                        clickHandler(p);
-                    }
-                }));
+                continue;
             }
-        }
 
-        foreach (KeyValuePair<string, List<MediaPropertyModel>> kvp in propertyGroupList)
-        {
+            emittedGroups.Add(groupName);
             List<BaseMenuFlyoutItemModel> subItems = [];
-            foreach (MediaPropertyModel p in kvp.Value)
+            foreach (MediaPropertyModel groupProperty in propertyGroupMap[groupName])
             {
-                subItems.Add(new ToggleMenuFlyoutItemModel()
-                {
-                    Text = p.DisplayName,
-                    IsChecked = p.Equals(selectedProperty),
-                    Click = () =>
-                    {
-                        clickHandler(p);
-                    }
-                });
+                subItems.Add(CreatePropertyItem(groupProperty, groupProperty.DisplayName));
             }
 
-            items.Add(new(kvp.Key, new SubItemMenuFlyoutItemModel()
+            items.Add(new SubItemMenuFlyoutItemModel()
             {
-                Text = kvp.Key,
+                Text = groupName,
                 Items = subItems,
-            }));
+            });
         }
 
-        items.Sort((a, b) => string.Compare(a.Item1, b.Item1, StringComparison.InvariantCultureIgnoreCase));
-        return items.Select(x => x.Item2);
+        return items;
+
+        ToggleMenuFlyoutItemModel CreatePropertyItem(MediaPropertyModel property, string text)
+        {
+            return new ToggleMenuFlyoutItemModel()
+            {
+                Text = text,
+                IsChecked = property.Equals(selectedProperty),
+                Click = () =>
+                {
+                    clickHandler(property);
+                },
+            };
+        }
     }
 
     private static long GetTick()

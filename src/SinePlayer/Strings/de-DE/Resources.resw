@@ -1051,6 +1051,15 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="PromptBeforeRemovingItems" xml:space="preserve">
     <value>Vor dem Entfernen von Elementen nachfragen</value>
   </data>
+  <data name="PropertyUnitMonth" xml:space="preserve">
+    <value>Monat</value>
+  </data>
+  <data name="PropertyUnitQuarter" xml:space="preserve">
+    <value>Quartal</value>
+  </data>
+  <data name="PropertyUnitYear" xml:space="preserve">
+    <value>Jahr</value>
+  </data>
   <data name="Random" xml:space="preserve">
     <value>Zufallswiedergabe</value>
   </data>

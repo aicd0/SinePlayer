@@ -17,6 +17,7 @@ using SinePlayer.Core.Common.Threading;
 using SinePlayer.Core.Common.Utils;
 using SinePlayer.Data.Database;
 using SinePlayer.Data.Models.Media;
+using SinePlayer.Data.Models.MediaProperty;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Helpers.MenuFlyoutHelpers;
 using SinePlayer.Helpers.Misc;
@@ -249,12 +250,12 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
 
             if (groupBy != null)
             {
-                List<MediaPropertyModel.GroupItem<MediaModel>> groupItems = groupBy.GroupMedia(items, x => x,
+                List<GroupItem<MediaModel>> groupItems = groupBy.GroupMedia(items, x => x,
                     filter.GroupOrderMethod,
                     filter.GroupSortingFunction,
                     filter.GroupSortingProperty,
                     filter.MergeSingleItemGroups);
-                foreach (MediaPropertyModel.GroupItem<MediaModel> item in groupItems)
+                foreach (GroupItem<MediaModel> item in groupItems)
                 {
                     SimpleTreeViewNodeModel groupNode = new()
                     {

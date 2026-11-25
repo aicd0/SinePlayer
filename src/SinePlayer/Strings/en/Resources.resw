@@ -1051,6 +1051,15 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="PromptBeforeRemovingItems" xml:space="preserve">
     <value>Prompt before removing items</value>
   </data>
+  <data name="PropertyUnitMonth" xml:space="preserve">
+    <value>Month</value>
+  </data>
+  <data name="PropertyUnitQuarter" xml:space="preserve">
+    <value>Quarter</value>
+  </data>
+  <data name="PropertyUnitYear" xml:space="preserve">
+    <value>Year</value>
+  </data>
   <data name="Random" xml:space="preserve">
     <value>Random</value>
   </data>

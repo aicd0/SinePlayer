@@ -1051,6 +1051,15 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="PromptBeforeRemovingItems" xml:space="preserve">
     <value>Demander confirmation avant de supprimer des éléments</value>
   </data>
+  <data name="PropertyUnitMonth" xml:space="preserve">
+    <value>mois</value>
+  </data>
+  <data name="PropertyUnitQuarter" xml:space="preserve">
+    <value>trimestre</value>
+  </data>
+  <data name="PropertyUnitYear" xml:space="preserve">
+    <value>année</value>
+  </data>
   <data name="Random" xml:space="preserve">
     <value>Aléatoire</value>
   </data>

@@ -1051,6 +1051,15 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="PromptBeforeRemovingItems" xml:space="preserve">
     <value>Preguntar antes de quitar elementos</value>
   </data>
+  <data name="PropertyUnitMonth" xml:space="preserve">
+    <value>mes</value>
+  </data>
+  <data name="PropertyUnitQuarter" xml:space="preserve">
+    <value>trimestre</value>
+  </data>
+  <data name="PropertyUnitYear" xml:space="preserve">
+    <value>año</value>
+  </data>
   <data name="Random" xml:space="preserve">
     <value>Aleatorio</value>
   </data>

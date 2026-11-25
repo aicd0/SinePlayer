@@ -1051,6 +1051,15 @@ $files</value>
   <data name="PromptBeforeRemovingItems" xml:space="preserve">
     <value>移除项目前进行确认</value>
   </data>
+  <data name="PropertyUnitMonth" xml:space="preserve">
+    <value>月</value>
+  </data>
+  <data name="PropertyUnitQuarter" xml:space="preserve">
+    <value>季度</value>
+  </data>
+  <data name="PropertyUnitYear" xml:space="preserve">
+    <value>年</value>
+  </data>
   <data name="Random" xml:space="preserve">
     <value>随机播放</value>
   </data>

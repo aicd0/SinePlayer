@@ -1051,6 +1051,15 @@ $files</value>
   <data name="PromptBeforeRemovingItems" xml:space="preserve">
     <value>항목을 제거하기 전에 확인</value>
   </data>
+  <data name="PropertyUnitMonth" xml:space="preserve">
+    <value>월</value>
+  </data>
+  <data name="PropertyUnitQuarter" xml:space="preserve">
+    <value>분기</value>
+  </data>
+  <data name="PropertyUnitYear" xml:space="preserve">
+    <value>연도</value>
+  </data>
   <data name="Random" xml:space="preserve">
     <value>무작위 재생</value>
   </data>

@@ -296,6 +296,9 @@ public class StringResourceProvider
     public string Proceed => GetResourceString("Proceed");
     public string Progress => GetResourceString("Progress");
     public string PromptBeforeRemovingItems => GetResourceString("PromptBeforeRemovingItems");
+    public string PropertyUnitMonth => GetResourceString("PropertyUnitMonth");
+    public string PropertyUnitQuarter => GetResourceString("PropertyUnitQuarter");
+    public string PropertyUnitYear => GetResourceString("PropertyUnitYear");
     public string Random => GetResourceString("Random");
     public string Rating => GetResourceString("Rating");
     public string ReadAheadBuffer => GetResourceString("ReadAheadBuffer");
@@ -426,6 +429,11 @@ public class StringResourceProvider
     public string WithColon(string text)
     {
         return TextWithColon.Replace("$text", text);
+    }
+
+    public string WithParentheses(string text, string detail)
+    {
+        return TextWithParentheses.Replace("$text", text).Replace("$detail", detail);
     }
 
     private static string GetResourceString(string resource)
