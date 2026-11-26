@@ -7,8 +7,6 @@ namespace SinePlayer.Core.Common.DebugTools;
 
 internal static class LogTree
 {
-    private const string TAG = nameof(LogTree);
-
     private const int MAX_NAME_LENGTH = 48;
 
     private const string EMPTY_TAG = "Empty";
