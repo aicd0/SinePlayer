@@ -122,7 +122,6 @@ public class StringResourceProvider
     public string Enabled => GetResourceString("Enabled");
     public string EnterFullscreen => GetResourceString("EnterFullscreen");
     public string EnterNewTags => GetResourceString("EnterNewTags");
-    public string EnterNewTagsHint => GetResourceString("EnterNewTagsHint");
     public string Error => GetResourceString("Error");
     public string ErrorCommonDescription => GetResourceString("ErrorCommonDescription");
     public string ExceptAppLaunch => GetResourceString("ExceptAppLaunch");
@@ -377,7 +376,6 @@ public class StringResourceProvider
     public string SyncBackward => GetResourceString("SyncBackward");
     public string SyncForward => GetResourceString("SyncForward");
     public string Tag => GetResourceString("Tag");
-    public string TagLinkTip => GetResourceString("TagLinkTip");
     public string Tags => GetResourceString("Tags");
     public string TextWithColon => GetResourceString("TextWithColon");
     public string TextWithParentheses => GetResourceString("TextWithParentheses");
