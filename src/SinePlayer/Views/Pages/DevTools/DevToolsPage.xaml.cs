@@ -33,7 +33,6 @@ namespace SinePlayer.Views.Pages.DevTools;
 
 internal sealed partial class DevToolsPage : BasePage
 {
-    private const string TAG = nameof(DevToolsPage);
     private const int MAX_LOG_ITEM_COUNT = 10000;
     private const int LOG_FILTER_DELAY_MILLISECONDS = 500;
     private const int COUNTER_UPDATE_INTERVAL = 500;
