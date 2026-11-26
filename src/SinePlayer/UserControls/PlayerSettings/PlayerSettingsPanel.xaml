@@ -171,10 +171,6 @@
                                         Grid.Column="3"
                                         HorizontalAlignment="Right" />
                                 </Grid>
-                                <Rectangle
-                                    Height="1"
-                                    Margin="0,8"
-                                    Fill="{ThemeResource AppSeperator2}" />
                                 <Grid Style="{StaticResource CommonSettingRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -289,10 +285,6 @@
                                     Minimum="-2000"
                                     SmallChange="5"
                                     ValueChanged="VideoPanYNumberBox_ValueChanged" />
-                                <Rectangle
-                                    Height="1"
-                                    Margin="0,8"
-                                    Fill="{ThemeResource AppSeperator2}" />
                                 <Grid Style="{StaticResource CommonSettingRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -710,6 +702,29 @@
                                         VerticalAlignment="Center"
                                         SelectionChanged="SubtitleTextAlignmentComboBox_SelectionChanged" />
                                 </Grid>
+                                <Grid Style="{StaticResource CommonSettingRowStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock
+                                        Grid.Column="0"
+                                        Margin="0,0,0,2"
+                                        VerticalAlignment="Center"
+                                        Text="{x:Bind ViewModel.SubtitleFixedSizeLabel, Mode=OneWay}" />
+                                    <ToggleSwitch
+                                        x:Name="SubtitleFixedSizeToggleSwitch"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource CompatToggleSwitchStyle}"
+                                        Toggled="SubtitleFixedSizeToggleSwitch_Toggled" />
+                                </Grid>
+                                <Rectangle
+                                    Height="1"
+                                    Margin="0,8"
+                                    Fill="{ThemeResource AppSeperator2}" />
                                 <settings:NumberBoxSettingView
                                     x:Name="SubtitleOutlineWidthNumberBox"
                                     Label="{x:Bind StringResource.OutlineWidth}"
@@ -751,6 +766,10 @@
                                         </Button.Flyout>
                                     </Button>
                                 </Grid>
+                                <Rectangle
+                                    Height="1"
+                                    Margin="0,8"
+                                    Fill="{ThemeResource AppSeperator2}" />
                                 <settings:NumberBoxSettingView
                                     x:Name="SubtitleShadowDistanceNumberBox"
                                     Label="{x:Bind StringResource.ShadowDistance}"
@@ -792,10 +811,6 @@
                                         </Button.Flyout>
                                     </Button>
                                 </Grid>
-                                <Rectangle
-                                    Height="1"
-                                    Margin="0,8"
-                                    Fill="{ThemeResource AppSeperator2}" />
                                 <Grid Style="{StaticResource CommonSettingRowStyle}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -815,25 +830,10 @@
                                         Style="{StaticResource CompatToggleSwitchStyle}"
                                         Toggled="SubtitleShadowToggleSwitch_Toggled" />
                                 </Grid>
-                                <Grid Style="{StaticResource CommonSettingRowStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock
-                                        Grid.Column="0"
-                                        Margin="0,0,0,2"
-                                        VerticalAlignment="Center"
-                                        Text="{x:Bind ViewModel.SubtitleFixedSizeLabel, Mode=OneWay}" />
-                                    <ToggleSwitch
-                                        x:Name="SubtitleFixedSizeToggleSwitch"
-                                        Grid.Column="3"
-                                        HorizontalAlignment="Right"
-                                        Style="{StaticResource CompatToggleSwitchStyle}"
-                                        Toggled="SubtitleFixedSizeToggleSwitch_Toggled" />
-                                </Grid>
+                                <Rectangle
+                                    Height="1"
+                                    Margin="0,8"
+                                    Fill="{ThemeResource AppSeperator2}" />
                                 <settings:SliderSettingView
                                     x:Name="SubtitleOpacitySlider"
                                     Label="{x:Bind StringResource.Opacity}"
@@ -847,6 +847,14 @@
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Transform}" SectionKey="Transform">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">
+                                <settings:NumberBoxSettingView
+                                    x:Name="SubtitleZoomNumberBox"
+                                    Label="{x:Bind StringResource.Zoom}"
+                                    LargeChange="0.1"
+                                    Maximum="8"
+                                    Minimum="0.1"
+                                    SmallChange="0.01"
+                                    ValueChanged="SubtitleZoomNumberBox_ValueChanged" />
                                 <settings:NumberBoxSettingView
                                     x:Name="SubtitlePanXNumberBox"
                                     Label="{x:Bind StringResource.PanX}"

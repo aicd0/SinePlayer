@@ -246,6 +246,8 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
                 : Math.Clamp(height * FontSizeFraction, MinimumFontSize, MaximumFontSize);
         }
 
+        fontSize *= (float)presentation.EffectiveZoom;
+
         float margin = height * MarginFraction;
         float gap = fontSize * StackGapFraction;
         SubtitleArea safe = SafeAreaOf(presentation, scale, width, height);
@@ -380,11 +382,17 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             96.0f,
             CanvasAlphaMode.Premultiplied);
 
-        SubtitleArea output = OutputAreaOf(image, presentation, width, height);
-        double x = output.Left + (image.Left * output.Width) + (presentation.OffsetX * scale);
-        double y = output.Top + (image.Top * output.Height) + (presentation.OffsetY * scale);
-        double scaledWidth = image.Width * output.Width;
-        double scaledHeight = image.Height * output.Height;
+        SubtitleArea frame = OutputAreaOf(image, presentation, width, height);
+
+        // The zoom is the cue's own: its fractions are read in the frame, and the rectangle they name grows about its own
+        // centre, so a line of words stays where it was placed instead of sliding with the frame's edges.
+        double cueWidth = image.Width * frame.Width;
+        double cueHeight = image.Height * frame.Height;
+        double zoom = presentation.EffectiveZoom;
+        double scaledWidth = cueWidth * zoom;
+        double scaledHeight = cueHeight * zoom;
+        double x = frame.Left + (image.Left * frame.Width) + ((cueWidth - scaledWidth) / 2.0) + (presentation.OffsetX * scale);
+        double y = frame.Top + (image.Top * frame.Height) + ((cueHeight - scaledHeight) / 2.0) + (presentation.OffsetY * scale);
 
         Vector2 kept = KeepInsideArea(new Vector2((float)x, (float)y), scaledWidth, scaledHeight, safe);
         session.DrawImage(bitmap, new Rect(kept.X, kept.Y, scaledWidth, scaledHeight));
@@ -401,14 +409,17 @@ internal sealed partial class Win2DSubtitleLayer : IDisposable
             canvasHeight = frame.Height * height;
         }
 
-        if (!(canvasWidth > 0.0) || !(canvasHeight > 0.0) || !double.IsFinite(canvasWidth) || !double.IsFinite(canvasHeight))
+        // A canvas that is not a size — neither the one the decoder named nor the picture's — leaves the surface itself as
+        // the frame, which is all a cue whose fractions cannot be read has to go on.
+        double outputWidth = width;
+        double outputHeight = height;
+        if (canvasWidth > 0.0 && canvasHeight > 0.0 && double.IsFinite(canvasWidth) && double.IsFinite(canvasHeight))
         {
-            return new SubtitleArea(0.0f, 0.0f, width, height);
+            double canvasScale = Math.Min(width / canvasWidth, height / canvasHeight);
+            outputWidth = Math.Min(canvasWidth * canvasScale, width);
+            outputHeight = Math.Min(canvasHeight * canvasScale, height);
         }
 
-        double scale = Math.Min(width / canvasWidth, height / canvasHeight);
-        double outputWidth = Math.Min(canvasWidth * scale, width);
-        double outputHeight = Math.Min(canvasHeight * scale, height);
         return new SubtitleArea(
             (float)((width - outputWidth) / 2.0),
             (float)(height - outputHeight),

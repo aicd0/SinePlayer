@@ -18,6 +18,8 @@ public readonly record struct SubtitlePresentation
 
     public SubtitleInsets Insets { get; init; }
 
+    public double Zoom { get; init; }
+
     public string? FontFamily { get; init; }
 
     public double FontSize { get; init; }
@@ -45,4 +47,6 @@ public readonly record struct SubtitlePresentation
     public double? Opacity { get; init; }
 
     public SubtitleFrame Frame { get; init; }
+
+    public double EffectiveZoom => Zoom > 0.0 && double.IsFinite(Zoom) ? Zoom : 1.0;
 }

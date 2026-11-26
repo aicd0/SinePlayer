@@ -21,6 +21,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
     public int Order { get; set; }
     public int PanX { get; set; }
     public int PanY { get; set; }
+    public double Zoom { get; set; } = 1.0;
     public string Family { get; set; } = string.Empty;
     public double Size { get; set; }
     public bool FixedSize { get; set; }
@@ -42,6 +43,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             Order = Order,
             OffsetX = PanX,
             OffsetY = PanY,
+            Zoom = Zoom,
             FontFamily = Family,
             FontSize = Size,
             FixedFontSize = FixedSize,
@@ -91,6 +93,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
         Order = model.Order ?? Order;
         PanX = model.PanX ?? PanX;
         PanY = model.PanY ?? PanY;
+        Zoom = model.Zoom ?? Zoom;
         Family = model.FontFamily ?? Family;
         Size = model.FontSize ?? Size;
         FixedSize = model.FixedFontSize ?? FixedSize;
@@ -116,6 +119,7 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
             Order = Order,
             PanX = PanX,
             PanY = PanY,
+            Zoom = Zoom,
             FontFamily = Family,
             FontSize = Size,
             FixedFontSize = FixedSize,
@@ -171,6 +175,9 @@ internal sealed class SubtitleSettingsModel : PresetSettingsModel<SubtitleSettin
 
         [JsonPropertyName("PanY")]
         public int? PanY { get; set; }
+
+        [JsonPropertyName("Zoom")]
+        public double? Zoom { get; set; }
 
         [JsonPropertyName("FontFamily")]
         public string? FontFamily { get; set; }

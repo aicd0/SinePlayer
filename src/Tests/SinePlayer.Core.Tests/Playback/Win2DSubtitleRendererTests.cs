@@ -654,6 +654,42 @@ public class Win2DSubtitleRendererTests
         }
     }
 
+    /// <summary>
+    /// The zoom the host names multiplies the size the words are drawn at, whatever size the presentation arrived at: it
+    /// scales the words rather than the surface they are laid out on, so the cue stays against the edge its alignment puts
+    /// it on and only its size changes.
+    /// </summary>
+    [Test]
+    public void ScalesTheWordsByTheZoomItIsGiven()
+    {
+        CanvasDevice device;
+        try
+        {
+            device = EnsureDetachedDevice();
+        }
+        catch (Exception exception)
+        {
+            Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+            return;
+        }
+
+        const int width = 480;
+        const int height = 300;
+
+        SubtitlePresentation plain = AtFixedSize(24.0);
+        SubtitlePresentation twice = plain with { Zoom = 2.0 };
+
+        (int _, int plainTop, int _, int plainBottom) = InkBounds(RenderInk(device, width, height, plain), width, height);
+        (int _, int twiceTop, int _, int twiceBottom) = InkBounds(RenderInk(device, width, height, twice), width, height);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(plainBottom, Is.GreaterThan(plainTop), "the cue is drawn for this to say anything");
+            Assert.That(twiceBottom - twiceTop, Is.EqualTo((plainBottom - plainTop) * 2).Within(4), "twice the zoom is twice the height");
+            Assert.That(twiceTop, Is.LessThan(plainTop), "the taller words grow upwards from the edge they are anchored to");
+        }
+    }
+
     /// <summary>Whether any pixel of the drawing carries exactly the colour given.</summary>
     private static bool HasColour(CanvasDevice device, int width, int height, SubtitlePresentation presentation, Color colour)
     {
@@ -1030,6 +1066,74 @@ public class Win2DSubtitleRendererTests
         {
             target?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// The zoom grows a bitmap cue about the centre of the rectangle its fractions name, and the safe region is applied to
+    /// the result: a cue near an edge stays on that edge instead of sliding with the frame's edges, and what the chrome
+    /// covers is answered for the bigger cue — scaling after that clamp would leave it under the bar.
+    /// </summary>
+    [Test]
+    public void ScalesABitmapCueAboutItsOwnCentreRatherThanTheFrames()
+    {
+        CanvasRenderTarget? target = null;
+        try
+        {
+            CanvasDevice device;
+            try
+            {
+                device = EnsureDetachedDevice();
+            }
+            catch (Exception exception)
+            {
+                Assert.Ignore($"This machine has no usable graphics device: {exception.Message}");
+                return;
+            }
+
+            const int width = 400;
+            const int height = 200;
+            target = new CanvasRenderTarget(device, width, height, 96.0f);
+
+            // Three quarters of the way down the surface, well away from its centre, which is where a frame-centred zoom
+            // would move it.
+            using SubtitleCue cue = BitmapCue(left: 0.4, top: 0.75, imageWidth: 0.2, imageHeight: 0.1);
+
+            (int left, int top, int right, int bottom) = DrawBitmapCue(target, device, cue, SubtitlePresentation.Identity, width, height);
+            (int zoomedLeft, int zoomedTop, int zoomedRight, int zoomedBottom) = DrawBitmapCue(
+                target, device, cue, SubtitlePresentation.Identity with { Zoom = 2.0 }, width, height);
+            (int _, int _, int _, int barredBottom) = DrawBitmapCue(target, device, cue, SubtitlePresentation.Identity with
+            {
+                Zoom = 2.0,
+                Insets = new SubtitleInsets(0.0, 0.0, 0.0, 100.0),
+            }, width, height);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(bottom, Is.GreaterThan(top), "the cue is drawn for this to say anything");
+                Assert.That(zoomedRight - zoomedLeft, Is.EqualTo((right - left) * 2).Within(4), "twice the zoom is twice the width");
+                Assert.That(zoomedBottom - zoomedTop, Is.EqualTo((bottom - top) * 2).Within(4), "and twice the height");
+                Assert.That((zoomedTop + zoomedBottom) / 2.0, Is.EqualTo((top + bottom) / 2.0).Within(2.0),
+                    "about the centre of the cue itself, so a cue low on the surface stays low instead of sliding further down");
+                Assert.That((zoomedLeft + zoomedRight) / 2.0, Is.EqualTo((left + right) / 2.0).Within(2.0), "and the same across");
+                Assert.That(barredBottom, Is.LessThanOrEqualTo(height - 100), "and the bigger cue is the one kept clear of the chrome");
+            }
+        }
+        finally
+        {
+            target?.Dispose();
+        }
+    }
+
+    /// <summary>Draws one bitmap cue into a surface and reads back where its ink landed.</summary>
+    private static (int Left, int Top, int Right, int Bottom) DrawBitmapCue(CanvasRenderTarget target, CanvasDevice device, SubtitleCue cue, SubtitlePresentation presentation, int width, int height)
+    {
+        using (CanvasDrawingSession session = target.CreateDrawingSession())
+        {
+            session.Clear(default(Color));
+            Win2DSubtitleLayer.DrawCues(session, device, (List<SubtitleCue>)[cue], presentation, width, height);
+        }
+
+        return InkBounds(target.GetPixelBytes(), width, height);
     }
 
     /// <summary>

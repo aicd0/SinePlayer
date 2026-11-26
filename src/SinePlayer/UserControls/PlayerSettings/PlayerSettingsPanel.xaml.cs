@@ -970,6 +970,12 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = settings.Subtitle.Zoom != presetSettings.Subtitle.Zoom;
+                tabModified = tabModified || modified;
+                UpdateSubtitleZoom(settings, presetSettings);
+            }
+
+            {
                 bool modified = settings.Subtitle.PanX != presetSettings.Subtitle.PanX;
                 tabModified = tabModified || modified;
                 UpdateSubtitlePanX(settings, presetSettings);
@@ -1826,6 +1832,43 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
         if (Math.Abs(SubtitleOrderNumberBox.Value - value) > 0.5)
         {
             SubtitleOrderNumberBox.Value = value;
+        }
+    }
+
+    private void SubtitleZoomNumberBox_ValueChanged(object? sender, EventArgs e)
+    {
+        if (_updatingUI)
+        {
+            return;
+        }
+
+        double value = SubtitleZoomNumberBox.Value;
+        if (double.IsNaN(value))
+        {
+            value = _mediaSettings.Subtitle.Zoom;
+        }
+
+        value = Math.Round(Math.Clamp(value, SubtitleZoomNumberBox.Minimum, SubtitleZoomNumberBox.Maximum), 2);
+        if (value != SubtitleZoomNumberBox.Value)
+        {
+            SubtitleZoomNumberBox.Value = value;
+        }
+
+        if (Math.Abs(_mediaSettings.Subtitle.Zoom - value) > 0.001)
+        {
+            ApplySubtitle(settings => settings.Zoom = value);
+        }
+    }
+
+    private void UpdateSubtitleZoom(PlayerSettingsModel settings, PlayerSettingsModel presetSettings)
+    {
+        SubtitleZoomNumberBox.RestoreValue = presetSettings.Subtitle.Zoom;
+        SubtitleZoomNumberBox.ResetValue = _defaultSettings.Subtitle.Zoom;
+
+        double value = settings.Subtitle.Zoom;
+        if (Math.Abs(SubtitleZoomNumberBox.Value - value) > 0.001)
+        {
+            SubtitleZoomNumberBox.Value = value;
         }
     }
 
