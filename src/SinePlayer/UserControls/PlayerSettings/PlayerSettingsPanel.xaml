@@ -569,6 +569,36 @@
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>
+                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Transform}" SectionKey="Transform">
+                        <settings:PlayerSettingsSection.SectionContent>
+                            <StackPanel Orientation="Vertical">
+                                <settings:NumberBoxSettingView
+                                    x:Name="SubtitleZoomNumberBox"
+                                    Label="{x:Bind StringResource.Zoom}"
+                                    LargeChange="0.1"
+                                    Maximum="8"
+                                    Minimum="0.1"
+                                    SmallChange="0.01"
+                                    ValueChanged="SubtitleZoomNumberBox_ValueChanged" />
+                                <settings:NumberBoxSettingView
+                                    x:Name="SubtitlePanXNumberBox"
+                                    Label="{x:Bind StringResource.PanX}"
+                                    LargeChange="20"
+                                    Maximum="2000"
+                                    Minimum="-2000"
+                                    SmallChange="5"
+                                    ValueChanged="SubtitlePanXNumberBox_ValueChanged" />
+                                <settings:NumberBoxSettingView
+                                    x:Name="SubtitlePanYNumberBox"
+                                    Label="{x:Bind StringResource.PanY}"
+                                    LargeChange="20"
+                                    Maximum="2000"
+                                    Minimum="-2000"
+                                    SmallChange="5"
+                                    ValueChanged="SubtitlePanYNumberBox_ValueChanged" />
+                            </StackPanel>
+                        </settings:PlayerSettingsSection.SectionContent>
+                    </settings:PlayerSettingsSection>
                     <settings:PlayerSettingsSection Title="{x:Bind StringResource.Font}" SectionKey="Font">
                         <settings:PlayerSettingsSection.SectionContent>
                             <StackPanel Orientation="Vertical">
@@ -841,36 +871,6 @@
                                     Minimum="0"
                                     StepFrequency="1"
                                     ValueChanged="SubtitleOpacitySlider_ValueChanged" />
-                            </StackPanel>
-                        </settings:PlayerSettingsSection.SectionContent>
-                    </settings:PlayerSettingsSection>
-                    <settings:PlayerSettingsSection Title="{x:Bind StringResource.Transform}" SectionKey="Transform">
-                        <settings:PlayerSettingsSection.SectionContent>
-                            <StackPanel Orientation="Vertical">
-                                <settings:NumberBoxSettingView
-                                    x:Name="SubtitleZoomNumberBox"
-                                    Label="{x:Bind StringResource.Zoom}"
-                                    LargeChange="0.1"
-                                    Maximum="8"
-                                    Minimum="0.1"
-                                    SmallChange="0.01"
-                                    ValueChanged="SubtitleZoomNumberBox_ValueChanged" />
-                                <settings:NumberBoxSettingView
-                                    x:Name="SubtitlePanXNumberBox"
-                                    Label="{x:Bind StringResource.PanX}"
-                                    LargeChange="20"
-                                    Maximum="2000"
-                                    Minimum="-2000"
-                                    SmallChange="5"
-                                    ValueChanged="SubtitlePanXNumberBox_ValueChanged" />
-                                <settings:NumberBoxSettingView
-                                    x:Name="SubtitlePanYNumberBox"
-                                    Label="{x:Bind StringResource.PanY}"
-                                    LargeChange="20"
-                                    Maximum="2000"
-                                    Minimum="-2000"
-                                    SmallChange="5"
-                                    ValueChanged="SubtitlePanYNumberBox_ValueChanged" />
                             </StackPanel>
                         </settings:PlayerSettingsSection.SectionContent>
                     </settings:PlayerSettingsSection>

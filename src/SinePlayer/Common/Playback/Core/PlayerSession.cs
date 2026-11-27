@@ -929,6 +929,7 @@ internal sealed partial class PlayerSession : IDisposable
 
         PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Subtitle, stream);
         settings.ToComponents().ApplySubtitle(chain);
+        chain.MemoryCacheCapacity = AppSettingsModel.SubtitleMemoryCacheCapacity;
         chain.Presentation = settings.Subtitle.ToPresentation() with { Insets = _subtitleInsets };
         chain.Offset = OffsetOf(settings.Subtitle.Sync);
     }

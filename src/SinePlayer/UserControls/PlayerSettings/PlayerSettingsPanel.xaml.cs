@@ -882,6 +882,24 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
             }
 
             {
+                bool modified = settings.Subtitle.Zoom != presetSettings.Subtitle.Zoom;
+                tabModified = tabModified || modified;
+                UpdateSubtitleZoom(settings, presetSettings);
+            }
+
+            {
+                bool modified = settings.Subtitle.PanX != presetSettings.Subtitle.PanX;
+                tabModified = tabModified || modified;
+                UpdateSubtitlePanX(settings, presetSettings);
+            }
+
+            {
+                bool modified = settings.Subtitle.PanY != presetSettings.Subtitle.PanY;
+                tabModified = tabModified || modified;
+                UpdateSubtitlePanY(settings, presetSettings);
+            }
+
+            {
                 bool modified = settings.Subtitle.Family != presetSettings.Subtitle.Family;
                 tabModified = tabModified || modified;
                 UpdateSubtitleFontFamily(settings);
@@ -967,24 +985,6 @@ internal sealed partial class PlayerSettingsPanel : BaseUserControl
                 bool modified = settings.Subtitle.Opacity != presetSettings.Subtitle.Opacity;
                 tabModified = tabModified || modified;
                 UpdateSubtitleOpacity(settings, presetSettings);
-            }
-
-            {
-                bool modified = settings.Subtitle.Zoom != presetSettings.Subtitle.Zoom;
-                tabModified = tabModified || modified;
-                UpdateSubtitleZoom(settings, presetSettings);
-            }
-
-            {
-                bool modified = settings.Subtitle.PanX != presetSettings.Subtitle.PanX;
-                tabModified = tabModified || modified;
-                UpdateSubtitlePanX(settings, presetSettings);
-            }
-
-            {
-                bool modified = settings.Subtitle.PanY != presetSettings.Subtitle.PanY;
-                tabModified = tabModified || modified;
-                UpdateSubtitlePanY(settings, presetSettings);
             }
 
             _subtitleCategory.IsModified = tabModified;

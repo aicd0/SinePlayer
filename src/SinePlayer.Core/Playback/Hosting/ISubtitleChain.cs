@@ -16,4 +16,6 @@ public interface ISubtitleChain : IPlaybackChain<SubtitleStreamInfo>
     IVideoRenderTarget? Target { get; }
 
     IVideoChain? LayoutVideoChain { get; set; }
+
+    long MemoryCacheCapacity { get; set; }
 }

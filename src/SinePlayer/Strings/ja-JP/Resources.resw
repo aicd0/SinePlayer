@@ -1282,6 +1282,9 @@ $plugins</value>
   <data name="Subtitle" xml:space="preserve">
     <value>字幕</value>
   </data>
+  <data name="SubtitleBufferCapacity" xml:space="preserve">
+    <value>字幕バッファ容量</value>
+  </data>
   <data name="SubtitleForced" xml:space="preserve">
     <value>強制</value>
   </data>

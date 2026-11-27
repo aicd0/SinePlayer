@@ -14,6 +14,7 @@ namespace SinePlayer.Views.Pages.Settings;
 internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
 {
     private const int MILLISECONDS_PER_SECOND = 1000;
+    private const long MEGABYTE = 1024L * 1024L;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -336,6 +337,17 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    private int _subtitleMemoryCacheCapacity;
+    public int SubtitleMemoryCacheCapacity
+    {
+        get => _subtitleMemoryCacheCapacity;
+        set
+        {
+            _subtitleMemoryCacheCapacity = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleMemoryCacheCapacity)));
+        }
+    }
+
     public string SyncVideoForwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncVideoForward);
     public string SyncVideoBackwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncVideoBackward);
     public string SyncAudioForwardLabel => KeyboardShortcutActions.GetFullName(KeyboardShortcutActions.SyncAudioForward);
@@ -362,6 +374,17 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
 
         ReadAheadSeconds = seconds;
         AppSettingsModel.ReadAhead = seconds * MILLISECONDS_PER_SECOND;
+    }
+
+    public void SetSubtitleMemoryCacheCapacity(int megabytes)
+    {
+        if (megabytes == SubtitleMemoryCacheCapacity)
+        {
+            return;
+        }
+
+        SubtitleMemoryCacheCapacity = megabytes;
+        AppSettingsModel.SubtitleMemoryCacheCapacity = megabytes * MEGABYTE;
     }
 
     private void Update()
@@ -400,6 +423,7 @@ internal partial class PlayerSettingsViewModel : INotifyPropertyChanged
             SubtitlePanStep = AppSettingsModel.SubtitlePanStep;
             ReadAheadSeconds = AppSettingsModel.ReadAhead / MILLISECONDS_PER_SECOND;
             FrameQueueCapacity = AppSettingsModel.FrameQueueCapacity;
+            SubtitleMemoryCacheCapacity = (int)(AppSettingsModel.SubtitleMemoryCacheCapacity / MEGABYTE);
         });
     }
 

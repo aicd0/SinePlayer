@@ -273,6 +273,12 @@ internal sealed partial class PlayerSettingsView : BaseUserControl
         }
     }
 
+    private void SubtitleMemoryCacheCapacityNumberBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        int value = (int)ReadStep(sender, ViewModel.SubtitleMemoryCacheCapacity);
+        ViewModel.SetSubtitleMemoryCacheCapacity(value);
+    }
+
     private static double ReadStep(NumberBox box, double fallback, int decimals = 0)
     {
         if (double.IsNaN(box.Value))

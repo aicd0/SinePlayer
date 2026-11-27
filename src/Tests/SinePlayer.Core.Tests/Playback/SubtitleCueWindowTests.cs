@@ -17,6 +17,12 @@ public class SubtitleCueWindowTests
     /// <summary>The run of reading the tests below belong to, unless they are about a jump between runs.</summary>
     private const long Epoch = 0;
 
+    /// <summary>A picture big enough that a handful of them reach the window's budget.</summary>
+    private const long BudgetSize = 20L * 1024 * 1024;
+
+    /// <summary>What the window keeps unless it is told otherwise.</summary>
+    private const long DefaultBudget = 32L * 1024 * 1024;
+
     [Test]
     public void ShowsTheCuesThatCoverThePosition()
     {
@@ -70,7 +76,7 @@ public class SubtitleCueWindowTests
     }
 
     [Test]
-    public void DropsWhatIsBehindButNotWhatIsStillVisible()
+    public void ShowsWhatIsStillUpAndNotWhatHasEnded()
     {
         SubtitleCueWindow window = Window();
         window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 2), Cue(3, 11)], TimeSpan.Zero);
@@ -99,35 +105,57 @@ public class SubtitleCueWindowTests
     }
 
     [Test]
-    public void LetsGoOfAStaleCueThatIsNotTheFirst()
+    public void KeepsACueThePlayheadHasPassedSoAJumpBackFindsIt()
     {
-        // Cues are ordered by where they begin, not by where they end: a line that began early can outlast one that began
-        // after it, so a sweep that stopped at the first cue still up would keep the ended one for ever.
-        WatchImage image = new();
-        SubtitleCueWindow window = Window();
-        window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 20), Cue(2, 3, image)], TimeSpan.Zero);
-
-        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(5)))
-        {
-        }
-
-        Assert.That(image.Disposed, Is.True, "the ended cue is let go of even though a longer one began before it");
-    }
-
-    [Test]
-    public void TrimsWhatTheRendererHasAskedPastEvenWithoutANewEvent()
-    {
-        // Asking is what drains, so a quiet stretch of the file does not have to wait for the track to say something else
-        // before what has been passed is let go of.
+        // The packet behind a line lies before where a jump back lands, so a re-read never delivers it again. Keeping
+        // what has been passed is what makes the line the jump landed in come back without reading the file.
         WatchImage image = new();
         SubtitleCueWindow window = Window();
         window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 2, image)], TimeSpan.Zero);
 
-        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(5)))
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(5))), Is.Empty, "the line has ended");
+        Assert.That(image.Disposed, Is.False, "and it is kept rather than let go of");
+
+        window.SeekTo(Epoch, TimeSpan.FromSeconds(1.5));
+
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(1.5))), Is.EqualTo(new[] { "1" }), "the jump back finds the line that belongs there");
+    }
+
+    [Test]
+    public void FreesTheLeastRecentlyAskedForCueWhenTheBudgetIsExceeded()
+    {
+        // The budget is a limit, not a hint: once it is exceeded the cold cues that have waited longest go. Asking for
+        // a line is what keeps it recent, so the place a cue was just seen is the last one to lose it — even though it
+        // is the oldest thing in the track.
+        const long budget = 64L * 1024 * 1024;
+        const int count = 70_000;
+
+        SubtitleCueWindow window = Window();
+        var images = new WatchImage[count];
+        for (int index = 0; index < count; index++)
+        {
+            var image = new WatchImage(1024);
+            images[index] = image;
+            var start = TimeSpan.FromSeconds(index);
+            window.Add(
+                Epoch,
+                (List<SubtitleCue>)[new SubtitleCue { Start = start, End = start + TimeSpan.FromMilliseconds(900), Image = new SubtitleImage { Buffer = image, Left = 0, Top = 0, Width = 1, Height = 1 } }],
+                start);
+        }
+
+        // The oldest event in the file is the one on screen, so it is asked for last of all.
+        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(0.5)))
         {
         }
 
-        Assert.That(image.Disposed, Is.True, "the question past its end was enough");
+        window.SeekTo(Epoch, TimeSpan.FromSeconds(60_000));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(images[1].Disposed, Is.True, "the cue that has waited longest is the one that goes");
+            Assert.That(images[0].Disposed, Is.False, "the cue that was on screen most recently stays");
+            Assert.That(window.ApproximateSize, Is.LessThanOrEqualTo(budget), "and the keeping is back within the budget");
+        }
     }
 
     [Test]
@@ -194,45 +222,214 @@ public class SubtitleCueWindowTests
         window.SeekTo(Epoch, TimeSpan.FromSeconds(2));
         window.Add(Epoch, (List<SubtitleCue>)[Cue(2, 4)], TimeSpan.FromSeconds(2));
 
-        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(3))), Is.EqualTo(new[] { "2" }), "the cue the jump landed on was kept");
+        Assert.That(
+            Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(3))),
+            Is.EqualTo(new[] { "1", "2" }),
+            "the cue the jump landed on was kept, and so was the one already passed that still covers it");
     }
 
     [Test]
-    public void KeepsACueUntilTheRendererHasAskedPastIt()
+    public void CountsTheSameEventOnceWhenTheCopyAlreadyHeldIsCold()
     {
-        // The reader runs ahead of the renderer, so a cue that has ended is not necessarily one nobody is about to ask for:
-        // the window keeps it until a question arrives that is past its end.
-        WatchImage image = new();
+        // A jump re-reads what it lands on. If the event was already held and has been passed since, the copy that comes
+        // back must still be recognised as the same one, or the budget would be spent on two pictures of one line.
+        WatchImage held = new();
         SubtitleCueWindow window = Window();
-        window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 2, image)], TimeSpan.Zero);
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 2, held)], TimeSpan.Zero);
+
+        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(5)))
+        {
+        }
+
+        WatchImage repeated = new();
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 2, repeated)], TimeSpan.FromSeconds(5));
+
+        window.SeekTo(Epoch, TimeSpan.FromSeconds(1.5));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(1.5))), Is.EqualTo(new[] { "1" }), "one copy, although the match was cold");
+            Assert.That(repeated.Disposed, Is.True, "the second decode is let go of");
+            Assert.That(held.Disposed, Is.False, "and the copy that was kept is the one that answers");
+        }
+    }
+
+    [Test]
+    public void NeverFreesWhatIsStillOnScreenForTheBudget()
+    {
+        // A budget cannot be met by taking away the answer to the question being asked: cues whose end is still ahead
+        // stay, even when they alone exceed the limit.
+        WatchImage first = new(BudgetSize);
+        WatchImage second = new(BudgetSize);
+        WatchImage third = new(BudgetSize);
+        WatchImage fourth = new(BudgetSize);
+
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 100, first), Cue(2, 100, second), Cue(3, 100, third), Cue(4, 100, fourth)], TimeSpan.Zero);
 
         using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(1.5)))
         {
         }
 
-        window.Add(Epoch, [], TimeSpan.FromSeconds(2.5));
-
-        Assert.That(image.Disposed, Is.False, "nothing has asked about a position past the cue's end yet");
-
-        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(3)))
+        using (Assert.EnterMultipleScope())
         {
+            Assert.That(first.Disposed, Is.False);
+            Assert.That(second.Disposed, Is.False);
+            Assert.That(third.Disposed, Is.False);
+            Assert.That(fourth.Disposed, Is.False, "nothing on screen was given up to meet the budget");
         }
-
-        Assert.That(image.Disposed, Is.True, "asking past it is what lets the window drop it");
     }
 
     [Test]
-    public void FreesWhatNobodyCanAskForWithoutARenderer()
+    public void LetsTheReaderSayWhatHasBeenPassedWhenNothingIsDrawing()
     {
-        // Nothing draws the cues, so nothing will ever ask: the caller's position is the floor, and a cue the reader has
-        // passed is gone. Without that, a window nobody drains would keep every cue it was ever given.
-        WatchImage image = new();
+        // Nothing will ask this window anything, so the position the reader has reached is the only clock it has.
+        // Without it a track nobody draws would never mark anything as passed, and the budget would have nothing to take.
+        WatchImage first = new(BudgetSize);
+        WatchImage second = new(BudgetSize);
+        WatchImage third = new(BudgetSize);
+        WatchImage fourth = new(BudgetSize);
+
         SubtitleCueWindow window = Window();
-        window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 2, image)], TimeSpan.Zero, discardStale: true);
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 2, first), Cue(3, 4, second), Cue(5, 6, third)], TimeSpan.Zero, readerIsTheFloor: true);
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(7, 8, fourth)], TimeSpan.FromSeconds(7), readerIsTheFloor: true);
 
-        window.Add(Epoch, [], TimeSpan.FromSeconds(5), discardStale: true);
+        Assert.That(first.Disposed, Is.True, "what the reader has passed is what the budget may take");
+    }
 
-        Assert.That(image.Disposed, Is.True, "no renderer means no future question to wait for");
+    [Test]
+    public void CountsTextAgainstTheBudgetToo()
+    {
+        // A picture is not the only thing a track can cost. Text is cheap per event but a track can hold tens of
+        // thousands of them, so the words and the animation instants they name are counted as well.
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 2, "a line of subtitles")], TimeSpan.Zero);
+
+        long plain = window.ApproximateSize;
+
+        SubtitleCueWindow withChanges = Window();
+        withChanges.Add(
+            Epoch,
+            (List<SubtitleCue>)
+            [
+                new SubtitleCue
+                {
+                    Start = TimeSpan.FromSeconds(1),
+                    End = TimeSpan.FromSeconds(2),
+                    Text = "a line of subtitles",
+                    Changes = (List<SubtitleChange>)[new SubtitleChange(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), false)],
+                },
+            ],
+            TimeSpan.Zero);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(plain, Is.GreaterThan("a line of subtitles".Length * sizeof(char)), "the words are counted");
+            Assert.That(withChanges.ApproximateSize, Is.GreaterThan(plain), "and so is each instant the line animates at");
+        }
+    }
+
+    [Test]
+    public void KeepsItsOrderWhenAnEventArrivesFromBeforeWhatIsHeld()
+    {
+        // A jump into a region the budget had given up re-reads events that belong before the ones still held, so the
+        // store has to file them in the middle rather than at the end.
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(10, 11), Cue(20, 21)], TimeSpan.FromSeconds(20));
+        window.SeekTo(Epoch, TimeSpan.FromSeconds(5));
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(5, 6), Cue(7, 8)], TimeSpan.FromSeconds(5));
+
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(7.5))), Is.EqualTo(new[] { "7" }), "the event that was filed in the middle answers");
+
+        window.SeekTo(Epoch, TimeSpan.FromSeconds(10.5));
+
+        Assert.That(Texts(window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(10.5))), Is.EqualTo(new[] { "10" }), "and the ones that were already held are still in order behind it");
+    }
+
+    [Test]
+    public void KeepsWhatItRetainsUnderTheBudget()
+    {
+        // A track long enough to cost far more than the budget is not allowed to keep it all: what has been passed goes,
+        // oldest first, until the keeping fits again.
+        string text = new('x', 2000);
+
+        SubtitleCueWindow window = Window();
+        for (int index = 0; index < 40_000; index++)
+        {
+            var start = TimeSpan.FromSeconds(index);
+            window.Add(
+                Epoch,
+                (List<SubtitleCue>)[new SubtitleCue { Start = start, End = start + TimeSpan.FromMilliseconds(900), Text = text }],
+                start,
+                readerIsTheFloor: true);
+        }
+
+        Assert.That(window.ApproximateSize, Is.LessThanOrEqualTo(DefaultBudget), "the keeping stays within the budget");
+    }
+
+    [Test]
+    public void EmptiesWhatHasBeenPassedWhenAJumpGoesPastIt()
+    {
+        string text = new('x', 2000);
+
+        SubtitleCueWindow window = Window();
+        for (int index = 0; index < 40_000; index++)
+        {
+            var start = TimeSpan.FromSeconds(index);
+            window.Add(Epoch, (List<SubtitleCue>)[new SubtitleCue { Start = start, End = start + TimeSpan.FromMilliseconds(900), Text = text }], start);
+        }
+
+        window.SeekTo(Epoch, TimeSpan.FromSeconds(50_000));
+
+        Assert.That(window.ApproximateSize, Is.LessThanOrEqualTo(DefaultBudget), "a jump past the whole backlog is what makes all of it forgettable at once");
+    }
+
+    [Test]
+    public void KeepsTheDefaultBudgetUntilItIsToldOtherwise()
+    {
+        SubtitleCueWindow window = Window();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(window.Capacity, Is.EqualTo(DefaultBudget), "the budget is what the settings start at");
+
+            window.Capacity = 1024L;
+            Assert.That(window.Capacity, Is.EqualTo(8L * 1024 * 1024), "a budget too small to hold anything is not accepted");
+
+            window.Capacity = 1L << 40;
+            Assert.That(window.Capacity, Is.EqualTo(4096L * 1024 * 1024), "and neither is one beyond what the setting offers");
+        }
+    }
+
+    [Test]
+    public void FreesAtOnceWhenTheBudgetIsTurnedDown()
+    {
+        const long size = 12L * 1024 * 1024;
+        WatchImage first = new(size);
+        WatchImage second = new(size);
+
+        SubtitleCueWindow window = Window();
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 2, first)], TimeSpan.Zero);
+
+        Assert.That(first.Disposed, Is.False, "a cue that is still up is never taken to meet the budget");
+
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(7, 8, second)], TimeSpan.FromSeconds(7));
+
+        // Past both, so both may go: what stops them is the budget, not the playhead.
+        using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(9)))
+        {
+        }
+
+        Assert.That(first.Disposed, Is.False, "the two fit, so neither is let go of");
+
+        window.Capacity = 8L * 1024 * 1024;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.Disposed, Is.True, "lowering the budget frees at once rather than at the next cue");
+            Assert.That(second.Disposed, Is.True);
+            Assert.That(window.ApproximateSize, Is.LessThanOrEqualTo(8L * 1024 * 1024));
+        }
     }
 
     [Test]
@@ -363,21 +560,31 @@ public class SubtitleCueWindowTests
     }
 
     [Test]
-    public void KeepsACueAliveWhileASnapshotHoldsIt()
+    public void FreesWhatTheBudgetEvictedOnlyWhenTheLastSnapshotLetsGo()
     {
-        // What the deleted one-second margin used to be an estimate of: the window stops offering a cue once a question has
-        // passed it, but a renderer may still be drawing it. The hold is what says so, so the picture survives.
-        WatchImage image = new();
+        // Evicting is not freeing: a cue the renderer is still drawing keeps its picture, and the last holder is what
+        // actually lets it go.
+        WatchImage image = new(BudgetSize);
         SubtitleCueWindow window = Window();
         window.Add(Epoch, (List<SubtitleCue>)[Cue(1, 2, image)], TimeSpan.Zero);
 
         SubtitleCueSnapshot snapshot = window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(1.5));
+        Assert.That(image.Disposed, Is.False);
 
+        // Passing the line makes it cold; the three that follow fill the budget again while staying ahead of the
+        // playhead, so the cold one is what the budget takes.
         using (window.GetVisibleCues(Epoch, TimeSpan.FromSeconds(5)))
         {
         }
 
-        Assert.That(image.Disposed, Is.False, "the snapshot is still reading it");
+        WatchImage ahead = new(BudgetSize);
+        window.Add(Epoch, (List<SubtitleCue>)[Cue(10, 20, ahead), Cue(21, 30, new WatchImage(BudgetSize)), Cue(31, 40, new WatchImage(BudgetSize))], TimeSpan.FromSeconds(5));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(image.Disposed, Is.False, "the snapshot is still drawing it");
+            Assert.That(ahead.Disposed, Is.False, "and what is still ahead was not given up for the budget");
+        }
 
         snapshot.Dispose();
 
@@ -505,9 +712,9 @@ public class SubtitleCueWindowTests
     /// A cue owns its image, and disposing it is the only observable effect a cue has — so a stand-in image is what makes
     /// "still held" checkable at all.
     /// </summary>
-    private sealed class WatchImage : ISubtitleImageBuffer
+    private sealed class WatchImage(long length = 1000) : ISubtitleImageBuffer
     {
-        public long Length => 1000;
+        public long Length => length;
 
         public int Width => 1;
 

@@ -1282,6 +1282,9 @@ $plugins</value>
   <data name="Subtitle" xml:space="preserve">
     <value>Субтитры</value>
   </data>
+  <data name="SubtitleBufferCapacity" xml:space="preserve">
+    <value>Объём буфера субтитров</value>
+  </data>
   <data name="SubtitleForced" xml:space="preserve">
     <value>Принудительные</value>
   </data>

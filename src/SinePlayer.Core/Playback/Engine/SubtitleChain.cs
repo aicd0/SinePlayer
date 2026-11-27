@@ -129,6 +129,12 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
         }
     }
 
+    public long MemoryCacheCapacity
+    {
+        get => CueWindow.Capacity;
+        set => CueWindow.Capacity = value;
+    }
+
     public long SurfaceVersion;
 
     public StreamBinding<SubtitleStreamInfo>? Selected { get; set; }
@@ -175,6 +181,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     public void Reset()
     {
         PacketQueue.Clear();
+        CueWindow.Reset();
 
         Source.Reset();
         Decoder.Reset();
@@ -369,6 +376,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                 }
 
                 CueWindow.SeekTo(epoch, epochGate.SeekPosition + epochGate.ReadOffset);
+                RenderNode.Wake();
                 continue;
             }
 
@@ -552,7 +560,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
             return OperationResult.Failure("The subtitle decoder returned no cues.");
         }
 
-        CueWindow.Add(epoch, cues, _timeline.Position, discardStale: !Renderer.HasComponent);
+        CueWindow.Add(epoch, cues, _timeline.Position, readerIsTheFloor: !Renderer.HasComponent);
         if (cues.Count > 0)
         {
             RenderNode.Wake();

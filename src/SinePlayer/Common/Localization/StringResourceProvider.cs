@@ -369,6 +369,7 @@ public class StringResourceProvider
     public string Stretch => GetResourceString("Stretch");
     public string StretchMethod => GetResourceString("StretchMethod");
     public string Subtitle => GetResourceString("Subtitle");
+    public string SubtitleBufferCapacity => GetResourceString("SubtitleBufferCapacity");
     public string SubtitleForced => GetResourceString("SubtitleForced");
     public string SubtitleTypeBitmap => GetResourceString("SubtitleTypeBitmap");
     public string SubtitleTypeText => GetResourceString("SubtitleTypeText");

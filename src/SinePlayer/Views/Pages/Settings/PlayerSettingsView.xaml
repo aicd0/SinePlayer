@@ -540,6 +540,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock
@@ -587,6 +588,32 @@
                 SpinButtonPlacementMode="Inline"
                 ValueChanged="FrameQueueCapacityNumberBox_ValueChanged"
                 Value="{x:Bind ViewModel.FrameQueueCapacity, Mode=OneWay}" />
+
+            <TextBlock
+                Grid.Row="2"
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Text="{x:Bind StringResource.SubtitleBufferCapacity}"
+                TextWrapping="Wrap" />
+            <StackPanel
+                Grid.Row="2"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="6">
+                <NumberBox
+                    x:Name="SubtitleMemoryCacheCapacityNumberBox"
+                    MinWidth="120"
+                    HorizontalAlignment="Left"
+                    LargeChange="256"
+                    Maximum="4096"
+                    Minimum="8"
+                    SmallChange="8"
+                    SpinButtonPlacementMode="Inline"
+                    ValueChanged="SubtitleMemoryCacheCapacityNumberBox_ValueChanged"
+                    Value="{x:Bind ViewModel.SubtitleMemoryCacheCapacity, Mode=OneWay}" />
+                <TextBlock VerticalAlignment="Center" Text="MB" />
+            </StackPanel>
         </Grid>
     </StackPanel>
 
