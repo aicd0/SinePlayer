@@ -590,6 +590,12 @@ $files</value>
   <data name="FontWeight" xml:space="preserve">
     <value>Font weight</value>
   </data>
+  <data name="Fonts" xml:space="preserve">
+    <value>Fonts</value>
+  </data>
+  <data name="FontsDescription" xml:space="preserve">
+    <value>Manage external fonts source</value>
+  </data>
   <data name="FrameBufferCapacity" xml:space="preserve">
     <value>Frame buffer capacity</value>
   </data>
@@ -685,6 +691,9 @@ $files</value>
   </data>
   <data name="Images" xml:space="preserve">
     <value>Images</value>
+  </data>
+  <data name="ImportFonts" xml:space="preserve">
+    <value>Import fonts</value>
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>Include hidden items</value>
@@ -837,6 +846,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   <data name="NoFavorite.Text" xml:space="preserve">
     <value>Your favorites appears here</value>
   </data>
+  <data name="NoFontsImported" xml:space="preserve">
+    <value>No fonts imported</value>
+  </data>
   <data name="NoHistory.Text" xml:space="preserve">
     <value>Your browsing history appears here</value>
   </data>
@@ -878,6 +890,9 @@ By clicking "Proceed", you confirm that you understand the risks and want to con
   </data>
   <data name="OpenFile" xml:space="preserve">
     <value>Open file</value>
+  </data>
+  <data name="OpenFontsFolder" xml:space="preserve">
+    <value>Open fonts folder</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Open home page</value>
@@ -1192,7 +1207,7 @@ Start in Safe Mode?</value>
   <data name="Select" xml:space="preserve">
     <value>Select</value>
   </data>
-  <data name="SelectAllAppBarButton.Label" xml:space="preserve">
+  <data name="SelectAll" xml:space="preserve">
     <value>Select all</value>
   </data>
   <data name="SelectAudioTrack" xml:space="preserve">

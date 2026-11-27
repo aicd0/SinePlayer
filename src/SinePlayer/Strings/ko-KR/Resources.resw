@@ -590,6 +590,12 @@ $files</value>
   <data name="FontWeight" xml:space="preserve">
     <value>글꼴 두께</value>
   </data>
+  <data name="Fonts" xml:space="preserve">
+    <value>글꼴</value>
+  </data>
+  <data name="FontsDescription" xml:space="preserve">
+    <value>외부 글꼴 원본 관리</value>
+  </data>
   <data name="FrameBufferCapacity" xml:space="preserve">
     <value>프레임 버퍼 용량</value>
   </data>
@@ -685,6 +691,9 @@ $files</value>
   </data>
   <data name="Images" xml:space="preserve">
     <value>이미지</value>
+  </data>
+  <data name="ImportFonts" xml:space="preserve">
+    <value>글꼴 가져오기</value>
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>숨겨진 항목 포함</value>
@@ -837,6 +846,9 @@ $files</value>
   <data name="NoFavorite.Text" xml:space="preserve">
     <value>즐겨찾기가 여기에 표시됩니다</value>
   </data>
+  <data name="NoFontsImported" xml:space="preserve">
+    <value>가져온 글꼴이 없습니다</value>
+  </data>
   <data name="NoHistory.Text" xml:space="preserve">
     <value>귀하의 검색 기록이 여기에 표시됩니다.</value>
   </data>
@@ -878,6 +890,9 @@ $files</value>
   </data>
   <data name="OpenFile" xml:space="preserve">
     <value>파일 열기</value>
+  </data>
+  <data name="OpenFontsFolder" xml:space="preserve">
+    <value>글꼴 폴더 열기</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>홈페이지 열기</value>
@@ -1192,7 +1207,7 @@ $plugins</value>
   <data name="Select" xml:space="preserve">
     <value>선택하다</value>
   </data>
-  <data name="SelectAllAppBarButton.Label" xml:space="preserve">
+  <data name="SelectAll" xml:space="preserve">
     <value>모두 선택</value>
   </data>
   <data name="SelectAudioTrack" xml:space="preserve">

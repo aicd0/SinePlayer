@@ -934,6 +934,33 @@ internal static class AppSettingsModel
         }
     }
 
+    public static List<string> EnabledFonts
+    {
+        get
+        {
+            return _db.Read(model =>
+            {
+                List<string> fonts = [];
+                if (model.EnabledFonts is not null)
+                {
+                    foreach (string? font in model.EnabledFonts)
+                    {
+                        if (!string.IsNullOrEmpty(font))
+                        {
+                            fonts.Add(font);
+                        }
+                    }
+                }
+                return fonts;
+            });
+        }
+        set
+        {
+            _db.Write(model => model.EnabledFonts = [.. value]);
+            _db.Save();
+        }
+    }
+
     public static List<string> MediaFolders
     {
         get
@@ -1261,6 +1288,9 @@ internal static class AppSettingsModel
 
         [JsonPropertyName("CloseLastTabBehavior")]
         public string? CloseLastTabBehavior { get; set; }
+
+        [JsonPropertyName("EnabledFonts")]
+        public List<string?>? EnabledFonts { get; set; }
 
         [JsonPropertyName("MediaFolders")]
         public List<string?>? MediaFolders { get; set; }

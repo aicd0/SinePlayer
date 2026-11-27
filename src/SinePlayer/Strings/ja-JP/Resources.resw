@@ -590,6 +590,12 @@ $files</value>
   <data name="FontWeight" xml:space="preserve">
     <value>フォントの太さ</value>
   </data>
+  <data name="Fonts" xml:space="preserve">
+    <value>フォント</value>
+  </data>
+  <data name="FontsDescription" xml:space="preserve">
+    <value>外部フォントのソースを管理します</value>
+  </data>
   <data name="FrameBufferCapacity" xml:space="preserve">
     <value>フレームバッファ容量</value>
   </data>
@@ -685,6 +691,9 @@ $files</value>
   </data>
   <data name="Images" xml:space="preserve">
     <value>画像</value>
+  </data>
+  <data name="ImportFonts" xml:space="preserve">
+    <value>フォントをインポート</value>
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>非表示の項目を含める</value>
@@ -837,6 +846,9 @@ $files</value>
   <data name="NoFavorite.Text" xml:space="preserve">
     <value>お気に入りはここに表示されます</value>
   </data>
+  <data name="NoFontsImported" xml:space="preserve">
+    <value>インポートされたフォントはありません</value>
+  </data>
   <data name="NoHistory.Text" xml:space="preserve">
     <value>閲覧履歴はここに表示されます</value>
   </data>
@@ -878,6 +890,9 @@ $files</value>
   </data>
   <data name="OpenFile" xml:space="preserve">
     <value>ファイルを開く</value>
+  </data>
+  <data name="OpenFontsFolder" xml:space="preserve">
+    <value>フォントフォルダーを開く</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>ホームページを開く</value>
@@ -1192,7 +1207,7 @@ $plugins</value>
   <data name="Select" xml:space="preserve">
     <value>選ぶ</value>
   </data>
-  <data name="SelectAllAppBarButton.Label" xml:space="preserve">
+  <data name="SelectAll" xml:space="preserve">
     <value>すべて選択</value>
   </data>
   <data name="SelectAudioTrack" xml:space="preserve">

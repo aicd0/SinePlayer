@@ -3,7 +3,6 @@
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
-using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Backends.Null;
@@ -42,15 +41,13 @@ internal sealed partial class NullSubtitleRenderer : ISubtitleRenderer
         }
     }
 
-    public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
+    public OperationResult Configure(SubtitleRenderSetup setup)
     {
         return OperationResult.Success();
     }
 
     public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePresentation presentation)
     {
-        ArgumentNullException.ThrowIfNull(cues);
-
         // The cues are the pipeline's and valid only for this call, so what is kept is a copy of the text.
         List<string> texts = [];
         foreach (SubtitleCue cue in cues)

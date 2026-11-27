@@ -159,6 +159,8 @@ public class StringResourceProvider
     public string FontStyleNormal => GetResourceString("FontStyleNormal");
     public string FontStyleOblique => GetResourceString("FontStyleOblique");
     public string FontWeight => GetResourceString("FontWeight");
+    public string Fonts => GetResourceString("Fonts");
+    public string FontsDescription => GetResourceString("FontsDescription");
     public string FrameBufferCapacity => GetResourceString("FrameBufferCapacity");
     public string FrameRate => GetResourceString("FrameRate");
     public string FunctionAverage => GetResourceString("FunctionAverage");
@@ -190,6 +192,7 @@ public class StringResourceProvider
     public string ImageMemoryCacheCapacity => GetResourceString("ImageMemoryCacheCapacity");
     public string ImageSaturation => GetResourceString("ImageSaturation");
     public string Images => GetResourceString("Images");
+    public string ImportFonts => GetResourceString("ImportFonts");
     public string IncludeHiddenItems => GetResourceString("IncludeHiddenItems");
     public string IncreaseFontSize => GetResourceString("IncreaseFontSize");
     public string InstallPlugin => GetResourceString("InstallPlugin");
@@ -229,6 +232,7 @@ public class StringResourceProvider
     public string Next => GetResourceString("Next");
     public string No => GetResourceString("No");
     public string NoContent => GetResourceString("NoContent");
+    public string NoFontsImported => GetResourceString("NoFontsImported");
     public string NoKeyboardShortcuts => GetResourceString("NoKeyboardShortcuts");
     public string NoMediaHint => GetResourceString("NoMediaHint");
     public string NoPluginsInstalled => GetResourceString("NoPluginsInstalled");
@@ -241,6 +245,7 @@ public class StringResourceProvider
     public string Opacity => GetResourceString("Opacity");
     public string Open => GetResourceString("Open");
     public string OpenFile => GetResourceString("OpenFile");
+    public string OpenFontsFolder => GetResourceString("OpenFontsFolder");
     public string OpenHomePage => GetResourceString("OpenHomePage");
     public string OpenInCurrentTab => GetResourceString("OpenInCurrentTab");
     public string OpenInLastActivePlayerTab => GetResourceString("OpenInLastActivePlayerTab");
@@ -340,6 +345,7 @@ public class StringResourceProvider
     public string SeekBackward => GetResourceString("SeekBackward");
     public string SeekForward => GetResourceString("SeekForward");
     public string Select => GetResourceString("Select");
+    public string SelectAll => GetResourceString("SelectAll");
     public string SelectAudioTrack => GetResourceString("SelectAudioTrack");
     public string SelectSubtitleTrack => GetResourceString("SelectSubtitleTrack");
     public string SelectVideoTrack => GetResourceString("SelectVideoTrack");

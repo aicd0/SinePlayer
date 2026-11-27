@@ -27,6 +27,7 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
     private TimeSpan _lastPacketSpan = TimeSpan.Zero;
 
     private readonly AtomicCell<SubtitlePresentation> _presentation = new(SubtitlePresentation.Identity);
+    private readonly AtomicCell<string[]> _fontPaths = new([]);
     private volatile IVideoChain? _layoutVideoChain;
     private IVideoRenderTarget? _target;
     private volatile bool _starved;
@@ -127,6 +128,12 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
             _layoutVideoChain = value;
             RenderNode.Wake();
         }
+    }
+
+    public IReadOnlyList<string> FontPaths
+    {
+        get => _fontPaths.Read();
+        set => _fontPaths.Write(_ => [.. value]);
     }
 
     public long MemoryCacheCapacity
@@ -254,7 +261,13 @@ internal sealed class SubtitleChain : ISubtitleChain, IChainFeed, IPipelineWakeT
                 renderer = rendererResolved.Result;
                 if (renderer is not null)
                 {
-                    OperationResult configured = renderer.Component.Configure(subtitleStream, subtitleSource.Info.Attachments, subtitleTarget);
+                    OperationResult configured = renderer.Component.Configure(new()
+                    {
+                        Stream = subtitleStream,
+                        Attachments = subtitleSource.Info.Attachments,
+                        FontPaths = FontPaths,
+                        Target = subtitleTarget,
+                    });
                     if (!configured.IsSuccessful)
                     {
                         return OperationResult<ChainChange>.Failure(configured.Message);

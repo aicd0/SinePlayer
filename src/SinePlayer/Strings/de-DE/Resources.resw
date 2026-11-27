@@ -590,6 +590,12 @@ $files</value>
   <data name="FontWeight" xml:space="preserve">
     <value>Schriftstärke</value>
   </data>
+  <data name="Fonts" xml:space="preserve">
+    <value>Schriftarten</value>
+  </data>
+  <data name="FontsDescription" xml:space="preserve">
+    <value>Externe Schriftartquelle verwalten</value>
+  </data>
   <data name="FrameBufferCapacity" xml:space="preserve">
     <value>Frame-Puffer-Kapazität</value>
   </data>
@@ -685,6 +691,9 @@ $files</value>
   </data>
   <data name="Images" xml:space="preserve">
     <value>Bilder</value>
+  </data>
+  <data name="ImportFonts" xml:space="preserve">
+    <value>Schriftarten importieren</value>
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>Versteckte Elemente einschließen</value>
@@ -837,6 +846,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   <data name="NoFavorite.Text" xml:space="preserve">
     <value>Ihre Favoriten erscheinen hier</value>
   </data>
+  <data name="NoFontsImported" xml:space="preserve">
+    <value>Keine Schriftarten importiert</value>
+  </data>
   <data name="NoHistory.Text" xml:space="preserve">
     <value>Ihr Browserverlauf wird hier angezeigt</value>
   </data>
@@ -878,6 +890,9 @@ Mit einem Klick auf „Fortfahren“ bestätigen Sie, dass Sie die Risiken verst
   </data>
   <data name="OpenFile" xml:space="preserve">
     <value>Datei öffnen</value>
+  </data>
+  <data name="OpenFontsFolder" xml:space="preserve">
+    <value>Schriftartenordner öffnen</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Startseite öffnen</value>
@@ -1192,7 +1207,7 @@ Im abgesicherten Modus starten?</value>
   <data name="Select" xml:space="preserve">
     <value>Wählen</value>
   </data>
-  <data name="SelectAllAppBarButton.Label" xml:space="preserve">
+  <data name="SelectAll" xml:space="preserve">
     <value>Alles auswählen</value>
   </data>
   <data name="SelectAudioTrack" xml:space="preserve">

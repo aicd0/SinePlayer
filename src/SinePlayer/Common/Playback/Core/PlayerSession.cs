@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 
 using SinePlayer.Common.Misc;
+using SinePlayer.Common.Storage;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
@@ -923,16 +924,16 @@ internal sealed partial class PlayerSession : IDisposable
 
     private void ApplySettings(ISubtitleChain chain)
     {
-        if (chain.SelectedStream is not { } stream)
-        {
-            return;
-        }
+        chain.FontPaths = SubtitleFontFolder.ReadEnabledPaths();
 
-        PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Subtitle, stream);
-        settings.ToComponents().ApplySubtitle(chain);
-        chain.MemoryCacheCapacity = AppSettingsModel.SubtitleMemoryCacheCapacity;
-        chain.Presentation = settings.Subtitle.ToPresentation() with { Insets = _subtitleInsets };
-        chain.Offset = OffsetOf(settings.Subtitle.Sync);
+        if (chain.SelectedStream is { } stream)
+        {
+            PlayerSettingsModel settings = SettingsOf(MediaStreamKind.Subtitle, stream);
+            settings.ToComponents().ApplySubtitle(chain);
+            chain.MemoryCacheCapacity = AppSettingsModel.SubtitleMemoryCacheCapacity;
+            chain.Presentation = settings.Subtitle.ToPresentation() with { Insets = _subtitleInsets };
+            chain.Offset = OffsetOf(settings.Subtitle.Sync);
+        }
     }
 
     private static TimeSpan OffsetOf(double seconds)

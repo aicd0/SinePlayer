@@ -590,6 +590,12 @@ $files</value>
   <data name="FontWeight" xml:space="preserve">
     <value>Graisse de police</value>
   </data>
+  <data name="Fonts" xml:space="preserve">
+    <value>Polices</value>
+  </data>
+  <data name="FontsDescription" xml:space="preserve">
+    <value>Gérer la source des polices externes</value>
+  </data>
   <data name="FrameBufferCapacity" xml:space="preserve">
     <value>Capacité de mémoire tampon d’images</value>
   </data>
@@ -685,6 +691,9 @@ $files</value>
   </data>
   <data name="Images" xml:space="preserve">
     <value>Images</value>
+  </data>
+  <data name="ImportFonts" xml:space="preserve">
+    <value>Importer des polices</value>
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>Inclure les éléments masqués</value>
@@ -837,6 +846,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   <data name="NoFavorite.Text" xml:space="preserve">
     <value>Vos favoris apparaîtront ici</value>
   </data>
+  <data name="NoFontsImported" xml:space="preserve">
+    <value>Aucune police importée</value>
+  </data>
   <data name="NoHistory.Text" xml:space="preserve">
     <value>Votre historique de navigation sera affiché ici</value>
   </data>
@@ -878,6 +890,9 @@ En cliquant sur « Continuer », vous confirmez que vous comprenez les risques e
   </data>
   <data name="OpenFile" xml:space="preserve">
     <value>Ouvrir un fichier</value>
+  </data>
+  <data name="OpenFontsFolder" xml:space="preserve">
+    <value>Ouvrir le dossier des polices</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Ouvrir la page d’accueil</value>
@@ -1192,7 +1207,7 @@ Démarrer en mode sans échec ?</value>
   <data name="Select" xml:space="preserve">
     <value>Sélectionner</value>
   </data>
-  <data name="SelectAllAppBarButton.Label" xml:space="preserve">
+  <data name="SelectAll" xml:space="preserve">
     <value>Tout sélectionner</value>
   </data>
   <data name="SelectAudioTrack" xml:space="preserve">

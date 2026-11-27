@@ -590,6 +590,12 @@ $files</value>
   <data name="FontWeight" xml:space="preserve">
     <value>Grosor de la fuente</value>
   </data>
+  <data name="Fonts" xml:space="preserve">
+    <value>Fuentes</value>
+  </data>
+  <data name="FontsDescription" xml:space="preserve">
+    <value>Administrar el origen de fuentes externas</value>
+  </data>
   <data name="FrameBufferCapacity" xml:space="preserve">
     <value>Capacidad del búfer de fotogramas</value>
   </data>
@@ -685,6 +691,9 @@ $files</value>
   </data>
   <data name="Images" xml:space="preserve">
     <value>Imágenes</value>
+  </data>
+  <data name="ImportFonts" xml:space="preserve">
+    <value>Importar fuentes</value>
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>Incluir elementos ocultos</value>
@@ -837,6 +846,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   <data name="NoFavorite.Text" xml:space="preserve">
     <value>Tus favoritos aparecen aquí</value>
   </data>
+  <data name="NoFontsImported" xml:space="preserve">
+    <value>No hay fuentes importadas</value>
+  </data>
   <data name="NoHistory.Text" xml:space="preserve">
     <value>Tu historial de navegación aparece aquí</value>
   </data>
@@ -878,6 +890,9 @@ Al hacer clic en "Continuar", confirmas que entiendes los riesgos y deseas conti
   </data>
   <data name="OpenFile" xml:space="preserve">
     <value>Abrir archivo</value>
+  </data>
+  <data name="OpenFontsFolder" xml:space="preserve">
+    <value>Abrir carpeta de fuentes</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>Abrir página de inicio</value>
@@ -1192,7 +1207,7 @@ $plugins</value>
   <data name="Select" xml:space="preserve">
     <value>Seleccionar</value>
   </data>
-  <data name="SelectAllAppBarButton.Label" xml:space="preserve">
+  <data name="SelectAll" xml:space="preserve">
     <value>Seleccionar todo</value>
   </data>
   <data name="SelectAudioTrack" xml:space="preserve">

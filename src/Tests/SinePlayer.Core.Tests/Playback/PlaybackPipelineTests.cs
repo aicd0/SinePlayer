@@ -1,4 +1,4 @@
-﻿// Copyright (c) aicd0. All rights reserved.
+// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
 using System.Collections.Concurrent;
@@ -2919,11 +2919,11 @@ public partial class PlaybackPipelineTests
 
         public bool Disposed { get; private set; }
 
-        public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
+        public OperationResult Configure(SubtitleRenderSetup setup)
         {
-            ConfiguredStream = stream;
-            ConfiguredAttachments = (List<MediaAttachment>)[.. attachments];
-            Target = target;
+            ConfiguredStream = setup.Stream;
+            ConfiguredAttachments = (List<MediaAttachment>)[.. setup.Attachments];
+            Target = setup.Target;
             return OperationResult.Success();
         }
 

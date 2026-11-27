@@ -82,6 +82,17 @@
                         </settings:SettingExpander.InnerContent>
                     </settings:SettingExpander>
 
+                    <!--  Fonts  -->
+                    <settings:SettingExpander
+                        Detail="{x:Bind StringResource.FontsDescription}"
+                        Glyph="&#xE8D2;"
+                        Header="{x:Bind StringResource.Fonts}"
+                        IsExpanded="False">
+                        <settings:SettingExpander.InnerContent>
+                            <settings:FontsSettingsView x:Name="FontsSettingsSection" />
+                        </settings:SettingExpander.InnerContent>
+                    </settings:SettingExpander>
+
                     <!--  Appearance  -->
                     <settings:SettingExpander
                         x:Uid="AppearanceExpander"

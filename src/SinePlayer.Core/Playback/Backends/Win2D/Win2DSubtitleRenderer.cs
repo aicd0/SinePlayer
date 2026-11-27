@@ -5,7 +5,6 @@ using Microsoft.Graphics.Canvas;
 
 using SinePlayer.Core.Common.ErrorHandling;
 using SinePlayer.Core.Playback.Abstractions.Decode;
-using SinePlayer.Core.Playback.Abstractions.Info;
 using SinePlayer.Core.Playback.Abstractions.Render;
 
 namespace SinePlayer.Core.Playback.Backends.Win2D;
@@ -37,7 +36,7 @@ internal sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
         }
     }
 
-    public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
+    public OperationResult Configure(SubtitleRenderSetup setup)
     {
         if (_disposed)
         {
@@ -52,7 +51,7 @@ internal sealed partial class Win2DSubtitleRenderer : ISubtitleRenderer
             previous.Leave(this);
         }
 
-        var layer = Win2DSubtitleLayer.Join(target, this);
+        var layer = Win2DSubtitleLayer.Join(setup.Target, this);
         _layer = layer;
         return layer.EnsureSurface();
     }

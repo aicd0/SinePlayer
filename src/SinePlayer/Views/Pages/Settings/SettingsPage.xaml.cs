@@ -66,6 +66,7 @@ internal sealed partial class SettingsPage : BasePage
         GeneralSettingsSection.Initialize(ViewModel.Shared);
         MediaSourceSettingsSection.Initialize(this, ViewModel.Shared);
         PlayerSettingsSection.Initialize(ViewModel.Shared);
+        FontsSettingsSection.Initialize(ViewModel.Shared);
         AppearanceSettingsSection.Initialize(ViewModel.Shared);
         KeyboardShortcutSettingsSection.Initialize(this, ViewModel.Shared);
         PluginSettingsSection.Initialize(ViewModel.Shared);

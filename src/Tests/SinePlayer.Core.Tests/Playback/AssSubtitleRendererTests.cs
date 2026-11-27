@@ -37,7 +37,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -71,7 +71,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -112,7 +112,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -174,7 +174,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), (List<MediaAttachment>)[attachment], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), (List<MediaAttachment>)[attachment], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -194,7 +194,7 @@ public class AssSubtitleRendererTests
         Assert.That(withAttachment, Is.GreaterThan(0), "the cue is drawn with the attached font available");
 
         // The same renderer, configured with a set of its own: libass keeps the fonts it was built with, so this rebuilds.
-        OperationResult reconfigured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult reconfigured = renderer.Configure(Setup(Stream("ass"), [], target));
         Assert.That(reconfigured.IsSuccessful, Is.True, reconfigured.Message);
 
         OperationResult drawnAgain = renderer.Show((List<SubtitleCue>)[cue], TimeSpan.FromSeconds(1), SubtitlePresentation.Identity);
@@ -203,6 +203,16 @@ public class AssSubtitleRendererTests
     }
 
     /// <summary>A font every Windows installation has, as the bytes of a real face rather than a made-up payload.</summary>
+    private static SubtitleRenderSetup Setup(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
+    {
+        return new SubtitleRenderSetup
+        {
+            Stream = stream,
+            Attachments = attachments,
+            FontPaths = [],
+            Target = target,
+        };
+    }
     private static string? FindSystemFont()
     {
         string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Fonts");
@@ -247,7 +257,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -291,7 +301,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -387,7 +397,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -432,7 +442,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -476,7 +486,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -523,7 +533,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -575,7 +585,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");
@@ -626,7 +636,7 @@ public class AssSubtitleRendererTests
         using AssSubtitleRenderer renderer = new();
         FakeTarget target = new(640, 360);
 
-        OperationResult configured = renderer.Configure(Stream("ass"), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream("ass"), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine cannot load or drive libass: {configured.Message}");

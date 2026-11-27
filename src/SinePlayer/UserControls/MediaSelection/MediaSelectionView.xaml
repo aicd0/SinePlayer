@@ -134,10 +134,10 @@
             Visibility="{x:Bind ViewModel.IsSelectMode, Mode=OneWay}">
             <StackPanel Margin="6,0" Orientation="Horizontal">
                 <AppBarToggleButton
-                    x:Uid="SelectAllAppBarButton"
                     Click="SelectAllButton_Click"
                     Icon="SelectAll"
-                    IsChecked="{x:Bind ViewModel.IsCommandBarSelectAllToggled, Mode=OneWay}" />
+                    IsChecked="{x:Bind ViewModel.IsCommandBarSelectAllToggled, Mode=OneWay}"
+                    Label="{x:Bind StringResource.SelectAll}" />
                 <AppBarSeparator />
                 <AppBarButton
                     Click="FavoriteButton_Click"

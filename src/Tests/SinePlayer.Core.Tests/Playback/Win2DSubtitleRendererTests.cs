@@ -63,7 +63,7 @@ public class Win2DSubtitleRendererTests
         RecordingTarget target = new(640, 360, 1.0);
         using Win2DSubtitleRenderer renderer = new();
 
-        OperationResult configured = renderer.Configure(Stream(), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream(), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
@@ -99,7 +99,7 @@ public class Win2DSubtitleRendererTests
         RecordingTarget target = new(320, 180, 1.0);
         using Win2DSubtitleRenderer renderer = new();
 
-        OperationResult configured = renderer.Configure(Stream(), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream(), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
@@ -115,7 +115,7 @@ public class Win2DSubtitleRendererTests
         RecordingTarget target = new(640, 360, 1.0);
         using Win2DSubtitleRenderer renderer = new();
 
-        OperationResult configured = renderer.Configure(Stream(), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream(), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
@@ -157,7 +157,7 @@ public class Win2DSubtitleRendererTests
         RecordingTarget target = new(400, 200, 1.0);
         using Win2DSubtitleRenderer renderer = new();
 
-        OperationResult configured = renderer.Configure(Stream(), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream(), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");
@@ -552,6 +552,16 @@ public class Win2DSubtitleRendererTests
     }
 
     /// <summary>The rightmost column of the drawing that carries exactly the colour given, or -1 when it carries none.</summary>
+    private static SubtitleRenderSetup Setup(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
+    {
+        return new SubtitleRenderSetup
+        {
+            Stream = stream,
+            Attachments = attachments,
+            FontPaths = [],
+            Target = target,
+        };
+    }
     private static int RightOfColour(CanvasDevice device, int width, int height, SubtitlePresentation presentation, Color colour)
     {
         byte[] pixels = RenderInk(device, width, height, presentation);
@@ -1399,7 +1409,7 @@ public class Win2DSubtitleRendererTests
         RecordingTarget target = new(640, 360, 1.0);
         using Win2DSubtitleRenderer renderer = new();
 
-        OperationResult configured = renderer.Configure(Stream(), [], target);
+        OperationResult configured = renderer.Configure(Setup(Stream(), [], target));
         if (!configured.IsSuccessful)
         {
             Assert.Ignore($"This machine has no usable graphics device: {configured.Message}");

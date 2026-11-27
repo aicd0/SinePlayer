@@ -588,6 +588,12 @@
   <data name="FontWeight" xml:space="preserve">
     <value>字型粗細</value>
   </data>
+  <data name="Fonts" xml:space="preserve">
+    <value>字型</value>
+  </data>
+  <data name="FontsDescription" xml:space="preserve">
+    <value>管理外部字型來源</value>
+  </data>
   <data name="FrameBufferCapacity" xml:space="preserve">
     <value>影格緩衝容量</value>
   </data>
@@ -683,6 +689,9 @@
   </data>
   <data name="Images" xml:space="preserve">
     <value>圖片</value>
+  </data>
+  <data name="ImportFonts" xml:space="preserve">
+    <value>匯入字型</value>
   </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>包含隱藏項目</value>
@@ -835,6 +844,9 @@
   <data name="NoFavorite.Text" xml:space="preserve">
     <value>您的收藏會顯示在此處</value>
   </data>
+  <data name="NoFontsImported" xml:space="preserve">
+    <value>沒有匯入的字型</value>
+  </data>
   <data name="NoHistory.Text" xml:space="preserve">
     <value>您的瀏覽記錄會顯示在此處</value>
   </data>
@@ -876,6 +888,9 @@
   </data>
   <data name="OpenFile" xml:space="preserve">
     <value>打開檔案</value>
+  </data>
+  <data name="OpenFontsFolder" xml:space="preserve">
+    <value>開啟字型資料夾</value>
   </data>
   <data name="OpenHomePage" xml:space="preserve">
     <value>開啟首頁</value>
@@ -1190,7 +1205,7 @@ $plugins</value>
   <data name="Select" xml:space="preserve">
     <value>選擇</value>
   </data>
-  <data name="SelectAllAppBarButton.Label" xml:space="preserve">
+  <data name="SelectAll" xml:space="preserve">
     <value>全選</value>
   </data>
   <data name="SelectAudioTrack" xml:space="preserve">

@@ -17,5 +17,7 @@ public interface ISubtitleChain : IPlaybackChain<SubtitleStreamInfo>
 
     IVideoChain? LayoutVideoChain { get; set; }
 
+    IReadOnlyList<string> FontPaths { get; set; }
+
     long MemoryCacheCapacity { get; set; }
 }

@@ -15,6 +15,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using SinePlayer.Common.BaseUI;
 using SinePlayer.Common.BaseUI.PageAbilities;
 using SinePlayer.Common.Playback.Surface;
+using SinePlayer.Common.Storage;
 using SinePlayer.Common.Utils;
 using SinePlayer.Core.Common.DebugTools;
 using SinePlayer.Core.Common.ErrorHandling;
@@ -446,6 +447,7 @@ internal sealed partial class PlaybackLabPage : BasePage
         IVideoChain video = await pipeline.AddVideoChain(_videoRenderTarget);
         IAudioChain audio = await pipeline.AddAudioChain();
         ISubtitleChain subtitle = await pipeline.AddSubtitleChain(_subtitleRenderTarget);
+        subtitle.FontPaths = SubtitleFontFolder.ReadEnabledPaths();
         subtitle.LayoutVideoChain = video;
 
         ApplyComponentSelection<IVideoDecoderFactory>(pipeline, VideoDecoderPicker.SelectedItem as ComponentChoice);

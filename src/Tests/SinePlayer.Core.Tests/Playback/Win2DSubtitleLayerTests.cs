@@ -80,7 +80,14 @@ public class Win2DSubtitleLayerTests
     {
         SubtitleStreamInfo stream = new() { Index = 2, CodecId = "subrip" };
 
-        OperationResult configured = renderer.Configure(stream, [], target);
+        SubtitleRenderSetup setup = new()
+        {
+            Stream = stream,
+            Attachments = [],
+            FontPaths = [],
+            Target = target,
+        };
+        OperationResult configured = renderer.Configure(setup);
         return configured.IsSuccessful;
     }
 

@@ -34,7 +34,9 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
     private IntPtr _track;
 
     private List<MediaAttachment> _attachments = [];
+    private string[] _fontPaths = [];
     private bool _fontsConfigured;
+    private bool _externalFontsAdded;
 
     private string? _builtScript;
     private string? _header;
@@ -60,33 +62,31 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         _surface.Dispose();
     }
 
-    public OperationResult Configure(SubtitleStreamInfo stream, IReadOnlyList<MediaAttachment> attachments, IVideoRenderTarget target)
+    public OperationResult Configure(SubtitleRenderSetup setup)
     {
-        ArgumentNullException.ThrowIfNull(stream);
-        ArgumentNullException.ThrowIfNull(attachments);
-        ArgumentNullException.ThrowIfNull(target);
-
         if (_disposed)
         {
             return OperationResult.Failure("The subtitle renderer has already been disposed.");
         }
 
-        if (_header is not null && !string.Equals(_header, stream.ScriptHeader, StringComparison.Ordinal))
+        if (_header is not null && !string.Equals(_header, setup.Stream.ScriptHeader, StringComparison.Ordinal))
         {
             // A different stream's styles: the track built from the old header describes cues that are not this track's.
             ReleaseTrack();
         }
 
-        // libass takes the fonts it is given when its font provider is built, once, as the renderer is created: a set that
-        // does not match the one this renderer holds means a renderer built for a different file.
-        if (!SameAttachments(attachments))
+        if (!IsSameConfiguration(setup.Attachments, setup.FontPaths))
         {
+            // libass takes the fonts it is given when its font provider is built, once, as the renderer is created: a setup that
+            // does not match the one this renderer holds means a renderer built for a different file or a different choice of
+            // fonts from the host.
             ReleaseRenderer();
         }
 
-        _attachments = [.. attachments];
-        _header = stream.ScriptHeader;
-        _surface.BindTarget(target);
+        _attachments = [.. setup.Attachments];
+        _fontPaths = [.. setup.FontPaths];
+        _header = setup.Stream.ScriptHeader;
+        _surface.BindTarget(setup.Target);
 
         OperationResult sized = _surface.EnsureSurface();
         if (!sized.IsSuccessful)
@@ -99,8 +99,6 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 
     public OperationResult Show(IReadOnlyList<SubtitleCue> cues, TimeSpan position, SubtitlePresentation presentation)
     {
-        ArgumentNullException.ThrowIfNull(cues);
-
         if (_disposed)
         {
             return OperationResult.Failure("The subtitle renderer has already been disposed.");
@@ -235,7 +233,9 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         }
 
         _fontsConfigured = false;
+        _externalFontsAdded = false;
         _attachments = [];
+        _fontPaths = [];
     }
 
     /// <summary>
@@ -261,6 +261,11 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         }
 
         _builtScript = script;
+
+        // After the script, not before: the fonts a file carries in its [Fonts] section are taken out of it while the
+        // track is parsed, and the folder's fonts are added behind them, so a name both carry resolves to the file's own.
+        AddExternalFonts();
+
         return OperationResult.Success();
     }
 
@@ -374,7 +379,7 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
 
     #endregion
 
-    #region Attachment
+    #region Fonts
 
     /// <summary>
     /// Hands libass the fonts the file carries, before it builds the font provider that will look them up: a font added
@@ -412,12 +417,45 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         }
     }
 
+    private void AddExternalFonts()
+    {
+        if (_externalFontsAdded)
+        {
+            return;
+        }
+
+        _externalFontsAdded = true;
+        if (_fontPaths.Length == 0)
+        {
+            return;
+        }
+
+        int added = 0;
+        foreach (string path in _fontPaths)
+        {
+            string name = Path.GetFileName(path);
+            try
+            {
+                byte[] data = File.ReadAllBytes(path);
+                LibassNative.ass_add_font(_library, name, data, data.Length);
+                added++;
+            }
+            catch (Exception ex)
+            {
+                PlaybackLogger.W(TAG, $"The font '{name}' could not be given to libass: {ex.Message}");
+            }
+        }
+
+        PlaybackLogger.I(TAG, $"{added} font(s) from the fonts folder are available to the script");
+    }
+
     private static bool IsFont(MediaAttachment attachment)
     {
         string? mimeType = attachment.MimeType;
         if (!string.IsNullOrEmpty(mimeType))
         {
-            return mimeType.Contains("truetype", StringComparison.OrdinalIgnoreCase) ||
+            return
+                mimeType.Contains("truetype", StringComparison.OrdinalIgnoreCase) ||
                 mimeType.Contains("opentype", StringComparison.OrdinalIgnoreCase) ||
                 mimeType.Contains("font", StringComparison.OrdinalIgnoreCase);
         }
@@ -430,7 +468,7 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
     }
 
     /// <summary>Whether the renderer holds exactly the fonts it was built with, which is what makes it reusable.</summary>
-    private bool SameAttachments(IReadOnlyList<MediaAttachment> attachments)
+    private bool IsSameConfiguration(IReadOnlyList<MediaAttachment> attachments, IReadOnlyList<string> fontPaths)
     {
         if (!_fontsConfigured)
         {
@@ -438,7 +476,7 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
             return true;
         }
 
-        if (_attachments.Count != attachments.Count)
+        if (_attachments.Count != attachments.Count || _fontPaths.Length != fontPaths.Count)
         {
             return false;
         }
@@ -447,6 +485,14 @@ internal sealed partial class AssSubtitleRenderer : ISubtitleRenderer
         {
             if (!string.Equals(_attachments[i].Name, attachments[i].Name, StringComparison.Ordinal) ||
                 _attachments[i].Data.Length != attachments[i].Data.Length)
+            {
+                return false;
+            }
+        }
+
+        for (int i = 0; i < fontPaths.Count; i++)
+        {
+            if (!string.Equals(_fontPaths[i], fontPaths[i], StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
