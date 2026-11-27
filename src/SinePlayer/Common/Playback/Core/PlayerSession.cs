@@ -25,6 +25,7 @@ using SinePlayer.Core.Playback.Abstractions.Source;
 using SinePlayer.Core.Playback.Backends.FFmpeg;
 using SinePlayer.Core.Playback.Backends.Remix;
 using SinePlayer.Core.Playback.Hosting;
+using SinePlayer.Core.Test;
 using SinePlayer.Data.Models.Media;
 using SinePlayer.Data.Models.Misc;
 using SinePlayer.Data.Models.Playback;
@@ -1088,8 +1089,7 @@ internal sealed partial class PlayerSession : IDisposable
         }
 
         string? folder = Path.GetDirectoryName(mediaPath);
-        string stem = Path.GetFileNameWithoutExtension(mediaPath);
-        if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(stem))
+        if (string.IsNullOrEmpty(folder))
         {
             return [];
         }
@@ -1106,7 +1106,7 @@ internal sealed partial class PlayerSession : IDisposable
                         continue;
                     }
 
-                    if (string.Equals(Path.GetFileNameWithoutExtension(path), stem, StringComparison.OrdinalIgnoreCase))
+                    if (SubtitleFileNameHelper.HasSameSubtitleBaseName(path, mediaPath))
                     {
                         found.Add(path);
                     }
