@@ -695,6 +695,9 @@ $files</value>
   <data name="ImportFonts" xml:space="preserve">
     <value>Импорт шрифтов</value>
   </data>
+  <data name="IncludeCollectionMediaItems" xml:space="preserve">
+    <value>Включать медиафайлы из коллекций</value>
+  </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>Включить скрытые элементы</value>
   </data>

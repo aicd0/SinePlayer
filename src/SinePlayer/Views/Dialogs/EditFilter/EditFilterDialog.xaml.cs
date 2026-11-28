@@ -142,6 +142,12 @@ internal sealed partial class EditFilterDialog : BaseContentDialog
         ViewModel.SetIncludeHiddenItems(isChecked);
     }
 
+    private void IncludeCollectionMediaCheckBox_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        bool isChecked = ((CheckBox)sender).IsChecked ?? false;
+        ViewModel.SetIncludeCollectionMedia(isChecked);
+    }
+
     private void SaveViewSettingsCheckBox_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         bool isChecked = ((CheckBox)sender).IsChecked ?? false;

@@ -98,6 +98,10 @@
             Content="{x:Bind StringResource.IncludeHiddenItems}"
             IsChecked="{x:Bind ViewModel.IncludeHiddenItems, Mode=TwoWay}" />
         <CheckBox
+            Click="IncludeCollectionMediaCheckBox_Click"
+            Content="{x:Bind StringResource.IncludeCollectionMediaItems}"
+            IsChecked="{x:Bind ViewModel.IncludeCollectionMedia, Mode=TwoWay}" />
+        <CheckBox
             Click="SaveViewSettingsCheckBox_Click"
             Content="{x:Bind StringResource.SaveViewSettings}"
             IsChecked="{x:Bind ViewModel.SaveViewSettings, Mode=TwoWay}" />

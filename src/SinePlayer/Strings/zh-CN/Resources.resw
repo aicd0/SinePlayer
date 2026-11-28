@@ -695,6 +695,9 @@ $files</value>
   <data name="ImportFonts" xml:space="preserve">
     <value>导入字体</value>
   </data>
+  <data name="IncludeCollectionMediaItems" xml:space="preserve">
+    <value>包含合集内的媒体</value>
+  </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>包含隐藏项目</value>
   </data>

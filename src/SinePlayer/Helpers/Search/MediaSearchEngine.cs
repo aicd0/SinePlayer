@@ -29,7 +29,7 @@ internal class MediaSearchEngine
     public string SearchText { get; set; } = string.Empty;
     public string Expression { get; set; } = string.Empty;
     public bool IncludeHidden { get; set; } = false;
-    public bool ExcludeInCollectionMedia { get; set; } = false;
+    public bool IncludeInCollectionMedia { get; set; } = true;
     public ICondition? CustomCondition { get; set; } = null;
 
     public void SetResultCallback(Action<IReadOnlyList<MediaModel>>? callback)
@@ -149,7 +149,7 @@ internal class MediaSearchEngine
     {
         string searchText = SearchText;
         bool includeHidden = IncludeHidden;
-        bool excludeInCollectionMedia = ExcludeInCollectionMedia;
+        bool includeInCollectionMedia = IncludeInCollectionMedia;
         ICondition? expressionCondition = ParseExpression(Expression);
         ICondition? customCondition = CustomCondition;
 
@@ -162,12 +162,9 @@ internal class MediaSearchEngine
         var matches = new List<Match>();
         await MediaHandle.Enqueue(() =>
         {
-            HashSet<long> matchedIds = [];
-            HashSet<long> matchedCollectionIds = [];
             SelectCommand command = SelectCommand.Create(MediaTable.Instance)
                 .AppendCondition(MediaHandle.CreateLibraryCondition());
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
-            IReaderToken<long> typeToken = command.PutQueryInt64(MediaTable.ColumnType);
             IReaderToken<string> title1Token = command.PutQueryString(MediaTable.ColumnTitle1);
             IReaderToken<string> title2Token = command.PutQueryString(MediaTable.ColumnTitle2);
 
@@ -184,6 +181,11 @@ internal class MediaSearchEngine
             if (customCondition is not null)
             {
                 command.AppendCondition(customCondition);
+            }
+
+            if (!includeInCollectionMedia)
+            {
+                command.AppendCondition(CreateExcludeInCollectionsCondition());
             }
 
             using SelectCommand.IReader reader = command.Execute();
@@ -203,23 +205,12 @@ internal class MediaSearchEngine
                     }
                 }
 
-                long id = idToken.GetValue();
                 matches.Add(new Match
                 {
-                    Id = id,
+                    Id = idToken.GetValue(),
                     Similarity = similarity,
                     SortTitle = title1 + " " + title2
                 });
-                matchedIds.Add(id);
-                if (typeToken.GetValue() == (long)MediaType.Collection)
-                {
-                    matchedCollectionIds.Add(id);
-                }
-            }
-
-            if (excludeInCollectionMedia && matchedCollectionIds.Count > 0)
-            {
-                ExcludeMediaInMatchedCollections(matches, matchedIds, matchedCollectionIds);
             }
 
             return true;
@@ -239,29 +230,11 @@ internal class MediaSearchEngine
         return ids;
     }
 
-    private static void ExcludeMediaInMatchedCollections(List<Match> matches, HashSet<long> matchedIds, HashSet<long> matchedCollectionIds)
+    private static ICondition CreateExcludeInCollectionsCondition()
     {
-        HashSet<long> containedMediaIds = [];
-        foreach (IEnumerable<long> collectionIdChunk in SqlUtils.ChunkBy(matchedCollectionIds))
-        {
-            SelectCommand command = SelectCommand.Create(MediaCollectionTable.Instance)
-                .AppendCondition(new InCondition(ColumnOrValue.FromColumn(MediaCollectionTable.ColumnCollectionId), collectionIdChunk));
-            IReaderToken<long> mediaIdToken = command.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
-            using SelectCommand.IReader reader = command.Execute();
-            while (reader.Read())
-            {
-                long mediaId = mediaIdToken.GetValue();
-                if (matchedIds.Contains(mediaId))
-                {
-                    containedMediaIds.Add(mediaId);
-                }
-            }
-        }
-
-        if (containedMediaIds.Count > 0)
-        {
-            matches.RemoveAll(x => containedMediaIds.Contains(x.Id));
-        }
+        var subquery = SelectCommand.Create(MediaCollectionTable.Instance);
+        _ = subquery.PutQueryInt64(MediaCollectionTable.ColumnMediaId);
+        return new NotCondition(new InCondition(ColumnOrValue.FromColumn(MediaTable.ColumnId), subquery));
     }
 
     private class Match

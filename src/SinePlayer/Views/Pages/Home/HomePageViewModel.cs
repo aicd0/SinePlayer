@@ -74,7 +74,6 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
     public void Initialize(ActionHandler actionHandler, string? filterJson)
     {
         _actionHandler = actionHandler;
-        _searchEngine.ExcludeInCollectionMedia = true;
         _searchEngine.SetResultCallback(OnMediaSearchResult);
         _filterSettingsModel = MediaFilterModel.Instance.GetModel() ?? new();
 
@@ -512,7 +511,9 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
         }
 
         // Update mediaItems
-        if (_searchEngine.Expression == filter.Expression && _searchEngine.IncludeHidden == filter.IncludeHiddenItems)
+        if (_searchEngine.Expression == filter.Expression &&
+            _searchEngine.IncludeHidden == filter.IncludeHiddenItems &&
+            _searchEngine.IncludeInCollectionMedia == filter.IncludeCollectionMedia)
         {
             ScheduleDisplayMedia();
         }
@@ -520,6 +521,7 @@ internal partial class HomePageViewModel : INotifyPropertyChanged
         {
             _searchEngine.Expression = filter.Expression;
             _searchEngine.IncludeHidden = filter.IncludeHiddenItems;
+            _searchEngine.IncludeInCollectionMedia = filter.IncludeCollectionMedia;
             ScheduleUpdateMedia();
         }
     }

@@ -193,6 +193,7 @@ public class StringResourceProvider
     public string ImageSaturation => GetResourceString("ImageSaturation");
     public string Images => GetResourceString("Images");
     public string ImportFonts => GetResourceString("ImportFonts");
+    public string IncludeCollectionMediaItems => GetResourceString("IncludeCollectionMediaItems");
     public string IncludeHiddenItems => GetResourceString("IncludeHiddenItems");
     public string IncreaseFontSize => GetResourceString("IncreaseFontSize");
     public string InstallPlugin => GetResourceString("InstallPlugin");

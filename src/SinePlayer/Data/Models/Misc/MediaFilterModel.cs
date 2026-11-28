@@ -127,6 +127,7 @@ class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
         public IReadOnlySet<string> CollapsedGroups { get; set; } = FrozenSet<string>.Empty;
         public ViewTypeEnum ViewType { get; set; } = ViewTypeEnum.LargeLandscape;
         public bool IncludeHiddenItems { get; set; } = false;
+        public bool IncludeCollectionMedia { get; set; } = false;
         public bool SaveViewSettings { get; set; } = false;
         public bool SaveSortingAndGroupingSettings { get; set; } = true;
         public bool MergeSingleItemGroups { get; set; } = false;
@@ -154,6 +155,7 @@ class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
                 CollapsedGroups = [.. CollapsedGroups],
                 ViewType = ViewTypeToString(ViewType),
                 IncludeHiddenItems = IncludeHiddenItems,
+                IncludeCollectionMedia = IncludeCollectionMedia,
                 SaveViewSettings = SaveViewSettings,
                 SaveSortingAndGroupingSettings = SaveSortingAndGroupingSettings,
                 MergeSingleItemGroups = MergeSingleItemGroups,
@@ -183,6 +185,7 @@ class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
                 ViewType = string.IsNullOrEmpty(model.ViewType) ?
                     defaultModel.ViewType : StringToViewType(model.ViewType),
                 IncludeHiddenItems = model.IncludeHiddenItems ?? defaultModel.IncludeHiddenItems,
+                IncludeCollectionMedia = model.IncludeCollectionMedia ?? defaultModel.IncludeCollectionMedia,
                 SaveViewSettings = model.SaveViewSettings ?? defaultModel.SaveViewSettings,
                 SaveSortingAndGroupingSettings = model.SaveSortingAndGroupingSettings ?? defaultModel.SaveSortingAndGroupingSettings,
                 MergeSingleItemGroups = model.MergeSingleItemGroups ?? defaultModel.MergeSingleItemGroups,
@@ -330,6 +333,9 @@ class MediaFilterModel : JsonDatabase<MediaFilterModel.JsonModel>
 
         [JsonPropertyName("GroupSortingProperty")]
         public JsonNode? GroupSortingProperty { get; set; }
+
+        [JsonPropertyName("IncludeCollectionMedia")]
+        public bool? IncludeCollectionMedia { get; set; }
 
         [JsonPropertyName("IncludeHiddenItems")]
         public bool? IncludeHiddenItems { get; set; }

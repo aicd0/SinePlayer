@@ -693,6 +693,9 @@
   <data name="ImportFonts" xml:space="preserve">
     <value>匯入字型</value>
   </data>
+  <data name="IncludeCollectionMediaItems" xml:space="preserve">
+    <value>包含合集內的媒體</value>
+  </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>包含隱藏項目</value>
   </data>

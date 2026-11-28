@@ -695,6 +695,9 @@ $files</value>
   <data name="ImportFonts" xml:space="preserve">
     <value>글꼴 가져오기</value>
   </data>
+  <data name="IncludeCollectionMediaItems" xml:space="preserve">
+    <value>컬렉션의 미디어 포함</value>
+  </data>
   <data name="IncludeHiddenItems" xml:space="preserve">
     <value>숨겨진 항목 포함</value>
   </data>

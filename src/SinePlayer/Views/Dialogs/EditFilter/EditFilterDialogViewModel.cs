@@ -63,6 +63,17 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         }
     }
 
+    private bool _includeCollectionMedia = false;
+    public bool IncludeCollectionMedia
+    {
+        get => _includeCollectionMedia;
+        set
+        {
+            _includeCollectionMedia = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IncludeCollectionMedia)));
+        }
+    }
+
     private bool _saveViewSettings = false;
     public bool SaveViewSettings
     {
@@ -132,6 +143,17 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
         }
 
         filter.IncludeHiddenItems = includeHiddenItems;
+    }
+
+    public void SetIncludeCollectionMedia(bool includeCollectionMedia)
+    {
+        MediaFilterModel.ExternalFilterModel? filter = _filter;
+        if (filter is null)
+        {
+            return;
+        }
+
+        filter.IncludeCollectionMedia = includeCollectionMedia;
     }
 
     public void SetSaveViewSettings(bool save)
@@ -289,6 +311,7 @@ internal partial class EditFilterDialogViewModel : INotifyPropertyChanged
             UpdateExpression(filter.Expression);
             ExpressionLiveData.Emit(filter.Expression);
             IncludeHiddenItems = filter.IncludeHiddenItems;
+            IncludeCollectionMedia = filter.IncludeCollectionMedia;
             SaveViewSettings = filter.SaveViewSettings;
             SaveSortingAndGroupingSettings = filter.SaveSortingAndGroupingSettings;
         }

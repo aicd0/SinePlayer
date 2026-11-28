@@ -73,7 +73,6 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
     public void Initialize(ActionHandler actionHandler)
     {
         _actionHandler = actionHandler;
-        _searchEngine.ExcludeInCollectionMedia = true;
         _searchEngine.SetResultCallback(OnMediaSearchResult);
     }
 
@@ -207,6 +206,7 @@ internal partial class FilterPresetsPageViewModel : INotifyPropertyChanged
 
         _searchEngine.Expression = selectedFilter.Expression;
         _searchEngine.IncludeHidden = selectedFilter.IncludeHiddenItems;
+        _searchEngine.IncludeInCollectionMedia = selectedFilter.IncludeCollectionMedia;
         _searchEngine.Update();
     }
 
