@@ -24,7 +24,6 @@ internal class MediaSearchEngine
     private int _updateSubmitted = 0;
 
     private Action<IReadOnlyList<MediaModel>>? _resultCallback = null;
-    private readonly List<MediaModel> _mediaItems = [];
 
     public string SearchText { get; set; } = string.Empty;
     public string Expression { get; set; } = string.Empty;
@@ -84,8 +83,6 @@ internal class MediaSearchEngine
             return xIndex - yIndex;
         });
 
-        _mediaItems.Clear();
-        _mediaItems.AddRange(mediaItems);
         _resultCallback?.Invoke(mediaItems);
     }
 
@@ -209,7 +206,6 @@ internal class MediaSearchEngine
                 {
                     Id = idToken.GetValue(),
                     Similarity = similarity,
-                    SortTitle = title1 + " " + title2
                 });
             }
 
@@ -241,6 +237,5 @@ internal class MediaSearchEngine
     {
         public long Id;
         public int Similarity = 0;
-        public string SortTitle = "";
     }
 }
