@@ -20,6 +20,9 @@ Prerequisites:
   Extract the `Native` folder directly into `src/SinePlayer.Core`.
 - Open [SinePlayer.sln](src/SinePlayer.sln) in Visual Studio to build and run the Sine Player app.
 
+## Plugins
+Sine Player can be extended with plugins (written in C#). See [Sine Player Plugins](https://github.com/aicd0/SinePlayerPlugins) for more information.
+
 ## Contributing
 If Sine Player is not working properly, you can [submit an issue on GitHub](https://github.com/aicd0/SinePlayer/issues/new/choose). If you know how to fix an issue, it is also encouraged to create a [pull request](https://github.com/aicd0/SinePlayer/pulls) for it.
 

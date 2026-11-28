@@ -234,7 +234,7 @@ internal partial class PluginContext : IPluginContext
             var command = SelectCommand.Create(MediaTable.Instance);
             IReaderToken<long> idToken = command.PutQueryInt64(MediaTable.ColumnId);
             command.AppendCondition(filterCondition);
-            command.AppendCondition(MediaHandle.CreateLibraryMediaCondition());
+            command.AppendCondition(MediaHandle.CreateLibraryCondition());
             using SelectCommand.IReader reader = command.Execute();
             while (reader.Read())
             {
