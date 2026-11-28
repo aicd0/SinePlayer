@@ -382,56 +382,18 @@ public static partial class ImageLoader
         }
 
         Size originalSize = new(meta.Width, meta.Height);
+        bool isVector = await context.GetIsVector();
         CalculateDesiredDimension(
             options.DecodeWidth,
             options.DecodeHeight,
             originalSize.Width,
             originalSize.Height,
-            out bool useOriginalSize,
+            isVector,
             out Size desiredSize);
 
         // Schedule ImageSource creation
         Func<Task<DecodedImageModel>> createFunc;
         Action cleanupAction;
-        if (useOriginalSize)
-        {
-            IVectorImageService? vectorService = await context.GetVectorService();
-            if (vectorService is not null)
-            {
-                CalculateDefaultSizeForVector(originalSize.Width, originalSize.Height, out int width, out int height);
-                SoftwareBitmap? softwareBitmap = await vectorService.CreateSoftwareBitmap(width, height);
-
-                if (softwareBitmap is null)
-                {
-                    return false;
-                }
-
-                createFunc = async () =>
-                {
-                    SoftwareBitmapSource source = new();
-                    await source.SetBitmapAsync(softwareBitmap);
-                    return new() { Source = source };
-                };
-                cleanupAction = softwareBitmap.Dispose;
-            }
-            else
-            {
-                Stream? stream = await context.GetSourceStream(request);
-                if (stream is null)
-                {
-                    return false;
-                }
-
-                createFunc = async () =>
-                {
-                    BitmapImage bitmap = new();
-                    await bitmap.SetSourceAsync(stream.AsRandomAccessStream());
-                    return new() { Source = bitmap };
-                };
-                cleanupAction = stream.Dispose;
-            }
-        }
-        else
         {
             LRUCache? imageCache = GetImageLRUCache();
             if (imageCache is null)
@@ -456,7 +418,14 @@ public static partial class ImageLoader
                 Stream? thumbnailStream = null;
                 try
                 {
-                    thumbnailStream = OpenThumbnailStreamFromCacheRecord(imageCache, record, fingerprint, originalSize, desiredSize, out List<string> cacheEntryKeys);
+                    thumbnailStream = OpenThumbnailStreamFromCacheRecord(
+                        imageCache,
+                        record,
+                        fingerprint,
+                        originalSize,
+                        desiredSize,
+                        isVector,
+                        out List<string> cacheEntryKeys);
                     if (thumbnailStream is not null)
                     {
                         Stream stream = thumbnailStream;
@@ -480,7 +449,15 @@ public static partial class ImageLoader
                         {
                             string cacheEntryKey = cacheEntryKeys[0];
                             fingerprint ??= await context.GetFingerprint();
-                            await SaveThumbnail(context, request, cacheEntryKey, fingerprint, originalSize, imageCache, record);
+                            await SaveThumbnail(
+                                context,
+                                request,
+                                cacheEntryKey,
+                                fingerprint,
+                                originalSize,
+                                isVector,
+                                imageCache,
+                                record);
                         }
 
                         IVectorImageService? vectorService = await context.GetVectorService();
@@ -557,15 +534,47 @@ public static partial class ImageLoader
         return true;
     }
 
-    private static void CalculateDesiredDimension(double frameWidth, double frameHeight,
-        double originWidth, double originHeight,
-        out bool useOriginalSize, out Size desiredSize)
+    private static void CalculateDesiredDimension(
+        double frameWidth, double frameHeight,
+        double originWidth, double originHeight, bool isVector,
+        out Size desiredSize)
     {
-        double desiredWidthRaw = Math.Min(frameWidth, originWidth);
-        double desiredHeightRaw = Math.Min(frameHeight, originHeight);
-        useOriginalSize = desiredWidthRaw >= originWidth && desiredHeightRaw >= originHeight;
-        int desiredWidth = Math.Max(1, (int)Math.Round(desiredWidthRaw));
-        int desiredHeight = Math.Max(1, (int)Math.Round(desiredHeightRaw));
+        double desiredWidthRaw;
+        double desiredHeightRaw;
+        if (isVector)
+        {
+            bool widthKnown = double.IsFinite(frameWidth);
+            bool heightKnown = double.IsFinite(frameHeight);
+            if (widthKnown && heightKnown)
+            {
+                desiredWidthRaw = frameWidth;
+                desiredHeightRaw = frameHeight;
+            }
+            else if (heightKnown)
+            {
+                desiredWidthRaw = frameHeight * originWidth / originHeight;
+                desiredHeightRaw = frameHeight;
+            }
+            else if (widthKnown)
+            {
+                desiredWidthRaw = frameWidth;
+                desiredHeightRaw = frameWidth * originHeight / originWidth;
+            }
+            else
+            {
+                CalculateDefaultSizeForVector((float)originWidth, (float)originHeight, out int width, out int height);
+                desiredWidthRaw = width;
+                desiredHeightRaw = height;
+            }
+        }
+        else
+        {
+            desiredWidthRaw = Math.Min(frameWidth, originWidth);
+            desiredHeightRaw = Math.Min(frameHeight, originHeight);
+        }
+
+        int desiredWidth = Math.Max(1, (int)Math.Round(Math.Min(desiredWidthRaw, int.MaxValue)));
+        int desiredHeight = Math.Max(1, (int)Math.Round(Math.Min(desiredHeightRaw, int.MaxValue)));
         desiredSize = new(desiredWidth, desiredHeight);
     }
 
@@ -611,10 +620,18 @@ public static partial class ImageLoader
         height = (int)targetHeight;
     }
 
-    private static Stream? OpenThumbnailStreamFromCacheRecord(LRUCache imageCache, ImageCacheDatabase.CacheRecord record, string? fingerprint,
-        SizeF originalSize, Size desiredSize, out List<string> cacheEntryKeys)
+    private static Stream? OpenThumbnailStreamFromCacheRecord(
+        LRUCache imageCache,
+        ImageCacheDatabase.CacheRecord record,
+        string? fingerprint,
+        SizeF originalSize,
+        Size desiredSize,
+        bool isVector,
+        out List<string> cacheEntryKeys)
     {
-        cacheEntryKeys = ImageCacheStrategy.CalculateCacheEntryKeys(desiredSize.Width, desiredSize.Height, originalSize);
+        long desiredResolution = (long)desiredSize.Width * desiredSize.Height;
+        long availableResolution = isVector ? long.MaxValue : (long)(originalSize.Width * originalSize.Height);
+        cacheEntryKeys = ImageCacheStrategy.CalculateCacheEntryKeys(Math.Min(desiredResolution, availableResolution));
 
         if (!ImageLoaderContext.ValidateCacheRecord(record, fingerprint))
         {
@@ -637,10 +654,17 @@ public static partial class ImageLoader
         return null;
     }
 
-    private static async Task SaveThumbnail(ImageLoaderContext context, ImageLoaderScheduler.Request request, string cacheEntryKey, string fingerprint,
-        Size originalSize, LRUCache imageCache, ImageCacheDatabase.CacheRecord record)
+    private static async Task SaveThumbnail(
+        ImageLoaderContext context,
+        ImageLoaderScheduler.Request request,
+        string cacheEntryKey,
+        string fingerprint,
+        Size originalSize,
+        bool isVector,
+        LRUCache imageCache,
+        ImageCacheDatabase.CacheRecord record)
     {
-        if (!CalculateDesiredThumbnailSize(cacheEntryKey, originalSize, out Size thumbnailSize))
+        if (!CalculateDesiredThumbnailSize(cacheEntryKey, originalSize, isVector, out Size thumbnailSize))
         {
             return;
         }
@@ -740,7 +764,7 @@ public static partial class ImageLoader
         return softwareBitmap;
     }
 
-    private static bool CalculateDesiredThumbnailSize(string cacheEntryKey, Size originalSize, out Size thumbnailSize)
+    private static bool CalculateDesiredThumbnailSize(string cacheEntryKey, Size originalSize, bool isVector, out Size thumbnailSize)
     {
         thumbnailSize = new();
 
@@ -751,7 +775,7 @@ public static partial class ImageLoader
         }
 
         double sourceResolution = originalSize.Width * originalSize.Height;
-        if (sourceResolution <= cacheResolution)
+        if (!isVector && sourceResolution <= cacheResolution)
         {
             thumbnailSize = originalSize;
             return true;

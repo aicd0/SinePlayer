@@ -11,6 +11,8 @@ public interface IImageConnection : IDisposable
 
     string Fingerprint { get; }
 
+    bool IsVector { get; }
+
     Task<Stream?> OpenImageStream();
 
     IVectorImageService? OpenVectorService();

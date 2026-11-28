@@ -26,7 +26,7 @@ public class BgraFrameConverterTests
         var buffer = FrameBuffer.CreatePacked(4, 1, pixels);
         using RawVideoFrame frame = Frame(buffer, 4, 1, PixelFormat.Bgra8);
 
-        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, maxEdge: 8, new VideoOrientation(0, false));
+        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, new VideoOrientation(0, false));
 
         Assert.That(thumbnail, Is.Not.Null);
         byte[] converted = thumbnail.Pixels;
@@ -57,7 +57,7 @@ public class BgraFrameConverterTests
         var buffer = FrameBuffer.CreatePacked(4, 2, pixels);
         using RawVideoFrame frame = Frame(buffer, 4, 2, PixelFormat.Bgra8);
 
-        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, maxEdge: 8, new VideoOrientation(1, false));
+        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, new VideoOrientation(1, false));
 
         Assert.That(thumbnail, Is.Not.Null);
         using (Assert.EnterMultipleScope())
@@ -83,7 +83,7 @@ public class BgraFrameConverterTests
         var buffer = FrameBuffer.CreatePacked(4, 2, pixels);
         using RawVideoFrame frame = Frame(buffer, 4, 2, PixelFormat.Bgra8);
 
-        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, maxEdge: 8, new VideoOrientation(2, false));
+        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, new VideoOrientation(2, false));
 
         Assert.That(thumbnail, Is.Not.Null);
         using (Assert.EnterMultipleScope())
@@ -116,8 +116,8 @@ public class BgraFrameConverterTests
         var buffer = FrameBuffer.CreatePacked(4, 2, pixels);
         using RawVideoFrame frame = Frame(buffer, 4, 2, PixelFormat.Bgra8);
 
-        MediaThumbnail? mirror = BgraFrameConverter.TryConvert(frame, maxEdge: 8, new VideoOrientation(0, true));
-        MediaThumbnail? turnedAndMirrored = BgraFrameConverter.TryConvert(frame, maxEdge: 8, new VideoOrientation(1, true));
+        MediaThumbnail? mirror = BgraFrameConverter.TryConvert(frame, new VideoOrientation(0, true));
+        MediaThumbnail? turnedAndMirrored = BgraFrameConverter.TryConvert(frame, new VideoOrientation(1, true));
 
         Assert.That(mirror, Is.Not.Null);
         Assert.That(turnedAndMirrored, Is.Not.Null);
@@ -143,7 +143,7 @@ public class BgraFrameConverterTests
         buffer.FillPlane(2, 128);
         using RawVideoFrame frame = Frame(buffer, 2, 2, PixelFormat.Yuv420P);
 
-        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, maxEdge: 8, new VideoOrientation(0, false));
+        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, new VideoOrientation(0, false));
 
         Assert.That(thumbnail, Is.Not.Null);
         Assert.That(Red(thumbnail, 0, 0), Is.EqualTo(255).Within(2));
@@ -163,7 +163,7 @@ public class BgraFrameConverterTests
         buffer.FillPlane10(2, 512);
         using RawVideoFrame frame = Frame(buffer, 2, 2, PixelFormat.Yuv420P10);
 
-        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, maxEdge: 8, new VideoOrientation(0, false));
+        MediaThumbnail? thumbnail = BgraFrameConverter.TryConvert(frame, new VideoOrientation(0, false));
 
         Assert.That(thumbnail, Is.Not.Null);
         using (Assert.EnterMultipleScope())
@@ -180,7 +180,7 @@ public class BgraFrameConverterTests
         var buffer = FrameBuffer.CreatePacked(4, 1, new byte[16]);
         using RawVideoFrame frame = Frame(buffer, 4, 1, PixelFormat.Unknown);
 
-        Assert.That(BgraFrameConverter.TryConvert(frame, maxEdge: 8, new VideoOrientation(0, false)), Is.Null);
+        Assert.That(BgraFrameConverter.TryConvert(frame, new VideoOrientation(0, false)), Is.Null);
     }
 
     private static byte Red(MediaThumbnail thumbnail, int x, int y)

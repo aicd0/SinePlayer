@@ -9,22 +9,18 @@ using SinePlayer.Core.Playback.Abstractions.Render;
 namespace SinePlayer.Core.Playback.Thumbnails;
 
 /// <summary>
-/// Turns one decoded frame into a small <c>BGRA8</c> picture. The frame is sampled straight out of its planes, so the
-/// picture is produced at its final size — a 4K frame never becomes a 4K buffer on the way. Downscaling averages the
-/// source pixels a destination pixel covers, which is what keeps thin lines from shimmering away.
+/// Turns one decoded frame into a <c>BGRA8</c> picture, sampled straight out of its planes, at the frame's own
+/// resolution and turned upright.
 /// </summary>
 internal static unsafe class BgraFrameConverter
 {
-    /// <summary>Samples taken per axis inside one destination pixel; more samples would cost time nothing shows.</summary>
-    private const int MaxBoxSamples = 4;
-
     /// <summary>
-    /// The picture, turned upright, with its longest edge at most <paramref name="maxEdge"/>. Null when the frame is
-    /// in a layout this does not read, which a caller has to treat as "no thumbnail" rather than as an error.
+    /// The picture, turned upright and at the frame's own size. Null when the frame is in a layout this does not
+    /// read, which a caller has to treat as "no thumbnail" rather than as an error.
     /// </summary>
-    internal static MediaThumbnail? TryConvert(RawVideoFrame frame, int maxEdge, VideoOrientation orientation)
+    internal static MediaThumbnail? TryConvert(RawVideoFrame frame, VideoOrientation orientation)
     {
-        if (frame.IsHardwareBacked || frame.Buffer is not IPlanarVideoBuffer buffer || maxEdge <= 0)
+        if (frame.IsHardwareBacked || frame.Buffer is not IPlanarVideoBuffer buffer)
         {
             return null;
         }
@@ -42,17 +38,11 @@ internal static unsafe class BgraFrameConverter
 
         Sampler source = created.GetValueOrDefault();
 
-        double scale = Math.Min(1.0, (double)maxEdge / Math.Max(frame.Width, frame.Height));
-        int scaleWidth = Math.Max(1, (int)Math.Round(frame.Width * scale));
-        int scaleHeight = Math.Max(1, (int)Math.Round(frame.Height * scale));
-
         bool isQuarterTurn = orientation.SwapsAxes;
-        int width = isQuarterTurn ? scaleHeight : scaleWidth;
-        int height = isQuarterTurn ? scaleWidth : scaleHeight;
+        int width = isQuarterTurn ? frame.Height : frame.Width;
+        int height = isQuarterTurn ? frame.Width : frame.Height;
 
         byte[] pixels = new byte[width * height * 4];
-        double stepX = (double)frame.Width / scaleWidth;
-        double stepY = (double)frame.Height / scaleHeight;
 
         fixed (byte* destination = pixels)
         {
@@ -64,34 +54,34 @@ internal static unsafe class BgraFrameConverter
                     // The mirror is applied after the turn, so it is undone before it: what is turned back here is the
                     // picture as it was stored, not the mirrored one.
                     int turnedX = orientation.Mirrored ? width - 1 - x : x;
-                    int scaleX;
-                    int scaleY;
+                    int sourceX;
+                    int sourceY;
                     switch (orientation.RotationDegrees)
                     {
                         case 90:
-                            scaleX = y;
-                            scaleY = scaleHeight - 1 - turnedX;
+                            sourceX = y;
+                            sourceY = frame.Height - 1 - turnedX;
                             break;
                         case 180:
-                            scaleX = scaleWidth - 1 - turnedX;
-                            scaleY = scaleHeight - 1 - y;
+                            sourceX = frame.Width - 1 - turnedX;
+                            sourceY = frame.Height - 1 - y;
                             break;
                         case 270:
-                            scaleX = scaleWidth - 1 - y;
-                            scaleY = turnedX;
+                            sourceX = frame.Width - 1 - y;
+                            sourceY = turnedX;
                             break;
                         default:
-                            scaleX = turnedX;
-                            scaleY = y;
+                            sourceX = turnedX;
+                            sourceY = y;
                             break;
                     }
 
-                    source.SampleBox(scaleX, scaleY, stepX, stepY, out byte red, out byte green, out byte blue);
+                    source.Read(sourceX, sourceY, out float red, out float green, out float blue);
 
                     byte* pixel = row + (x * 4);
-                    pixel[0] = blue;
-                    pixel[1] = green;
-                    pixel[2] = red;
+                    pixel[0] = ToByte(blue);
+                    pixel[1] = ToByte(green);
+                    pixel[2] = ToByte(red);
                     pixel[3] = 255;
                 }
             }
@@ -223,7 +213,7 @@ internal static unsafe class BgraFrameConverter
         }
 
         /// <summary>The colour of the source pixel at the given position.</summary>
-        private void Read(int x, int y, out float red, out float green, out float blue)
+        internal void Read(int x, int y, out float red, out float green, out float blue)
         {
             if (_layout is Layout.Bgra or Layout.Rgba)
             {
@@ -271,52 +261,20 @@ internal static unsafe class BgraFrameConverter
             int value = _layout is Layout.SemiPlanar16 or Layout.Planar16 ? *(ushort*)position : *position;
             return value >> _bitShift;
         }
+    }
 
-        /// <summary>The average colour of the source rectangle one destination pixel covers.</summary>
-        internal void SampleBox(int scaleX, int scaleY, double stepX, double stepY, out byte red, out byte green, out byte blue)
+    private static byte ToByte(float value)
+    {
+        if (value <= 0.0F)
         {
-            int startX = (int)(scaleX * stepX);
-            int startY = (int)(scaleY * stepY);
-            int spanX = Math.Max(1, (int)((scaleX + 1) * stepX) - startX);
-            int spanY = Math.Max(1, (int)((scaleY + 1) * stepY) - startY);
-            int countX = Math.Min(spanX, MaxBoxSamples);
-            int countY = Math.Min(spanY, MaxBoxSamples);
-
-            float totalRed = 0.0F;
-            float totalGreen = 0.0F;
-            float totalBlue = 0.0F;
-            for (int i = 0; i < countY; i++)
-            {
-                int y = startY + (i * spanY / countY);
-                for (int j = 0; j < countX; j++)
-                {
-                    int x = startX + (j * spanX / countX);
-                    Read(x, y, out float sampleRed, out float sampleGreen, out float sampleBlue);
-                    totalRed += sampleRed;
-                    totalGreen += sampleGreen;
-                    totalBlue += sampleBlue;
-                }
-            }
-
-            float count = countX * countY;
-            red = ToByte(totalRed / count);
-            green = ToByte(totalGreen / count);
-            blue = ToByte(totalBlue / count);
+            return 0;
         }
 
-        private static byte ToByte(float value)
+        if (value >= 255.0F)
         {
-            if (value <= 0.0F)
-            {
-                return 0;
-            }
-
-            if (value >= 255.0F)
-            {
-                return 255;
-            }
-
-            return (byte)(value + 0.5F);
+            return 255;
         }
+
+        return (byte)(value + 0.5F);
     }
 }

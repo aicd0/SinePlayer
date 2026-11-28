@@ -1,8 +1,6 @@
 ﻿// Copyright (c) aicd0. All rights reserved.
 // Licensed under the GNU General Public License v3.0 or later.
 
-using System.Drawing;
-
 namespace SinePlayer.Core.Imaging;
 
 internal static class ImageCacheStrategy
@@ -12,24 +10,16 @@ internal static class ImageCacheStrategy
     private const int CACHE_ENTRY_RESOLUTION_100K = 100000;
     private const int CACHE_ENTRY_RESOLUTION_300K = 300000;
 
-    public static List<string> CalculateCacheEntryKeys(int desiredWidth, int desiredHeight, SizeF originalSize)
+    public static List<string> CalculateCacheEntryKeys(long requiredResolution)
     {
         List<string> keys = [];
 
-        int desiredResolution = desiredWidth * desiredHeight;
-        double originResolution = originalSize.Width * originalSize.Height;
-
-        if (desiredResolution >= originResolution)
-        {
-            return keys;
-        }
-
-        if (desiredResolution <= CACHE_ENTRY_RESOLUTION_100K)
+        if (requiredResolution <= CACHE_ENTRY_RESOLUTION_100K)
         {
             keys.Add(CACHE_ENTRY_KEY_100K);
         }
 
-        if (desiredResolution <= CACHE_ENTRY_RESOLUTION_300K)
+        if (requiredResolution <= CACHE_ENTRY_RESOLUTION_300K)
         {
             keys.Add(CACHE_ENTRY_KEY_300K);
         }

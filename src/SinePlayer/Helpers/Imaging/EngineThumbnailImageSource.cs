@@ -22,7 +22,6 @@ namespace SinePlayer.Helpers.Imaging;
 internal sealed partial class EngineThumbnailImageSource : IImageSource
 {
     private const string TAG = nameof(EngineThumbnailImageSource);
-    private const int THUMBNAIL_MAX_EDGE = 400;
 
     private static readonly ConcurrentDictionary<string, byte> sFailures = [];
 
@@ -64,8 +63,7 @@ internal sealed partial class EngineThumbnailImageSource : IImageSource
                 new FFmpegSourceProviderFactory(),
                 new FFmpegVideoDecoderFactory(),
                 MediaLocator.Parse(path),
-                position: null,
-                THUMBNAIL_MAX_EDGE);
+                position: null);
             if (!extracted.IsSuccessful)
             {
                 Logger.W(TAG, $"Unable to draw a thumbnail for '{path}': {extracted.ErrorMessage}");
@@ -114,6 +112,8 @@ internal sealed partial class EngineThumbnailImageSource : IImageSource
         public string CacheKey => uri;
 
         public string Fingerprint => FileUtils.GetFileSignature(path);
+
+        public bool IsVector => false;
 
         public void Dispose()
         {

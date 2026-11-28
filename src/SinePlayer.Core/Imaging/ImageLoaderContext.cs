@@ -226,6 +226,12 @@ public sealed partial class ImageLoaderContext(IImageSource source) : IDisposabl
         return _fingerprint;
     }
 
+    internal async Task<bool> GetIsVector()
+    {
+        IImageConnection? connection = await GetConnection();
+        return connection is not null && connection.IsVector;
+    }
+
     internal async Task<IVectorImageService?> GetVectorService()
     {
         if (_vectorService is not null)

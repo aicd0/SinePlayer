@@ -85,6 +85,8 @@ internal sealed partial class WindowsThumbnailImageSource : IImageSource
 
         public string Fingerprint => FileUtils.GetFileSignature(path);
 
+        public bool IsVector => false;
+
         public void Dispose()
         {
         }

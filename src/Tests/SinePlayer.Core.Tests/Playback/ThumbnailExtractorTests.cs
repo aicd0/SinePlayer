@@ -10,14 +10,12 @@ namespace SinePlayer.Core.Tests.Playback;
 
 /// <summary>
 /// Draws posters out of real files. The pictures a shell thumbnail can give are out of reach here — that is a Windows
-/// service — so what is checked is the part this project owns: that a frame comes out of a file, at the size asked
-/// for, in the shape the video has.
+/// service — so what is checked is the part this project owns: that a frame comes out of a file, at the video's own
+/// size and in its own shape.
 /// </summary>
 [TestFixture]
 public class ThumbnailExtractorTests
 {
-    private const int MaxEdge = 320;
-
     [OneTimeSetUp]
     public void OneTimeSetUp()
     {
@@ -31,38 +29,19 @@ public class ThumbnailExtractorTests
         string path = RawAudioVideoFixtureFile.Create();
         try
         {
-            OperationResult<MediaThumbnail> extracted = Extract(path, MaxEdge);
+            OperationResult<MediaThumbnail> extracted = Extract(path);
 
             Assert.That(extracted.IsSuccessful, Is.True, extracted.ErrorMessage);
             MediaThumbnail thumbnail = extracted.Result;
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(Math.Max(thumbnail.Width, thumbnail.Height), Is.EqualTo(MaxEdge), "the longest edge is the size asked for");
-                Assert.That(thumbnail.Width, Is.GreaterThan(thumbnail.Height), "the fixture is a landscape picture");
-                Assert.That((double)thumbnail.Width / thumbnail.Height, Is.EqualTo(320.0 / 180.0).Within(0.02), "the shape is the video's, not a fixed one");
+                Assert.That(thumbnail.Width, Is.EqualTo(320), "the picture is the video's own size");
+                Assert.That(thumbnail.Height, Is.EqualTo(180));
                 Assert.That(thumbnail.Pixels, Has.Length.EqualTo(thumbnail.Width * thumbnail.Height * 4));
                 Assert.That(thumbnail.Stride, Is.EqualTo(thumbnail.Width * 4));
                 Assert.That(thumbnail.Pixels, Has.Some.Not.EqualTo(0), "the picture has pixels in it");
             }
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    [Test]
-    public void NeverEnlargesAPictureSmallerThanTheSizeAskedFor()
-    {
-        string path = RawAudioVideoFixtureFile.Create();
-        try
-        {
-            OperationResult<MediaThumbnail> extracted = Extract(path, maxEdge: 1920);
-
-            Assert.That(extracted.IsSuccessful, Is.True, extracted.ErrorMessage);
-            Assert.That(extracted.Result.Width, Is.EqualTo(320), "a small video is not blown up to the size asked for");
-            Assert.That(extracted.Result.Height, Is.EqualTo(180));
         }
         finally
         {
@@ -77,7 +56,7 @@ public class ThumbnailExtractorTests
         WriteSilentWaveFile(path);
         try
         {
-            OperationResult<MediaThumbnail> extracted = Extract(path, MaxEdge);
+            OperationResult<MediaThumbnail> extracted = Extract(path);
 
             Assert.That(extracted.IsSuccessful, Is.False);
             Assert.That(extracted.ErrorMessage, Does.Contain("no video stream"));
@@ -91,7 +70,7 @@ public class ThumbnailExtractorTests
     [Test]
     public void ReportsAFileThatDoesNotOpen()
     {
-        OperationResult<MediaThumbnail> extracted = Extract(@"Z:\nowhere\missing-file.mkv", MaxEdge);
+        OperationResult<MediaThumbnail> extracted = Extract(@"Z:\nowhere\missing-file.mkv");
 
         Assert.That(extracted.IsSuccessful, Is.False, "a file that cannot be opened is a failure, not an exception");
     }
@@ -110,8 +89,7 @@ public class ThumbnailExtractorTests
                 new FFmpegSourceProviderFactory(),
                 new FFmpegVideoDecoderFactory(),
                 MediaLocator.Parse(path),
-                TimeSpan.FromSeconds(30),
-                MaxEdge);
+                TimeSpan.FromSeconds(30));
 
             Assert.That(extracted.IsSuccessful, Is.True, extracted.ErrorMessage);
             Assert.That(extracted.Result.Width, Is.EqualTo(VideoFixtureFile.Width));
@@ -123,14 +101,13 @@ public class ThumbnailExtractorTests
         }
     }
 
-    private static OperationResult<MediaThumbnail> Extract(string path, int maxEdge)
+    private static OperationResult<MediaThumbnail> Extract(string path)
     {
         return MediaThumbnailExtractor.TryExtract(
             new FFmpegSourceProviderFactory(),
             new FFmpegVideoDecoderFactory(),
             MediaLocator.Parse(path),
-            position: null,
-            maxEdge);
+            position: null);
     }
 
     private static void WriteSilentWaveFile(string path)

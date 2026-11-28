@@ -8,6 +8,7 @@
 ## Coding
 
 - Always ask before introducing anything new: a new pattern, a new design, new behavior, a new coding style, a new dependency or API.
+- If a comment you wrote disappears or gets trimmed, the user probably did it. Do not restore the comment without asking.
 - Do not run the full test suite unless explicitly asked. Building x64 is the default verification.
 - No redundant API shapes: if a property is settable, do not also accept it as an `Add*(…)` parameter, and do not add a
   method that only forwards one argument. One way to say a thing.

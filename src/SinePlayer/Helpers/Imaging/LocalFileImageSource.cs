@@ -45,6 +45,8 @@ internal sealed partial class LocalFileImageSource : IImageSource
 
         public string Fingerprint => FileUtils.GetFileSignature(path);
 
+        public bool IsVector => false;
+
         public void Dispose()
         {
         }
